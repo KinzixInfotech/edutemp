@@ -1,4 +1,6 @@
-// File: src/app/api/schools/[schoolId]/students/route.js
+// src/app/api/schools/[schoolId]/students/route.js
+export const dynamic = "force-dynamic"
+
 import { PrismaClient } from "@prisma/client"
 import { NextResponse } from "next/server"
 
@@ -6,7 +8,6 @@ const prisma = new PrismaClient()
 
 export async function GET(req, context) {
     const { schoolId } = context.params
-
     if (!schoolId) {
         return NextResponse.json({ error: "School ID is required" }, { status: 400 })
     }
@@ -15,21 +16,10 @@ export async function GET(req, context) {
         const students = await prisma.student.findMany({
             where: { schoolId },
             include: {
-                user: {
-                    select: {
-                        email: true,
-                    },
-                },
-                class: {
-                    select: {
-                        name: true,
-                        section: true,
-                    },
-                },
+                user: { select: { email: true } },
+                class: { select: { name: true, section: true } }
             },
-            orderBy: {
-                studentName: 'asc',
-            },
+            orderBy: { studentName: "asc" }
         })
 
         return NextResponse.json({ students })

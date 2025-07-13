@@ -134,29 +134,29 @@ model Teacher {
 }
 
 model Student {
-  id                   String                @id @default(cuid())
-  userId               String                @unique
-  admissionNo          String                @unique
-  studentName          String
-  studentpfp           String?
-  classId              String
-  session              String
-  adhaarNo             String?
-  fatherName           String
-  motherName           String
-  fatherMobileNumber   String?
-  motherMobileNumber   String?
-  guardianName         String?
-  guardianRelation     String?
-  guardianMobileNo     String?
-  dob                  DateTime
-  gender               Gender
-  parentId             String?
-  address              String
-  bloodGroup           String?
-  schoolId             String
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  admissionNo        String   @unique
+  studentName        String
+  studentpfp         String?
+  classId            String
+  session            String
+  adhaarNo           String?
+  fatherName         String
+  motherName         String
+  fatherMobileNumber String?
+  motherMobileNumber String?
+  guardianName       String?
+  guardianRelation   String?
+  guardianMobileNo   String?
+  dob                DateTime
+  gender             Gender
+  parentId           String?
+  address            String
+  bloodGroup         String?
+  schoolId           String
+  createdAt          DateTime @default(now())
+
   user                 User                  @relation(fields: [userId], references: [id])
   class                Class?                @relation(fields: [classId], references: [id])
   parent               Parent?               @relation(fields: [parentId], references: [id])

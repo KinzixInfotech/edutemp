@@ -1,8 +1,9 @@
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
 
-const prisma = new PrismaClient();
-
+const prisma = new PrismaClient({
+    log: ['query', 'info', 'warn'],
+});
 export async function GET(req) {
     try {
         const { searchParams } = new URL(req.url);
@@ -11,42 +12,31 @@ export async function GET(req) {
         if (!email) {
             return NextResponse.json({ error: "Missing email" }, { status: 400 });
         }
+        const start = performance.now();
 
         const user = await prisma.user.findUnique({
             where: { email },
+            include: {
+                admin: true,
+                teacher: true,
+                staff: true,
+                student: true,
+            },
         });
 
+
+
+        const end = performance.now();
+        console.log(`🕒 Supabase Query took ${end - start} ms`);
         if (!user) {
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
-        let schoolId = null;
-
-        switch (user.role) {
-            case "ADMIN":
-                const admin = await prisma.admin.findUnique({ where: { userId: user.id } });
-                schoolId = admin?.schoolId;
-                break;
-
-            case "TEACHING_STAFF":
-                const teacher = await prisma.teacher.findUnique({ where: { userId: user.id } });
-                schoolId = teacher?.schoolId;
-                break;
-
-            case "NON_TEACHING_STAFF":
-                const staff = await prisma.staff.findUnique({ where: { userId: user.id } });
-                schoolId = staff?.schoolId;
-                break;
-
-            case "STUDENT":
-                const student = await prisma.student.findFirst({ where: { userId: user.id } });
-                schoolId = student?.schoolId;
-                break;
-
-            case "PARENT":
-                // You may handle parent logic here later
-                break;
-        }
+        const schoolId =
+            user.admin?.schoolId ||
+            user.teacher?.schoolId ||
+            user.staff?.schoolId ||
+            user.student?.schoolId;
 
         return NextResponse.json({
             id: user.id,
