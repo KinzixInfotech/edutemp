@@ -56,17 +56,13 @@ model School {
   staff    Staff[]
   classes  Class[]
   admins   Admin[]
-
-  @@index([email])
-  @@index([currentDomain])
-  @@index([createdAt])
 }
 
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
   password  String
-  role      Role
+  role      Role // Role must match related model: TEACHING_STAFF → Teacher, NON_TEACHING_STAFF → Staff
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -75,9 +71,6 @@ model User {
   parent  Parent?
   staff   Staff?
   admin   Admin?
-
-  @@index([role])
-  @@index([createdAt])
 }
 
 model Admin {
@@ -86,8 +79,6 @@ model Admin {
   schoolId String
   user     User   @relation(fields: [userId], references: [id])
   school   School @relation(fields: [schoolId], references: [id])
-
-  @@index([schoolId])
 }
 
 model Parent {
@@ -107,12 +98,9 @@ model Staff {
   gender      Gender
   contact     String
   address     String
-  user        User               @relation(fields: [userId], references: [id])
+  user        User               @relation(fields: [userId], references: [id]) // Role = NON_TEACHING_STAFF
   school      School             @relation(fields: [schoolId], references: [id])
   documents   EmployeeDocument[]
-
-  @@index([schoolId])
-  @@index([department])
 }
 
 model Teacher {
@@ -123,40 +111,37 @@ model Teacher {
   department  String
   designation String
   gender      Gender
-  user        User               @relation(fields: [userId], references: [id])
+  user        User               @relation(fields: [userId], references: [id]) // Role = TEACHING_STAFF
   school      School             @relation(fields: [schoolId], references: [id])
   subjects    Subject[]
   classes     Class[]
   documents   EmployeeDocument[]
-
-  @@index([schoolId])
-  @@index([employeeId])
 }
 
 model Student {
-  id                   String                @id @default(cuid())
-  userId               String                @unique
-  admissionNo          String                @unique
-  studentName          String
-  studentpfp           String?
-  classId              String
-  session              String
-  adhaarNo             String?
-  fatherName           String
-  motherName           String
-  fatherMobileNumber   String?
-  motherMobileNumber   String?
-  guardianName         String?
-  guardianRelation     String?
-  guardianMobileNo     String?
-  dob                  DateTime
-  gender               Gender
-  parentId             String?
-  address              String
-  bloodGroup           String?
-  schoolId             String
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
+  id                 String  @id @default(cuid())
+  userId             String  @unique
+  admissionNo        String  @unique
+  studentName        String
+  studentpfp         String?
+  classId            String
+  session            String
+  adhaarNo           String?
+  fatherName         String
+  motherName         String
+  fatherMobileNumber String?
+  motherMobileNumber String?
+  guardianName       String?
+  guardianRelation   String?
+  guardianMobileNo   String?
+
+  dob        DateTime
+  gender     Gender
+  parentId   String?
+  address    String
+  bloodGroup String?
+  schoolId   String
+
   user                 User                  @relation(fields: [userId], references: [id])
   class                Class?                @relation(fields: [classId], references: [id])
   parent               Parent?               @relation(fields: [parentId], references: [id])
@@ -166,11 +151,8 @@ model Student {
   feePayments          FeePayment[]
   documents            StudentDocument[]
   transportAssignments TransportAssignment[]
-  LibraryBook          LibraryBook[]
 
-  @@index([schoolId])
-  @@index([admissionNo])
-  @@index([createdAt])
+  LibraryBook LibraryBook[]
 }
 
 model StudentDocument {
@@ -182,9 +164,6 @@ model StudentDocument {
   uploadedAt DateTime @default(now())
 
   student Student @relation(fields: [studentId], references: [id])
-
-  @@index([studentId])
-  @@index([uploadedAt])
 }
 
 model EmployeeDocument {
@@ -193,12 +172,12 @@ model EmployeeDocument {
   fileUrl    String
   fileType   String
   uploadedAt DateTime @default(now())
-  teacherId  String?
-  staffId    String?
-  teacher    Teacher? @relation(fields: [teacherId], references: [id])
-  staff      Staff?   @relation(fields: [staffId], references: [id])
 
-  @@index([uploadedAt])
+  teacherId String?
+  staffId   String?
+
+  teacher Teacher? @relation(fields: [teacherId], references: [id])
+  staff   Staff?   @relation(fields: [staffId], references: [id])
 }
 
 model Class {
@@ -213,8 +192,6 @@ model Class {
   exams     Exam[]
   teacher   Teacher?    @relation(fields: [teacherId], references: [id])
   school    School      @relation(fields: [schoolId], references: [id])
-
-  @@index([schoolId])
 }
 
 model Subject {
@@ -224,8 +201,6 @@ model Subject {
   teacherId String
   teacher   Teacher     @relation(fields: [teacherId], references: [id])
   timetable Timetable[]
-
-  @@index([teacherId])
 }
 
 model Timetable {
@@ -237,9 +212,6 @@ model Timetable {
   endTime   DateTime
   class     Class    @relation(fields: [classId], references: [id])
   subject   Subject  @relation(fields: [subjectId], references: [id])
-
-  @@index([classId])
-  @@index([day])
 }
 
 model Attendance {
@@ -248,9 +220,6 @@ model Attendance {
   date      DateTime
   status    AttendanceStatus
   student   Student          @relation(fields: [studentId], references: [id])
-
-  @@index([studentId])
-  @@index([date])
 }
 
 model Exam {
@@ -260,9 +229,6 @@ model Exam {
   date    DateTime
   class   Class    @relation(fields: [classId], references: [id])
   grades  Grade[]
-
-  @@index([classId])
-  @@index([date])
 }
 
 model Grade {
@@ -273,9 +239,6 @@ model Grade {
   marks     Float
   student   Student @relation(fields: [studentId], references: [id])
   exam      Exam    @relation(fields: [examId], references: [id])
-
-  @@index([studentId])
-  @@index([examId])
 }
 
 model FeePayment {
@@ -286,10 +249,6 @@ model FeePayment {
   dueDate   DateTime
   paidDate  DateTime?
   student   Student   @relation(fields: [studentId], references: [id])
-
-  @@index([studentId])
-  @@index([status])
-  @@index([dueDate])
 }
 
 model LibraryBook {
@@ -303,9 +262,6 @@ model LibraryBook {
   issuedTo    Student?  @relation(fields: [issuedToId], references: [id])
   issuedDate  DateTime?
   dueDate     DateTime?
-
-  @@index([category])
-  @@index([issuedToId])
 }
 
 model TransportRoute {
@@ -323,9 +279,6 @@ model TransportAssignment {
   stopName  String
   student   Student        @relation(fields: [studentId], references: [id])
   route     TransportRoute @relation(fields: [routeId], references: [id])
-
-  @@index([routeId])
-  @@index([studentId])
 }
 
 model Event {
@@ -334,8 +287,6 @@ model Event {
   description String
   date        DateTime
   createdBy   String
-
-  @@index([date])
 }
 
 model Notification {
@@ -344,7 +295,4 @@ model Notification {
   message String
   date    DateTime
   target  Role
-
-  @@index([target])
-  @@index([date])
 }

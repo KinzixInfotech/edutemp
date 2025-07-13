@@ -6,14 +6,14 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import "nprogress/nprogress.css";
 import dynamic from "next/dynamic";
+import { useAuth } from "@/context/AuthContext";
 
 const TopProgressBar = dynamic(() => import("@/app/components/TopProgressBar"), {
-  ssr: false,
+    ssr: false,
 });
 export default function ClientLayout({ children }) {
     const pathname = usePathname();
-    const hideUI = ["/login", ].includes(pathname);
-
+    const hideUI = ["/login",].includes(pathname);
     return (
         <SidebarProvider
             style={{
@@ -22,7 +22,7 @@ export default function ClientLayout({ children }) {
             }}
         >
             {!hideUI && <AppSidebar variant="inset" />}
-            <TopProgressBar/>
+            <TopProgressBar />
             <SidebarInset>
                 {!hideUI && <SiteHeader />}
                 <main className="p-4 w-full h-full">{children}</main>
