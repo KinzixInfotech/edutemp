@@ -1,9 +1,6 @@
-import { PrismaClient } from "@prisma/client";
+import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
-const prisma = new PrismaClient({
-    log: ['query', 'info', 'warn'],
-});
 export async function GET(req) {
     try {
         const { searchParams } = new URL(req.url);
@@ -12,31 +9,60 @@ export async function GET(req) {
         if (!email) {
             return NextResponse.json({ error: "Missing email" }, { status: 400 });
         }
+
         const start = performance.now();
 
+        // Step 1: Fetch user only (without relations)
         const user = await prisma.user.findUnique({
             where: { email },
-            include: {
-                admin: true,
-                teacher: true,
-                staff: true,
-                student: true,
+            select: {
+                id: true,
+                email: true,
+                role: true,
             },
         });
 
-
-
-        const end = performance.now();
-        console.log(`🕒 Supabase Query took ${end - start} ms`);
         if (!user) {
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
-        const schoolId =
-            user.admin?.schoolId ||
-            user.teacher?.schoolId ||
-            user.staff?.schoolId ||
-            user.student?.schoolId;
+        let schoolId = null;
+
+        // Step 2: Fetch schoolId from corresponding model based on role
+        switch (user.role) {
+            case "ADMIN":
+                const admin = await prisma.admin.findUnique({
+                    where: { userId: user.id },
+                    select: { schoolId: true },
+                });
+                schoolId = admin?.schoolId;
+                break;
+            case "TEACHING_STAFF":
+                const teacher = await prisma.teacher.findUnique({
+                    where: { userId: user.id },
+                    select: { schoolId: true },
+                });
+                schoolId = teacher?.schoolId;
+                break;
+            case "NON_TEACHING_STAFF":
+                const staff = await prisma.staff.findUnique({
+                    where: { userId: user.id },
+                    select: { schoolId: true },
+                });
+                schoolId = staff?.schoolId;
+                break;
+            case "STUDENT":
+                const student = await prisma.student.findUnique({
+                    where: { userId: user.id },
+                    select: { schoolId: true },
+                });
+                schoolId = student?.schoolId;
+                break;
+            // Add other cases if needed (e.g., DIRECTOR, PARENT)
+        }
+
+        const end = performance.now();
+        console.log(`🕒 Query took ${end - start} ms`);
 
         return NextResponse.json({
             id: user.id,

@@ -9,6 +9,7 @@ import Link from 'next/link'
 import {
     Card, CardContent, CardHeader, CardTitle
 } from "@/components/ui/card"
+import { RefreshCcw } from "lucide-react"
 import {
     Select, SelectTrigger, SelectValue, SelectContent, SelectItem
 } from "@/components/ui/select"
@@ -54,6 +55,27 @@ export default function StudentPage() {
                 <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
                     <CardTitle className="text-xl">Student List</CardTitle>
                     <div className="flex items-center gap-2">
+                        <Button className="bg-primary w-20 transition-all  disabled:bg-gray-500 cursor-pointer  text-white" onClick={() => {
+                            setLoading(true)
+                            fetchStudents()
+                        }} disabled={loading}>
+
+                            {
+                                loading ? (
+                                    <Loader2 className="animate-spin h-4 w-4" color="black" />
+                                ) : 'Refresh'
+                            }
+                        </Button>
+                        {/* <button
+                            onClick={() => {
+                                setLoading(true)
+                                fetchStudents()
+                            }}
+                            title="Refresh students"
+                            className="hover:text-primary transition-colors"
+                        >
+                            <RefreshCcw className="h-5 w-5" />
+                        </button> */}
                         <Select onValueChange={setSelectedSession}>
                             <SelectTrigger className="w-[180px]">
                                 <SelectValue placeholder="Filter by Session" />
