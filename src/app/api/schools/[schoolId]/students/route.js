@@ -14,11 +14,11 @@ export async function GET(req, { params }) {
         const students = await prisma.student.findMany({
             where: { schoolId },
             select: {
-                id: true,
-                studentName: true,
-                session: true,
+                userId: true,
+                name: true,
+                // session: true,
                 class: {
-                    select: { name: true, section: true }
+                    select: { className: true, Section: true }
                 },
                 user: {
                     select: { email: true }

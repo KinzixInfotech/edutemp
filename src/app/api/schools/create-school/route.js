@@ -1,89 +1,152 @@
-import { PrismaClient, Role } from "@prisma/client"
-import { NextResponse } from "next/server"
-import { z } from "zod"
-import { supabaseAdmin } from "@/lib/supbase-admin"
+import { AuditAction } from "@prisma/client";
+import { supabaseAdmin } from "@/lib/supbase-admin";
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import prisma from "@/lib/prisma";
 
-const prisma = new PrismaClient()
+const schoolSchema = z
+  .object({
+    name: z.string(),
+    email: z.string().email(),
+    phone: z.string(),
+    location: z.string(),
+    profilePicture: z.string().optional(),
+    subscriptionType: z.enum(["A", "B", "C"]),
+    language: z.string(),
+    domainMode: z.enum(["tenant", "custom"]),
+    tenantName: z.string().optional(),
+    customDomain: z.string().optional().nullable(),
+    adminem: z.string().email(),
+    adminPassword: z.string().min(6),
+  })
+  .superRefine((data, ctx) => {
+    if (data.domainMode === "tenant" && !data.tenantName) {
+      ctx.addIssue({
+        path: ["tenantName"],
+        code: "custom",
+        message: "Tenant name is required when using tenant mode",
+      });
+    }
 
-const schoolSchema = z.object({
-  name: z.string(),
-  location: z.string(),
-  email: z.string(),
-  phone: z.string(),
-  logo: z.string().optional(),
-  subscriptionType: z.enum(["A", "B", "C"]),
-  language: z.string(),
-  domainMode: z.enum(["tenant", "custom"]),
-  tenantName: z.string().optional(),
-  customDomain: z.string().optional(),
-  adminem: z.string().email(),
-  adminPassword: z.string().min(6),
-})
+    if (
+      data.domainMode === "custom" &&
+      (!data.customDomain || data.customDomain.trim() === "")
+    ) {
+      ctx.addIssue({
+        path: ["customDomain"],
+        code: "custom",
+        message: "Custom domain is required when using custom mode",
+      });
+    }
+  });
 
 export async function POST(req) {
+  let createdUserId = null;
+
   try {
-    const body = await req.json()
-    const parsed = schoolSchema.parse(body)
+    const body = await req.json();
+    const parsed = schoolSchema.parse(body);
 
     const resolvedDomain =
       parsed.domainMode === "tenant"
-        ? `${parsed.tenantName?.toLowerCase().replace(/\s+/g, "")}.edubreezy.com`
-        : parsed.customDomain
+        ? `${parsed.tenantName?.toLowerCase().replace(/\s+/g, "")}.domainx.com`
+        : parsed.customDomain || "";
 
-    // 🔐 1. Create user in Supabase Auth
-    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    // Step 1: Create user in Supabase Auth
+    const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email: parsed.adminem,
       password: parsed.adminPassword,
       email_confirm: true,
-    })
+    });
 
-    if (authError || !authUser?.user?.id) {
-      throw new Error(`Supabase Auth Error: ${authError?.message || "Unknown error"}`)
+    console.log("Supabase response:", data, error);
+
+    if (error || !data?.user?.id) {
+      throw new Error(`Supabase Auth Error: ${error?.message}`);
     }
 
-    const uid = authUser.user.id
+    createdUserId = data.user.id;
 
-    // 🔄 2. Store School, User, and Admin in Prisma
+    // Step 2: Transaction to create school, user, admin, audit
     const result = await prisma.$transaction(async (tx) => {
-      const school = await tx.school.create({
+      const school = await tx.School.create({
         data: {
           name: parsed.name,
-          email: parsed.email,
-          phone: parsed.phone,
-          address: parsed.location,
-          logoUrl: parsed.logo || null,
-          subscriptionType: parsed.subscriptionType,
-          language: parsed.language,
-          currentDomain: resolvedDomain,
-          customDomain: parsed.domainMode === "custom" ? parsed.customDomain : "",
+          domain: resolvedDomain,
+          profilePicture: parsed.profilePicture || "",
+          location: parsed.location,
+          SubscriptionType: parsed.subscriptionType,
+          Language: parsed.language,
         },
-      })
+      });
 
-      await tx.user.create({
+      // Ensure ADMIN role exists or create it
+      const adminRole = await tx.Role.upsert({
+        where: { name: "ADMIN" },
+        update: {},
+        create: { name: "ADMIN" },
+      });
+
+      const user = await tx.User.create({
         data: {
-          id: uid, // Supabase UID
           email: parsed.adminem,
-          password: "supabase_managed", // Not used, just placeholder
-          role: Role.ADMIN,
+          adminUserId: createdUserId, // Supabase UUID
+          school: {
+            connect: { id: school.id },
+          },
+          role: {
+            connect: { id: adminRole.id },
+          },
+          Admin: {
+            create: {
+              schoolId: school.id,
+            },
+          },
         },
-      })
+      });
 
-      await tx.admin.create({
+      await tx.AuditLog.create({
         data: {
-          userId: uid,
-          schoolId: school.id,
+          userId: user.id,
+          action: AuditAction.CREATE,
+          tableName: "School",
+          rowId: school.id, // Must be String (UUID) in Prisma schema
+          newData: {
+            name: parsed.name,
+            domain: resolvedDomain,
+            adminEmail: parsed.adminem,
+          },
         },
-      })
+      });
 
-      return { school }
-    })
+      return { school, user };
+    });
 
-    return NextResponse.json({ success: true, school: result.school })
+    return NextResponse.json({ success: true, result });
   } catch (error) {
-    console.error("❌ School creation error:", error)
+    console.error("❌ Error creating school:", error);
+
+    // Cleanup Supabase user if creation partially failed
+    if (createdUserId) {
+      try {
+        await supabaseAdmin.auth.admin.deleteUser(createdUserId);
+        console.log(`🔁 Rolled back Supabase user: ${createdUserId}`);
+      } catch (cleanupError) {
+        console.error("⚠️ Failed to delete Supabase user:", cleanupError);
+      }
+    }
+
     return NextResponse.json(
-      { success: false, error: error.message || "Something went wrong" },
+      {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === "string"
+              ? error
+              : JSON.stringify(error),
+      },
       { status: 500 }
-    )
+    );
   }
 }

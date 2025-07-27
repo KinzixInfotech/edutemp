@@ -25,7 +25,8 @@ export default function ClientLayout({ children }) {
             <TopProgressBar />
             <SidebarInset>
                 {!hideUI && <SiteHeader />}
-                <main className="p-4 w-full h-full">{children}</main>
+                {/* p-4 */}
+                <main className=" w-full h-full">{children}</main>
             </SidebarInset>
         </SidebarProvider>
     );

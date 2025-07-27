@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Calendar } from "@/components/ui/calendar"
 import { toast } from "sonner"
 import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Command, CommandInput, CommandItem, CommandGroup } from "@/components/ui/command"
 import {
     Select,
@@ -32,44 +33,104 @@ export default function NewProfilePage() {
     }, [schoolId])
 
     const router = useRouter()
-    const baseForm = {
-        name: "",
-        email: "",
-        dob: "", // consider using ISO format or Date object
-        studentName: "",
-        admissionNo: "",
-        adhaarNo: "",
-        bloodGroup: "",
-        address: "",
-        profilePhoto: "",
-        class: "",
-        password: '',
-        certificates: [],
-        mobile: "",
-        guardianName: "",
-        childId: "",
-        busNumber: "",
-        studentCount: "",
-        location: "",
-        role: "",
-        labName: "",
-        results: {},
-        teacherId: "",
-        parentIds: [],
+    // const baseForm = {
+    //     name: "",
+    //     email: "",
+    //     dob: "", // consider using ISO format or Date object
+    //     studentName: "",
+    //     admissionNo: "",
+    //     adhaarNo: "",
+    //     bloodGroup: "",
+    //     address: "",
+    //     profilePhoto: "",
+    //     class: "",
+    //     password: '',
+    //     certificates: [],
+    //     mobile: "",
+    //     guardianName: "",
+    //     childId: "",
+    //     busNumber: "",
+    //     studentCount: "",
+    //     location: "",
+    //     role: "",
+    //     labName: "",
+    //     results: {},
+    //     teacherId: "",
+    //     parentIds: [],
 
-        // Added based on the Student model:
+    //     // Added based on the Student model:
+    //     fatherName: "",
+    //     motherName: "",
+    //     fatherMobileNumber: "",
+    //     motherMobileNumber: "",
+    //     guardianRelation: "",
+    //     guardianMobileNo: "",
+    //     gender: "", // Expected to be: "MALE" | "FEMALE" | "OTHER" (based on enum Gender)
+    //     session: "",
+    //     classId: "",
+    //     userId: "",
+    //     schoolId,
+    //     parentId: "",
+    // }
+    const baseForm = {
+        // Required for student creation
+        name: "",
+        studentName: "", // redundant with 'name' — choose one or unify
+        email: "",
+        password: "",
+        dob: "", // should be ISO format or Date object
+        gender: "", // "MALE" | "FEMALE" | "OTHER"
+        admissionNo: "",
+        admissionDate: "", // 📅 add this
+        rollNumber: "", // 🆕
+        academicYear: "", // 🆕
+        bloodGroup: "",
+        adhaarNo: "",
+        address: "",
+        city: "", // 🆕
+        state: "", // 🆕
+        country: "", // 🆕
+        postalCode: "", // 🆕
+
+        // Class & Section
+        classId: "",
+        sectionId: "", // 🆕
+
+        // School & User (filled from context/backend usually)
+        userId: "",
+        schoolId: "", // ✅ assigned from parent component
+        parentId: "",
+
+        // Guardian and Parents Info
         fatherName: "",
         motherName: "",
         fatherMobileNumber: "",
         motherMobileNumber: "",
+        guardianName: "",
         guardianRelation: "",
         guardianMobileNo: "",
-        gender: "", // Expected to be: "MALE" | "FEMALE" | "OTHER" (based on enum Gender)
-        session: "",
-        classId: "",
-        userId: "",
-        schoolId,
-        parentId: "",
+
+        // Misc
+        house: "", // 🆕
+        profilePhoto: "", // file or URL
+        dateOfLeaving: "", // optional
+        certificates: [],
+
+        // Optional fields (you had earlier)
+        mobile: "", // can map to contactNumber
+        session: "", // maybe rename to academicYear?
+        busNumber: "",
+        studentCount: "",
+        location: "", // general school location or address?
+        role: "", // likely fixed as "STUDENT"
+        labName: "",
+        results: {}, // may map to examResults
+        teacherId: "",
+        parentIds: [], // if multiple guardians
+
+        // Optional tracking fields (backend-controlled)
+        feeStatus: "PENDING", // optional; backend default usually
+        status: "ACTIVE", // or "INACTIVE"
     }
 
     const [form, setForm] = useState(baseForm)
@@ -108,94 +169,39 @@ export default function NewProfilePage() {
                 )
             case "students":
                 return (
-
                     <>
-                        <Input
-                            placeholder="Student Name"
-                            value={form.studentName}
-                            onChange={(e) => setForm({ ...form, studentName: e.target.value })}
-                        />
-                        <Input
-                            placeholder="Student Email"
-                            value={form.email}
-                            onChange={(e) => setForm({ ...form, email: e.target.value })}
-                        />
 
-                        <Input
-                            placeholder="Student Password"
-                            value={form.password}
-                            onChange={(e) => setForm({ ...form, password: e.target.value })}
-                        />
-                        {/* ✅ Class Select Dropdown */}
-                        <Select
-                            value={form.classId}
-                            onValueChange={(value) => setForm({ ...form, classId: value })}
-                        >
-                            <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Select Class" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {classes.map((cls) => (
-                                    <SelectItem key={cls.id} value={cls.id}>
-                                        {cls.name} {cls.section ? `- ${cls.section}` : ""}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <Input placeholder="Academic Year" value={form.academicYear} onChange={(e) => setForm({ ...form, academicYear: e.target.value })} />
+
                         <Input
                             placeholder="Admission Number"
                             value={form.admissionNo}
                             onChange={(e) => setForm({ ...form, admissionNo: e.target.value })}
                         />
-
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    className={`w-full justify-start text-left font-normal ${!form.admissionDate && "text-muted-foreground"
+                                        }`}
+                                >
+                                    {form.admissionDate ? format(form.admissionDate, "PPP") : "Select Admission Date"}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                    mode="single"
+                                    selected={form.admissionDate}
+                                    onSelect={(date) => setForm({ ...form, admissionDate: date })}
+                                    initialFocus
+                                />
+                            </PopoverContent>
+                        </Popover>
                         <Input
-                            placeholder="Aadhaar Number"
-                            value={form.adhaarNo}
-                            onChange={(e) => setForm({ ...form, adhaarNo: e.target.value })}
+                            placeholder="Student Name"
+                            value={form.studentName}
+                            onChange={(e) => setForm({ ...form, studentName: e.target.value })}
                         />
-
-                        <Input
-                            placeholder="Father Name"
-                            value={form.fatherName}
-                            onChange={(e) => setForm({ ...form, fatherName: e.target.value })}
-                        />
-
-                        <Input
-                            placeholder="Mother Name"
-                            value={form.motherName}
-                            onChange={(e) => setForm({ ...form, motherName: e.target.value })}
-                        />
-
-                        <Input
-                            placeholder="Father Mobile Number"
-                            value={form.fatherMobileNumber}
-                            onChange={(e) => setForm({ ...form, fatherMobileNumber: e.target.value })}
-                        />
-
-                        <Input
-                            placeholder="Mother Mobile Number"
-                            value={form.motherMobileNumber}
-                            onChange={(e) => setForm({ ...form, motherMobileNumber: e.target.value })}
-                        />
-
-                        <Input
-                            placeholder="Guardian Name"
-                            value={form.guardianName}
-                            onChange={(e) => setForm({ ...form, guardianName: e.target.value })}
-                        />
-
-                        <Input
-                            placeholder="Guardian Relation"
-                            value={form.guardianRelation}
-                            onChange={(e) => setForm({ ...form, guardianRelation: e.target.value })}
-                        />
-
-                        <Input
-                            placeholder="Guardian Mobile Number"
-                            value={form.guardianMobileNo}
-                            onChange={(e) => setForm({ ...form, guardianMobileNo: e.target.value })}
-                        />
-
                         {/* ✅ Profile Photo Upload */}
                         <Label htmlFor="profilePhoto">Upload Profile Photo</Label>
                         <Input
@@ -207,25 +213,40 @@ export default function NewProfilePage() {
                             }
                         />
 
-                        {/* ✅ ShadCN Calendar for DOB */}
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    className={`w-full justify-start text-left font-normal ${!form.dob && "text-muted-foreground"}`}
-                                >
-                                    {form.dob ? format(form.dob, "PPP") : "Select Date of Birth"}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                                <Calendar
-                                    mode="single"
-                                    selected={form.dob}
-                                    onSelect={(date) => setForm({ ...form, dob: date })}
-                                    initialFocus
-                                />
-                            </PopoverContent>
-                        </Popover>
+                        {/* ✅ Class Select Dropdown */}
+                        <Select
+                            value={form.classId}
+                            onValueChange={(value) => setForm({ ...form, classId: value })}
+                        >
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select Class" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {/* {classes.map((cls) => (
+                                    <SelectItem key={cls.id} value={cls.id}>
+                                        {cls.name} {cls.section ? `- ${cls.section}` : ""}
+                                    </SelectItem>
+                                ))} */}
+                            </SelectContent>
+                        </Select>
+                        <Select
+                            value={form.sectionId}
+                            onValueChange={(value) => setForm({ ...form, sectionId: value })}
+                        >
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select Section" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {/* {sections.map((section) => (
+                                    <SelectItem key={section.id} value={section.id}>
+                                        {section.name}
+                                    </SelectItem>
+                                ))} */}
+                            </SelectContent>
+                        </Select>
+
+
+                        <Input placeholder="Roll Number" value={form.rollNumber} onChange={(e) => setForm({ ...form, rollNumber: e.target.value })} />
 
                         {/* ✅ Gender Select */}
                         <Select
@@ -242,17 +263,157 @@ export default function NewProfilePage() {
                             </SelectContent>
                         </Select>
 
-                        <Input
-                            placeholder="Address"
-                            value={form.address}
-                            onChange={(e) => setForm({ ...form, address: e.target.value })}
-                        />
 
                         <Input
                             placeholder="Blood Group"
                             value={form.bloodGroup}
                             onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })}
                         />
+                        <Input placeholder="Stundent Contact Number" value={form.contactNumber} onChange={(e) => setForm({ ...form, contactNumber: e.target.value })} />
+                        <Input
+                            placeholder="Student Email"
+                            value={form.email}
+                            onChange={(e) => setForm({ ...form, email: e.target.value })}
+                        />
+
+                        <Input
+                            placeholder="Student Password"
+                            value={form.password}
+                            onChange={(e) => setForm({ ...form, password: e.target.value })}
+                        />
+                        <Input placeholder="House" value={form.house} onChange={(e) => setForm({ ...form, house: e.target.value })} />
+                        <Input placeholder="Previous School Name" value={form.previousSchoolName} onChange={(e) => setForm({ ...form, previousSchoolName: e.target.value })} />
+                        <Input
+                            placeholder="Aadhaar Number"
+                            value={form.adhaarNo}
+                            onChange={(e) => setForm({ ...form, adhaarNo: e.target.value })}
+                        />
+                        <Label className="mt-4">Select Guardian Type</Label>
+                        <RadioGroup
+                            value={form.guardianType}
+                            onValueChange={(value) => setForm({ ...form, guardianType: value })}
+                            className="flex flex-row space-y-2 "
+                        >
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="PARENTS" id="r1" />
+                                <Label htmlFor="r1">Father & Mother</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="GUARDIAN" id="r2" />
+                                <Label htmlFor="r2">Guardian</Label>
+                            </div>
+                        </RadioGroup>
+
+                        {/* Conditionally Render Fields */}
+                        {form.guardianType === "PARENTS" && (
+                            <>
+                                <Input
+                                    placeholder="Father Name"
+                                    value={form.fatherName}
+                                    onChange={(e) => setForm({ ...form, fatherName: e.target.value })}
+                                />
+                                <Input
+                                    placeholder="Father Mobile Number"
+                                    value={form.fatherMobileNumber}
+                                    onChange={(e) => setForm({ ...form, fatherMobileNumber: e.target.value })}
+                                />
+                                <Input
+                                    placeholder="Mother Name"
+                                    value={form.motherName}
+                                    onChange={(e) => setForm({ ...form, motherName: e.target.value })}
+                                />
+                                <Input
+                                    placeholder="Mother Mobile Number"
+                                    value={form.motherMobileNumber}
+                                    onChange={(e) => setForm({ ...form, motherMobileNumber: e.target.value })}
+                                />
+                            </>
+                        )}
+
+                        {form.guardianType === "GUARDIAN" && (
+                            <>
+                                <Input
+                                    placeholder="Guardian Name"
+                                    value={form.guardianName}
+                                    onChange={(e) => setForm({ ...form, guardianName: e.target.value })}
+                                />
+                                <Input
+                                    placeholder="Guardian Relation"
+                                    value={form.guardianRelation}
+                                    onChange={(e) => setForm({ ...form, guardianRelation: e.target.value })}
+                                />
+                                <Input
+                                    placeholder="Guardian Mobile Number"
+                                    value={form.guardianMobileNo}
+                                    onChange={(e) => setForm({ ...form, guardianMobileNo: e.target.value })}
+                                />
+                            </>
+                        )}
+                        {/* <Input
+                            placeholder="Father Name"
+                            value={form.fatherName}
+                            onChange={(e) => setForm({ ...form, fatherName: e.target.value })}
+                        />
+
+                        <Input
+                            placeholder="Mother Name"
+                            value={form.motherName}
+                            onChange={(e) => setForm({ ...form, motherName: e.target.value })}
+                        /> */}
+                        {/* 
+                        <Input
+                            placeholder="Father Mobile Number"
+                            value={form.fatherMobileNumber}
+                            onChange={(e) => setForm({ ...form, fatherMobileNumber: e.target.value })}
+                        /> */}
+
+                        {/* <Input
+                            placeholder="Mother Mobile Number"
+                            value={form.motherMobileNumber}
+                            onChange={(e) => setForm({ ...form, motherMobileNumber: e.target.value })}
+                        /> */}
+
+                        {/* <Input
+                            placeholder="Guardian Name"
+                            value={form.guardianName}
+                            onChange={(e) => setForm({ ...form, guardianName: e.target.value })}
+                        />
+
+                        <Input
+                            placeholder="Guardian Relation"
+                            value={form.guardianRelation}
+                            onChange={(e) => setForm({ ...form, guardianRelation: e.target.value })}
+                        /> */}
+
+                        {/* <Input
+                            placeholder="Guardian Mobile Number"
+                            value={form.guardianMobileNo}
+                            onChange={(e) => setForm({ ...form, guardianMobileNo: e.target.value })}
+                        /> */}
+
+
+
+                        <Input
+                            placeholder="Address Line 1"
+                            value={form.address}
+                            onChange={(e) => setForm({ ...form, address: e.target.value })}
+                        />
+
+
+
+                        <Input placeholder="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+                        <Input placeholder="State" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
+                        <Input placeholder="Country" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} />
+                        <Input placeholder="Postal Code" value={form.postalCode} onChange={(e) => setForm({ ...form, postalCode: e.target.value })} />
+
+                        {/* Date of Leaving (Optional) */}
+                        {/* <Label htmlFor="dateOfLeaving">Date of Leaving</Label>
+                        <Calendar
+                            mode="single"
+                            selected={form.dateOfLeaving}
+                            onSelect={(date) => setForm({ ...form, dateOfLeaving: date })}
+                            initialFocus
+                        /> */}
                     </>
 
                 )

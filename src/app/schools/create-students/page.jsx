@@ -22,13 +22,14 @@ import { useAuth } from "@/context/AuthContext"
 export default function StudentPage() {
 
     const { fullUser } = useAuth();
-    const schoolId = fullUser?.schoolId;
+    const schoolId = fullUser?.schoolId || "40bbcedf-fa01-40ea-b825-202074d722b8";
     // useParams()
     const [students, setStudents] = useState([])
     const [selectedSession, setSelectedSession] = useState("")
     const [loading, setLoading] = useState(true)
     const fetchStudents = async () => {
         try {
+            alert
             const res = await fetch(`/api/schools/${schoolId}/students`)
             const data = await res.json()
             setStudents(data.students)
@@ -115,14 +116,14 @@ export default function StudentPage() {
                                         </div>
                                     </TableCell>
                                 </TableRow>
-                            ) : filteredStudents.length === 0 ? (
+                            ) : filteredStudents && filteredStudents.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={4} className="text-center text-muted-foreground">
                                         No students found for this session.
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                filteredStudents.map((student) => (
+                               filteredStudents && filteredStudents.map((student) => (
                                     <TableRow key={student.id}>
                                         <TableCell><Checkbox aria-label={`Select ${student.studentName}`} /></TableCell>
                                         <TableCell>{student.studentName}</TableCell>

@@ -3,30 +3,29 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "postgresql" // adjust if you're using another DB
   url      = env("DIRECT_URL")
 }
 
 model School {
-  id               String    @id @default(uuid()) @db.Uuid
+  id               Int           @id @default(autoincrement())
   name             String
-  domain           String    @unique
+  domain           String        @unique // required for identifying tenant via domain
   profilePicture   String
   location         String
   SubscriptionType String
   Language         String
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  deletedAt        DateTime?
-
-  classes      Class[]
-  users        User[]
-  admins       Admin[]
-  transport    Transport[]
-  libraryBooks LibraryBook[]
-  galleries    Gallery[]
-  exams        Exam[]
-  Student      Student[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  deletedAt        DateTime? // Soft delete
+  classes          Class[]
+  users            User[]
+  admins           Admin[]
+  transport        Transport[]
+  libraryBooks     LibraryBook[]
+  galleries        Gallery[]
+  exams            Exam[]
+  Student          Student[]
 
   @@index([name])
 }
@@ -38,8 +37,8 @@ model Role {
 }
 
 model User {
-  id        String    @id @default(uuid()) @db.Uuid
-  schoolId  String    @db.Uuid
+  id        Int       @id @default(autoincrement())
+  schoolId  Int
   roleId    Int
   email     String
   createdAt DateTime  @default(now())
@@ -56,6 +55,7 @@ model User {
   receivedNotifications Notification[]    @relation("Receiver")
   Document              Document[]
   AuditLog              AuditLog[]
+  // admin                 Admin?
   adminUserId           String?
   Admin                 Admin[]
 
@@ -64,30 +64,33 @@ model User {
 }
 
 model Admin {
-  userId   String @id @db.Uuid
-  schoolId String @db.Uuid
+  userId   Int @id // make sure it's Int, not String
+  schoolId Int
 
   school School @relation(fields: [schoolId], references: [id])
   User   User   @relation(fields: [userId], references: [id])
 }
 
 model Student {
-  userId             String               @id @db.Uuid
-  classId            Int
-  parentId           String?              @db.Uuid
-  name               String
-  email              String
-  dob                String
-  gender             String
-  admissionDate      String
-  sectionId          Int
-  section            Section              @relation(fields: [sectionId], references: [id])
+  userId        Int     @id
+  classId       Int
+  parentId      Int?
+  name          String
+  email         String
+  dob           String
+  gender        String
+  admissionDate String
+  schoolId      Int
+  school        School  @relation(fields: [schoolId], references: [id])
+  sectionId     Int
+  section       Section @relation(fields: [sectionId], references: [id])
+
   bloodGroup         String
   rollNumber         String
   academicYear       String
   PreviousSchoolName String?
   Status             StudentStatus
-  FeeStatus          FeeStatus            @default(PENDING)
+  FeeStatus          FeeStatus     @default(PENDING)
   DateOfLeaving      String?
   contactNumber      String
   Address            String
@@ -104,11 +107,12 @@ model Student {
   House              String?
   profilePicture     String
   admissionNo        String
-  schoolId           String               @db.Uuid
-  school             School               @relation(fields: [schoolId], references: [id])
-  user               User                 @relation(fields: [userId], references: [id])
-  class              Class                @relation(fields: [classId], references: [id])
+  user               User          @relation(fields: [userId], references: [id])
+  class              Class         @relation(fields: [classId], references: [id])
+
+  // fees        Fee[]
   examResults        ExamResult[]
+  // Section     Section?     @relation(fields: [sectionId], references: [id])
   ExamIssue          ExamIssue[]
   HomeworkSubmission HomeworkSubmission[]
   FeeStructure       FeeStructure[]
@@ -128,7 +132,7 @@ model ExamSeries {
 
 model ExamIssue {
   id        Int      @id @default(autoincrement())
-  studentId String   @db.Uuid
+  studentId Int
   issueDate DateTime
   student   Student  @relation(fields: [studentId], references: [userId])
 }
@@ -142,7 +146,7 @@ model Vehicle {
 model HomeworkSubmission {
   id             Int      @id @default(autoincrement())
   homeworkId     Int
-  studentId      String   @db.Uuid
+  studentId      Int
   submissionDate DateTime
 
   homework Homework @relation(fields: [homeworkId], references: [id])
@@ -150,12 +154,14 @@ model HomeworkSubmission {
 }
 
 model Teacher {
-  userId         String  @id @db.Uuid
-  departmentId   Int
+  userId       Int @id
+  departmentId Int
+
   employeeId     String
   profilePicture String
   name           String
   designation    String
+  // subject        Subject          @relation(fields: [subjectId], references: [id])
   gender         String
   age            String
   bloodGroup     String
@@ -168,19 +174,19 @@ model Teacher {
   country        String?
   PostalCode     String?
 
-  subjects      Subject[]
+  subjects      Subject[] // inverse relation
   user          User             @relation(fields: [userId], references: [id])
   department    Department       @relation(fields: [departmentId], references: [id])
   homework      Homework[]
   subjectId     Int
   sections      SectionTeacher[]
-  classTeachers ClassTeacher[]
+  classTeachers ClassTeacher[] // <-- NEW
 
   @@index([departmentId])
 }
 
 model NonTeachingStaff {
-  userId       String @id @db.Uuid
+  userId       Int @id
   departmentId Int
 
   employeeId     String
@@ -201,13 +207,14 @@ model NonTeachingStaff {
 
   user       User       @relation(fields: [userId], references: [id])
   department Department @relation(fields: [departmentId], references: [id])
+  // homework   Homework[]
 
   @@index([departmentId])
 }
 
 model Class {
   id        Int    @id @default(autoincrement())
-  schoolId  String @db.Uuid
+  schoolId  Int
   className String
 
   school       School         @relation(fields: [schoolId], references: [id])
@@ -224,21 +231,21 @@ model Class {
 
 model Section {
   id              Int              @id @default(autoincrement())
-  name            String
+  name            String // e.g. "A", "B"
   classId         Int
-  assignedTeacher SectionTeacher[]
+  assignedTeacher SectionTeacher[] // many-to-many
   students        Student[]
 
   class Class @relation(fields: [classId], references: [id])
 
-  @@unique([classId, name])
+  @@unique([classId, name]) // Prevent duplicate section names in same class
   @@index([classId])
 }
 
 model SectionTeacher {
-  id        Int    @id @default(autoincrement())
+  id        Int @id @default(autoincrement())
   sectionId Int
-  teacherId String @db.Uuid
+  teacherId Int
 
   section Section @relation(fields: [sectionId], references: [id])
   teacher Teacher @relation(fields: [teacherId], references: [userId])
@@ -249,9 +256,9 @@ model SectionTeacher {
 }
 
 model ClassTeacher {
-  id        Int    @id @default(autoincrement())
+  id        Int @id @default(autoincrement())
   classId   Int
-  teacherId String @db.Uuid
+  teacherId Int
 
   class   Class   @relation(fields: [classId], references: [id])
   teacher Teacher @relation(fields: [teacherId], references: [userId])
@@ -263,7 +270,7 @@ model ClassTeacher {
 
 model Document {
   id          Int          @id @default(autoincrement())
-  userId      String       @db.Uuid
+  userId      Int
   title       String
   description String?
   fileUrl     String
@@ -305,10 +312,10 @@ model Department {
 }
 
 model Homework {
-  id        Int    @id @default(autoincrement())
+  id        Int @id @default(autoincrement())
   classId   Int
   subjectId Int
-  teacherId String @db.Uuid
+  teacherId Int
 
   class              Class                @relation(fields: [classId], references: [id])
   subject            Subject              @relation(fields: [subjectId], references: [id])
@@ -322,7 +329,7 @@ model Homework {
 
 model Exam {
   id        Int      @id @default(autoincrement())
-  schoolId  String   @db.Uuid
+  schoolId  Int
   title     String
   createdAt DateTime @default(now())
 
@@ -334,9 +341,9 @@ model Exam {
 }
 
 model ExamResult {
-  id        Int    @id @default(autoincrement())
+  id        Int @id @default(autoincrement())
   examId    Int
-  studentId String @db.Uuid
+  studentId Int
   subjectId Int
 
   exam    Exam    @relation(fields: [examId], references: [id])
@@ -352,7 +359,7 @@ model ExamResult {
 model FeeStructure {
   id        Int      @id @default(autoincrement())
   classId   Int
-  studentId String   @db.Uuid
+  studentId Int
   issueDate DateTime
 
   class    Class        @relation(fields: [classId], references: [id])
@@ -362,7 +369,7 @@ model FeeStructure {
 
 model FeePayment {
   id          Int      @id @default(autoincrement())
-  studentId   String   @db.Uuid
+  studentId   Int
   structureId Int
   amount      Float
   paymentDate DateTime
@@ -373,7 +380,7 @@ model FeePayment {
 
 model Attendance {
   id     Int      @id @default(autoincrement())
-  userId String   @db.Uuid
+  userId Int
   date   DateTime
   status String
 
@@ -384,8 +391,8 @@ model Attendance {
 
 model Notification {
   id         Int      @id @default(autoincrement())
-  senderId   String   @db.Uuid
-  receiverId String   @db.Uuid
+  senderId   Int
+  receiverId Int
   message    String
   createdAt  DateTime @default(now())
 
@@ -398,7 +405,7 @@ model Notification {
 
 model Transport {
   id       Int     @id @default(autoincrement())
-  schoolId String  @db.Uuid
+  schoolId Int
   route    String?
 
   school    School   @relation(fields: [schoolId], references: [id])
@@ -410,7 +417,7 @@ model Transport {
 
 model LibraryBook {
   id       Int     @id @default(autoincrement())
-  schoolId String  @db.Uuid
+  schoolId Int
   title    String
   author   String?
 
@@ -421,7 +428,7 @@ model LibraryBook {
 
 model Gallery {
   id       Int    @id @default(autoincrement())
-  schoolId String @db.Uuid
+  schoolId Int
   title    String
 
   school School @relation(fields: [schoolId], references: [id])
@@ -431,13 +438,13 @@ model Gallery {
 
 model AuditLog {
   id        Int         @id @default(autoincrement())
-  userId    String?     @db.Uuid
+  userId    Int?
   action    AuditAction
   tableName String
-  rowId     String
+  rowId     Int // ID of the row affected
   timestamp DateTime    @default(now())
-  oldData   Json?
-  newData   Json?
+  oldData   Json? // before change
+  newData   Json? // after change
   error     String?
 
   user User? @relation(fields: [userId], references: [id])

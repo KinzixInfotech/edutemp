@@ -3,7 +3,7 @@
 import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-
+import { useRouter } from "next/navigation"
 import {
   Form,
   FormField,
@@ -30,8 +30,8 @@ const schoolFormSchema = z.object({
   location: z.string().min(1),
   phone: z.string().min(1),
   logo: z.string().optional(),
-  adminem:z.string().min(1),
-  adminPassword:z.string().min(1),
+  adminem: z.string().min(1),
+  adminPassword: z.string().min(1),
   subscriptionType: z.enum(["A", "B", "C"]),
   language: z.string().min(1),
 
@@ -47,6 +47,7 @@ const schoolFormSchema = z.object({
 })
 
 export default function CreateSchoolPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(false)
   const form = useForm({
     resolver: zodResolver(schoolFormSchema),
@@ -93,6 +94,7 @@ export default function CreateSchoolPage() {
       if (res.ok) {
         toast.success("School created successfully!")
         form.reset()
+        router.push('/schools/all-schools');
       } else {
         toast.error(result.error || "Something went wrong.")
       }

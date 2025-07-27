@@ -9,7 +9,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
-
+import image from '../../../public/edulogin.png';
+import { FlickeringGrid } from "@/components/magicui/flickering-grid"
 export default function LoginPhoto({ className, ...props }) {
     const router = useRouter()
     const [email, setEmail] = useState("")
@@ -51,17 +52,19 @@ export default function LoginPhoto({ className, ...props }) {
     }
 
     return (
-        <div className=" flex min-h-svh flex-col items-center justify-center p-6 md:p-10">
-            <div className="w-full max-w-sm md:max-w-3xl">
+        <div className="relative w-full overflow-hidden flex h-screen flex-col items-center justify-center p-6 md:p-10">
+
+            <div className="w-full max-w-sm md:max-w-3xl z-40">
+
                 <div className={cn("flex flex-col gap-6", className)} {...props}>
                     <Card className="overflow-hidden p-0">
                         <CardContent className="grid p-0 md:grid-cols-2">
                             <form className="p-6 md:p-8" onSubmit={handleLogin}>
                                 <div className="flex flex-col gap-6">
                                     <div className="flex flex-col items-center text-center">
-                                        <h1 className="text-2xl font-bold">Welcome back</h1>
+                                        <h1 className="text-2xl font-bold">Welcome</h1>
                                         <p className="text-muted-foreground text-balance">
-                                            Login to your EduBreezy Admin
+                                            Login to your Edubreezy workspace!
                                         </p>
                                     </div>
                                     <div className="grid gap-3">
@@ -69,7 +72,7 @@ export default function LoginPhoto({ className, ...props }) {
                                         <Input
                                             id="email"
                                             type="email"
-                                            placeholder="m@example.com"
+                                            placeholder="Enter Your Email"
                                             required
                                             value={email}
                                             onChange={(e) => setEmail(e.target.value)}
@@ -88,12 +91,12 @@ export default function LoginPhoto({ className, ...props }) {
                                         <Input
                                             id="password"
                                             type="password"
+                                            placeholder="Enter Your Password"
                                             required
                                             value={password}
                                             onChange={(e) => setPassword(e.target.value)}
                                         />
                                     </div>
-
                                     <Button type="submit" className="w-full text-white">
                                         Login
                                     </Button>
@@ -103,9 +106,9 @@ export default function LoginPhoto({ className, ...props }) {
 
                             <div className="bg-muted relative hidden md:block">
                                 <img
-                                    src="/placeholder.svg"
+                                    src={image.src}
                                     alt="Image"
-                                    className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+                                    className="absolute pointer-events-none inset-0 h-full w-full object-cover  "
                                 />
                             </div>
                         </CardContent>
