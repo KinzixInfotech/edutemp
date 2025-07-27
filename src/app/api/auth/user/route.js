@@ -13,14 +13,23 @@ export async function GET(req) {
         const start = performance.now();
 
         // Step 1: Fetch user only (without relations)
-        const user = await prisma.user.findUnique({
+        const user = await prisma.User.findUnique({
             where: { email },
             select: {
                 id: true,
                 email: true,
                 role: true,
+                schoolId: true,
+                school: {
+                    select: {
+                        id: true,
+                        name: true,
+                        domain: true,
+                    },
+                },
             },
         });
+        console.log(user, 'from api');
 
         if (!user) {
             return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -29,7 +38,7 @@ export async function GET(req) {
         let schoolId = null;
 
         // Step 2: Fetch schoolId from corresponding model based on role
-        switch (user.role) {
+        switch (user.role.name) {
             case "ADMIN":
                 const admin = await prisma.admin.findUnique({
                     where: { userId: user.id },

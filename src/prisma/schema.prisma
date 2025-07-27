@@ -38,10 +38,10 @@ model Role {
 }
 
 model User {
-  id        String    @id @default(uuid()) @db.Uuid
+  id        String    @id @db.Uuid // Supabase UUID — do not use default(uuid())
   schoolId  String    @db.Uuid
   roleId    Int
-  email     String
+  email     String    @unique
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -56,8 +56,7 @@ model User {
   receivedNotifications Notification[]    @relation("Receiver")
   Document              Document[]
   AuditLog              AuditLog[]
-  adminUserId           String?
-  Admin                 Admin[]
+  Admin                 Admin?
 
   @@index([schoolId])
   @@index([roleId])
@@ -214,24 +213,24 @@ model Class {
   students     Student[]
   subjects     Subject[]
   homework     Homework[]
-  Section      Section[]
+  sections     Section[] // Renamed: Section → sections
   FeeStructure FeeStructure[]
   ClassTeacher ClassTeacher[]
 
-  @@unique([schoolId, className])
+  @@unique([schoolId, className]) // "6" must be unique per school
   @@index([schoolId])
 }
 
 model Section {
   id              Int              @id @default(autoincrement())
-  name            String
+  name            String // e.g., "A", "B", etc.
   classId         Int
-  assignedTeacher SectionTeacher[]
+  assignedTeacher SectionTeacher[] // for assigning multiple teachers
   students        Student[]
 
   class Class @relation(fields: [classId], references: [id])
 
-  @@unique([classId, name])
+  @@unique([classId, name]) // ✅ ensures unique section names per class
   @@index([classId])
 }
 

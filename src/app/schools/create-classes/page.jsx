@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
@@ -11,15 +10,9 @@ import { Loader2 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
 
 export default function AddClassPage() {
-    const { fullUser } = useAuth();
-    const schoolId = fullUser?.schoolId;
-    if (!schoolId) {
-        return (
-            <div className="p-6 text-red-500 font-medium">
-                Error: School ID not available. Please log in or select a school.
-            </div>
-        )
-    }
+    const { fullUser } = useAuth()
+    const schoolId = fullUser?.schoolId
+
     const [className, setClassName] = useState("")
     const [section, setSection] = useState("")
     const [classes, setClasses] = useState([])
@@ -27,13 +20,21 @@ export default function AddClassPage() {
     const [fetchingLoading, setFetchingLoading] = useState(false)
 
     const fetchClasses = async () => {
+        if (!schoolId) return
         setFetchingLoading(true)
         try {
             const res = await fetch(`/api/schools/${schoolId}/classes`)
             const data = await res.json()
-            setClasses(data)
-        } catch {
+            // ✅ Defensive: ensure array
+            if (Array.isArray(data)) {
+                setClasses(data)
+            } else {
+                setClasses([])
+                console.error("Unexpected data format:", data)
+            }
+        } catch (err) {
             toast.error("Failed to load classes")
+            setClasses([])
         } finally {
             setFetchingLoading(false)
         }
@@ -48,8 +49,8 @@ export default function AddClassPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     name: className.toUpperCase(),
-                    section: section.toUpperCase(),
-                })
+                    sections: [section.toUpperCase()],
+                }),
             })
             if (!res.ok) throw new Error()
             toast.success("Class added")
@@ -66,6 +67,10 @@ export default function AddClassPage() {
     useEffect(() => {
         if (schoolId) fetchClasses()
     }, [schoolId])
+
+    if (!schoolId) {
+        return <div className="p-6 text-red-500 font-medium">School ID not available.</div>
+    }
 
     return (
         <div className="p-6 space-y-6">
@@ -98,7 +103,7 @@ export default function AddClassPage() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Class</TableHead>
-                                <TableHead>Section</TableHead>
+                                <TableHead>Sections</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -114,16 +119,25 @@ export default function AddClassPage() {
                             ) : classes.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={2} className="text-center text-muted-foreground">
-                                        No classes found.
+                                        No classes or sections found.
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                classes.map((cls) => (
-                                    <TableRow key={cls.id}>
-                                        <TableCell>{cls.name}</TableCell>
-                                        <TableCell>{cls.section}</TableCell>
-                                    </TableRow>
-                                ))
+                                classes.map((cls) =>
+                                    Array.isArray(cls.sections) && cls.sections.length > 0 ? (
+                                        cls.sections.map((sec) => (
+                                            <TableRow key={`sec-${cls.id}-${sec.id}`}>
+                                                <TableCell>{cls.className}</TableCell>
+                                                <TableCell>{sec.name}</TableCell>
+                                            </TableRow>
+                                        ))
+                                    ) : (
+                                        <TableRow key={`cls-${cls.id}`}>
+                                            <TableCell>{cls.className}</TableCell>
+                                            <TableCell className="text-muted-foreground">No sections</TableCell>
+                                        </TableRow>
+                                    )
+                                )
                             )}
                         </TableBody>
                     </Table>

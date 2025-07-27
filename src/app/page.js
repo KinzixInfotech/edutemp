@@ -34,7 +34,7 @@ export default function Dashboard() {
   }, [loading, fullUser])
 
   if (loading) return <LoaderPage />
-  if (!fullUser) return <p>Not authenticated</p>
+  // if (!fullUser) return <p>Not authenticated</p>
 
   return (
     <div>

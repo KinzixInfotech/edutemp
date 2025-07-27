@@ -22,16 +22,30 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 export default function NewProfilePage() {
     const { schoolId, role } = useParams()
     const [classes, setClasses] = useState([])
+    const [selectedClassId, setSelectedClassId] = useState("")
+    const [selectedSectionId, setSelectedSectionId] = useState("")
+
     useEffect(() => {
-        const fetchClasses = async () => {
-            if (!schoolId) return
-            const res = await fetch(`/api/schools/${schoolId}/classes`)
-            const data = await res.json()
-            setClasses(data || [])
-        }
-        fetchClasses()
+        if (!schoolId) return
+        setLoading(true)
+        fetch(`/api/schools/${schoolId}/classes`)
+            .then((res) => res.json())
+            .then((data) => {
+                const normalized = data.map((cls) => ({
+                    ...cls,
+                    sections: cls.sections || [],
+                }))
+                setClasses(normalized)
+            })
+            .catch(() => toast.error("Failed to load classes"))
+            .finally(() => setLoading(false))
     }, [schoolId])
 
+    const selectedClass = classes.find((cls) => cls.id.toString() === selectedClassId)
+    const sections = selectedClass?.sections || []
+    console.log("class:", classes)
+    console.log("Selected Class:", selectedClass)
+    console.log("Sections:", sections)
     const router = useRouter()
     // const baseForm = {
     //     name: "",
@@ -227,6 +241,11 @@ export default function NewProfilePage() {
                                         {cls.name} {cls.section ? `- ${cls.section}` : ""}
                                     </SelectItem>
                                 ))} */}
+                                {classes.map((cls) => (
+                                    <SelectItem key={cls.id} value={cls.id.toString()}>
+                                        {cls.className}
+                                    </SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                         <Select
@@ -237,11 +256,11 @@ export default function NewProfilePage() {
                                 <SelectValue placeholder="Select Section" />
                             </SelectTrigger>
                             <SelectContent>
-                                {/* {sections.map((section) => (
-                                    <SelectItem key={section.id} value={section.id}>
-                                        {section.name}
+                                {sections.map((sec) => (
+                                    <SelectItem key={sec.id} value={sec.id.toString()}>
+                                        {sec.name}
                                     </SelectItem>
-                                ))} */}
+                                ))}
                             </SelectContent>
                         </Select>
 

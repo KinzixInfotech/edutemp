@@ -22,7 +22,7 @@ import { useAuth } from "@/context/AuthContext"
 export default function StudentPage() {
 
     const { fullUser } = useAuth();
-    const schoolId = fullUser?.schoolId || "40bbcedf-fa01-40ea-b825-202074d722b8";
+    const schoolId = fullUser?.schoolId;
     // useParams()
     const [students, setStudents] = useState([])
     const [selectedSession, setSelectedSession] = useState("")

@@ -89,18 +89,12 @@ export async function POST(req) {
 
       const user = await tx.User.create({
         data: {
+          id: createdUserId, //  use Supabase Auth ID
           email: parsed.adminem,
-          adminUserId: createdUserId, // Supabase UUID
-          school: {
-            connect: { id: school.id },
-          },
-          role: {
-            connect: { id: adminRole.id },
-          },
+          school: { connect: { id: school.id } },
+          role: { connect: { id: adminRole.id } },
           Admin: {
-            create: {
-              schoolId: school.id,
-            },
+            create: { schoolId: school.id },
           },
         },
       });

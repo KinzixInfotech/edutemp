@@ -7,12 +7,14 @@ import {
     IconNotification,
     IconUserCircle,
 } from "@tabler/icons-react"
-
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase'; // a
 import {
     Avatar,
     AvatarFallback,
     AvatarImage,
 } from "@/components/ui/avatar"
+import { toast } from "sonner"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -32,9 +34,22 @@ import {
 
 export function NavUser({ }) {
     const { isMobile } = useSidebar()
+    const router = useRouter();
     const { setOpen } = useSettingsDialog()
     const { fullUser, loading } = useAuth();
     console.log(fullUser);
+    const handleLogout = async () => {
+        toast("Logging Out");
+        const { error } = await supabase.auth.signOut();
+
+        if (error) {
+            console.error('Logout error:', error.message);
+        } else {
+            // Optionally clear any local state or cookies if needed
+            toast("Logged Out Successfuly");
+            router.push('/login'); // Redirect after logout
+        }
+    };
     return (
         <SidebarMenu>
             <SidebarMenuItem>
@@ -49,7 +64,7 @@ export function NavUser({ }) {
                                 <AvatarFallback className="rounded-lg">CN</AvatarFallback>
                             </Avatar>
                             <div className="grid flex-1 text-left text-sm leading-tight">
-                                <span className="truncate font-medium">{fullUser?.name}</span>
+                                <span className="truncate font-medium">{fullUser?.name || 'Add Name'}</span>
                                 <span className="text-muted-foreground truncate text-xs">
                                     {fullUser?.email}
                                 </span>
@@ -70,7 +85,7 @@ export function NavUser({ }) {
                                     <AvatarFallback className="rounded-lg">CN</AvatarFallback>
                                 </Avatar>
                                 <div className="grid flex-1 text-left text-sm leading-tight">
-                                    <span className="truncate font-medium">{fullUser?.name} || {fullUser?.role}</span>
+                                    <span className="truncate font-medium">{fullUser?.name || 'Add Name'} || {fullUser?.role.name}</span>
                                     <span className="text-muted-foreground truncate text-xs">
                                         {fullUser?.email}
                                     </span>
@@ -93,13 +108,16 @@ export function NavUser({ }) {
                             </DropdownMenuItem>
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem>
-                            <IconLogout />
-                            Log out
-                        </DropdownMenuItem>
+                        <div onClick={handleLogout}>
+                            <DropdownMenuItem >
+                                <IconLogout />
+                                Log out
+                            </DropdownMenuItem>
+                        </div>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </SidebarMenuItem>
         </SidebarMenu>
+
     )
 }
