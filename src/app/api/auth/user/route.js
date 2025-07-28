@@ -67,7 +67,6 @@ export async function GET(req) {
                 });
                 schoolId = student?.schoolId;
                 break;
-            // Add other cases if needed (e.g., DIRECTOR, PARENT)
         }
 
         const end = performance.now();

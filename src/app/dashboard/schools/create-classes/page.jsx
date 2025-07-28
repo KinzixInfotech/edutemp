@@ -111,7 +111,7 @@ export default function ManageClassSectionPage() {
                 <CardContent className="p-4 flex flex-col sm:flex-row items-center gap-4">
                     <Select
                         value={selectedClassId}
-                        onValueChange={(e) => setSelectedClassId(e.target.value)}
+                        onValueChange={(value) => setSelectedClassId(value)}
                     >
                         <SelectTrigger className="w-full">
                             <SelectValue placeholder="Select Class" />
