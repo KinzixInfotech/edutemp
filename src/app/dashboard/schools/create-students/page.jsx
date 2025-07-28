@@ -48,7 +48,7 @@ export default function StudentPage() {
     const filteredStudents = selectedSession
         ? students.filter((s) => s.session === selectedSession)
         : students
-
+console.log(filteredStudents)
     const sessions = [...new Set((students || []).map((s) => s.session))]
     return (
         <div className="max-w-6xl mx-auto px-4 py-6 space-y-4">
@@ -90,7 +90,7 @@ export default function StudentPage() {
                             </SelectContent>
                         </Select>
 
-                        <Link href={`/schools/${schoolId}/profiles/students/new`}>
+                        <Link href={`${schoolId}/profiles/students/new`}>
                             <Button className="bg-primary text-white">Add Student</Button>
                         </Link>
                     </div>

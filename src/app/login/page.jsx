@@ -25,6 +25,7 @@ export default function LoginPhoto({ className, ...props }) {
         const loggedInCookie = cookies.find(cookie => cookie.startsWith("sb-user="));
         if (loggedInCookie) {
             setAlreadyLoggedIn(true)
+            router.push("/dashboard")
         }
     }, []);
 

@@ -3,35 +3,28 @@ import { NextResponse } from "next/server"
 
 
 // POST /api/schools/[schoolId]/classes
-export async function POST(req, context) {
-    const { schoolId } = context.params;
-    const { name, sections } = await req.json(); // expect `sections` as array
-
-    if (!schoolId || !name || !Array.isArray(sections) || sections.length === 0) {
-        return new Response("Missing required fields", { status: 400 });
-    }
-
+export async function POST(req, {params}) {
     try {
-        const createdClass = await prisma.class.create({
+        const { schoolId } = params
+        const { name } = await req.json()
+
+        if (!schoolId || !name) {
+            return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+        }
+
+        const newClass = await prisma.class.create({
             data: {
                 schoolId,
                 className: name,
-                sections: {
-                    create: sections.map((sec) => ({ name: sec })),
-                },
             },
-            include: {
-                sections: true,
-            },
-        });
+        })
 
-        return Response.json(createdClass);
-    } catch (error) {
-        console.error("Error creating class:", error);
-        return new Response("Failed to create class", { status: 500 });
+        return NextResponse.json({ success: true, class: newClass }, { status: 201 })
+    } catch (err) {
+        console.error("[CLASS_CREATE]", err)
+        return NextResponse.json({ error: "Server error" }, { status: 500 })
     }
 }
-
 
 
 

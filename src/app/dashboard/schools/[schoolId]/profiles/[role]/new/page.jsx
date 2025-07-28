@@ -41,11 +41,7 @@ export default function NewProfilePage() {
             .finally(() => setLoading(false))
     }, [schoolId])
 
-    const selectedClass = classes.find((cls) => cls.id.toString() === selectedClassId)
-    const sections = selectedClass?.sections || []
-    console.log("class:", classes)
-    console.log("Selected Class:", selectedClass)
-    console.log("Sections:", sections)
+
     const router = useRouter()
     const baseForm = {
         // Required for student creation
@@ -108,8 +104,12 @@ export default function NewProfilePage() {
         status: "ACTIVE", // or "INACTIVE"
     }
 
-    const [form, setForm] = useState(baseForm)
+    const [form, setForm] = useState(baseForm);
 
+    // Derived value (depends on `classes` and `form`)
+    const sections = form.classId === "ALL"
+        ? classes.flatMap((cls) => cls.sections || [])
+        : (classes.find((cls) => cls.id.toString() === form.classId)?.sections || []);
     const [loading, setLoading] = useState(false)
 
     const handleSubmit = async () => {
@@ -191,17 +191,15 @@ export default function NewProfilePage() {
                         {/* ✅ Class Select Dropdown */}
                         <Select
                             value={form.classId}
-                            onValueChange={(value) => setForm({ ...form, classId: value })}
+                            onValueChange={(value) => {
+                                setForm({ ...form, classId: value, sectionId: "" });
+                            }}
                         >
                             <SelectTrigger className="w-full">
                                 <SelectValue placeholder="Select Class" />
                             </SelectTrigger>
                             <SelectContent>
-                                {/* {classes.map((cls) => (
-                                    <SelectItem key={cls.id} value={cls.id}>
-                                        {cls.name} {cls.section ? `- ${cls.section}` : ""}
-                                    </SelectItem>
-                                ))} */}
+                                <SelectItem value="ALL">All Classes</SelectItem>
                                 {classes.map((cls) => (
                                     <SelectItem key={cls.id} value={cls.id.toString()}>
                                         {cls.className}
@@ -217,6 +215,7 @@ export default function NewProfilePage() {
                                 <SelectValue placeholder="Select Section" />
                             </SelectTrigger>
                             <SelectContent>
+                                <SelectItem value="ALL">All Sections</SelectItem>
                                 {sections.map((sec) => (
                                     <SelectItem key={sec.id} value={sec.id.toString()}>
                                         {sec.name}
@@ -224,7 +223,6 @@ export default function NewProfilePage() {
                                 ))}
                             </SelectContent>
                         </Select>
-
 
                         <Input placeholder="Roll Number" value={form.rollNumber} onChange={(e) => setForm({ ...form, rollNumber: e.target.value })} />
 

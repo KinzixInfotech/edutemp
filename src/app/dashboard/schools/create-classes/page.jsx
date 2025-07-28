@@ -9,14 +9,16 @@ import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
 
-export default function AddClassPage() {
+export default function ManageClassSectionPage() {
     const { fullUser } = useAuth()
     const schoolId = fullUser?.schoolId
 
     const [className, setClassName] = useState("")
-    const [section, setSection] = useState("")
+    const [sectionName, setSectionName] = useState("")
+    const [selectedClassId, setSelectedClassId] = useState("")
     const [classes, setClasses] = useState([])
-    const [loading, setLoading] = useState(false)
+    const [loadingClass, setLoadingClass] = useState(false)
+    const [loadingSection, setLoadingSection] = useState(false)
     const [fetchingLoading, setFetchingLoading] = useState(false)
 
     const fetchClasses = async () => {
@@ -25,14 +27,8 @@ export default function AddClassPage() {
         try {
             const res = await fetch(`/api/schools/${schoolId}/classes`)
             const data = await res.json()
-            // ✅ Defensive: ensure array
-            if (Array.isArray(data)) {
-                setClasses(data)
-            } else {
-                setClasses([])
-                console.error("Unexpected data format:", data)
-            }
-        } catch (err) {
+            setClasses(Array.isArray(data) ? data : [])
+        } catch {
             toast.error("Failed to load classes")
             setClasses([])
         } finally {
@@ -41,26 +37,42 @@ export default function AddClassPage() {
     }
 
     const handleAddClass = async () => {
-        if (!className || !section) return toast.error("Class and section required")
-        setLoading(true)
+        if (!className) return toast.error("Class name is required")
+        setLoadingClass(true)
         try {
             const res = await fetch(`/api/schools/${schoolId}/classes`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    name: className.toUpperCase(),
-                    sections: [section.toUpperCase()],
-                }),
+                body: JSON.stringify({ name: className.toUpperCase() })
             })
             if (!res.ok) throw new Error()
-            toast.success("Class added")
+            toast.success("Class created")
             setClassName("")
-            setSection("")
             fetchClasses()
         } catch {
-            toast.error("Failed to add class")
+            toast.error("Failed to create class")
         } finally {
-            setLoading(false)
+            setLoadingClass(false)
+        }
+    }
+
+    const handleAddSection = async () => {
+        if (!selectedClassId || !sectionName) return toast.error("Class and Section required")
+        setLoadingSection(true)
+        try {
+            const res = await fetch(`/api/schools/${schoolId}/classes/${selectedClassId}/sections`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: sectionName.toUpperCase() })
+            })
+            if (!res.ok) throw new Error()
+            toast.success("Section added")
+            setSectionName("")
+            fetchClasses()
+        } catch {
+            toast.error("Failed to add section")
+        } finally {
+            setLoadingSection(false)
         }
     }
 
@@ -68,14 +80,11 @@ export default function AddClassPage() {
         if (schoolId) fetchClasses()
     }, [schoolId])
 
-    if (!schoolId) {
-        return <div className="p-6 text-red-500 font-medium">School ID not available.</div>
-    }
-
     return (
         <div className="p-6 space-y-6">
-            <h1 className="text-xl font-semibold">Manage Classes</h1>
+            <h1 className="text-xl font-semibold">Manage Classes & Sections</h1>
 
+            {/* Create Class */}
             <Card>
                 <CardContent className="p-4 flex flex-col sm:flex-row items-center gap-4">
                     <Input
@@ -84,19 +93,40 @@ export default function AddClassPage() {
                         value={className}
                         onChange={(e) => setClassName(e.target.value)}
                     />
-                    <Input
-                        placeholder="Section (e.g., A)"
-                        className="uppercase"
-                        value={section}
-                        onChange={(e) => setSection(e.target.value)}
-                    />
-                    <Button className="text-white flex gap-2 items-center" disabled={loading} onClick={handleAddClass}>
-                        {loading && <Loader2 className="animate-spin w-4 h-4" />}
+                    <Button className="text-white flex gap-2 items-center" disabled={loadingClass} onClick={handleAddClass}>
+                        {loadingClass && <Loader2 className="animate-spin w-4 h-4" />}
                         Add Class
                     </Button>
                 </CardContent>
             </Card>
 
+            {/* Create Section */}
+            <Card>
+                <CardContent className="p-4 flex flex-col sm:flex-row items-center gap-4">
+                    <select
+                        className="border rounded p-2 w-full"
+                        value={selectedClassId}
+                        onChange={(e) => setSelectedClassId(e.target.value)}
+                    >
+                        <option value="">Select Class</option>
+                        {classes.map((cls) => (
+                            <option key={cls.id} value={cls.id}>{cls.className}</option>
+                        ))}
+                    </select>
+                    <Input
+                        placeholder="Section Name (e.g., A)"
+                        className="uppercase"
+                        value={sectionName}
+                        onChange={(e) => setSectionName(e.target.value)}
+                    />
+                    <Button className="text-white flex gap-2 items-center" disabled={loadingSection} onClick={handleAddSection}>
+                        {loadingSection && <Loader2 className="animate-spin w-4 h-4" />}
+                        Add Section
+                    </Button>
+                </CardContent>
+            </Card>
+
+            {/* Table */}
             <Card>
                 <CardContent className="p-4">
                     <Table>
@@ -123,7 +153,7 @@ export default function AddClassPage() {
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                classes.map((cls) =>
+                                classes.map((cls) => (
                                     Array.isArray(cls.sections) && cls.sections.length > 0 ? (
                                         cls.sections.map((sec) => (
                                             <TableRow key={`sec-${cls.id}-${sec.id}`}>
@@ -137,7 +167,7 @@ export default function AddClassPage() {
                                             <TableCell className="text-muted-foreground">No sections</TableCell>
                                         </TableRow>
                                     )
-                                )
+                                ))
                             )}
                         </TableBody>
                     </Table>

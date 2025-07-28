@@ -217,20 +217,20 @@ model Class {
   FeeStructure FeeStructure[]
   ClassTeacher ClassTeacher[]
 
-  @@unique([schoolId, className]) // "6" must be unique per school
+  // @@unique([schoolId, className]) // "6" must be unique per school
   @@index([schoolId])
 }
 
 model Section {
   id              Int              @id @default(autoincrement())
-  name            String // e.g., "A", "B", etc.
+  name            String
   classId         Int
-  assignedTeacher SectionTeacher[] // for assigning multiple teachers
+  schoolId        String           @db.Uuid // Optional but helpful for direct filtering
+  class           Class            @relation(fields: [classId], references: [id])
+  assignedTeacher SectionTeacher[]
   students        Student[]
 
-  class Class @relation(fields: [classId], references: [id])
-
-  @@unique([classId, name]) // ✅ ensures unique section names per class
+  @@unique([classId, name])
   @@index([classId])
 }
 
