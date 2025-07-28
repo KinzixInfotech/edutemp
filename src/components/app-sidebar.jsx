@@ -46,7 +46,7 @@ const data = {
     navMain: [
         {
             title: "Dashboard",
-            url: "/",
+            url: "/dashboard/",
             icon: IconDashboard,
         },
         {
@@ -129,12 +129,12 @@ const data = {
     documents: [
         {
             name: "Create School",
-            url: "/schools/create-school",
+            url: "/dashboard/schools/create-school",
             icon: IconDatabase,
         },
         {
             name: "All Schools",
-            url: "/schools/all-schools",
+            url: "/dashboard/schools/all-schools",
             icon: IconReport,
         },
         {
@@ -146,22 +146,22 @@ const data = {
     schoolSetting: [
         {
             name: "Add Classes",
-            url: "/schools/create-classes",
+            url: "/dashboard/schools/create-classes",
             icon: IconDatabase,
         },
         {
             name: "Add Students",
-            url: "/schools/create-students",
+            url: "/dashboard/schools/create-students",
             icon: IconDatabase,
         },
         {
             name: "Add Teaching Staff",
-            url: "/schools/create-classes",
+            url: "/dashboard/schools/create-classes",
             icon: IconDatabase,
         },
         {
             name: "Add Non-Teaching Staff",
-            url: "/schools/create-classes",
+            url: "/dashboard/schools/create-classes",
             icon: IconDatabase,
         },
 
@@ -169,7 +169,7 @@ const data = {
     eduemployes: [
         {
             name: "All Employees",
-            url: "/create-school",
+            url: "/dashboard/create-school",
             icon: IconDatabase,
         },
         {

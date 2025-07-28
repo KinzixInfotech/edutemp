@@ -143,7 +143,7 @@ export default function Page() {
                                     <TableCell>{school.location}</TableCell>
                                     <TableCell>{school.currentDomain}</TableCell>
                                     <TableCell className="text-right space-x-2">
-                                        <Link href={`/schools/${school.id}/manage`}>
+                                        <Link href={`/dashboard/schools/${school.id}/manage`}>
                                             <Button size="sm" variant="outline">View</Button>
                                         </Link>
                                         <Button

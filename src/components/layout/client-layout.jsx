@@ -13,7 +13,7 @@ const TopProgressBar = dynamic(() => import("@/app/components/TopProgressBar"), 
 });
 export default function ClientLayout({ children }) {
     const pathname = usePathname();
-    const hideUI = ["/login",].includes(pathname);
+    const hideUI = ["/dashboard/login",].includes(pathname);
     return (
         <SidebarProvider
             style={{

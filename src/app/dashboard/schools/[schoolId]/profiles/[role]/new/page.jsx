@@ -47,45 +47,6 @@ export default function NewProfilePage() {
     console.log("Selected Class:", selectedClass)
     console.log("Sections:", sections)
     const router = useRouter()
-    // const baseForm = {
-    //     name: "",
-    //     email: "",
-    //     dob: "", // consider using ISO format or Date object
-    //     studentName: "",
-    //     admissionNo: "",
-    //     adhaarNo: "",
-    //     bloodGroup: "",
-    //     address: "",
-    //     profilePhoto: "",
-    //     class: "",
-    //     password: '',
-    //     certificates: [],
-    //     mobile: "",
-    //     guardianName: "",
-    //     childId: "",
-    //     busNumber: "",
-    //     studentCount: "",
-    //     location: "",
-    //     role: "",
-    //     labName: "",
-    //     results: {},
-    //     teacherId: "",
-    //     parentIds: [],
-
-    //     // Added based on the Student model:
-    //     fatherName: "",
-    //     motherName: "",
-    //     fatherMobileNumber: "",
-    //     motherMobileNumber: "",
-    //     guardianRelation: "",
-    //     guardianMobileNo: "",
-    //     gender: "", // Expected to be: "MALE" | "FEMALE" | "OTHER" (based on enum Gender)
-    //     session: "",
-    //     classId: "",
-    //     userId: "",
-    //     schoolId,
-    //     parentId: "",
-    // }
     const baseForm = {
         // Required for student creation
         name: "",

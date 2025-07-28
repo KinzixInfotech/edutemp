@@ -10,43 +10,44 @@ export function AuthProvider({ children }) {
     const [fullUser, setFullUser] = useState(null); // Prisma user with role + schoolId
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const getSessionAndUser = async () => {
-            try {
-                const {
-                    data: { session },
-                } = await supabase.auth.getSession();
+    // ⛳ Unified fetch user method
+    const fetchUser = async (sessionUser) => {
+        try {
+            setUser(sessionUser);
+            if (sessionUser?.email) {
+                const res = await fetch(`/api/auth/user?email=${sessionUser.email}`);
+                const data = await res.json();
 
-                const supabaseUser = session;
-                setUser(supabaseUser);
-                console.log("📦 Supabase User:", supabaseUser);
-
-                if (supabaseUser?.user.email) {
-                    const res = await fetch(`/api/auth/user?email=${supabaseUser.user.email}`);
-                    const data = await res.json();
-
-                    if (res.ok) {
-                        console.log("✅ Full User:", data);
-                        setFullUser(data);
-                    } else {
-                        console.error("❌ Failed to fetch full user:", data.error);
-                    }
+                if (res.ok) {
+                    console.log("✅ Full User:", data);
+                    setFullUser(data);
+                } else {
+                    console.error("❌ Failed to fetch full user:", data.error);
                 }
-            } catch (err) {
-                console.error("❌ Auth loading error:", err);
-            } finally {
-                setLoading(false);
             }
+        } catch (err) {
+            console.error("❌ Error fetching user:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        const getInitialSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            const currentUser = session?.user ?? null;
+            console.log("📦 Initial Session:", session);
+            await fetchUser(currentUser);
         };
 
-        getSessionAndUser();
+        getInitialSession();
 
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((_event, session) => {
             const currentUser = session?.user ?? null;
             console.log("🔁 Auth change detected. User:", currentUser);
-            setUser(currentUser);
+            fetchUser(currentUser);
         });
 
         return () => subscription.unsubscribe();
