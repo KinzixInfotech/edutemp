@@ -93,7 +93,7 @@ export default function Header() {
                 </div>
                 {/* Right side */}
                 <div className="flex items-center gap-2">
-                    <Link href={'/dashboard/login'}>
+                    <Link href={'/login'}>
                         <Button asChild size="lg" className="text-sm bg-blue-600 text-white hover:bg-blue-700">
                             <span className="text-primary hover:text-primary/90">Login</span>
                         </Button>
