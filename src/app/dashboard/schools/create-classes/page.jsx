@@ -8,7 +8,13 @@ import { Card, CardContent } from "@/components/ui/card"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
-
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 export default function ManageClassSectionPage() {
     const { fullUser } = useAuth()
     const schoolId = fullUser?.schoolId
@@ -43,7 +49,7 @@ export default function ManageClassSectionPage() {
             const res = await fetch(`/api/schools/${schoolId}/classes`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name: className.toUpperCase() })
+                body: JSON.stringify({ name: className.toUpperCase(), schoolId })
             })
             if (!res.ok) throw new Error()
             toast.success("Class created")
@@ -103,16 +109,22 @@ export default function ManageClassSectionPage() {
             {/* Create Section */}
             <Card>
                 <CardContent className="p-4 flex flex-col sm:flex-row items-center gap-4">
-                    <select
-                        className="border rounded p-2 w-full"
+                    <Select
                         value={selectedClassId}
-                        onChange={(e) => setSelectedClassId(e.target.value)}
+                        onValueChange={(e) => setSelectedClassId(e.target.value)}
                     >
-                        <option value="">Select Class</option>
-                        {classes.map((cls) => (
-                            <option key={cls.id} value={cls.id}>{cls.className}</option>
-                        ))}
-                    </select>
+                        <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select Class" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="ALL">Select Class</SelectItem>
+                            {classes.map((cls) => (
+                                <SelectItem key={cls.id} value={cls.id}>
+                                    {cls.className}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                     <Input
                         placeholder="Section Name (e.g., A)"
                         className="uppercase"

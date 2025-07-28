@@ -62,7 +62,10 @@ export function NavUser({ }) {
                         >
                             <Avatar className="h-8 w-8 rounded-lg grayscale">
                                 <AvatarImage src={fullUser?.avatar} alt={fullUser?.name} />
-                                <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                                <AvatarFallback className="rounded-lg">
+
+                                    {fullUser?.email?.[0]?.toUpperCase() ?? "U"}
+                                </AvatarFallback>
                             </Avatar>
                             <div className="grid flex-1 text-left text-sm leading-tight">
                                 <span className="truncate font-medium">{fullUser?.name || 'Add Name'}</span>

@@ -81,6 +81,6 @@ export async function GET(req) {
         });
     } catch (err) {
         console.error("❌ Error in /api/auth/user:", err);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+        return NextResponse.json({ error: err }, { status: 500 });
     }
 }

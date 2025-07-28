@@ -15,14 +15,7 @@ export default async function RootLayout({ children }) {
     if (!sbUser) {
         // redirect or handle unauthenticated
         redirect('/login');
-    } else {
-        console.log("🍪 User from cookie:", sbUser.value);
     }
-    // const currentUser = session?.user ?? null;
-    // console.log("📦 Initial Session: from", session);
-    // if (!user) {
-    //     redirect('/login')
-    // }
     return (
 
         <AuthProvider>

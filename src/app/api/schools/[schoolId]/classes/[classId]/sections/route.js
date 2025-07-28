@@ -14,6 +14,7 @@ export async function POST(req, { params }) {
         const newSection = await prisma.section.create({
             data: {
                 name: name.toUpperCase(),
+                schoolId,
                 classId: Number(classId),
             },
         })
