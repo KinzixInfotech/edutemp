@@ -34,6 +34,12 @@ import { useSidebar } from "@/components/ui/sidebar"
 
 export default function ManageSchoolPage() {
     const { toggleSidebar } = useSidebar()
+    const router = useRouter()
+    const { schoolId } = useParams()
+    const [loading, setLoading] = useState(true)
+    const [activeTab, setActiveTab] = useState("teachers")
+    const [profiles, setProfiles] = useState({})
+
     const profileTabsConfig = {
         teachers: {
             label: "Teachers",
@@ -49,17 +55,17 @@ export default function ManageSchoolPage() {
             label: "Students",
             columns: [
                 { key: "admissionNo", label: "Admission Number" },
-                { key: "studentName", label: "Name" },
+                { key: "name", label: "Name" },
                 { key: "dob", label: "DOB" },
                 { key: "gender", label: "Gender" },
-                { key: "fatherName", label: "Father Name" },
-                { key: "motherName", label: "Mother Name" },
+                { key: "FatherName", label: "Father Name" },
+                { key: "MotherName", label: "Mother Name" },
             ],
         },
         parents: {
             label: "Parents",
             columns: [
-                { key: "guardianName", label: "Guradian" },
+                { key: "guardianName", label: "Guardian" },
                 {
                     key: "childId",
                     label: "Child",
@@ -75,7 +81,7 @@ export default function ManageSchoolPage() {
                                     <Command>
                                         <CommandList>
                                             <CommandItem>Name: {child.name}</CommandItem>
-                                            <CommandItem>Class: {child.class}</CommandItem>
+                                            <CommandItem>Class: {child.class?.className || "N/A"}</CommandItem>
                                             <CommandItem>Email: {child.email || "N/A"}</CommandItem>
                                             <CommandItem>DOB: {child.dob || "N/A"}</CommandItem>
                                             <CommandItem>Location: {child.location || "N/A"}</CommandItem>
@@ -144,11 +150,6 @@ export default function ManageSchoolPage() {
             ],
         },
     }
-    const router = useRouter()
-    const { schoolId } = useParams()
-    const [loading, setLoading] = useState(true)
-    const [activeTab, setActiveTab] = useState("teachers")
-    const [profiles, setProfiles] = useState({})
 
     const roleTabs = Object.entries(profileTabsConfig).map(([key, val]) => ({
         key,
@@ -162,7 +163,6 @@ export default function ManageSchoolPage() {
             const data = await res.json()
             setProfiles(data)
             toast.success("Profiles loaded")
-            // const data = await res.json()
         } catch (err) {
             toast.error("Failed to fetch profiles")
         } finally {
@@ -197,32 +197,36 @@ export default function ManageSchoolPage() {
         }
     }
 
+    const renderValue = (value) => {
+        if (typeof value === "object" && value !== null) {
+            return value.className || value.name || value.title || "[Object]"
+        }
+        return value ?? "-"
+    }
+
     return (
         <div className="p-6 space-y-6">
             <div className="flex items-center justify-between">
                 <h1 className="text-xl font-semibold">Manage School: {schoolId}</h1>
-                <Button className={'text-white capitalize'} onClick={handleAdd}>Add {activeTab.slice(0, -1)}</Button>
+                <Button className="text-white capitalize" onClick={handleAdd}>
+                    Add {activeTab.slice(0, -1)}
+                </Button>
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="flex w-full overflow-x-auto whitespace-nowrap no-scrollbar gap-2 px-2 sm:px-4">
                     {roleTabs.map((tab) => (
-                        <TabsTrigger
-                            key={tab.key}
-                            value={tab.key}
-                            className="flex-shrink-0"
-                        >
+                        <TabsTrigger key={tab.key} value={tab.key} className="flex-shrink-0">
                             {tab.label}
                         </TabsTrigger>
                     ))}
                 </TabsList>
 
-
                 {roleTabs.map((tab) => (
                     <TabsContent key={tab.key} value={tab.key} className="pt-4">
                         <Card>
                             <CardContent className="overflow-x-auto min-w-[700px] lg:w-[896px]">
-                                <Table className="min-w-[700px] lg:w-[896px] ">
+                                <Table className="min-w-[700px] lg:w-[896px]">
                                     <TableHeader>
                                         <TableRow>
                                             {profileTabsConfig[tab.key].columns.map((col) => (
@@ -234,7 +238,7 @@ export default function ManageSchoolPage() {
                                     <TableBody>
                                         {loading ? (
                                             <TableRow>
-                                                <TableCell colSpan={6} className="text-center py-6">
+                                                <TableCell colSpan={99} className="text-center py-6">
                                                     <div className="flex justify-center items-center gap-2 text-muted-foreground">
                                                         <Loader2 className="animate-spin h-4 w-4" />
                                                         Loading...
@@ -243,8 +247,16 @@ export default function ManageSchoolPage() {
                                             </TableRow>
                                         ) : currentList.length === 0 ? (
                                             <TableRow>
-                                                <TableCell colSpan={6} className="text-center py-6">
-                                                    No {tab.label} found.
+                                                {profileTabsConfig[tab.key].columns.map((col) => (
+                                                    <TableCell
+                                                        key={col.key}
+                                                        className="text-center text-muted-foreground"
+                                                    >
+                                                        No data
+                                                    </TableCell>
+                                                ))}
+                                                <TableCell className="text-center text-muted-foreground">
+                                                    No actions
                                                 </TableCell>
                                             </TableRow>
                                         ) : (
@@ -254,15 +266,26 @@ export default function ManageSchoolPage() {
                                                         <TableCell key={col.key}>
                                                             {typeof col.render === "function"
                                                                 ? col.render(item[col.key], profiles)
-                                                                : item[col.key] ?? "-"}
+                                                                : renderValue(item[col.key])}
                                                         </TableCell>
                                                     ))}
-
                                                     <TableCell className="text-right space-x-2">
-                                                        <Button size="sm" variant="outline" onClick={() => router.push(`/schools/${schoolId}/profiles/${tab.key}/${item.id}/edit`)}>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() =>
+                                                                router.push(
+                                                                    `/schools/${schoolId}/profiles/${tab.key}/${item.id}/edit`
+                                                                )
+                                                            }
+                                                        >
                                                             Edit
                                                         </Button>
-                                                        <Button size="sm" variant="destructive" onClick={() => handleDelete(item.id)}>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="destructive"
+                                                            onClick={() => handleDelete(item.id)}
+                                                        >
                                                             Delete
                                                         </Button>
                                                     </TableCell>

@@ -44,65 +44,132 @@ export default function NewProfilePage() {
 
     const router = useRouter()
     const baseForm = {
-        // Required for student creation
-        name: "",
-        studentName: "", // redundant with 'name' — choose one or unify
+        // Required fields for student creation
+        studentName: "", // this maps to 'name' in DB
+        name: "",        // optionally unify with studentName if not used separately
         email: "",
         password: "",
-        dob: "", // should be ISO format or Date object
+        dob: null, // ✅ Date object or null
         gender: "", // "MALE" | "FEMALE" | "OTHER"
+
         admissionNo: "",
-        admissionDate: "", // 📅 add this
-        rollNumber: "", // 🆕
-        academicYear: "", // 🆕
+        admissionDate: null, // ✅ Date object
+        rollNumber: "",
+        academicYear: "",
         bloodGroup: "",
         adhaarNo: "",
+
         address: "",
-        city: "", // 🆕
-        state: "", // 🆕
-        country: "", // 🆕
-        postalCode: "", // 🆕
+        city: "",
+        state: "",
+        country: "",
+        postalCode: "",
 
         // Class & Section
         classId: "",
-        sectionId: "", // 🆕
+        sectionId: "",
 
-        // School & User (filled from context/backend usually)
-        userId: "",
-        schoolId: "", // ✅ assigned from parent component
-        parentId: "",
+        // School & User context
+        userId: "",     // auto-filled by backend usually
+        schoolId: "",   // passed from URL or context
+        parentId: "",   // optional
 
-        // Guardian and Parents Info
+        // Guardian and Parent Info
         fatherName: "",
-        motherName: "",
         fatherMobileNumber: "",
+        motherName: "",
         motherMobileNumber: "",
         guardianName: "",
         guardianRelation: "",
         guardianMobileNo: "",
+        guardianType: "PARENTS", // or "GUARDIAN"
 
-        // Misc
-        house: "", // 🆕
-        profilePhoto: "", // file or URL
-        dateOfLeaving: "", // optional
+        // Optional student metadata
+        house: "",
+        profilePhoto: null, // File object
+        dateOfLeaving: null, // ✅ Date object or null
         certificates: [],
 
-        // Optional fields (you had earlier)
-        mobile: "", // can map to contactNumber
-        session: "", // maybe rename to academicYear?
+        // Optional/Extra
+        mobile: "",             // use this for contactNumber
+        contactNumber: "",      // maps to contactNumber in DB
+        session: "",            // may duplicate academicYear
         busNumber: "",
         studentCount: "",
-        location: "", // general school location or address?
-        role: "", // likely fixed as "STUDENT"
+        location: "",
+        role: "STUDENT",
         labName: "",
-        results: {}, // may map to examResults
+        results: {},            // optional exam results object
         teacherId: "",
-        parentIds: [], // if multiple guardians
+        parentIds: [],          // if multiple guardians
 
-        // Optional tracking fields (backend-controlled)
-        feeStatus: "PENDING", // optional; backend default usually
-        status: "ACTIVE", // or "INACTIVE"
+        // Backend-tracked fields
+        feeStatus: "PENDING",   // "PENDING" | "PAID" | etc.
+        status: "ACTIVE",       // "ACTIVE" | "INACTIVE"
     }
+
+    // const baseForm = {
+    //     // Required for student creation
+    //     name: "",
+    //     class: "",
+    //     studentName: "", // redundant with 'name' — choose one or unify
+    //     email: "",
+    //     password: "",
+    //     dob: "", // should be ISO format or Date object
+    //     gender: "", // "MALE" | "FEMALE" | "OTHER"
+    //     admissionNo: "",
+    //     admissionDate: "", // 📅 add this
+    //     rollNumber: "", // 🆕
+    //     academicYear: "", // 🆕
+    //     bloodGroup: "",
+    //     adhaarNo: "",
+    //     address: "",
+    //     city: "", // 🆕
+    //     state: "", // 🆕
+    //     country: "", // 🆕
+    //     postalCode: "", // 🆕
+
+    //     // Class & Section
+    //     classId: "",
+    //     sectionId: "", // 🆕
+
+    //     // School & User (filled from context/backend usually)
+    //     userId: "",
+    //     schoolId: "", // ✅ assigned from parent component
+    //     parentId: "",
+
+    //     // Guardian and Parents Info
+    //     fatherName: "",
+    //     motherName: "",
+    //     fatherMobileNumber: "",
+    //     motherMobileNumber: "",
+    //     guardianName: "",
+    //     guardianRelation: "",
+    //     guardianMobileNo: "",
+
+    //     // Misc
+    //     house: "", // 🆕
+    //     profilePhoto: "", // file or URL
+    //     dateOfLeaving: "", // optional
+    //     certificates: [],
+
+    //     // Optional fields (you had earlier)
+    //     mobile: "", // can map to contactNumber
+    //     session: "", // maybe rename to academicYear?
+    //     busNumber: "",
+    //     studentCount: "",
+    //     location: "", // general school location or address?
+    //     role: "", // likely fixed as "STUDENT"
+    //     labName: "",
+    //     results: {}, // may map to examResults
+    //     teacherId: "",
+    //     parentIds: [], // if multiple guardians
+
+    //     // Optional tracking fields (backend-controlled)
+    //     feeStatus: "PENDING", // optional; backend default usually
+    //     status: "ACTIVE", // or "INACTIVE"
+    //     role
+    // }
 
     const [form, setForm] = useState(baseForm);
 
@@ -115,14 +182,23 @@ export default function NewProfilePage() {
     const handleSubmit = async () => {
         try {
             setLoading(true)
+            const cleanForm = {
+                ...form,
+                dob: form.dob ? new Date(form.dob).toISOString() : null,
+                admissionDate: form.admissionDate ? new Date(form.admissionDate).toISOString() : null,
+                dateOfLeaving: form.dateOfLeaving ? new Date(form.dateOfLeaving).toISOString() : null,
+                parentId: form.parentId || null,
+                userId: form.userId || undefined,
+                schoolId: schoolId,
+            };
             const res = await fetch(`/api/schools/${schoolId}/profiles/${role}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(form)
+                body: JSON.stringify(cleanForm)
             })
             if (!res.ok) throw new Error("Failed to create profile")
             toast.success(`${role} profile created`)
-            router.push(`/schools/${schoolId}/manage`)
+            router.push(`/dashboard/schools/${schoolId}/manage`)
         } catch {
             toast.error("Creation failed")
         } finally {
@@ -177,6 +253,31 @@ export default function NewProfilePage() {
                             value={form.studentName}
                             onChange={(e) => setForm({ ...form, studentName: e.target.value })}
                         />
+                        {/* <Input type="date" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} /> */}
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    className={`w-full justify-start text-left font-normal ${!form.dob ? "text-muted-foreground" : ""}`}
+                                >
+                                    {form.dob ? format(form.dob, "PPP") : "DOB"}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                    mode="single"
+                                    selected={form.admissionDate}
+                                    onSelect={(date) => setForm({ ...form, dob: date })}
+                                    initialFocus
+                                />
+                            </PopoverContent>
+                        </Popover>
+
+                        {/* <Input
+                            type="date"
+                            value={form.dob ? format(new Date(form.dob), "yyyy-MM-dd") : ""}
+                            onChange={(e) => setForm({ ...form, dob: new Date(e.target.value) })}
+                        /> */}
                         {/* ✅ Profile Photo Upload */}
                         <Label htmlFor="profilePhoto">Upload Profile Photo</Label>
                         <Input
@@ -240,8 +341,6 @@ export default function NewProfilePage() {
                                 <SelectItem value="OTHER">Other</SelectItem>
                             </SelectContent>
                         </Select>
-
-
                         <Input
                             placeholder="Blood Group"
                             value={form.bloodGroup}
@@ -266,6 +365,7 @@ export default function NewProfilePage() {
                             value={form.adhaarNo}
                             onChange={(e) => setForm({ ...form, adhaarNo: e.target.value })}
                         />
+
                         <Label className="mt-4">Select Guardian Type</Label>
                         <RadioGroup
                             value={form.guardianType}
@@ -327,71 +427,15 @@ export default function NewProfilePage() {
                                 />
                             </>
                         )}
-                        {/* <Input
-                            placeholder="Father Name"
-                            value={form.fatherName}
-                            onChange={(e) => setForm({ ...form, fatherName: e.target.value })}
-                        />
-
-                        <Input
-                            placeholder="Mother Name"
-                            value={form.motherName}
-                            onChange={(e) => setForm({ ...form, motherName: e.target.value })}
-                        /> */}
-                        {/* 
-                        <Input
-                            placeholder="Father Mobile Number"
-                            value={form.fatherMobileNumber}
-                            onChange={(e) => setForm({ ...form, fatherMobileNumber: e.target.value })}
-                        /> */}
-
-                        {/* <Input
-                            placeholder="Mother Mobile Number"
-                            value={form.motherMobileNumber}
-                            onChange={(e) => setForm({ ...form, motherMobileNumber: e.target.value })}
-                        /> */}
-
-                        {/* <Input
-                            placeholder="Guardian Name"
-                            value={form.guardianName}
-                            onChange={(e) => setForm({ ...form, guardianName: e.target.value })}
-                        />
-
-                        <Input
-                            placeholder="Guardian Relation"
-                            value={form.guardianRelation}
-                            onChange={(e) => setForm({ ...form, guardianRelation: e.target.value })}
-                        /> */}
-
-                        {/* <Input
-                            placeholder="Guardian Mobile Number"
-                            value={form.guardianMobileNo}
-                            onChange={(e) => setForm({ ...form, guardianMobileNo: e.target.value })}
-                        /> */}
-
-
-
                         <Input
                             placeholder="Address Line 1"
                             value={form.address}
                             onChange={(e) => setForm({ ...form, address: e.target.value })}
                         />
-
-
-
                         <Input placeholder="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
                         <Input placeholder="State" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
                         <Input placeholder="Country" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} />
                         <Input placeholder="Postal Code" value={form.postalCode} onChange={(e) => setForm({ ...form, postalCode: e.target.value })} />
-
-                        {/* Date of Leaving (Optional) */}
-                        {/* <Label htmlFor="dateOfLeaving">Date of Leaving</Label>
-                        <Calendar
-                            mode="single"
-                            selected={form.dateOfLeaving}
-                            onSelect={(date) => setForm({ ...form, dateOfLeaving: date })}
-                            initialFocus
-                        /> */}
                     </>
 
                 )

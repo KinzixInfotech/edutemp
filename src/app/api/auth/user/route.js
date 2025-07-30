@@ -20,6 +20,7 @@ export async function GET(req) {
                 email: true,
                 role: true,
                 schoolId: true,
+
                 school: {
                     select: {
                         id: true,
@@ -36,6 +37,10 @@ export async function GET(req) {
         }
 
         let schoolId = null;
+        let profilePicture = null;
+        let classs = null;
+        let section = null;
+        let name = null;
 
         // Step 2: Fetch schoolId from corresponding model based on role
         switch (user.role.name) {
@@ -63,20 +68,33 @@ export async function GET(req) {
             case "STUDENT":
                 const student = await prisma.student.findUnique({
                     where: { userId: user.id },
-                    select: { schoolId: true },
+                    select: {
+                        name: true,
+                        // class: true,
+                        // section: true,
+                        schoolId: true,
+                        profilePicture: true,
+                    },
                 });
                 schoolId = student?.schoolId;
+                name = student?.name;
+                // classs = student?.class;
+                // section = student?.section;
+                profilePicture = student?.profilePicture;
                 break;
         }
-
         const end = performance.now();
-        console.log(`🕒 Query took ${end - start} ms`);
+        console.log(`🕒 Query took ${end - start, profilePicture} ms`);
 
         return NextResponse.json({
             id: user.id,
             email: user.email,
             role: user.role,
             schoolId,
+            name,
+            classs,
+            section,
+            profilePicture, // ✅ now included in the response
         });
     } catch (err) {
         console.error("❌ Error in /api/auth/user:", err);

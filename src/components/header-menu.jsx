@@ -21,7 +21,8 @@ export function UserDropdown() {
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Avatar className="h-8 w-8 rounded-lg grayscale cursor-pointer">
-                    <AvatarImage src={fullUser?.avatarUrl} alt={fullUser?.name} />
+                    <AvatarImage src={fullUser?.
+                        profilePicture} alt={fullUser?.name} />
                     <AvatarFallback className='rounded-lg'>
                         {fullUser?.email?.[0]?.toUpperCase() ?? "U"}
                     </AvatarFallback>
