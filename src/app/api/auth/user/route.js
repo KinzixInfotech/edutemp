@@ -37,6 +37,7 @@ export async function GET(req) {
         }
 
         let schoolId = null;
+        let studentdatafull = null;
         let profilePicture = null;
         let classs = null;
         let section = null;
@@ -68,18 +69,17 @@ export async function GET(req) {
             case "STUDENT":
                 const student = await prisma.student.findUnique({
                     where: { userId: user.id },
-                    select: {
-                        name: true,
-                        // class: true,
-                        // section: true,
-                        schoolId: true,
-                        profilePicture: true,
-                    },
-                });
+                    include: {
+                        class: true,
+                        section: true,
+                    }
+
+                })
                 schoolId = student?.schoolId;
                 name = student?.name;
-                // classs = student?.class;
-                // section = student?.section;
+                studentdatafull = student,
+                    classs = student?.class;
+                section = student?.section;
                 profilePicture = student?.profilePicture;
                 break;
         }
@@ -93,6 +93,7 @@ export async function GET(req) {
             schoolId,
             name,
             classs,
+            studentdatafull,
             section,
             profilePicture, // ✅ now included in the response
         });

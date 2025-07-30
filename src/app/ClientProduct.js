@@ -11,7 +11,8 @@ export default function ClientProduct({ children }) {
     return (
         <>
             {!hideHeaderFooter && <Header />}
-            <main className="flex-1 px-3.5 pt-4">{children}</main>
+            {/* px-3.5 pt-4 */}
+            <main className="flex-1">{children}</main>
             {!hideHeaderFooter && <Footer />}
         </>
     );

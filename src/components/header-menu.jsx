@@ -20,7 +20,7 @@ export function UserDropdown() {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Avatar className="h-8 w-8 rounded-lg grayscale cursor-pointer">
+                <Avatar className="h-8 w-8 rounded-lg  cursor-pointer">
                     <AvatarImage src={fullUser?.
                         profilePicture} alt={fullUser?.name} />
                     <AvatarFallback className='rounded-lg'>
