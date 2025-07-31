@@ -27,6 +27,7 @@ import {
 export function NavDocuments({
     items,
     name,
+    activePath,
 }) {
     const { isMobile } = useSidebar()
 

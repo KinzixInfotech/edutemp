@@ -142,7 +142,7 @@ export async function POST(req, context) {
         }
         console.log(parsed, 'from edu');
         const created = await prisma.$transaction(async (tx) => {
-            // 🧠 Ensure Role exists
+            // Ensure Role exists
             const role = await tx.role.upsert({
                 where: { name: mappedRole },
                 update: {},

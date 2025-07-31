@@ -13,7 +13,7 @@ export async function POST(req) {
     const body = await req.json();
     const { email, password } = loginSchema.parse(body);
 
-    // 1️⃣ Supabase Auth with robust error handling
+    // 1️⃣ Supabase Auth
     let authData, authError;
     try {
       const result = await supabase.auth.signInWithPassword({ email, password });
@@ -25,7 +25,6 @@ export async function POST(req) {
     }
 
     if (authError || !authData?.user) {
-      console.warn("❌ Invalid credentials or Supabase error:", authError?.message);
       return NextResponse.json(
         { error: "Invalid email or password" },
         { status: 401 }
@@ -34,10 +33,11 @@ export async function POST(req) {
 
     const userId = authData.user.id;
 
-    // 2️⃣ Get user from your Prisma DB
+    // 2️⃣ Get user from Prisma
     const user = await prisma.User.findUnique({
-      where: { id: userId }, include: {
-        role: true, //  this will fetch the Role object along with the user
+      where: { id: userId },
+      include: {
+        role: true,
       },
     });
 
@@ -48,9 +48,21 @@ export async function POST(req) {
       );
     }
 
+    // ✅ Early exit for SUPER_ADMIN
+    if (user.role.name === "SUPER_ADMIN") {
+      return NextResponse.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          schoolId: null,
+        },
+      });
+    }
+
     // 3️⃣ Resolve schoolId based on user role
     let schoolId = null;
-    console.log(user, 'from login');
+
     switch (user.role.name) {
       case "ADMIN": {
         const admin = await prisma.admin.findUnique({ where: { userId } });
@@ -84,7 +96,7 @@ export async function POST(req) {
               select: {
                 schoolId: true,
               },
-              take: 1, // Assuming one school
+              take: 1,
             },
           },
         });
@@ -97,6 +109,7 @@ export async function POST(req) {
         return NextResponse.json({ error: "Unsupported role" }, { status: 403 });
     }
 
+    // 4️⃣ Final check for linked school
     if (!schoolId) {
       return NextResponse.json(
         { error: "No school linked to this user" },
@@ -104,7 +117,7 @@ export async function POST(req) {
       );
     }
 
-    // ✅ Success response
+    // ✅ Success
     return NextResponse.json({
       user: {
         id: user.id,

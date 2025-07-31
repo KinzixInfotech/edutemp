@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
-import { Loader2 } from "lucide-react"
+import { Loader2, RefreshCcw, Plus } from "lucide-react"
 import { useIsMobile } from "@/hooks/use-mobile"
 import {
     Table,
@@ -98,16 +98,23 @@ export default function Page() {
         <div className="w-full p-4">
             <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">All Schools</h2>
-                <Button onClick={fetchSchools} disabled={loading}>
-                    {loading ? (
-                        <span className="flex items-center gap-2">
-                            <Loader2 className="animate-spin h-4 w-4" />
-                            Refreshing...
-                        </span>
-                    ) : (
-                        "Refresh"
-                    )}
-                </Button>
+                <div className="gap-4 flex-row flex">
+                    <Button variant={'outline'} onClick={fetchSchools} disabled={loading}>
+                        {loading ? (
+                            <span className="flex items-center gap-2">
+                                <Loader2 className="animate-spin h-4 w-4" />
+                                Refreshing...
+                            </span>
+                        ) : (
+                            <RefreshCcw />
+                        )}
+                    </Button>
+                    <Link href={'create-school'}>
+                        <Button >
+                            Create School<Plus />
+                        </Button>
+                    </Link>
+                </div>
             </div>
 
             <div className="overflow-x-auto overflow-hidden rounded-lg border">

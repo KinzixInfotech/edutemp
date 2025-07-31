@@ -1,32 +1,17 @@
 "use client"
 
 import * as React from "react"
-import {
-    IconCamera,
-    IconChartBar,
-    IconDashboard,
-    IconDatabase,
-    IconFileAi,
-    IconFileDescription,
-    IconFileWord,
-    IconFolder,
-    IconHelp,
-    IconInnerShadowTop,
-    IconListDetails,
-    IconReport,
-    IconSearch,
-    IconSettings,
-    IconUsers,
-} from "@tabler/icons-react"
-import Image from 'next/image';
-import { useTheme } from 'next-themes';
-import logoBlack from '../../public/logo-black.png';
-import logoWhite from '../../public/logo-white.png';
+import Image from "next/image"
+import { usePathname } from "next/navigation"
+import { useTheme } from "next-themes"
+import { useAuth } from "@/context/AuthContext"
 
-import { NavDocuments } from "@/components/nav-documents"
-import { NavMain } from "@/components/nav-main"
+import logoBlack from "../../public/edu.png"
+import logoWhite from "../../public/logo-white.png"
+
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
+
 import {
     Sidebar,
     SidebarContent,
@@ -37,194 +22,132 @@ import {
     SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
-const data = {
+import {
+    IconDashboard,
+    IconListDetails,
+    IconChartBar,
+    IconDatabase,
+    IconSchool,
+    IconReport,
+    IconSettings,
+    IconHelp,
+    IconSearch,
+} from "@tabler/icons-react"
+import { NavSidebarSections } from "./nav-main"
+const sidebarData = [
+    {
+        title: "Main",
+        items: [
+            { label: "Dashboard", url: "/dashboard/", icon: IconDashboard, roles: ["SUPER_ADMIN", "STUDENT"] },
+            { label: "Create Superadmin", url: "/dashboard/edubreezy/add-user", icon: IconListDetails, roles: ["SUPER_ADMIN"] },
+            { label: "Analytics", url: "#", icon: IconChartBar, roles: ["SUPER_ADMIN"] },
+        ],
+    },
+    {
+        title: "School Settings",
+        items: [
+            { label: "Add Classes", url: "/dashboard/schools/create-classes", icon: IconDatabase, roles: ["ADMIN"] },
+            { label: "Add Students", url: "/dashboard/schools/create-students", icon: IconDatabase, roles: ["ADMIN"] },
+        ],
+        items: [
+            { label: "All Schools", url: "/dashboard/schools/all-schools", icon: IconDatabase, roles: ['SUPER_ADMIN'] },
+            { label: "Add Students", url: "/dashboard/schools/create-students", icon: IconDatabase, roles: ["ADMIN"] },
+            { label: "Add Teacher", url: "/dashboard/schools/add-teacher", icon: IconDatabase, roles: ["ADMIN"] },
+            { label: "Add ", url: "/dashboard/schools/create-students", icon: IconDatabase, roles: ["ADMIN"] },
+        ],
+    },
+    {
+        title: "Edu Employees",
+        items: [
+            { label: "All Employees", url: "/dashboard/edubreezy/add-user", icon: IconDatabase, roles: ['SUPER_ADMIN'] },
+            { label: "Add Employee", url: "#", icon: IconReport, roles: ['SUPER_ADMIN'] },
+        ],
+    },
+
+
+]
+const navUser = {
     user: {
         name: "shadcn",
         email: "m@example.com",
         avatar: "/avatars/shadcn.jpg",
     },
-    navMain: [
-        {
-            title: "Dashboard",
-            url: "/dashboard/",
-            icon: IconDashboard,
-        },
-        {
-            title: "Create admin user",
-            url: "#",
-            icon: IconListDetails,
-        },
-        {
-            title: "Analytics",
-            url: "#",
-            icon: IconChartBar,
-        },
-
-    ],
-    clouds: [
-        {
-            title: "Capture",
-            icon: IconCamera,
-            isActive: true,
-            url: "#",
-            items: [
-                {
-                    title: "Active Proposals",
-                    url: "#",
-                },
-                {
-                    title: "Archived",
-                    url: "#",
-                },
-            ],
-        },
-        {
-            title: "Proposal",
-            icon: IconFileDescription,
-            url: "#",
-            items: [
-                {
-                    title: "Active Proposals",
-                    url: "#",
-                },
-                {
-                    title: "Archived",
-                    url: "#",
-                },
-            ],
-        },
-        {
-            title: "Prompts",
-            icon: IconFileAi,
-            url: "#",
-            items: [
-                {
-                    title: "Active Proposals",
-                    url: "#",
-                },
-                {
-                    title: "Archived",
-                    url: "#",
-                },
-            ],
-        },
-    ],
-    navSecondary: [
-        {
-            title: "Settings",
-            url: "#",
-            icon: IconSettings,
-        },
-        {
-            title: "Get Help",
-            url: "#",
-            icon: IconHelp,
-        },
-        {
-            title: "Search",
-            url: "#",
-            icon: IconSearch,
-        },
-    ],
-    documents: [
-        {
-            name: "Create School",
-            url: "/dashboard/schools/create-school",
-            icon: IconDatabase,
-        },
-        {
-            name: "All Schools",
-            url: "/dashboard/schools/all-schools",
-            icon: IconReport,
-        },
-        {
-            name: "School Subscription",
-            url: "#",
-            icon: IconFileWord,
-        },
-    ],
-    schoolSetting: [
-        {
-            name: "Add Classes",
-            url: "/dashboard/schools/create-classes",
-            icon: IconDatabase,
-        },
-        {
-            name: "Add Students",
-            url: "/dashboard/schools/create-students",
-            icon: IconDatabase,
-        },
-        {
-            name: "Add Teaching Staff",
-            url: "/dashboard/schools/create-classes",
-            icon: IconDatabase,
-        },
-        {
-            name: "Add Non-Teaching Staff",
-            url: "/dashboard/schools/create-classes",
-            icon: IconDatabase,
-        },
-
-    ],
-    eduemployes: [
-        {
-            name: "All Employees",
-            url: "/dashboard/create-school",
-            icon: IconDatabase,
-        },
-        {
-            name: "Add Employee",
-            url: "#",
-            icon: IconReport,
-        },
-        {
-            name: "Teams",
-            url: "#",
-            icon: IconReport,
-        },
-    ],
+    support: {
+        title: "General",
+        items: [
+            { label: "Settings", url: "#", icon: IconSettings },
+            { label: "Help", url: "#", icon: IconHelp },
+        ],
+    },
 }
+// const data = {
+
+//     navMain: [
+//         { title: "Dashboard", url: "/dashboard", icon: IconDashboard, roles: ["SUPERADMIN"] },
+//         { title: "Create admin user", url: "#", icon: IconListDetails, roles: ["SUPERADMIN"] },
+//         { title: "Analytics", url: "#", icon: IconChartBar, roles: ["SUPERADMIN"] },
+//     ],
+//     schoolSetting: [
+//         { title: "Add Classes", url: "/dashboard/schools/create-classes", icon: IconDatabase, roles: ["ADMIN"] },
+//         { title: "Add Students", url: "/dashboard/schools/create-students", icon: IconDatabase, roles: ["ADMIN"] },
+//         { title: "Add Teaching Staff", url: "/dashboard/schools/create-classes", icon: IconDatabase, roles: ["ADMIN"] },
+//         { title: "Add Non-Teaching Staff", url: "/dashboard/schools/create-classes", icon: IconDatabase, roles: ["ADMIN"] },
+//     ],
+//     documents: [
+//         { title: "All Schools", url: "/dashboard/schools/all-schools", icon: IconSchool },
+//     ],
+//     eduemployes: [
+//         { title: "All Employees", url: "/dashboard/create-school", icon: IconDatabase },
+//         { title: "Add Employee", url: "#", icon: IconReport },
+//         { title: "Teams", url: "#", icon: IconReport },
+//     ],
+//     navSecondary: [
+//         { title: "Settings", url: "#", icon: IconSettings },
+//         { title: "Get Help", url: "#", icon: IconHelp },
+//         { title: "Search", url: "#", icon: IconSearch },
+//     ],
+// }
 
 export function AppSidebar({ ...props }) {
-    const { resolvedTheme } = useTheme();
-    const [mounted, setMounted] = React.useState(false);
+    const { resolvedTheme } = useTheme()
+    const { fullUser } = useAuth()
+    const pathname = usePathname()
 
-    React.useEffect(() => {
-        setMounted(true);
-    }, []);
+    const [mounted, setMounted] = React.useState(false)
+    React.useEffect(() => setMounted(true), [])
+    if (!mounted) return null
 
-    if (!mounted) return null; // prevent hydration mismatch
-
-    const logo = resolvedTheme === 'dark' ? logoWhite : logoBlack;
-
+    const logo = resolvedTheme === "dark" ? logoWhite : logoBlack
     return (
         <Sidebar collapsible="offcanvas" {...props}>
             <SidebarHeader>
                 <SidebarMenu>
-                    <SidebarMenuItem >
+                    <SidebarMenuItem>
                         <SidebarMenuButton
                             asChild
                             className="data-[slot=sidebar-menu-button]:!p-1.5"
                         >
                             <a href="#">
-                                <img src={logo.src} width={160} height={160} alt="EduBreezy" />
+                                <Image src={logo} width={160} height={160} alt="EduBreezy" />
                             </a>
                         </SidebarMenuButton>
                         <span className="text-sm font-medium ml-2">A Kinzix product</span>
                     </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarHeader>
+
             <SidebarContent>
-                <NavMain items={data.navMain} />
-                <NavDocuments items={data.schoolSetting} name="School Setting" />
-                <NavDocuments items={data.documents} name="Edu School Settings" />
-                <NavDocuments items={data.eduemployes} name="Edu employes" />
-                <NavSecondary items={data.navSecondary} className="mt-auto" />
+                <NavSidebarSections
+                    sections={sidebarData}
+                    userRole={fullUser?.role?.name}
+                    activePath={pathname}
+                />
             </SidebarContent>
+
             <SidebarFooter>
-                <NavUser user={data.user} />
+                {/* <NavSecondary items={navUser.support} className="mt-auto" /> */}
+                <NavUser user={navUser.user} />
             </SidebarFooter>
         </Sidebar>
-    );
+    )
 }
-

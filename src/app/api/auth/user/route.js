@@ -20,7 +20,8 @@ export async function GET(req) {
                 email: true,
                 role: true,
                 schoolId: true,
-
+                name: true,
+                profilePicture: true,
                 school: {
                     select: {
                         id: true,
@@ -38,10 +39,10 @@ export async function GET(req) {
 
         let schoolId = null;
         let studentdatafull = null;
-        let profilePicture = null;
+        let profilePicture = user?.profilePicture || null;
         let classs = null;
         let section = null;
-        let name = null;
+        let name = user?.name || null;
 
         // Step 2: Fetch schoolId from corresponding model based on role
         switch (user.role.name) {

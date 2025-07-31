@@ -37,19 +37,47 @@ model Role {
   users User[]
 }
 
-model User {
-  id        String    @id @db.Uuid // Supabase UUID — do not use default(uuid())
-  schoolId  String    @db.Uuid
-  roleId    Int
-  email     String    @unique
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+// model User {
+//   id        String    @id @db.Uuid // Supabase UUID — do not use default(uuid())
+//   schoolId  String    @db.Uuid
+//   roleId    Int
+//   email     String    @unique
+//   createdAt DateTime  @default(now())
+//   updatedAt DateTime  @updatedAt
+//   deletedAt DateTime?
 
-  school                School            @relation(fields: [schoolId], references: [id])
+//   Superadmin            Superadmin?
+//   school                School            @relation(fields: [schoolId], references: [id])
+//   role                  Role              @relation(fields: [roleId], references: [id])
+//   student               Student?
+//   teacher               TeachingStaff?
+//   nonTeachingStaff      NonTeachingStaff?
+//   attendance            Attendance[]
+//   sentNotifications     Notification[]    @relation("Sender")
+//   receivedNotifications Notification[]    @relation("Receiver")
+//   Document              Document[]
+//   AuditLog              AuditLog[]
+//   Admin                 Admin?
+
+//   @@index([schoolId])
+//   @@index([roleId])
+// }
+model User {
+  id             String    @id @db.Uuid
+  schoolId       String?   @db.Uuid
+  roleId         Int // 1 = Superadmin
+  email          String    @unique
+  name           String?
+  profilePicture String    @default("default.png")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  // Relations
+  school                School?           @relation(fields: [schoolId], references: [id])
   role                  Role              @relation(fields: [roleId], references: [id])
   student               Student?
-  teacher               Teacher?
+  teacher               TeachingStaff?
   nonTeachingStaff      NonTeachingStaff?
   attendance            Attendance[]
   sentNotifications     Notification[]    @relation("Sender")
@@ -148,7 +176,7 @@ model HomeworkSubmission {
   student  Student  @relation(fields: [studentId], references: [userId])
 }
 
-model Teacher {
+model TeachingStaff {
   userId         String  @id @db.Uuid
   departmentId   Int
   employeeId     String
@@ -239,8 +267,8 @@ model SectionTeacher {
   sectionId Int
   teacherId String @db.Uuid
 
-  section Section @relation(fields: [sectionId], references: [id])
-  teacher Teacher @relation(fields: [teacherId], references: [userId])
+  section Section       @relation(fields: [sectionId], references: [id])
+  teacher TeachingStaff @relation(fields: [teacherId], references: [userId])
 
   @@unique([sectionId, teacherId])
   @@index([sectionId])
@@ -252,8 +280,8 @@ model ClassTeacher {
   classId   Int
   teacherId String @db.Uuid
 
-  class   Class   @relation(fields: [classId], references: [id])
-  teacher Teacher @relation(fields: [teacherId], references: [userId])
+  class   Class         @relation(fields: [classId], references: [id])
+  teacher TeachingStaff @relation(fields: [teacherId], references: [userId])
 
   @@unique([classId, teacherId])
   @@index([classId])
@@ -288,7 +316,7 @@ model Subject {
 
   homework    Homework[]
   examResults ExamResult[]
-  Teacher     Teacher[]
+  Teacher     TeachingStaff[]
 
   @@index([classId])
   @@index([departmentId])
@@ -298,7 +326,7 @@ model Department {
   id   Int    @id @default(autoincrement())
   name String @unique
 
-  teachers         Teacher[]
+  teachers         TeachingStaff[]
   subjects         Subject[]
   NonTeachingStaff NonTeachingStaff[]
 }
@@ -311,7 +339,7 @@ model Homework {
 
   class              Class                @relation(fields: [classId], references: [id])
   subject            Subject              @relation(fields: [subjectId], references: [id])
-  teacher            Teacher              @relation(fields: [teacherId], references: [userId])
+  teacher            TeachingStaff        @relation(fields: [teacherId], references: [userId])
   HomeworkSubmission HomeworkSubmission[]
 
   @@index([classId])

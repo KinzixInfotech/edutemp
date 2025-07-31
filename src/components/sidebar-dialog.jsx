@@ -76,6 +76,7 @@ export function SettingsDialog() {
             return (
                 <div className="space-y-4">
                     {/* Avatar & Name */}
+
                     <div className="flex items-center gap-4">
                         <Avatar className="w-16 h-16">
                             <AvatarImage src={fullUser?.profilePicture} />
@@ -157,7 +158,10 @@ export function SettingsDialog() {
                                             <SidebarMenuItem key={item.name}>
                                                 <SidebarMenuButton
                                                     asChild
-                                                    isActive={selectedSection === item.name}
+                                                    variant={'default'}
+                                                    // isActive={selectedSection === item.name}
+                                                    className={`w-full font-semibold hover:cursor-pointer ${selectedSection === item.name ? "bg-white hover:bg-white font-semibold text-black shadow-md " : ""}`}
+
                                                 >
                                                     <button onClick={() => setSelectedSection(item.name)} className="w-full text-left flex items-center gap-2">
                                                         <item.icon className="w-4 h-4" />
@@ -176,7 +180,7 @@ export function SettingsDialog() {
                             <Breadcrumb>
                                 <BreadcrumbList>
                                     <BreadcrumbItem className="hidden md:block">
-                                        <BreadcrumbLink href="#">Settings</BreadcrumbLink>
+                                        <BreadcrumbLink href="#">Account</BreadcrumbLink>
                                     </BreadcrumbItem>
                                     <BreadcrumbSeparator className="hidden md:block" />
                                     <BreadcrumbItem>
@@ -191,6 +195,6 @@ export function SettingsDialog() {
                     </main>
                 </SidebarProvider>
             </DialogContent>
-        </Dialog>
+        </Dialog >
     )
 }
