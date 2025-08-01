@@ -20,7 +20,15 @@ import {
     SidebarMenuItem,
     SidebarProvider,
 } from "@/components/ui/sidebar"
+import { Moon, Sun } from "lucide-react"
 
+import { Button } from "@/components/ui/button"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
     Bell, Check, Globe, Home, Keyboard, Link, Lock, Menu, MessageCircle,
     Paintbrush, Settings, Video
@@ -28,23 +36,37 @@ import {
 
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { useSettingsDialog } from "@/context/Settingsdialog-context"
+import { ModeToggle } from './toggle';
+import { useTheme } from 'next-themes';
 
 const data = {
     nav: [
         { name: "Profile", icon: Home },
+        { name: "Attendance", icon: Home },
         { name: "Notifications", icon: Bell },
-        { name: "Navigation", icon: Menu },
         { name: "Appearance", icon: Paintbrush },
         { name: "Messages & media", icon: MessageCircle },
-        { name: "Language & region", icon: Globe },
-        { name: "Accessibility", icon: Keyboard },
-        { name: "Mark as read", icon: Check },
-        { name: "Audio & video", icon: Video },
-        { name: "Connected accounts", icon: Link },
-        { name: "Privacy & visibility", icon: Lock },
-        { name: "Advanced", icon: Settings },
     ],
 }
+const DynamicGoogleMap = ({ locationQuery }) => {
+    const encodedQuery = encodeURIComponent(locationQuery);
+
+    const src = `https://www.google.com/maps?q=${encodedQuery}&t=k&output=embed`;
+    return (
+        <div className="max-w-full rounded-full h-72 px-1 pt-2.5">
+            <iframe
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                loading="lazy"
+                allowFullScreen
+                className='rounded-lg'
+                referrerPolicy="no-referrer-when-downgrade"
+                src={src}
+            />
+        </div>
+    );
+};
 function ProfileItem({ label, value }) {
     return (
         <div>
@@ -53,76 +75,156 @@ function ProfileItem({ label, value }) {
         </div>
     );
 }
-// Simulated profile data
-const currentUser = {
-    name: "John Doe",
-    dob: "2002-06-15",
-    role: "student", // or teacher, parent, etc.
-    photo: "https://api.dicebear.com/7.x/lorelei/svg?seed=John",
-    extra: {
-        admissionNo: "ADM123",
-        class: "10-A",
-        bloodGroup: "O+",
-        email: "john@example.com",
-    },
-}
 
 export function SettingsDialog() {
+    const { setTheme } = useTheme()
     const { open, setOpen } = useSettingsDialog()
     const [selectedSection, setSelectedSection] = useState("Profile")
     const { fullUser } = useAuth();
+    const dob =
+        fullUser?.role?.name === "STUDENT"
+            ? fullUser?.studentdatafull?.dob
+            : fullUser?.teacherdata?.dob || fullUser?.adminData?.dob;
     const renderContent = () => {
+        let profileFields = null;
+        console.log(fullUser?.role?.name);
+        switch (fullUser?.role?.name) {
+            case "STUDENT":
+                profileFields = (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                        <ProfileItem label="Admission No" value={fullUser?.studentdatafull?.admissionNo} />
+                        <ProfileItem label="Class" value={`${fullUser?.classs?.className || "-"} - ${fullUser?.section?.name || "-"}`} />
+                        <ProfileItem label="Email" value={fullUser?.email} />
+                        <ProfileItem label="Blood Group" value={fullUser?.studentdatafull?.bloodGroup} />
+                        <ProfileItem label="Gender" value={fullUser?.studentdatafull?.gender} />
+                        <ProfileItem label="Admission Date" value={new Date(fullUser?.studentdatafull?.admissionDate).toLocaleDateString()} />
+                        <ProfileItem label="Roll Number" value={fullUser?.studentdatafull?.rollNumber} />
+                        <ProfileItem label="Fee Status" value={fullUser?.studentdatafull?.FeeStatus} />
+                        <ProfileItem label="Father Name" value={fullUser?.studentdatafull?.FatherName} />
+                        <ProfileItem label="Father Number" value={fullUser?.studentdatafull?.FatherNumber} />
+                        <ProfileItem label="Mother Name" value={fullUser?.studentdatafull?.MotherName} />
+                        <ProfileItem label="Mother Number" value={fullUser?.studentdatafull?.MotherNumber} />
+                        <ProfileItem label="Contact Number" value={fullUser?.studentdatafull?.contactNumber} />
+                        <ProfileItem label="House" value={fullUser?.studentdatafull?.House} />
+                        <ProfileItem label="City" value={fullUser?.studentdatafull?.city} />
+                        <ProfileItem label="State" value={fullUser?.studentdatafull?.state} />
+                        <ProfileItem label="Country" value={fullUser?.studentdatafull?.country} />
+                        <ProfileItem label="Postal Code" value={fullUser?.studentdatafull?.postalCode} />
+                        <ProfileItem label="Address" value={fullUser?.studentdatafull?.Address} />
+                        <ProfileItem label="Status" value={fullUser?.studentdatafull?.Status} />
+                    </div>
+                );
+                break;
+
+            case "TEACHER":
+                profileFields = (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                        <ProfileItem label="Name" value={fullUser?.name} />
+                        <ProfileItem label="Email" value={fullUser?.email} />
+                        <ProfileItem label="Department" value={fullUser?.teacherdata?.department} />
+                        <ProfileItem label="Qualification" value={fullUser?.teacherdata?.qualification} />
+                        <ProfileItem label="Experience" value={fullUser?.teacherdata?.experience} />
+                        <ProfileItem label="Gender" value={fullUser?.teacherdata?.gender} />
+                        <ProfileItem label="Contact Number" value={fullUser?.teacherdata?.contactNumber} />
+                        <ProfileItem label="Address" value={fullUser?.teacherdata?.address} />
+                    </div>
+                );
+                break;
+
+            case "ADMIN":
+                profileFields = (
+                    <div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                            <ProfileItem label="Name" value={fullUser?.name} />
+                            <ProfileItem label="User Id" value={fullUser?.id} />
+                            <ProfileItem label="Email" value={fullUser?.email} />
+                            <ProfileItem label="Role" value={fullUser?.role?.name} />
+                            <ProfileItem label="School" value={fullUser?.school?.name} />
+                            <ProfileItem label="School Domain" value={fullUser?.school?.domain} />
+                            <ProfileItem label="UI Language" value={fullUser?.school?.Language} />
+                        </div>
+                        <DynamicGoogleMap locationQuery="Ranchi, Jharkhand" />
+                    </div>
+                );
+                break;
+            case "SUPER_ADMIN":
+                profileFields = (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                        <ProfileItem label="Name" value={fullUser?.name} />
+                        <ProfileItem label="Email" value={fullUser?.email} />
+                        <ProfileItem label="Role" value={fullUser?.role?.name} />
+                        {/* <ProfileItem label="Contact Number" value={fullUser?.adminData?.contactNumber} /> */}
+                    </div>
+                );
+                break;
+
+            default:
+                console.warn("Unknown role:", fullUser?.role?.name);
+                profileFields = <p className="text-muted-foreground">No profile information available for this role.</p>;
+        }
         if (selectedSection === "Profile") {
             return (
-                <div className="space-y-4">
-                    {/* Avatar & Name */}
-
+                <div className="space-y-4 ">
                     <div className="flex items-center gap-4">
                         <Avatar className="w-16 h-16">
                             <AvatarImage src={fullUser?.profilePicture} />
-                            <AvatarFallback>{currentUser.name[0]}</AvatarFallback>
+                            <AvatarFallback>{fullUser?.name?.charAt(0) || "?"}</AvatarFallback>
                         </Avatar>
                         <div>
                             <h2 className="text-xl font-semibold">{fullUser?.name}</h2>
-                            <p>DOB: {fullUser?.studentdatafull?.dob ? new Date(fullUser?.studentdatafull?.dob).toLocaleDateString() : "Please Add DOB"}</p>
+                            <p>DOB: {dob ? new Date(dob).toLocaleDateString() : "Please Add DOB"}</p>
+
                         </div>
                     </div>
-
-                    {/* Profile Fields */}
-                    {currentUser.role === "student" && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                            <ProfileItem label="Admission No" value={fullUser?.studentdatafull?.admissionNo} />
-                            <ProfileItem
-                                label="Class"
-                                value={`${fullUser?.classs?.className || "-"} - ${fullUser?.section?.name || "-"}`}
-                            />
-                            <ProfileItem label="Email" value={fullUser?.email} />
-                            <ProfileItem label="Blood Group" value={fullUser?.studentdatafull?.bloodGroup} />
-                            <ProfileItem label="Gender" value={fullUser?.studentdatafull?.gender} />
-                            <ProfileItem
-                                label="Admission Date"
-                                value={new Date(fullUser?.studentdatafull?.admissionDate).toLocaleDateString()}
-                            />
-                            <ProfileItem label="Roll Number" value={fullUser?.studentdatafull?.rollNumber} />
-                            <ProfileItem label="Fee Status" value={fullUser?.studentdatafull?.FeeStatus} />
-                            <ProfileItem label="Father Name" value={fullUser?.studentdatafull?.FatherName} />
-                            <ProfileItem label="Father Number" value={fullUser?.studentdatafull?.FatherNumber} />
-                            <ProfileItem label="Mother Name" value={fullUser?.studentdatafull?.MotherName} />
-                            <ProfileItem label="Mother Number" value={fullUser?.studentdatafull?.MotherNumber} />
-                            <ProfileItem label="Contact Number" value={fullUser?.studentdatafull?.contactNumber} />
-                            <ProfileItem label="House" value={fullUser?.studentdatafull?.House} />
-                            <ProfileItem label="City" value={fullUser?.studentdatafull?.city} />
-                            <ProfileItem label="State" value={fullUser?.studentdatafull?.state} />
-                            <ProfileItem label="Country" value={fullUser?.studentdatafull?.country} />
-                            <ProfileItem label="Postal Code" value={fullUser?.studentdatafull?.postalCode} />
-                            <ProfileItem label="Address" value={fullUser?.studentdatafull?.Address} />
-                            <ProfileItem label="Status" value={fullUser?.studentdatafull?.Status} />
-                        </div>
-                    )}
+                    {profileFields}
                 </div>
-            );
+            )
         }
+        if (selectedSection === "Appearance") {
+            return (
+                <div className="space-y-6 p-6 ">
+                    {/* Header */}
+                    <div className="space-y-1">
+                        <h2 className="text-2xl font-bold tracking-tight">Appearance</h2>
+                        <p className="text-muted-foreground">Customize the look and feel of your profile and app theme.</p>
+                    </div>
 
+
+
+                    {/* Theme Toggle */}
+                    <div className="space-y-2 p-6 rounded-xl   border  max-w-2xl">
+                        <label className="text-sm font-medium">Theme</label>
+                        <p className="text-sm text-muted-foreground mb-2">
+                            Choose between light and dark mode.
+                        </p>
+                        {/* <ModeToggle /> */}
+                        <div className='flex items-center justify-center'>
+                            <DropdownMenu >
+                                <DropdownMenuTrigger >
+                                    <Button variant="outline" size="icon" >
+                                        <Sun className="h-[1.2rem] w-[1.2rem] scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
+                                        <Moon className="absolute h-[1.2rem] w-[1.2rem] scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
+                                        <span className="sr-only">Toggle theme</span>
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => setTheme("light")}>
+                                        Light
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setTheme("dark")}>
+                                        Dark
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setTheme("system")}>
+                                        System
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                    </div>
+                </div>
+            )
+
+        }
 
         // Default section
         return (

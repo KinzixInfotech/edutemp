@@ -42,6 +42,7 @@ export async function GET(req) {
         let profilePicture = user?.profilePicture || null;
         let classs = null;
         let section = null;
+        let school = null;
         let name = user?.name || null;
 
         // Step 2: Fetch schoolId from corresponding model based on role
@@ -49,9 +50,13 @@ export async function GET(req) {
             case "ADMIN":
                 const admin = await prisma.admin.findUnique({
                     where: { userId: user.id },
-                    select: { schoolId: true },
+                    select: {
+                        schoolId: true,
+                        school: true,
+                    },
                 });
                 schoolId = admin?.schoolId;
+                school = admin?.school;
                 break;
             case "TEACHING_STAFF":
                 const teacher = await prisma.teacher.findUnique({
@@ -92,11 +97,12 @@ export async function GET(req) {
             email: user.email,
             role: user.role,
             schoolId,
+            school,
             name,
             classs,
             studentdatafull,
             section,
-            profilePicture, // ✅ now included in the response
+            profilePicture,
         });
     } catch (err) {
         console.error("❌ Error in /api/auth/user:", err);

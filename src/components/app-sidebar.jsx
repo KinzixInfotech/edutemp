@@ -34,6 +34,7 @@ import {
     IconSearch,
 } from "@tabler/icons-react"
 import { NavSidebarSections } from "./nav-main"
+import { Separator } from "./ui/separator"
 const sidebarData = [
     {
         title: "Main",
@@ -44,22 +45,51 @@ const sidebarData = [
         ],
     },
     {
-        title: "School Settings",
+        title: "Staff Management",
+
         items: [
-            { label: "Add Classes", url: "/dashboard/schools/create-classes", icon: IconDatabase, roles: ["ADMIN"] },
-            { label: "Add Students", url: "/dashboard/schools/create-students", icon: IconDatabase, roles: ["ADMIN"] },
-        ],
-        items: [
+            { label: "Manage Teaching Staff", url: "/dashboard/schools/manage-teaching-staff", icon: IconDatabase, roles: ["ADMIN"] },
+            { label: "Manage Non Teaching Staff", url: "/dashboard/schools/manage-non-teaching-staff", icon: IconDatabase, roles: ["ADMIN"] },
             { label: "All Schools", url: "/dashboard/schools/all-schools", icon: IconDatabase, roles: ['SUPER_ADMIN'] },
-            { label: "Add Students", url: "/dashboard/schools/create-students", icon: IconDatabase, roles: ["ADMIN"] },
-            { label: "Add Teacher", url: "/dashboard/schools/add-teacher", icon: IconDatabase, roles: ["ADMIN"] },
-            { label: "Add ", url: "/dashboard/schools/create-students", icon: IconDatabase, roles: ["ADMIN"] },
         ],
+    },
+    {
+        title: "Manage Students",
+        items: [
+            { label: "Manage Students", url: "/dashboard/schools/manage-student", icon: IconDatabase, roles: ["ADMIN"] },
+            { label: "Manage Alumni ", url: "/dashboard/schools/manage-gallery", icon: IconDatabase, roles: ["ADMIN"] },
+        ]
+    },
+    {
+        title: "Manage Classes",
+        items: [
+            { label: "Manage Classes", url: "/dashboard/schools/create-classes", icon: IconDatabase, roles: ["ADMIN"] },
+            { label: "Send Notification", url: "/dashboard/schools/send-notifcation", icon: IconDatabase, roles: ["ADMIN"] },
+        ]
+    },
+    {
+        title: "Additional Management",
+        items: [
+            { label: "Manage Transport ", url: "/dashboard/schools/manage-gallery", icon: IconDatabase, roles: ["ADMIN"] },
+            { label: "Manage Library ", url: "/dashboard/schools/manage-gallery", icon: IconDatabase, roles: ["ADMIN"] },
+            { label: "View Fees ", url: "/dashboard/schools/manage-gallery", icon: IconDatabase, roles: ["ADMIN"] },
+            { label: "Manage Time Table ", url: "/dashboard/schools/manage-gallery", icon: IconDatabase, roles: ["ADMIN"] },
+            { label: "Manage Examination ", url: "/dashboard/schools/manage-gallery", icon: IconDatabase, roles: ["ADMIN"] },
+            { label: "Manage Gallery", url: "/dashboard/schools/manage-gallery", icon: IconDatabase, roles: ["ADMIN"] },
+        ]
+    },
+    {
+
+        title: "Manage Fee Collection",
+        items: [
+            { label: "Manage Fees ", url: "/dashboard/schools/manage-gallery", icon: IconDatabase, roles: ["ADMIN"] },
+        ]
     },
     {
         title: "Edu Employees",
         items: [
-            { label: "All Employees", url: "/dashboard/edubreezy/add-user", icon: IconDatabase, roles: ['SUPER_ADMIN'] },
+
+            { label: "All Employees", url: "/dashboard/edubreezy/employees", icon: IconDatabase, roles: ['SUPER_ADMIN'] },
             { label: "Add Employee", url: "#", icon: IconReport, roles: ['SUPER_ADMIN'] },
         ],
     },
@@ -80,34 +110,6 @@ const navUser = {
         ],
     },
 }
-// const data = {
-
-//     navMain: [
-//         { title: "Dashboard", url: "/dashboard", icon: IconDashboard, roles: ["SUPERADMIN"] },
-//         { title: "Create admin user", url: "#", icon: IconListDetails, roles: ["SUPERADMIN"] },
-//         { title: "Analytics", url: "#", icon: IconChartBar, roles: ["SUPERADMIN"] },
-//     ],
-//     schoolSetting: [
-//         { title: "Add Classes", url: "/dashboard/schools/create-classes", icon: IconDatabase, roles: ["ADMIN"] },
-//         { title: "Add Students", url: "/dashboard/schools/create-students", icon: IconDatabase, roles: ["ADMIN"] },
-//         { title: "Add Teaching Staff", url: "/dashboard/schools/create-classes", icon: IconDatabase, roles: ["ADMIN"] },
-//         { title: "Add Non-Teaching Staff", url: "/dashboard/schools/create-classes", icon: IconDatabase, roles: ["ADMIN"] },
-//     ],
-//     documents: [
-//         { title: "All Schools", url: "/dashboard/schools/all-schools", icon: IconSchool },
-//     ],
-//     eduemployes: [
-//         { title: "All Employees", url: "/dashboard/create-school", icon: IconDatabase },
-//         { title: "Add Employee", url: "#", icon: IconReport },
-//         { title: "Teams", url: "#", icon: IconReport },
-//     ],
-//     navSecondary: [
-//         { title: "Settings", url: "#", icon: IconSettings },
-//         { title: "Get Help", url: "#", icon: IconHelp },
-//         { title: "Search", url: "#", icon: IconSearch },
-//     ],
-// }
-
 export function AppSidebar({ ...props }) {
     const { resolvedTheme } = useTheme()
     const { fullUser } = useAuth()
@@ -122,7 +124,7 @@ export function AppSidebar({ ...props }) {
         <Sidebar collapsible="offcanvas" {...props}>
             <SidebarHeader>
                 <SidebarMenu>
-                    <SidebarMenuItem>
+                    <SidebarMenuItem className='border-b pb-2'>
                         <SidebarMenuButton
                             asChild
                             className="data-[slot=sidebar-menu-button]:!p-1.5"
@@ -131,8 +133,9 @@ export function AppSidebar({ ...props }) {
                                 <Image src={logo} width={160} height={160} alt="EduBreezy" />
                             </a>
                         </SidebarMenuButton>
-                        <span className="text-sm font-medium ml-2">A Kinzix product</span>
+                        {/* <span className="text-sm font-medium ml-2">A Kinzix product</span> */}
                     </SidebarMenuItem>
+
                 </SidebarMenu>
             </SidebarHeader>
 
@@ -144,8 +147,7 @@ export function AppSidebar({ ...props }) {
                 />
             </SidebarContent>
 
-            <SidebarFooter>
-                {/* <NavSecondary items={navUser.support} className="mt-auto" /> */}
+            <SidebarFooter className='border-t'>
                 <NavUser user={navUser.user} />
             </SidebarFooter>
         </Sidebar>

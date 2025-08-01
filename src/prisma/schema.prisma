@@ -27,6 +27,7 @@ model School {
   galleries    Gallery[]
   exams        Exam[]
   Student      Student[]
+  MasterAdmin  MasterAdmin?
 
   @@index([name])
 }
@@ -37,35 +38,10 @@ model Role {
   users User[]
 }
 
-// model User {
-//   id        String    @id @db.Uuid // Supabase UUID — do not use default(uuid())
-//   schoolId  String    @db.Uuid
-//   roleId    Int
-//   email     String    @unique
-//   createdAt DateTime  @default(now())
-//   updatedAt DateTime  @updatedAt
-//   deletedAt DateTime?
-
-//   Superadmin            Superadmin?
-//   school                School            @relation(fields: [schoolId], references: [id])
-//   role                  Role              @relation(fields: [roleId], references: [id])
-//   student               Student?
-//   teacher               TeachingStaff?
-//   nonTeachingStaff      NonTeachingStaff?
-//   attendance            Attendance[]
-//   sentNotifications     Notification[]    @relation("Sender")
-//   receivedNotifications Notification[]    @relation("Receiver")
-//   Document              Document[]
-//   AuditLog              AuditLog[]
-//   Admin                 Admin?
-
-//   @@index([schoolId])
-//   @@index([roleId])
-// }
 model User {
   id             String    @id @db.Uuid
   schoolId       String?   @db.Uuid
-  roleId         Int // 1 = Superadmin
+  roleId         Int
   email          String    @unique
   name           String?
   profilePicture String    @default("default.png")
@@ -85,6 +61,7 @@ model User {
   Document              Document[]
   AuditLog              AuditLog[]
   Admin                 Admin?
+  MasterAdmin           MasterAdmin?
 
   @@index([schoolId])
   @@index([roleId])
@@ -93,6 +70,13 @@ model User {
 model Admin {
   userId   String @id @db.Uuid
   schoolId String @db.Uuid
+  school   School @relation(fields: [schoolId], references: [id])
+  User     User   @relation(fields: [userId], references: [id])
+}
+
+model MasterAdmin {
+  userId   String @id @unique @db.Uuid
+  schoolId String @unique @db.Uuid //  @unique to enforce one-to-one
 
   school School @relation(fields: [schoolId], references: [id])
   User   User   @relation(fields: [userId], references: [id])
@@ -241,7 +225,7 @@ model Class {
   students     Student[]
   subjects     Subject[]
   homework     Homework[]
-  sections     Section[] // Renamed: Section → sections
+  sections     Section[]
   FeeStructure FeeStructure[]
   ClassTeacher ClassTeacher[]
 

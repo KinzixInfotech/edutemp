@@ -21,15 +21,15 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                 if (visibleItems.length === 0) return null
 
                 return (
-                    <SidebarGroup key={section.title}>
+                    <SidebarGroup key={section.title} >
                         <SidebarGroupLabel>{section.title}</SidebarGroupLabel>
-                        <SidebarMenu>
+                        <SidebarMenu >
                             {visibleItems.map((item) => {
                                 const isActive = activePath === item.url
                                 return (
                                     <SidebarMenuItem key={item.label}>
                                         <SidebarMenuButton asChild
-                                            className={`w-full font-semibold hover:cursor-pointer ${isActive ? "bg-white hover:bg-white font-semibold text-black shadow-md " : ""}`}>
+                                            className={`w-full  py-4  hover:cursor-pointer ${isActive ? "bg-white  dark:border-black dark:text-black hover:bg-white font-semibold text-bl border" : ""}`}>
                                             <Link href={item.url}>
                                                 {item.icon && <item.icon className="w-4 h-4" />}
                                                 <span>{item.label}</span>

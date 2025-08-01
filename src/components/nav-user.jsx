@@ -90,26 +90,19 @@ export function NavUser({ }) {
                                     <AvatarFallback className="rounded-lg">CN</AvatarFallback>
                                 </Avatar>
                                 <div className="grid flex-1 text-left text-sm leading-tight">
-                                    <span className="truncate font-medium">{fullUser?.name || 'Add Name'} || {fullUser?.role.name}</span>
+                                    <span className="truncate capitalize font-medium">{fullUser?.name || 'Add Name'} </span>
                                     <span className="text-muted-foreground truncate text-xs">
                                         {fullUser?.email}
                                     </span>
                                 </div>
                             </div>
+                            {/* {fullUser?.role.name} */}
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         <DropdownMenuGroup>
                             <DropdownMenuItem onClick={() => setOpen(true)}>
                                 <IconUserCircle />
                                 Account
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                                <IconCreditCard />
-                                Billing
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                                <IconNotification />
-                                Notifications
                             </DropdownMenuItem>
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator />
