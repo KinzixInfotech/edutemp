@@ -126,6 +126,8 @@ export default function Page() {
                             <TableHead>Name</TableHead>
                             <TableHead>Address</TableHead>
                             {/* <TableHead>Admin</TableHead> */}
+                            <TableHead>Phone</TableHead>
+
                             <TableHead>Domain</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
@@ -153,6 +155,8 @@ export default function Page() {
                                     <TableCell>{school.name}</TableCell>
                                     <TableCell>{school.location}</TableCell>
                                     {/* <TableCell>{school.adminem}</TableCell> */}
+                                    <TableCell>{school.contactNumber}</TableCell>
+
                                     <TableCell>{school.domain}</TableCell>
                                     <TableCell className="text-right space-x-2">
                                         <Link href={`/dashboard/schools/${school.id}/manage`}>
