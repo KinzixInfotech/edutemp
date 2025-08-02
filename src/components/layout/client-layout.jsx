@@ -26,7 +26,7 @@ export default function ClientLayout({ children }) {
             <SidebarInset>
                 {!hideUI && <SiteHeader />}
                 {/* p-4 */}
-                <main className=" w-full h-full">{children}</main>
+                <main className="w-full h-full">{children}</main>
             </SidebarInset>
         </SidebarProvider>
     );
