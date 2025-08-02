@@ -10,12 +10,14 @@ import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import { cookies } from "next/headers";
 export default async function RootLayout({ children }) {
+    
     const cookieStore = cookies();
     const sbUser = cookieStore.get("sb-user");
-    if (!sbUser) {
-        // redirect or handle unauthenticated
-        redirect('/login');
-    }
+    // if (!sbUser) {
+    //     // redirect or handle unauthenticated
+    //     redirect('/login');
+    // }
+    
     return (
 
         <AuthProvider>

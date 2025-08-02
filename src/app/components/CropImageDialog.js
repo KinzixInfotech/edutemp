@@ -24,7 +24,7 @@ export default function CropImageDialog({ image, open, onClose, onCropComplete, 
   }, []);
 
   return (
-    <Dialog open={open} onOpenChange={(val) => !uploading && onClose(val)}>
+    <Dialog open={open} c onOpenChange={(val) => !uploading && onClose(val)}>
       <DialogContent className="max-w-[90vw] w-[500px]">
         <div className="relative w-full h-[300px] bg-gray-100">
           <Cropper

@@ -9,6 +9,7 @@ const schoolSchema = z
     name: z.string(),
     email: z.string().email(),
     phone: z.string(),
+    schoolCode: z.string(),
     location: z.string(),
     profilePicture: z.string().optional(),
     subscriptionType: z.enum(["A", "B", "C"]),
@@ -45,11 +46,12 @@ export async function POST(req) {
 
   try {
     const body = await req.json();
+    console.log(body)
     const parsed = schoolSchema.parse(body);
 
     const resolvedDomain =
       parsed.domainMode === "tenant"
-        ? `${parsed.tenantName?.toLowerCase().replace(/\s+/g, "")}.domainx.com`
+        ? `${parsed.tenantName?.toLowerCase().replace(/\s+/g, "")}.edubreezy.com`
         : parsed.customDomain || "";
 
     // Step 1: Create user in Supabase Auth
@@ -73,13 +75,14 @@ export async function POST(req) {
         data: {
           name: parsed.name,
           domain: resolvedDomain,
+          schoolCode: parsed.schoolCode,
+          contactNumber: parsed.phone,
           profilePicture: parsed.profilePicture || "",
           location: parsed.location,
           SubscriptionType: parsed.subscriptionType,
           Language: parsed.language,
         },
       });
-
       // Ensure ADMIN role exists or create it
       const adminRole = await tx.Role.upsert({
         where: { name: "ADMIN" },

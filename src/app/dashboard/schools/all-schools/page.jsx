@@ -47,6 +47,7 @@ export default function Page() {
             const res = await fetch("/api/schools/all")
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || "Failed to fetch schools")
+            console.log(data, 'from all school page')
             setSchools(data)
             toast.success("Schools loaded successfully")
         } catch (err) {
@@ -121,8 +122,10 @@ export default function Page() {
                 <Table className="min-w-[700px]">
                     <TableHeader className="bg-muted sticky top-0 z-10">
                         <TableRow>
+                            <TableHead>School Code</TableHead>
                             <TableHead>Name</TableHead>
-                            <TableHead>Location</TableHead>
+                            <TableHead>Address</TableHead>
+                            {/* <TableHead>Admin</TableHead> */}
                             <TableHead>Domain</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
@@ -146,9 +149,11 @@ export default function Page() {
                         ) : (
                             schools.map((school) => (
                                 <TableRow key={school.id}>
+                                    <TableCell>{school.schoolCode}</TableCell>
                                     <TableCell>{school.name}</TableCell>
                                     <TableCell>{school.location}</TableCell>
-                                    <TableCell>{school.currentDomain}</TableCell>
+                                    {/* <TableCell>{school.adminem}</TableCell> */}
+                                    <TableCell>{school.domain}</TableCell>
                                     <TableCell className="text-right space-x-2">
                                         <Link href={`/dashboard/schools/${school.id}/manage`}>
                                             <Button size="sm" variant="outline">View</Button>

@@ -11,8 +11,10 @@ model School {
   id               String    @id @default(uuid()) @db.Uuid
   name             String
   domain           String    @unique
+  schoolCode       String    @unique
   profilePicture   String
   location         String
+  contactNumber    String
   SubscriptionType String
   Language         String
   createdAt        DateTime  @default(now())
@@ -39,15 +41,16 @@ model Role {
 }
 
 model User {
-  id             String    @id @db.Uuid
-  schoolId       String?   @db.Uuid
+  id             String     @id @db.Uuid
+  schoolId       String?    @db.Uuid
   roleId         Int
-  email          String    @unique
+  email          String     @unique
   name           String?
-  profilePicture String    @default("default.png")
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  profilePicture String     @default("default.png")
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
   deletedAt      DateTime?
+  status         UserStatus @default(ACTIVE)
 
   // Relations
   school                School?           @relation(fields: [schoolId], references: [id])
@@ -97,7 +100,7 @@ model Student {
   rollNumber         String
   academicYear       String
   PreviousSchoolName String?
-  Status             StudentStatus
+  // Status             StudentStatus
   FeeStatus          FeeStatus            @default(PENDING)
   DateOfLeaving      String?
   contactNumber      String
@@ -179,13 +182,14 @@ model TeachingStaff {
   country        String?
   PostalCode     String?
 
-  subjects      Subject[]
-  user          User             @relation(fields: [userId], references: [id])
-  department    Department       @relation(fields: [departmentId], references: [id])
-  homework      Homework[]
-  subjectId     Int
-  sections      SectionTeacher[]
-  classTeachers ClassTeacher[]
+  subjects   Subject[]
+  user       User       @relation(fields: [userId], references: [id])
+  department Department @relation(fields: [departmentId], references: [id])
+  homework   Homework[]
+  subjectId  Int
+  // sections      SectionTeacher[]
+  // classTeachers ClassTeacher[]
+  Class      Class[]
 
   @@index([departmentId])
 }
@@ -217,60 +221,63 @@ model NonTeachingStaff {
 }
 
 model Class {
-  id        Int    @id @default(autoincrement())
-  schoolId  String @db.Uuid
-  className String
-
-  school       School         @relation(fields: [schoolId], references: [id])
-  students     Student[]
-  subjects     Subject[]
-  homework     Homework[]
-  sections     Section[]
-  FeeStructure FeeStructure[]
-  ClassTeacher ClassTeacher[]
+  id                  Int            @id @default(autoincrement())
+  schoolId            String         @db.Uuid
+  className           String
+  capacity            Int
+  supervisorId        String?
+  teachingStaffUserId String?        @db.Uuid
+  supervisor          TeachingStaff? @relation(fields: [teachingStaffUserId], references: [userId])
+  school              School         @relation(fields: [schoolId], references: [id])
+  students            Student[]
+  subjects            Subject[]
+  homework            Homework[]
+  sections            Section[]
+  FeeStructure        FeeStructure[]
+  // ClassTeacher        ClassTeacher[]
 
   // @@unique([schoolId, className]) // "6" must be unique per school
   @@index([schoolId])
 }
 
 model Section {
-  id              Int              @id @default(autoincrement())
-  name            String
-  classId         Int
-  schoolId        String           @db.Uuid // Optional but helpful for direct filtering
-  class           Class            @relation(fields: [classId], references: [id])
-  assignedTeacher SectionTeacher[]
-  students        Student[]
+  id       Int       @id @default(autoincrement())
+  name     String
+  classId  Int
+  schoolId String    @db.Uuid // Optional but helpful for direct filtering
+  class    Class     @relation(fields: [classId], references: [id])
+  // assignedTeacher SectionTeacher[]
+  students Student[]
 
   @@unique([classId, name])
   @@index([classId])
 }
 
-model SectionTeacher {
-  id        Int    @id @default(autoincrement())
-  sectionId Int
-  teacherId String @db.Uuid
+// model SectionTeacher {
+//   id        Int    @id @default(autoincrement())
+//   sectionId Int
+//   teacherId String @db.Uuid
 
-  section Section       @relation(fields: [sectionId], references: [id])
-  teacher TeachingStaff @relation(fields: [teacherId], references: [userId])
+//   section Section       @relation(fields: [sectionId], references: [id])
+//   // teacher TeachingStaff @relation(fields: [teacherId], references: [userId])
 
-  @@unique([sectionId, teacherId])
-  @@index([sectionId])
-  @@index([teacherId])
-}
+//   @@unique([sectionId, teacherId])
+//   @@index([sectionId])
+//   @@index([teacherId])
+// }
 
-model ClassTeacher {
-  id        Int    @id @default(autoincrement())
-  classId   Int
-  teacherId String @db.Uuid
+// model ClassTeacher {
+//   id        Int    @id @default(autoincrement())
+//   classId   Int
+//   teacherId String @db.Uuid
 
-  class   Class         @relation(fields: [classId], references: [id])
-  teacher TeachingStaff @relation(fields: [teacherId], references: [userId])
+//   class   Class         @relation(fields: [classId], references: [id])
+//   teacher TeachingStaff @relation(fields: [teacherId], references: [userId])
 
-  @@unique([classId, teacherId])
-  @@index([classId])
-  @@index([teacherId])
-}
+//   @@unique([classId, teacherId])
+//   @@index([classId])
+//   @@index([teacherId])
+// }
 
 model Document {
   id          Int          @id @default(autoincrement())
@@ -467,10 +474,12 @@ enum FeeStatus {
   PENDING
 }
 
-enum StudentStatus {
+enum UserStatus {
   ACTIVE
   INACTIVE
   LEFT
+  DISABLED
+  BANNED
 }
 
 enum DocumentType {

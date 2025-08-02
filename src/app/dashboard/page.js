@@ -12,7 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChartAreaInteractive } from '@/components/chart-area-interactive';
 import { SectionCards } from '@/components/section-cards';
 import LoaderPage from '@/components/loader-page';
@@ -24,7 +24,21 @@ import { ChartLineLabel } from '@/components/line-chart';
 export default function Dashboard() {
   const { fullUser, loading } = useAuth();
   const [date, setDate] = useState(new Date());
+  const [data, setData] = useState([]);
+  useEffect(() => {
+    fetch("/api/school-trend")
+      .then(res => res.json())
+      .then(apiData => {
+        // transform for AreaChart
+        const formatted = apiData.map(item => ({
+          date: item.date,
+          schools: item.schools,
 
+        }))
+        console.log(formatted, apiData);
+        setData(formatted)
+      })
+  }, [])
   const events = [
     { title: "Product Strategy Meeting", time: "12:00 PM – 02:00 PM", description: "Align roadmap and define Q4 deliverables." },
     { title: "UX Audit Review", time: "03:00 PM – 04:30 PM", description: "Review accessibility and UI consistency." },
@@ -32,7 +46,7 @@ export default function Dashboard() {
   ];
 
   const cards = [
-    { label: "Total Students", value: "1,234", trend: "+12.5%", direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
+    // { label: "Total Students", value: ", trend: " + 12.5 % ", direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
     { label: "Total Teacher", value: "2000", direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
     { label: "Total Staffs", value: "200", direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
     { label: "Total Alumini", value: "200", direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
@@ -81,8 +95,29 @@ export default function Dashboard() {
       case "TEACHER":
         return (
           <div className="px-4 sm:px-6">
+            <SectionCards data={cards} />
             <ChartAreaInteractive />
           </div>
+        );
+      case "SUPER_ADMIN":
+        const count = data.find(entry => entry.date === "Aug 2025")?.schools || 0;
+        console.log(count); // 1
+        const superadmindata = [
+          { label: "Total School", value: count, trend: "+12.5%", direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
+          { label: "Total Revenue", value: "2000", direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
+          { label: "Active Accounts", value: "200", direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
+          { label: "Total Employees", value: "200", direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
+        ];
+
+
+        return (
+          <>
+            <SectionCards data={superadmindata} />
+            <div className="flex flex-col gap-3.5 px-4 sm:px-6">
+              <ChartAreaInteractive chartData={data} />
+              <ChartLineLabel chartData={linechartData} title="Finance" date="Today" />
+            </div>
+          </>
         );
       case "STUDENT":
         return (

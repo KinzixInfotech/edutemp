@@ -12,10 +12,13 @@ import {
   FormControl,
   FormMessage
 } from "@/components/ui/form"
+import CropImageDialog from "@/app/components/CropImageDialog";
+import { uploadFiles } from "@/app/components/utils/uploadThing";
 import { toast } from "sonner"
-import { useState } from "react"
-import { Loader2 } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Loader2, Copy, Check, CheckCircle, XCircle, RefreshCcw } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import debounce from "lodash.debounce"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
@@ -29,26 +32,35 @@ const schoolFormSchema = z.object({
   email: z.string().min(1),
   location: z.string().min(1),
   phone: z.string().min(1),
-  logo: z.string().optional(),
+  profilePicture: z.string().optional(),
   adminem: z.string().min(1),
   adminPassword: z.string().min(1),
   subscriptionType: z.enum(["A", "B", "C"]),
   language: z.string().min(1),
-
+  schoolCode: z.string(),
   domainMode: z.enum(["tenant", "custom"]),
   tenantName: z.string().optional(),
   customDomain: z.string().optional(),
-}).refine((data) => {
-  if (data.domainMode === "tenant") return !!data.tenantName
-  if (data.domainMode === "custom") return !!data.customDomain
-}, {
-  message: "Domain input required.",
-  path: ["tenantName"] // this is safer fallback for both
-})
+}).refine(
+  (data) => {
+    if (data.domainMode === "tenant") return !!data.tenantName?.trim();
+    if (data.domainMode === "custom") return !!data.customDomain?.trim();
+    return true;
+  },
+  (data) => ({
+    message: "Domain input required.",
+    path: [data.domainMode === "custom" ? "customDomain" : "tenantName"],
+  })
+);
 
 export default function CreateSchoolPage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false)
+  const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [rawImage, setRawImage] = useState(null);
+  const [errorUpload, setErrorupload] = useState(false);
+  const [tempImage, setTempImage] = useState(null);
+  const [cropDialogOpen, setCropDialogOpen] = useState(false);
+  // domain validation function
   const form = useForm({
     resolver: zodResolver(schoolFormSchema),
     defaultValues: {
@@ -58,17 +70,107 @@ export default function CreateSchoolPage() {
       location: "",
       subscriptionType: "A",
       language: "en",
+      schoolCode: '',
       adminem: "",
       adminPassword: "",
       domainMode: "tenant",
       tenantName: "",
       customDomain: "",
-      logo: "",
+      profilePicture: "",
     }
   })
+  const subdomain = form.watch("tenantName") // your form field name
+  const [checking, setChecking] = useState(false)
+  const [available, setAvailable] = useState(null)
+
+
+  const check = debounce(async (val) => {
+    if (!val) return
+    setChecking(true)
+    setAvailable(null)
+
+    const res = await fetch(`/api/check-domain?subdomain=${val}`)
+    const { exists } = await res.json()
+
+    setChecking(false)
+
+    if (exists) {
+      setAvailable(false)
+      form.setError("tenantName", {
+        type: "manual",
+        message: "Domain already exists",
+      })
+    } else {
+      setAvailable(true)
+      form.clearErrors("tenantName")
+
+    }
+  }, 500)
+
+  useEffect(() => {
+    if (!subdomain || subdomain.trim() === "") {
+      setAvailable(null)
+      form.clearErrors("tenantName")
+      return
+    }
+
+    check(subdomain)
+    return () => check.cancel()
+  }, [subdomain])
+  const handleImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setRawImage(reader.result);
+      setCropDialogOpen(true);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const generateSchoolCode = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch("/api/schools/schoolcodegenerate")
+      if (!res.ok) throw new Error("Failed to generate school code")
+      const { code } = await res.json()
+      form.setValue("schoolCode", code, {
+        shouldDirty: true,
+        shouldValidate: true,
+      })
+    } catch (error) {
+      console.error("Error generating school code:", error)
+      toast.error("Error generating school code");
+      // Optional: show toast or error UI
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const retryUpload = async () => {
+    const res = await uploadFiles("profilePictureUploader", {
+      files: [tempImage],
+      input: {
+        profileId: crypto.randomUUID(),
+        username: form.name || "User",
+      },
+    });
+    if (res && res[0]?.url) {
+      form.setValue("profilePicture", res[0].ufsUrl)
+      setPreviewUrl(res[0].ufsUrl);
+      toast.success("Image uploaded!");
+      setErrorupload(true);
+    } else {
+      toast.error("Upload failed");
+    }
+  }
+  const router = useRouter();
+  const [loading, setLoading] = useState(false)
+
 
   const domainMode = useWatch({ control: form.control, name: "domainMode" })
-  const logo = useWatch({ control: form.control, name: "logo" })
+  // const profile = useWatch({ control: form.control, name: "logo" })
 
 
 
@@ -94,7 +196,7 @@ export default function CreateSchoolPage() {
       if (res.ok) {
         toast.success("School created successfully!")
         form.reset()
-        router.push('/schools/all-schools');
+        router.push('/dashboard/schools/all-schools');
       } else {
         toast.error(result.error || "Something went wrong.")
       }
@@ -104,8 +206,113 @@ export default function CreateSchoolPage() {
       setLoading(false)
     }
   }
+  function SchoolCodeField({ field }) {
+    const [copied, setCopied] = useState(false)
+    const value = `${field?.value || ""}`
+
+    const handleCopy = async () => {
+      await navigator.clipboard.writeText(value)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+
+    return (
+      <FormItem>
+        <FormLabel>School Code</FormLabel>
+        <FormControl>
+          <div className="flex flex-row gap-2 items-center">
+            <div className="pointer-events-none py-1 px-3.5 border rounded-lg w-16 flex items-center justify-center bg-muted">
+              <span className="text-black/55 dark:text-gray-200 text-lg ">EB-</span>
+            </div>
+
+            <Input
+              readOnly
+              value={field.value}
+              className="flex-1 cursor-default"
+              placeholder="Generate"
+            />
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              onClick={generateSchoolCode}
+              disabled={loading}
+            >
+              <RefreshCcw className="w-4 h-4 animate-spin-once" />
+            </Button>
+
+            {field.name === "schoolCode" && field.value && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={handleCopy}
+              >
+                {copied ? (
+                  <Check className="h-4 w-4 text-green-500" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </Button>
+            )}
+
+          </div>
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    )
+  }
   return (
     <div className="max-w-3xl mx-auto p-6">
+      {cropDialogOpen && rawImage && (
+        <CropImageDialog
+          image={rawImage}
+          onClose={() => {
+            if (!uploading) setCropDialogOpen(false); // disable closing while uploading
+          }}
+          uploading={uploading}
+
+          open={cropDialogOpen}
+          // onClose={() => setCropDialogOpen(false)}
+          onCropComplete={async (croppedBlob) => {
+            const now = new Date();
+            const iso = now.toISOString().replace(/[:.]/g, "-");
+            const perf = Math.floor(performance.now() * 1000); // microseconds (approximate nanos)
+            const timestamp = `${iso}-${perf}`;
+            const filename = `${timestamp}.jpg`;
+            const file = new File([croppedBlob], filename, { type: "image/jpeg" });
+            setTempImage(file);
+            try {
+              setUploading(true)
+
+              const res = await uploadFiles("profilePictureUploader", {
+                files: [file],
+                input: {
+                  profileId: crypto.randomUUID(),
+                  username: form.name || "User",
+                },
+              });
+              if (res && res[0]?.url) {
+                form.setValue("profilePicture", res[0].url)
+                setPreviewUrl(res[0].url);
+                toast.success("Image uploaded!")
+                setErrorupload(false);
+              } else {
+                toast.error("Upload failed");
+                setErrorupload(true);
+              }
+            } catch (err) {
+              toast.error("Something went wrong during upload");
+              console.error(err);
+              setErrorupload(true);
+            } finally {
+              setUploading(false)
+              setCropDialogOpen(false);
+            }
+
+          }}
+        />
+      )}
       <Card>
         <CardHeader>
           <CardTitle>Create School</CardTitle>
@@ -185,34 +392,19 @@ export default function CreateSchoolPage() {
                 )}
               />
               {/* Logo Upload or URL */}
-              <FormField
-                control={form.control}
-                name="logo"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>School Logo</FormLabel>
-                    <FormControl>
-                      <Input type="file" accept="image/*" onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (file) {
-                          const url = URL.createObjectURL(file)
-                          field.onChange(url)
-                        }
-                      }} />
-                    </FormControl>
-
-
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="space-y-2">
+                <Label>School Logo</Label>
+                <Input type="file" accept="image/*" onChange={handleImageUpload} />
+                {previewUrl && <img src={previewUrl} width={80} height={80} alt="Preview" className="rounded-full mt-2" />}
+                {errorUpload && <div onClick={() => retryUpload()} ><Button >Retry</Button></div>}
+              </div>
               {/* Location */}
               <FormField
                 control={form.control}
                 name="location"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Location</FormLabel>
+                    <FormLabel>Address</FormLabel>
                     <FormControl>
                       <Input placeholder="Delhi, India" {...field} />
                     </FormControl>
@@ -246,40 +438,6 @@ export default function CreateSchoolPage() {
                   </FormItem>
                 )}
               />
-
-
-              {/* Language Dropdown */}
-              <FormField
-                control={form.control}
-                name="language"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Language</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={'en'}>
-                      <FormControl>
-                        <SelectTrigger className={'w-full'}>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="en">English</SelectItem>
-                        <SelectItem value="hi">Hindi</SelectItem>
-                        <SelectItem value="bn">Bengali</SelectItem>
-                        <SelectItem value="ta">Tamil</SelectItem>
-                        <SelectItem value="te">Telugu</SelectItem>
-                        <SelectItem value="or">Odia</SelectItem>
-                        <SelectItem value="kn">Kannada</SelectItem>
-                        <SelectItem value="ml">Malayalam</SelectItem>
-                        <SelectItem value="mr">Marathi</SelectItem>
-                        <SelectItem value="gu">Gujarati</SelectItem>
-                        <SelectItem value="pa">Punjabi</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
               {/* Domain Mode Toggle */}
               <FormField
                 control={form.control}
@@ -313,11 +471,38 @@ export default function CreateSchoolPage() {
                   name="tenantName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Subdomain</FormLabel>
+                      <FormLabel>School Domain</FormLabel>
                       <FormControl>
-                        <div className="flex items-center gap-2">
-                          <Input placeholder="e.g. sunshine" {...field} />
-                          <span className="text-muted-foreground text-sm">.edubreezy.com</span>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Input
+                              id="domain"
+                              placeholder="e.g. sunshine"
+                              {...field}
+                              className={form.formState.errors.tenantName ? "border-red-500" : ""}
+                            />
+                            <span className="text-muted-foreground text-sm">.edubreezy.com</span>
+                            {available === true && (
+                              <CheckCircle className="text-green-500 h-5 w-5" />
+                            )}
+                            {available === false && (
+                              <XCircle className="text-red-500 h-5 w-5" />
+                            )}
+                          </div>
+
+                          {checking && (
+                            <p className="text-sm text-muted-foreground">Checking domain availability...</p>
+                          )}
+
+                          {available === true && !checking && (
+                            <p className="text-sm text-green-600">Domain is available 🎉</p>
+                          )}
+
+                          {form.formState.errors.tenantName && (
+                            <p className="text-sm text-red-500">
+                              {form.formState.errors.tenantName.message}
+                            </p>
+                          )}
                         </div>
                       </FormControl>
                       <FormMessage />
@@ -342,7 +527,11 @@ export default function CreateSchoolPage() {
                   )}
                 />
               )}
-
+              <FormField
+                control={form.control}
+                name="schoolCode"
+                render={({ field }) => <SchoolCodeField field={field} />}
+              />
               <Button type="submit" className="w-full text-white" disabled={loading}>
                 {loading ? (
                   <span className="flex items-center justify-center gap-2 text-white">

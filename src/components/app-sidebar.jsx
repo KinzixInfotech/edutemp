@@ -40,7 +40,7 @@ const sidebarData = [
         title: "Main",
         items: [
             { label: "Dashboard", url: "/dashboard/", icon: IconDashboard, roles: ["SUPER_ADMIN", "STUDENT"] },
-            { label: "Create Superadmin", url: "/dashboard/edubreezy/add-user", icon: IconListDetails, roles: ["SUPER_ADMIN"] },
+            { label: "Create Super Admin", url: "/dashboard/edubreezy/add-user", icon: IconListDetails, roles: ["SUPER_ADMIN"] },
             { label: "Analytics", url: "#", icon: IconChartBar, roles: ["SUPER_ADMIN"] },
         ],
     },

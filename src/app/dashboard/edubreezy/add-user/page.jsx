@@ -5,9 +5,7 @@ import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { toast } from "sonner";
 import Image from "next/image";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Eye, EyeOff, Loader2, Plus } from "lucide-react";
-import { UploadButton } from "@uploadthing/react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,9 +32,10 @@ export default function CreateSuperadminPage() {
     const [uploading, setUploading] = useState(false);
     const [previewUrl, setPreviewUrl] = useState("");
     const [rawImage, setRawImage] = useState(null);
+    const [tempImage, setTempImage] = useState(null);
     const [cropDialogOpen, setCropDialogOpen] = useState(false);
     const router = useRouter();
-
+    const [errorUpload, setErrorupload] = useState(false);
     useEffect(() => {
         fetchUsers();
     }, []);
@@ -95,6 +94,23 @@ export default function CreateSuperadminPage() {
         }
     };
 
+    const retryUpload = async () => {
+        const res = await uploadFiles("profilePictureUploader", {
+            files: [tempImage],
+            input: {
+                profileId: crypto.randomUUID(),
+                username: form.name || "User",
+            },
+        });
+        if (res && res[0]?.url) {
+            setForm({ ...form, profilePicture: res[0].url });
+            setPreviewUrl(res[0].url);
+            toast.success("Image uploaded!");
+            setErrorupload(true);
+        } else {
+            toast.error("Upload failed");
+        }
+    }
 
 
     return (
@@ -117,6 +133,7 @@ export default function CreateSuperadminPage() {
                         const timestamp = `${iso}-${perf}`;
                         const filename = `${timestamp}.jpg`;
                         const file = new File([croppedBlob], filename, { type: "image/jpeg" });
+                        setTempImage(file);
                         try {
                             setUploading(true)
 
@@ -130,13 +147,16 @@ export default function CreateSuperadminPage() {
                             if (res && res[0]?.url) {
                                 setForm({ ...form, profilePicture: res[0].url });
                                 setPreviewUrl(res[0].url);
-                                toast.success("Image uploaded!");
+                                toast.success("Image uploaded!")
+                                setErrorupload(false);
                             } else {
                                 toast.error("Upload failed");
+                                setErrorupload(true);
                             }
                         } catch (err) {
                             toast.error("Something went wrong during upload");
                             console.error(err);
+                            setErrorupload(true);
                         } finally {
                             setUploading(false)
                             setCropDialogOpen(false);
@@ -173,6 +193,7 @@ export default function CreateSuperadminPage() {
                         <Label>Profile Picture</Label>
                         <Input type="file" accept="image/*" onChange={handleImageUpload} />
                         {previewUrl && <Image src={previewUrl} width={80} height={80} alt="Preview" className="rounded-full mt-2" />}
+                        {errorUpload && <div onClick={() => retryUpload()} ><Button >Retry</Button></div>}
                     </div>
                     <div className="col-span-full flex justify-center">
                         <Button onClick={handleSubmit} disabled={loading}>
@@ -251,6 +272,6 @@ export default function CreateSuperadminPage() {
                     </Table>
                 </CardContent>
             </Card>
-        </div>
+        </div >
     );
 }
