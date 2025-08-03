@@ -94,7 +94,7 @@ export default function TimetableBuilder() {
                             </Button>
                         </div>
                     ))}
-                    <Button className="w-full" onClick={addPeriod}>
+                    <Button className="w-full dark:text-white" onClick={addPeriod}>
                         <Plus className="w-4 h-4 mr-2" /> Add Period
                     </Button>
                     <div>
@@ -174,7 +174,7 @@ export default function TimetableBuilder() {
                         </table>
                     </div>
 
-                    <Button className="mt-6 w-full" onClick={handleSave}>
+                    <Button className="mt-6 w-full dark:text-white" onClick={handleSave}>
                         Save Timetable
                     </Button>
                 </CardContent>
