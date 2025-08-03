@@ -19,13 +19,14 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                 )
 
                 if (visibleItems.length === 0) return null
-
+                const normalize = (path) => path.replace(/\/$/, "")
                 return (
                     <SidebarGroup key={section.title} >
                         <SidebarGroupLabel>{section.title}</SidebarGroupLabel>
                         <SidebarMenu >
                             {visibleItems.map((item) => {
-                                const isActive = activePath === item.url
+                                const isActive = normalize(activePath) === normalize(item.url)
+
                                 return (
                                     <SidebarMenuItem key={item.label}>
                                         <SidebarMenuButton asChild

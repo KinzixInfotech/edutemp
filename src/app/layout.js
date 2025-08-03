@@ -14,7 +14,14 @@ export default function RootLayout({ children }) {
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen flex flex-col">
         <ClientProduct>{children}</ClientProduct>
-        <Toaster />
+        <Toaster
+          theme="system"
+          toastOptions={{
+            classNames: {
+              description: "text-sm mt-1 !text-black dark:!text-white",
+            },
+          }}
+        />
       </body>
     </html>
   );

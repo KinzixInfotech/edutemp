@@ -20,25 +20,91 @@ import { CalendarClock } from "lucide-react";
 import { ChartPieLabel } from '@/components/chart-pie';
 import { ChartBarMultiple } from '@/components/bar-chart';
 import { ChartLineLabel } from '@/components/line-chart';
+import BigCalendar from '@/components/big-calendar';
 
 export default function Dashboard() {
   const { fullUser, loading } = useAuth();
   const [date, setDate] = useState(new Date());
-  const [data, setData] = useState([]);
+  const [chartDataSuper, setChartDataSuper] = useState([])
+  const [schoolCount, setSchoolCount] = useState(0);
+  const [trend, setTrend] = useState(0);
+  const [direction, setDirection] = useState("neutral");
+  const [activeCount, setActiveCount] = useState(0);
+  // useEffect(() => {
+  //   fetch("/api/school-trend")
+  //     .then(res => res.json())
+  //     .then(apiData => {
+  //       // transform for AreaChart
+  //       const formatted = apiData.map(item => ({
+  //         date: item.date,
+  //         schools: item.schools,
+
+  //       }))
+  //       console.log(formatted, apiData);
+  //       setData(formatted)
+  //     })
+  //   const fetchActiveUsers = async () => {
+  //     try {
+  //       const res = await fetch('/api/active-users');
+  //       const data = await res.json();
+
+  //       if (res.ok) {
+  //         setCount(data.activeCount);
+  //       } else {
+  //         console.error('Error fetching active user count:', data.error);
+  //       }
+  //     } catch (err) {
+  //       console.error('Network error:', err);
+  //     }
+  //   };
+
+  //   fetchActiveUsers();
+  // }, [])
+
   useEffect(() => {
-    fetch("/api/school-trend")
-      .then(res => res.json())
-      .then(apiData => {
-        // transform for AreaChart
-        const formatted = apiData.map(item => ({
+    const fetchStats = async () => {
+      try {
+        // 1️⃣ Fetch school trend data
+        const res = await fetch('/api/school-trend');
+        if (!res.ok) throw new Error("Failed to fetch school trend");
+
+        const data = await res.json();
+        // format the data for chart 
+        const formatted = data.data.map(item => ({
           date: item.date,
           schools: item.schools,
-
         }))
-        console.log(formatted, apiData);
-        setData(formatted)
-      })
-  }, [])
+
+        setChartDataSuper(formatted)
+        const latest = data?.data?.[data.data.length - 1];
+
+        setSchoolCount(latest?.schools ?? 0);
+        setTrend(data?.trend ?? 0);
+        setDirection(data?.direction ?? "neutral");
+      } catch (err) {
+        console.error("❌ School trend error:", err);
+        setSchoolCount(0);
+        setTrend(0);
+        setDirection("neutral");
+      }
+
+      try {
+        // 2️⃣ Fetch active accounts (queued after school trend)
+        const activeRes = await fetch('/api/account-status');
+        if (!activeRes.ok) throw new Error("Failed to fetch active accounts");
+
+        const activeData = await activeRes.json();
+        setActiveCount(activeData?.active ?? 0);
+      } catch (err) {
+        console.error("❌ Active account fetch error:", err);
+        setActiveCount(0);
+      }
+    };
+
+    fetchStats();
+  }, []);
+
+
   const events = [
     { title: "Product Strategy Meeting", time: "12:00 PM – 02:00 PM", description: "Align roadmap and define Q4 deliverables." },
     { title: "UX Audit Review", time: "03:00 PM – 04:30 PM", description: "Review accessibility and UI consistency." },
@@ -100,13 +166,12 @@ export default function Dashboard() {
           </div>
         );
       case "SUPER_ADMIN":
-        const count = data.find(entry => entry.date === "Aug 2025")?.schools || 0;
-        console.log(count); // 1
+
         const superadmindata = [
-          { label: "Total School", value: count, trend: "+12.5%", direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
-          { label: "Total Revenue", value: "2000", direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
-          { label: "Active Accounts", value: "200", direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
-          { label: "Total Employees", value: "200", direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
+          { label: "Total School", value: schoolCount, trend: trend + '%', direction: direction, info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
+          { label: "Active Accounts", value: activeCount ?? '...', direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
+          // { label: "Total Revenue", value: "2000", direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
+          { label: "Total Employees", value: "0", direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
         ];
 
 
@@ -114,7 +179,7 @@ export default function Dashboard() {
           <>
             <SectionCards data={superadmindata} />
             <div className="flex flex-col gap-3.5 px-4 sm:px-6">
-              <ChartAreaInteractive chartData={data} />
+              <ChartAreaInteractive chartData={chartDataSuper} />
               <ChartLineLabel chartData={linechartData} title="Finance" date="Today" />
             </div>
           </>

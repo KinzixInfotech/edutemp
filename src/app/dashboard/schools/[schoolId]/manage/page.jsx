@@ -14,6 +14,14 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover"
 import {
+    Dialog,
+    DialogTrigger,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription
+} from "@/components/ui/dialog"
+import {
     Command,
     CommandList,
     CommandItem,
@@ -26,11 +34,13 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
+import { formatDate } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import { useSidebar } from "@/components/ui/sidebar"
+import { Separator } from "@/components/ui/separator"
 
 export default function ManageSchoolPage() {
     const { toggleSidebar } = useSidebar()
@@ -39,6 +49,23 @@ export default function ManageSchoolPage() {
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState("teachers")
     const [profiles, setProfiles] = useState({})
+    const [school, setSchoolData] = useState({});
+    const [adminDialogOpen, setAdminDialogOpen] = useState(false)
+
+    useEffect(() => {
+        const fetchSchool = async () => {
+            try {
+                const res = await fetch(`/api/schools/get-school/${schoolId}`);
+                const data = await res.json();
+                setSchoolData(data.school);
+                console.log(data.school);
+            } catch (err) {
+                console.error("Failed to fetch school:", err);
+            }
+        };
+
+        fetchSchool();
+    }, []);
 
     const profileTabsConfig = {
         teachers: {
@@ -161,6 +188,7 @@ export default function ManageSchoolPage() {
             setLoading(true)
             const res = await fetch(`/api/schools/${schoolId}/profiles`)
             const data = await res.json()
+            console.log(data, 'from manage')
             setProfiles(data)
             toast.success("Profiles loaded")
         } catch (err) {
@@ -197,6 +225,7 @@ export default function ManageSchoolPage() {
         }
     }
 
+
     const renderValue = (value) => {
         if (typeof value === "object" && value !== null) {
             return value.className || value.name || value.title || "[Object]"
@@ -206,12 +235,109 @@ export default function ManageSchoolPage() {
 
     return (
         <div className="p-6 space-y-6">
+
             <div className="flex items-center justify-between">
-                <h1 className="text-xl font-semibold">Manage School: {schoolId}</h1>
+                <h1 className="text-xl font-semibold"></h1>
                 <Button className="text-white capitalize" onClick={handleAdd}>
                     Add {activeTab.slice(0, -1)}
                 </Button>
             </div>
+            <Card className="w-full mt-6 rounded-2xl  border border-border bg-white dark:bg-[#18181b]">
+                <div className="flex flex-col md:flex-row items-center gap-6 p-6">
+                    {/* School Logo */}
+                    <div className="w-24 h-24 flex-shrink-0 overflow-hidden rounded-full border border-gray-300 dark:border-gray-600">
+                        <img
+                            src={school.profilePicture || "/placeholder.png"}
+                            alt={school.name}
+                            className="object-cover w-full h-full"
+                        />
+
+                    </div>
+                    {/* School Info */}
+                    <div className="flex-1">
+                        <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">{school.name}</h2>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                            ID: <span className="underline" >{school.id || "Unknown Location"}</span>
+                        </p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                            {school.location || "Unknown Location"}
+                        </p>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4 text-sm">
+                            <div>
+                                <p className="text-muted-foreground">School Code</p>
+                                <p className="font-medium">{school.schoolCode}</p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground">Contact</p>
+                                <p className="font-medium">{school.contactNumber || "N/A"}</p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground">Subscription</p>
+                                <p className="font-medium">{school.SubscriptionType || "Free"}</p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground">Time Zone</p>
+                                <p className="font-medium">{school.timezone || "Asia/Kolkata"}</p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground ">Created At</p>
+                                <p className="text-sm font-semibold">
+                                    {formatDate(school.createdAt)}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground ">Last Updated At</p>
+                                <p className="text-sm font-semibold">
+                                    {formatDate(school.updatedAt)}
+                                </p>
+                            </div>
+                            <div>
+                                <Dialog open={adminDialogOpen} onOpenChange={setAdminDialogOpen}>
+                                    <DialogTrigger asChild>
+                                        <div onClick={() => setAdminDialogOpen(true)} className="cursor-pointer">
+                                            <p className="text-muted-foreground">Assigned Admin</p>
+                                            <p className="text-sm underline font-semibold">View</p>
+                                        </div>
+                                    </DialogTrigger>
+
+                                    <DialogContent className="max-w-md  dark:border-muted dark:bg-[#18181b]">
+                                        <DialogHeader>
+                                            <DialogTitle>Assigned Admin</DialogTitle>
+                                            <DialogDescription>
+                                                Admin linked to this school
+                                            </DialogDescription>
+                                        </DialogHeader>
+
+                                        <div className="space-y-4 mt-4  dark:border-muted dark:bg-[#18181b]">
+                                            {school.admins?.length > 0 ? (
+                                                school.admins.map((admin, idx) => (
+                                                    <div key={idx} className="flex items-center  gap-2">
+                                                        <img
+                                                            src={admin.User?.profilePicture || "/default.png"}
+                                                            alt={admin.User?.name}
+                                                            className="w-20 h-20 rounded-full object-cover"
+                                                        />
+                                                        <div className="bg-muted w-full px-2.5  rounded-lg py-2.5" >
+                                                            <p className="font-medium">{admin.User?.name || "Unnamed"}</p>
+                                                            <p className="text-sm text-muted-foreground">{admin.User?.email}</p>
+                                                            <p className="text-sm text-muted-foreground ">UserId: <span className="underline">{admin.userId}</span> </p>
+                                                            <p className="text-sm text-muted-foreground lowercase">Status: {admin.User?.status}</p>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <p className="text-sm text-muted-foreground">No admins assigned.</p>
+                                            )}
+                                        </div>
+                                    </DialogContent>
+                                </Dialog>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Card>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="flex w-full overflow-x-auto whitespace-nowrap no-scrollbar gap-2 px-2 sm:px-4">

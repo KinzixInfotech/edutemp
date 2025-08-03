@@ -46,8 +46,9 @@ const chartConfig = {
     },
 }
 
-export function ChartAreaInteractive({chartData}) {
+export function ChartAreaInteractive({ chartData }) {
     const isMobile = useIsMobile()
+
     const [timeRange, setTimeRange] = React.useState("90d")
 
     React.useEffect(() => {
@@ -55,25 +56,40 @@ export function ChartAreaInteractive({chartData}) {
             setTimeRange("7d")
         }
     }, [isMobile])
+    // Map how many months to keep based on selected range
+    const monthsToKeep = {
+        "90d": 3,
+        "30d": 2,
+        "7d": 1,
+    }
 
-    const filteredData = chartData.filter((item) => {
-        const date = new Date(item.date)
-        const referenceDate = new Date("2024-06-30")
-        let daysToSubtract = 90
-        if (timeRange === "30d") {
-            daysToSubtract = 30
-        } else if (timeRange === "7d") {
-            daysToSubtract = 7
-        }
-        const startDate = new Date(referenceDate)
-        startDate.setDate(startDate.getDate() - daysToSubtract)
-        return date >= startDate
-    })
+    // Take the latest N entries from chartData
+    const filteredData = chartData.slice(-Math.max(monthsToKeep[timeRange], 2));
+
+    // Trend calculation from first and last
+    const first = filteredData[0]?.schools ?? 0
+    const last = filteredData[filteredData.length - 1]?.schools ?? 0
+
+    const trend = first === 0
+        ? (last > 0 ? 100 : 0)
+        : ((last - first) / first) * 100
+
+    const trendRounded = Math.round(trend)
+    const trendDirection = trendRounded > 0 ? "↑" : trendRounded < 0 ? "↓" : "→"
+    const trendColor =
+        trendRounded > 0 ? "text-green-600"
+            : trendRounded < 0 ? "text-red-600"
+                : "text-gray-500"
 
     return (
         <Card className="@container/card">
             <CardHeader>
-                <CardTitle>EduBreezy Total Traffic</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                    EduBreezy Total Traffic
+                    <span className={`text-sm font-semibold ${trendColor}`}>
+                        {trendDirection} {Math.abs(trendRounded)}%
+                    </span>
+                </CardTitle>
                 <CardDescription>
                     <span className="hidden @[540px]/card:block">
                         Total for the last 3 months
@@ -89,8 +105,8 @@ export function ChartAreaInteractive({chartData}) {
                         className="hidden *:data-[slot=toggle-group-item]:!px-4 @[767px]/card:flex"
                     >
                         <ToggleGroupItem value="90d">Last 3 months</ToggleGroupItem>
-                        <ToggleGroupItem value="30d">Last 30 days</ToggleGroupItem>
-                        <ToggleGroupItem value="7d">Last 7 days</ToggleGroupItem>
+                        <ToggleGroupItem value="30d">Last 2 months</ToggleGroupItem>
+                        <ToggleGroupItem value="7d">Last 1 month</ToggleGroupItem>
                     </ToggleGroup>
                     <Select value={timeRange} onValueChange={setTimeRange}>
                         <SelectTrigger
@@ -105,10 +121,10 @@ export function ChartAreaInteractive({chartData}) {
                                 Last 3 months
                             </SelectItem>
                             <SelectItem value="30d" className="rounded-lg">
-                                Last 30 days
+                                Last 2 months
                             </SelectItem>
                             <SelectItem value="7d" className="rounded-lg">
-                                Last 7 days
+                                Last 1 month
                             </SelectItem>
                         </SelectContent>
                     </Select>

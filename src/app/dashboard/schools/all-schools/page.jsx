@@ -36,7 +36,7 @@ import { Label } from "@/components/ui/label"
 export default function Page() {
     const isMobile = useIsMobile()
     const [schools, setSchools] = useState([])
-    const [loading, setLoading] = useState(false)
+    const [loading, setLoading] = useState(true)
     const [editDrawerOpen, setEditDrawerOpen] = useState(false)
     const [editSchool, setEditSchool] = useState(null)
     const [editLoading, setEditLoading] = useState(false)
@@ -119,7 +119,7 @@ export default function Page() {
             </div>
 
             <div className="overflow-x-auto overflow-hidden rounded-lg border">
-                <Table className="min-w-[700px]">
+                <Table className="">
                     <TableHeader className="bg-muted sticky top-0 z-10">
                         <TableRow>
                             <TableHead>School Code</TableHead>
@@ -127,7 +127,7 @@ export default function Page() {
                             <TableHead>Address</TableHead>
                             {/* <TableHead>Admin</TableHead> */}
                             <TableHead>Phone</TableHead>
-
+                            <TableHead>Logo</TableHead>
                             <TableHead>Domain</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
@@ -137,7 +137,7 @@ export default function Page() {
                             <TableRow>
                                 <TableCell colSpan={4} className="text-center py-8 h-24">
                                     <div className="flex justify-center items-center gap-2 text-muted-foreground">
-                                        <Loader2 className="animate-spin h-5 w-5" />
+                                        <Loader2 className="animate-spin h-5 " />
                                         Loading schools...
                                     </div>
                                 </TableCell>
@@ -151,18 +151,21 @@ export default function Page() {
                         ) : (
                             schools.map((school) => (
                                 <TableRow key={school.id}>
-                                    <TableCell>{school.schoolCode}</TableCell>
+                                    <TableCell >
+                                        {school.schoolCode}</TableCell>
                                     <TableCell>{school.name}</TableCell>
                                     <TableCell>{school.location}</TableCell>
                                     {/* <TableCell>{school.adminem}</TableCell> */}
                                     <TableCell>{school.contactNumber}</TableCell>
-
+                                    <TableCell>
+                                        <img src={school.profilePicture} className="w-7 h-7" />
+                                    </TableCell>
                                     <TableCell>{school.domain}</TableCell>
                                     <TableCell className="text-right space-x-2">
                                         <Link href={`/dashboard/schools/${school.id}/manage`}>
                                             <Button size="sm" variant="outline">View</Button>
                                         </Link>
-                                        <Button
+                                        {/* <Button
                                             size="sm"
                                             variant="outline"
                                             onClick={() => {
@@ -171,7 +174,7 @@ export default function Page() {
                                             }}
                                         >
                                             Edit
-                                        </Button>
+                                        </Button> */}
                                     </TableCell>
                                 </TableRow>
                             ))

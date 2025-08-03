@@ -40,15 +40,27 @@ export function NavUser({ }) {
     console.log(fullUser);
     const handleLogout = async () => {
         toast("Logging Out");
+
+        const user = await supabase.auth.getUser();
+        const userId = user.data?.user?.id;
+
+        if (userId) {
+            //  Update status via backend
+            await fetch("/api/logout-status", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId }),
+            });
+        }
+
         const { error } = await supabase.auth.signOut();
 
         if (error) {
-            console.error('Logout error:', error.message);
+            console.error("Logout error:", error.message);
         } else {
-            // Optionally clear any local state or cookies if needed
-            toast("Logged Out Successfuly");
+            toast("Logged Out Successfully");
             document.cookie = "sb-user=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC";
-            router.push('/login'); // Redirect after logout
+            router.push("/login");
         }
     };
     return (

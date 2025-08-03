@@ -3,121 +3,93 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
 
+// Parse incoming login body
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
+  schoolCode: z.string().optional(),
 });
 
 export async function POST(req) {
   try {
     const body = await req.json();
-    const { email, password } = loginSchema.parse(body);
+    const { email, password, schoolCode } = loginSchema.parse(body);
 
-    // 1️⃣ Supabase Auth
-    let authData, authError;
-    try {
-      const result = await supabase.auth.signInWithPassword({ email, password });
-      authData = result.data;
-      authError = result.error;
-    } catch (err) {
-      console.error("🔥 Supabase Auth Failure:", err);
-      return NextResponse.json({ error: "Authentication service unavailable" }, { status: 503 });
-    }
+    // Step 1️⃣: Login via Supabase
+    const result = await supabase.auth.signInWithPassword({ email, password });
+    const authData = result.data;
+    const authError = result.error;
 
     if (authError || !authData?.user) {
-      return NextResponse.json(
-        { error: "Invalid email or password" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
 
     const userId = authData.user.id;
 
-    // 2️⃣ Get user from Prisma
-    const user = await prisma.User.findUnique({
+    // Step 2️⃣: Fetch user from Prisma DB
+    const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: {
-        role: true,
-      },
+      include: { role: true },
     });
 
     if (!user) {
-      return NextResponse.json(
-        { error: "User not found in database" },
-        { status: 404 }
-      );
+      await supabase.auth.signOut(); // Cleanup
+      return NextResponse.json({ error: "User not found in database" }, { status: 404 });
     }
 
-    // ✅ Early exit for SUPER_ADMIN
-    if (user.role.name === "SUPER_ADMIN") {
-      return NextResponse.json({
-        user: {
-          id: user.id,
-          email: user.email,
-          role: user.role,
-          schoolId: null,
-        },
-      });
+    // Step 3️⃣: Decide based on schoolCode presence
+    const isSchoolLogin = Boolean(schoolCode?.trim());
+
+    // ✅ If school login — only allow school roles
+    const schoolRoles = ["ADMIN", "TEACHING_STAFF", "NON_TEACHING_STAFF", "STUDENT", "PARENT"];
+    if (isSchoolLogin && !schoolRoles.includes(user.role.name)) {
+      await supabase.auth.signOut();
+      return NextResponse.json({ error: "Only school users can login here" }, { status: 403 });
     }
 
-    // 3️⃣ Resolve schoolId based on user role
+    // ✅ If no schoolCode — only SUPER_ADMIN can login
+    if (!isSchoolLogin && user.role.name !== "SUPER_ADMIN") {
+      await supabase.auth.signOut();
+      return NextResponse.json({ error: "Only super admins can login without school code" }, { status: 403 });
+    }
+
+    // Step 4️⃣: Set user ACTIVE
+    await prisma.user.update({
+      where: { id: userId },
+      data: { status: "ACTIVE" },
+    });
+
+    // Step 5️⃣: Resolve schoolId (if school user)
     let schoolId = null;
 
     switch (user.role.name) {
-      case "ADMIN": {
-        const admin = await prisma.admin.findUnique({ where: { userId } });
-        schoolId = admin?.schoolId;
+      case "ADMIN":
+        schoolId = (await prisma.admin.findUnique({ where: { userId } }))?.schoolId;
         break;
-      }
-
-      case "TEACHING_STAFF": {
-        const teacher = await prisma.teacher.findUnique({ where: { userId } });
-        schoolId = teacher?.schoolId;
+      case "TEACHING_STAFF":
+        schoolId = (await prisma.teacher.findUnique({ where: { userId } }))?.schoolId;
         break;
-      }
-
-      case "NON_TEACHING_STAFF": {
-        const staff = await prisma.staff.findUnique({ where: { userId } });
-        schoolId = staff?.schoolId;
+      case "NON_TEACHING_STAFF":
+        schoolId = (await prisma.staff.findUnique({ where: { userId } }))?.schoolId;
         break;
-      }
-
-      case "STUDENT": {
-        const student = await prisma.student.findFirst({ where: { userId } });
-        schoolId = student?.schoolId;
+      case "STUDENT":
+        schoolId = (await prisma.student.findFirst({ where: { userId } }))?.schoolId;
         break;
-      }
-
-      case "PARENT": {
+      case "PARENT":
         const parent = await prisma.parent.findUnique({
           where: { userId },
-          include: {
-            students: {
-              select: {
-                schoolId: true,
-              },
-              take: 1,
-            },
-          },
+          include: { students: { select: { schoolId: true }, take: 1 } },
         });
-
         schoolId = parent?.students?.[0]?.schoolId || null;
         break;
-      }
-
-      default:
-        return NextResponse.json({ error: "Unsupported role" }, { status: 403 });
     }
 
-    // 4️⃣ Final check for linked school
-    if (!schoolId) {
-      return NextResponse.json(
-        { error: "No school linked to this user" },
-        { status: 400 }
-      );
+    if (isSchoolLogin && !schoolId) {
+      await supabase.auth.signOut();
+      return NextResponse.json({ error: "School not linked to user" }, { status: 400 });
     }
 
-    // ✅ Success
+    // ✅ All good
     return NextResponse.json({
       user: {
         id: user.id,
@@ -128,9 +100,11 @@ export async function POST(req) {
     });
 
   } catch (err) {
-    console.error("❌ Login Error:", err);
     return NextResponse.json(
-      { error: "Internal Server Error" },
+      {
+        error: "Internal Server Error",
+        message: err instanceof Error ? err.message : String(err),
+      },
       { status: 500 }
     );
   }

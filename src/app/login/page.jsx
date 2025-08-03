@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -19,6 +19,10 @@ export default function LoginPhoto({ className, ...props }) {
     const [errorMsg, setErrorMsg] = useState("")
     const [loading, setLoading] = useState(false)
     const [alreadyLoggedIn, setAlreadyLoggedIn] = useState(false)
+    // schoolcode
+    const searchParams = useSearchParams()
+    const schoolCode = searchParams.get("schoolCode")
+    const [school, setSchool] = useState(null)
 
     useEffect(() => {
         const cookies = document.cookie.split(";").map(cookie => cookie.trim());
@@ -28,6 +32,29 @@ export default function LoginPhoto({ className, ...props }) {
             router.push("/dashboard")
         }
     }, []);
+
+
+    useEffect(() => {
+        const fetchSchool = async () => {
+            if (!schoolCode) return // wait for hydration
+            console.log("✅ schoolCode:", schoolCode)
+
+            try {
+                const res = await fetch(`/api/schools/by-code?schoolcode=${schoolCode}`);
+                const data = await res.json();
+
+                if (res.ok) {
+                    setSchool(data.school);
+                } else {
+                    console.error("❌ API error:", data.error);
+                }
+            } catch (err) {
+                console.error("❌ Fetch failed:", err);
+            }
+        }
+
+        fetchSchool();
+    }, [schoolCode]);
 
     const handleLogin = async (e) => {
         e.preventDefault()
@@ -46,12 +73,20 @@ export default function LoginPhoto({ className, ...props }) {
             const res = await fetch("/api/auth/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify(
+                    schoolCode ? { email, password, schoolCode } : { email, password }
+                )
             })
 
             const result = await res.json()
             if (!res.ok) {
-                toast("Login Error", { description: result.error })
+                toast("Login Error", {
+                    description: "Only school users can login here",
+
+                    classNames: {
+                        description: "text-sm mt-1 !text-black dark:!text-white",
+                    },
+                });
                 return
             }
 
@@ -60,6 +95,8 @@ export default function LoginPhoto({ className, ...props }) {
             router.push("/dashboard")
         } catch (err) {
             toast("Login Error", { description: err.message || "Something went wrong" })
+            console.log(err)
+            toast(err)
         } finally {
             setLoading(false)
         }
@@ -71,6 +108,13 @@ export default function LoginPhoto({ className, ...props }) {
                 <div className={cn("flex flex-col gap-6", className)} {...props}>
                     <Card className="overflow-hidden p-0">
                         <CardContent className="grid p-0 md:grid-cols-2">
+                            {/* {school ? (
+                                <p>School: {school.name} ({school.schoolCode})</p>
+                            ) : schoolCode ? (
+                                <p>Looking for school: {schoolCode}...</p>
+                            ) : (
+                                <p>No school code in URL</p>
+                            )} */}
                             <form className="p-6 md:p-8" onSubmit={handleLogin}>
                                 <div className="flex flex-col gap-6">
                                     <div className="flex flex-col items-center text-center">
@@ -129,11 +173,22 @@ export default function LoginPhoto({ className, ...props }) {
                             </form>
 
                             <div className="bg-muted relative hidden md:block">
-                                <img
-                                    src={image.src}
-                                    alt="Image"
-                                    className="absolute pointer-events-none inset-0 h-full w-full object-cover"
-                                />
+                                {school ? (
+                                    <img
+                                        src={school.profilePicture}
+                                        alt="Image"
+                                        className="absolute pointer-events-none inset-0 h-full w-full object-cover"
+                                    />
+                                ) : schoolCode ? (
+                                    <p></p>
+                                ) : (
+                                    <img
+                                        src={image.src}
+                                        alt="Image"
+                                        className="absolute pointer-events-none inset-0 h-full w-full object-cover"
+                                    />
+                                )}
+
                             </div>
                         </CardContent>
                     </Card>

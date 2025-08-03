@@ -43,8 +43,18 @@ export function SectionCards({ data }) {
                         {/* Trend */}
                         {metric.trend && (
                             <CardAction className="mt-2">
-                                <Badge variant="outline" className="text-xs dark:border-muted-foreground/40 dark:text-muted-foreground">
-                                    <Icon className="mr-1 h-3 w-3" />
+                                <Badge
+                                    variant="outline"
+                                    className={`text-xs flex items-center gap-1 px-2 py-0.5 rounded-full
+    ${metric.direction === "up"
+                                            ? "text-green-600 border-green-600"
+                                            : metric.direction === "down"
+                                                ? "text-red-600 border-red-600"
+                                                : "text-gray-500 border-gray-400"}
+    dark:border-muted-foreground/40
+  `}
+                                >
+                                    <Icon className="h-3 w-3" />
                                     {metric.trend}
                                 </Badge>
                             </CardAction>

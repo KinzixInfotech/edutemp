@@ -41,7 +41,7 @@ const sidebarData = [
         items: [
             { label: "Dashboard", url: "/dashboard/", icon: IconDashboard, roles: ["SUPER_ADMIN", "STUDENT"] },
             { label: "Create Super Admin", url: "/dashboard/edubreezy/add-user", icon: IconListDetails, roles: ["SUPER_ADMIN"] },
-            { label: "Analytics", url: "#", icon: IconChartBar, roles: ["SUPER_ADMIN"] },
+            { label: "Audit Log", url: "/dashboard/auditlog", icon: IconChartBar, roles: ["SUPER_ADMIN"] },
         ],
     },
     {
@@ -73,7 +73,7 @@ const sidebarData = [
             { label: "Manage Transport ", url: "/dashboard/schools/manage-gallery", icon: IconDatabase, roles: ["ADMIN"] },
             { label: "Manage Library ", url: "/dashboard/schools/manage-gallery", icon: IconDatabase, roles: ["ADMIN"] },
             { label: "View Fees ", url: "/dashboard/schools/manage-gallery", icon: IconDatabase, roles: ["ADMIN"] },
-            { label: "Manage Time Table ", url: "/dashboard/schools/manage-gallery", icon: IconDatabase, roles: ["ADMIN"] },
+            { label: "Manage Time Table ", url: "/dashboard/schools/manage-time-table", icon: IconDatabase, roles: ["ADMIN"] },
             { label: "Manage Examination ", url: "/dashboard/schools/manage-gallery", icon: IconDatabase, roles: ["ADMIN"] },
             { label: "Manage Gallery", url: "/dashboard/schools/manage-gallery", icon: IconDatabase, roles: ["ADMIN"] },
         ]
@@ -133,7 +133,6 @@ export function AppSidebar({ ...props }) {
                                 <Image src={logo} width={160} height={160} alt="EduBreezy" />
                             </a>
                         </SidebarMenuButton>
-                        {/* <span className="text-sm font-medium ml-2">A Kinzix product</span> */}
                     </SidebarMenuItem>
 
                 </SidebarMenu>
@@ -146,7 +145,6 @@ export function AppSidebar({ ...props }) {
                     activePath={pathname}
                 />
             </SidebarContent>
-
             <SidebarFooter className='border-t'>
                 <NavUser user={navUser.user} />
             </SidebarFooter>
