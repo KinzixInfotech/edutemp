@@ -5,9 +5,9 @@ import { z } from "zod";
 
 const roleMap = {
     students: "STUDENT",
-    teachers: "TEACHING_STAFF",
+    teacher: "TEACHING_STAFF",
     parents: "PARENT",
-    peons: "NON_TEACHING_STAFF",
+    staff: "NON_TEACHING_STAFF",
     labassistants: "NON_TEACHING_STAFF",
     librarians: "NON_TEACHING_STAFF",
     accountants: "NON_TEACHING_STAFF",
@@ -55,20 +55,49 @@ const studentSchema = baseUserSchema.extend({
 });
 
 const teacherSchema = baseUserSchema.extend({
-    schoolId: z.string().uuid(),
-    department: z.string(),
+    name: z.string(),
+    departmentId: z.string().optional(),
+
+    profilePicture: z.string(),
     designation: z.string(),
+    empployeeId: z.string(),
     gender: z.string(),
+    age: z.string(),
+    bloodGroup: z.string(),
+    address: z.string(),
+    dob: z.coerce.date(),
+    city: z.string(),
+    district: z.string(),
+    state: z.string(),
+    country: z.string(),
+    postalCode: z.string(),
+    contactNumber: z.string(),
+    schoolId: z.string().uuid(),
+    department: z.string().optional(),
+    designation: z.string(),
 });
 
 const staffSchema = baseUserSchema.extend({
     name: z.string(),
-    schoolId: z.string().uuid(),
+    departmentId: z.string().optional(),
+
+    profilePicture: z.string(),
     designation: z.string(),
-    department: z.string(),
+    empployeeId: z.string(),
     gender: z.string(),
-    contact: z.string(),
+    age: z.string(),
+    bloodGroup: z.string(),
     address: z.string(),
+    dob: z.coerce.date(),
+    city: z.string(),
+    district: z.string(),
+    state: z.string(),
+    country: z.string(),
+    postalCode: z.string(),
+    contactNumber: z.string(),
+    schoolId: z.string().uuid(),
+    department: z.string().optional(),
+    designation: z.string(),
 });
 
 const parentSchema = baseUserSchema.extend({
@@ -123,23 +152,23 @@ export async function POST(req, context) {
 
         createdUserId = authUser.user.id;
 
-        if (mappedRole === "STUDENT") {
-            await supabaseAdmin.auth.admin.updateUserById(createdUserId, {
-                user_metadata: {
-                    name: parsed.studentName,
-                    profilePicture: parsed.studentpfp || "",
-                    admissionNo: parsed.admissionNo,
-                    session: parsed.session,
-                    dob: parsed.dob.toISOString(),
-                    gender: parsed.gender,
-                    classId: parsed.classId,
-                    sectionId: parsed.sectionId,
-                    rollNumber: parsed.rollNumber || "",
-                    schoolId: parsed.schoolId,
-                    address: parsed.address,
-                },
-            });
-        }
+        // if (mappedRole === "STUDENT") {
+        //     await supabaseAdmin.auth.admin.updateUserById(createdUserId, {
+        //         user_metadata: {
+        //             name: parsed.studentName,
+        //             profilePicture: parsed.studentpfp || "",
+        //             admissionNo: parsed.admissionNo,
+        //             session: parsed.session,
+        //             dob: parsed.dob.toISOString(),
+        //             gender: parsed.gender,
+        //             classId: parsed.classId,
+        //             sectionId: parsed.sectionId,
+        //             rollNumber: parsed.rollNumber || "",
+        //             schoolId: parsed.schoolId,
+        //             address: parsed.address,
+        //         },
+        //     });
+        // }
         console.log(parsed, 'from edu');
         const created = await prisma.$transaction(async (tx) => {
             // Ensure Role exists
@@ -153,6 +182,7 @@ export async function POST(req, context) {
             const user = await tx.user.create({
                 data: {
                     id: createdUserId,
+                    password: parsed.password,
                     email: parsed.email,
                     school: { connect: { id: parsed.schoolId } },
                     role: { connect: { id: role.id } },
@@ -173,7 +203,7 @@ export async function POST(req, context) {
                             admissionNo: parsed.admissionNo,
                             academicYear: parsed.session,
                             school: { connect: { id: parsed.schoolId } },
-                            user: { connect: { id: user.id } }, // 👈 REQUIRED!
+                            user: { connect: { id: user.id } }, //  REQUIRED!
                             class: { connect: { id: parsed.classId } },
                             dob: parsed.dob.toISOString(),
                             gender: parsed.gender,
@@ -205,29 +235,55 @@ export async function POST(req, context) {
                     break;
 
                 case "TEACHING_STAFF":
-                    profile = await tx.teacher.create({
+                    profile = await tx.teachingStaff.create({
                         data: {
-                            userId: user.id,
+                            // userId: user.id,
                             school: { connect: { id: parsed.schoolId } },
-                            department: parsed.department,
+                            user: { connect: { id: user.id } }, //  REQUIRED!
+                            // department: parsed.department,
                             designation: parsed.designation,
                             gender: parsed.gender,
-                            employeeId: `${parsed.schoolId}-${Date.now()}`,
+                            employeeId: parsed.empployeeId,
+                            profilePicture: parsed.profilePicture,
+                            name: parsed.name,
+                            age: parsed.age,
+                            bloodGroup: parsed.bloodGroup,
+                            dob: parsed.dob.toISOString(),
+                            contactNumber: parsed.contactNumber,
+                            email: parsed.email,
+                            address: parsed.address,
+                            City: parsed.city,
+                            district: parsed.district || "",
+                            state: parsed.state || "",
+                            country: parsed.country || "",
+                            PostalCode: parsed.postalCode || "",
                         },
                     });
                     break;
 
                 case "NON_TEACHING_STAFF":
-                    profile = await tx.staff.create({
+                    profile = await tx.NonTeachingStaff.create({
                         data: {
-                            userId: user.id,
-                            name: parsed.name,
+                            // userId: user.id,
                             school: { connect: { id: parsed.schoolId } },
+                            user: { connect: { id: user.id } }, //  REQUIRED!
+                            // department: parsed.department,
                             designation: parsed.designation,
-                            department: parsed.department,
                             gender: parsed.gender,
-                            contact: parsed.contact,
+                            employeeId: parsed.empployeeId,
+                            profilePicture: parsed.profilePicture,
+                            name: parsed.name,
+                            age: parsed.age,
+                            bloodGroup: parsed.bloodGroup,
+                            dob: parsed.dob.toISOString(),
+                            contactNumber: parsed.contactNumber,
+                            email: parsed.email,
                             address: parsed.address,
+                            City: parsed.city,
+                            district: parsed.district || "",
+                            state: parsed.state || "",
+                            country: parsed.country || "",
+                            PostalCode: parsed.postalCode || "",
                         },
                     });
                     break;
@@ -246,7 +302,9 @@ export async function POST(req, context) {
             }
 
             return { user, profile };
-        });
+        }, {
+            timeout: 10000 // 10 seconds (default is 5000)
+        });;
 
         return NextResponse.json({ success: true, ...created });
     } catch (error) {

@@ -9,6 +9,11 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Calendar } from "@/components/ui/calendar"
 import { toast } from "sonner"
 import { Label } from '@/components/ui/label';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+
+import CropImageDialog from "@/app/components/CropImageDialog";
+import { uploadFiles } from "@/app/components/utils/uploadThing";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Command, CommandInput, CommandItem, CommandGroup } from "@/components/ui/command"
 import {
@@ -23,8 +28,18 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 export default function NewProfilePage() {
     const { schoolId, role } = useParams()
     const [classes, setClasses] = useState([])
+    const [resetKey, setResetKey] = useState(0);
+
     const [selectedClassId, setSelectedClassId] = useState("")
     const [selectedSectionId, setSelectedSectionId] = useState("")
+    const [previewUrl, setPreviewUrl] = useState("");
+    const [uploading, setUploading] = useState(false);
+    const [errorUpload, setErrorupload] = useState(false);
+
+    const [rawImage, setRawImage] = useState(null);
+    const [tempImage, setTempImage] = useState(null);
+    const [cropDialogOpen, setCropDialogOpen] = useState(false);
+
 
     useEffect(() => {
         if (!schoolId) return
@@ -59,7 +74,7 @@ export default function NewProfilePage() {
         academicYear: "",
         bloodGroup: "",
         adhaarNo: "",
-
+        empployeeId: "",
         address: "",
         city: "",
         state: "",
@@ -87,7 +102,7 @@ export default function NewProfilePage() {
 
         // Optional student metadata
         house: "",
-        profilePhoto: null, // File object
+        profilePicture: null, // File object
         dateOfLeaving: null, // ✅ Date object or null
         certificates: [],
 
@@ -98,79 +113,17 @@ export default function NewProfilePage() {
         busNumber: "",
         studentCount: "",
         location: "",
-        role: "STUDENT",
+        role: "",
+        district: "",
         labName: "",
         results: {},            // optional exam results object
         teacherId: "",
         parentIds: [],          // if multiple guardians
-
+        designation: "",
         // Backend-tracked fields
         feeStatus: "PENDING",   // "PENDING" | "PAID" | etc.
         status: "ACTIVE",       // "ACTIVE" | "INACTIVE"
     }
-
-    // const baseForm = {
-    //     // Required for student creation
-    //     name: "",
-    //     class: "",
-    //     studentName: "", // redundant with 'name' — choose one or unify
-    //     email: "",
-    //     password: "",
-    //     dob: "", // should be ISO format or Date object
-    //     gender: "", // "MALE" | "FEMALE" | "OTHER"
-    //     admissionNo: "",
-    //     admissionDate: "", // 📅 add this
-    //     rollNumber: "", // 🆕
-    //     academicYear: "", // 🆕
-    //     bloodGroup: "",
-    //     adhaarNo: "",
-    //     address: "",
-    //     city: "", // 🆕
-    //     state: "", // 🆕
-    //     country: "", // 🆕
-    //     postalCode: "", // 🆕
-
-    //     // Class & Section
-    //     classId: "",
-    //     sectionId: "", // 🆕
-
-    //     // School & User (filled from context/backend usually)
-    //     userId: "",
-    //     schoolId: "", // ✅ assigned from parent component
-    //     parentId: "",
-
-    //     // Guardian and Parents Info
-    //     fatherName: "",
-    //     motherName: "",
-    //     fatherMobileNumber: "",
-    //     motherMobileNumber: "",
-    //     guardianName: "",
-    //     guardianRelation: "",
-    //     guardianMobileNo: "",
-
-    //     // Misc
-    //     house: "", // 🆕
-    //     profilePhoto: "", // file or URL
-    //     dateOfLeaving: "", // optional
-    //     certificates: [],
-
-    //     // Optional fields (you had earlier)
-    //     mobile: "", // can map to contactNumber
-    //     session: "", // maybe rename to academicYear?
-    //     busNumber: "",
-    //     studentCount: "",
-    //     location: "", // general school location or address?
-    //     role: "", // likely fixed as "STUDENT"
-    //     labName: "",
-    //     results: {}, // may map to examResults
-    //     teacherId: "",
-    //     parentIds: [], // if multiple guardians
-
-    //     // Optional tracking fields (backend-controlled)
-    //     feeStatus: "PENDING", // optional; backend default usually
-    //     status: "ACTIVE", // or "INACTIVE"
-    //     role
-    // }
 
     const [form, setForm] = useState(baseForm);
 
@@ -199,6 +152,7 @@ export default function NewProfilePage() {
             })
             if (!res.ok) throw new Error("Failed to create profile")
             toast.success(`${role} profile created`)
+            setResetKey((prev) => prev + 1)
             router.push(`/dashboard/schools/${schoolId}/manage`)
         } catch {
             toast.error("Creation failed")
@@ -206,21 +160,26 @@ export default function NewProfilePage() {
             setLoading(false)
         }
     }
+    const handleImageUpload = (previewUrl) => {
+        if (!previewUrl || previewUrl === rawImage) return;
+        setRawImage(previewUrl);
+        setCropDialogOpen(true);
+    }
     function renderFields(role) {
         switch (role?.toLowerCase()) {
             case "teacher":
                 return (
                     <>
-                        <FileUploadButton field='Teacher' />
+                        <FileUploadButton field="Teacher" onChange={(previewUrl) => handleImageUpload(previewUrl)} resetKey={resetKey} />
                         <Input placeholder="Teacher Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                        <Input placeholder="Teacher Employee Id " value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                        <Input placeholder="Teacher Designation" value={form.class} onChange={(e) => setForm({ ...form, class: e.target.value })} />
+                        <Input placeholder="Teacher Employee Id " value={form.empployeeId} onChange={(e) => setForm({ ...form, empployeeId: e.target.value })} />
+                        <Input placeholder="Teacher Designation" value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} />
                         <Input type="date" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} />
-                        <Input value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} placeholder="Teacher Age" />
+                        <Input value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} placeholder="Teacher Age" />
                         <Input placeholder="Teacher Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-                        <Input type="password" placeholder="Teacher Password" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                        <Input type="password" placeholder="Teacher Password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
                         <Input placeholder="Blood Group" value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })} />
-                        <Input placeholder="Teacher Contact Number" value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })} />
+                        <Input placeholder="Teacher Contact Number" value={form.contactNumber} onChange={(e) => setForm({ ...form, contactNumber: e.target.value })} />
                         <Select
                             value={form.gender}
                             onValueChange={(value) => setForm({ ...form, gender: value })}
@@ -234,12 +193,12 @@ export default function NewProfilePage() {
                                 <SelectItem value="OTHER">Other</SelectItem>
                             </SelectContent>
                         </Select>
-                        <Input placeholder="Teacher Address" value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })} />
-                        <Input placeholder="Teacher City" value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })} />
-                        <Input placeholder="Teacher District" value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })} />
-                        <Input placeholder="Teacher Country" value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })} />
-                        <Input placeholder="Teacher Postal Code" value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })} />
-                        <Input placeholder="Teacher State" value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })} />
+                        <Input placeholder="Teacher Address Line 1" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+                        <Input placeholder="Teacher City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+                        <Input placeholder="Teacher District" value={form.district} onChange={(e) => setForm({ ...form, district: e.target.value })} />
+                        <Input placeholder="Teacher Country" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} />
+                        <Input placeholder="Teacher Postal Code" value={form.postalCode} onChange={(e) => setForm({ ...form, postalCode: e.target.value })} />
+                        <Input placeholder="Teacher State" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
                     </>
                 )
             case "students":
@@ -539,12 +498,35 @@ export default function NewProfilePage() {
             case "staff":
                 return (
                     <>
-                        <Input placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                        <Input placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                        <FileUploadButton field="Staff" onChange={(previewUrl) => handleImageUpload(previewUrl)} resetKey={resetKey} />
+                        <Input placeholder="Staff Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                        <Input placeholder="Staff Employee Id " value={form.empployeeId} onChange={(e) => setForm({ ...form, empployeeId: e.target.value })} />
+                        <Input placeholder="Staff Designation" value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} />
                         <Input type="date" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} />
-                        <Input placeholder="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+                        <Input value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} placeholder="Staff Age" />
+                        <Input placeholder="Staff Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                        <Input type="password" placeholder="Staff Password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
                         <Input placeholder="Blood Group" value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })} />
-                        <Input placeholder="Role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} />
+                        <Input placeholder="Staff Contact Number" value={form.contactNumber} onChange={(e) => setForm({ ...form, contactNumber: e.target.value })} />
+                        <Select
+                            value={form.gender}
+                            onValueChange={(value) => setForm({ ...form, gender: value })}
+                        >
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select Gender" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="MALE">Male</SelectItem>
+                                <SelectItem value="FEMALE">Female</SelectItem>
+                                <SelectItem value="OTHER">Other</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Input placeholder="Staff Address Line 1" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+                        <Input placeholder="Staff City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+                        <Input placeholder="Staff District" value={form.district} onChange={(e) => setForm({ ...form, district: e.target.value })} />
+                        <Input placeholder="Staff Country" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} />
+                        <Input placeholder="Staff Postal Code" value={form.postalCode} onChange={(e) => setForm({ ...form, postalCode: e.target.value })} />
+                        <Input placeholder="Staff State" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
                     </>
                 )
             case "labassistants":
@@ -577,6 +559,58 @@ export default function NewProfilePage() {
 
     return (
         <div className="max-w-xl mx-auto p-6">
+            {cropDialogOpen && rawImage && (
+                <CropImageDialog
+                    image={rawImage}
+                    onClose={() => {
+                        if (!uploading) {
+                            setCropDialogOpen(false);
+                        }
+                    }}
+                    uploading={uploading}
+
+                    open={cropDialogOpen}
+                    // onClose={() => setCropDialogOpen(false)}
+                    onCropComplete={async (croppedBlob) => {
+                        const now = new Date();
+                        const iso = now.toISOString().replace(/[:.]/g, "-");
+                        const perf = Math.floor(performance.now() * 1000); // microseconds (approximate nanos)
+                        const timestamp = `${iso}-${perf}`;
+                        const filename = `${timestamp}.jpg`;
+                        const file = new File([croppedBlob], filename, { type: "image/jpeg" });
+                        setTempImage(file);
+                        try {
+                            setUploading(true)
+
+                            const res = await uploadFiles("profilePictureUploader", {
+                                files: [file],
+                                input: {
+                                    profileId: crypto.randomUUID(),
+                                    username: form.name || "User",
+                                },
+                            });
+                            if (res && res[0]?.url) {
+                                setForm({ ...form, profilePicture: res[0].url });
+                                setPreviewUrl(res[0].url);
+                                toast.success("Image uploaded!")
+                                setErrorupload(false);
+                            } else {
+                                toast.error("Upload failed");
+                                setErrorupload(true);
+                            }
+                        } catch (err) {
+                            toast.error("Something went wrong during upload");
+                            console.error(err);
+
+                            setErrorupload(true);
+                        } finally {
+                            setUploading(false)
+                            setCropDialogOpen(false);
+                        }
+
+                    }}
+                />
+            )}
             <Card className='shadow-lg'>
                 <CardContent className="space-y-4 pt-6">
                     {renderFields(role)}

@@ -26,6 +26,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem
 } from "@/components/ui/select"
+import FileUploadButton from "@/components/fileupload"
 
 const schoolFormSchema = z.object({
   name: z.string().min(1),
@@ -36,6 +37,8 @@ const schoolFormSchema = z.object({
   adminem: z.string().min(1),
   adminPassword: z.string().min(1),
   subscriptionType: z.enum(["A", "B", "C"]),
+  masteradminemail: z.string().min(1),
+  masteradminpassword: z.string().min(1),
   language: z.string().min(1),
   schoolCode: z.string(),
   domainMode: z.enum(["tenant", "custom"]),
@@ -59,6 +62,7 @@ export default function CreateSchoolPage() {
   const [rawImage, setRawImage] = useState(null);
   const [errorUpload, setErrorupload] = useState(false);
   const [tempImage, setTempImage] = useState(null);
+  const [resetKey, setResetKey] = useState(0);
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   // domain validation function
   const form = useForm({
@@ -72,6 +76,8 @@ export default function CreateSchoolPage() {
       language: "en",
       schoolCode: '',
       adminem: "",
+      masteradminemail: "",
+      masteradminpassword: "",
       adminPassword: "",
       domainMode: "tenant",
       tenantName: "",
@@ -117,18 +123,22 @@ export default function CreateSchoolPage() {
     check(subdomain)
     return () => check.cancel()
   }, [subdomain])
-  const handleImageUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // const handleImageUpload = (e) => {
+  //   const file = e.target.files?.[0];
+  //   if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      setRawImage(reader.result);
-      setCropDialogOpen(true);
-    };
-    reader.readAsDataURL(file);
-  };
-
+  //   const reader = new FileReader();
+  //   reader.onload = () => {
+  //     setRawImage(reader.result);
+  //     setCropDialogOpen(true);
+  //   };
+  //   reader.readAsDataURL(file);
+  // };
+  const handleImageUpload = (previewUrl) => {
+    if (!previewUrl || previewUrl === rawImage) return;
+    setRawImage(previewUrl);
+    setCropDialogOpen(true);
+  }
   const generateSchoolCode = async () => {
     setLoading(true)
     try {
@@ -196,6 +206,7 @@ export default function CreateSchoolPage() {
       if (res.ok) {
         toast.success("School created successfully!")
         form.reset()
+        setResetKey((prev) => prev + 1)
         router.push('/dashboard/schools/all-schools');
       } else {
         toast.error(result.error || "Something went wrong.")
@@ -363,7 +374,34 @@ export default function CreateSchoolPage() {
                   </FormItem>
                 )}
               />
-              {/*admin email*/}
+              {/*master admin email*/}
+              <FormField
+                control={form.control}
+                name="masteradminemail"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Master Admin Email</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Master Admin Email" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {/*master admin password*/}
+              <FormField
+                control={form.control}
+                name="masteradminpassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Master Admin Password</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Master Admin Password" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="adminem"
@@ -391,12 +429,14 @@ export default function CreateSchoolPage() {
                   </FormItem>
                 )}
               />
+
               {/* Logo Upload or URL */}
               <div className="space-y-2">
                 <Label>School Logo</Label>
-                <Input type="file" accept="image/*" onChange={handleImageUpload} />
+                {/* <Input type="file" accept="image/*" onChange={handleImageUpload} />
                 {previewUrl && <img src={previewUrl} width={80} height={80} alt="Preview" className="rounded-full mt-2" />}
-                {errorUpload && <div onClick={() => retryUpload()} ><Button >Retry</Button></div>}
+                {errorUpload && <div onClick={() => retryUpload()} ><Button >Retry</Button></div>} */}
+                <FileUploadButton field="Teacher" onChange={(previewUrl) => handleImageUpload(previewUrl)} />
               </div>
               {/* Location */}
               <FormField

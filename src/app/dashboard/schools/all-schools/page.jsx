@@ -111,7 +111,7 @@ export default function Page() {
                         )}
                     </Button>
                     <Link href={'create-school'}>
-                        <Button >
+                        <Button className='dark:text-white' >
                             Create School<Plus />
                         </Button>
                     </Link>

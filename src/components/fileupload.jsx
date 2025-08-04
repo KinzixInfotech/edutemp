@@ -1,13 +1,14 @@
 "use client"
 
+import { useEffect, useRef } from "react"
 import { AlertCircleIcon, ImageIcon, UploadIcon, XIcon } from "lucide-react"
 
 import { useFileUpload } from '@/lib/useFileupload'
 import { Button } from '@/components/ui/button'
 
-export default function FileUploadButton({field}) {
+export default function FileUploadButton({ field, onChange, resetKey }) {
     const maxSizeMB = 2
-    const maxSize = maxSizeMB * 1024 * 1024 // 2MB default
+    const maxSize = maxSizeMB * 1024 * 1024 // 2MB
 
     const [
         { files, isDragging, errors },
@@ -19,25 +20,44 @@ export default function FileUploadButton({field}) {
             openFileDialog,
             removeFile,
             getInputProps,
+            clearFiles, // ✅ this is already exposed
         },
     ] = useFileUpload({
         accept: "image/,image/png,image/jpeg,image/jpg,image/gif",
         maxSize,
     })
+
+
     const previewUrl = files[0]?.preview || null
+
+    // Send previewUrl to parent only when changed
+    const previousUrlRef = useRef(null)
+    useEffect(() => {
+        if (onChange && previewUrl && previewUrl !== previousUrlRef.current) {
+            previousUrlRef.current = previewUrl
+            onChange(previewUrl)
+        }
+    }, [previewUrl, onChange])
+
+    // Clear preview when resetKey changes
+    useEffect(() => {
+        if (clearFiles) {
+            clearFiles()
+            previousUrlRef.current = null // ensures onChange works again with same file
+        }
+    }, [resetKey])
     const fileName = files[0]?.file.name || null
 
     return (
         <div className="flex flex-col gap-2">
             <div className="relative">
-                {/* Drop area */}
                 <div
                     onDragEnter={handleDragEnter}
                     onDragLeave={handleDragLeave}
                     onDragOver={handleDragOver}
                     onDrop={handleDrop}
                     data-dragging={isDragging || undefined}
-                    className="border-input data-[dragging=true]:bg-accent/50 has-[input:focus]:border-ring has-[input:focus]:ring-ring/50 relative flex min-h-52 flex-col items-center justify-center overflow-hidden rounded-xl border border-dashed p-4 transition-colors has-[input:focus]:ring-[3px]"
+                    className="border-blue-500 data-[dragging=true]:bg-accent/50 has-[input:focus]:border-ring has-[input:focus]:ring-ring/50 relative flex min-h-52 flex-col items-center justify-center overflow-hidden rounded-xl border border-dashed p-4 transition-colors has-[input:focus]:ring-[3px]"
                 >
                     <input
                         {...getInputProps()}
@@ -48,7 +68,7 @@ export default function FileUploadButton({field}) {
                         <div className="absolute inset-0 flex items-center justify-center p-4">
                             <img
                                 src={previewUrl}
-                                alt={files[0]?.file?.name || "Uploaded image"}
+                                alt={fileName || "Uploaded image"}
                                 className="mx-auto max-h-full rounded object-contain"
                             />
                         </div>
@@ -94,10 +114,7 @@ export default function FileUploadButton({field}) {
             </div>
 
             {errors.length > 0 && (
-                <div
-                    className="text-destructive flex items-center gap-1 text-xs"
-                    role="alert"
-                >
+                <div className="text-destructive flex items-center gap-1 text-xs" role="alert">
                     <AlertCircleIcon className="size-3 shrink-0" />
                     <span>{errors[0]}</span>
                 </div>

@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button";
 import CropImageDialog from "@/app/components/CropImageDialog";
 import { uploadFiles } from "@/app/components/utils/uploadThing";
+import FileUploadButton from "@/components/fileupload";
 
 const schema = z.object({
     name: z.string().min(1, "Name is required"),
@@ -26,6 +27,7 @@ const schema = z.object({
 export default function CreateSuperadminPage() {
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [resetKey, setResetKey] = useState(0);
     const [password, setPassword] = useState("");
     const [form, setForm] = useState({ name: "", email: "", password: "", profilePicture: "" });
     const [users, setUsers] = useState([]);
@@ -48,17 +50,11 @@ export default function CreateSuperadminPage() {
         }
     };
 
-    const handleImageUpload = (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = () => {
-            setRawImage(reader.result);
-            setCropDialogOpen(true);
-        };
-        reader.readAsDataURL(file);
-    };
+    const handleImageUpload = (previewUrl) => {
+        if (!previewUrl || previewUrl === rawImage) return;
+        setRawImage(previewUrl);
+        setCropDialogOpen(true);
+    }
 
     const handleSubmit = async () => {
         setLoading(true);
@@ -83,6 +79,7 @@ export default function CreateSuperadminPage() {
                 setPassword("");
                 setPreviewUrl("");
                 fetchUsers();
+                setResetKey((prev) => prev + 1)
             } else {
                 toast.error("Error Creating SuperAdmin");
             }
@@ -120,7 +117,9 @@ export default function CreateSuperadminPage() {
                 <CropImageDialog
                     image={rawImage}
                     onClose={() => {
-                        if (!uploading) setCropDialogOpen(false); // disable closing while uploading
+                        if (!uploading) {
+                            setCropDialogOpen(false);
+                        }
                     }}
                     uploading={uploading}
 
@@ -156,6 +155,7 @@ export default function CreateSuperadminPage() {
                         } catch (err) {
                             toast.error("Something went wrong during upload");
                             console.error(err);
+
                             setErrorupload(true);
                         } finally {
                             setUploading(false)
@@ -171,32 +171,36 @@ export default function CreateSuperadminPage() {
                     <CardTitle>Create Superadmin</CardTitle>
                 </CardHeader>
                 <Separator />
+                <div className="space-y-2 px-6 ">
+                    {/* <Label>Profile Picture</Label> */}
+                    {/* <Input type="file" accept="image/*" onChange={handleImageUpload} /> */}
+                    {/* <FileUploadButton /> */}
+                    <FileUploadButton field="Superadmin" onChange={(previewUrl) => handleImageUpload(previewUrl)} resetKey={resetKey} />
+                    {/* {previewUrl && <Image src={previewUrl} width={80} height={80} alt="Preview" className="rounded-full mt-2" />}
+                        {errorUpload && <div onClick={() => retryUpload()} ><Button >Retry</Button></div>} */}
+                </div>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
                     <div className="space-y-2">
                         <Label>Name</Label>
-                        <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Full name" />
+                        <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className='bg-accent' placeholder="Full name" />
                     </div>
                     <div className="space-y-2">
                         <Label>Email</Label>
-                        <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} type="email" placeholder="user@example.com" />
+                        <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className='bg-accent' type="email" placeholder="user@example.com" />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 col-span-full">
                         <Label>Password</Label>
                         <div className="relative">
-                            <Input id="password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} className="pr-10" />
+                            <Input id="password" placeholder="Password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} className="pr-10 bg-accent" />
                             <div onClick={() => setShowPassword(!showPassword)} className="absolute cursor-pointer right-2 top-1/2 -translate-y-1/2 p-1">
                                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                             </div>
                         </div>
                     </div>
-                    <div className="space-y-2">
-                        <Label>Profile Picture</Label>
-                        <Input type="file" accept="image/*" onChange={handleImageUpload} />
-                        {previewUrl && <Image src={previewUrl} width={80} height={80} alt="Preview" className="rounded-full mt-2" />}
-                        {errorUpload && <div onClick={() => retryUpload()} ><Button >Retry</Button></div>}
-                    </div>
+
                     <div className="col-span-full flex justify-center">
-                        <Button onClick={handleSubmit} disabled={loading}>
+                        <Button onClick={handleSubmit} className='dark:text-white' disabled={loading}>
                             {loading ? (
                                 <span className="flex items-center gap-2">
                                     <Loader2 className="animate-spin h-4 w-4" />
@@ -214,64 +218,59 @@ export default function CreateSuperadminPage() {
             </Card>
 
             {/* User List */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Existing Superadmins</CardTitle>
-                </CardHeader>
-                <Separator />
-                <CardContent className="overflow-auto">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Name</TableHead>
-                                <TableHead>Email</TableHead>
-                                <TableHead>Profile</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
+            <div className="overflow-x-auto overflow-hidden rounded-lg border">
+
+                <Table className="min-w-[800px]">
+                    <TableHeader className="bg-muted sticky top-0 z-10">
+                        <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Picture</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {users.map((user) => (
+                            <TableRow key={user.id}>
+                                <TableCell>{user.name || "-"}</TableCell>
+                                <TableCell>{user.email}</TableCell>
+                                <TableCell>
+                                    {user.profilePicture ? (
+                                        <img
+                                            src={user.profilePicture || "/default.png"}
+                                            alt="Profile"
+                                            width={32}
+                                            height={32}
+                                            className="rounded-full"
+                                        />
+                                    ) : (
+                                        "-"
+                                    )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    <Dialog>
+                                        <DialogTrigger asChild>
+                                            <Button variant="outline" size="sm">View</Button>
+                                        </DialogTrigger>
+                                        <DialogContent>
+                                            <DialogHeader>
+                                                <DialogTitle>User Details</DialogTitle>
+                                            </DialogHeader>
+                                            <div className="space-y-2">
+                                                <p><strong>Name:</strong> {user.name}</p>
+                                                <p><strong>Email:</strong> {user.email}</p>
+                                                {user.profilePicture && (
+                                                    <Image src={user.profilePicture} alt="Profile" width={100} height={100} className="rounded-md" />
+                                                )}
+                                            </div>
+                                        </DialogContent>
+                                    </Dialog>
+                                </TableCell>
                             </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {users.map((user) => (
-                                <TableRow key={user.id}>
-                                    <TableCell>{user.name || "-"}</TableCell>
-                                    <TableCell>{user.email}</TableCell>
-                                    <TableCell>
-                                        {/* {user.profilePicture ? (
-                                            <Image
-                                                src={user.profilePicture || "/default.png"}
-                                                alt="Profile"
-                                                width={32}
-                                                height={32}
-                                                className="rounded-full"
-                                            />
-                                        ) : (
-                                            "-"
-                                        )} */}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <Dialog>
-                                            <DialogTrigger asChild>
-                                                <Button variant="outline" size="sm">View</Button>
-                                            </DialogTrigger>
-                                            <DialogContent>
-                                                <DialogHeader>
-                                                    <DialogTitle>User Details</DialogTitle>
-                                                </DialogHeader>
-                                                <div className="space-y-2">
-                                                    <p><strong>Name:</strong> {user.name}</p>
-                                                    <p><strong>Email:</strong> {user.email}</p>
-                                                    {user.profilePicture && (
-                                                        <Image src={user.profilePicture} alt="Profile" width={100} height={100} className="rounded-md" />
-                                                    )}
-                                                </div>
-                                            </DialogContent>
-                                        </Dialog>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
         </div >
     );
 }

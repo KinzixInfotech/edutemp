@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import Link from 'next/link';
 const subjectColors = {
   Hindi: "bg-red-200",
   "Language Skill": "bg-blue-200",
@@ -241,7 +242,9 @@ const Timetable = ({ className }) => {
         </div>
       </div>
       <div className="print-hidden flex flex-row justify-between mt-4">
-        <Button onClick={() => window.print()} className='dark:text-white'>Create New Time Table</Button>
+        <Link href="/create-time-table">
+          <Button className='dark:text-white'>Create New Time Table</Button>
+        </Link>
         <Button onClick={() => window.print()} className='dark:text-white'>Print</Button>
       </div>
     </>

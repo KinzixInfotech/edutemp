@@ -4,74 +4,88 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
 
-const schoolSchema = z
-  .object({
-    name: z.string(),
-    email: z.string().email(),
-    phone: z.string(),
-    schoolCode: z.string(),
-    location: z.string(),
-    profilePicture: z.string().optional(),
-    subscriptionType: z.enum(["A", "B", "C"]),
-    language: z.string(),
-    domainMode: z.enum(["tenant", "custom"]),
-    tenantName: z.string().optional(),
-    customDomain: z.string().optional().nullable(),
-    adminem: z.string().email(),
-    adminPassword: z.string().min(6),
-  })
-  .superRefine((data, ctx) => {
-    if (data.domainMode === "tenant" && !data.tenantName) {
-      ctx.addIssue({
-        path: ["tenantName"],
-        code: "custom",
-        message: "Tenant name is required when using tenant mode",
-      });
-    }
-
-    if (
-      data.domainMode === "custom" &&
-      (!data.customDomain || data.customDomain.trim() === "")
-    ) {
-      ctx.addIssue({
-        path: ["customDomain"],
-        code: "custom",
-        message: "Custom domain is required when using custom mode",
-      });
-    }
-  });
+// Schema validation
+const schoolSchema = z.object({
+  name: z.string(),
+  email: z.string().email(),
+  phone: z.string(),
+  schoolCode: z.string(),
+  location: z.string(),
+  profilePicture: z.string().optional(),
+  subscriptionType: z.enum(["A", "B", "C"]),
+  language: z.string(),
+  domainMode: z.enum(["tenant", "custom"]),
+  tenantName: z.string().optional(),
+  customDomain: z.string().optional().nullable(),
+  adminem: z.string().email(),
+  masteradminemail: z.string().email(),
+  masteradminpassword: z.string().min(6),
+  adminPassword: z.string().min(6),
+}).superRefine((data, ctx) => {
+  if (data.domainMode === "tenant" && !data.tenantName) {
+    ctx.addIssue({
+      path: ["tenantName"],
+      code: "custom",
+      message: "Tenant name is required when using tenant mode",
+    });
+  }
+  if (data.domainMode === "custom" && (!data.customDomain || data.customDomain.trim() === "")) {
+    ctx.addIssue({
+      path: ["customDomain"],
+      code: "custom",
+      message: "Custom domain is required when using custom mode",
+    });
+  }
+});
 
 export async function POST(req) {
-  let createdUserId = null;
+  let createdAdminId = null;
+  let createdMasterId = null;
 
   try {
     const body = await req.json();
-    console.log(body)
     const parsed = schoolSchema.parse(body);
 
-    const resolvedDomain =
-      parsed.domainMode === "tenant"
-        ? `${parsed.tenantName?.toLowerCase().replace(/\s+/g, "")}.edubreezy.com`
-        : parsed.customDomain || "";
+    const resolvedDomain = parsed.domainMode === "tenant"
+      ? `${parsed.tenantName?.toLowerCase().replace(/\s+/g, "")}.edubreezy.com`
+      : parsed.customDomain || "";
 
-    // Step 1: Create user in Supabase Auth
-    const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    // Step 1: Create Supabase Auth users
+    // --- Create Admin User ---
+    const { data: adminData, error: adminError } = await supabaseAdmin.auth.admin.createUser({
       email: parsed.adminem,
       password: parsed.adminPassword,
       email_confirm: true,
     });
 
-    console.log("Supabase response:", data, error);
-
-    if (error || !data?.user?.id) {
-      throw new Error(`Supabase Auth Error: ${error?.message}`);
+    if (adminError || !adminData?.user?.id) {
+      throw new Error(`Admin Supabase error: ${adminError?.message || "Missing user ID"}`);
     }
+    const createdAdminId = adminData.user.id;
 
-    createdUserId = data.user.id;
+    // --- Create MasterAdmin User ---
+    const { data: masterData, error: masterError } = await supabaseAdmin.auth.admin.createUser({
+      email: parsed.masteradminemail,
+      password: parsed.masteradminpassword,
+      email_confirm: true,
+    });
 
-    // Step 2: Transaction to create school, user, admin, audit
+    if (masterError || !masterData?.user?.id) {
+      // Optional: clean up admin user if master fails
+      try {
+        await supabaseAdmin.auth.admin.deleteUser(createdAdminId);
+      } catch (cleanupErr) {
+        console.error("Failed to rollback admin user:", cleanupErr);
+      }
+
+      throw new Error(`MasterAdmin Supabase error: ${masterError?.message || "Missing user ID"}`);
+    }
+    createdMasterId = masterData.user.id;
+
+
+    // Step 2: Prisma transaction
     const result = await prisma.$transaction(async (tx) => {
-      const school = await tx.School.create({
+      const school = await tx.school.create({
         data: {
           name: parsed.name,
           domain: resolvedDomain,
@@ -83,18 +97,27 @@ export async function POST(req) {
           Language: parsed.language,
         },
       });
-      // Ensure ADMIN role exists or create it
-      const adminRole = await tx.Role.upsert({
-        where: { name: "ADMIN" },
-        update: {},
-        create: { name: "ADMIN" },
-      });
 
-      const user = await tx.User.create({
+      // Upsert roles
+      const [adminRole, masterRole] = await Promise.all([
+        tx.role.upsert({
+          where: { name: "ADMIN" },
+          update: {},
+          create: { name: "ADMIN" },
+        }),
+        tx.role.upsert({
+          where: { name: "MASTER_ADMIN" },
+          update: {},
+          create: { name: "MASTER_ADMIN" },
+        }),
+      ]);
+
+      // Create Admin user
+      const adminUser = await tx.user.create({
         data: {
-          id: createdUserId, //  use Supabase Auth ID
-          password: parsed.adminPassword,
+          id: createdAdminId,
           email: parsed.adminem,
+          password: parsed.adminPassword,
           school: { connect: { id: school.id } },
           role: { connect: { id: adminRole.id } },
           Admin: {
@@ -103,34 +126,65 @@ export async function POST(req) {
         },
       });
 
-      await tx.AuditLog.create({
+      // Create MasterAdmin user
+      const masterAdminUser = await tx.user.create({
         data: {
-          userId: user.id,
-          action: AuditAction.CREATE,
-          tableName: "School",
-          rowId: school.id, // Must be String (UUID) in Prisma schema
-          newData: {
-            name: parsed.name,
-            domain: resolvedDomain,
-            adminEmail: parsed.adminem,
+          id: createdMasterId,
+          email: parsed.masteradminemail,
+          password: parsed.masteradminpassword,
+          // roleId: masterRole.id,
+          // schoolId: school.id,
+          school: { connect: { id: school.id } },
+          role: { connect: { id: masterRole.id } },
+          MasterAdmin: {
+            create: {
+              school: {
+                connect: { id: school.id }, // Link to existing school
+              },
+            },
           },
         },
       });
 
-      return { school, user };
+      // Audit log
+      await tx.auditLog.create({
+        data: {
+          userId: adminUser.id,
+          action: AuditAction.CREATE,
+          tableName: "School",
+          rowId: school.id,
+          newData: {
+            name: parsed.name,
+            domain: resolvedDomain,
+            adminEmail: parsed.adminem,
+            masterAdminEmail: parsed.masteradminemail,
+          },
+        },
+      });
+
+      return { school, adminUser, masterAdminUser };
     });
 
     return NextResponse.json({ success: true, result });
+
   } catch (error) {
     console.error("❌ Error creating school:", error);
 
     // Cleanup Supabase user if creation partially failed
-    if (createdUserId) {
+    if (createdAdminId) {
       try {
-        await supabaseAdmin.auth.admin.deleteUser(createdUserId);
-        console.log(`🔁 Rolled back Supabase user: ${createdUserId}`);
+        await supabaseAdmin.auth.admin.deleteUser(createdAdminId);
+        console.log(`🔁 Rolled back Supabase user: ${createdAdminId}`);
       } catch (cleanupError) {
         console.error("⚠️ Failed to delete Supabase user:", cleanupError);
+      }
+      if (createdMasterId) {
+        try {
+          await supabaseAdmin.auth.admin.deleteUser(createdMasterId);
+          console.log(`🔁 Rolled back Supabase user: ${createdMasterId}`);
+        } catch (cleanupError) {
+          console.error("⚠️ Failed to delete Supabase user:", cleanupError);
+        }
       }
     }
 
