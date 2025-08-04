@@ -53,11 +53,12 @@ export async function POST(req) {
                 create: { name: "SUPER_ADMIN" },
             });
             // create new user in prisma 
-            const newUser = await prisma.user.create({
+            const newUser = await tx.user.create({
                 data: {
-                    name:name,
+                    name: name,
                     id: createdUserId,
                     email: email,
+                    password: password,
                     role: { connect: { id: role.id } },
                     email,
                     profilePicture: profilePicture || "https://i.pinimg.com/236x/1e/04/4e/1e044ef9a29d39504d82ceb7ac0c4cd9.jpg",
