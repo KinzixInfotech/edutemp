@@ -39,7 +39,7 @@ const sidebarData = [
     {
         title: "Main",
         items: [
-            { label: "Dashboard", url: "/dashboard/", icon: IconDashboard, roles: ["SUPER_ADMIN", "STUDENT"] },
+            { label: "Dashboard", url: "/dashboard/", icon: IconDashboard, roles: ["SUPER_ADMIN", "STUDENT","ADMIN","MASTER_ADMIN","TEACHER","STAFF"] },
             { label: "Create Super Admin", url: "/dashboard/edubreezy/add-user", icon: IconListDetails, roles: ["SUPER_ADMIN"] },
             { label: "Audit Log", url: "/dashboard/auditlog", icon: IconChartBar, roles: ["SUPER_ADMIN"] },
         ],

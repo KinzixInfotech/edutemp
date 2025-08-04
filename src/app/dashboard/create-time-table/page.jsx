@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -14,17 +14,41 @@ import {
 } from '@/components/ui/select'
 import { Plus, Trash } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
+import { useAuth } from '@/context/AuthContext'
 
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-const classes = ['Class 6A', 'Class 6B', 'Class 7A', 'Class 7B']
-
 export default function TimetableBuilder() {
+    const [classes, setClasses] = useState([])
+    const [fetchingLoading, setFetchingLoading] = useState(false)
+
     const [selectedClass, setSelectedClass] = useState('')
     const [periods, setPeriods] = useState([
         { label: '1', time: '08:30-09:10' },
         { label: '2', time: '09:10-09:50' },
         { label: '3', time: '09:50-10:30' },
     ])
+    const { fullUser } = useAuth()
+    const schoolId = fullUser?.schoolId
+
+    const fetchClasses = async () => {
+        if (!schoolId) return
+        setFetchingLoading(true)
+        try {
+            const res = await fetch(`/api/schools/${schoolId}/classes`)
+            const data = await res.json()
+            setClasses(Array.isArray(data) ? data : [])
+        } catch {
+            toast.error("Failed to load classes")
+            setClasses([])
+        } finally {
+            setFetchingLoading(false)
+        }
+    }
+    useEffect(() => {
+        fetchClasses()
+    }, [schoolId])
+
     const [breakIndex, setBreakIndex] = useState(null)
     const [timetable, setTimetable] = useState({})
 
@@ -48,7 +72,7 @@ export default function TimetableBuilder() {
     return (
         <div className="space-y-6 px-4 py-6 max-w-full">
             {/* Class Select */}
-            <Card className="bg-muted">
+            <Card className="">
                 <CardContent className="pt-4 space-y-4">
                     <div>
                         <Label className="mb-3 block">Select Class</Label>
@@ -58,8 +82,8 @@ export default function TimetableBuilder() {
                             </SelectTrigger>
                             <SelectContent>
                                 {classes.map((cls) => (
-                                    <SelectItem key={cls} value={cls}>
-                                        {cls}
+                                    <SelectItem key={cls.id} value={cls.className}>
+                                        {cls.className}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
@@ -69,7 +93,7 @@ export default function TimetableBuilder() {
             </Card>
 
             {/* Period Settings */}
-            <Card className="bg-muted">
+            <Card className="">
                 <CardContent className="space-y-4 pt-4" >
                     <h2 className="text-xl font-semibold">Period Settings</h2>
                     {periods.map((p, idx) => (
@@ -116,16 +140,16 @@ export default function TimetableBuilder() {
             </Card>
 
             {/* Timetable */}
-            <Card className="bg-muted">
+            <Card className="">
                 <CardContent className="pt-4">
                     <h2 className="text-xl font-semibold mb-4">Timetable</h2>
                     <div className="overflow-x-auto">
-                        <table className="min-w-[700px]   w-full border text-sm table-fixed">
+                        <table className="min-w-[700px]  bg-white dark:bg-muted  w-full border text-sm table-fixed">
                             <thead>
                                 <tr>
-                                    <th className="border px-2 py-1 w-[120px] bg-muted dark:bg-muted/20">Day</th>
+                                    <th className="border px-2 py-1 w-[120px]">Day</th>
                                     {periods.map((p, idx) => (
-                                        <th key={idx} className="border px-2 py-1 min-w-[140px] bg-muted dark:bg-muted/20">
+                                        <th key={idx} className="border px-2 py-1 min-w-[140px]">
                                             {p.label}
                                             <br />
                                             <span className="text-xs text-muted-foreground">{p.time}</span>

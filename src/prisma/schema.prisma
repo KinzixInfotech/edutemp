@@ -45,6 +45,7 @@ model User {
   schoolId       String?    @db.Uuid
   roleId         Int
   email          String     @unique
+  password       String
   name           String?
   profilePicture String     @default("default.png")
   createdAt      DateTime   @default(now())
@@ -165,7 +166,7 @@ model HomeworkSubmission {
 
 model TeachingStaff {
   userId         String  @id @db.Uuid
-  departmentId   Int
+  departmentId   Int?
   employeeId     String
   profilePicture String
   name           String
@@ -183,12 +184,10 @@ model TeachingStaff {
   PostalCode     String?
 
   subjects   Subject[]
-  user       User       @relation(fields: [userId], references: [id])
-  department Department @relation(fields: [departmentId], references: [id])
+  user       User        @relation(fields: [userId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
   homework   Homework[]
   subjectId  Int
-  // sections      SectionTeacher[]
-  // classTeachers ClassTeacher[]
   Class      Class[]
 
   @@index([departmentId])
@@ -234,23 +233,36 @@ model Class {
   homework            Homework[]
   sections            Section[]
   FeeStructure        FeeStructure[]
-  // ClassTeacher        ClassTeacher[]
 
-  // @@unique([schoolId, className]) // "6" must be unique per school
   @@index([schoolId])
 }
 
 model Section {
-  id       Int       @id @default(autoincrement())
-  name     String
-  classId  Int
-  schoolId String    @db.Uuid // Optional but helpful for direct filtering
-  class    Class     @relation(fields: [classId], references: [id])
+  id         Int         @id @default(autoincrement())
+  name       String
+  classId    Int
+  schoolId   String      @db.Uuid // Optional but helpful for direct filtering
+  class      Class       @relation(fields: [classId], references: [id])
   // assignedTeacher SectionTeacher[]
-  students Student[]
+  students   Student[]
+  timetables Timetable[] // 👈 Add this
 
   @@unique([classId, name])
   @@index([classId])
+}
+
+model Timetable {
+  id        String  @id @default(uuid())
+  sectionId Int
+  day       String // e.g., "Monday"
+  period    Int // e.g., 1, 2, 3...
+  subject   String
+  teacher   String?
+
+  section Section @relation(fields: [sectionId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // model SectionTeacher {

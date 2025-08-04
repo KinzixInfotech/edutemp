@@ -6,7 +6,7 @@ import { NextResponse } from "next/server"
 export async function POST(req, { params }) {
     try {
         const { schoolId } = params
-        const { name } = await req.json()
+        const { name, capacity } = await req.json()
 
         if (!schoolId || !name) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
@@ -16,6 +16,7 @@ export async function POST(req, { params }) {
             data: {
                 schoolId,
                 className: name,
+                capacity: capacity,
             },
         })
 
@@ -38,7 +39,8 @@ export async function GET(req, { params }) {
     try {
         const classes = await prisma.class.findMany({
             where: { schoolId },
-            include: { sections: true },
+           
+            include: { sections: true, },
         });
 
         return NextResponse.json(classes);

@@ -18,6 +18,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import FileUploadButton from '@/components/fileupload'
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 export default function NewProfilePage() {
     const { schoolId, role } = useParams()
@@ -207,15 +208,38 @@ export default function NewProfilePage() {
     }
     function renderFields(role) {
         switch (role?.toLowerCase()) {
-            case "teachers":
+            case "teacher":
                 return (
                     <>
-                        <Input placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                        <Input placeholder="Class" value={form.class} onChange={(e) => setForm({ ...form, class: e.target.value })} />
+                        <FileUploadButton field='Teacher' />
+                        <Input placeholder="Teacher Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                        <Input placeholder="Teacher Employee Id " value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                        <Input placeholder="Teacher Designation" value={form.class} onChange={(e) => setForm({ ...form, class: e.target.value })} />
                         <Input type="date" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} />
-                        <Input placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-                        <Input placeholder="Certificates (comma separated)" value={form.certificates.join(", ")} onChange={(e) => setForm({ ...form, certificates: e.target.value.split(",") })} />
+                        <Input value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} placeholder="Teacher Age" />
+                        <Input placeholder="Teacher Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                        <Input type="password" placeholder="Teacher Password" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
                         <Input placeholder="Blood Group" value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })} />
+                        <Input placeholder="Teacher Contact Number" value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })} />
+                        <Select
+                            value={form.gender}
+                            onValueChange={(value) => setForm({ ...form, gender: value })}
+                        >
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select Gender" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="MALE">Male</SelectItem>
+                                <SelectItem value="FEMALE">Female</SelectItem>
+                                <SelectItem value="OTHER">Other</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Input placeholder="Teacher Address" value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })} />
+                        <Input placeholder="Teacher City" value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })} />
+                        <Input placeholder="Teacher District" value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })} />
+                        <Input placeholder="Teacher Country" value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })} />
+                        <Input placeholder="Teacher Postal Code" value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })} />
+                        <Input placeholder="Teacher State" value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })} />
                     </>
                 )
             case "students":
@@ -512,7 +536,7 @@ export default function NewProfilePage() {
                         <Input placeholder="Location" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
                     </>
                 )
-            case "peons":
+            case "staff":
                 return (
                     <>
                         <Input placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -553,7 +577,7 @@ export default function NewProfilePage() {
 
     return (
         <div className="max-w-xl mx-auto p-6">
-            <Card>
+            <Card className='shadow-lg'>
                 <CardContent className="space-y-4 pt-6">
                     {renderFields(role)}
                     <Button onClick={handleSubmit} disabled={loading} className="w-full text-white">
