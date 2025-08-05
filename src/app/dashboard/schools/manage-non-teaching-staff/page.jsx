@@ -121,7 +121,7 @@ export default function TeacherListPage() {
                     <Button variant="outline" className="bg-muted" onClick={fetchNonTeachers}>
                         <RefreshCw />
                     </Button>
-                    <Link href={`${schoolId}/profiles/staff/new`}>
+                    <Link href={`/dashboard/schools/${schoolId}/profiles/staff/new`}>
                         <Button className='dark:text-white'>
                             <Plus />
                         </Button>

@@ -242,7 +242,7 @@ const Timetable = ({ className }) => {
         </div>
       </div>
       <div className="print-hidden flex flex-row justify-between mt-4">
-        <Link href="/create-time-table">
+        <Link href="/dashboard/create-time-table">
           <Button className='dark:text-white'>Create New Time Table</Button>
         </Link>
         <Button onClick={() => window.print()} className='dark:text-white'>Print</Button>

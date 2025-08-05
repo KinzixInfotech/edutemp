@@ -114,7 +114,7 @@ export default function TeacherListPage() {
                         <RefreshCw size={16} />
                     </Button>
 
-                    <Link href={`/${schoolId}/profiles/teacher/new`}>
+                    <Link href={`/dashbboard/schools/${schoolId}/profiles/teacher/new`}>
                         <Button className='dark:text-white'>
                             <Plus size={16} />
                         </Button>
@@ -231,7 +231,7 @@ export default function TeacherListPage() {
                                 { label: 'Age', value: dialogData.age || 'N/A' },
                                 { label: 'Blood Group', value: dialogData.bloodGroup || 'N/A' },
                                 { label: 'Status', value: dialogData.user?.status || 'Active' },
-                                { label: 'Address', value: dialogData.address || 'N/A' },
+                                { label: 'Address Line 1', value: dialogData.address || 'N/A' },
                                 { label: 'City', value: dialogData.City || 'N/A' },
                                 { label: 'District', value: dialogData.district || 'N/A' },
                                 { label: 'State', value: dialogData.state || 'N/A' },

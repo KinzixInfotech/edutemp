@@ -178,7 +178,7 @@ export default function StudentListPage() {
                         <RefreshCw size={16} />
                     </Button>
 
-                    <Link href={`/${schoolId}/profiles/students/new`}>
+                    <Link href={`/dashboard/schools/${schoolId}/profiles/students/new`}>
                         <Button className='dark:text-white'>
                             <Plus size={16} />
                         </Button>
@@ -216,7 +216,7 @@ export default function StudentListPage() {
                             <TableHead>Name</TableHead>
                             <TableHead>Email</TableHead>
                             <TableHead>Class</TableHead>
-                            <TableHead>Section</TableHead>
+                            {/* <TableHead>Section</TableHead> */}
                             <TableHead>Status</TableHead>
                             <TableHead className="text-right">Action</TableHead>
                         </TableRow>
@@ -247,10 +247,7 @@ export default function StudentListPage() {
                                     </TableCell>
                                     <TableCell>{student.name}</TableCell>
                                     <TableCell>{student.user?.email || 'N/A'}</TableCell>
-                                    <TableCell>{student.class?.className || 'N/A'}</TableCell>
-                                    <TableCell>
-                                        {student.class?.sections?.map(s => s.name).join(', ') || 'N/A'}
-                                    </TableCell>
+                                    <TableCell>{student.class?.className || 'N/A'}'{student.class?.sections?.map(s => s.name).join(', ') || 'N/A'}</TableCell>
                                     <TableCell>{student.status || 'Active'}</TableCell>
 
                                     <TableCell className="text-right">
@@ -357,7 +354,7 @@ export default function StudentListPage() {
                             <div className="px-4 py-3 border-b border">
                                 <div className="font-medium mb-2">Link Parent Account</div>
                                 <Select
-                                    value={selectedParentId || ''} 
+                                    value={selectedParentId || ''}
                                     onValueChange={(val) => setSelectedParentId(val)}
                                 >
                                     <SelectTrigger className="bg-white w-full">
