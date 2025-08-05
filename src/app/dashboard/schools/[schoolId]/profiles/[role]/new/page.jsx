@@ -262,7 +262,7 @@ export default function NewProfilePage() {
                             onChange={(e) => setForm({ ...form, dob: new Date(e.target.value) })}
                         /> */}
                         {/* ✅ Profile Photo Upload */}
-                        <Label htmlFor="profilePhoto">Upload Profile Photo</Label>
+                        {/* <Label htmlFor="profilePhoto">Upload Profile Photo</Label>
                         <Input
                             id="profilePhoto"
                             type="file"
@@ -270,8 +270,8 @@ export default function NewProfilePage() {
                             onChange={(e) =>
                                 setForm({ ...form, profilePhoto: e.target.files?.[0] || null })
                             }
-                        />
-
+                        /> */}
+                        <FileUploadButton field="Student" onChange={(previewUrl) => handleImageUpload(previewUrl)} resetKey={resetKey} />
                         {/* ✅ Class Select Dropdown */}
                         <Select
                             value={form.classId}

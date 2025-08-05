@@ -119,7 +119,6 @@ model Student {
   GuardianName       String?
   GuardianRelation   String?
   House              String?
-  profilePicture     String
   admissionNo        String
   schoolId           String               @db.Uuid
   school             School               @relation(fields: [schoolId], references: [id])
@@ -167,24 +166,23 @@ model HomeworkSubmission {
 }
 
 model TeachingStaff {
-  userId         String  @id @db.Uuid
-  departmentId   Int?
-  employeeId     String
-  profilePicture String
-  name           String
-  designation    String
-  gender         String
-  age            String
-  bloodGroup     String
-  contactNumber  String
-  dob            String
-  email          String
-  address        String
-  City           String
-  district       String?
-  state          String?
-  country        String?
-  PostalCode     String?
+  userId        String  @id @db.Uuid
+  departmentId  Int?
+  employeeId    String
+  name          String
+  designation   String
+  gender        String
+  age           String
+  bloodGroup    String
+  contactNumber String
+  dob           String
+  email         String
+  address       String
+  City          String
+  district      String?
+  state         String?
+  country       String?
+  PostalCode    String?
 
   school     School      @relation(fields: [schoolId], references: [id])
   subjects   Subject[]
@@ -202,23 +200,22 @@ model NonTeachingStaff {
   userId       String @id @db.Uuid
   departmentId Int?
 
-  employeeId     String
-  profilePicture String
-  name           String
-  designation    String
-  gender         String
-  dob            String
-  age            String
-  bloodGroup     String
-  contactNumber  String
-  email          String
-  address        String
-  City           String
-  district       String?
-  state          String?
-  country        String?
-  PostalCode     String?
-  school         School  @relation(fields: [schoolId], references: [id])
+  employeeId    String
+  name          String
+  designation   String
+  gender        String
+  dob           String
+  age           String
+  bloodGroup    String
+  contactNumber String
+  email         String
+  address       String
+  City          String
+  district      String?
+  state         String?
+  country       String?
+  PostalCode    String?
+  school        School  @relation(fields: [schoolId], references: [id])
 
   user       User        @relation(fields: [userId], references: [id])
   department Department? @relation(fields: [departmentId], references: [id])

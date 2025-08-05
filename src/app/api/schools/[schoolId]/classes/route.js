@@ -39,7 +39,7 @@ export async function GET(req, { params }) {
     try {
         const classes = await prisma.class.findMany({
             where: { schoolId },
-           
+
             include: { sections: true, },
         });
 
@@ -49,3 +49,7 @@ export async function GET(req, { params }) {
         return NextResponse.json({ error: "Failed to fetch classes" }, { status: 500 });
     }
 }
+
+
+
+

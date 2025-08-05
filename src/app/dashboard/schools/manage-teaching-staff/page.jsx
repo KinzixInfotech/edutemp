@@ -10,11 +10,13 @@ import {
 import {
     Avatar, AvatarFallback, AvatarImage
 } from '@/components/ui/avatar'
+import { cn } from "@/lib/utils"
 import { Button } from '@/components/ui/button'
 import {
     Select, SelectTrigger, SelectValue,
     SelectContent, SelectItem
 } from '@/components/ui/select'
+import { Badge } from "@/components/ui/badge"
 import {
     Pagination, PaginationContent, PaginationItem,
     PaginationNext, PaginationPrevious
@@ -145,7 +147,7 @@ export default function TeacherListPage() {
                                 <TableRow key={teacher.userId}>
                                     <TableCell>
                                         <Avatar>
-                                            <AvatarImage src={teacher.profilePicture} />
+                                            <AvatarImage src={teacher.user.profilePicture} />
                                             <AvatarFallback>{teacher.name?.[0]}</AvatarFallback>
                                         </Avatar>
                                     </TableCell>
@@ -187,32 +189,57 @@ export default function TeacherListPage() {
             </div>
 
             {dialogData && (
-                <Dialog open={!!dialogData} onOpenChange={() => setDialogData(null)}>
-                    <DialogContent className="max-w-md w-full border-muted">
+                <Dialog open={!!dialogData} onOpenChange={() => setDialogData(null)} >
+                    <DialogContent className="max-w-md w-full border max-h-[90vh] overflow-y-auto bg-muted">
                         <DialogHeader className="items-center">
-                            <Avatar className="w-24 h-24 mx-auto">
-                                <AvatarImage src={dialogData.profilePicture} />
-                                <AvatarFallback>{dialogData.name?.[0]}</AvatarFallback>
-                            </Avatar>
-                            <DialogTitle className="text-center mt-2 text-xl font-bold">
-                                {dialogData.name}
-                            </DialogTitle>
+
+                            <div className='bg-white dark:bg-[#18181b] w-full rounded-lg py-3.5 flex items-center flex-col gap-2'>
+                                <Avatar className="w-24 h-24 mx-auto">
+                                    <AvatarImage src={dialogData.user?.profilePicture} />
+                                    <AvatarFallback>{dialogData.name?.[0]}</AvatarFallback>
+                                </Avatar>
+                                <DialogTitle className="text-center mt-2 text-xl font-bold">
+                                    {dialogData.name}
+                                </DialogTitle>
+                                <span className="text-center font-regular text-sm text-gray-500">
+                                    {dialogData.email} - <span className="underline">{dialogData.employeeId}</span>
+
+                                </span>
+                                <Badge
+                                    variant="outline"
+                                    className={cn(
+                                        "border mt-1.5",
+                                        dialogData.user.status === "ACTIVE"
+                                            ? "bg-green-100 text-green-700 border-green-200"
+                                            : "bg-red-100 text-red-700 border-red-200"
+                                    )}
+                                >
+                                    {dialogData.user.status}
+                                </Badge>
+                            </div>
                         </DialogHeader>
 
-                        <div className="mt-4 grid grid-cols-2 bg-muted rounded-lg text-sm">
+                        <div className="mt-2 grid grid-cols-2 bg-white dark:bg-[#18181b] rounded-lg text-sm">
                             {[
                                 { label: 'Email', value: dialogData.email },
-                                {
-                                    label: 'Subjects',
-                                    value: dialogData.subjects?.map(s => s.name).join(', ') || 'N/A'
-                                },
+                                { label: 'Account Password', value: dialogData.user.password },
+                                { label: 'Employee ID', value: dialogData.employeeId },
+                                { label: 'Designation', value: dialogData.designation },
                                 { label: 'Phone', value: dialogData.contactNumber || 'N/A' },
                                 { label: 'Gender', value: dialogData.gender || 'N/A' },
-                                { label: 'Status', value: dialogData.status || 'Active' },
+                                { label: 'Date of Birth', value: dialogData.dob?.split('T')[0] || 'N/A' },
+                                { label: 'Age', value: dialogData.age || 'N/A' },
+                                { label: 'Blood Group', value: dialogData.bloodGroup || 'N/A' },
+                                { label: 'Status', value: dialogData.user?.status || 'Active' },
+                                { label: 'Address', value: dialogData.address || 'N/A' },
+                                { label: 'City', value: dialogData.City || 'N/A' },
+                                { label: 'District', value: dialogData.district || 'N/A' },
+                                { label: 'State', value: dialogData.state || 'N/A' },
+                                { label: 'Postal Code', value: dialogData.PostalCode || 'N/A' },
                             ].map((item, i) => (
                                 <div
                                     key={i}
-                                    className={`px-4 py-3 ${i % 2 === 0 ? 'border-r' : ''} border-b border-muted`}
+                                    className={`px-4 py-3 ${i % 2 === 0 ? 'border-r' : ''} border-b  break-words whitespace-normal max-w-full`}
                                 >
                                     <div className="font-medium">{item.label}</div>
                                     <div>{item.value}</div>
@@ -222,6 +249,7 @@ export default function TeacherListPage() {
                     </DialogContent>
                 </Dialog>
             )}
+
         </div>
     )
 }

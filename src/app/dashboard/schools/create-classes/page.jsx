@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
+
 import { Card, CardContent } from "@/components/ui/card"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
@@ -27,6 +29,9 @@ export default function ManageClassSectionPage() {
     const [loadingClass, setLoadingClass] = useState(false)
     const [loadingSection, setLoadingSection] = useState(false)
     const [fetchingLoading, setFetchingLoading] = useState(false)
+    const [confirmOpen, setConfirmOpen] = useState(false)
+    const [selectedTeacher, setSelectedTeacher] = useState(null)
+    const [selectedClassIdToUpdate, setSelectedClassIdToUpdate] = useState(null)
 
     useEffect(() => {
         if (schoolId) {
@@ -36,9 +41,9 @@ export default function ManageClassSectionPage() {
     }, [schoolId])
     const fetchTeachers = async () => {
         try {
-            const res = await fetch(`/api/schools/${schoolId}/teachers`)
+            const res = await fetch(`/api/schools/teaching-staff/${schoolId}`)
             const data = await res.json()
-            setTeachers(Array.isArray(data) ? data : [])
+            setTeachers(Array.isArray(data.data) ? data.data : [])
         } catch {
             toast.error("Failed to load teachers")
             setTeachers([])
@@ -58,6 +63,36 @@ export default function ManageClassSectionPage() {
             setFetchingLoading(false)
         }
     }
+    const handleSupervisorChange = (classId, teacherId) => {
+        setSelectedClassIdToUpdate(classId)
+        setSelectedTeacher(teacherId)
+        setConfirmOpen(true)
+    }
+    const confirmSupervisorChange = async () => {
+        if (!selectedClassIdToUpdate || !selectedTeacher) {
+            toast.error("Missing class or teacher selection");
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/schools/${schoolId}/classes/${selectedClassIdToUpdate}`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ teachingStaffUserId: selectedTeacher }),
+            });
+
+            if (!res.ok) throw new Error();
+
+            toast.success("Supervisor assigned successfully");
+            fetchClasses();
+            setConfirmOpen(false);
+        } catch (error) {
+            console.error("❌ Supervisor assign error:", error);
+            toast.error("Failed to assign supervisor");
+        }
+    };
 
     const handleAddClass = async () => {
         if (!className) return toast.error("Class name is required")
@@ -106,6 +141,15 @@ export default function ManageClassSectionPage() {
 
     return (
         <div className="p-6 space-y-6">
+            <ConfirmDialog
+                open={confirmOpen}
+                onOpenChange={() => setConfirmOpen(false)}
+                onConfirm={confirmSupervisorChange}
+                title="Confirm Supervisor Assignment"
+                description="Are you sure you want to assign this teacher as supervisor? This will override any existing assignment."
+                confirmText="Yes, assign"
+                confirmName="" // Optional – use if you want type-to-confirm
+            />
             <h1 className="text-xl font-semibold">Manage Classes & Sections</h1>
 
             {/* Create Class */}
@@ -113,14 +157,14 @@ export default function ManageClassSectionPage() {
                 <CardContent className="p-4 flex flex-col sm:flex-row items-center gap-4">
                     <Input
                         placeholder="Class Name (e.g., 10)"
-                        className="uppercase"
+                        className="uppercase bg-muted"
                         type='number'
                         value={className}
                         onChange={(e) => setClassName(e.target.value)}
                     />
                     <Input
                         placeholder="capacity"
-                        className="uppercase"
+                        className="uppercase bg-muted"
                         type='number'
                         value={capacity}
                         onChange={(e) => setCapacity(e.target.value)}
@@ -138,7 +182,7 @@ export default function ManageClassSectionPage() {
                         value={selectedClassId}
                         onValueChange={(value) => setSelectedClassId(value)}
                     >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="w-full bg-muted">
                             <SelectValue placeholder="Select Class" />
                         </SelectTrigger>
                         <SelectContent>
@@ -152,7 +196,7 @@ export default function ManageClassSectionPage() {
                     </Select>
                     <Input
                         placeholder="Section Name (e.g., A)"
-                        className="uppercase"
+                        className="uppercase bg-muted"
                         value={sectionName}
                         onChange={(e) => setSectionName(e.target.value)}
                     />
@@ -164,79 +208,66 @@ export default function ManageClassSectionPage() {
             </Card>
 
             {/* Table */}
-            <Card>
-                <CardContent className="p-4">
-                    <Table>
-                        <TableHeader>
+            <div className="overflow-x-auto overflow-hidden rounded-lg border">
+
+                <Table className="min-w-[800px]">
+                    <TableHeader className="bg-muted sticky top-0 z-10">
+                        <TableRow>
+                            <TableHead className="w-[25%]">Class</TableHead>
+                            <TableHead className="w-[25%]">Sections</TableHead>
+                            <TableHead className="w-[25%]">Capacity</TableHead>
+                            <TableHead className="w-[25%]">Class Teacher</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {fetchingLoading ? (
                             <TableRow>
-                                <TableHead className="w-[25%]">Class</TableHead>
-                                <TableHead className="w-[25%]">Sections</TableHead>
-                                <TableHead className="w-[25%]">Capacity</TableHead>
-                                <TableHead className="w-[25%]">Supervisor</TableHead>
+                                <TableCell colSpan={4} className="text-center py-4">
+                                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                                        <Loader2 className="animate-spin w-4 h-4" />
+                                        Loading classes...
+                                    </div>
+                                </TableCell>
                             </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {fetchingLoading ? (
-                                <TableRow>
-                                    <TableCell colSpan={4} className="text-center py-4">
-                                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                                            <Loader2 className="animate-spin w-4 h-4" />
-                                            Loading classes...
-                                        </div>
+                        ) : classes.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={4} className="text-center text-muted-foreground">
+                                    No classes or sections found.
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            classes.map((cls) => (
+                                <TableRow key={cls.id}>
+                                    <TableCell>{cls.className}</TableCell>
+                                    <TableCell>
+                                        {Array.isArray(cls.sections) && cls.sections.length > 0
+                                            ? cls.sections.map((sec) => sec.name).join(", ")
+                                            : "No sections"}
+                                    </TableCell>
+                                    <TableCell>{cls.capacity}</TableCell>
+                                    <TableCell>
+                                        <Select
+                                            value={cls.teachingStaffUserId || ""}
+                                            onValueChange={(teacherId) => handleSupervisorChange(cls.id, teacherId)}
+                                        >
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue placeholder="Assign Supervisor" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {teachers.map((t) => (
+                                                    <SelectItem key={t.userId} value={t.userId}>
+                                                        {t.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                     </TableCell>
                                 </TableRow>
-                            ) : classes.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={4} className="text-center text-muted-foreground">
-                                        No classes or sections found.
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                classes.map((cls) => (
-                                    <TableRow key={cls.id}>
-                                        <TableCell>{cls.className}</TableCell>
-                                        <TableCell>
-                                            {Array.isArray(cls.sections) && cls.sections.length > 0
-                                                ? cls.sections.map((sec) => sec.name).join(", ")
-                                                : "No sections"}
-                                        </TableCell>
-                                        <TableCell>{cls.capacity}</TableCell>
-                                        <TableCell>
-                                            <Select
-                                                value={cls.teachingStaffUserId || ""}
-                                                onValueChange={async (teacherId) => {
-                                                    try {
-                                                        await fetch(`/api/schools/${schoolId}/classes/${cls.id}`, {
-                                                            method: "PATCH",
-                                                            headers: { "Content-Type": "application/json" },
-                                                            body: JSON.stringify({ teachingStaffUserId: teacherId }),
-                                                        })
-                                                        toast.success("Supervisor assigned")
-                                                        fetchClasses()
-                                                    } catch {
-                                                        toast.error("Failed to assign supervisor")
-                                                    }
-                                                }}
-                                            >
-                                                <SelectTrigger className="w-full">
-                                                    <SelectValue placeholder="Assign Supervisor" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {teachers.map((t) => (
-                                                        <SelectItem key={t.userId} value={t.userId}>
-                                                            {t.name}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+                            ))
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
         </div>
     )
 }

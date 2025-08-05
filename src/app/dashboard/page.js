@@ -26,40 +26,15 @@ export default function Dashboard() {
   const { fullUser, loading } = useAuth();
   const [date, setDate] = useState(new Date());
   const [chartDataSuper, setChartDataSuper] = useState([])
+  const [maleCount, setMaleCount] = useState(0);
+  const [femaleCount, setFemaleCount] = useState(0);
+  const [totalStudentCount, setTotalStudentCount] = useState(0);
   const [schoolCount, setSchoolCount] = useState(0);
   const [trend, setTrend] = useState(0);
   const [direction, setDirection] = useState("neutral");
   const [activeCount, setActiveCount] = useState(0);
-  // useEffect(() => {
-  //   fetch("/api/school-trend")
-  //     .then(res => res.json())
-  //     .then(apiData => {
-  //       // transform for AreaChart
-  //       const formatted = apiData.map(item => ({
-  //         date: item.date,
-  //         schools: item.schools,
-
-  //       }))
-  //       console.log(formatted, apiData);
-  //       setData(formatted)
-  //     })
-  //   const fetchActiveUsers = async () => {
-  //     try {
-  //       const res = await fetch('/api/active-users');
-  //       const data = await res.json();
-
-  //       if (res.ok) {
-  //         setCount(data.activeCount);
-  //       } else {
-  //         console.error('Error fetching active user count:', data.error);
-  //       }
-  //     } catch (err) {
-  //       console.error('Network error:', err);
-  //     }
-  //   };
-
-  //   fetchActiveUsers();
-  // }, [])
+  const [adminTeacherCount, setAdminTeacherCount] = useState(0);
+  const [adminNonTeacherCount, setAdminNonTeacherCount] = useState(0);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -89,7 +64,7 @@ export default function Dashboard() {
       }
 
       try {
-        // 2️⃣ Fetch active accounts (queued after school trend)
+        // Fetch active accounts (queued after school trend)
         const activeRes = await fetch('/api/account-status');
         if (!activeRes.ok) throw new Error("Failed to fetch active accounts");
 
@@ -100,27 +75,53 @@ export default function Dashboard() {
         setActiveCount(0);
       }
     };
+    const fetchAdminStatsTeacher = async () => {
+      try {
+        const res = await fetch(`/api/schools/teaching-staff/${fullUser?.schoolId}/count`);
+        const json = await res.json();
+        setAdminTeacherCount(json.count);
+        // Gender-based student count
+        const genderRes = await fetch(`/api/schools/gender-count/${fullUser?.schoolId}`);
+        const genderData = await genderRes.json();
 
-    fetchStats();
-  }, []);
-
-
+        setMaleCount(genderData.male ?? 0);
+        setFemaleCount(genderData.female ?? 0);
+        setTotalStudentCount(genderData.total ?? 0);
+      } catch (err) {
+        console.error("❌ Admin stats fetch error:", err);
+      }
+    };
+    const fetchAdminStatsTNoneacher = async () => {
+      try {
+        const res = await fetch(`/api/schools/non-teaching-staff/${fullUser?.schoolId}/count`);
+        const json = await res.json();
+        setAdminNonTeacherCount(json.count);
+      } catch (err) {
+        console.error("❌ Admin stats fetch error:", err);
+      }
+    };
+    if (fullUser?.role?.name === 'SUPER_ADMIN') {
+      fetchStats();
+    } else if (fullUser?.role?.name === 'ADMIN') {
+      fetchAdminStatsTeacher();
+      fetchAdminStatsTNoneacher();
+    }
+  }, [fullUser]);
   const events = [
     { title: "Product Strategy Meeting", time: "12:00 PM – 02:00 PM", description: "Align roadmap and define Q4 deliverables." },
     { title: "UX Audit Review", time: "03:00 PM – 04:30 PM", description: "Review accessibility and UI consistency." },
     { title: "Sprint Planning", time: "05:00 PM – 06:00 PM", description: "Define next sprint tasks and goals." },
   ];
 
-  const cards = [
-    // { label: "Total Students", value: ", trend: " + 12.5 % ", direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
-    { label: "Total Teacher", value: "2000", direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
-    { label: "Total Staffs", value: "200", direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
-    { label: "Total Alumini", value: "200", direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
+  const cards = [,
+    { label: "Total Teaching Staff", value: adminTeacherCount, direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
+    { label: "Total Staffs", value: adminNonTeacherCount, direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
+    { label: "Total Students", value: totalStudentCount, direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
   ];
 
   const chartData = [
-    { browser: "Boys", visitors: 275, fill: "var(--ring)" },
-    { browser: "Girls", visitors: 200, fill: "#8ec5ff" },
+    { browser: "Boys", visitors: maleCount, fill: "var(--ring)" },
+    { browser: "Girls", visitors: femaleCount, fill: "#8ec5ff" },
   ];
 
   const barchartData = [

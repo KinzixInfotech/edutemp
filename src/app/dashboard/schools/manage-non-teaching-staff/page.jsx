@@ -12,6 +12,8 @@ import {
     SelectContent,
     SelectItem
 } from '@/components/ui/select'
+import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 import {
     Pagination,
     PaginationContent,
@@ -109,7 +111,7 @@ export default function TeacherListPage() {
                             <SelectValue placeholder="Filter by subject" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="ALL">All Subjects</SelectItem>
+                            <SelectItem value="ALL">All Designation</SelectItem>
                             <SelectItem value="Math">Math</SelectItem>
                             <SelectItem value="Science">Science</SelectItem>
                             <SelectItem value="English">English</SelectItem>
@@ -120,7 +122,7 @@ export default function TeacherListPage() {
                         <RefreshCw />
                     </Button>
                     <Link href={`${schoolId}/profiles/staff/new`}>
-                        <Button>
+                        <Button className='dark:text-white'>
                             <Plus />
                         </Button>
                     </Link>
@@ -134,7 +136,7 @@ export default function TeacherListPage() {
                             <TableHead>Photo</TableHead>
                             <TableHead>Name</TableHead>
                             <TableHead>Email</TableHead>
-                            <TableHead>Subject</TableHead>
+                            <TableHead>Designation</TableHead>
                             <TableHead className="text-right">Action</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -151,13 +153,13 @@ export default function TeacherListPage() {
                                 <TableRow key={teacher.id}>
                                     <TableCell>
                                         <Avatar>
-                                            <AvatarImage src={teacher.profilePicture} />
+                                            <AvatarImage src={teacher.user?.profilePicture} />
                                             <AvatarFallback>{teacher.name?.[0]}</AvatarFallback>
                                         </Avatar>
                                     </TableCell>
                                     <TableCell>{teacher.name}</TableCell>
                                     <TableCell>{teacher.email}</TableCell>
-                                    <TableCell>{teacher.subject}</TableCell>
+                                    <TableCell>{teacher.designation}</TableCell>
                                     <TableCell className="text-right">
                                         <Button
                                             variant="outline"
@@ -195,37 +197,65 @@ export default function TeacherListPage() {
 
             {dialogData && (
                 <Dialog open={!!dialogData} onOpenChange={() => setDialogData(null)}>
-                    <DialogContent className="max-w-md w-full border-muted">
+                    <DialogContent className="max-w-md w-full border max-h-[90vh] overflow-y-auto bg-muted">
                         <DialogHeader className="items-center">
-                            <Avatar className="w-24 h-24 mx-auto">
-                                <AvatarImage src={dialogData.profilePicture} />
-                                <AvatarFallback>{dialogData.name?.[0]}</AvatarFallback>
-                            </Avatar>
-                            <DialogTitle className="text-center mt-2 text-xl font-bold">
-                                {dialogData.name}
-                            </DialogTitle>
+
+                            <div className='bg-white dark:bg-[#18181b] w-full rounded-lg py-3.5 flex items-center flex-col gap-2'>
+                                <Avatar className="w-24 h-24 mx-auto">
+                                    <AvatarImage src={dialogData.user?.profilePicture} />
+                                    <AvatarFallback>{dialogData.name?.[0]}</AvatarFallback>
+                                </Avatar>
+                                <DialogTitle className="text-center mt-2 text-xl font-bold">
+                                    {dialogData.name}
+                                </DialogTitle>
+                                <span className="text-center font-regular text-sm text-gray-500">
+                                    {dialogData.email} - <span className="underline">{dialogData.employeeId}</span>
+                                </span>
+                                <Badge
+                                    variant="outline"
+                                    className={cn(
+                                        "border mt-1.5",
+                                        dialogData.user.status === "ACTIVE"
+                                            ? "bg-green-100 text-green-700 border-green-200"
+                                            : "bg-red-100 text-red-700 border-red-200"
+                                    )}
+                                >
+                                    {dialogData.user.status}
+                                </Badge>
+                            </div>
                         </DialogHeader>
 
-                        <div className="mt-4 grid grid-cols-2 bg-muted rounded-lg text-sm">
+                        <div className="mt-2 grid grid-cols-2 bg-white dark:bg-[#18181b] rounded-lg text-sm">
                             {[
                                 { label: 'Email', value: dialogData.email },
-                                { label: 'Subject', value: dialogData.subject },
-                                { label: 'Phone', value: dialogData.phone || 'N/A' },
-                                { label: 'Gender', value: dialogData.gender || 'N/A' },
-                                { label: 'Status', value: dialogData.status || 'Active' }
+                                { label: 'Designation', value: dialogData.designation },
+                                { label: 'Employee ID', value: dialogData.employeeId },
+                                { label: 'Gender', value: dialogData.gender },
+                                { label: 'DOB', value: new Date(dialogData.dob).toLocaleDateString() },
+                                { label: 'Age', value: dialogData.age },
+                                { label: 'Blood Group', value: dialogData.bloodGroup },
+                                { label: 'Contact Number', value: dialogData.contactNumber },
+                                { label: 'Address', value: dialogData.address },
+                                { label: 'City', value: dialogData.City },
+                                { label: 'District', value: dialogData.district },
+                                { label: 'State', value: dialogData.state },
+                                { label: 'Country', value: dialogData.country },
+                                { label: 'Postal Code', value: dialogData.PostalCode },
+                                { label: 'Status', value: dialogData.user?.status || 'Active' }
                             ].map((item, i) => (
                                 <div
                                     key={i}
-                                    className={`px-4 py-3 ${i % 2 === 0 ? 'border-r' : ''} border-b border-muted`}
+                                    className={`px-4 py-3 ${i % 2 === 0 ? 'border-r' : ''} border-b `}
                                 >
                                     <div className="font-medium">{item.label}</div>
-                                    <div>{item.value}</div>
+                                    <div>{item.value || 'N/A'}</div>
                                 </div>
                             ))}
                         </div>
                     </DialogContent>
                 </Dialog>
             )}
+
         </div>
     )
 }

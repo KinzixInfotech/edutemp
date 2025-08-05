@@ -152,24 +152,6 @@ export async function POST(req, context) {
 
         createdUserId = authUser.user.id;
 
-        // if (mappedRole === "STUDENT") {
-        //     await supabaseAdmin.auth.admin.updateUserById(createdUserId, {
-        //         user_metadata: {
-        //             name: parsed.studentName,
-        //             profilePicture: parsed.studentpfp || "",
-        //             admissionNo: parsed.admissionNo,
-        //             session: parsed.session,
-        //             dob: parsed.dob.toISOString(),
-        //             gender: parsed.gender,
-        //             classId: parsed.classId,
-        //             sectionId: parsed.sectionId,
-        //             rollNumber: parsed.rollNumber || "",
-        //             schoolId: parsed.schoolId,
-        //             address: parsed.address,
-        //         },
-        //     });
-        // }
-        console.log(parsed, 'from edu');
         const created = await prisma.$transaction(async (tx) => {
             // Ensure Role exists
             const role = await tx.role.upsert({
@@ -183,6 +165,8 @@ export async function POST(req, context) {
                 data: {
                     id: createdUserId,
                     password: parsed.password,
+                    profilePicture: parsed.profilePicture,
+                    name: parsed.name,
                     email: parsed.email,
                     school: { connect: { id: parsed.schoolId } },
                     role: { connect: { id: role.id } },
@@ -207,17 +191,16 @@ export async function POST(req, context) {
                             class: { connect: { id: parsed.classId } },
                             dob: parsed.dob.toISOString(),
                             gender: parsed.gender,
+                            PreviousSchoolName: parsed.previousSchoolName,
                             Address: parsed.address,
                             FatherName: parsed.fatherName,
                             MotherName: parsed.motherName,
                             FatherNumber: parsed.fatherMobileNumber || "",
                             MotherNumber: parsed.motherMobileNumber || "",
-                            profilePicture: parsed.studentpfp || "",
                             bloodGroup: parsed.bloodGroup || "",
                             contactNumber: parsed.contactNumber || "",
                             email: parsed.email,
                             FeeStatus: "PENDING",
-                            Status: "ACTIVE",
                             admissionDate: parsed.admissionDate?.toISOString() || new Date().toISOString(),
                             rollNumber: parsed.rollNumber || "",
                             city: parsed.city || "",
@@ -244,7 +227,6 @@ export async function POST(req, context) {
                             designation: parsed.designation,
                             gender: parsed.gender,
                             employeeId: parsed.empployeeId,
-                            profilePicture: parsed.profilePicture,
                             name: parsed.name,
                             age: parsed.age,
                             bloodGroup: parsed.bloodGroup,
@@ -271,7 +253,6 @@ export async function POST(req, context) {
                             designation: parsed.designation,
                             gender: parsed.gender,
                             employeeId: parsed.empployeeId,
-                            profilePicture: parsed.profilePicture,
                             name: parsed.name,
                             age: parsed.age,
                             bloodGroup: parsed.bloodGroup,
