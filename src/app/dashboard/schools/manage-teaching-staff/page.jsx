@@ -114,7 +114,7 @@ export default function TeacherListPage() {
                         <RefreshCw size={16} />
                     </Button>
 
-                    <Link href={`/dashbboard/schools/${schoolId}/profiles/teacher/new`}>
+                    <Link href={`/dashboard/schools/${schoolId}/profiles/teacher/new`}>
                         <Button className='dark:text-white'>
                             <Plus size={16} />
                         </Button>
