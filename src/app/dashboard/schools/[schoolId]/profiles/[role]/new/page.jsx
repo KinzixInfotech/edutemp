@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select"
 import FileUploadButton from '@/components/fileupload'
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
+
 export default function NewProfilePage() {
     const { schoolId, role } = useParams()
     const [classes, setClasses] = useState([])
@@ -236,7 +237,6 @@ export default function NewProfilePage() {
                             value={form.studentName}
                             onChange={(e) => setForm({ ...form, studentName: e.target.value })}
                         />
-                        {/* <Input type="date" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} /> */}
                         <Popover>
                             <PopoverTrigger asChild>
                                 <Button
@@ -256,23 +256,7 @@ export default function NewProfilePage() {
                             </PopoverContent>
                         </Popover>
 
-                        {/* <Input
-                            type="date"
-                            value={form.dob ? format(new Date(form.dob), "yyyy-MM-dd") : ""}
-                            onChange={(e) => setForm({ ...form, dob: new Date(e.target.value) })}
-                        /> */}
-                        {/* ✅ Profile Photo Upload */}
-                        {/* <Label htmlFor="profilePhoto">Upload Profile Photo</Label>
-                        <Input
-                            id="profilePhoto"
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) =>
-                                setForm({ ...form, profilePhoto: e.target.files?.[0] || null })
-                            }
-                        /> */}
-                        <FileUploadButton field="Student" onChange={(previewUrl) => handleImageUpload(previewUrl)} resetKey={resetKey} />
-                        {/* ✅ Class Select Dropdown */}
+
                         <Select
                             value={form.classId}
                             onValueChange={(value) => {
@@ -310,7 +294,6 @@ export default function NewProfilePage() {
 
                         <Input placeholder="Roll Number" value={form.rollNumber} onChange={(e) => setForm({ ...form, rollNumber: e.target.value })} />
 
-                        {/* ✅ Gender Select */}
                         <Select
                             value={form.gender}
                             onValueChange={(value) => setForm({ ...form, gender: value })}
@@ -348,24 +331,23 @@ export default function NewProfilePage() {
                             value={form.adhaarNo}
                             onChange={(e) => setForm({ ...form, adhaarNo: e.target.value })}
                         />
-
-                        <Label className="mt-4">Select Guardian Type</Label>
-                        <RadioGroup
-                            value={form.guardianType}
-                            onValueChange={(value) => setForm({ ...form, guardianType: value })}
-                            className="flex flex-row space-y-2 "
-                        >
-                            <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="PARENTS" id="r1" />
-                                <Label htmlFor="r1">Father & Mother</Label>
+                        <div>
+                            <Label className="mt-4">Select Guardian Type</Label>
+                            <RadioGroup
+                                value={form.guardianType}
+                                onValueChange={(value) => setForm({ ...form, guardianType: value })}
+                                className="flex flex-row space-y-2 "
+                            >
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="PARENTS" id="r1" />
+                                    <Label htmlFor="r1">Father & Mother</Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="GUARDIAN" id="r2" />
+                                    <Label htmlFor="r2">Guardian</Label>
                             </div>
-                            <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="GUARDIAN" id="r2" />
-                                <Label htmlFor="r2">Guardian</Label>
-                            </div>
-                        </RadioGroup>
-
-                        {/* Conditionally Render Fields */}
+                            </RadioGroup>
+                      </div>
                         {form.guardianType === "PARENTS" && (
                             <>
                                 <Input
@@ -410,6 +392,7 @@ export default function NewProfilePage() {
                                 />
                             </>
                         )}
+                  
                         <Input
                             placeholder="Address Line 1"
                             value={form.address}
@@ -558,7 +541,7 @@ export default function NewProfilePage() {
     }
 
     return (
-        <div className="max-w-xl mx-auto p-6">
+        <div className="w-full h-full p-6">
             {cropDialogOpen && rawImage && (
                 <CropImageDialog
                     image={rawImage}
@@ -590,8 +573,8 @@ export default function NewProfilePage() {
                                 },
                             });
                             if (res && res[0]?.url) {
-                                setForm({ ...form, profilePicture: res[0].url });
-                                setPreviewUrl(res[0].url);
+                                setForm({ ...form, profilePicture: res[0].ufsUrl });
+                                setPreviewUrl(res[0].ufsUrl);
                                 toast.success("Image uploaded!")
                                 setErrorupload(false);
                             } else {
@@ -612,11 +595,20 @@ export default function NewProfilePage() {
                 />
             )}
             <Card className='shadow-lg'>
-                <CardContent className="space-y-4 pt-6">
-                    {renderFields(role)}
-                    <Button onClick={handleSubmit} disabled={loading} className="w-full text-white">
-                        {loading ? "Creating..." : "Create"}
-                    </Button>
+                <CardContent className="pt-6">
+                    {/* Grid wrapper — responsive: 1 col mobile, 2 cols md, 3 cols lg */}
+                    <FileUploadButton onChange={(previewUrl) => handleImageUpload(previewUrl)} resetKey={resetKey} />
+                    <div className="grid mt-3.5 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {/* renderFields will output many inputs; they become grid children */}
+                        {renderFields(role)}
+
+                        {/* Create button — span full width of grid */}
+                        <div className="col-span-1 md:col-span-2 lg:col-span-3">
+                            <Button onClick={handleSubmit} disabled={loading} className="w-full text-white">
+                                {loading ? "Creating..." : "Create"}
+                            </Button>
+                        </div>
+                    </div>
                 </CardContent>
             </Card>
         </div>

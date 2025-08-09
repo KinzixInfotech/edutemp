@@ -221,15 +221,7 @@ lg:w-[24.375em]
         <div className="border px-2.5 dark:bg-card py-2.5
         h-full
         rounded-lg">
-          <div className="w-full max-w-[22rem] mx-auto h-full min-h-[20rem]">
-            <Calendar
-              className="rounded-md bg-white dark:bg-[#222225] border shadow-sm w-full"
-              mode="single"
-              selected={date}
-              onSelect={setDate}
-              captionLayout="dropdown"
-            />
-          </div>
+      
 
           <div className="w-full py-2">
             <div className="flex items-center justify-between mb-3">

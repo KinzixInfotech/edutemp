@@ -26,6 +26,7 @@ const studentSchema = baseUserSchema.extend({
     session: z.string(),
     schoolId: z.string().uuid(),
     dob: z.coerce.date(),
+    profilePicture: z.string(),
     gender: z.string().toUpperCase(),
     address: z.string(),
     fatherName: z.string().optional(),

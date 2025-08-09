@@ -129,7 +129,7 @@ export default function TeacherListPage() {
                             <TableHead>Photo</TableHead>
                             <TableHead>Name</TableHead>
                             <TableHead>Email</TableHead>
-                            <TableHead>Subjects</TableHead>
+                            <TableHead>Gender</TableHead>
                             <TableHead className="text-right">Action</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -154,7 +154,8 @@ export default function TeacherListPage() {
                                     <TableCell>{teacher.name}</TableCell>
                                     <TableCell>{teacher.email}</TableCell>
                                     <TableCell>
-                                        {teacher.subjects?.map(s => s.name).join(', ') || 'N/A'}
+                                        {/* {teacher.subjects?.map(s => s.name).join(', ') || 'N/A'} */}
+                                        {teacher?.gender}
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <Button

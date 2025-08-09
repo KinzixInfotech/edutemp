@@ -1,27 +1,22 @@
-// File: /app/api/schools/[schoolId]/classes/[classId]/sections/route.js
-import prisma from "@/lib/prisma"
-import { NextResponse } from "next/server"
+import { NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+
 export async function POST(req, { params }) {
     try {
-        const { schoolId, classId } = params
-        const { name } = await req.json()
+        const { classId, schoolId } = params;
+        const { name } = await req.json();
 
-        if (!name || !schoolId || !classId) {
-            return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
-        }
-
-        // ✅ Create Section
-        const newSection = await prisma.section.create({
+        const section = await prisma.section.create({
             data: {
-                name: name.toUpperCase(),
+                name,
                 schoolId,
-                classId: Number(classId),
+                classId: parseInt(classId, 10),  // convert to int
             },
-        })
+        });
 
-        return NextResponse.json({ success: true, section: newSection }, { status: 201 })
-    } catch (err) {
-        console.error("[SECTION_CREATE]", err)
-        return NextResponse.json({ error: "Server error" }, { status: 500 })
+        return NextResponse.json(section, { status: 201 });
+    } catch (error) {
+        console.error("Error creating section:", error);
+        return NextResponse.json({ error: "Failed to create section" }, { status: 500 });
     }
 }

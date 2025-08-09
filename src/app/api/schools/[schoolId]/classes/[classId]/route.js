@@ -1,34 +1,53 @@
 import prisma from "@/lib/prisma"
 import { NextResponse } from "next/server"
 
+export async function PATCH(req, { params }) {
+    const { classId, schoolId } = params
 
-export async function PATCH(req,{params}) {
-    const { classId, schoolId } = params;
-
-    if (!classId || !schoolId) {
-        return NextResponse.json({ error: "Missing classId or schoolId" }, { status: 400 });
+    if (!classId) {
+        return NextResponse.json(
+            { error: "Missing classId" },
+            { status: 400 }
+        )
+    } else if (!schoolId) {
+        return NextResponse.json(
+            { error: "Missing schoolId" },
+            { status: 400 }
+        )
     }
 
     try {
-        const body = await req.json();
-        const { teachingStaffUserId } = body;
+        const { teacherId } = await req.json()
 
-    if (!teachingStaffUserId) {
-            return NextResponse.json({ error: "Missing teachingStaffUserId" }, { status: 400 });
+        if (!teacherId) {
+            return NextResponse.json(
+                { error: "Missing teachingStaffUserId" },
+                { status: 400 }
+            )
         }
 
-        const updatedClass = await prisma.class.update({
+        // Update only if section belongs to the given school
+        const updated = await prisma.section.updateMany({
             where: {
                 id: parseInt(classId, 10),
+                schoolId: schoolId,
             },
-            data: {
-                teachingStaffUserId,
-            },
-        });
+            data: { teachingStaffUserId:teacherId },
+        })
 
-        return NextResponse.json({ success: true, data: updatedClass });
+        if (updated.count === 0) {
+            return NextResponse.json(
+                { error: "Section not found for this school" },
+                { status: 404 }
+            )
+        }
+
+        return NextResponse.json({ success: true })
     } catch (error) {
-        console.error("❌ Update supervisor error:", error);
-        return NextResponse.json({ error: "Failed to update supervisor" }, { status: 500 });
+        console.error("❌ Update section supervisor error:", error)
+        return NextResponse.json(
+            { error: "Failed to update section supervisor" },
+            { status: 500 }
+        )
     }
 }

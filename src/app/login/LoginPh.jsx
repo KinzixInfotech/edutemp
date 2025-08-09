@@ -11,12 +11,14 @@ import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import image from '../../../public/edulogin.png';
 import { Loader2 } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function LoginPhoto({ className, ...props }) {
     const router = useRouter()
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [errorMsg, setErrorMsg] = useState("")
+    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false)
     const [alreadyLoggedIn, setAlreadyLoggedIn] = useState(false)
     // schoolcode
@@ -137,38 +139,46 @@ export default function LoginPhoto({ className, ...props }) {
                                     <div className="grid gap-3">
                                         <div className="flex items-center">
                                             <Label htmlFor="password">Password</Label>
-                                            <a
-                                                href="#"
-                                                className="ml-auto text-sm underline-offset-2 hover:underline"
-                                            >
+                                            <a href="#" className="ml-auto text-sm underline-offset-2 hover:underline">
                                                 Forgot your password?
                                             </a>
                                         </div>
-                                        <Input
-                                            id="password"
-                                            type="password"
-                                            placeholder="Enter Your Password"
-                                            required
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                        />
+                                        <div className="relative">
+                                            <Input
+                                                id="password"
+                                                type={showPassword ? "text" : "password"}
+                                                placeholder="Enter Your Password"
+                                                required
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                className="absolute right-3 cursor-pointer top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                                aria-label={showPassword ? "Hide password" : "Show password"}
+                                            >
+                                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                            </button>
+
+                                        </div>
+                                        <Button
+                                            type="submit"
+                                            className="w-full text-white"
+                                            disabled={loading || alreadyLoggedIn}
+                                        >
+                                            {alreadyLoggedIn ? (
+                                                "Already Logged In"
+                                            ) : loading ? (
+                                                <span className="flex items-center justify-center gap-2">
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                    Logging in...
+                                                </span>
+                                            ) : (
+                                                "Login"
+                                            )}
+                                        </Button>
                                     </div>
-                                    <Button
-                                        type="submit"
-                                        className="w-full text-white"
-                                        disabled={loading || alreadyLoggedIn}
-                                    >
-                                        {alreadyLoggedIn ? (
-                                            "Already Logged In"
-                                        ) : loading ? (
-                                            <span className="flex items-center justify-center gap-2">
-                                                <Loader2 className="h-4 w-4 animate-spin" />
-                                                Logging in...
-                                            </span>
-                                        ) : (
-                                            "Login"
-                                        )}
-                                    </Button>
                                 </div>
                             </form>
 

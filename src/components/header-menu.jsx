@@ -11,7 +11,6 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/context/AuthContext"
-import { ModeToggle } from "./toggle"
 
 export function UserDropdown() {
     const router = useRouter()

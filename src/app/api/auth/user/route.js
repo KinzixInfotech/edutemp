@@ -1,6 +1,56 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
+export async function PUT(req) {
+    try {
+        const body = await req.json();
+        const { id, role, updates } = body; // `updates` is an object of { fieldName: value }
+
+        if (!id || !role || !updates) {
+            return NextResponse.json({ error: "Missing required data" }, { status: 400 });
+        }
+
+        let updatedUser;
+
+        switch (role) {
+            case "STUDENT":
+                updatedUser = await prisma.student.update({
+                    where: { userId: id },
+                    data: updates,
+                });
+                break;
+
+            case "TEACHER":
+                updatedUser = await prisma.teacher.update({
+                    where: { userId: id },
+                    data: updates,
+                });
+                break;
+
+            case "ADMIN":
+                updatedUser = await prisma.admin.update({
+                    where: { userId: id },
+                    data: updates,
+                });
+                break;
+
+            case "SUPER_ADMIN":
+                updatedUser = await prisma.user.update({
+                    where: { id },
+                    data: updates,
+                });
+                break;
+
+            default:
+                return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+        }
+
+        return NextResponse.json({ message: "Profile updated successfully", updatedUser });
+    } catch (err) {
+        console.error("❌ Error updating user:", err);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    }
+}
 export async function GET(req) {
     try {
         const { searchParams } = new URL(req.url);
@@ -86,7 +136,7 @@ export async function GET(req) {
                 studentdatafull = student,
                     classs = student?.class;
                 section = student?.section;
-                profilePicture = student?.profilePicture;
+                // profilePicture = student?.profilePicture;
                 break;
         }
         const end = performance.now();

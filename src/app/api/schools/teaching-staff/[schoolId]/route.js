@@ -9,17 +9,27 @@ export async function GET(req, { params }) {
         return NextResponse.json({ error: "Missing schoolId" }, { status: 400 });
     }
 
-    const includeParams = searchParams.get("include")?.split(",") ?? [];
+    let include = { user: true }; // always include user
 
-    // Always include "user" by default
-    const include = { user: true };
-
-    // Add other includes dynamically
-    includeParams.forEach((relation) => {
-        if (relation && relation !== "user") {
-            include[relation] = true;
+    const includeParam = searchParams.get("include");
+    if (includeParam) {
+        try {
+            // Try to parse JSON first
+            if (includeParam.trim().startsWith("{")) {
+                // If they send something like `?include={"Class":{"include":{"sections":true}}}`
+                include = { ...include, ...JSON.parse(includeParam) };
+            } else {
+                // If they send a comma-separated list like "class,sections"
+                includeParam.split(",").forEach((relation) => {
+                    if (relation && relation !== "user") {
+                        include[relation] = true;
+                    }
+                });
+            }
+        } catch (err) {
+            console.warn("Invalid include param:", includeParam);
         }
-    });
+    }
 
     try {
         const staff = await prisma.teachingStaff.findMany({

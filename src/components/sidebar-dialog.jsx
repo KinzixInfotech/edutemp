@@ -1,6 +1,6 @@
 "use client"
 import { useAuth } from '@/context/AuthContext';
-import React, { useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -10,6 +10,7 @@ import {
     BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
+import { toast } from "sonner"
 import {
     Sidebar,
     SidebarContent,
@@ -20,6 +21,8 @@ import {
     SidebarMenuItem,
     SidebarProvider,
 } from "@/components/ui/sidebar"
+import { Camera } from "lucide-react";
+import { CircleUserRoundIcon, XIcon, Loader2, Router } from "lucide-react"
 import { Moon, Sun } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -32,12 +35,17 @@ import {
     Bell, Check, Globe, Home, Keyboard, Link, Lock, Menu, MessageCircle,
     Paintbrush, Settings, Video
 } from "lucide-react"
-
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { useSettingsDialog } from "@/context/Settingsdialog-context"
 import { ModeToggle } from './toggle';
 import { useTheme } from 'next-themes';
-
+import { useFileUpload } from '@/lib/useFileupload';
+import { Input } from './ui/input';
+import axios from 'axios';
+import { Fi } from 'zod/v4/locales';
+import CropImageDialog from "@/app/components/CropImageDialog";
+import { uploadFiles } from "@/app/components/utils/uploadThing";
+import { useRouter } from 'next/navigation';
 const data = {
     nav: [
         { name: "Profile", icon: Home },
@@ -47,9 +55,21 @@ const data = {
         { name: "Messages & media", icon: MessageCircle },
     ],
 }
+
+const roleMap = {
+    students: "STUDENT",
+    teacher: "TEACHING_STAFF",
+    parents: "PARENT",
+    staff: "NON_TEACHING_STAFF",
+    labassistants: "NON_TEACHING_STAFF",
+    librarians: "NON_TEACHING_STAFF",
+    accountants: "NON_TEACHING_STAFF",
+    busdrivers: "NON_TEACHING_STAFF",
+    admin: "ADMIN",
+};
+
 const DynamicGoogleMap = ({ locationQuery }) => {
     const encodedQuery = encodeURIComponent(locationQuery);
-
     const src = `https://www.google.com/maps?q=${encodedQuery}&t=k&output=embed`;
     return (
         <div className="max-w-full rounded-full h-72 px-1 pt-2.5">
@@ -66,66 +86,466 @@ const DynamicGoogleMap = ({ locationQuery }) => {
         </div>
     );
 };
-function ProfileItem({ label, value }) {
+
+function ProfileItem({ label, value, onChange, name }) {
     return (
         <div>
-            <p className="text-muted-foreground">{label}</p>
-            <p>{value || "-"}</p>
+            <p className="text-muted-foreground mb-2.5">{label}</p>
+            <Input value={value || ''} onChange={(e) => onChange(name, e.target.value)} readOnly={!onChange} />
         </div>
     );
 }
+function FileUploadAvatar({ field, onChange, resetKey, defValue }) {
+    const maxSizeMB = 2
+    const maxSize = maxSizeMB * 1024 * 1024 // 2MB
+
+    const [
+        { files, isDragging, errors },
+        {
+            handleDragEnter,
+            handleDragLeave,
+            handleDragOver,
+            handleDrop,
+            openFileDialog,
+            removeFile,
+            getInputProps,
+            clearFiles, // ✅ this is already exposed
+        },
+    ] = useFileUpload({
+        accept: "image/,image/png,image/jpeg,image/jpg,image/gif",
+        maxSize,
+    })
+
+
+    const previewUrl = files[0]?.preview;
+
+    // Send previewUrl to parent only when changed
+    const previousUrlRef = useRef(null)
+    useEffect(() => {
+        if (onChange && previewUrl && previewUrl !== previousUrlRef.current) {
+            previousUrlRef.current = previewUrl
+            onChange(previewUrl)
+        }
+    }, [previewUrl, onChange])
+
+    // Clear preview when resetKey changes
+    useEffect(() => {
+        if (clearFiles) {
+            clearFiles()
+            previousUrlRef.current = null // ensures onChange works again with same file
+        }
+    }, [resetKey])
+    const fileName = files[0]?.file.name || null
+    return (
+        <div >
+            <div className="relative">
+                <div className='relative'>
+                    <button
+                        className="border-input hover:bg-accent/50 data-[dragging=true]:bg-accent/50 focus-visible:border-ring focus-visible:ring-ring/50 relative flex size-16 items-center justify-center overflow-hidden rounded-full border border-dashed transition-colors outline-none focus-visible:ring-[3px] has-disabled:pointer-events-none has-disabled:opacity-50 has-[img]:border-none"
+                        onClick={openFileDialog}
+                        onDragEnter={handleDragEnter}
+                        onDragLeave={handleDragLeave}
+                        onDragOver={handleDragOver}
+                        onDrop={handleDrop}
+                        data-dragging={isDragging || undefined}
+                        aria-label={previewUrl ? "Change image" : "Upload image"}
+                    >
+                        {previewUrl && previewUrl.trim() !== "" ? (
+                            <img
+                                className="size-full object-cover"
+                                src={previewUrl}
+                                alt={files[0]?.file?.name || "Uploaded image"}
+                                width={64}
+                                height={64}
+                                style={{ objectFit: "cover" }}
+                            />
+                        ) : defValue && defValue.trim() !== "" ? (
+                            <div className="relative w-16 h-16 group cursor-pointer">
+                                <img
+                                    className="size-full object-cover"
+                                    src={defValue}
+                                    alt={files[0]?.file?.name || "Uploaded image"}
+                                    width={64}
+                                    height={64}
+                                    style={{ objectFit: "cover" }}
+                                />
+                                {/* Hover overlay */}
+                                <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-center items-center text-white text-xs font-semibold">
+                                    <Camera className="mb-1" size={20} />
+                                    Change Image
+                                </div>
+                            </div>
+                        ) : (
+                            <div aria-hidden="true" className="size-4 opacity-60">
+                                <CircleUserRoundIcon />
+                            </div>
+                        )}
+                    </button>
+                    {previewUrl && (
+                        <Button
+                            onClick={() => removeFile(files[0]?.id)}
+                            size="icon"
+                            className="border-background focus-visible:border-background absolute top-0 -right-1 size-6 rounded-full border-2 shadow-none"
+                            aria-label="Remove image"
+                        >
+                            <XIcon className="size-3.5 dark:text-white" />
+                        </Button>
+                    )}
+                    <input
+                        {...getInputProps()}
+                        className="sr-only"
+                        aria-label="Upload image file"
+                        tabIndex={-1}
+                    />
+                </div>
+
+            </div>
+
+            {errors.length > 0 && (
+                <div className="text-destructive flex items-center gap-1 text-xs" role="alert">
+                    <AlertCircleIcon className="size-3 shrink-0" />
+                    <span>{errors[0]}</span>
+                </div>
+            )}
+        </div>
+    )
+}
 
 export function SettingsDialog() {
-    const { setTheme } = useTheme()
-    const { open, setOpen } = useSettingsDialog()
-    const [selectedSection, setSelectedSection] = useState("Profile")
+    const [resetKey, setResetKey] = useState(0);
+
+    const [
+        { files, isDragging },
+        {
+            removeFile,
+            openFileDialog,
+            getInputProps,
+            handleDragEnter,
+            handleDragLeave,
+            handleDragOver,
+            handleDrop,
+        },
+    ] = useFileUpload({
+        accept: "image/*",
+    });
+    const { setTheme } = useTheme();
+    const { open, setOpen } = useSettingsDialog();
+    const [selectedSection, setSelectedSection] = useState("Profile");
     const { fullUser } = useAuth();
+    const router = useRouter()
     const dob =
         fullUser?.role?.name === "STUDENT"
             ? fullUser?.studentdatafull?.dob
-            : fullUser?.teacherdata?.dob || fullUser?.adminData?.dob;
+            : fullUser?.role?.name === "TEACHING_STAFF"
+                ? fullUser?.teacherdata?.dob
+                : fullUser?.role?.name === "ADMIN"
+                    ? fullUser?.adminData?.dob
+                    : null;
+
+    const [updatedFields, setUpdatedFields] = useState({});
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleInputChange = (field, value) => {
+        setUpdatedFields((prev) => ({
+            ...prev,
+            [field]: value,
+        }));
+    };
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            const userId = fullUser?.id;
+            const role = fullUser?.role?.name;
+
+            let payload = { id: userId };
+
+            if (role === "STUDENT") {
+                payload.studentdatafull = {
+                    ...(updatedFields.name && { name: updatedFields.name }),
+                    ...(updatedFields.admissionNo && { admissionNo: updatedFields.admissionNo }),
+                    ...(updatedFields.academicYear && { academicYear: updatedFields.academicYear }),
+                    ...(updatedFields.dob && { dob: new Date(updatedFields.dob).toISOString() }),
+                    ...(updatedFields.gender && { gender: updatedFields.gender.toUpperCase() }),
+                    ...(updatedFields.address && { address: updatedFields.address }),
+                    ...(updatedFields.FatherName && { FatherName: updatedFields.FatherName }),
+                    ...(updatedFields.MotherName && { MotherName: updatedFields.MotherName }),
+                    ...(updatedFields.FatherNumber && { FatherNumber: updatedFields.FatherNumber }),
+                    ...(updatedFields.MotherNumber && { MotherNumber: updatedFields.MotherNumber }),
+                    ...(updatedFields.GuardianName && { GuardianName: updatedFields.GuardianName }),
+                    ...(updatedFields.GuardianRelation && { GuardianRelation: updatedFields.GuardianRelation }),
+                    ...(updatedFields.bloodGroup && { bloodGroup: updatedFields.bloodGroup }),
+                    ...(updatedFields.contactNumber && { contactNumber: updatedFields.contactNumber }),
+                    ...(updatedFields.rollNumber && { rollNumber: updatedFields.rollNumber }),
+                    ...(updatedFields.city && { city: updatedFields.city }),
+                    ...(updatedFields.state && { state: updatedFields.state }),
+                    ...(updatedFields.country && { country: updatedFields.country }),
+                    ...(updatedFields.postalCode && { postalCode: updatedFields.postalCode }),
+                    ...(updatedFields.DateOfLeaving && { DateOfLeaving: new Date(updatedFields.DateOfLeaving).toISOString() }),
+                    ...(updatedFields.House && { House: updatedFields.House }),
+                    ...(updatedFields.PreviousSchoolName && { PreviousSchoolName: updatedFields.PreviousSchoolName }),
+                    ...(updatedFields.admissionDate && { admissionDate: new Date(updatedFields.admissionDate).toISOString() }),
+                    ...(updatedFields.FeeStatus && { FeeStatus: updatedFields.FeeStatus }),
+                    ...(updatedFields.class && {
+                        classId: parseInt(updatedFields.class.split('-')[0].trim(), 10) || undefined,
+                        sectionId: parseInt(updatedFields.class.split('-')[1].trim(), 10) || undefined,
+                    }),
+                };
+                delete payload.studentdatafull.class; // Remove class string
+            } else if (role === "TEACHING_STAFF") {
+                payload.teacherdata = {
+                    ...(updatedFields.name && { name: updatedFields.name }),
+                    ...(updatedFields.email && { email: updatedFields.email }),
+                    ...(updatedFields.department && { designation: updatedFields.department }),
+                    ...(updatedFields.qualification && { qualification: updatedFields.qualification }),
+                    ...(updatedFields.experience && { experience: updatedFields.experience }),
+                    ...(updatedFields.gender && { gender: updatedFields.gender }),
+                    ...(updatedFields.contactNumber && { contactNumber: updatedFields.contactNumber }),
+                    ...(updatedFields.address && { address: updatedFields.address }),
+                    ...(updatedFields.dob && { dob: new Date(updatedFields.dob).toISOString() }),
+                };
+            } else if (role === "NON_TEACHING_STAFF") {
+                payload.nonTeachingStaff = {
+                    ...(updatedFields.name && { name: updatedFields.name }),
+                    ...(updatedFields.email && { email: updatedFields.email }),
+                    ...(updatedFields.department && { designation: updatedFields.department }),
+                    ...(updatedFields.qualification && { qualification: updatedFields.qualification }),
+                    ...(updatedFields.experience && { experience: updatedFields.experience }),
+                    ...(updatedFields.gender && { gender: updatedFields.gender }),
+                    ...(updatedFields.contactNumber && { contactNumber: updatedFields.contactNumber }),
+                    ...(updatedFields.address && { address: updatedFields.address }),
+                    ...(updatedFields.dob && { dob: new Date(updatedFields.dob).toISOString() }),
+                };
+            } else if (role === "PARENT") {
+                payload = {
+                    ...payload,
+                    ...(updatedFields.name && { guardianName: updatedFields.name }),
+                    ...(updatedFields.childId && { childId: updatedFields.childId }),
+                };
+            } else if (role === "ADMIN") {
+                payload.adminData = {
+                    ...(updatedFields.name && { name: updatedFields.name }),
+                    ...(updatedFields.email && { email: updatedFields.email }),
+                    ...(updatedFields.school && { schoolId: fullUser?.school?.id }), // Use existing schoolId
+                    ...(updatedFields.domain && { domain: updatedFields.domain }),
+                    ...(updatedFields.Language && { Language: updatedFields.Language }),
+                };
+            } else if (role === "SUPER_ADMIN") {
+                payload = {
+                    ...payload,
+                    ...(updatedFields.name && { name: updatedFields.name }),
+                    ...(updatedFields.email && { email: updatedFields.email }),
+                };
+            }
+
+            // Include profile picture if uploaded
+            if (previewUrl) {
+                payload.profilePicture = previewUrl;
+            }
+
+            const response = await axios.patch(`/api/users/${userId}`, payload);
+            if (response.data.success) {
+                toast.success(`Profile updated successfully!`)
+                // setCropDialogOpen(false);
+                setUpdatedFields({});
+                // router.refresh()
+                window.location.reload();
+            } else {
+                toast.error(`Failed to update profile ${response.data.error}`)
+                throw new Error(response.data.error || "Failed to update profile");
+            }
+        } catch (error) {
+            // setCropDialogOpen(false);
+            console.error("Error updating profile:", error);
+            toast.error(`Error updating profile! ${error.message || "Please try again."}`)
+            // alert(`Failed to update profile: ${error.message || "Please try again."}`);
+        } finally {
+            setIsSaving(false);
+            setCropDialogOpen(false);
+        }
+    };
+
     const renderContent = () => {
         let profileFields = null;
-        console.log(fullUser?.role?.name);
         switch (fullUser?.role?.name) {
             case "STUDENT":
                 profileFields = (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                        <ProfileItem label="Admission No" value={fullUser?.studentdatafull?.admissionNo} />
-                        <ProfileItem label="Class" value={`${fullUser?.classs?.className || "-"} - ${fullUser?.section?.name || "-"}`} />
-                        <ProfileItem label="Email" value={fullUser?.email} />
-                        <ProfileItem label="Blood Group" value={fullUser?.studentdatafull?.bloodGroup} />
-                        <ProfileItem label="Gender" value={fullUser?.studentdatafull?.gender} />
-                        <ProfileItem label="Admission Date" value={new Date(fullUser?.studentdatafull?.admissionDate).toLocaleDateString()} />
-                        <ProfileItem label="Roll Number" value={fullUser?.studentdatafull?.rollNumber} />
-                        <ProfileItem label="Fee Status" value={fullUser?.studentdatafull?.FeeStatus} />
-                        <ProfileItem label="Father Name" value={fullUser?.studentdatafull?.FatherName} />
-                        <ProfileItem label="Father Number" value={fullUser?.studentdatafull?.FatherNumber} />
-                        <ProfileItem label="Mother Name" value={fullUser?.studentdatafull?.MotherName} />
-                        <ProfileItem label="Mother Number" value={fullUser?.studentdatafull?.MotherNumber} />
-                        <ProfileItem label="Contact Number" value={fullUser?.studentdatafull?.contactNumber} />
-                        <ProfileItem label="House" value={fullUser?.studentdatafull?.House} />
-                        <ProfileItem label="City" value={fullUser?.studentdatafull?.city} />
-                        <ProfileItem label="State" value={fullUser?.studentdatafull?.state} />
-                        <ProfileItem label="Country" value={fullUser?.studentdatafull?.country} />
-                        <ProfileItem label="Postal Code" value={fullUser?.studentdatafull?.postalCode} />
-                        <ProfileItem label="Address" value={fullUser?.studentdatafull?.Address} />
-                        <ProfileItem label="Status" value={fullUser?.studentdatafull?.Status} />
+                        <ProfileItem
+                            label="Admission No"
+                            value={updatedFields.admissionNo || fullUser?.studentdatafull?.admissionNo}
+                            name="admissionNo"
+                            onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Class"
+                            value={updatedFields.class || `${fullUser?.classs?.className || "-"} - ${fullUser?.section?.name || "-"}`}
+                            name="class"
+                            onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Email"
+                            value={updatedFields.email || fullUser?.email}
+                            name="email"
+                        // onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Blood Group"
+                            value={updatedFields.bloodGroup || fullUser?.studentdatafull?.bloodGroup}
+                            name="bloodGroup"
+                            onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Gender"
+                            value={updatedFields.gender || fullUser?.studentdatafull?.gender}
+                            name="gender"
+                            onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Admission Date"
+                            value={updatedFields.admissionDate || (fullUser?.studentdatafull?.admissionDate ? new Date(fullUser?.studentdatafull?.admissionDate).toLocaleDateString() : '')}
+                            name="admissionDate"
+                        // onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Roll Number"
+                            value={updatedFields.rollNumber || fullUser?.studentdatafull?.rollNumber}
+                            name="rollNumber"
+                        // onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Fee Status"
+                            value={updatedFields.FeeStatus || fullUser?.studentdatafull?.FeeStatus}
+                            name="FeeStatus"
+                        // onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Father Name"
+                            value={updatedFields.FatherName || fullUser?.studentdatafull?.FatherName}
+                            name="FatherName"
+                        // onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Father Number"
+                            value={updatedFields.FatherNumber || fullUser?.studentdatafull?.FatherNumber}
+                            name="FatherNumber"
+                        // onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Mother Name"
+                            value={updatedFields.MotherName || fullUser?.studentdatafull?.MotherName}
+                            name="MotherName"
+                        // onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Mother Number"
+                            value={updatedFields.MotherNumber || fullUser?.studentdatafull?.MotherNumber}
+                            name="MotherNumber"
+                        // onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Contact Number"
+                            value={updatedFields.contactNumber || fullUser?.studentdatafull?.contactNumber}
+                            name="contactNumber"
+                        // onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="House"
+                            value={updatedFields.House || fullUser?.studentdatafull?.House}
+                            name="House"
+                        // onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="City"
+                            value={updatedFields.city || fullUser?.studentdatafull?.city}
+                            name="city"
+                            onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="State"
+                            value={updatedFields.state || fullUser?.studentdatafull?.state}
+                            name="state"
+                            onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Country"
+                            value={updatedFields.country || fullUser?.studentdatafull?.country}
+                            name="country"
+                            onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Postal Code"
+                            value={updatedFields.postalCode || fullUser?.studentdatafull?.postalCode}
+                            name="postalCode"
+                            onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Address"
+                            value={updatedFields.Address || fullUser?.studentdatafull?.Address}
+                            name="Address"
+                            onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Status"
+                            value={updatedFields.Status || fullUser?.studentdatafull?.Status}
+                            name="Status"
+                            onChange={handleInputChange}
+                        />
                     </div>
                 );
                 break;
 
-            case "TEACHER":
+            case "TEACHING_STAFF":
                 profileFields = (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                        <ProfileItem label="Name" value={fullUser?.name} />
-                        <ProfileItem label="Email" value={fullUser?.email} />
-                        <ProfileItem label="Department" value={fullUser?.teacherdata?.department} />
-                        <ProfileItem label="Qualification" value={fullUser?.teacherdata?.qualification} />
-                        <ProfileItem label="Experience" value={fullUser?.teacherdata?.experience} />
-                        <ProfileItem label="Gender" value={fullUser?.teacherdata?.gender} />
-                        <ProfileItem label="Contact Number" value={fullUser?.teacherdata?.contactNumber} />
-                        <ProfileItem label="Address" value={fullUser?.teacherdata?.address} />
+                        <ProfileItem
+                            label="Name"
+                            value={updatedFields.name || fullUser?.name}
+                            name="name"
+                            onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Email"
+                            value={updatedFields.email || fullUser?.email}
+                            name="email"
+                            onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Designation"
+                            value={updatedFields.department || fullUser?.teacherdata?.designation}
+                            name="department"
+                            onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Qualification"
+                            value={updatedFields.qualification || fullUser?.teacherdata?.qualification}
+                            name="qualification"
+                            onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Experience"
+                            value={updatedFields.experience || fullUser?.teacherdata?.experience}
+                            name="experience"
+                            onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Gender"
+                            value={updatedFields.gender || fullUser?.teacherdata?.gender}
+                            name="gender"
+                            onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Contact Number"
+                            value={updatedFields.contactNumber || fullUser?.teacherdata?.contactNumber}
+                            name="contactNumber"
+                            onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Address"
+                            value={updatedFields.address || fullUser?.teacherdata?.address}
+                            name="address"
+                            onChange={handleInputChange}
+                        />
                     </div>
                 );
                 break;
@@ -134,25 +554,65 @@ export function SettingsDialog() {
                 profileFields = (
                     <div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                            <ProfileItem label="Name" value={fullUser?.name} />
-                            <ProfileItem label="User Id" value={fullUser?.id} />
-                            <ProfileItem label="Email" value={fullUser?.email} />
-                            <ProfileItem label="Role" value={fullUser?.role?.name} />
-                            <ProfileItem label="School" value={fullUser?.school?.name} />
-                            <ProfileItem label="School Domain" value={fullUser?.school?.domain} />
-                            <ProfileItem label="UI Language" value={fullUser?.school?.Language} />
+                            <ProfileItem
+                                label="Name"
+                                value={updatedFields.name || fullUser?.name}
+                                name="name"
+                                onChange={handleInputChange}
+                            />
+                            <ProfileItem
+                                label="User Id"
+                                value={updatedFields.id || fullUser?.id}
+                                name="id"
+                            />
+                            <ProfileItem
+                                label="Email"
+                                value={updatedFields.email || fullUser?.email}
+                                name="email"
+                                onChange={handleInputChange}
+                            />
+                            <ProfileItem
+                                label="Role"
+                                value={updatedFields.role || fullUser?.role?.name}
+                                name="role"
+                            />
+                            <ProfileItem
+                                label="School"
+                                value={updatedFields.school || fullUser?.school?.name}
+                                name="school"
+                                onChange={handleInputChange}
+                            />
+                            <ProfileItem
+                                label="School Domain"
+                                value={updatedFields.domain || fullUser?.school?.domain}
+                                name="domain"
+                            />
                         </div>
-                        <DynamicGoogleMap locationQuery="Ranchi, Jharkhand" />
                     </div>
                 );
                 break;
+
             case "SUPER_ADMIN":
                 profileFields = (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                        <ProfileItem label="Name" value={fullUser?.name} />
-                        <ProfileItem label="Email" value={fullUser?.email} />
-                        <ProfileItem label="Role" value={fullUser?.role?.name} />
-                        {/* <ProfileItem label="Contact Number" value={fullUser?.adminData?.contactNumber} /> */}
+                        <ProfileItem
+                            label="Name"
+                            value={updatedFields.name || fullUser?.name}
+                            name="name"
+                            onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Email"
+                            value={updatedFields.email || fullUser?.email}
+                            name="email"
+                        // onChange={handleInputChange}
+                        />
+                        <ProfileItem
+                            label="Role"
+                            value={updatedFields.role || fullUser?.role?.name}
+                            name="role"
+                        // onChange={handleInputChange}
+                        />
                     </div>
                 );
                 break;
@@ -163,44 +623,43 @@ export function SettingsDialog() {
         }
         if (selectedSection === "Profile") {
             return (
-                <div className="space-y-4 ">
+                <div className={`space-y-4 ${isSaving ? 'opacity-50 blur-sm' : ''}`}>
                     <div className="flex items-center gap-4">
-                        <Avatar className="w-16 h-16">
-                            <AvatarImage src={fullUser?.profilePicture} />
-                            <AvatarFallback>{fullUser?.name?.charAt(0) || "?"}</AvatarFallback>
-                        </Avatar>
+                        <FileUploadAvatar defValue={fullUser?.profilePicture} onChange={(previewUrl) => handleImageUpload(previewUrl)} resetKey={resetKey} />
                         <div>
                             <h2 className="text-xl font-semibold">{fullUser?.name}</h2>
                             <p>DOB: {dob ? new Date(dob).toLocaleDateString() : "Please Add DOB"}</p>
-
                         </div>
                     </div>
                     {profileFields}
+                    {Object.keys(updatedFields).length > 0 && (
+                        <Button
+                            onClick={handleSave}
+                            className="mt-4 dark:text-white w-full"
+                            disabled={isSaving}
+                        >
+                            {isSaving ? 'Saving...' : 'Save Changes'}
+                        </Button>
+                    )}
                 </div>
             )
         }
         if (selectedSection === "Appearance") {
             return (
-                <div className="space-y-6 p-6 ">
-                    {/* Header */}
+                <div className="space-y-6 p-6">
                     <div className="space-y-1">
                         <h2 className="text-2xl font-bold tracking-tight">Appearance</h2>
                         <p className="text-muted-foreground">Customize the look and feel of your profile and app theme.</p>
                     </div>
-
-
-
-                    {/* Theme Toggle */}
-                    <div className="space-y-2 p-6 rounded-xl   border  max-w-2xl">
+                    <div className="space-y-2 p-6 rounded-xl border max-w-2xl">
                         <label className="text-sm font-medium">Theme</label>
                         <p className="text-sm text-muted-foreground mb-2">
                             Choose between light and dark mode.
                         </p>
-                        {/* <ModeToggle /> */}
                         <div className='flex items-center justify-center'>
-                            <DropdownMenu >
-                                <DropdownMenuTrigger >
-                                    <Button variant="outline" size="icon" >
+                            <DropdownMenu>
+                                <DropdownMenuTrigger>
+                                    <Button variant="outline" size="icon">
                                         <Sun className="h-[1.2rem] w-[1.2rem] scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
                                         <Moon className="absolute h-[1.2rem] w-[1.2rem] scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
                                         <span className="sr-only">Toggle theme</span>
@@ -222,10 +681,7 @@ export function SettingsDialog() {
                     </div>
                 </div>
             )
-
         }
-
-        // Default section
         return (
             <div className="space-y-4">
                 <h2 className="text-lg font-semibold">{selectedSection}</h2>
@@ -241,61 +697,130 @@ export function SettingsDialog() {
             </div>
         )
     }
+    const [previewUrl, setPreviewUrl] = useState("");
+    const [uploading, setUploading] = useState(false);
+    const [errorUpload, setErrorupload] = useState(false);
 
+    const [rawImage, setRawImage] = useState(null);
+    const [tempImage, setTempImage] = useState(null);
+    const [cropDialogOpen, setCropDialogOpen] = useState(false);
+    const handleImageUpload = (previewUrl) => {
+        if (!previewUrl || previewUrl === rawImage) return;
+        setRawImage(previewUrl);
+        handleInputChange('profilePicture', previewUrl);
+        setCropDialogOpen(true);
+    }
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogContent className="overflow-hidden p-0 md:max-h-[500px] md:max-w-[700px] lg:max-w-[800px]">
-                <DialogTitle className="sr-only">Settings</DialogTitle>
-                <DialogDescription className="sr-only">
-                    Customize your settings here.
-                </DialogDescription>
-                <SidebarProvider className="items-start">
-                    <Sidebar collapsible="none" className="hidden md:flex ">
-                        <SidebarContent>
-                            <SidebarGroup className='bg-[#f4f4f5] dark:bg-[#27272a] h-full'>
-                                <SidebarGroupContent>
-                                    <SidebarMenu>
-                                        {data.nav.map((item) => (
-                                            <SidebarMenuItem key={item.name}>
-                                                <SidebarMenuButton
-                                                    asChild
-                                                    variant={'default'}
-                                                    // isActive={selectedSection === item.name}
-                                                    className={`w-full font-semibold hover:cursor-pointer ${selectedSection === item.name ? "bg-white hover:bg-white font-semibold text-black shadow-md " : ""}`}
+        <>
+            {cropDialogOpen && rawImage && (
+                <CropImageDialog
+                    image={rawImage}
+                    onClose={() => {
+                        if (!uploading) {
+                            setCropDialogOpen(false);
+                        }
+                    }}
+                    uploading={uploading}
 
-                                                >
-                                                    <button onClick={() => setSelectedSection(item.name)} className="w-full text-left flex items-center gap-2">
-                                                        <item.icon className="w-4 h-4" />
-                                                        <span>{item.name}</span>
-                                                    </button>
-                                                </SidebarMenuButton>
-                                            </SidebarMenuItem>
-                                        ))}
-                                    </SidebarMenu>
-                                </SidebarGroupContent>
-                            </SidebarGroup>
-                        </SidebarContent>
-                    </Sidebar>
-                    <main className="flex h-[480px] flex-1 flex-col overflow-hidden">
-                        <header className="flex h-16 shrink-0 items-center gap-2 px-4">
-                            <Breadcrumb>
-                                <BreadcrumbList>
-                                    <BreadcrumbItem className="hidden md:block">
-                                        <BreadcrumbLink href="#">Account</BreadcrumbLink>
-                                    </BreadcrumbItem>
-                                    <BreadcrumbSeparator className="hidden md:block" />
-                                    <BreadcrumbItem>
-                                        <BreadcrumbPage>{selectedSection}</BreadcrumbPage>
-                                    </BreadcrumbItem>
-                                </BreadcrumbList>
-                            </Breadcrumb>
-                        </header>
-                        <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4 pt-0">
-                            {renderContent()}
-                        </div>
-                    </main>
-                </SidebarProvider>
-            </DialogContent>
-        </Dialog >
+                    open={cropDialogOpen}
+                    // onClose={() => setCropDialogOpen(false)}
+                    onCropComplete={async (croppedBlob) => {
+                        const now = new Date();
+                        const iso = now.toISOString().replace(/[:.]/g, "-");
+                        const perf = Math.floor(performance.now() * 1000); // microseconds (approximate nanos)
+                        const timestamp = `${iso}-${perf}`;
+                        const filename = `${timestamp}.jpg`;
+                        const file = new File([croppedBlob], filename, { type: "image/jpeg" });
+                        setTempImage(file);
+                        try {
+                            setUploading(true)
+
+                            const res = await uploadFiles("profilePictureUploader", {
+                                files: [file],
+                                input: {
+                                    profileId: crypto.randomUUID(),
+                                    username: fullUser.name || "User",
+                                },
+                            });
+                            if (res && res[0]?.url) {
+                                // setForm({ ...form, profilePicture: res[0].ufsUrl });
+                                setPreviewUrl(res[0].ufsUrl);
+                                toast.success("Image uploaded!")
+                                setErrorupload(false);
+                            } else {
+                                toast.error("Upload failed");
+                                setErrorupload(true);
+                            }
+                        } catch (err) {
+                            toast.error("Something went wrong during upload");
+                            console.error(err);
+
+                            setErrorupload(true);
+                        } finally {
+                            setUploading(false)
+                            setCropDialogOpen(false);
+                        }
+
+                    }}
+                />
+            )}
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="overflow-hidden p-0 md:max-h-[500px] md:max-w-[700px] lg:max-w-[800px]">
+                    <DialogTitle className="sr-only">Settings</DialogTitle>
+                    <DialogDescription className="sr-only">
+                        Customize your settings here.
+                    </DialogDescription>
+                    <SidebarProvider className="items-start">
+                        <Sidebar collapsible="none" className="hidden md:flex">
+                            <SidebarContent>
+                                <SidebarGroup className='bg-[#f4f4f5] dark:bg-[#27272a] h-full'>
+                                    <SidebarGroupContent>
+                                        <SidebarMenu>
+                                            {data.nav.map((item) => (
+                                                <SidebarMenuItem key={item.name}>
+                                                    <SidebarMenuButton
+                                                        asChild
+                                                        variant={'default'}
+                                                        className={`w-full font-semibold hover:cursor-pointer ${selectedSection === item.name ? "bg-white hover:bg-white font-semibold text-black shadow-md" : ""}`}
+                                                    >
+                                                        <button onClick={() => setSelectedSection(item.name)} className="w-full text-left flex items-center gap-2">
+                                                            <item.icon className="w-4 h-4" />
+                                                            <span>{item.name}</span>
+                                                        </button>
+                                                    </SidebarMenuButton>
+                                                </SidebarMenuItem>
+                                            ))}
+                                        </SidebarMenu>
+                                    </SidebarGroupContent>
+                                </SidebarGroup>
+                            </SidebarContent>
+                        </Sidebar>
+                        <main className="flex h-[480px] flex-1 flex-col overflow-hidden">
+                            <header className="flex h-16 shrink-0 items-center gap-2 px-4">
+                                <Breadcrumb>
+                                    <BreadcrumbList>
+                                        <BreadcrumbItem className="hidden md:block">
+                                            <BreadcrumbLink href="#">Account</BreadcrumbLink>
+                                        </BreadcrumbItem>
+                                        <BreadcrumbSeparator className="hidden md:block" />
+                                        <BreadcrumbItem>
+                                            <BreadcrumbPage>{selectedSection}</BreadcrumbPage>
+                                        </BreadcrumbItem>
+                                    </BreadcrumbList>
+                                </Breadcrumb>
+                            </header>
+                            <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4 pt-0">
+                                {renderContent()}
+                            </div>
+                        </main>
+                        {isSaving && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm z-50">
+                                <Loader2 className="h-8 w-8 animate-spin text-black dark:text-white" />
+                            </div>
+                        )}
+                    </SidebarProvider>
+                </DialogContent>
+            </Dialog>
+        </>
     )
 }

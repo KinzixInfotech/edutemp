@@ -63,36 +63,34 @@ export default function ManageClassSectionPage() {
             setFetchingLoading(false)
         }
     }
-    const handleSupervisorChange = (classId, teacherId) => {
-        setSelectedClassIdToUpdate(classId)
+    const handleSupervisorChange = (sectionId, teacherId) => {
+        setSelectedClassIdToUpdate(sectionId) // now this is actually sectionId
         setSelectedTeacher(teacherId)
         setConfirmOpen(true)
     }
+
     const confirmSupervisorChange = async () => {
         if (!selectedClassIdToUpdate || !selectedTeacher) {
-            toast.error("Missing class or teacher selection");
-            return;
+            toast.error("Missing section or teacher selection")
+            return
         }
 
         try {
             const res = await fetch(`/api/schools/${schoolId}/classes/${selectedClassIdToUpdate}`, {
                 method: "PATCH",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ teachingStaffUserId: selectedTeacher }),
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ teacherId: selectedTeacher }),
             });
+            if (!res.ok) throw new Error()
 
-            if (!res.ok) throw new Error();
-
-            toast.success("Supervisor assigned successfully");
-            fetchClasses();
-            setConfirmOpen(false);
+            toast.success("Supervisor assigned successfully")
+            fetchClasses()
+            setConfirmOpen(false)
         } catch (error) {
-            console.error("❌ Supervisor assign error:", error);
-            toast.error("Failed to assign supervisor");
+            console.error("❌ Supervisor assign error:", error)
+            toast.error("Error:", error)
         }
-    };
+    }
 
     const handleAddClass = async () => {
         if (!className) return toast.error("Class name is required")
@@ -236,36 +234,44 @@ export default function ManageClassSectionPage() {
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            classes.map((cls) => (
-                                <TableRow key={cls.id}>
-                                    <TableCell>{cls.className}</TableCell>
-                                    <TableCell>
-                                        {Array.isArray(cls.sections) && cls.sections.length > 0
-                                            ? cls.sections.map((sec) => sec.name).join(", ")
-                                            : "No sections"}
-                                    </TableCell>
-                                    <TableCell>{cls.capacity}</TableCell>
-                                    <TableCell>
-                                        <Select
-                                            value={cls.teachingStaffUserId || ""}
-                                            onValueChange={(teacherId) => handleSupervisorChange(cls.id, teacherId)}
-                                        >
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder="Assign Supervisor" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {teachers.map((t) => (
-                                                    <SelectItem key={t.userId} value={t.userId}>
-                                                        {t.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </TableCell>
-                                </TableRow>
-                            ))
+                            classes.map((cls) =>
+                                cls.sections?.length > 0 ? (
+                                    cls.sections.map((sec) => (
+                                        <TableRow key={sec.id}>
+                                            <TableCell>{cls.className}</TableCell>
+                                            <TableCell>{sec.name}</TableCell>
+                                            <TableCell>{cls.capacity}</TableCell>
+                                            <TableCell>
+                                                <Select
+                                                    value={sec.teachingStaffUserId || ""}
+                                                    onValueChange={(teacherId) =>
+                                                        handleSupervisorChange(sec.id, teacherId) // pass sectionId
+                                                    }
+                                                >
+                                                    <SelectTrigger className="w-full">
+                                                        <SelectValue placeholder="Assign Supervisor" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {teachers.map((t) => (
+                                                            <SelectItem key={t.userId} value={t.userId}>
+                                                                {t.name}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : (
+                                    <TableRow key={`empty-${cls.id}`}>
+                                        <TableCell>{cls.className}</TableCell>
+                                        <TableCell colSpan={3}>No sections</TableCell>
+                                    </TableRow>
+                                )
+                            )
                         )}
                     </TableBody>
+
                 </Table>
             </div>
         </div>

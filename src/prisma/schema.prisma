@@ -184,14 +184,16 @@ model TeachingStaff {
   country       String?
   PostalCode    String?
 
-  school     School      @relation(fields: [schoolId], references: [id])
-  subjects   Subject[]
-  user       User        @relation(fields: [userId], references: [id])
-  department Department? @relation(fields: [departmentId], references: [id])
-  homework   Homework[]
-  subjectId  Int?
-  Class      Class[]
-  schoolId   String      @db.Uuid
+  school                School                  @relation(fields: [schoolId], references: [id])
+  subjects              Subject[]
+  user                  User                    @relation(fields: [userId], references: [id])
+  department            Department?             @relation(fields: [departmentId], references: [id])
+  homework              Homework[]
+  subjectId             Int?
+  Class                 Class[]
+  schoolId              String                  @db.Uuid
+  SectionSubjectTeacher SectionSubjectTeacher[]
+  Section               Section[]
 
   @@index([departmentId])
 }
@@ -225,35 +227,52 @@ model NonTeachingStaff {
 }
 
 model Class {
-  id                  Int            @id @default(autoincrement())
-  schoolId            String         @db.Uuid
-  className           String
-  capacity            Int
-  supervisorId        String?
-  teachingStaffUserId String?        @db.Uuid
-  supervisor          TeachingStaff? @relation(fields: [teachingStaffUserId], references: [userId])
+  id        Int    @id @default(autoincrement())
+  schoolId  String @db.Uuid
+  className String
+  capacity  Int
+
   school              School         @relation(fields: [schoolId], references: [id])
   students            Student[]
   subjects            Subject[]
   homework            Homework[]
   sections            Section[]
   FeeStructure        FeeStructure[]
+  TeachingStaff       TeachingStaff? @relation(fields: [teachingStaffUserId], references: [userId])
+  teachingStaffUserId String?        @db.Uuid
 
+  @@unique([id, schoolId])
   @@index([schoolId])
 }
 
 model Section {
-  id         Int         @id @default(autoincrement())
-  name       String
-  classId    Int
-  schoolId   String      @db.Uuid // Optional but helpful for direct filtering
-  class      Class       @relation(fields: [classId], references: [id])
-  // assignedTeacher SectionTeacher[]
-  students   Student[]
-  timetables Timetable[] // 👈 Add this
+  id                  Int            @id @default(autoincrement())
+  name                String
+  classId             Int
+  schoolId            String         @db.Uuid
+  teachingStaffUserId String?        @db.Uuid // Section Supervisor
+  supervisor          TeachingStaff? @relation(fields: [teachingStaffUserId], references: [userId])
+
+  class           Class                   @relation(fields: [classId], references: [id])
+  students        Student[]
+  timetables      Timetable[]
+  subjectTeachers SectionSubjectTeacher[]
 
   @@unique([classId, name])
   @@index([classId])
+}
+
+model SectionSubjectTeacher {
+  id                  Int    @id @default(autoincrement())
+  sectionId           Int
+  subjectId           Int
+  teachingStaffUserId String @db.Uuid
+
+  section Section       @relation(fields: [sectionId], references: [id])
+  subject Subject       @relation(fields: [subjectId], references: [id])
+  teacher TeachingStaff @relation(fields: [teachingStaffUserId], references: [userId])
+
+  @@unique([sectionId, subjectId])
 }
 
 model Timetable {
@@ -322,9 +341,10 @@ model Subject {
   class      Class      @relation(fields: [classId], references: [id])
   department Department @relation(fields: [departmentId], references: [id])
 
-  homework    Homework[]
-  examResults ExamResult[]
-  Teacher     TeachingStaff[]
+  homework              Homework[]
+  examResults           ExamResult[]
+  Teacher               TeachingStaff[]
+  SectionSubjectTeacher SectionSubjectTeacher[]
 
   @@index([classId])
   @@index([departmentId])
