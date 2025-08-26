@@ -82,11 +82,13 @@ export default function AttendanceTable({ role, month, isMarkingMode, onSubmit, 
             .then((res) => res.json())
             .then(setUsers);
 
-        const userIds = users.map((u) => u.userId);
-        if (userIds.length > 0) {
-            fetch(`/api/attendance/bulk?userIds=${userIds.join(",")}&date=${format(selectedDate, "yyyy-MM-dd")}`)
-                .then(res => res.json())
-                .then(setAttendances);
+        if (users.length > 0) {
+            const userIds = users.map((u) => u.userId);
+            if (userIds.length > 0) {
+                fetch(`/api/attendance/bulk?userIds=${userIds.join(",")}&date=${format(selectedDate, "yyyy-MM-dd")}`)
+                    .then(res => res.json())
+                    .then(setAttendances);
+            }
         }
     }, [role, month, selectedDate, users.length]);
 
@@ -144,12 +146,13 @@ export default function AttendanceTable({ role, month, isMarkingMode, onSubmit, 
             setChanges({});
 
             // Refetch attendance data
-            fetch(
-                `/api/attendance/bulk?userIds=${users.map(u => u.userId).join(",")}&date=${format(selectedDate, "yyyy-MM-dd")}`
-            )
-                .then(res => res.json())
-                .then(data => setAttendances(data.map(a => ({ ...a, status: a.status.toUpperCase() }))));
-
+            if (users.length > 0) {
+                fetch(
+                    `/api/attendance/bulk?userIds=${users.map(u => u.userId).join(",")}&date=${format(selectedDate, "yyyy-MM-dd")}`
+                )
+                    .then(res => res.json())
+                    .then(data => setAttendances(data.map(a => ({ ...a, status: a.status.toUpperCase() }))));
+            }
             // Notify parent
             onSubmit?.({ loading: false, error: null, success: "Attendances updated successfully!" });
         } catch (err) {
@@ -240,7 +243,7 @@ export default function AttendanceTable({ role, month, isMarkingMode, onSubmit, 
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {users.map((user, index) => (
+                    {users.length > 0 && users.map((user, index) => (
                         <TableRow key={user.userId}>
                             <TableCell className="font-semibold">{index + 1}</TableCell>
                             <TableCell>

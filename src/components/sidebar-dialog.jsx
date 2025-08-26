@@ -46,6 +46,8 @@ import { Fi } from 'zod/v4/locales';
 import CropImageDialog from "@/app/components/CropImageDialog";
 import { uploadFiles } from "@/app/components/utils/uploadThing";
 import { useRouter } from 'next/navigation';
+import { Calendar } from './ui/calendar';
+import { ChartRadialShape } from './chart-radial';
 const data = {
     nav: [
         { name: "Profile", icon: Home },
@@ -212,6 +214,40 @@ function FileUploadAvatar({ field, onChange, resetKey, defValue }) {
 }
 
 export function SettingsDialog() {
+    function parseLocalDate(dateStr) {
+        const [year, month, day] = dateStr.split("-").map(Number)
+        return new Date(year, month - 1, day) // month is 0-based
+    }
+
+    const [markedDates, setMarkedDates] = useState({})
+    const [selectedDate, setSelectedDate] = useState(new Date())
+
+    const getDateKey = (date) => {
+        if (!date) return null;
+        return date.toLocaleDateString("en-CA");
+    };
+    const markPresent = () => {
+        const dateKey = getDateKey(selectedDate)
+        if (!dateKey) return
+        setMarkedDates((prev) => ({ ...prev, [dateKey]: "present" }))
+    }
+
+    const markLeave = () => {
+        const dateKey = getDateKey(selectedDate)
+        if (!dateKey) return
+        setMarkedDates((prev) => ({ ...prev, [dateKey]: "leave" }))
+    }
+
+    const markAbsent = () => {
+        const dateKey = getDateKey(selectedDate)
+        if (!dateKey) return
+        setMarkedDates((prev) => ({ ...prev, [dateKey]: "absent" }))
+    }
+
+    const dateKey = getDateKey(selectedDate)
+    const status = dateKey ? markedDates[dateKey] : null
+
+
     const [resetKey, setResetKey] = useState(0);
 
     const [
@@ -645,6 +681,85 @@ export function SettingsDialog() {
                     )}
                 </div>
             )
+        } else if (selectedSection === "Attendance") {
+
+            return (
+                <div className="flex flex-col gap-6">
+                    {/* Section 1: Status + Actions */}
+                    <div className="space-y-3">
+                        <span className="text-sm font-medium">
+                            {status === "present"
+                                ? "✅ Present"
+                                : status === "leave"
+                                    ? "🟡 Leave"
+                                    : status === "absent"
+                                        ? "❌ Absent"
+                                        : "— Not Marked"}{" "}
+                            {dateKey ? `on ${selectedDate?.toLocaleDateString()}` : ""}
+                        </span>
+
+                        <div className="flex flex-row gap-2">
+                            <Button
+                                size="sm"
+                                className="text-white flex-1"
+                                onClick={markPresent}
+                                disabled={!selectedDate}
+                            >
+                                Mark Present
+                            </Button>
+                            <Button
+                                size="sm"
+                                className="text-white flex-1"
+                                variant="outline"
+                                disabled={!selectedDate}
+                            >
+                                Request Leave
+                            </Button>
+                        </div>
+
+                    </div>
+
+
+
+                    {/* Section 3: Calendar */}
+                    <div className="grid grid-cols-2">
+                        <div>
+                            <Calendar
+                                mode="single"
+                                selected={selectedDate}
+                                onSelect={setSelectedDate}
+                                modifiers={{
+                                    present: Object.keys(markedDates)
+                                        .filter((d) => markedDates[d] === "present")
+                                        .map((d) => new Date(d)),
+                                    leave: Object.keys(markedDates)
+                                        .filter((d) => markedDates[d] === "leave")
+                                        .map((d) => new Date(d)),
+                                    absent: Object.keys(markedDates)
+                                        .filter((d) => markedDates[d] === "absent")
+                                        .map((d) => new Date(d)),
+                                }}
+                                modifiersClassNames={{
+                                    present: "bg-green-500 text-white",
+                                    leave: "bg-yellow-500 text-white",
+                                    absent: "bg-red-500 text-white",
+                                }}
+
+                            />
+                        </div>
+                        <div className='flex h-full items-center justify-center'>
+                            <ChartRadialShape />
+                        
+                            {/* <span></span> */}
+                        </div>
+                    </div>
+                    {/* Section 2: Attendance Chart */}
+                    {/* <div className="flex justify-center"> */}
+
+                    {/* </div> */}
+                </div>
+            );
+
         }
         if (selectedSection === "Appearance") {
             return (
