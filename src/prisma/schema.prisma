@@ -427,14 +427,14 @@ model FeePayment {
 }
 
 model Attendance {
-  id     Int      @id @default(autoincrement())
-  userId String   @db.Uuid
+  id     Int              @id @default(autoincrement())
+  userId String           @db.Uuid
   date   DateTime
-  status String
+  status AttendanceStatus
 
   user User @relation(fields: [userId], references: [id])
 
-  @@index([userId, date])
+  @@unique([userId, date]) 
 }
 
 model Notification {
@@ -525,4 +525,11 @@ enum DocumentType {
   CERTIFICATE
   REPORT
   OTHER
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HOLIDAY
 }

@@ -17,7 +17,6 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                 const visibleItems = section.items.filter(
                     (item) => !item.roles || item.roles.includes(userRole)
                 )
-
                 if (visibleItems.length === 0) return null
                 const normalize = (path) => path.replace(/\/$/, "")
                 return (
@@ -30,7 +29,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                 return (
                                     <SidebarMenuItem key={item.label}>
                                         <SidebarMenuButton asChild
-                                            className={`w-full  py-4  hover:cursor-pointer ${isActive ? "bg-white  dark:border-black dark:text-black hover:bg-white font-semibold text-bl border" : ""}`}>
+                                            className={`w-full  py-4 hover:bg-white    dark:hover:text-black transition-all hover:cursor-pointer ${isActive ? "bg-white shadow-md dark:text-black font-semibold text-bl border" : ""}`}>
                                             <Link href={item.url}>
                                                 {item.icon && <item.icon className="w-4 h-4" />}
                                                 <span>{item.label}</span>

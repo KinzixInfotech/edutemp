@@ -2,71 +2,42 @@ import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
 export async function GET(req, { params }) {
-    const { schoolId } = await params // ✅ no await
+    const { schoolId } = params;
+    const { classId, sectionId, page = 1, limit = 10 } = Object.fromEntries(req.nextUrl.searchParams);
 
     if (!schoolId) {
         return NextResponse.json({ error: "School ID is required" }, { status: 400 });
     }
 
+    const skip = (Number(page) - 1) * Number(limit);
+
     try {
-        const start = performance.now();
-
-        // const students = await prisma.student.findMany({
-        //     where: { schoolId },
-        //     select: {
-        //         userId: true,
-        //         name: true,
-        //         // session: true,
-        // class: {
-        //     select: { className: true, sections: true }
-        // },
-        //         user: {
-        //             select: { email: true }
-        //         }
-        //     }
-        // });
         const students = await prisma.student.findMany({
-            where: { schoolId },
+            where: {
+                schoolId,
+                ...(classId ? { classId: Number(classId) } : {}),
+                ...(sectionId ? { sectionId: Number(sectionId) } : {}),
+            },
             include: {
-                user: {
-                    select: {
-                        email: true,
-                        createdAt: true,
-                        updatedAt: true,
-                        status: true,
-                        profilePicture: true,
-                    }
-                },
-                class: {
-                    select: { className: true, sections: true }
-                },
-                // class: {
-                //     include: {
-                //         sections: true   // includes all sections of the class
-                //     }
-                // },
-                // section: true,        // includes section details
-                // school: true,         // includes school info
-                // examResults: true,
-                // ExamIssue: true,
-                // HomeworkSubmission: true,
-                // FeeStructure: true,
-                // FeePayment: true,
-                // Add parent if it's a model:
-                // parent: {
-                //     include: {
-                //         user: true       // if parent is related to User
-                //     }
-                // }
-            }
-        })
+                user: true,
+                class: { select: { className: true } },
+                section: { select: { name: true } }, // <-- include only student's section
+            },
+            skip,
+            take: Number(limit),
+        });
 
-        const end = performance.now();
-        console.log(`⏱️ DB query took ${(end - start).toFixed(2)} ms`);
+        const total = await prisma.student.count({
+            where: {
+                schoolId,
+                ...(classId ? { classId: Number(classId) } : {}),
+                ...(sectionId ? { sectionId: Number(sectionId) } : {}),
+            },
+        });
 
-        return NextResponse.json({ students });
+        return NextResponse.json({ students, total });
     } catch (err) {
-        console.error("[GET_STUDENTS]", err);
+        console.error(err);
         return NextResponse.json({ error: "Failed to fetch students" }, { status: 500 });
     }
 }

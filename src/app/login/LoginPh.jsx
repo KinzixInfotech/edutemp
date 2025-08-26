@@ -44,7 +44,6 @@ export default function LoginPhoto({ className, ...props }) {
             try {
                 const res = await fetch(`/api/schools/by-code?schoolcode=${schoolCode}`);
                 const data = await res.json();
-
                 if (res.ok) {
                     setSchool(data.school);
                 } else {

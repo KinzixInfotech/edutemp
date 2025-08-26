@@ -155,7 +155,7 @@ export default function Dashboard() {
                 <ChartPieLabel chartData={chartData} title="Students" date="January - June 2024" />
                 <ChartBarMultiple chartData={barchartData} title="Attendance" date="Today" />
               </div>
-              <ChartLineLabel chartData={linechartData} title="Finance" date="Today" />
+              {/* <ChartLineLabel chartData={linechartData} title="Finance" date="Today" /> */}
             </div>
           </>
         );
@@ -200,65 +200,56 @@ export default function Dashboard() {
     <div className="flex flex-col lg:flex-row gap-2
     px-3 items-center lg:items-start h-full
     ">
-      <div className="w-full lg:w-[75%] flex flex-col">
+      <div className="w-full lg:w-full flex flex-col">
         <div className="@container/main flex flex-1 flex-col gap-2">
           <div className="flex flex-col gap-4 py-4 
            md:gap-6 md:py-6
           md:pr-0
           ">
             {renderRoleContent()}
-          </div>
-        </div>
-      </div>
-
-      <div className='flex flex-col md:px-5  md:py-6 gap-4 max-w-5xl
-      sm:px-6
-      px-[15px]
-w-[-webkit-fill-available]
-lg:w-[24.375em]
-      '>
-        {/* Calendar + Events */}
-        <div className="border px-2.5 dark:bg-card py-2.5
-        h-full
-        rounded-lg">
-      
-
-          <div className="w-full py-2">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold dark:text-white text-gray-800">Events</h2>
-              <button className="text-xs dark:text-white text-gray-500 hover:text-gray-800">View</button>
-            </div>
-            <div className="space-y-2">
-              {events.map((event, idx) => (
-                <div
-                  key={idx}
-                  className="flex shadow-sm items-start gap-2 rounded-md bg-white px-3 py-2 dark:bg-[#222225] border-t-primary border-[0.5] border-t-2 transition-all"
-                >
-                  <div className="flex flex-col flex-1 gap-1.5">
-                    <h3 className="font-medium text-sm dark:text-white text-gray-800">{event.title}</h3>
-                    <p className="text-xs text-gray-500 dark:text-[#b5b5b5]">{event.description}</p>
-                    <div className="flex flex-row items-center dark:text-white text-gray-400 text-[11px] pt-1 gap-2">
-                      <CalendarClock className="h-4 w-4 mb-1" />
-                      {event.time}
-                    </div>
+            <div className="grid grid-cols-3 gap-4 px-4 sm:px-6">
+              {/* Calendar + Events */}
+              <div className="col-span-2 border px-2.5 py-2.5 rounded-lg dark:bg-card">
+                <div className="w-full py-2">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-sm font-semibold dark:text-white text-gray-800">Events</h2>
+                    <button className="text-xs dark:text-white text-gray-500 hover:text-gray-800">View</button>
+                  </div>
+                  <div className="space-y-2">
+                    {events.map((event, idx) => (
+                      <div
+                        key={idx}
+                        className="flex shadow-sm items-start gap-2 rounded-md bg-white px-3 py-2 dark:bg-[#222225] border-t-primary border-[0.5] border-t-2 transition-all"
+                      >
+                        <div className="flex flex-col flex-1 col-span-2 gap-1.5">
+                          <h3 className="font-medium text-sm dark:text-white text-gray-800">{event.title}</h3>
+                          <p className="text-xs text-gray-500 dark:text-[#b5b5b5]">{event.description}</p>
+                          <div className="flex flex-row items-center dark:text-white text-gray-400 text-[11px] pt-1 gap-2">
+                            <CalendarClock className="h-4 w-4 mb-1" />
+                            {event.time}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
+              </div>
 
-        {/* Announcement Panel */}
-        <div className="border px-2.5 dark:bg-card py-2.5 rounded-lg">
-          <div className="w-full py-2">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold dark:text-white text-gray-800">Announcement</h2>
-              <button className="text-xs dark:text-white text-gray-500 hover:text-gray-800">View</button>
+              {/* Announcement Panel */}
+              <div className="col-span-1 border px-2.5 py-2.5 rounded-lg dark:bg-card">    <div className="w-full py-2">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm font-semibold dark:text-white text-gray-800">Announcement</h2>
+                  <button className="text-xs dark:text-white text-gray-500 hover:text-gray-800">View</button>
+                </div>
+                <EventList events={events} />
+              </div>
+              </div>
             </div>
-            <EventList events={events} />
           </div>
         </div>
       </div>
+
+
     </div>
   );
 }

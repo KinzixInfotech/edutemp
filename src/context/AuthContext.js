@@ -8,11 +8,12 @@ const AuthContext = createContext();
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);       // Supabase user
     const [fullUser, setFullUser] = useState(null); // Prisma user with role + schoolId
-    const [loading, setLoading] = useState(true);
-
+    const [loading, setLoading] = useState(false);
+    const [loadingMsg, setLoadingMsg] = useState('');
     // ⛳ Unified fetch user method
     const fetchUser = async (sessionUser) => {
         try {
+            setLoadingMsg('Initializing....')
             setUser(sessionUser);
             if (sessionUser?.email) {
                 const res = await fetch(`/api/auth/user?email=${sessionUser.email}`);
@@ -21,14 +22,17 @@ export function AuthProvider({ children }) {
                 if (res.ok) {
                     console.log("✅ Full User:", data);
                     setFullUser(data);
+                    setLoadingMsg('Initialized....')
+                    setLoading(false);
                 } else {
                     console.error("❌ Failed to fetch full user:", data.error);
+                    setLoadingMsg('Initialization Failed, Please Check Your Internet Connection....')
                 }
             }
         } catch (err) {
             console.error("❌ Error fetching user:", err);
+            setLoadingMsg('Initialization Failed, Please Check Your Internet Connection....')
         } finally {
-            setLoading(false);
         }
     };
 
@@ -54,7 +58,7 @@ export function AuthProvider({ children }) {
     }, []);
 
     return (
-        <AuthContext.Provider value={{ user, fullUser, loading }}>
+        <AuthContext.Provider value={{ user, fullUser, loading, loadingMsg }}>
             {children}
         </AuthContext.Provider>
     );

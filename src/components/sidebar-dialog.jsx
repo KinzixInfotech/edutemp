@@ -571,11 +571,11 @@ export function SettingsDialog() {
                                 name="email"
                                 onChange={handleInputChange}
                             />
-                            <ProfileItem
+                            {/* <ProfileItem
                                 label="Role"
                                 value={updatedFields.role || fullUser?.role?.name}
                                 name="role"
-                            />
+                            /> */}
                             <ProfileItem
                                 label="School"
                                 value={updatedFields.school || fullUser?.school?.name}
@@ -628,6 +628,8 @@ export function SettingsDialog() {
                         <FileUploadAvatar defValue={fullUser?.profilePicture} onChange={(previewUrl) => handleImageUpload(previewUrl)} resetKey={resetKey} />
                         <div>
                             <h2 className="text-xl font-semibold">{fullUser?.name}</h2>
+                            <span className="text-sm font-regular">{fullUser?.role?.name}</span>
+                            {/* value={updatedFields.role || fullUser?.role?.name} */}
                             <p>DOB: {dob ? new Date(dob).toLocaleDateString() : "Please Add DOB"}</p>
                         </div>
                     </div>

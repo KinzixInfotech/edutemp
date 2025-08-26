@@ -8,11 +8,16 @@ import "nprogress/nprogress.css";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/context/AuthContext";
 import pkg from '../../../package.json';
+import LoaderPage from "../loader-page";
 
 const TopProgressBar = dynamic(() => import("@/app/components/TopProgressBar"), {
     ssr: false,
 });
 export default function ClientLayout({ children }) {
+    const { loading, loadingMsg } = useAuth();
+    if (loading) {
+        return <LoaderPage msg={loadingMsg} />
+    }
     const pathname = usePathname();
     const hideUI = ["/dashboard/login",].includes(pathname);
     return (
