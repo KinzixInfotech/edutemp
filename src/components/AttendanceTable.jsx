@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { capitalizeFirstLetter } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { eachDayOfInterval, endOfMonth, format, startOfMonth } from "date-fns";
+import { eachDayOfInterval, endOfMonth, format, parseISO, startOfMonth } from "date-fns";
 import { useAuth } from "@/context/AuthContext";
 import LoaderPage from "./loader-page";
 import { ChartLine, Check, Clock, Download, X } from "lucide-react";
@@ -85,24 +85,31 @@ export default function AttendanceTable({ role, month, isMarkingMode, onSubmit, 
         if (users.length > 0) {
             const userIds = users.map((u) => u.userId);
             if (userIds.length > 0) {
-                fetch(`/api/attendance/bulk?userIds=${userIds.join(",")}&date=${format(selectedDate, "yyyy-MM-dd")}`)
+                fetch(`/api/attendance/bulk?userIds=${userIds.join(",")}&date=${format(selectedDate, "yyyy-MM-dd")}&schoolId=${fullUser?.schoolId}`)
                     .then(res => res.json())
-                    .then(setAttendances);
+                    .then(data => {
+                        setAttendances((data.attendanceRecords || []).map(a => ({
+                            ...a,
+                            status: a.status.toUpperCase(),
+                        })));
+                    });
             }
         }
     }, [role, month, selectedDate, users.length]);
 
     const getStatus = (userId, date) => {
-        const isoDate = format(date, "yyyy-MM-dd");
+        const isoDate = format(date, "yyyy-MM-dd"); // selected date
         const changed = changes[userId]?.[isoDate];
-        if (changed) return changed.toUpperCase(); // force uppercase
+        if (changed) return changed.toUpperCase();
 
         const att = attendances.find(
-            a => a.userId === userId && format(new Date(a.date), "yyyy-MM-dd") === isoDate
+            a => a.userId === userId && a.date.slice(0, 10) === isoDate
         );
+
         return att?.status?.toUpperCase() || "ABSENT";
     };
 
+    
 
     const handleChange = (userId, date, value) => {
         const isoDate = format(date, "yyyy-MM-dd");

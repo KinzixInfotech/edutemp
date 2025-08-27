@@ -9,6 +9,7 @@ import { SettingsDialogProvider } from "@/context/Settingsdialog-context";
 import { supabase } from '@/lib/supabase';
 import { redirect } from 'next/navigation';
 import { cookies } from "next/headers";
+import { LoaderProvider } from './context/Loader';
 export default async function RootLayout({ children }) {
 
     const cookieStore = cookies();
@@ -18,17 +19,19 @@ export default async function RootLayout({ children }) {
 
         <AuthProvider>
             <SettingsDialogProvider>
-                <ThemeProvider attribute="class" defaultTheme="system" enableSystem >
-                    <ClientLayout>{children}</ClientLayout>
-                    <Toaster
-                        theme="system"
-                        toastOptions={{
-                            classNames: {
-                                description: "text-black dark:text-white"
-                            }
-                        }}
-                    />
-                </ThemeProvider>
+                <LoaderProvider>
+                    <ThemeProvider attribute="class" defaultTheme="system" enableSystem >
+                        <ClientLayout>{children}</ClientLayout>
+                        <Toaster
+                            theme="system"
+                            toastOptions={{
+                                classNames: {
+                                    description: "text-black dark:text-white"
+                                }
+                            }}
+                        />
+                    </ThemeProvider>
+                </LoaderProvider>
                 <SettingsDialog />
             </SettingsDialogProvider>
         </AuthProvider>

@@ -1,25 +1,66 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import "nprogress/nprogress.css";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/context/AuthContext";
-import pkg from '../../../package.json';
-import LoaderPage from "../loader-page";
+import pkg from "../../../package.json";
+import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
+import { useLoader } from "@/app/dashboard/context/Loader";
 
 const TopProgressBar = dynamic(() => import("@/app/components/TopProgressBar"), {
     ssr: false,
 });
+
 export default function ClientLayout({ children }) {
-    const { loading, loadingMsg } = useAuth();
-    if (loading) {
-        return <LoaderPage msg={loadingMsg} />
-    }
+    const { loadingMsg } = useAuth();
+    const router = useRouter();
     const pathname = usePathname();
-    const hideUI = ["/dashboard/login",].includes(pathname);
+    const [loading, setLoading] = useState(false);
+
+    // Trigger loader on route change (compile/fetch time)
+    // useEffect(() => {
+    //     setLoading(true); // show loader immediately
+
+    //     // Once page is mounted, hide loader
+    //     const timeout = setTimeout(() => {
+    //         setLoading(false);
+    //     }, 50); // small delay for smoothness
+
+    //     return () => clearTimeout(timeout);
+    // }, [pathname]);
+    // useEffect(() => {
+    //     const handleRouteChange = (url, { shallow }) => {
+    //         console.log(
+    //             `App is changing to ${url} ${shallow ? 'with' : 'without'
+    //             } shallow routing`
+    //         )
+    //     }
+
+    //     router.events.on('routeChangeStart', handleRouteChange)
+
+    //     // If the component is unmounted, unsubscribe
+    //     // from the event with the `off` method:
+    //     return () => {
+    //         router.events.off('routeChangeStart', handleRouteChange)
+    //     }
+    // }, [router])
+    // if (loading) {
+    //     return (
+    //         <div className="flex items-center justify-center h-screen">
+    //             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    //             {/* <span className="ml-2">{loadingMsg}</span> */}
+    //         </div>
+    //     );
+    // }
+
+    const hideUI = ["/dashboard/login"].includes(pathname);
+
+
     return (
         <SidebarProvider
             style={{
@@ -32,7 +73,16 @@ export default function ClientLayout({ children }) {
             <SidebarInset>
                 {!hideUI && <SiteHeader />}
                 {/* p-4 */}
-                <main className="w-full h-full">{children}</main>
+                {/* <main className="w-full h-full">{children}</main> */}
+                <main className="w-full h-full relative">
+                    {loading ? (
+                        <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-50">
+                            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                        </div>
+                    ) : (
+                        children
+                    )}
+                </main>
                 <footer className="w-full border-t bg-muted dark:bg-muted/30 rounded-b-lg  text-xs text-muted-foreground mt-8">
                     <div className="max-w-7xl mx-auto px-4 py-3  flex flex-col md:flex-row justify-between items-center gap-2">
                         <div className="flex items-center gap-2">

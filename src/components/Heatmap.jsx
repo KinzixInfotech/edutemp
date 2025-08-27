@@ -15,8 +15,8 @@ export default function Heatmap() {
     //     <CardDescription>A heatmap chart displaying data in a grid format.</CardDescription>
     //   </CardHeader>
     //   <CardContent>
-    <CircleheatmapgridChart className="aspect-[4/3]" />
-    //   </CardContent>
+    <CircleheatmapgridChart className="aspect-[4/3] bg-muted rounded-lg py-2.5" />
+    //   </CardContent>ftex
     // </Card>
   )
 }
@@ -25,6 +25,7 @@ function CircleheatmapgridChart(props) {
   return (
     <div {...props}>
       <ResponsiveHeatMap
+      
         data={[
           {
             id: "A",
@@ -233,6 +234,7 @@ function CircleheatmapgridChart(props) {
           },
         ]}
         cellComponent="circle"
+        // color="white"
         valueFormat=">-.2s"
         sizeVariation={{
           sizes: [0.6, 1],

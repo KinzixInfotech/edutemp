@@ -125,6 +125,7 @@ function Calendar({
               <div
                 className="flex size-(--cell-size) items-center justify-center text-center">
                 {children}
+
               </div>
             </td>
           );
@@ -200,16 +201,30 @@ function CalendarDayButton({
       data-range-end={modifiers.range_end}
       data-range-middle={modifiers.range_middle}
       className={cn(
-        "data-[selected-single=true]:bg-primary data-[selected-single=true]:text-primary-foreground flex aspect-square size-auto w-full rounded-none min-w-(--cell-size) flex-col gap-1 leading-none font-normal p-[10px] border-[0.6px]",
-
-        modifiers.present && "bg-green-500 text-white hover:bg-green-600",
-        modifiers.absent && "bg-red-500 text-white hover:bg-red-600",
-
+        "data-[selected-single=true]:bg-primary data-[selected-single=true]:text-primary-foreground flex aspect-square size-auto relative w-full rounded-none min-w-(--cell-size) flex-col gap-1 leading-none font-normal p-[10px] border-[0.6px]",
+        modifiers.present,
+        modifiers.absent,
         defaultClassNames.day,
         className
       )}
       {...props}
-    />
+    >
+      {/* Day text */}
+      <span>{day.date.getDate()}</span>
+
+      {/* Dot indicator */}
+      {(modifiers.present || modifiers.absent || modifiers.late) && (
+        <span
+          className={cn(
+            "absolute top-1 right-1 h-2 w-2 rounded-full",
+            modifiers.present && "bg-green-500",
+            modifiers.absent && "bg-red-500",
+            modifiers.late && "bg-yellow-500"
+          )}
+        />
+      )}
+    </Button>
+
   )
 }
 

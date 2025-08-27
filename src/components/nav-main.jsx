@@ -9,8 +9,15 @@ import {
     SidebarMenuItem,
     SidebarMenuButton,
 } from "@/components/ui/sidebar"
+import { useLoader } from "@/app/dashboard/context/Loader";
 
 export function NavSidebarSections({ sections, userRole, activePath }) {
+    const { setLoading } = useLoader();
+
+    const handleClick = () => {
+        setLoading(true); // show loader immediately
+    };
+
     return (
         <>
             {sections.map((section) => {
@@ -22,7 +29,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                 return (
                     <SidebarGroup key={section.title} >
                         <SidebarGroupLabel>{section.title}</SidebarGroupLabel>
-                        <SidebarMenu >
+                        <SidebarMenu  >
                             {visibleItems.map((item) => {
                                 const isActive = normalize(activePath) === normalize(item.url)
 
@@ -30,7 +37,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                     <SidebarMenuItem key={item.label}>
                                         <SidebarMenuButton asChild
                                             className={`w-full  py-4 hover:bg-white    dark:hover:text-black transition-all hover:cursor-pointer ${isActive ? "bg-white shadow-md dark:text-black font-semibold text-bl border" : ""}`}>
-                                            <Link href={item.url}>
+                                            <Link href={item.url} >
                                                 {item.icon && <item.icon className="w-4 h-4" />}
                                                 <span>{item.label}</span>
                                             </Link>

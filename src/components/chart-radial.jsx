@@ -28,9 +28,9 @@ const chartConfig = {
     safari: { label: "Safari", color: "var(--chart-2)" },
 }
 
-export function ChartRadialShape() {
+export function ChartRadialShape({value}) {
     return (
-        <>
+        <div >
             <ChartContainer
                 config={chartConfig}
                 className="mx-auto aspect-square max-h-[150px]" // ⬅️ smaller size
@@ -65,15 +65,15 @@ export function ChartRadialShape() {
                                                 y={viewBox.cy}
                                                 className="fill-foreground text-xl font-bold" // ⬅️ smaller font
                                             >
-                                                {chartData[0].visitors.toLocaleString()}
+                                                {value?.toLocaleString()}%
                                             </tspan>
-                                            <tspan
+                                            {/* <tspan
                                                 x={viewBox.cx}
                                                 y={(viewBox.cy || 0) + 18}
                                                 className="fill-muted-foreground text-xs"
                                             >
                                                 Visitors
-                                            </tspan>
+                                            </tspan> */}
                                         </text>
                                     )
                                 }
@@ -82,6 +82,6 @@ export function ChartRadialShape() {
                     </PolarRadiusAxis>
                 </RadialBarChart>
             </ChartContainer>
-        </>
+        </div>
     )
 }

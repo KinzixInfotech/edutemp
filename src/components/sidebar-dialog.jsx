@@ -21,9 +21,10 @@ import {
     SidebarMenuItem,
     SidebarProvider,
 } from "@/components/ui/sidebar"
-import { Camera } from "lucide-react";
-import { CircleUserRoundIcon, XIcon, Loader2, Router } from "lucide-react"
-import { Moon, Sun } from "lucide-react"
+// import { Camera, CheckCircle, MinusCircle, XCircle } from "lucide-react";
+import { CheckCircle, MinusCircle, XCircle, Sun, Moon, TrendingUp, TrendingDown, Minus, Loader2, Camera, CircleUserRoundIcon, XIcon, Router } from 'lucide-react';
+// import {  } from "lucide-react"
+// import { Moon, Sun } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
     DropdownMenu,
@@ -48,6 +49,9 @@ import { uploadFiles } from "@/app/components/utils/uploadThing";
 import { useRouter } from 'next/navigation';
 import { Calendar } from './ui/calendar';
 import { ChartRadialShape } from './chart-radial';
+import Heatmap from './Heatmap';
+import { format, formatISO } from 'date-fns';
+
 const data = {
     nav: [
         { name: "Profile", icon: Home },
@@ -96,6 +100,35 @@ function ProfileItem({ label, value, onChange, name }) {
             <Input value={value || ''} onChange={(e) => onChange(name, e.target.value)} readOnly={!onChange} />
         </div>
     );
+}
+async function markAttendance(schoolId, userId, date, status) {
+    try {
+        const response = await fetch('/api/attendance/single', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                schoolId: schoolId,
+                userId: userId,
+                date: date, // ISO 8601 format, e.g., "2025-08-27T00:00:00Z"
+                status: status, // "PRESENT", "ABSENT", "LATE", or "HOLIDAY"
+            }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to mark attendance');
+        }
+
+        const data = await response.json();
+        console.log('Attendance marked successfully:', data);
+
+        return data;
+    } catch (error) {
+        console.error('Error marking attendance:', error.message);
+        throw error;
+    }
 }
 function FileUploadAvatar({ field, onChange, resetKey, defValue }) {
     const maxSizeMB = 2
@@ -214,39 +247,242 @@ function FileUploadAvatar({ field, onChange, resetKey, defValue }) {
 }
 
 export function SettingsDialog() {
-    function parseLocalDate(dateStr) {
-        const [year, month, day] = dateStr.split("-").map(Number)
-        return new Date(year, month - 1, day) // month is 0-based
-    }
+    const { fullUser } = useAuth();
+    const today = new Date();
+    // Add state for selected month
+    const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
 
-    const [markedDates, setMarkedDates] = useState({})
-    const [selectedDate, setSelectedDate] = useState(new Date())
+    const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+    const [percentageData, setPercentageData] = useState(null);
+    const [markedDates, setMarkedDates] = useState({});
+    const [loadingAtt, setLoadingAtt] = useState(false);
+    const [selectedDate, setSelectedDate] = useState(today);
 
+    // Function to generate month options (last 12 months)
+    const getMonthOptions = () => {
+        const options = [];
+        const today = new Date();
+        for (let i = 0; i < 12; i++) {
+            const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+            const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            const label = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+            options.push({ value, label });
+        }
+        return options;
+    };
+    // Function to parse local date string (e.g., "2025-08-27")
+    const parseLocalDate = (dateStr) => {
+        const [year, month, day] = dateStr.split("-").map(Number);
+        return new Date(year, month - 1, day); // month is 0-based
+    };
+
+    // Function to get month in "YYYY-MM" format from a date
+    const getMonthFromDate = (date) => {
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    };
+
+    // Function to get date key in "YYYY-MM-DD" format
     const getDateKey = (date) => {
         if (!date) return null;
-        return date.toLocaleDateString("en-CA");
+        return date.toLocaleDateString("en-CA"); // e.g., "2025-08-27"
     };
-    const markPresent = () => {
-        const dateKey = getDateKey(selectedDate)
-        if (!dateKey) return
-        setMarkedDates((prev) => ({ ...prev, [dateKey]: "present" }))
-    }
 
-    const markLeave = () => {
-        const dateKey = getDateKey(selectedDate)
-        if (!dateKey) return
-        setMarkedDates((prev) => ({ ...prev, [dateKey]: "leave" }))
-    }
 
-    const markAbsent = () => {
-        const dateKey = getDateKey(selectedDate)
-        if (!dateKey) return
-        setMarkedDates((prev) => ({ ...prev, [dateKey]: "absent" }))
-    }
+    // Update getAttendance to fetch with month parameter
+    const getAttendance = async (userId, schoolId, month) => {
+        setLoadingAtt(true);
+        try {
+            const response = await fetch(
+                `/api/attendance/getsingle?userId=${encodeURIComponent(userId)}&schoolId=${encodeURIComponent(schoolId)}&month=${encodeURIComponent(month)}`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
 
-    const dateKey = getDateKey(selectedDate)
-    const status = dateKey ? markedDates[dateKey] : null
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to fetch attendance');
+            }
 
+            const { attendanceRecords, percentageData } = await response.json();
+
+            const newMarkedDates = attendanceRecords.reduce((acc, record) => {
+                const dateKey = new Date(record.date).toLocaleDateString("en-CA");
+                let status;
+                switch (record.status) {
+                    case 'PRESENT': status = 'present'; break;
+                    case 'ABSENT': status = 'absent'; break;
+                    case 'HOLIDAY': status = 'holiday'; break;
+                    case 'LATE': status = 'leave'; break;
+                    default: status = 'present';
+                }
+                return { ...acc, [dateKey]: status };
+            }, {});
+
+            setMarkedDates(newMarkedDates);
+            setPercentageData(percentageData);
+            console.log(markedDates, percentageData, 'from view');
+
+        } catch (error) {
+            console.error('Error fetching attendance:', error.message);
+        } finally {
+            setLoadingAtt(false);
+        }
+    };
+    // Update useEffect to include selectedMonth
+    useEffect(() => {
+        if (fullUser?.id && fullUser?.schoolId) {
+            getAttendance(fullUser.id, fullUser.schoolId, selectedMonth);
+        }
+    }, [fullUser?.id, fullUser?.schoolId, selectedMonth]);
+
+    // Update marking functions to refresh percentage data
+    const markPresent = async () => {
+        const dateKey = getDateKey(selectedDate);
+        if (!dateKey) {
+            console.error("Invalid date key");
+            return;
+        }
+        setLoadingAtt(true);
+        try {
+            const normalizedDate = format(selectedDate, "yyyy-MM-dd"); // ✅YYYY-MM-DD only
+
+            const response = await fetch("/api/attendance/single", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    schoolId: fullUser?.schoolId,
+                    userId: fullUser?.id,
+                    date: normalizedDate,
+                    status: "PRESENT",
+                }),
+            });
+
+            console.log(selectedDate, normalizedDate);
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || "Failed to mark attendance");
+            }
+
+            const data = await response.json();
+            console.log("Attendance marked successfully:", data);
+
+            setMarkedDates((prev) => ({ ...prev, [dateKey]: "present" }));
+            getAttendance(fullUser.id, fullUser.schoolId, selectedMonth);
+        } catch (error) {
+            console.error("Error marking attendance:", error.message);
+        } finally {
+            setLoadingAtt(false);
+        }
+    };
+
+
+    // Mark attendance as LEAVE
+    const markLeave = async () => {
+        const dateKey = getDateKey(selectedDate);
+        if (!dateKey) {
+            console.error('Invalid date key');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/attendance/single', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    schoolId: fullUser?.schoolId,
+                    userId: fullUser?.id,
+                    date: selectedDate.toISOString(),
+                    status: 'HOLIDAY', // Using HOLIDAY for leave
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to mark attendance');
+            }
+
+            const data = await response.json();
+            console.log('Attendance marked successfully:', data);
+
+            setMarkedDates((prev) => ({ ...prev, [dateKey]: 'leave' }));
+        } catch (error) {
+            console.error('Error marking attendance:', error.message);
+        }
+    };
+
+    // Mark attendance as ABSENT
+    const markAbsent = async () => {
+        const dateKey = getDateKey(selectedDate);
+        if (!dateKey) {
+            console.error('Invalid date key');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/attendance/single', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    schoolId: fullUser?.schoolId,
+                    userId: fullUser?.id,
+                    date: selectedDate.toISOString(),
+                    status: 'ABSENT',
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to mark attendance');
+            }
+
+            const data = await response.json();
+            console.log('Attendance marked successfully:', data);
+
+            setMarkedDates((prev) => ({ ...prev, [dateKey]: 'absent' }));
+        } catch (error) {
+            console.error('Error marking attendance:', error.message);
+        }
+    };
+
+    const dateKey = getDateKey(selectedDate);
+    const status = dateKey ? markedDates[dateKey] : null;
+    const getStatusStyles = (status) => {
+        switch (status) {
+            case 'present':
+                return 'border-green-500 bg-green-100 text-green-700';
+            case 'leave':
+                return 'border-yellow-500 bg-yellow-100 text-yellow-700';
+            case 'absent':
+                return 'border-red-500 bg-red-100 text-red-700';
+            case 'holiday':
+                return 'border-blue-500 bg-blue-100 text-blue-700';
+            default:
+                return 'border-gray-300 bg-gray-100 text-gray-700';
+        }
+    };
+    const getTrendStyles = (trend) => {
+        switch (trend) {
+            case 'up': return 'text-green-600';
+            case 'down': return 'text-red-600';
+            case 'stable': return 'text-yellow-600';
+            default: return 'text-gray-600';
+        }
+    };
+    // useEffect(() => {
+    //     if (selectedDate) {
+    //         const newMonth = getMonthFromDate(selectedDate);
+    //         setSelectedMonth(newMonth);
+    //     }
+    // }, [selectedDate]);
 
     const [resetKey, setResetKey] = useState(0);
 
@@ -267,7 +503,6 @@ export function SettingsDialog() {
     const { setTheme } = useTheme();
     const { open, setOpen } = useSettingsDialog();
     const [selectedSection, setSelectedSection] = useState("Profile");
-    const { fullUser } = useAuth();
     const router = useRouter()
     const dob =
         fullUser?.role?.name === "STUDENT"
@@ -399,6 +634,10 @@ export function SettingsDialog() {
             setIsSaving(false);
             setCropDialogOpen(false);
         }
+    };
+    const handleMonthChange = (newMonth) => {
+        const newSelectedMonth = getMonthFromDate(newMonth);
+        setSelectedMonth(newSelectedMonth);
     };
 
     const renderContent = () => {
@@ -682,49 +921,101 @@ export function SettingsDialog() {
                 </div>
             )
         } else if (selectedSection === "Attendance") {
-
             return (
-                <div className="flex flex-col gap-6">
-                    {/* Section 1: Status + Actions */}
-                    <div className="space-y-3">
-                        <span className="text-sm font-medium">
-                            {status === "present"
-                                ? "✅ Present"
-                                : status === "leave"
-                                    ? "🟡 Leave"
-                                    : status === "absent"
-                                        ? "❌ Absent"
-                                        : "— Not Marked"}{" "}
-                            {dateKey ? `on ${selectedDate?.toLocaleDateString()}` : ""}
-                        </span>
-
-                        <div className="flex flex-row gap-2">
-                            <Button
-                                size="sm"
-                                className="text-white flex-1"
-                                onClick={markPresent}
-                                disabled={!selectedDate}
-                            >
-                                Mark Present
-                            </Button>
-                            <Button
-                                size="sm"
-                                className="text-white flex-1"
-                                variant="outline"
-                                disabled={!selectedDate}
-                            >
-                                Request Leave
-                            </Button>
-                        </div>
-
+                loadingAtt ? (
+                    <div className='h-full transition-all w-full flex items-center justify-center'>
+                        <Loader2 className='animate-spin' size={40} />
+                        {/* <span className=''>Marking....</span> */}
                     </div>
+                ) : (
+                    <div className="flex flex-col gap-6">
+                        {/* Section 1: Status + Actions */}
+                        < div className="space-y-3" >
+                            <div
+                                className={` flex justify-center  items-center  py-4 border rounded-lg ${getStatusStyles(status)}`}
+                            >
+                                {/* <span className="text-sm font-medium">
+                                {status === "present"
+                                    ? "✅ Present"
+                                    : status === "leave"
+                                        ? "🟡 Leave"
+                                        : status === "absent"
+                                            ? "❌ Absent"
+                                            : "Not Marked"}{" "}
+                                {dateKey ? `on ${selectedDate?.toLocaleDateString()}` : ""}
+                            </span> */}
+                                <span
+                                    className='inline-flex text-sm font-medium justify-center items-center gap-2'
+                                >
+                                    {status === 'present' && <CheckCircle size={16} />}
+                                    {status === 'leave' && <MinusCircle size={16} />}
+                                    {status === 'absent' && <XCircle size={16} />}
+                                    {status === 'holiday' && <Sun size={16} />}
+                                    {status === 'present'
+                                        ? 'Present'
+                                        : status === 'leave'
+                                            ? 'Leave'
+                                            : status === 'absent'
+                                                ? 'Absent'
+                                                : status === 'holiday'
+                                                    ? 'Holiday'
+                                                    : 'Not Marked'}
+                                    {dateKey && ` on ${selectedDate.toLocaleDateString()}`}
+                                </span>
+                            </div>
+
+                            <div className="flex flex-row gap-2">
+                                <Button
+                                    size="sm"
+                                    className="text-white flex-1"
+                                    onClick={markPresent}
+                                    disabled={!selectedDate}
+                                >
+                                    Mark Present
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    className="bg-yellow-50 flex-1"
+                                    variant="outline"
+                                    disabled={!selectedDate}
+                                >
+                                    Request Leave
+                                </Button>
+                            </div>
+
+                        </div >
 
 
 
-                    {/* Section 3: Calendar */}
-                    <div className="grid grid-cols-2">
-                        <div>
-                            <Calendar
+                        {/* Section 3: Calendar */}
+                        < div className="grid grid-row-2 gap-1" >
+
+
+                            <div>
+
+                                <div className="bg-muted rounded-lg mb-3.5 pb-3.5">
+                                    <ChartRadialShape value={percentageData?.percentage} />
+                                    <div className='flex flex-col items-center justify-center'>
+                                        <span className="text-xs text-gray-500">
+                                            Total Present Percentage Of Week
+                                        </span>
+                                        {percentageData ? (
+                                            <>
+                                                {percentageData.trend === 'up' && <TrendingUp size={16} className={getTrendStyles('up')} />}
+                                                {percentageData.trend === 'down' && <TrendingDown size={16} className={getTrendStyles('down')} />}
+                                                {percentageData.trend === 'stable' && <Minus size={16} className={getTrendStyles('stable')} />}
+                                                {percentageData.trend === 'no-data' && <Minus size={16} className={getTrendStyles('no-data')} />}
+                                            </>
+                                        ) : null}
+                                        <span className="text-xs text-gray-500">
+                                            {percentageData?.presentDays} of {percentageData?.daysInMonth} days present
+                                        </span>
+                                    </div>
+                                </div>
+                                {/* <Heatmap /> */}
+                            </div>
+                            <div className='bg-muted flex items-center justify-center rounded-lg'>
+                                {/* <Calendar
                                 mode="single"
                                 selected={selectedDate}
                                 onSelect={setSelectedDate}
@@ -744,20 +1035,40 @@ export function SettingsDialog() {
                                     leave: "bg-yellow-500 text-white",
                                     absent: "bg-red-500 text-white",
                                 }}
+                                className='bg-transparent'
+                            /> */}
+                                <Calendar
+                                    mode="single"
+                                    selected={selectedDate}
+                                    onSelect={setSelectedDate}
+                                    month={selectedMonth}
+                                    onMonthChange={handleMonthChange}
+                                    modifiers={{
+                                        present: Object.keys(markedDates)
+                                            .filter((d) => markedDates[d] === "present")
+                                            .map((d) => parseLocalDate(d)),
+                                        leave: Object.keys(markedDates)
+                                            .filter((d) => markedDates[d] === "leave")
+                                            .map((d) => parseLocalDate(d)),
+                                        absent: Object.keys(markedDates)
+                                            .filter((d) => markedDates[d] === "absent")
+                                            .map((d) => parseLocalDate(d)),
+                                    }}
+                                    // modifiersClassNames={{
+                                    //     present: " text-white",
+                                    //     leave: "text-white",
+                                    //     absent: "text-white",
+                                    // }}
+                                    className='bg-transparent w-full'
+                                />
+                            </div>
+                        </div >
+                        {/* Section 2: Attendance Chart */}
+                        {/* <div className="flex justify-center"> */}
 
-                            />
-                        </div>
-                        <div className='flex h-full items-center justify-center'>
-                            <ChartRadialShape />
-                        
-                            {/* <span></span> */}
-                        </div>
-                    </div>
-                    {/* Section 2: Attendance Chart */}
-                    {/* <div className="flex justify-center"> */}
-
-                    {/* </div> */}
-                </div>
+                        {/* </div> */}
+                    </div >
+                )
             );
 
         }
@@ -856,7 +1167,7 @@ export function SettingsDialog() {
                                 files: [file],
                                 input: {
                                     profileId: crypto.randomUUID(),
-                                    username: fullUser.name || "User",
+                                    username: fullUser?.name || "User",
                                 },
                             });
                             if (res && res[0]?.url) {
@@ -882,7 +1193,7 @@ export function SettingsDialog() {
                 />
             )}
             <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="overflow-hidden p-0 md:max-h-[500px] md:max-w-[700px] lg:max-w-[800px]">
+                <DialogContent className="overflow-hidden p-0 md:max-h-[500px] md:max-w-[700px] lg:max-w-[850px]">
                     <DialogTitle className="sr-only">Settings</DialogTitle>
                     <DialogDescription className="sr-only">
                         Customize your settings here.
@@ -916,10 +1227,10 @@ export function SettingsDialog() {
                             <header className="flex h-16 shrink-0 items-center gap-2 px-4">
                                 <Breadcrumb>
                                     <BreadcrumbList>
-                                        <BreadcrumbItem className="hidden md:block">
+                                        {/* <BreadcrumbItem className="hidden md:block">
                                             <BreadcrumbLink href="#">Account</BreadcrumbLink>
-                                        </BreadcrumbItem>
-                                        <BreadcrumbSeparator className="hidden md:block" />
+                                        </BreadcrumbItem> */}
+                                        {/* <BreadcrumbSeparator className="hidden md:block" /> */}
                                         <BreadcrumbItem>
                                             <BreadcrumbPage>{selectedSection}</BreadcrumbPage>
                                         </BreadcrumbItem>
