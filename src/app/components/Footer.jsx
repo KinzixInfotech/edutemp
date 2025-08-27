@@ -58,7 +58,7 @@ const footerData = {
 
 export default function Footer() {
     return (
-        <footer className="bg-[#f8f8f8] rounded-lg m-3.5 px-4 md:px-6 border-t border-gray-200 pt-16 pb-3">
+        <footer className="bg-[#f8f8f8] rounded-lg px-4 md:px-6 border-t border-gray-200 pt-16 pb-3">
             <div className="max-w-7xl mx-auto">
                 <div className="flex flex-wrap justify-between items-center mb-10">
                     <div className="w-full md:w-auto mb-6 md:mb-0">

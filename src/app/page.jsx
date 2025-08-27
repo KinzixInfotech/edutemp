@@ -1,78 +1,57 @@
-import Image from "next/image";
-import Hero from "./components/Hero";
-import FeatureTabs from "./components/Feature";
-import './product.css';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import Head from 'next/head';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 
 export default function Home() {
     return (
-        <div className="">
-            {/* hero section */}
-            <Hero />
-            {/* feature section */}
-            <FeatureTabs />
-            {/* alternate features */}
-            <AlternatingFeatures />
-        </div>
-    );
-}
-const features = [
-    {
-        title: "Customize how your team’s work flows",
-        description:
-            "Set up, clean up, and automate even the most complex school workflows—from admissions to daily attendance.",
-        image: "/features/board-ui.png", // replace with your image path
-    },
-    {
-        title: "Stay on track – even when the track changes",
-        description:
-            "Use timeline views to map the full school year, schedule exams, communicate updates, and keep everyone aligned.",
-        image: "/features/timeline-ui.png", // replace with your image path
-    },
-    {
-        title: "Empower staff with intelligent dashboards",
-        description:
-            "Give your teachers and admins clarity with role-based dashboards for productivity, attendance, and performance.",
-        image: "/features/dashboard-ui.png", // replace with your image path
-    },
-];
+        <div className="flex flex-col md:flex-row min-h-screen bg-primary text-white">
+            <Head>
+                <title>AI-Powered School Management</title>
+                <meta name="description" content="AI-powered school management software for Indian schools" />
+            </Head>
 
-function AlternatingFeatures() {
-    return (
-        <section className="w-full  bg-[#e9f2ff] py-20 md:px-16 px-6 rounded-lg">
-            <div className="max-w-7xl mx-auto space-y-24">
-                {features.map((feature, index) => {
-                    const isEven = index % 2 === 0;
-                    return (
-                        <div
-                            key={index}
-                            className={`flex flex-col-reverse ${isEven ? "md:flex-row" : "md:flex-row-reverse"
-                                } items-center gap-10`}
-                        >
-                            {/* Text */}
-                            <div className="w-full md:w-1/2 text-center md:text-left">
-                                <h2 className="text-3xl md:text-4xl font-semibold text-slate-800 mb-4">
-                                    {feature.title}
-                                </h2>
-                                <div className="w-full h-1 bg-[#cfe1fd] mb-6" />
-                                <p className="text-slate-600 text-lg leading-relaxed">
-                                    {feature.description}
-                                </p>
-                            </div>
-
-                            {/* Image */}
-                            <div className="w-full md:w-1/2">
-                                <Image
-                                    src={feature.image}
-                                    alt={feature.title}
-                                    width={700}
-                                    height={400}
-                                    className="rounded-xl w-full shadow-xl object-contain"
-                                />
-                            </div>
-                        </div>
-                    );
-                })}
+            <div className="w-full md:w-1/2 p-6 md:p-12 flex items-center justify-center">
+                <div>
+                    <h1 className="text-4xl md:text-6xl font-bold mb-4"><span>AI-Driven</span>,<br /> Cloud Application for School Management</h1>
+                    <p className="text-sm md:text-lg mb-6">
+                        Our AI-driven cloud-based school administration system is a comprehensive solution made to revolutionize how educational institutions function.  It unifies all of the necessary functions into a single, smooth platform, from expediting admissions and attendance to simplifying tests, communication, and everyday administration.  Its intelligent automation and intuitive design help schools save time, cut down on manual labor, and make the experience for administrators, teachers, students, and parents smarter, faster, and more connected.
+                    </p>
+                </div>
             </div>
-        </section>
+
+            <div className="w-full md:w-1/2 p-6  md:p-12 bg-primary text-gray-800 flex items-center justify-center">
+                <div className="w-full max-w-md bg-white rounded-lg px-3.5 py-3.5">
+                    <h2 className="text-2xl font-bold mb-2 text-center">Book Your Free Demo</h2>
+                    <p className="text-center mb-6">We are available to serve you always!</p>
+                    <form className="space-y-4 ">
+                        <Input type="text" placeholder="Your Full Name*" className="w-full p-2 border rounded-md" required />
+                        <Input type="text" placeholder="School Name" className="w-full p-2 border rounded-md" />
+                        <Input type="email" placeholder="Email Address" className="w-full p-2 border rounded-md" />
+                        <Input type="tel" placeholder="Contact Number*" className="w-full p-2 border rounded-md" required />
+                        <Select>
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Your Designation" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="principal">Principal</SelectItem>
+                                <SelectItem value="teacher">Teacher</SelectItem>
+                                <SelectItem value="admin">Admin</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Input type="text" placeholder="School Website" className="w-full p-2 border rounded-md" />
+                        <Button type="submit" className="w-full  text-white p-2 rounded-lg ">BOOK</Button>
+                    </form>
+                </div>
+                
+            </div>
+    
+        </div>
     );
 }

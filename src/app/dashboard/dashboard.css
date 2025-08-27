@@ -54,7 +54,8 @@
   --card-foreground: oklch(0.141 0.005 285.823);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.141 0.005 285.823);
-  --primary: oklch(0.623 0.214 259.815);
+  --primary: oklch(0.57 0.24 260.8);
+  /* oklch(0.623 0.214 259.815) */
   --primary-foreground: oklch(0.97 0.014 254.604);
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
@@ -192,6 +193,7 @@
   flex-direction: column !important; */
   width: 99% !important;
 }
+
 @media print {
   body * {
     visibility: hidden;
@@ -208,6 +210,7 @@
     width: 100%;
   }
 }
+
 .rbc-event:nth-child(1) {
   background-color: #e2f8ff !important;
 }
