@@ -17,7 +17,7 @@ const page = () => {
                 {/* <span className="text-muted-foreground text-center mb-2.5 font-semibold lg:text-lg txt-sm capitalize ">
                     The page you looking for doesn't exist, Please Make Sure The Url Is correct
                 </span> */}
-                <span className="text-5xl text-center font-bold capitalize">The page you looking for doesn't exist</span>
+                <span className="text-5xl text-center font-bold capitalize">Page doesn't exist</span>
                 <span className="text-muted-foreground text-center text-lg capitalize ">
                   Please Make Sure The Url Is correct
                 </span>
