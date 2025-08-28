@@ -58,8 +58,12 @@ const footerData = {
 
 export default function Footer() {
     return (
-        <footer className="bg-[#f8f8f8] rounded-lg px-4 md:px-6 border-t border-gray-200 pt-16 pb-3">
-            <div className="max-w-7xl mx-auto">
+        <footer className="bg-[#f8f8f8] relative overflow-hidden rounded-lg px-4 md:px-6 border-t border-gray-200 pb-3">
+            <div
+                className="absolute inset-0 rotate-180 bg-[url('/cloud.png')] object-cover bg-top top-3.5"
+            // style={{  }} // control cloud size
+            ></div>
+            <div className="max-w-7xl mx-auto relative container pt-16 z-40">
                 <div className="flex flex-wrap justify-between items-center mb-10">
                     <div className="w-full md:w-auto mb-6 md:mb-0">
                         <Image
@@ -124,7 +128,7 @@ export default function Footer() {
                             rel="noopener noreferrer"
                         >
                             <Image
-                                src="/kinzix.png" // replace with your actual logo path
+                                src="/kinzix-black.webp" // replace with your actual logo path
                                 alt="Kinzix"
                                 width={100}
                                 height={40}

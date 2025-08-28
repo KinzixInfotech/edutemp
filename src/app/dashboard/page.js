@@ -238,7 +238,6 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-
               {/* Announcement Panel */}
               <div className="col-span-1 border-none px-2.5 py-2.5 rounded-sm dark:bg-card">    <div className="w-full py-2">
                 <div className="flex items-center justify-between mb-3">

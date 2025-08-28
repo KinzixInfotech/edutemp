@@ -21,14 +21,14 @@ export default function Header() {
     const pathname = usePathname();
 
     return (
-        <header className="sticky top-0 border-b bg-white px-4 md:px-6">
+        <header className="sticky top-0 border-b bg-white px-4 md:px-6 z-40">
             <div className="flex h-16 items-center justify-between gap-4">
                 {/* Left side */}
                 <div className="flex items-center gap-2">
                     <div className="flex items-center gap-6">
-                        <a href="/" className="text-primary hover:text-primary/90">
+                        <Link href="/" className="text-primary hover:text-primary/90">
                             <Image src='/edu.png' width={200} height={200} alt="EduBreezy" priority />
-                        </a>
+                        </Link>
                     </div>
                 </div>
 
