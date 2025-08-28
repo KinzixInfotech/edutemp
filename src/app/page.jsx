@@ -17,7 +17,7 @@ export default function Home() {
                 <meta name="description" content="AI-powered school management software for Indian schools" />
             </Head>
 
-            <div className="w-full md:w-1/2 p-6 md:p-12 flex items-center justify-center">
+            <div className="w-full md:w-1/2 px-6 py-2.5 md:p-12 flex items-center justify-center">
                 <div>
                     <h1 className="text-4xl md:text-6xl font-bold mb-4"><span>AI-Driven</span>,<br /> Cloud Application for School Management</h1>
                     <p className="text-sm md:text-lg mb-6">
@@ -26,7 +26,7 @@ export default function Home() {
                 </div>
             </div>
 
-            <div className="w-full md:w-1/2 p-6  md:p-12 bg-primary text-gray-800 flex items-center justify-center">
+            <div className="w-full md:w-1/2 px-6  md:p-12 bg-primary text-gray-800 flex items-center justify-center">
                 <div className="w-full max-w-md bg-white rounded-lg px-3.5 py-3.5">
                     <h2 className="text-2xl font-bold mb-2 text-center">Book Your Free Demo</h2>
                     <p className="text-center mb-6">We are available to serve you always!</p>
