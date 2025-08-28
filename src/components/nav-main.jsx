@@ -20,7 +20,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
     const handleClick = () => setLoading(true)
 
     const normalize = (path) => path?.replace(/\/$/, "")
-    
+
 
     return (
         <>
@@ -45,8 +45,8 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                 <CollapsibleTrigger asChild>
                                                     <SidebarMenuButton
                                                         className={`w-full justify-between  py-4 hover:!bg-white hover:!text-black transition-all hover:cursor-pointer ${isActive
-                                                                ? "bg-white shadow-md dark:text-black font-semibold text-bl border"
-                                                                : ""
+                                                            ? "bg-white shadow-md dark:text-black font-semibold text-bl border"
+                                                            : ""
                                                             }`}
                                                     >
                                                         <div className="flex items-center gap-2">
@@ -70,12 +70,12 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                             <SidebarMenuSubItem key={sub.label} >
                                                                 <SidebarMenuSubButton
                                                                     asChild
-                                                                    className={`transition-all ${isSubActive ? "bg-white shadow-md dark:text-black font-semibold text-bl border" : ""
+                                                                    className={`transition-all font-semibold ${isSubActive ? "bg-white shadow-md dark:text-black font-semibold text-bl border" : ""
                                                                         }`}
                                                                 >
                                                                     <Link href={sub.url} onClick={handleClick}>
                                                                         {sub.icon && <sub.icon className="w-4 h-4" />}
-                                                                        <span>{sub.label}</span>
+                                                                        <span className="">{sub.label}</span>
                                                                     </Link>
                                                                 </SidebarMenuSubButton>
                                                             </SidebarMenuSubItem>
@@ -93,8 +93,8 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                         <SidebarMenuButton
                                             asChild
                                             className={`w-full py-4 hover:bg-white dark:hover:text-black transition-all hover:cursor-pointer ${isActive
-                                                    ? "bg-white shadow-md dark:text-black font-semibold text-bl border"
-                                                    : ""
+                                                ? "bg-white shadow-md dark:text-black font-semibold text-bl border"
+                                                : ""
                                                 }`}
                                         >
                                             <Link href={item.url} onClick={handleClick}>

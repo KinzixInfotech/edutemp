@@ -35,7 +35,7 @@ import {
 } from "@tabler/icons-react"
 import { NavSidebarSections } from "./nav-main"
 import { Separator } from "./ui/separator"
-import { DollarSign } from "lucide-react"
+import { BookMarked, DollarSign, Ellipsis, Grip, MonitorCog, Send, UserPen } from "lucide-react"
 const sidebarData = [
     {
         title: "Main",
@@ -49,7 +49,7 @@ const sidebarData = [
         title: "Staff Management",
         items: [
             {
-                label: "Manage Staff", url: "/dashboard/schools/manage-teaching-staff", icon: IconDatabase, roles: ["ADMIN"],
+                label: "Manage Staff", url: "/dashboard/schools/manage-teaching-staff", icon: UserPen, roles: ["ADMIN"],
                 submenu: [
                     { label: "Manage Teaching Staff", url: "/dashboard/schools/manage-teaching-staff", roles: ["ADMIN"] },
                     { label: "Manage Non Teaching Staff", url: "/dashboard/schools/manage-non-teaching-staff", roles: ["ADMIN"] },
@@ -76,16 +76,11 @@ const sidebarData = [
     // },
     {
         title: "Manage Classes",
-        items: {
-            label: "Class",
-            icon: DollarSign,
-            roles: ["ADMIN"],
-            subMenu: [
-                { label: "Manage Classes", url: "/dashboard/schools/create-classes", icon: IconDatabase, roles: ["ADMIN"] },
-                { label: "Manage Attendance", url: "/dashboard/attendance/", icon: IconDatabase, roles: ["ADMIN"] },
-                { label: "Send Notification", url: "/dashboard/schools/send-notifcation", icon: IconDatabase, roles: ["ADMIN"] },
-            ]
-        }
+        items: [
+            { label: "Manage Classes", url: "/dashboard/schools/create-classes", icon: BookMarked, roles: ["ADMIN"] },
+            { label: "Manage Attendance", url: "/dashboard/attendance/", icon: MonitorCog, roles: ["ADMIN"] },
+            { label: "Send Notification", url: "/dashboard/schools/send-notifcation", icon: Send, roles: ["ADMIN"] },
+        ]
     },
 
     {
@@ -102,12 +97,12 @@ const sidebarData = [
                     { label: "Report", url: "/dashboard/fees/manage-fee-structure", roles: ["ADMIN"] },
                 ],
             },
-            {
-                label: "Manage Non Teaching Staff",
-                url: "/dashboard/schools/manage-non-teaching-staff",
-                icon: IconDatabase,
-                roles: ["ADMIN"],
-            },
+            // {
+            //     label: "Manage Non Teaching Staff",
+            //     url: "/dashboard/schools/manage-non-teaching-staff",
+            //     icon: IconDatabase,
+            //     roles: ["ADMIN"],
+            // },
         ],
     },
     {
@@ -123,15 +118,15 @@ const sidebarData = [
         items: [
             {
                 label: "Additional Management",
-                icon: DollarSign,
+                icon: Grip,
                 roles: ["ADMIN"],
                 submenu: [
-                    { label: "Manage Transport ", url: "/dashboard/schools/manage-gallery", icon: IconDatabase, roles: ["ADMIN"] },
-                    { label: "Manage Library ", url: "/dashboard/schools/manage-gallery", icon: IconDatabase, roles: ["ADMIN"] },
-                    { label: "View Fees ", url: "/dashboard/schools/manage-gallery", icon: IconDatabase, roles: ["ADMIN"] },
-                    { label: "Manage Time Table ", url: "/dashboard/schools/manage-time-table", icon: IconDatabase, roles: ["ADMIN"] },
-                    { label: "Manage Examination ", url: "/dashboard/schools/manage-gallery", icon: IconDatabase, roles: ["ADMIN"] },
-                    { label: "Manage Gallery", url: "/dashboard/schools/manage-gallery", icon: IconDatabase, roles: ["ADMIN"] },
+                    { label: "Manage Transport ", url: "/dashboard/schools/manage-gallery", roles: ["ADMIN"] },
+                    { label: "Manage Library ", url: "/dashboard/schools/manage-gallery", roles: ["ADMIN"] },
+                    { label: "View Fees ", url: "/dashboard/schools/manage-gallery", roles: ["ADMIN"] },
+                    { label: "Manage Time Table ", url: "/dashboard/schools/manage-time-table", roles: ["ADMIN"] },
+                    { label: "Manage Examination ", url: "/dashboard/schools/manage-gallery", roles: ["ADMIN"] },
+                    { label: "Manage Gallery", url: "/dashboard/schools/manage-gallery", roles: ["ADMIN"] },
                 ]
             },
 
