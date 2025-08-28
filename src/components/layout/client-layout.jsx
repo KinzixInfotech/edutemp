@@ -22,42 +22,6 @@ export default function ClientLayout({ children }) {
     const pathname = usePathname();
     const [loading, setLoading] = useState(false);
 
-    // Trigger loader on route change (compile/fetch time)
-    // useEffect(() => {
-    //     setLoading(true); // show loader immediately
-
-    //     // Once page is mounted, hide loader
-    //     const timeout = setTimeout(() => {
-    //         setLoading(false);
-    //     }, 50); // small delay for smoothness
-
-    //     return () => clearTimeout(timeout);
-    // }, [pathname]);
-    // useEffect(() => {
-    //     const handleRouteChange = (url, { shallow }) => {
-    //         console.log(
-    //             `App is changing to ${url} ${shallow ? 'with' : 'without'
-    //             } shallow routing`
-    //         )
-    //     }
-
-    //     router.events.on('routeChangeStart', handleRouteChange)
-
-    //     // If the component is unmounted, unsubscribe
-    //     // from the event with the `off` method:
-    //     return () => {
-    //         router.events.off('routeChangeStart', handleRouteChange)
-    //     }
-    // }, [router])
-    // if (loading) {
-    //     return (
-    //         <div className="flex items-center justify-center h-screen">
-    //             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-    //             {/* <span className="ml-2">{loadingMsg}</span> */}
-    //         </div>
-    //     );
-    // }
-
     const hideUI = ["/dashboard/login"].includes(pathname);
 
 
