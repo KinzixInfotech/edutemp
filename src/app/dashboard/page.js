@@ -211,9 +211,9 @@ export default function Dashboard() {
           md:pr-0
           ">
             {renderRoleContent()}
-            <div className="grid grid-cols-3 gap-4 px-4">
+            <div className="flex  px-4">
               {/* Calendar + Events */}
-              <div className="col-span-2 border-none px-2.5 py-2.5 rounded-sm  dark:bg-card">
+              <div className="w-full border-none px-2.5 py-2.5 rounded-sm  dark:bg-card">
                 <div className="w-full py-2">
                   <div className="flex items-center justify-between mb-3">
                     <h2 className="text-sm font-semibold dark:text-white text-gray-800">Events</h2>
@@ -239,14 +239,14 @@ export default function Dashboard() {
                 </div>
               </div>
               {/* Announcement Panel */}
-              <div className="col-span-1 border-none px-2.5 py-2.5 rounded-sm dark:bg-card">    <div className="w-full py-2">
+              {/* <div className="lg:col-span-1 w-full border-none px-2.5 py-2.5 rounded-sm dark:bg-card">    <div className="w-full py-2">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-sm font-semibold dark:text-white text-gray-800">Announcement</h2>
                   <button className="text-xs dark:text-white text-gray-500 hover:text-gray-800">View</button>
                 </div>
                 <EventList events={events} />
               </div>
-              </div>
+              </div> */}
             </div>
           </div>
         </div>
