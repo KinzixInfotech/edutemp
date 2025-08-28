@@ -16,7 +16,7 @@ export function SectionCards({ data }) {
                 return (
                     <div
                         key={index}
-                        className="relative rounded-2xl p-4 min-h-[120px] flex flex-col justify-between text-sm border border-border  text-gray-800 dark:text-white bg-gradient-to-t from-[color-mix(in_oklab,var(--primary)_5%,transparent)] to-white dark:bg-[#18181b] dark:from-transparent dark:to-transparent  dark:border-muted/40 dark:shadow-lg"
+                        className="relative rounded-sm p-4 min-h-[120px] flex flex-col justify-between text-sm border border-border  text-gray-800 dark:text-white bg-gradient-to-t from-[color-mix(in_oklab,var(--primary)_5%,transparent)] to-white dark:bg-[#18181b] dark:from-transparent dark:to-transparent  dark:border-muted/40 dark:shadow-lg"
                     >
                         {/* Top Left Date */}
                         {metric.date && (

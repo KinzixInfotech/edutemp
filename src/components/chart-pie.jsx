@@ -49,7 +49,7 @@ const chartConfig = {
 
 export function ChartPieLabel({ chartData, title, date }) {
     return (
-        <Card className="flex flex-col ">
+        <Card className="flex flex-col rounded-sm border-none  bg-muted dark:bg-[#18181b] ">
             <CardHeader className="items-center pb-0">
                 <CardTitle>{title}</CardTitle>
                 <CardDescription>{date}</CardDescription>

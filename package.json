@@ -21,6 +21,7 @@
     "@fullcalendar/react": "^6.1.18",
     "@fullcalendar/timegrid": "^6.1.18",
     "@hookform/resolvers": "^5.1.1",
+    "@mui/x-charts": "^8.10.2",
     "@nivo/heatmap": "^0.99.0",
     "@nivo/line": "^0.99.0",
     "@prisma/client": "^6.12.0",

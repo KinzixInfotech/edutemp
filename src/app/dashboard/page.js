@@ -18,7 +18,7 @@ import { SectionCards } from '@/components/section-cards';
 import LoaderPage from '@/components/loader-page';
 import { CalendarClock } from "lucide-react";
 import { ChartPieLabel } from '@/components/chart-pie';
-import { ChartBarMultiple } from '@/components/bar-chart';
+import { ChartBarHorizontal, } from '@/components/bar-chart';
 import { ChartLineLabel } from '@/components/line-chart';
 import BigCalendar from '@/components/big-calendar';
 
@@ -150,10 +150,14 @@ export default function Dashboard() {
         return (
           <>
             <SectionCards data={cards} />
-            <div className="flex flex-col gap-3.5 px-4 sm:px-6">
+            <div className="flex flex-col gap-3.5 px-4">
+              {/* <ChartAreaInteractive chartData={chartDataSuper} /> */}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full">
                 <ChartPieLabel chartData={chartData} title="Students" date="January - June 2024" />
-                <ChartBarMultiple chartData={barchartData} title="Attendance" date="Today" />
+                {/* <ChartBarMultiple chartData={barchartData} title="Attendance" date="Today" />
+                 */}
+                <ChartBarHorizontal />
               </div>
               {/* <ChartLineLabel chartData={linechartData} title="Finance" date="Today" /> */}
             </div>
@@ -207,9 +211,9 @@ export default function Dashboard() {
           md:pr-0
           ">
             {renderRoleContent()}
-            <div className="grid grid-cols-3 gap-4 px-4 sm:px-6">
+            <div className="grid grid-cols-3 gap-4 px-4">
               {/* Calendar + Events */}
-              <div className="col-span-2 border px-2.5 py-2.5 rounded-lg dark:bg-card">
+              <div className="col-span-2 border-none px-2.5 py-2.5 rounded-sm  dark:bg-card">
                 <div className="w-full py-2">
                   <div className="flex items-center justify-between mb-3">
                     <h2 className="text-sm font-semibold dark:text-white text-gray-800">Events</h2>
@@ -236,7 +240,7 @@ export default function Dashboard() {
               </div>
 
               {/* Announcement Panel */}
-              <div className="col-span-1 border px-2.5 py-2.5 rounded-lg dark:bg-card">    <div className="w-full py-2">
+              <div className="col-span-1 border-none px-2.5 py-2.5 rounded-sm dark:bg-card">    <div className="w-full py-2">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-sm font-semibold dark:text-white text-gray-800">Announcement</h2>
                   <button className="text-xs dark:text-white text-gray-500 hover:text-gray-800">View</button>

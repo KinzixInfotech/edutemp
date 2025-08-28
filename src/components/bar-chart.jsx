@@ -1,7 +1,7 @@
 "use client"
 
 import { TrendingUp } from "lucide-react"
-import { Bar, BarChart, CartesianGrid, XAxis } from "recharts"
+import { Bar, BarChart, XAxis, YAxis } from "recharts"
 
 import {
     Card,
@@ -18,52 +18,66 @@ import {
     ChartTooltipContent,
 } from "@/components/ui/chart"
 
-export const description = "A multiple bar chart"
+export const description = "A horizontal bar chart"
+
+const chartData = [
+    { month: "January", desktop: 186 },
+    { month: "February", desktop: 305 },
+    { month: "March", desktop: 237 },
+    { month: "April", desktop: 73 },
+    { month: "May", desktop: 209 },
+    { month: "June", desktop: 214 },
+]
 
 const chartConfig = {
     desktop: {
         label: "Desktop",
         color: "var(--chart-1)",
     },
-    mobile: {
-        label: "Mobile",
-        color: "var(--chart-2)",
-    },
 }
 
-export function ChartBarMultiple({ chartData, title, date }) {
+export function ChartBarHorizontal() {
     return (
-        <Card className="flex flex-col">
-            <CardHeader className="items-center pb-0">
-                <CardTitle>{title}</CardTitle>
-                <CardDescription>{date}</CardDescription>
+        <Card className='bg-muted dark:bg-[#18181b] rounded-sm border-none'>
+            <CardHeader>
+                <CardTitle>Attendance</CardTitle>
+                <CardDescription>January - June 2024</CardDescription>
             </CardHeader>
-            <CardContent className="flex-1 pb-0">
-                <ChartContainer
-                    config={chartConfig}
-                    className="[&_.recharts-pie-label-text]:fill-foreground mx-auto aspect-square max-h-[250px] pb-0"
-                >
-                    <BarChart accessibilityLayer data={chartData}>
-                        <CartesianGrid vertical={false} />
-                        <XAxis
+            <CardContent>
+                <ChartContainer config={chartConfig}>
+                    <BarChart
+                        accessibilityLayer
+                        data={chartData}
+                        layout="vertical"
+                        margin={{
+                            left: -20,
+                        }}
+                    >
+                        <XAxis type="number" dataKey="desktop" hide />
+                        <YAxis
                             dataKey="month"
+                            type="category"
                             tickLine={false}
                             tickMargin={10}
                             axisLine={false}
-                            tickFormatter={(value) => value.slice(0, 3)}
+                            tickFormatter={(value) => String(value).slice(0, 3)}
                         />
                         <ChartTooltip
                             cursor={false}
-                            content={<ChartTooltipContent indicator="dashed" />}
+                            content={<ChartTooltipContent hideLabel />}
                         />
-                        <Bar dataKey="Present" fill="var(--ring)" radius={4} />
-                        <Bar dataKey="Absent" fill="#8ec5ff"
-                        
-                        radius={4} />
+                        <Bar dataKey="desktop" fill="#2b7fff" radius={5} />
                     </BarChart>
                 </ChartContainer>
             </CardContent>
-
+            <CardFooter className="flex-col items-start gap-2 text-sm">
+                <div className="flex gap-2 leading-none font-medium">
+                    Trending up by 5.2% this month <TrendingUp className="h-4 w-4" />
+                </div>
+                <div className="text-muted-foreground leading-none">
+                    Showing total visitors for the last 6 months
+                </div>
+            </CardFooter>
         </Card>
     )
 }
