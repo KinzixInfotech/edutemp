@@ -166,11 +166,13 @@ export function AppSidebar({ ...props }) {
                     <SidebarMenuItem className='border-b pb-2'>
                         <SidebarMenuButton
                             asChild
-                            className="data-[slot=sidebar-menu-button]:!p-1.5"
+                            className="data-[slot=sidebar-menu-button]:!p-1.5 h-fit flex items-center justify-center pointer-events-none"
                         >
-                            <a href="#">
-                                <Image src={logo} width={160} height={160} alt="EduBreezy" />
-                            </a>
+                            {/* <a href="/"> */}
+                            <div>
+                                <Image src={logo} width={210} height={200} alt="EduBreezy" />
+                            </div>
+                            {/* </a> */}
                         </SidebarMenuButton>
                     </SidebarMenuItem>
 
