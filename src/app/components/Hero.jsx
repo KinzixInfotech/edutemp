@@ -37,19 +37,26 @@ const Hero = () => {
                 </div>
 
                 {/* Input + Button */}
-                <div className="mt-14 flex flex-col sm:flex-row w-full max-w-lg gap-3">
-                    <input
-                        type="number"
-                        placeholder="Enter Your School Code"
-                        value={code}
-                        onChange={(e) => setCode(e.target.value)}
-                        className="flex-1 bg-white  p-3 border-muted rounded-lg text-sm font-bold outline-none border-2"
-                    />
+                <div className="mt-14 flex flex-col sm:flex-row  w-full max-w-lg gap-2">
+                    <div className="inline-flex gap-1 lg:flex flex-row lg:w-full">
+                        <div className="bg-white flex items-center border border-black justify-center px-3.5 rounded-lg">
+                            <span className="font-bold flex items-center justify-center text-lg">
+                                EB -
+                            </span>
+                        </div>
+                        <input
+                            type="number"
+                            placeholder="Enter Your School Code"
+                            value={code}
+                            onChange={(e) => setCode(e.target.value)}
+                            className="flex-1 bg-white  p-3 border-black rounded-lg text-sm font-bold outline-none border"
+                        />
+                    </div>
                     <Link href={code ? `/login?schoolCode=EB-${code}` : "#"} passHref>
                         <Button
                             className="h-11 w-full sm:w-auto cursor-pointer font-bold text-lg rounded-lg px-6  bg-black text-white hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed"
                             disabled={!code}
-                            // size={'lg'}
+                        // size={'lg'}
                         >
                             Submit
                         </Button>

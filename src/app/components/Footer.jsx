@@ -58,7 +58,7 @@ const footerData = {
 
 export default function Footer() {
     return (
-        <footer className="bg-[#f8f8f8] relative overflow-hidden rounded-lg px-4 md:px-6 border-t border-gray-200 pb-3">
+        <footer className="bg-[#f8f8f8] border-t-black rounded-none relative overflow-hidden  px-4 md:px-6 border-t border-gray-200 pb-3">
             <div
                 className="absolute inset-0 rotate-180 bg-[url('/cloud.png')] object-cover bg-top top-3.5"
             // style={{  }} // control cloud size
