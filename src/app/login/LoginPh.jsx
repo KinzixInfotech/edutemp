@@ -117,7 +117,7 @@ export default function LoginPhoto({ className, ...props }) {
 
     return (
         <div>
-            <div className="relative w-full overflow-hidden flex h-screen flex-col  p-6 md:p-10">
+            <div className="relative w-full  flex h-screen flex-col  p-6 md:p-10">
 
                 <div className="flex flex-col items-center justify-center">
                     <div className="bg-muted w-fit py-1.5 rounded-lg px-5  mb-3  ">
