@@ -11,7 +11,7 @@ import {
 
 export default function Home() {
     return (
-        <div className="flex flex-col md:flex-row min-h-screen bg-primary text-white">
+        <div className="flex flex-col md:flex-row py-6 lg:py-0 min-h-screen bg-primary text-white">
             <Head>
                 <title>AI-Powered School Management</title>
                 <meta name="description" content="AI-powered school management software for Indian schools" />

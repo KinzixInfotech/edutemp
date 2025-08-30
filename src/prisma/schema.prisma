@@ -409,6 +409,8 @@ model FeeStructure {
   classId   Int
   studentId String   @db.Uuid
   issueDate DateTime
+  mode      FeeMode // NEW: mode of fee collection
+  amount    Float // NEW: base fee amount (per mode)
 
   class    Class        @relation(fields: [classId], references: [id])
   student  Student      @relation(fields: [studentId], references: [userId])
@@ -434,7 +436,7 @@ model Attendance {
 
   user User @relation(fields: [userId], references: [id])
 
-  @@unique([userId, date]) 
+  @@unique([userId, date])
 }
 
 model Notification {
@@ -532,4 +534,11 @@ enum AttendanceStatus {
   ABSENT
   LATE
   HOLIDAY
+}
+
+enum FeeMode {
+  MONTHLY
+  QUARTERLY
+  HALF_YEARLY
+  YEARLY
 }
