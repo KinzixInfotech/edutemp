@@ -11,6 +11,7 @@ import pkg from "../../../package.json";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useLoader } from "@/app/dashboard/context/Loader";
+import OnboardingDialog from "../OnboardDialog";
 
 const TopProgressBar = dynamic(() => import("@/app/components/TopProgressBar"), {
     ssr: false,
@@ -22,6 +23,7 @@ export default function ClientLayout({ children }) {
     const pathname = usePathname();
     const [loading, setLoading] = useState(false);
 
+
     const hideUI = ["/dashboard/login"].includes(pathname);
 
 
@@ -32,6 +34,7 @@ export default function ClientLayout({ children }) {
                 "--header-height": "calc(var(--spacing) * 12)",
             }}
         >
+            <OnboardingDialog />
             {!hideUI && <AppSidebar variant="inset" />}
             <TopProgressBar />
             <SidebarInset>
