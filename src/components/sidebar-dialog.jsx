@@ -22,7 +22,7 @@ import {
     SidebarProvider,
 } from "@/components/ui/sidebar"
 // import { Camera, CheckCircle, MinusCircle, XCircle } from "lucide-react";
-import { CheckCircle, MinusCircle, XCircle, Sun, Moon, TrendingUp, TrendingDown, Minus, Loader2, Camera, CircleUserRoundIcon, XIcon, Router } from 'lucide-react';
+import { CheckCircle, MinusCircle, XCircle, Sun, Moon, TrendingUp, TrendingDown, Minus, Loader2, Camera, CircleUserRoundIcon, XIcon, Router, MonitorCog } from 'lucide-react';
 // import {  } from "lucide-react"
 // import { Moon, Sun } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -55,10 +55,8 @@ import { format, formatISO } from 'date-fns';
 const data = {
     nav: [
         { name: "Profile", icon: Home },
-        { name: "Attendance", icon: Home },
-        { name: "Notifications", icon: Bell },
-        { name: "Appearance", icon: Paintbrush },
-        { name: "Messages & media", icon: MessageCircle },
+        { name: "Attendance", icon: MonitorCog },
+
     ],
 }
 
