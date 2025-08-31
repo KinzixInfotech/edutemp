@@ -92,9 +92,9 @@ const sidebarData = [
                 roles: ["ADMIN"],
                 submenu: [
                     { label: "Fee Manage", url: "/dashboard/fees/manage-fees", roles: ["ADMIN"] },
-                    { label: "Payments", url: "/dashboard/fees/manage-fee-structure", roles: ["ADMIN"] },
+                    { label: "Payments", url: "/dashboard/fees/payments", roles: ["ADMIN"] },
                     { label: "Fee Strcuture", url: "/dashboard/fees/manage-fee-structure", roles: ["ADMIN"] },
-                    { label: "Report", url: "/dashboard/fees/manage-fee-structure", roles: ["ADMIN"] },
+                    { label: "Report", url: "/dashboard/fees/report", roles: ["ADMIN"] },
                 ],
             },
         ],

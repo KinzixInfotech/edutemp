@@ -51,14 +51,6 @@ export function AuthProvider({ children }) {
             } else {
                 console.error("API failed:", res.status, data);
             }
-            // if (res.ok) {
-            //     setFullUser(data);
-            //     localStorage.setItem("user", JSON.stringify(data)); // cache it
-            //     setLoadingMsg('Initialized....');
-            // } else {
-            //     console.error("❌ Failed to fetch full user:", data.error);
-            //     setLoadingMsg('Initialization Failed. Check your connection....');
-            // }
         } catch (err) {
             console.error("❌ Error fetching user:", err);
             setLoadingMsg('Initialization Failed. Check your connection....');

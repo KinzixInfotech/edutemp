@@ -12,6 +12,8 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useLoader } from "@/app/dashboard/context/Loader";
 import OnboardingDialog from "../OnboardDialog";
+import { supabase } from "@/lib/supabase";
+import LoaderPage from "../loader-page";
 
 const TopProgressBar = dynamic(() => import("@/app/components/TopProgressBar"), {
     ssr: false,
@@ -22,8 +24,36 @@ export default function ClientLayout({ children }) {
     const router = useRouter();
     const pathname = usePathname();
     const [loading, setLoading] = useState(false);
+    useEffect(() => {
+        const checkUser = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
 
+            if (!session?.user) {
+                // Not logged in → redirect to login
+                router.push("/login");
+            } else {
+                // Logged in
+                setLoading(false);
+            }
+        };
 
+        checkUser();
+
+        // Optional: listen to auth state changes (logout elsewhere)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            (_event, session) => {
+                if (!session?.user) {
+                    router.push("/login");
+                }
+            }
+        );
+
+        return () => subscription.unsubscribe();
+    }, [router]);
+
+    if (loading) {
+        return <LoaderPage showmsg={false}/>; // or a spinner
+    }
     const hideUI = ["/dashboard/login"].includes(pathname);
 
 
