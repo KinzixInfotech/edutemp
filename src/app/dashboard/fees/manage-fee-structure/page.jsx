@@ -141,7 +141,6 @@ export default function FeeStructureTableForm() {
 
     return (
         <>
-
             <div className="p-6 flex justify-center">
                 {fetchingLoading ? <LoaderPage showmsg={false} /> : (
                     <Card className="w-full max-w-4xl shadow-none rounded-xl bg-muted dark:bg-[#18181b] border-none">
