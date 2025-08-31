@@ -6,25 +6,26 @@ import { supabase } from "@/lib/supabase";
 // Parse incoming login body
 const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  // password: z.string().min(6),
+  userId: z.string(),
   schoolCode: z.string().optional(),
 });
 
 export async function POST(req) {
   try {
     const body = await req.json();
-    const { email, password, schoolCode } = loginSchema.parse(body);
+    const { userId, schoolCode } = loginSchema.parse(body);
 
     // Step 1️⃣: Login via Supabase
-    const result = await supabase.auth.signInWithPassword({ email, password });
-    const authData = result.data;
-    const authError = result.error;
+    // const result = await supabase.auth.signInWithPassword({ email, password });
+    // const authData = result.data;
+    // const authError = result.error;
 
-    if (authError || !authData?.user) {
-      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
-    }
+    // if (authError || !authData?.user) {
+    //   return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+    // }
 
-    const userId = authData.user.id;
+    // const userId = authData.user.id;
 
     // Step 2️⃣: Fetch user from Prisma DB
     const user = await prisma.user.findUnique({

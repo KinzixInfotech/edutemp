@@ -35,12 +35,12 @@ import {
 } from "@tabler/icons-react"
 import { NavSidebarSections } from "./nav-main"
 import { Separator } from "./ui/separator"
-import { BookMarked, DollarSign, Ellipsis, Grip, MonitorCog, Send, UserPen } from "lucide-react"
+import { BookMarked, DollarSign, Ellipsis, Grip, House, MonitorCog, Send, UserPen } from "lucide-react"
 const sidebarData = [
     {
-        title: "Main",
+        // title: "Main",
         items: [
-            { label: "Dashboard", url: "/dashboard/", icon: IconDashboard, roles: ["SUPER_ADMIN", "STUDENT", "ADMIN", "MASTER_ADMIN", "TEACHER", "STAFF"] },
+            { label: "Home", url: "/dashboard/", icon: House, roles: ["SUPER_ADMIN", "STUDENT", "ADMIN", "MASTER_ADMIN", "TEACHER", "STAFF"] },
             { label: "Create Super Admin", url: "/dashboard/edubreezy/add-user", icon: IconListDetails, roles: ["SUPER_ADMIN"] },
             { label: "Audit Log", url: "/dashboard/auditlog", icon: IconChartBar, roles: ["SUPER_ADMIN"] },
         ],
@@ -153,11 +153,6 @@ export function AppSidebar({ ...props }) {
     const { resolvedTheme } = useTheme()
     const { fullUser } = useAuth()
     const pathname = usePathname()
-
-    const [mounted, setMounted] = React.useState(false)
-    React.useEffect(() => setMounted(true), [])
-    if (!mounted) return null
-
     const logo = resolvedTheme === "dark" ? logoWhite : logoBlack
     return (
         <Sidebar collapsible="offcanvas" {...props}>

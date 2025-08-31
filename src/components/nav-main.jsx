@@ -32,7 +32,9 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
 
                 return (
                     <SidebarGroup key={section.title}>
-                        <SidebarGroupLabel>{section.title}</SidebarGroupLabel>
+                        {section.title && (
+                            <SidebarGroupLabel>{section.title}</SidebarGroupLabel>
+                        )}
                         <SidebarMenu>
                             {visibleItems.map((item) => {
                                 const isActive = normalize(activePath) === normalize(item.url)
@@ -44,8 +46,8 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                             <SidebarMenuItem>
                                                 <CollapsibleTrigger asChild>
                                                     <SidebarMenuButton
-                                                        className={`w-full justify-between  py-4 hover:!bg-white hover:!text-black transition-all hover:cursor-pointer ${isActive
-                                                            ? "bg-white shadow-md dark:text-black font-semibold text-bl border"
+                                                        className={`group w-full justify-between py-4 hover:!bg-white hover:!text-black transition-all hover:cursor-pointer ${isActive
+                                                            ? "bg-white dark:text-white dark:bg-[#171717] shadow-xs font-semibold text-bl border"
                                                             : ""
                                                             }`}
                                                     >
@@ -53,14 +55,14 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                             {item.icon && <item.icon className="w-4 h-4" />}
                                                             <span>{item.label}</span>
                                                         </div>
-                                                        <ChevronDown className="w-4 h-4 data-[state=open]:hidden" />
-                                                        <ChevronUp className="w-4 h-4 hidden data-[state=open]:block" />
+                                                        <ChevronDown className="w-4 h-4 group-data-[state=open]:hidden" />
+                                                        <ChevronUp className="w-4 h-4 hidden group-data-[state=open]:block" />
                                                     </SidebarMenuButton>
                                                 </CollapsibleTrigger>
                                             </SidebarMenuItem>
 
-                                            <CollapsibleContent>
-                                                <SidebarMenuSub>
+                                            <CollapsibleContent >
+                                                <SidebarMenuSub className='mt-1.5'>
                                                     {item.submenu.map((sub) => {
                                                         if (sub.roles && !sub.roles.includes(userRole)) return null
                                                         const isSubActive =
@@ -92,8 +94,8 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                     <SidebarMenuItem key={item.label}>
                                         <SidebarMenuButton
                                             asChild
-                                            className={`w-full py-4 hover:bg-white dark:hover:text-black transition-all hover:cursor-pointer ${isActive
-                                                ? "bg-white shadow-md dark:text-black font-semibold text-bl border"
+                                            className={`w-full  py-4 hover:!bg-white hover:!text-black transition-all hover:cursor-pointer ${isActive
+                                                ? "bg-white dark:text-white dark:bg-[#171717]  shadow-xs font-semibold text-bl border"
                                                 : ""
                                                 }`}
                                         >

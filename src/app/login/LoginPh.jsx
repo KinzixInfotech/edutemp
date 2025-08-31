@@ -31,15 +31,14 @@ export default function LoginPhoto({ className, ...props }) {
     const searchParams = useSearchParams()
     const schoolCode = searchParams.get("schoolCode")
     const [school, setSchool] = useState(null)
-
     useEffect(() => {
-        const cookies = document.cookie.split(";").map(cookie => cookie.trim());
-        const loggedInCookie = cookies.find(cookie => cookie.startsWith("sb-user="));
-        if (loggedInCookie) {
-            setAlreadyLoggedIn(true)
-            router.push("/dashboard")
-        }
-    }, []);
+        supabase.auth.getSession().then(({ data }) => {
+            if (data.session) {
+                setAlreadyLoggedIn(true);
+                router.push("/dashboard")
+            }
+        })
+    }, [])
     useEffect(() => {
         if (!schoolCode) {
             setLoadingl(false)
@@ -69,51 +68,110 @@ export default function LoginPhoto({ className, ...props }) {
     }
 
 
+    // const handleLogin = async (e) => {
+    //     e.preventDefault()
+    //     setErrorMsg("")
+    //     setLoading(true)
+
+    //     try {
+    //         const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+
+    //         if (error || !data.user) {
+    //             setErrorMsg(error?.message || "Login failed")
+    //             toast("Authorization Failed", { description: error?.message })
+    //             return
+    //         }
+
+    //         const res = await fetch("/api/auth/login", {
+    //             method: "POST",
+    //             headers: { "Content-Type": "application/json" },
+    //             body: JSON.stringify(
+    //                 schoolCode
+    //                     ? { email, password, schoolCode, userId: data.user.id }
+    //                     : { email, password, userId: data.user.id }
+    //             )
+    //         })
+
+    //         const result = await res.json()
+    //         console.log(res);
+
+    //         if (!res.ok) {
+    //             const { error } = await supabase.auth.signOut()
+
+    //             toast.error("Login Error", {
+    //                 description: result.error,
+    //                 classNames: {
+    //                     description: "text-sm mt-1 !text-black dark:!text-white",
+    //                 },
+    //             });
+    //             return
+    //         }
+    //         toast.success(`Welcome back, ${result.user.name || result.user.email}`)
+    //         router.push("/dashboard")
+    //     } catch (err) {
+    //         toast("Login Error", { description: err.message || "Something went wrong" })
+    //         console.log(err)
+    //         toast(err)
+    //     } finally {
+    //         setLoading(false)
+    //     }
+    // }
     const handleLogin = async (e) => {
-        e.preventDefault()
-        setErrorMsg("")
-        setLoading(true)
+        e.preventDefault();
+        setErrorMsg("");
+        setLoading(true);
 
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+            // 1. Authenticate with Supabase
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
 
             if (error || !data.user) {
-                setErrorMsg(error?.message || "Login failed")
-                toast("Authorization Failed", { description: error?.message })
-                return
+                setErrorMsg(error?.message || "Login failed");
+                toast("Authorization Failed", { description: error?.message });
+                return;
             }
 
-            const res = await fetch("/api/auth/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(
-                    schoolCode ? { email, password, schoolCode } : { email, password }
-                )
-            })
+            // 2. Fetch user data securely from your API (by userId)
+            const res = await fetch(`/api/auth/user?userId=${data.user.id}`, {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    // optional: include supabase session token for verification
+                    Authorization: `Bearer ${data.session?.access_token}`,
+                },
+            });
 
-            const result = await res.json()
+            const result = await res.json();
+
             if (!res.ok) {
-                toast("Login Error", {
-                    description: "Only school users can login here",
-
+                await supabase.auth.signOut();
+                toast.error("Login Error", {
+                    description: result.error,
                     classNames: {
                         description: "text-sm mt-1 !text-black dark:!text-white",
                     },
                 });
-                return
+                return;
             }
 
-            document.cookie = `sb-user=${result.user.email}; path=/; max-age=${30 * 24 * 60 * 60}`
-            toast(`Welcome back, ${result.user.name || result.user.email}`)
-            router.push("/dashboard")
+            // 3. Success → store user in local state/cache (or context/Redux)
+            toast.success(`Welcome back, ${result.name || result.email}`);
+
+            // store in localStorage (optional)
+            localStorage.setItem("user", JSON.stringify(result));
+
+            // redirect
+            router.push("/dashboard");
         } catch (err) {
-            toast("Login Error", { description: err.message || "Something went wrong" })
-            console.log(err)
-            toast(err)
+            toast("Login Error", { description: err.message || "Something went wrong" });
+            console.error("❌ Login failed:", err);
         } finally {
-            setLoading(false)
+            setLoading(false);
         }
-    }
+    };
 
     return (
         <div>
