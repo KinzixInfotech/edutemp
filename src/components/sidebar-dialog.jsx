@@ -617,6 +617,7 @@ export function SettingsDialog() {
                 toast.success(`Profile updated successfully!`)
                 // setCropDialogOpen(false);
                 setUpdatedFields({});
+                localStorage.removeItem("user");
                 // router.refresh()
                 window.location.reload();
             } else {

@@ -64,14 +64,14 @@ export default function OrdersTable() {
   const statuses = ["All", "New Order", "On Payment", "On Deliver", "Arrived"];
   const StatusBadge = ({ status }) => {
     const statusStyles = {
-      PENDING: "bg-yellow-100 text-yellow-800 border   border-yellow-300",
-      PAID: "bg-green-100 text-green-800 border   border-green-300",
-      UNPAID: "bg-red-100 text-red-800 border   border-red-300",
+      PENDING: "bg-yellow-100 text-yellow-800 border  border-yellow-300",
+      PAID: "bg-green-100 text-green-800 border  border-green-300",
+      UNPAID: "bg-red-100 text-red-800 border  border-red-300",
     };
 
     return (
       <span
-        className={`px-2 py-1 rounded-lg text-xs font-medium ${statusStyles[status]}`}
+        className={`px-2 py-1 rounded-sm text-sm font-medium  ${statusStyles[status]}`}
       >
         {status}
       </span>

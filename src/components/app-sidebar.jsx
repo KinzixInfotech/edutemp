@@ -97,12 +97,6 @@ const sidebarData = [
                     { label: "Report", url: "/dashboard/fees/manage-fee-structure", roles: ["ADMIN"] },
                 ],
             },
-            // {
-            //     label: "Manage Non Teaching Staff",
-            //     url: "/dashboard/schools/manage-non-teaching-staff",
-            //     icon: IconDatabase,
-            //     roles: ["ADMIN"],
-            // },
         ],
     },
     {

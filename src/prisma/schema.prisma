@@ -410,6 +410,7 @@ model FeeStructure {
   studentId String   @db.Uuid
   issueDate DateTime
   mode      FeeMode // NEW: mode of fee collection
+  name      String
   amount    Float // NEW: base fee amount (per mode)
 
   class    Class        @relation(fields: [classId], references: [id])

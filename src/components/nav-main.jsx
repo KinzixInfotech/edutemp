@@ -72,7 +72,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                             <SidebarMenuSubItem key={sub.label} >
                                                                 <SidebarMenuSubButton
                                                                     asChild
-                                                                    className={`transition-all  ${isSubActive ? "bg-white shadow-md dark:text-black font-semibold text-bl border" : ""
+                                                                    className={`transition-all  ${isSubActive ? "bg-white shadow-md dark:text-black  font-semibold text-bl border dark:hover:!text-white" : ""
                                                                         }`}
                                                                 >
                                                                     <Link href={sub.url} onClick={handleClick}>

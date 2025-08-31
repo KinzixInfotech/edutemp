@@ -37,7 +37,6 @@ export function NavUser({ }) {
     const router = useRouter();
     const { setOpen } = useSettingsDialog()
     const { fullUser, loading } = useAuth();
-    console.log(fullUser);
     const handleLogout = async () => {
         toast("Logging Out");
 
@@ -62,6 +61,7 @@ export function NavUser({ }) {
         } else {
             localStorage.removeItem("user");
             toast.success("Logged Out Successfully");
+            router.push('/login');
         }
     };
     return (
