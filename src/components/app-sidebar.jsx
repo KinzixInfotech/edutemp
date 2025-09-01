@@ -35,7 +35,7 @@ import {
 } from "@tabler/icons-react"
 import { NavSidebarSections } from "./nav-main"
 import { Separator } from "./ui/separator"
-import { BookMarked, CalendarCog, DollarSign, Ellipsis, Grip, House, MonitorCog, Send, User, UserPen } from "lucide-react"
+import { BookMarked, CalendarCog, Coins, DollarSign, Ellipsis, Grip, House, MonitorCog, Send, User, UserPen } from "lucide-react"
 const sidebarData = [
     {
         // title: "Main",
@@ -89,13 +89,23 @@ const sidebarData = [
         title: "Fee Management",
         items: [
             {
-                label: "Finance",
+                label: "Fee Structure",
                 icon: DollarSign,
+                roles: ["ADMIN"],
+                submenu: [
+                    { label: "Create Fee Strcuture", url: "/dashboard/fees/manage-fee-structure", roles: ["ADMIN"] },
+                    { label: "View Fee Structure", url: "/dashboard/fees/fee-structures", roles: ["ADMIN"] },
+                    { label: "Student Fee Overrides", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
+                ],
+            },
+            {
+                label: "Fee Manage",
+                icon: Coins,
                 roles: ["ADMIN"],
                 submenu: [
                     { label: "Fee Manage", url: "/dashboard/fees/manage-fees", roles: ["ADMIN"] },
                     { label: "Payments", url: "/dashboard/fees/payments", roles: ["ADMIN"] },
-                    { label: "Fee Strcuture", url: "/dashboard/fees/manage-fee-structure", roles: ["ADMIN"] },
+                    { label: "Collect Fee", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
                     { label: "Report", url: "/dashboard/fees/report", roles: ["ADMIN"] },
                 ],
             },

@@ -1,13 +1,13 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useForm, useFieldArray } from "react-hook-form"
-import { z } from "zod"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card"
-import { Check, ChevronsUpDown } from "lucide-react"
+import { useState, useEffect } from "react";
+import { useForm, useFieldArray } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import {
     Form,
     FormField,
@@ -15,439 +15,298 @@ import {
     FormLabel,
     FormControl,
     FormMessage,
-} from "@/components/ui/form"
-import {
-    Popover,
-    PopoverTrigger,
-    PopoverContent,
-} from "@/components/ui/popover"
-// import { Command, CommandInput, CommandGroup, CommandItem } from "@/components/ui/command"
-import { Trash2 } from "lucide-react"
-import { Command, CommandInput, CommandGroup, CommandItem, CommandEmpty } from "@/components/ui/command"
-// schema
-import { cn } from "@/lib/utils"
-import { useEffect } from "react"
-import { useAuth } from "@/context/AuthContext"
-import LoaderPage from "@/components/loader-page"
-import { toast } from "sonner"
+} from "@/components/ui/form";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { useAuth } from "@/context/AuthContext";
+import LoaderPage from "@/components/loader-page";
+import { toast } from "sonner";
+import Link from "next/link";
+
 const schema = z.object({
-    classId: z.string().min(1),
-    term: z.string().min(1),
+    academicYearId: z.string().uuid({ message: "Academic year is required" }),
     fees: z.array(
         z.object({
             title: z.string().min(1, "Fee title required"),
             amount: z.number().positive("Enter valid amount"),
         })
     ),
-})
-const terms = [
-    { label: "2025-2026", value: "t1" },
-    { label: "2026-2027", value: "t2" },
-]
+});
+
 export default function FeeStructureTableForm() {
     const [classes, setClasses] = useState([]);
+    const [academicYears, setAcademicYears] = useState([]);
+    const [submitting, setSubmitting] = useState(false);
     const { fullUser, loading } = useAuth();
-    const [students, setStudents] = useState([])
-    const [fetchingLoading, setFetchingLoading] = useState(false)
+    const [fetchingLoading, setFetchingLoading] = useState(false);
 
     const form = useForm({
         resolver: zodResolver(schema),
         defaultValues: {
-            classId: "",
-            term: "",
-            studentId: "",
-            studentScope: "all", // default
+            academicYearId: "",
             fees: [{ title: "", amount: 0 }],
         },
-    })
+    });
+
     const { fields, append, remove } = useFieldArray({
         control: form.control,
         name: "fees",
-    })
+    });
 
-    const total = form.watch("fees")?.reduce((sum, f) => sum + (f.amount || 0), 0)
-    const onSubmit = (values) => {
-        console.log("Submit:", values)
-    }
-    const fetchStudents = async (id) => {
-        console.log("fetchStudents called with id:", id)
+    const total = form.watch("fees")?.reduce((sum, f) => sum + (f.amount || 0), 0);
+
+    const onSubmit = async (values) => {
         try {
-            const classIdForApi = 'ALL'
-            const sectionIdForApi = 'ALL'
+            if (!fullUser?.schoolId) {
+                toast.error("School not found");
+                return;
+            }
 
-            const res = await fetch(`/api/schools/${id}/students?page=ALL&limit=ALL&classId=${classIdForApi}&sectionId=${sectionIdForApi}`)
+            setSubmitting(true);
 
+            const payload = {
+                schoolId: fullUser.schoolId,
+                academicYearId: values.academicYearId,
+                fees: values.fees.map((f) => ({
+                    name: f.title,
+                    amount: f.amount,
+                    mode: "MONTHLY",
+                })),
+            };
 
-            const json = await res.json()
-            console.log("Response status:", json);
+            console.log("Submitting payload:", payload);
 
-            setStudents(json.students || [])
+            const res = await fetch(`/api/schools/fee/structures`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
 
             if (!res.ok) {
-                const text = await res.text(); // log error details
-                console.error("API Error Response:", text);
-                throw new Error(`Failed: ${res.status}`);
+                const errText = await res.text();
+                console.error("API error:", errText);
+                toast.error("Failed to create fee structure");
+                return;
             }
+
+            const json = await res.json();
+            console.log("API response:", json);
+            toast.success("Fee structure created successfully ✅");
+
+            form.reset();
         } catch (err) {
-            console.error(err)
+            console.error(err);
+            toast.error("Something went wrong");
         } finally {
-            // setLoading(false)
-            console.log('fetched');
+            setSubmitting(false);
         }
-    }
+    };
+
     const fetchClasses = async () => {
-        setFetchingLoading(true)
-        if (!fullUser?.schoolId) return
+        setFetchingLoading(true);
+        if (!fullUser?.schoolId) return;
         try {
-            const res = await fetch(`/api/schools/${fullUser?.schoolId}/classes`)
-            const data = await res.json()
-            console.log(data);
-            // Flatten classes with sections
+            const res = await fetch(`/api/schools/${fullUser?.schoolId}/classes`);
+            const data = await res.json();
             const mapped = (Array.isArray(data) ? data : []).flatMap((cls) => {
                 if (Array.isArray(cls.sections) && cls.sections.length > 0) {
                     return cls.sections.map((sec) => ({
                         label: `${cls.className}'${sec.name}`,
-                        value: `${cls.id}-${sec.id}`, // composite key
+                        value: `${cls.id}-${sec.id}`,
                         classId: cls.id,
                         sectionId: sec.id,
-                    }))
+                    }));
                 }
-                // fallback if no sections
                 return {
                     label: `Class ${cls.className}`,
                     value: `${cls.id}`,
                     classId: cls.id,
                     sectionId: null,
-                }
-            })
-            console.log(mapped);
-            setClasses(mapped)
+                };
+            });
+            setClasses(mapped);
         } catch (err) {
-            console.error(err)
-            toast.error("Failed to load classes")
-            setClasses([])
+            console.error(err);
+            toast.error("Failed to load classes");
+            setClasses([]);
         }
-        setFetchingLoading(false)
-    }
+        setFetchingLoading(false);
+    };
 
+    const fetchAcademicYears = async () => {
+        if (!fullUser?.schoolId) return;
+        try {
+            const res = await fetch(`/api/schools/academic-years?schoolId=${fullUser?.schoolId}`);
+            const data = await res.json();
+            setAcademicYears(data || []);
+        } catch (err) {
+            console.error(err);
+            toast.error("Failed to load academic years");
+            setAcademicYears([]);
+        }
+    };
 
     useEffect(() => {
         if (fullUser?.schoolId) {
             fetchClasses();
-            fetchStudents(fullUser.schoolId);
+            fetchAcademicYears();
         }
     }, [fullUser?.schoolId]);
 
     return (
-        <>
-            <div className="p-6 flex justify-center">
-                {fetchingLoading ? <LoaderPage showmsg={false} /> : (
-                    <Card className="w-full max-w-4xl shadow-none rounded-xl bg-muted dark:bg-[#18181b] border-none">
-                        <CardHeader>
-                            <CardTitle className="text-lg font-semibold">
-                                Create Fee Structure
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <Form {...form}>
-                                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                                    {/* Header filters: Select Class + Term */}
-                                    <div className="flex gap-4 lg:flex-row flex-col">
-                                        {/* Select Class Combobox */}
-                                        <FormField
-                                            control={form.control}
-                                            name="classId"
-                                            render={({ field }) => (
-                                                <FormItem className="flex-1">
-                                                    <FormLabel>Select Class</FormLabel>
-                                                    <Popover>
-                                                        <PopoverTrigger asChild>
-                                                            <FormControl>
-                                                                <Button
-                                                                    variant="outline"
-                                                                    role="combobox"
-                                                                    className="w-full justify-between"
-                                                                >
-                                                                    {field.value
-                                                                        ? classes.find((c) => c.value === field.value)?.label
-                                                                        : "Select Class"}
-                                                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                                                </Button>
-                                                            </FormControl>
-                                                        </PopoverTrigger>
-                                                        <PopoverContent className="w-[200px] p-0">
-                                                            <Command>
-                                                                <CommandInput placeholder="Search class..." />
-                                                                <CommandGroup>
-                                                                    {classes.map((c) => (
-                                                                        <CommandItem
-                                                                            key={c.value}
-                                                                            onSelect={() => form.setValue("classId", c.value)}
-                                                                        >
-                                                                            <Check
-                                                                                className={cn(
-                                                                                    "mr-2 h-4 w-4",
-                                                                                    c.value === field.value ? "opacity-100" : "opacity-0"
-                                                                                )}
-                                                                            />
-                                                                            {c.label}
-                                                                        </CommandItem>
-                                                                    ))}
-                                                                </CommandGroup>
-                                                            </Command>
-                                                        </PopoverContent>
-                                                    </Popover>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
+        <div className="p-6 flex justify-center">
+            {fetchingLoading ? (
+                <LoaderPage showmsg={false} />
+            ) : (
+                <Card className="w-full max-w-4xl shadow-none rounded-xl bg-muted dark:bg-[#18181b] border-none">
+                    <CardHeader>
+                        <CardTitle className="text-lg font-semibold">Create Fee Structure</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <Form {...form}>
+                            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
 
-                                        {/* Select Term Combobox */}
-                                        <FormField
-                                            control={form.control}
-                                            name="term"
-                                            render={({ field }) => (
-                                                <FormItem className="flex-1">
-                                                    <FormLabel>Select Session</FormLabel>
-                                                    <Popover>
-                                                        <PopoverTrigger asChild>
-                                                            <FormControl>
-                                                                <Button
-                                                                    variant="outline"
-                                                                    role="combobox"
-                                                                    className="w-full justify-between"
-                                                                >
-                                                                    {field.value
-                                                                        ? terms.find((t) => t.value === field.value)?.label
-                                                                        : "Select Session"}
-                                                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                                                </Button>
-                                                            </FormControl>
-                                                        </PopoverTrigger>
-                                                        <PopoverContent className="w-[200px] p-0">
-                                                            <Command>
-                                                                <CommandInput placeholder="Search Session..." />
-                                                                <CommandEmpty>No Session Found</CommandEmpty>
-                                                                <CommandGroup>
-                                                                    {terms.map((t) => (
-                                                                        <CommandItem
-                                                                            key={t.value}
-                                                                            onSelect={() => form.setValue("term", t.value)}
-                                                                        >
-                                                                            <Check
-                                                                                className={cn(
-                                                                                    "mr-2 h-4 w-4",
-                                                                                    t.value === field.value ? "opacity-100" : "opacity-0"
-                                                                                )}
-                                                                            />
-                                                                            {t.label}
-                                                                        </CommandItem>
-                                                                    ))}
-                                                                </CommandGroup>
-                                                            </Command>
-                                                        </PopoverContent>
-                                                    </Popover>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-
-                                        {/* All / Specific Student Combobox */}
-                                        <FormField
-                                            control={form.control}
-                                            name="studentScope"
-                                            render={({ field }) => (
-                                                <FormItem className="flex-1">
-                                                    <FormLabel>Student Scope</FormLabel>
-                                                    <Popover>
-                                                        <PopoverTrigger asChild>
-                                                            <FormControl>
-                                                                <Button
-                                                                    variant="outline"
-                                                                    role="combobox"
-                                                                    className="w-full justify-between"
-                                                                >
-                                                                    {field.value === "all"
-                                                                        ? "All Students"
-                                                                        : "Specific Student"}
-                                                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                                                </Button>
-                                                            </FormControl>
-                                                        </PopoverTrigger>
-                                                        <PopoverContent className="w-[200px] p-0">
-                                                            <Command>
-                                                                <CommandGroup>
-                                                                    <CommandItem
-                                                                        onSelect={() => form.setValue("studentScope", "all")}
-                                                                    >
-                                                                        All Students
-                                                                    </CommandItem>
-                                                                    <CommandItem
-                                                                        onSelect={() => form.setValue("studentScope", "specific")}
-                                                                    >
-                                                                        Specific Student
-                                                                    </CommandItem>
-                                                                </CommandGroup>
-                                                            </Command>
-                                                        </PopoverContent>
-                                                    </Popover>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-
-                                        {/* Show Student Combobox ONLY if specific is chosen */}
-                                        {form.watch("studentScope") === "specific" && (
-                                            <FormField
-                                                control={form.control}
-                                                name="studentId"
-                                                render={({ field }) => (
-                                                    <FormItem className="flex-1">
-                                                        <FormLabel>Select Student</FormLabel>
-                                                        <Popover>
-                                                            <PopoverTrigger asChild>
-                                                                <FormControl>
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        role="combobox"
-                                                                        className="w-full justify-between"
-                                                                    >
-                                                                        {console.log("field.value:", field.value, "students:", students)}
-                                                                        {field.value
-                                                                            ? students.find((s) => s.userId === field.value)?.name
-                                                                            : "Choose Student"}
-                                                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                                                    </Button>
-                                                                </FormControl>
-                                                            </PopoverTrigger>
-                                                            <PopoverContent className="w-[200px] p-0">
-                                                                <Command>
-                                                                    <CommandInput placeholder="Search student..." />
-                                                                    <CommandEmpty>No Student Found</CommandEmpty>
-                                                                    <CommandGroup>
-                                                                        {students.map((s) => (
-                                                                            <CommandItem
-                                                                                key={s.userId}
-                                                                                onSelect={() => form.setValue("studentId", s.userId)}
-                                                                            >
-                                                                                <Check
-                                                                                    className={cn(
-                                                                                        "mr-2 h-4 w-4",
-                                                                                        s.userId === field.value ? "opacity-100" : "opacity-0"
-                                                                                    )}
-                                                                                />
-                                                                                <img
-                                                                                    className="w-7 h-7 rounded-full border border-muted-foreground object-cover"
-                                                                                    src={s.user.profilePicture}
-                                                                                    alt={s.name}
-                                                                                />
-                                                                                #{s.admissionNo}-{s.name}
-                                                                            </CommandItem>
-                                                                        ))}
-                                                                    </CommandGroup>
-
-                                                                </Command>
-                                                            </PopoverContent>
-                                                        </Popover>
-                                                        <FormMessage />
-                                                    </FormItem>
-                                                )}
-                                            />
-                                        )}
-                                    </div>
-
-                                    {/* Table */}
-                                    <div className="border rounded-lg overflow-hidden bg-white dark:bg-transparent">
-                                        <div className="grid grid-cols-12 bg-gray-50 dark:bg-gray-800 text-sm font-medium px-4 py-2">
-                                            <div className="col-span-6">Fee Particulars</div>
-                                            <div className="col-span-4 ">Amount</div>
-                                            <div className="col-span-2 text-center">Actions</div>
-                                        </div>
-                                        {fields.map((field, index) => (
-                                            <div
-                                                key={field.id}
-                                                className="grid grid-cols-12  gap-2.5 items-center px-4 py-2 border-t"
+                                {/* Academic Year Dropdown */}
+                                <FormField
+                                    control={form.control}
+                                    name="academicYearId"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Academic Year</FormLabel>
+                                            <Select
+                                                value={field.value}
+                                                onValueChange={field.onChange}
                                             >
-                                                {/* Fee Title */}
-                                                <div className="col-span-6">
-                                                    <FormField
-                                                        control={form.control}
-                                                        name={`fees.${index}.title`}
-                                                        render={({ field }) => (
-                                                            <FormItem>
-                                                                <FormControl>
-                                                                    <Input placeholder="Enter Fee Particulars" {...field} className='dark:bg-[#171717] bg-white' />
-                                                                </FormControl>
-                                                            </FormItem>
-                                                        )}
-                                                    />
-                                                </div>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select academic year" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {academicYears.length > 0 ? (
+                                                        academicYears.map((year) => (
+                                                            <SelectItem key={year.id} value={year.id}>
+                                                                {year.name}
+                                                            </SelectItem>
+                                                        ))
+                                                    ) : (
+                                                        <div className="p-2  font-semibold">
+                                                            {/* No academic years found.{" "} */}
+                                                            <Link
+                                                                href="/dashboard/schools/academic-years"
+                                                                className="text-muted-foreground  flex flex-row items-center font-normal text-sm justify-center"
+                                                            >
+                                                                Create <Plus size={14} />
+                                                            </Link>
+                                                        </div>
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
 
-                                                {/* Amount */}
-                                                <div className="col-span-4">
-                                                    <FormField
-                                                        control={form.control}
-                                                        name={`fees.${index}.amount`}
-                                                        render={({ field }) => (
-                                                            <FormItem>
-                                                                <FormControl>
-                                                                    <Input
-                                                                        type="number"
-                                                                        step="0.01"                // allow decimals
-                                                                        inputMode="decimal"        // better on mobile
-                                                                        placeholder="0.00"
-                                                                        {...field}
-                                                                        onChange={(e) => {
-                                                                            // keep it as string first, then convert safely
-                                                                            const value = e.target.value
-                                                                            field.onChange(value === "" ? "" : parseFloat(value))
-                                                                        }}
-                                                                        className="dark:bg-[#171717] bg-white"
-                                                                    />
-                                                                </FormControl>
-                                                            </FormItem>
-                                                        )}
-                                                    />
-
-                                                </div>
-
-                                                {/* Actions */}
-                                                <div className="col-span-2 flex justify-center">
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() => remove(index)}
-                                                    >
-                                                        <Trash2 className="h-4 w-4 text-red-500" />
-                                                    </Button>
-                                                </div>
+                                {/* Fee Particulars Table */}
+                                <div className="border rounded-lg overflow-hidden bg-white dark:bg-transparent">
+                                    <div className="grid grid-cols-12 bg-gray-50 dark:bg-gray-800 text-sm font-medium px-4 py-2">
+                                        <div className="col-span-6">Fee Particulars</div>
+                                        <div className="col-span-4">Amount</div>
+                                        <div className="col-span-2 text-center">Actions</div>
+                                    </div>
+                                    {fields.map((field, index) => (
+                                        <div
+                                            key={field.id}
+                                            className="grid grid-cols-12 gap-2.5 items-center px-4 py-2 border-t"
+                                        >
+                                            <div className="col-span-6">
+                                                <FormField
+                                                    control={form.control}
+                                                    name={`fees.${index}.title`}
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormControl>
+                                                                <Input
+                                                                    placeholder="Enter Fee Particulars"
+                                                                    {...field}
+                                                                    className="dark:bg-[#171717] bg-white"
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
                                             </div>
-                                        ))}
-                                    </div>
-                                    {/* Add Fee */}
+                                            <div className="col-span-4">
+                                                <FormField
+                                                    control={form.control}
+                                                    name={`fees.${index}.amount`}
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormControl>
+                                                                <Input
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    inputMode="decimal"
+                                                                    placeholder="0.00"
+                                                                    {...field}
+                                                                    onChange={(e) => {
+                                                                        const value = e.target.value;
+                                                                        field.onChange(value === "" ? "" : parseFloat(value));
+                                                                    }}
+                                                                    className="dark:bg-[#171717] bg-white"
+                                                                />
+                                                            </FormControl>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
+                                            </div>
+                                            <div className="col-span-2 flex justify-center">
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => remove(index)}
+                                                >
+                                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => append({ title: "", amount: 0 })}
+                                >
+                                    + Add Fee
+                                </Button>
+
+                                <div className="flex justify-between items-center pt-4">
+                                    <span className="text-lg font-normal">
+                                        Total: <span className="font-semibold"> ₹{total.toFixed(2)}</span>
+                                    </span>
                                     <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => append({ title: "", amount: 0 })}
+                                        type="submit"
+                                        className="bg-blue-600 text-white"
+                                        disabled={submitting}
                                     >
-                                        + Add Fee
+                                        {submitting ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Saving...
+                                            </>
+                                        ) : (
+                                            "Save School Fees"
+                                        )}
                                     </Button>
-                                    {/* Total + Submit */}
-                                    <div className="flex justify-between items-center pt-4">
-                                        <span className="text-lg font-normal">
-                                            Total: <span className="font-semibold"> ₹{total.toFixed(2)}</span>
-                                        </span>
-                                        <Button type="submit" className="bg-blue-600 text-white">
-                                            Save School Fees
-                                        </Button>
-                                    </div>
-                                </form>
-                            </Form>
-                        </CardContent>
-                    </Card>
-                )}
-            </div>
-        </>
-    )
+                                </div>
+                            </form>
+                        </Form>
+                    </CardContent>
+                </Card>
+            )}
+        </div>
+    );
 }

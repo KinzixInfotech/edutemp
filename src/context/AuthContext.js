@@ -106,7 +106,7 @@ export function AuthProvider({ children }) {
 
     useEffect(() => {
 
-        // console.log(fullUser, 'from auth context');
+        console.log(fullUser, 'from auth context');
 
     }, [fullUser])
 
