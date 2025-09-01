@@ -32,6 +32,7 @@ model School {
   MasterAdmin      MasterAdmin?
   TeachingStaff    TeachingStaff[]
   NonTeachingStaff NonTeachingStaff[]
+  AcademicYear     AcademicYear[]
 
   @@index([name])
 }
@@ -73,6 +74,25 @@ model User {
   @@index([roleId])
 }
 
+model AcademicYear {
+  id        String   @id @default(uuid())
+  name      String // e.g. "2024-25"
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // relations
+  schoolId String    @db.Uuid
+  school   School    @relation(fields: [schoolId], references: [id])
+  students Student[]
+  classes  Class[]
+
+  // ensure one school cannot have duplicate names for years
+  @@unique([schoolId, name])
+  @@index([schoolId])
+}
+
 model Admin {
   userId   String @id @db.Uuid
   schoolId String @db.Uuid
@@ -101,7 +121,6 @@ model Student {
   section            Section              @relation(fields: [sectionId], references: [id])
   bloodGroup         String
   rollNumber         String
-  academicYear       String
   PreviousSchoolName String?
   // Status             StudentStatus
   FeeStatus          FeeStatus            @default(PENDING)
@@ -129,6 +148,8 @@ model Student {
   HomeworkSubmission HomeworkSubmission[]
   FeeStructure       FeeStructure[]
   FeePayment         FeePayment[]
+  AcademicYear       AcademicYear?        @relation(fields: [academicYearId], references: [id])
+  academicYearId     String?
 
   @@index([classId])
   @@index([sectionId])
@@ -240,6 +261,8 @@ model Class {
   FeeStructure        FeeStructure[]
   TeachingStaff       TeachingStaff? @relation(fields: [teachingStaffUserId], references: [userId])
   teachingStaffUserId String?        @db.Uuid
+  AcademicYear        AcademicYear?  @relation(fields: [academicYearId], references: [id])
+  academicYearId      String?
 
   @@unique([id, schoolId])
   @@index([schoolId])

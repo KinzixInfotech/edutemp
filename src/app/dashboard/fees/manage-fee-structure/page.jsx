@@ -94,6 +94,37 @@ export default function FeeStructureTableForm() {
     const onSubmit = (values) => {
         console.log("Submit:", values)
     }
+    const fetchStudents = async () => {
+        // setLoading(true)
+        try {
+            console.log('fetching students');
+
+            // const res = await fetch(
+            //     `/api/schools/${schoolId}/students?page=${page}&limit=${itemsPerPage}&classId=${classFilter === 'ALL' ? '' : classFilter}&sectionId=${sectionFilter === 'ALL' ? '' : sectionFilter}&search=${search}`
+            // )
+            // const classIdForApi = classFilter === 'ALL'
+            //     ? ''
+            //     : students.find(s => s.class?.className === classFilter)?.classId || '';
+
+            // const sectionIdForApi = sectionFilter === 'ALL'
+            //     ? ''
+            //     : students.find(s => s.section?.name === sectionFilter)?.sectionId || '';
+            const res = await fetch(
+                `/api/schools/${fullUser?.schoolId}/students?page=1&limit=10`
+            )
+            const json = await res.json()
+            // setStudents(json.students || [])
+            console.log(json);
+
+            // setTotal(json.total || 0)
+        } catch (err) {
+            console.error(err)
+        } finally {
+            // setLoading(false)
+            console.log('fetched');
+
+        }
+    }
     const fetchClasses = async () => {
         setFetchingLoading(true)
         if (!fullUser?.schoolId) return
@@ -136,6 +167,7 @@ export default function FeeStructureTableForm() {
     useEffect(() => {
         if (fullUser?.schoolId) {
             fetchClasses();
+            fetchStudents();
         }
     }, [fullUser?.schoolId]);
 

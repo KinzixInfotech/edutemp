@@ -205,9 +205,7 @@ export default function NewProfilePage() {
             case "students":
                 return (
                     <>
-
                         <Input placeholder="Academic Year" value={form.academicYear} onChange={(e) => setForm({ ...form, academicYear: e.target.value })} />
-
                         <Input
                             placeholder="Admission Number"
                             value={form.admissionNo}

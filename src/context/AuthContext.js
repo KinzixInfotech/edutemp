@@ -29,12 +29,13 @@ export function AuthProvider({ children }) {
             if (cached) {
                 setFullUser(JSON.parse(cached));
                 return;
+                console.log("Cached user:", cached);
             }
 
             // 2️⃣ Otherwise fetch from API
             setLoading(true);
             setLoadingMsg('Initializing....');
-            const res = await fetch(`/api/auth/user?id=${sessionUser.id}`, {
+            const res = await fetch(`/api/auth/user?userId=${sessionUser.id}`, {
                 headers: {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
@@ -43,7 +44,6 @@ export function AuthProvider({ children }) {
             const data = await res.json();
 
             console.log("fetchUser called with:", sessionUser);
-            console.log("Cached user:", cached);
 
             if (res.ok) {
                 console.log("API returned user:", data);

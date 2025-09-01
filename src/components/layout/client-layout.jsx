@@ -69,8 +69,6 @@ export default function ClientLayout({ children }) {
             <TopProgressBar />
             <SidebarInset>
                 {!hideUI && <SiteHeader />}
-                {/* p-4 */}
-                {/* <main className="w-full h-full">{children}</main> */}
                 <main className="w-full h-full relative">
                     {loading ? (
                         <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-50">
