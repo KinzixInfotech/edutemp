@@ -93,7 +93,7 @@ const sidebarData = [
                 icon: DollarSign,
                 roles: ["ADMIN"],
                 submenu: [
-                    { label: "Create Fee Strcuture", url: "/dashboard/fees/manage-fee-structure", roles: ["ADMIN"] },
+                    { label: "Create Fee Structure", url: "/dashboard/fees/manage-fee-structure", roles: ["ADMIN"] },
                     { label: "View Fee Structure", url: "/dashboard/fees/fee-structures", roles: ["ADMIN"] },
                     { label: "Student Fee Overrides", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
                 ],

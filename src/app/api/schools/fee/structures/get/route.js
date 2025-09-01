@@ -38,9 +38,9 @@ export async function GET(req) {
 
         return NextResponse.json(feeStructures);
     } catch (error) {
-        console.error("Error fetching fee structures:", error);
+        console.error("Error fetching fee structures:", error.message, error.stack);
         return NextResponse.json(
-            { error: "Failed to fetch fee structures" },
+            { error: "Failed to fetch fee structures", details: error.message },
             { status: 500 }
         );
     }

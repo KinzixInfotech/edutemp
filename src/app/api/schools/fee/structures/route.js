@@ -31,7 +31,6 @@ export async function POST(req) {
                 amount: f.amount,
             })),
         })
-
         return NextResponse.json(
             { message: "Fee structures created", count: feeStructures.count },
             { status: 201 }
