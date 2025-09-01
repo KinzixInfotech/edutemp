@@ -23,7 +23,7 @@ const baseUserSchema = z.object({
 const studentSchema = baseUserSchema.extend({
     studentName: z.string(),
     admissionNo: z.string(),
-    session: z.string(),
+    academicYearId: z.string(),
     schoolId: z.string().uuid(),
     dob: z.coerce.date(),
     profilePicture: z.string(),
@@ -186,7 +186,7 @@ export async function POST(req, context) {
                         data: {
                             name: parsed.studentName,
                             admissionNo: parsed.admissionNo,
-                            academicYear: parsed.session,
+                            AcademicYear: { connect: { id: parsed.academicYearId } },
                             school: { connect: { id: parsed.schoolId } },
                             user: { connect: { id: user.id } }, //  REQUIRED!
                             class: { connect: { id: parsed.classId } },

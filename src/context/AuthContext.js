@@ -13,9 +13,6 @@ export function AuthProvider({ children }) {
 
     // ⛳ Unified fetch user method
     const fetchUser = async (sessionUser) => {
-        console.log(sessionUser);
-
-
         try {
             setUser(sessionUser);
 
@@ -29,7 +26,6 @@ export function AuthProvider({ children }) {
             if (cached) {
                 setFullUser(JSON.parse(cached));
                 return;
-                console.log("Cached user:", cached);
             }
 
             // 2️⃣ Otherwise fetch from API
@@ -43,10 +39,9 @@ export function AuthProvider({ children }) {
             });
             const data = await res.json();
 
-            console.log("fetchUser called with:", sessionUser);
+        
 
             if (res.ok) {
-                console.log("API returned user:", data);
                 setFullUser(data);
             } else {
                 console.error("API failed:", res.status, data);
@@ -66,12 +61,11 @@ export function AuthProvider({ children }) {
             try {
                 setLoading(true)
                 const { data } = await supabase.auth.getSession();
-                console.log(data);
+                // console.log(data);
 
                 // Get current user from session
                 const currentUser = data.session?.user ?? null;
 
-                console.log(currentUser);
 
                 // 🔹 First try cached user
                 const cachedUser = localStorage.getItem("user");
@@ -112,7 +106,7 @@ export function AuthProvider({ children }) {
 
     useEffect(() => {
 
-        console.log(fullUser, 'from auth context');
+        // console.log(fullUser, 'from auth context');
 
     }, [fullUser])
 

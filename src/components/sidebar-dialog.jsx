@@ -120,8 +120,6 @@ async function markAttendance(schoolId, userId, date, status) {
         }
 
         const data = await response.json();
-        console.log('Attendance marked successfully:', data);
-
         return data;
     } catch (error) {
         console.error('Error marking attendance:', error.message);
@@ -322,8 +320,6 @@ export function SettingsDialog() {
 
             setMarkedDates(newMarkedDates);
             setPercentageData(percentageData);
-            console.log(markedDates, percentageData, 'from view');
-
         } catch (error) {
             console.error('Error fetching attendance:', error.message);
         } finally {
@@ -359,7 +355,6 @@ export function SettingsDialog() {
                 }),
             });
 
-            console.log(selectedDate, normalizedDate);
 
             if (!response.ok) {
                 const errorData = await response.json();
@@ -367,7 +362,6 @@ export function SettingsDialog() {
             }
 
             const data = await response.json();
-            console.log("Attendance marked successfully:", data);
 
             setMarkedDates((prev) => ({ ...prev, [dateKey]: "present" }));
             getAttendance(fullUser.id, fullUser.schoolId, selectedMonth);
@@ -407,8 +401,6 @@ export function SettingsDialog() {
             }
 
             const data = await response.json();
-            console.log('Attendance marked successfully:', data);
-
             setMarkedDates((prev) => ({ ...prev, [dateKey]: 'leave' }));
         } catch (error) {
             console.error('Error marking attendance:', error.message);
@@ -443,7 +435,6 @@ export function SettingsDialog() {
             }
 
             const data = await response.json();
-            console.log('Attendance marked successfully:', data);
 
             setMarkedDates((prev) => ({ ...prev, [dateKey]: 'absent' }));
         } catch (error) {

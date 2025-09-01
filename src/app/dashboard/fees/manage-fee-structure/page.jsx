@@ -23,11 +23,6 @@ import {
 } from "@/components/ui/popover"
 // import { Command, CommandInput, CommandGroup, CommandItem } from "@/components/ui/command"
 import { Trash2 } from "lucide-react"
-// import {
-//   Popover,
-//   PopoverTrigger,
-//   PopoverContent,
-// } from "@/components/ui/popover"
 import { Command, CommandInput, CommandGroup, CommandItem, CommandEmpty } from "@/components/ui/command"
 // schema
 import { cn } from "@/lib/utils"
@@ -45,34 +40,14 @@ const schema = z.object({
         })
     ),
 })
-
-const classes = [
-    { label: "All Classes", value: "all" },
-    { label: "Class 1", value: "1" },
-    { label: "Class 2", value: "2" },
-]
-
 const terms = [
     { label: "2025-2026", value: "t1" },
     { label: "2026-2027", value: "t2" },
 ]
-
-const students = [
-    { label: "John Doe", value: "uuid-1" },
-    { label: "Jane Smith", value: "uuid-2" },
-    { label: "Ali Khan", value: "uuid-3" },
-]
-
 export default function FeeStructureTableForm() {
     const [classes, setClasses] = useState([]);
     const { fullUser, loading } = useAuth();
-    // if (loading) {
-    //     return <p>Loading...</p>; // or a spinner/skeleton
-    // }
-
-    // if (!fullUser) {
-    //     return <p>No user found</p>; // e.g. logged out
-    // }
+    const [students, setStudents] = useState([])
     const [fetchingLoading, setFetchingLoading] = useState(false)
 
     const form = useForm({
@@ -80,11 +55,11 @@ export default function FeeStructureTableForm() {
         defaultValues: {
             classId: "",
             term: "",
+            studentId: "",
             studentScope: "all", // default
             fees: [{ title: "", amount: 0 }],
         },
     })
-
     const { fields, append, remove } = useFieldArray({
         control: form.control,
         name: "fees",
@@ -94,35 +69,30 @@ export default function FeeStructureTableForm() {
     const onSubmit = (values) => {
         console.log("Submit:", values)
     }
-    const fetchStudents = async () => {
-        // setLoading(true)
+    const fetchStudents = async (id) => {
+        console.log("fetchStudents called with id:", id)
         try {
-            console.log('fetching students');
+            const classIdForApi = 'ALL'
+            const sectionIdForApi = 'ALL'
 
-            // const res = await fetch(
-            //     `/api/schools/${schoolId}/students?page=${page}&limit=${itemsPerPage}&classId=${classFilter === 'ALL' ? '' : classFilter}&sectionId=${sectionFilter === 'ALL' ? '' : sectionFilter}&search=${search}`
-            // )
-            // const classIdForApi = classFilter === 'ALL'
-            //     ? ''
-            //     : students.find(s => s.class?.className === classFilter)?.classId || '';
+            const res = await fetch(`/api/schools/${id}/students?page=ALL&limit=ALL&classId=${classIdForApi}&sectionId=${sectionIdForApi}`)
 
-            // const sectionIdForApi = sectionFilter === 'ALL'
-            //     ? ''
-            //     : students.find(s => s.section?.name === sectionFilter)?.sectionId || '';
-            const res = await fetch(
-                `/api/schools/${fullUser?.schoolId}/students?page=1&limit=10`
-            )
+
             const json = await res.json()
-            // setStudents(json.students || [])
-            console.log(json);
+            console.log("Response status:", json);
 
-            // setTotal(json.total || 0)
+            setStudents(json.students || [])
+
+            if (!res.ok) {
+                const text = await res.text(); // log error details
+                console.error("API Error Response:", text);
+                throw new Error(`Failed: ${res.status}`);
+            }
         } catch (err) {
             console.error(err)
         } finally {
             // setLoading(false)
             console.log('fetched');
-
         }
     }
     const fetchClasses = async () => {
@@ -132,7 +102,6 @@ export default function FeeStructureTableForm() {
             const res = await fetch(`/api/schools/${fullUser?.schoolId}/classes`)
             const data = await res.json()
             console.log(data);
-
             // Flatten classes with sections
             const mapped = (Array.isArray(data) ? data : []).flatMap((cls) => {
                 if (Array.isArray(cls.sections) && cls.sections.length > 0) {
@@ -152,8 +121,6 @@ export default function FeeStructureTableForm() {
                 }
             })
             console.log(mapped);
-
-
             setClasses(mapped)
         } catch (err) {
             console.error(err)
@@ -167,7 +134,7 @@ export default function FeeStructureTableForm() {
     useEffect(() => {
         if (fullUser?.schoolId) {
             fetchClasses();
-            fetchStudents();
+            fetchStudents(fullUser.schoolId);
         }
     }, [fullUser?.schoolId]);
 
@@ -184,7 +151,6 @@ export default function FeeStructureTableForm() {
                         <CardContent>
                             <Form {...form}>
                                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-
                                     {/* Header filters: Select Class + Term */}
                                     <div className="flex gap-4 lg:flex-row flex-col">
                                         {/* Select Class Combobox */}
@@ -346,8 +312,9 @@ export default function FeeStructureTableForm() {
                                                                         role="combobox"
                                                                         className="w-full justify-between"
                                                                     >
+                                                                        {console.log("field.value:", field.value, "students:", students)}
                                                                         {field.value
-                                                                            ? students.find((s) => s.value === field.value)?.label
+                                                                            ? students.find((s) => s.userId === field.value)?.name
                                                                             : "Choose Student"}
                                                                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                                                     </Button>
@@ -360,19 +327,25 @@ export default function FeeStructureTableForm() {
                                                                     <CommandGroup>
                                                                         {students.map((s) => (
                                                                             <CommandItem
-                                                                                key={s.value}
-                                                                                onSelect={() => form.setValue("studentId", s.value)}
+                                                                                key={s.userId}
+                                                                                onSelect={() => form.setValue("studentId", s.userId)}
                                                                             >
                                                                                 <Check
                                                                                     className={cn(
                                                                                         "mr-2 h-4 w-4",
-                                                                                        s.value === field.value ? "opacity-100" : "opacity-0"
+                                                                                        s.userId === field.value ? "opacity-100" : "opacity-0"
                                                                                     )}
                                                                                 />
-                                                                                {s.label}
+                                                                                <img
+                                                                                    className="w-7 h-7 rounded-full border border-muted-foreground object-cover"
+                                                                                    src={s.user.profilePicture}
+                                                                                    alt={s.name}
+                                                                                />
+                                                                                #{s.admissionNo}-{s.name}
                                                                             </CommandItem>
                                                                         ))}
                                                                     </CommandGroup>
+
                                                                 </Command>
                                                             </PopoverContent>
                                                         </Popover>
@@ -452,7 +425,6 @@ export default function FeeStructureTableForm() {
                                             </div>
                                         ))}
                                     </div>
-
                                     {/* Add Fee */}
                                     <Button
                                         type="button"
@@ -461,11 +433,10 @@ export default function FeeStructureTableForm() {
                                     >
                                         + Add Fee
                                     </Button>
-
                                     {/* Total + Submit */}
                                     <div className="flex justify-between items-center pt-4">
-                                        <span className="font-semibold text-lg">
-                                            Total: ${total.toFixed(2)}
+                                        <span className="text-lg font-normal">
+                                            Total: <span className="font-semibold"> ₹{total.toFixed(2)}</span>
                                         </span>
                                         <Button type="submit" className="bg-blue-600 text-white">
                                             Save School Fees

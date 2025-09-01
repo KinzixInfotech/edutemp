@@ -30,6 +30,7 @@ export default function NewProfilePage() {
     const { schoolId, role } = useParams()
     const [classes, setClasses] = useState([])
     const [resetKey, setResetKey] = useState(0);
+    const [years, setYears] = useState([])
 
     const [selectedClassId, setSelectedClassId] = useState("")
     const [selectedSectionId, setSelectedSectionId] = useState("")
@@ -72,7 +73,7 @@ export default function NewProfilePage() {
         admissionNo: "",
         admissionDate: null, // ✅ Date object
         rollNumber: "",
-        academicYear: "",
+        academicYearId: "",
         bloodGroup: "",
         adhaarNo: "",
         empployeeId: "",
@@ -110,7 +111,6 @@ export default function NewProfilePage() {
         // Optional/Extra
         mobile: "",             // use this for contactNumber
         contactNumber: "",      // maps to contactNumber in DB
-        session: "",            // may duplicate academicYear
         busNumber: "",
         studentCount: "",
         location: "",
@@ -203,9 +203,31 @@ export default function NewProfilePage() {
                     </>
                 )
             case "students":
+                useEffect(() => {
+                    const fetchYears = async () => {
+                        const res = await fetch(`/api/schools/academic-years?schoolId=${schoolId}`)
+                        const data = await res.json()
+                        setYears(data)
+                    }
+                    fetchYears()
+                }, [])
                 return (
                     <>
-                        <Input placeholder="Academic Year" value={form.academicYear} onChange={(e) => setForm({ ...form, academicYear: e.target.value })} />
+                        <Select
+                            value={form.academicYearId}
+                            onValueChange={(value) => setForm({ ...form, academicYearId: value })}
+                        >
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select Academic Year" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {years.map((year) => (
+                                    <SelectItem key={year.id} value={year.id}>
+                                        {new Date(year.startDate).toLocaleDateString("en-GB")} - {new Date(year.endDate).toLocaleDateString("en-GB")}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                         <Input
                             placeholder="Admission Number"
                             value={form.admissionNo}
@@ -343,9 +365,9 @@ export default function NewProfilePage() {
                                 <div className="flex items-center space-x-2">
                                     <RadioGroupItem value="GUARDIAN" id="r2" />
                                     <Label htmlFor="r2">Guardian</Label>
-                            </div>
+                                </div>
                             </RadioGroup>
-                      </div>
+                        </div>
                         {form.guardianType === "PARENTS" && (
                             <>
                                 <Input
@@ -390,7 +412,7 @@ export default function NewProfilePage() {
                                 />
                             </>
                         )}
-                  
+
                         <Input
                             placeholder="Address Line 1"
                             value={form.address}
