@@ -22,8 +22,11 @@ import LoaderPage from "@/components/loader-page";
 import { toast } from "sonner";
 import Link from "next/link";
 
+const FeeModes = ["MONTHLY", "QUARTERLY", "HALF_YEARLY", "YEARLY"]; //enums
+
 const schema = z.object({
     academicYearId: z.string().uuid({ message: "Academic year is required" }),
+    mode: z.enum(FeeModes), // <-- moved here
     fees: z.array(
         z.object({
             title: z.string().min(1, "Fee title required"),
@@ -31,6 +34,7 @@ const schema = z.object({
         })
     ),
 });
+
 
 export default function FeeStructureTableForm() {
     const [classes, setClasses] = useState([]);
@@ -43,6 +47,7 @@ export default function FeeStructureTableForm() {
         resolver: zodResolver(schema),
         defaultValues: {
             academicYearId: "",
+            mode: "MONTHLY", // default
             fees: [{ title: "", amount: 0 }],
         },
     });
@@ -62,14 +67,14 @@ export default function FeeStructureTableForm() {
             }
 
             setSubmitting(true);
-
             const payload = {
                 schoolId: fullUser.schoolId,
                 academicYearId: values.academicYearId,
-                fees: values.fees.map((f) => ({
+                classId: null,
+                mode: values.mode, // <-- top-level
+                fees: values.fees.map(f => ({
                     name: f.title,
                     amount: f.amount,
-                    mode: "MONTHLY",
                 })),
             };
 
@@ -90,7 +95,7 @@ export default function FeeStructureTableForm() {
 
             const json = await res.json();
             console.log("API response:", json);
-            toast.success("Fee structure created successfully ✅");
+            toast.success("Fee Structure created successfully");
 
             form.reset();
         } catch (err) {
@@ -164,47 +169,73 @@ export default function FeeStructureTableForm() {
                     <CardContent>
                         <Form {...form}>
                             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                                <div className="flex lg:flex-row flex-col gap-3.5 w-full justify-betweens">
+                                    {/* Academic Year Dropdown */}
+                                    <FormField
+                                        control={form.control}
+                                        name="academicYearId"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Academic Year</FormLabel>
+                                                <Select
+                                                    value={field.value}
+                                                    onValueChange={field.onChange}
+                                                >
+                                                    <FormControl>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select academic year" />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent>
+                                                        {academicYears.length > 0 ? (
+                                                            academicYears.map((year) => (
+                                                                <SelectItem key={year.id} value={year.id}>
+                                                                    {year.name}
+                                                                </SelectItem>
+                                                            ))
+                                                        ) : (
+                                                            <div className="p-2  font-semibold">
+                                                                {/* No academic years found.{" "} */}
+                                                                <Link
+                                                                    href="/dashboard/schools/academic-years"
+                                                                    className="text-muted-foreground  flex flex-row items-center font-normal text-sm justify-center"
+                                                                >
+                                                                    Create <Plus size={14} />
+                                                                </Link>
+                                                            </div>
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
 
-                                {/* Academic Year Dropdown */}
-                                <FormField
-                                    control={form.control}
-                                    name="academicYearId"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Academic Year</FormLabel>
-                                            <Select
-                                                value={field.value}
-                                                onValueChange={field.onChange}
-                                            >
-                                                <FormControl>
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select academic year" />
-                                                    </SelectTrigger>
-                                                </FormControl>
-                                                <SelectContent>
-                                                    {academicYears.length > 0 ? (
-                                                        academicYears.map((year) => (
-                                                            <SelectItem key={year.id} value={year.id}>
-                                                                {year.name}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="mode"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Fee Mode</FormLabel>
+                                                <Select value={field.value} onValueChange={field.onChange}>
+                                                    <FormControl>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select Mode" />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent>
+                                                        {["MONTHLY", "QUARTERLY", "HALF_YEARLY", "YEARLY"].map((m) => (
+                                                            <SelectItem key={m} value={m}>
+                                                                {m}
                                                             </SelectItem>
-                                                        ))
-                                                    ) : (
-                                                        <div className="p-2  font-semibold">
-                                                            {/* No academic years found.{" "} */}
-                                                            <Link
-                                                                href="/dashboard/schools/academic-years"
-                                                                className="text-muted-foreground  flex flex-row items-center font-normal text-sm justify-center"
-                                                            >
-                                                                Create <Plus size={14} />
-                                                            </Link>
-                                                        </div>
-                                                    )}
-                                                </SelectContent>
-                                            </Select>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
 
                                 {/* Fee Particulars Table */}
                                 <div className="border rounded-lg overflow-hidden bg-white dark:bg-transparent">

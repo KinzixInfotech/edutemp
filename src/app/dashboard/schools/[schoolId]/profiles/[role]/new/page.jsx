@@ -171,7 +171,7 @@ export default function NewProfilePage() {
             case "teacher":
                 return (
                     <>
-                        <FileUploadButton field="Teacher" onChange={(previewUrl) => handleImageUpload(previewUrl)} resetKey={resetKey} />
+                        {/* <FileUploadButton field="Teacher" onChange={(previewUrl) => handleImageUpload(previewUrl)} resetKey={resetKey} /> */}
                         <Input placeholder="Teacher Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
                         <Input placeholder="Teacher Employee Id " value={form.empployeeId} onChange={(e) => setForm({ ...form, empployeeId: e.target.value })} />
                         <Input placeholder="Teacher Designation" value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} />
@@ -356,7 +356,7 @@ export default function NewProfilePage() {
                             <RadioGroup
                                 value={form.guardianType}
                                 onValueChange={(value) => setForm({ ...form, guardianType: value })}
-                                className="flex flex-row space-y-2 "
+                                className="flex flex-row space-y-2  my-2.5"
                             >
                                 <div className="flex items-center space-x-2">
                                     <RadioGroupItem value="PARENTS" id="r1" />
@@ -501,7 +501,7 @@ export default function NewProfilePage() {
             case "staff":
                 return (
                     <>
-                        <FileUploadButton field="Staff" onChange={(previewUrl) => handleImageUpload(previewUrl)} resetKey={resetKey} />
+                        {/* <FileUploadButton field="Staff" onChange={(previewUrl) => handleImageUpload(previewUrl)} resetKey={resetKey} /> */}
                         <Input placeholder="Staff Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
                         <Input placeholder="Staff Employee Id " value={form.empployeeId} onChange={(e) => setForm({ ...form, empployeeId: e.target.value })} />
                         <Input placeholder="Staff Designation" value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} />

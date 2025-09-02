@@ -77,24 +77,24 @@ model User {
   @@index([roleId])
 }
 
-model AcademicYear {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String
-  startDate DateTime
-  endDate   DateTime
-  isActive  Boolean  @default(false)
-  createdAt DateTime @default(now())
+// model AcademicYear {
+//   id        String   @id @default(uuid()) @db.Uuid
+//   name      String
+//   startDate DateTime
+//   endDate   DateTime
+//   isActive  Boolean  @default(false)
+//   createdAt DateTime @default(now())
 
-  schoolId     String         @db.Uuid
-  school       School         @relation(fields: [schoolId], references: [id])
-  students     Student[]
-  classes      Class[]
-  FeeStructure FeeStructure[]
-  FeePayment   FeePayment[]
+//   schoolId     String         @db.Uuid
+//   school       School         @relation(fields: [schoolId], references: [id])
+//   students     Student[]
+//   classes      Class[]
+//   FeeStructure FeeStructure[]
+//   FeePayment   FeePayment[]
 
-  @@unique([schoolId, name])
-  @@index([schoolId])
-}
+//   @@unique([schoolId, name])
+//   @@index([schoolId])
+// }
 
 model Admin {
   userId   String @id @db.Uuid
@@ -494,26 +494,46 @@ model ExamResult {
 //   @@index([studentId])
 // }
 
+model AcademicYear {
+  id            String         @id @default(uuid()) @db.Uuid
+  name          String
+  startDate     DateTime
+  endDate       DateTime
+  isActive      Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  schoolId      String         @db.Uuid
+  school        School         @relation(fields: [schoolId], references: [id])
+  students      Student[]
+  classes       Class[]
+  FeeStructures FeeStructure[]
+  FeePayments   FeePayment[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+}
+
 model FeeStructure {
-  id             String          @id @default(uuid())
-  schoolId       String
-  academicYearId String
+  id             String          @id @default(uuid()) @db.Uuid
+  schoolId       String?         @db.Uuid
+  academicYearId String          @db.Uuid
+  issueDate      DateTime        @default(now())
   name           String
+  mode           FeeMode         @default(MONTHLY) // <-- enum used here
   feeParticulars FeeParticular[]
   createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  School         School          @relation(fields: [schoolId], references: [id])
-  AcademicYear   AcademicYear    @relation(fields: [academicYearId], references: [id])
+  updatedAt      DateTime        @default(now()) @updatedAt
   Student        Student?        @relation(fields: [studentUserId], references: [userId])
   studentUserId  String?         @db.Uuid
   Class          Class?          @relation(fields: [classId], references: [id])
   classId        Int?
-  FeePayment     FeePayment[]
+  FeePayments    FeePayment[]
+  School         School?         @relation(fields: [schoolId], references: [id])
+  AcademicYear   AcademicYear    @relation(fields: [academicYearId], references: [id])
 }
 
 model FeeParticular {
-  id                   String                 @id @default(uuid())
-  feeStructureId       String
+  id                   String                 @id @default(uuid()) @db.Uuid
+  feeStructureId       String                 @db.Uuid
   name                 String
   defaultAmount        Float
   feeStructure         FeeStructure           @relation(fields: [feeStructureId], references: [id])
@@ -521,27 +541,28 @@ model FeeParticular {
 }
 
 model StudentFeeStructure {
-  id             String                 @id @default(uuid())
-  studentId      String
-  academicYearId String
+  id             String                 @id @default(uuid()) @db.Uuid
+  studentId      String                 @db.Uuid
+  academicYearId String                 @db.Uuid
   feeParticulars StudentFeeParticular[]
   createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
+  updatedAt      DateTime               @default(now()) @updatedAt
   School         School?                @relation(fields: [schoolId], references: [id])
   schoolId       String?                @db.Uuid
   Student        Student?               @relation(fields: [studentUserId], references: [userId])
   studentUserId  String?                @db.Uuid
-  FeePayment     FeePayment[]
+  FeePayments    FeePayment[]
 }
 
 model StudentFeeParticular {
-  id                    String              @id @default(uuid())
-  studentFeeStructureId String
-  globalParticularId    String // reference to FeeParticular
-  amount                Float? // can override defaultAmount
-  status                String              @default("unpaid") // paid/unpaid/waived
-  studentFeeStructure   StudentFeeStructure @relation(fields: [studentFeeStructureId], references: [id])
-  globalParticular      FeeParticular       @relation(fields: [globalParticularId], references: [id])
+  id                    String                  @id @default(uuid()) @db.Uuid
+  studentFeeStructureId String                  @db.Uuid
+  globalParticularId    String                  @db.Uuid
+  amount                Float?
+  status                String                  @default("unpaid")
+  studentFeeStructure   StudentFeeStructure     @relation(fields: [studentFeeStructureId], references: [id])
+  globalParticular      FeeParticular           @relation(fields: [globalParticularId], references: [id])
+  StudentFeeInstallment StudentFeeInstallment[]
 }
 
 model FeePayment {
@@ -555,7 +576,6 @@ model FeePayment {
   paymentDate           DateTime @default(now())
   paymentMode           String
 
-  // relations
   school              School               @relation(fields: [schoolId], references: [id])
   academicYear        AcademicYear         @relation(fields: [academicYearId], references: [id])
   student             Student              @relation(fields: [studentId], references: [userId])
@@ -567,6 +587,20 @@ model FeePayment {
   @@index([studentId])
   @@index([feeStructureId])
   @@index([studentFeeStructureId])
+}
+
+model StudentFeeInstallment {
+  id                     String   @id @default(uuid()) @db.Uuid
+  studentFeeParticularId String   @db.Uuid
+  dueDate                DateTime
+  amount                 Float
+  status                 String   @default("UNPAID") // UNPAID / PAID / PARTIAL
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @default(now()) @updatedAt
+
+  studentFeeParticular StudentFeeParticular @relation(fields: [studentFeeParticularId], references: [id])
+
+  @@index([studentFeeParticularId])
 }
 
 model Attendance {

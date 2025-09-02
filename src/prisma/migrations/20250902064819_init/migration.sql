@@ -60,19 +60,6 @@ CREATE TABLE "public"."User" (
 );
 
 -- CreateTable
-CREATE TABLE "public"."AcademicYear" (
-    "id" UUID NOT NULL,
-    "name" TEXT NOT NULL,
-    "startDate" TIMESTAMP(3) NOT NULL,
-    "endDate" TIMESTAMP(3) NOT NULL,
-    "isActive" BOOLEAN NOT NULL DEFAULT false,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "schoolId" UUID NOT NULL,
-
-    CONSTRAINT "AcademicYear_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "public"."Admin" (
     "userId" UUID NOT NULL,
     "schoolId" UUID NOT NULL,
@@ -320,29 +307,65 @@ CREATE TABLE "public"."ExamResult" (
 );
 
 -- CreateTable
+CREATE TABLE "public"."AcademicYear" (
+    "id" UUID NOT NULL,
+    "name" TEXT NOT NULL,
+    "startDate" TIMESTAMP(3) NOT NULL,
+    "endDate" TIMESTAMP(3) NOT NULL,
+    "isActive" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "schoolId" UUID NOT NULL,
+
+    CONSTRAINT "AcademicYear_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "public"."FeeStructure" (
     "id" UUID NOT NULL,
-    "schoolId" UUID NOT NULL,
+    "schoolId" UUID,
     "academicYearId" UUID NOT NULL,
-    "classId" INTEGER,
-    "studentId" UUID,
-    "issueDate" TIMESTAMP(3) NOT NULL,
-    "mode" "public"."FeeMode" NOT NULL,
+    "issueDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "name" TEXT NOT NULL,
-    "amount" DOUBLE PRECISION NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "studentUserId" UUID,
+    "classId" INTEGER,
 
     CONSTRAINT "FeeStructure_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
+CREATE TABLE "public"."FeeParticular" (
+    "id" UUID NOT NULL,
+    "feeStructureId" UUID NOT NULL,
+    "name" TEXT NOT NULL,
+    "defaultAmount" DOUBLE PRECISION NOT NULL,
+
+    CONSTRAINT "FeeParticular_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "public"."StudentFeeStructure" (
     "id" UUID NOT NULL,
-    "schoolId" UUID NOT NULL,
-    "feeStructureId" UUID NOT NULL,
     "studentId" UUID NOT NULL,
-    "customAmount" DOUBLE PRECISION,
+    "academicYearId" UUID NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "schoolId" UUID,
+    "studentUserId" UUID,
 
     CONSTRAINT "StudentFeeStructure_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."StudentFeeParticular" (
+    "id" UUID NOT NULL,
+    "studentFeeStructureId" UUID NOT NULL,
+    "globalParticularId" UUID NOT NULL,
+    "amount" DOUBLE PRECISION,
+    "status" TEXT NOT NULL DEFAULT 'unpaid',
+
+    CONSTRAINT "StudentFeeParticular_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -455,12 +478,6 @@ CREATE INDEX "User_schoolId_idx" ON "public"."User"("schoolId");
 CREATE INDEX "User_roleId_idx" ON "public"."User"("roleId");
 
 -- CreateIndex
-CREATE INDEX "AcademicYear_schoolId_idx" ON "public"."AcademicYear"("schoolId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "AcademicYear_schoolId_name_key" ON "public"."AcademicYear"("schoolId", "name");
-
--- CreateIndex
 CREATE UNIQUE INDEX "MasterAdmin_userId_key" ON "public"."MasterAdmin"("userId");
 
 -- CreateIndex
@@ -536,25 +553,10 @@ CREATE INDEX "ExamResult_subjectId_idx" ON "public"."ExamResult"("subjectId");
 CREATE UNIQUE INDEX "ExamResult_examId_studentId_subjectId_key" ON "public"."ExamResult"("examId", "studentId", "subjectId");
 
 -- CreateIndex
-CREATE INDEX "FeeStructure_schoolId_idx" ON "public"."FeeStructure"("schoolId");
+CREATE INDEX "AcademicYear_schoolId_idx" ON "public"."AcademicYear"("schoolId");
 
 -- CreateIndex
-CREATE INDEX "FeeStructure_academicYearId_idx" ON "public"."FeeStructure"("academicYearId");
-
--- CreateIndex
-CREATE INDEX "FeeStructure_classId_idx" ON "public"."FeeStructure"("classId");
-
--- CreateIndex
-CREATE INDEX "FeeStructure_studentId_idx" ON "public"."FeeStructure"("studentId");
-
--- CreateIndex
-CREATE INDEX "StudentFeeStructure_schoolId_idx" ON "public"."StudentFeeStructure"("schoolId");
-
--- CreateIndex
-CREATE INDEX "StudentFeeStructure_feeStructureId_idx" ON "public"."StudentFeeStructure"("feeStructureId");
-
--- CreateIndex
-CREATE INDEX "StudentFeeStructure_studentId_idx" ON "public"."StudentFeeStructure"("studentId");
+CREATE UNIQUE INDEX "AcademicYear_schoolId_name_key" ON "public"."AcademicYear"("schoolId", "name");
 
 -- CreateIndex
 CREATE INDEX "FeePayment_schoolId_idx" ON "public"."FeePayment"("schoolId");
@@ -597,9 +599,6 @@ ALTER TABLE "public"."User" ADD CONSTRAINT "User_schoolId_fkey" FOREIGN KEY ("sc
 
 -- AddForeignKey
 ALTER TABLE "public"."User" ADD CONSTRAINT "User_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "public"."Role"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "public"."AcademicYear" ADD CONSTRAINT "AcademicYear_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "public"."School"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."Admin" ADD CONSTRAINT "Admin_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "public"."School"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -716,25 +715,34 @@ ALTER TABLE "public"."ExamResult" ADD CONSTRAINT "ExamResult_studentId_fkey" FOR
 ALTER TABLE "public"."ExamResult" ADD CONSTRAINT "ExamResult_subjectId_fkey" FOREIGN KEY ("subjectId") REFERENCES "public"."Subject"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."FeeStructure" ADD CONSTRAINT "FeeStructure_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "public"."School"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "public"."AcademicYear" ADD CONSTRAINT "AcademicYear_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "public"."School"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."FeeStructure" ADD CONSTRAINT "FeeStructure_academicYearId_fkey" FOREIGN KEY ("academicYearId") REFERENCES "public"."AcademicYear"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "public"."FeeStructure" ADD CONSTRAINT "FeeStructure_studentUserId_fkey" FOREIGN KEY ("studentUserId") REFERENCES "public"."Student"("userId") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."FeeStructure" ADD CONSTRAINT "FeeStructure_classId_fkey" FOREIGN KEY ("classId") REFERENCES "public"."Class"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."FeeStructure" ADD CONSTRAINT "FeeStructure_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "public"."Student"("userId") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "public"."FeeStructure" ADD CONSTRAINT "FeeStructure_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "public"."School"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."StudentFeeStructure" ADD CONSTRAINT "StudentFeeStructure_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "public"."School"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "public"."FeeStructure" ADD CONSTRAINT "FeeStructure_academicYearId_fkey" FOREIGN KEY ("academicYearId") REFERENCES "public"."AcademicYear"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."StudentFeeStructure" ADD CONSTRAINT "StudentFeeStructure_feeStructureId_fkey" FOREIGN KEY ("feeStructureId") REFERENCES "public"."FeeStructure"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "public"."FeeParticular" ADD CONSTRAINT "FeeParticular_feeStructureId_fkey" FOREIGN KEY ("feeStructureId") REFERENCES "public"."FeeStructure"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "public"."StudentFeeStructure" ADD CONSTRAINT "StudentFeeStructure_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "public"."Student"("userId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "public"."StudentFeeStructure" ADD CONSTRAINT "StudentFeeStructure_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "public"."School"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."StudentFeeStructure" ADD CONSTRAINT "StudentFeeStructure_studentUserId_fkey" FOREIGN KEY ("studentUserId") REFERENCES "public"."Student"("userId") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."StudentFeeParticular" ADD CONSTRAINT "StudentFeeParticular_studentFeeStructureId_fkey" FOREIGN KEY ("studentFeeStructureId") REFERENCES "public"."StudentFeeStructure"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."StudentFeeParticular" ADD CONSTRAINT "StudentFeeParticular_globalParticularId_fkey" FOREIGN KEY ("globalParticularId") REFERENCES "public"."FeeParticular"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."FeePayment" ADD CONSTRAINT "FeePayment_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "public"."School"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
