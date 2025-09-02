@@ -517,6 +517,7 @@ model FeeStructure {
   schoolId       String?         @db.Uuid
   academicYearId String          @db.Uuid
   issueDate      DateTime        @default(now())
+  isInstallment  Boolean         @default(false) // false = fixed, true = has installments
   name           String
   mode           FeeMode         @default(MONTHLY) // <-- enum used here
   feeParticulars FeeParticular[]

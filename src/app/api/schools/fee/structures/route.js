@@ -88,63 +88,9 @@ export async function POST(req) {
             include: { feeParticulars: true },
         });
 
-        // 2. Fetch all students in this class (or all if classId is null)
-        const students = await prisma.student.findMany({
-            where: {
-                schoolId: parsed.schoolId,
-                ...(parsed.classId ? { classId: parsed.classId } : {}),
-            },
-        });
-
-        // 3. Assign fees to each student
-        for (const student of students) {
-            await prisma.studentFeeStructure.create({
-                data: {
-                    studentId: student.userId,
-                    academicYearId: parsed.academicYearId,
-                    schoolId: parsed.schoolId,
-                    studentUserId: student.userId,
-                    feeParticulars: {
-                        create: feeStructure.feeParticulars.map(fp => ({
-                            globalParticularId: fp.id,
-                            amount: fp.defaultAmount,
-                            status: "UNPAID",
-                        })),
-                    },
-                },
-            });
-        }
-
-        // 4. Assign student fees structure to each student
-        for (const student of students) {
-            const studentFee = await prisma.studentFeeStructure.create({
-                data: {
-                    studentId: student.userId,
-                    academicYearId: parsed.academicYearId,
-                    schoolId: parsed.schoolId,
-                    studentUserId: student.userId,
-                    feeParticulars: {
-                        create: feeStructure.feeParticulars.map(fp => ({
-                            globalParticularId: fp.id,
-                            amount: fp.defaultAmount,
-                            status: "UNPAID",
-                        })),
-                    },
-                },
-                include: { feeParticulars: true }
-            });
-
-            // Create installments for each fee particular
-            for (const sfp of studentFee.feeParticulars) {
-                const installments = getInstallments(parsed.mode, sfp.amount);
-                await prisma.studentFeeInstallment.createMany({
-                    data: installments.map(inst => ({ ...inst, studentFeeParticularId: sfp.id }))
-                });
-            }
-        }
 
         return NextResponse.json({
-            message: `Fee structure created and assigned to ${students.length} students`,
+            message: `Fee structure created`,
             feeStructure,
         }, { status: 201 });
 

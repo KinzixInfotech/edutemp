@@ -11,21 +11,45 @@ export async function GET(req) {
             return NextResponse.json({ error: "schoolId is required" }, { status: 400 });
         }
 
+        // fetch structures
         const feeStructures = await prisma.feeStructure.findMany({
             where: {
                 schoolId,
                 ...(academicYearId && { academicYearId }),
             },
             include: {
-                AcademicYear: { // <-- fix capitalization
+                AcademicYear: {
                     select: { name: true, startDate: true, endDate: true },
                 },
-                feeParticulars: true, // fee particulars will now be included
+                feeParticulars: true,
+                _count: { select: { FeePayments: true } }, // optional extra
             },
             orderBy: { createdAt: "desc" },
         });
 
-        return NextResponse.json(feeStructures);
+        // add assigned info
+        const data = await Promise.all(
+            feeStructures.map(async (fs) => {
+                const assignedCount = await prisma.studentFeeStructure.count({
+                    where: {
+                        feeParticulars: {
+                            some: {
+                                globalParticular: {
+                                    feeStructureId: fs.id, // go via StudentFeeParticular → FeeParticular → FeeStructure
+                                },
+                            },
+                        },
+                    },
+                });
+                return {
+                    ...fs,
+                    assigned: assignedCount > 0,
+                    assignedCount,
+                };
+            })
+        );
+
+        return NextResponse.json(data);
     } catch (error) {
         console.error("Error fetching fee structures:", error);
         return NextResponse.json(
