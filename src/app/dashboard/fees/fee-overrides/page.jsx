@@ -76,7 +76,9 @@ export default function FeeStructuresTable() {
                             value: `${cls.id}-${sec.id}`,
                             classId: cls.id,
                             sectionId: sec.id,
-                            acyearName: cls.AcademicYear.name,
+                            acyearName: cls.AcademicYear?.name || null,
+                            totalStudent: cls._count.students,
+                            assigned: cls.isStructureAssigned,
                         }));
                     }
 
@@ -172,6 +174,23 @@ export default function FeeStructuresTable() {
                                     <TableCell className="py-4 text-muted-foreground">{index + 1}</TableCell>
                                     <TableCell className="py-4">{cls.label}</TableCell>
                                     <TableCell className="py-4">{cls.acyearName}</TableCell>
+                                    <TableCell className="py-4">{cls.totalStudent}</TableCell>
+                                    <TableCell className="py-4">
+                                        <Badge
+                                            variant={cls.assigned ? "default" : "secondary"}
+                                            className="py-1.5 w-32 break-words text-center"
+                                        >
+                                            {cls.assigned ? `Assigned` : "Not Assigned"}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="py-4">            <Button
+                                        size="sm"
+                                        variant="outline"
+                                    // onClick={}
+                                    >
+                                        View
+                                    </Button></TableCell>
+
                                     {/* <TableCell className="py-4">{cls.label}</TableCell> */}
 
                                     {/* <TableCell className="py-4">{new Date(fee.issueDate).toLocaleDateString()}</TableCell>

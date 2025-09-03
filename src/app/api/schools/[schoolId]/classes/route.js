@@ -52,15 +52,15 @@ export async function GET(req, { params }) {
     const { searchParams } = new URL(req.url)
     const academicYearId = searchParams.get("academicYearId") // Optional filter by academicYearId
     const getAcademicYear = searchParams.get("getAcademicYear") === "true" // Check if getAcademicYear=true
-
+    const getStudent = searchParams.get("getStudent") === "true"
+    const showStructure = searchParams.get("showStructure") === "true"
     if (!schoolId) {
       return NextResponse.json({ error: "schoolId is required" }, { status: 400 })
     }
-
     const classes = await prisma.class.findMany({
       where: {
         schoolId,
-        ...(academicYearId && { academicYearId }), // Filter by academicYearId if provided
+        ...(academicYearId && { academicYearId }),
       },
       include: {
         sections: {
@@ -70,12 +70,22 @@ export async function GET(req, { params }) {
             },
           },
         },
-        // Include AcademicYear only if getAcademicYear=true
         ...(getAcademicYear && { AcademicYear: true }),
+        ...(getStudent
+          ? { students: true }
+          : { _count: { select: { students: true } } }),
+        ...(showStructure && { FeeStructure: true }), // only if requested
       },
     })
 
-    return NextResponse.json(classes)
+    // 🔹 post-process to always add isStructureAssigned
+    const result = classes.map((cls) => ({
+      ...cls,
+      isStructureAssigned:
+        (cls.FeeStructure && cls.FeeStructure.length > 0) ||
+        (cls._count?.FeeStructure ?? 0) > 0,
+    }))
+    return NextResponse.json(result)
   } catch (error) {
     console.error("[CLASS_GET_ERROR]", error)
     return NextResponse.json({ error: "Failed to fetch classes" }, { status: 500 })
