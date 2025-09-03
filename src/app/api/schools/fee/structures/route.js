@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { z } from "zod";
 
 const schema = z.object({
+    name: z.string(),
     schoolId: z.string().uuid(),
     academicYearId: z.string().uuid(),
     classId: z.number().int().nullable().optional(),
@@ -77,7 +78,7 @@ export async function POST(req) {
                 classId: parsed.classId ?? null,
                 mode: parsed.mode,
                 issueDate: new Date(),
-                name: getFeeStructureName(parsed.mode),
+                name: parsed.name + '-' + getFeeStructureName(parsed.mode),
                 feeParticulars: {
                     create: parsed.fees.map(f => ({
                         name: f.name,

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import {
@@ -173,7 +174,14 @@ export default function FeeStructuresTable() {
                   <TableCell className="py-4">{fee.mode}</TableCell>
                   <TableCell className="py-4">{new Date(fee.issueDate).toLocaleDateString()}</TableCell>
                   <TableCell className="py-4">{fee.AcademicYear?.name ?? "N/A"}</TableCell>
-                  <TableCell className="py-4"> Assigned: {fee.assigned ? `Yes (${fee.assignedCount} students)` : "No"}</TableCell>
+                  <TableCell className="py-4">
+                    <Badge
+                      variant={fee.assigned ? "default" : "secondary"}
+                      className="py-1.5 w-32 break-words text-center"
+                    >
+                      {fee.assigned ? `Assigned (${fee.assignedCount} students)` : "Not Assigned"}
+                    </Badge>
+                  </TableCell>
 
                   {/* <TableCell className="py-4">
                     <Dialog>

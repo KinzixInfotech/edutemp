@@ -26,6 +26,7 @@ const FeeModes = ["MONTHLY", "QUARTERLY", "HALF_YEARLY", "YEARLY"]; //enums
 
 const schema = z.object({
     academicYearId: z.string().uuid({ message: "Academic year is required" }),
+    name: z.string(),
     mode: z.enum(FeeModes), // <-- moved here
     fees: z.array(
         z.object({
@@ -46,6 +47,7 @@ export default function FeeStructureTableForm() {
     const form = useForm({
         resolver: zodResolver(schema),
         defaultValues: {
+            name: "",
             academicYearId: "",
             mode: "MONTHLY", // default
             fees: [{ title: "", amount: 0 }],
@@ -68,6 +70,7 @@ export default function FeeStructureTableForm() {
 
             setSubmitting(true);
             const payload = {
+                name: values.name,
                 schoolId: fullUser.schoolId,
                 academicYearId: values.academicYearId,
                 classId: null,
@@ -170,6 +173,23 @@ export default function FeeStructureTableForm() {
                         <Form {...form}>
                             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                                 <div className="flex lg:flex-row flex-col gap-3.5 w-full justify-betweens">
+                                    <FormField
+                                        control={form.control}
+                                        name={'name'}
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Fee Structure Name</FormLabel>
+                                                <FormControl>
+                                                    <Input
+                                                        placeholder="Name"
+                                                        {...field}
+                                                        className="bg-muted"
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
                                     {/* Academic Year Dropdown */}
                                     <FormField
                                         control={form.control}
@@ -182,7 +202,7 @@ export default function FeeStructureTableForm() {
                                                     onValueChange={field.onChange}
                                                 >
                                                     <FormControl>
-                                                        <SelectTrigger>
+                                                        <SelectTrigger className='w-full'>
                                                             <SelectValue placeholder="Select academic year" />
                                                         </SelectTrigger>
                                                     </FormControl>
@@ -219,7 +239,7 @@ export default function FeeStructureTableForm() {
                                                 <FormLabel>Fee Mode</FormLabel>
                                                 <Select value={field.value} onValueChange={field.onChange}>
                                                     <FormControl>
-                                                        <SelectTrigger>
+                                                        <SelectTrigger className='w-full'>
                                                             <SelectValue placeholder="Select Mode" />
                                                         </SelectTrigger>
                                                     </FormControl>
@@ -309,6 +329,7 @@ export default function FeeStructureTableForm() {
                                 <Button
                                     type="button"
                                     variant="outline"
+                                    className='lg:w-fit w-full'
                                     onClick={() => append({ title: "", amount: 0 })}
                                 >
                                     + Add Fee
