@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useLoader } from "@/app/dashboard/context/Loader";
 import OnboardingDialog from "../OnboardDialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/lib/supabase";
 import LoaderPage from "../loader-page";
 
@@ -110,11 +111,15 @@ export default function ClientLayout({ children }) {
                     <div className="max-w-7xl mx-auto px-4 py-3  flex flex-col md:flex-row justify-between items-center gap-2">
                         <div className="flex items-center gap-2">
                             {/* <span className="font-medium">System Status:</span> */}
-                            <span
-                                className={`${getStatusStyles(status.indicator)} px-2 py-1.5 rounded-full`}
-                            >
-                                {status.description}
-                            </span>
+                            {status ? (
+                                <span
+                                    className={`${getStatusStyles(status.indicator)} px-2 py-1.5 rounded-full`}
+                                >
+                                    {status.description}
+                                </span>
+                            ) : (
+                                <Skeleton className="h-6 w-48 rounded-full" />
+                            )}
                         </div>
 
                         <div className="flex items-center gap-4">
