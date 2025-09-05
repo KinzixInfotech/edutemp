@@ -94,7 +94,7 @@ const sidebarData = [
                 roles: ["ADMIN"],
                 submenu: [
                     { label: "Create Fee Structure", url: "/dashboard/fees/manage-fee-structure", roles: ["ADMIN"] },
-                    { label: "Assign Fee Structure", url: "/dashboard/fees/fee-structures", roles: ["ADMIN"] },
+                    { label: "View Fee Structures", url: "/dashboard/fees/fee-structures", roles: ["ADMIN"] },
                     { label: "Student Fee Overrides", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
                 ],
             },

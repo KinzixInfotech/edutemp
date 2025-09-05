@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,131 +15,224 @@ import {
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Command, CommandGroup, CommandItem } from "@/components/ui/command"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { Plus } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { useForm, useFieldArray } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "@/components/ui/form";
+
+// Schema for editing fee structure
+const editSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  mode: z.enum(["MONTHLY", "QUARTERLY", "HALF_YEARLY", "YEARLY"]),
+  feeParticulars: z
+    .array(
+      z.object({
+        id: z.string().optional(),
+        name: z.string().min(1, "Name is required"),
+        amount: z.number().positive("Amount must be positive"),
+      })
+    )
+    .min(1, "At least one particular is required"),
+});
+
 export default function FeeStructuresTable() {
   const { fullUser } = useAuth();
   const [feeStructures, setFeeStructures] = useState([]);
+  const [filteredFeeStructures, setFilteredFeeStructures] = useState([]);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedFees, setSelectedFees] = useState(null);
-  const [applyAll, setApplyAll] = useState(false);
-  const [academicYears, setAcademicYears] = useState([]);
-  const [classes, setClasses] = useState([]);
-  const [open, setopen] = useState(false)
-  const [selectedYear, setSelectedYear] = useState(""); // ✅ manage year selection
-  const [selectedClass, setSelectedClass] = useState([]);
-  const [feeStaus, setFeeStatus] = useState([]);
-  useEffect(() => {
-    console.log(selectedClass);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [selectedFeeStructure, setSelectedFeeStructure] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  }, [selectedClass])
+  const form = useForm({
+    resolver: zodResolver(editSchema),
+    defaultValues: {
+      name: "",
+      mode: "MONTHLY",
+      feeParticulars: [],
+    },
+  });
 
-  const toggleClass = (id) => {
-    setSelectedClass((prev) =>
-      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
-    )
-  }
-  const fetchClasses = async () => {
-    // setFetchingLoading(true);
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "feeParticulars",
+  });
+
+  // Fetch fee structures
+  const fetchFeeStructures = useCallback(async () => {
     if (!fullUser?.schoolId) return;
+    setLoading(true);
     try {
-      const res = await fetch(`/api/schools/${fullUser?.schoolId}/classes`);
+      const res = await fetch(`/api/schools/fee/structures?schoolId=${fullUser.schoolId}`, {
+        method: "GET",
+      }
+      );
 
-
+      if (!res.ok) throw new Error("Failed to fetch fee structures");
       const data = await res.json();
-      console.log(data);
-
-      const mapped = (Array.isArray(data) ? data : []).flatMap((cls) => {
-        if (Array.isArray(cls.sections) && cls.sections.length > 0) {
-          return cls.sections.map((sec) => ({
-            label: `${cls.className}'${sec.name}`,
-            value: `${cls.id}-${sec.id}`,
-            classId: cls.id,
-            sectionId: sec.id,
-          }));
-        }
-
-        return {
-          label: `Class ${cls.className}`,
-          value: `${cls.id}`,
-          classId: cls.id,
-          sectionId: null,
-        };
-      });
-
-      console.log(mapped, 'mappeddata'); //  log after mapping
-      setClasses(mapped);  //  then update your state
+      setFeeStructures(data);
+      setFilteredFeeStructures(data);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to load classes");
-      setClasses([]);
-    }
-    // setFetchingLoading(false);
-  };
-  useEffect(() => {
-
-    // const fetchStatusApi = async () => {
-    //   try {
-    //     const res = await fetch(`/api/schools/fee/structures/status?schoolId=${schoolId}`);
-    //     if (!res.ok) throw new Error("Failed to fetch");
-    //     const data = await res.json();
-    //     setFeeStatus(data);
-    //   } catch (err) {
-    //     console.error(err);
-    //   } finally {
-    //     setLoading(false);
-    //   }
-    // };
-
-
-
-
-    const fetchAcademicYears = async () => {
-      if (!fullUser?.schoolId) return;
-      try {
-        const res = await fetch(`/api/schools/academic-years?schoolId=${fullUser?.schoolId}`);
-        const data = await res.json();
-        setAcademicYears(data || []);
-      } catch (err) {
-        console.error(err);
-        toast.error("Failed to load academic years");
-        setAcademicYears([]);
-      }
-    };
-
-    async function fetchFeeStructures() {
-      try {
-        const res = await fetch(`/api/schools/fee/structures/get?schoolId=${fullUser.schoolId}`);
-        if (!res.ok) throw new Error("Failed to fetch");
-        const data = await res.json();
-        setFeeStructures(data);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    if (fullUser?.schoolId) {
-      fetchFeeStructures();
-      fetchClasses();
-      fetchAcademicYears();
+      toast.error(err.message || "Failed to load fee structures");
+    } finally {
+      setLoading(false);
     }
   }, [fullUser]);
 
+  useEffect(() => {
+    fetchFeeStructures();
+  }, [fetchFeeStructures]);
+
+  // Handle search
+  useEffect(() => {
+    setFilteredFeeStructures(
+      feeStructures.filter((fee) =>
+        fee.name.toLowerCase().includes(search.toLowerCase())
+      )
+    );
+  }, [search, feeStructures]);
+
+  const openEditDialog = (fee) => {
+    form.reset({
+      name: fee.name.split('-')[0], // Remove mode and year suffix
+      mode: fee.mode,
+      feeParticulars: fee.feeParticulars.map((p) => ({
+        id: p.id,
+        name: p.name,
+        amount: Number(p.defaultAmount), // Ensure number
+      })),
+    });
+    setSelectedFeeStructure(fee);
+    setEditOpen(true);
+  };
+
+  const handleEditSubmit = async (values) => {
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/schools/fee/structures`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: selectedFeeStructure.id, ...values }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update fee structure");
+      }
+      toast.success("Fee structure updated successfully");
+      setEditOpen(false);
+      form.reset();
+      await fetchFeeStructures();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Failed to update fee structure");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/schools/fee/structures?id=${selectedFeeStructure.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to delete fee structure");
+      }
+      toast.success("Fee structure deleted successfully");
+      setDeleteOpen(false);
+      await fetchFeeStructures();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || "Failed to delete fee structure");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  // Convert number to words in Indian numbering system (Rupees & Paise)
+  function numberToWordsIndian(num) {
+    if (num === 0) return "Zero Rupees Only"
+
+    const a = [
+      "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+      "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen",
+      "Seventeen", "Eighteen", "Nineteen"
+    ]
+    const b = [
+      "", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"
+    ]
+
+    function inWords(n) {
+      if (n < 20) return a[n]
+      if (n < 100) return b[Math.floor(n / 10)] + (n % 10 ? " " + a[n % 10] : "")
+      if (n < 1000)
+        return (
+          a[Math.floor(n / 100)] +
+          " Hundred" +
+          (n % 100 ? " " + inWords(n % 100) : "")
+        )
+      if (n < 100000)
+        return (
+          inWords(Math.floor(n / 1000)) +
+          " Thousand" +
+          (n % 1000 ? " " + inWords(n % 1000) : "")
+        )
+      if (n < 10000000)
+        return (
+          inWords(Math.floor(n / 100000)) +
+          " Lakh" +
+          (n % 100000 ? " " + inWords(n % 100000) : "")
+        )
+      return (
+        inWords(Math.floor(n / 10000000)) +
+        " Crore" +
+        (n % 10000000 ? " " + inWords(n % 10000000) : "")
+      )
+    }
+
+    const [rupees, paise] = num.toFixed(2).split(".")
+
+    let words = ""
+    if (parseInt(rupees, 10) > 0) {
+      words += inWords(parseInt(rupees, 10)) + " Rupees"
+    }
+    if (parseInt(paise, 10) > 0) {
+      words += " and " + inWords(parseInt(paise, 10)) + " Paise"
+    }
+
+    return words + " Only"
+  }
   return (
     <div className="p-6">
-      <div className="flex justify-between px-3.5 py-4 items-center mb-4  gap-5 rounded-lg bg-muted lg:flex-row flex-col">
-        <Input placeholder="Search by Name..." className="dark:bg-[#171717] bg-white border lg:w-[180px] rounded-lg" />
+      <div className="flex justify-between px-3.5 py-4 items-center mb-4 gap-5 rounded-lg bg-muted lg:flex-row flex-col">
+        <Input
+          placeholder="Search by Name..."
+          className="dark:bg-[#171717] bg-white border lg:w-[180px] rounded-lg"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          aria-label="Search fee structures"
+        />
         <div className="flex gap-1.5 lg:flex-row flex-col lg:w-fit w-full">
           <Link href="./manage-fee-structure">
-            <Button className='lg:w-fit w-full'>Add Fee Structure</Button>
+            <Button className="lg:w-fit w-full">Add Fee Structure</Button>
           </Link>
-          <Button variant="outline" className='lg:w-fit w-full'>Export</Button>
+          <Button variant="outline" className="lg:w-fit w-full">Export</Button>
         </div>
       </div>
 
@@ -153,19 +246,18 @@ export default function FeeStructuresTable() {
               <TableHead>Issue Date</TableHead>
               <TableHead>Academic Year</TableHead>
               <TableHead>Structure Assigned</TableHead>
-
-              <TableHead>Action</TableHead>
+              <TableHead className="text-left">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-4">
+                <TableCell colSpan={7} className="text-center py-4">
                   Loading...
                 </TableCell>
               </TableRow>
-            ) : feeStructures.length > 0 ? (
-              feeStructures.map((fee, index) => (
+            ) : filteredFeeStructures.length > 0 ? (
+              filteredFeeStructures.map((fee, index) => (
                 <TableRow
                   key={fee.id}
                   className={index % 2 === 0 ? "bg-muted" : "bg-background"}
@@ -183,23 +275,23 @@ export default function FeeStructuresTable() {
                       {fee.assigned ? `Assigned (${fee.assignedCount} students)` : "Not Assigned"}
                     </Badge>
                   </TableCell>
-
-                  {/* <TableCell className="py-4">
+                  <TableCell className="py-4 flex flex-row gap-2.5">
                     <Dialog>
                       <DialogTrigger asChild>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => setSelectedFees(fee.feeParticulars)}
+                          aria-label={`View particulars for ${fee.name}`}
                         >
-                          View Details
+                          View
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="sm:max-w-lg   dark:bg-[#171717] bg-white w-full">
+                      <DialogContent className="sm:max-w-lg dark:bg-[#171717] bg-white w-full overflow-hidden">
                         <DialogHeader>
                           <DialogTitle>{fee.name} - Fee Particulars</DialogTitle>
                         </DialogHeader>
-                        <div className="space-y-2">
+                        {/* <div className="space-y-2">
                           {selectedFees && selectedFees.length > 0 ? (
                             selectedFees.map((f) => (
                               <Card key={f.id} className="border bg-muted">
@@ -214,213 +306,98 @@ export default function FeeStructuresTable() {
                           ) : (
                             <p>No particulars found</p>
                           )}
+                        </div> */}
+                        <div className="space-y-4">
+                          {selectedFees && selectedFees.length > 0 ? (
+
+                            <div className="border rounded-lg p-4">
+                              {/* <h3 className="font-medium mb-2">{fs.name} ({fs.mode})</h3> */}
+                              <Table className="w-full">
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>#</TableHead>
+                                    <TableHead>Particular</TableHead>
+                                    <TableHead>Amount</TableHead>
+
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+
+                                  {selectedFees.map((f, idx) => (
+                                    <TableRow
+                                      key={f.id}
+                                      className={idx % 2 === 0 ? "bg-muted" : "bg-background"}
+                                    >
+                                      <TableCell>{idx + 1}</TableCell>
+                                      <TableCell>{f.name}</TableCell>
+                                      <TableCell>₹{f.defaultAmount.toFixed(2)}</TableCell>
+                                    </TableRow>
+                                  ))}
+
+                                  {/* Total Row */}
+                                  <TableRow className="font-semibold">
+                                    <TableCell colSpan={2} className="text-right">
+                                      Total
+                                    </TableCell>
+
+                                    <TableCell>
+
+                                      <div
+                                        className="text-xs text-muted-foreground mt-1 whitespace-normal break-words p-1 "
+                                        style={{ maxWidth: "200px" }}
+                                      >
+                                        {numberToWordsIndian(
+                                          selectedFees.reduce((sum, f) => sum + (f.defaultAmount || 0), 0)
+                                        )}
+
+                                      </div>
+                                      ₹{
+                                        selectedFees
+                                          .reduce((sum, f) => sum + (f.defaultAmount || 0), 0)
+                                          .toLocaleString("en-IN", { maximumFractionDigits: 20 })
+                                      }
+                                    </TableCell>
+                                  </TableRow>
+
+                                </TableBody>
+                              </Table>
+                            </div>
+                          ) : (
+                            <p>No particulars found</p>
+                          )}
                         </div>
                         <DialogClose asChild>
-                          <Button className="mt-4 w-full">Close</Button>
+                          <Button className="mt-4 w-full" aria-label="Close dialog">
+                            Close
+                          </Button>
                         </DialogClose>
                       </DialogContent>
                     </Dialog>
-                  </TableCell> */}
-                  <TableCell className="py-4">
-                    <div className="flex gap-2">
-                      {/* Assign Fee Structure */}
-                      <Dialog open={open} onOpenChange={setopen}>
-                        <DialogTrigger asChild>
-                          <Button size="sm" className="bg-green-600 text-white">
-                            Assign
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-lg dark:bg-[#171717] bg-white w-full">
-                          <DialogHeader>
-                            <DialogTitle>Assign Fee Structure</DialogTitle>
-                          </DialogHeader>
-                          <form
-                            className="space-y-4"
-                            onSubmit={async (e) => {
-                              e.preventDefault();
-
-                              const body = {
-                                feeStructureId: fee.id,
-                                academicYearId: selectedYear,
-                                classId: selectedClass, // array of ids like ["1-2", "3"]
-                                applyToAllStudents: applyAll, // ✅ direct from state
-                              };
-
-                              try {
-                                const res = await fetch("/api/schools/fee/structures/assign", {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify(body),
-                                });
-
-                                const data = await res.json();
-                                if (data.success === true) {
-                                  toast.success(`Fee structure assigned to ${data.count} students successfully!`)
-                                  await fetchClasses();       // refresh classes
-                                  setopen(false)
-                                } else {
-                                  toast.error(data.error || "Failed to assign fee structure")
-                                  setopen(false)
-
-                                }
-                              } catch (err) {
-                                console.error(err);
-                                setopen(false)
-
-                                toast.error("Server error while assigning")
-                              }
-                            }}
-                          >
-                            {/* Academic Year */}
-                            <div>
-                              <label className="block text-sm mb-1">Session (Academic Year)</label>
-                              <Select value={selectedYear} onValueChange={setSelectedYear}>
-                                <SelectTrigger className="w-full">
-                                  <SelectValue placeholder="Select academic year" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {academicYears.length > 0 ? (
-                                    academicYears.map((year) => (
-                                      <SelectItem key={year.id} value={year.id}>
-                                        {year.name}
-                                      </SelectItem>
-                                    ))
-                                  ) : (
-                                    <div className="p-2 font-semibold">
-                                      <Link
-                                        href="/dashboard/schools/manage-fee-structure"
-                                        className="text-muted-foreground flex flex-row items-center font-normal text-sm justify-center"
-                                      >
-                                        Create <Plus size={14} />
-                                      </Link>
-                                    </div>
-                                  )}
-                                </SelectContent>
-                              </Select>
-                            </div>
-
-                            {/* Class */}
-                            {
-                              selectedYear.length > 0 && !applyAll && (
-                                <div>
-                                  <label className="block text-sm mb-1">Class</label>
-                                  {/* <Select value={selectedClass} onValueChange={setSelectedClass}>
-                                    <SelectTrigger className="w-full">
-                                      <SelectValue placeholder="Select class" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {classes.length > 0 ? (
-                                        classes.map((cls) => (
-                                          <SelectItem key={cls.value} value={cls.value}>
-                                            {cls.label}
-                                          </SelectItem>
-                                        ))
-                                      ) : (
-                                        <div className="p-2 font-semibold">
-                                          <Link
-                                            href="/dashboard/schools/create-classes"
-                                            className="text-muted-foreground flex flex-row items-center font-normal text-sm justify-center"
-                                          >
-                                            Create Classes <Plus size={14} />
-                                          </Link>
-                                        </div>
-                                      )}
-                                    </SelectContent>
-                                  </Select> */}
-                                  <Popover >
-                                    <PopoverTrigger asChild>
-                                      <Button variant="outline" className="w-full justify-between">
-                                        {selectedClass.length > 0
-                                          ? `${selectedClass.length} classes selected`
-                                          : "Select classes"}
-                                      </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-[200px] p-0">
-                                      <Command>
-                                        <CommandGroup>
-                                          {classes.map((cls) => (
-                                            <CommandItem
-                                              key={cls.id}
-                                              onSelect={() => toggleClass(cls.classId)}
-                                              className="flex items-center space-x-2"
-                                            >
-                                              <Checkbox checked={selectedClass.includes(cls.classId)} />
-                                              <span>{cls.label}</span>
-                                            </CommandItem>
-                                          ))}
-                                        </CommandGroup>
-                                      </Command>
-                                    </PopoverContent>
-                                  </Popover>
-                                </div>
-
-                              )
-                            }
-
-                            {/* Checkbox */}
-                            <div className="flex items-center gap-2">
-                              <Checkbox
-                                id="applyAll"
-                                checked={applyAll}
-                                onCheckedChange={(checked) => setApplyAll(!!checked)}
-                              />
-                              <label
-                                htmlFor="applyAll"
-                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                              >
-                                Apply to all students in class
-                              </label>
-                            </div>
-
-                            <Button type="submit" className="w-full">
-                              Assign
-                            </Button>
-                          </form>
-                        </DialogContent>
-                      </Dialog>
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setSelectedFees(fee.feeParticulars)}
-                          >
-                            View
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-lg dark:bg-[#171717] bg-white w-full">
-                          <DialogHeader>
-                            <DialogTitle>{fee.name} - Fee Particulars</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-2">
-                            {selectedFees && selectedFees.length > 0 ? (
-                              selectedFees.map((f) => (
-                                <Card key={f.id} className="border bg-muted">
-                                  <CardHeader>
-                                    <CardTitle className="text-sm font-medium">{f.name}</CardTitle>
-                                  </CardHeader>
-                                  <CardContent>
-                                    Amount: ₹{f.defaultAmount.toFixed(2)}
-                                  </CardContent>
-                                </Card>
-                              ))
-                            ) : (
-                              <p>No particulars found</p>
-                            )}
-                          </div>
-                          <DialogClose asChild>
-                            <Button className="mt-4 w-full">Close</Button>
-                          </DialogClose>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openEditDialog(fee)}
+                      aria-label={`Edit ${fee.name}`}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => {
+                        setSelectedFeeStructure(fee);
+                        setDeleteOpen(true);
+                      }}
+                      aria-label={`Delete ${fee.name}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-4">
+                <TableCell colSpan={7} className="text-center py-4">
                   No fee structures found.
                 </TableCell>
               </TableRow>
@@ -428,6 +405,136 @@ export default function FeeStructuresTable() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-2xl dark:bg-[#171717] bg-white w-full">
+          <DialogHeader>
+            <DialogTitle>Edit Fee Structure - {selectedFeeStructure?.name}</DialogTitle>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleEditSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter fee structure name" {...field} aria-label="Fee structure name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="mode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Mode</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} aria-label="Select fee mode">
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select mode" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="MONTHLY">MONTHLY</SelectItem>
+                        <SelectItem value="QUARTERLY">QUARTERLY</SelectItem>
+                        <SelectItem value="HALF_YEARLY">HALF_YEARLY</SelectItem>
+                        <SelectItem value="YEARLY">YEARLY</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div>
+                <FormLabel>Fee Particulars</FormLabel>
+                {fields.map((field, index) => (
+                  <div key={field.id} className="flex gap-2 mt-2">
+                    <FormField
+                      control={form.control}
+                      name={`feeParticulars.${index}.name`}
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormControl>
+                            <Input placeholder="Particular name" {...field} aria-label={`Fee particular ${index + 1} name`} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`feeParticulars.${index}.amount`}
+                      render={({ field }) => (
+                        <FormItem className="flex-1">
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="Amount"
+                              value={field.value || ""}
+                              onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : "")}
+                              aria-label={`Fee particular ${index + 1} amount`}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      onClick={() => remove(index)}
+                      aria-label={`Remove fee particular ${index + 1}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-2"
+                  onClick={() => append({ name: "", amount: "" })}
+                  aria-label="Add fee particular"
+                >
+                  Add Particular
+                </Button>
+              </div>
+              <Button type="submit" disabled={submitting} aria-label="Save fee structure changes">
+                {submitting ? "Saving..." : "Save Changes"}
+              </Button>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirm Dialog */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Delete</DialogTitle>
+          </DialogHeader>
+          <p>Are you sure you want to delete {selectedFeeStructure?.name}?</p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} aria-label="Cancel deletion">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={submitting}
+              aria-label="Confirm deletion"
+            >
+              {submitting ? "Deleting..." : "Delete"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
