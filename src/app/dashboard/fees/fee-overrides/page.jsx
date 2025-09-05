@@ -58,12 +58,11 @@ export default function FeeStructuresTable() {
         //     setLoading(false);
         //   }
         // };
-
         const fetchClasses = async () => {
             // setFetchingLoading(true);
             if (!fullUser?.schoolId) return;
             try {
-                const res = await fetch(`/api/schools/${fullUser?.schoolId}/classes?getAcademicYear=true`);
+                const res = await fetch(`/api/schools/${fullUser?.schoolId}/classes?getAcademicYear=true&academicYearId=ee6dddaa-e44a-4648-9aa2-c93ad5e481a2`);
 
 
                 const data = await res.json();

@@ -30,6 +30,7 @@ export default function FeeStructuresTable() {
   const [applyAll, setApplyAll] = useState(false);
   const [academicYears, setAcademicYears] = useState([]);
   const [classes, setClasses] = useState([]);
+  const [open, setopen] = useState(false)
   const [selectedYear, setSelectedYear] = useState(""); // ✅ manage year selection
   const [selectedClass, setSelectedClass] = useState([]);
   const [feeStaus, setFeeStatus] = useState([]);
@@ -43,8 +44,44 @@ export default function FeeStructuresTable() {
       prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
     )
   }
-  useEffect(() => {
+  const fetchClasses = async () => {
+    // setFetchingLoading(true);
+    if (!fullUser?.schoolId) return;
+    try {
+      const res = await fetch(`/api/schools/${fullUser?.schoolId}/classes`);
 
+
+      const data = await res.json();
+      console.log(data);
+
+      const mapped = (Array.isArray(data) ? data : []).flatMap((cls) => {
+        if (Array.isArray(cls.sections) && cls.sections.length > 0) {
+          return cls.sections.map((sec) => ({
+            label: `${cls.className}'${sec.name}`,
+            value: `${cls.id}-${sec.id}`,
+            classId: cls.id,
+            sectionId: sec.id,
+          }));
+        }
+
+        return {
+          label: `Class ${cls.className}`,
+          value: `${cls.id}`,
+          classId: cls.id,
+          sectionId: null,
+        };
+      });
+
+      console.log(mapped, 'mappeddata'); //  log after mapping
+      setClasses(mapped);  //  then update your state
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load classes");
+      setClasses([]);
+    }
+    // setFetchingLoading(false);
+  };
+  useEffect(() => {
 
     // const fetchStatusApi = async () => {
     //   try {
@@ -59,43 +96,7 @@ export default function FeeStructuresTable() {
     //   }
     // };
 
-    const fetchClasses = async () => {
-      // setFetchingLoading(true);
-      if (!fullUser?.schoolId) return;
-      try {
-        const res = await fetch(`/api/schools/${fullUser?.schoolId}/classes`);
 
-
-        const data = await res.json();
-        console.log(data);
-
-        const mapped = (Array.isArray(data) ? data : []).flatMap((cls) => {
-          if (Array.isArray(cls.sections) && cls.sections.length > 0) {
-            return cls.sections.map((sec) => ({
-              label: `${cls.className}'${sec.name}`,
-              value: `${cls.id}-${sec.id}`,
-              classId: cls.id,
-              sectionId: sec.id,
-            }));
-          }
-
-          return {
-            label: `Class ${cls.className}`,
-            value: `${cls.id}`,
-            classId: cls.id,
-            sectionId: null,
-          };
-        });
-
-        console.log(mapped, 'mappeddata'); //  log after mapping
-        setClasses(mapped);  //  then update your state
-      } catch (err) {
-        console.error(err);
-        toast.error("Failed to load classes");
-        setClasses([]);
-      }
-      // setFetchingLoading(false);
-    };
 
 
     const fetchAcademicYears = async () => {
@@ -223,7 +224,7 @@ export default function FeeStructuresTable() {
                   <TableCell className="py-4">
                     <div className="flex gap-2">
                       {/* Assign Fee Structure */}
-                      <Dialog>
+                      <Dialog open={open} onOpenChange={setopen}>
                         <DialogTrigger asChild>
                           <Button size="sm" className="bg-green-600 text-white">
                             Assign
@@ -233,7 +234,6 @@ export default function FeeStructuresTable() {
                           <DialogHeader>
                             <DialogTitle>Assign Fee Structure</DialogTitle>
                           </DialogHeader>
-
                           <form
                             className="space-y-4"
                             onSubmit={async (e) => {
@@ -254,15 +254,19 @@ export default function FeeStructuresTable() {
                                 });
 
                                 const data = await res.json();
-                                if (res.ok) {
+                                if (data.success === true) {
                                   toast.success(`Fee structure assigned to ${data.count} students successfully!`)
-                                  window.reload();
+                                  await fetchClasses();       // refresh classes
+                                  setopen(false)
                                 } else {
-
                                   toast.error(data.error || "Failed to assign fee structure")
+                                  setopen(false)
+
                                 }
                               } catch (err) {
                                 console.error(err);
+                                setopen(false)
+
                                 toast.error("Server error while assigning")
                               }
                             }}

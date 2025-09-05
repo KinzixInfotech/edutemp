@@ -63,6 +63,19 @@ export async function GET(req, { params }) {
         ...(academicYearId && { academicYearId }),
       },
       include: {
+        FeeStructure: {
+          include: {
+            feeParticulars: {
+              include: {
+                StudentFeeParticular: {
+                  include: {
+                    globalParticular: true,
+                  }
+                },
+              }
+            }
+          }
+        },
         sections: {
           include: {
             subjectTeachers: {
@@ -73,18 +86,45 @@ export async function GET(req, { params }) {
         ...(getAcademicYear && { AcademicYear: true }),
         ...(getStudent
           ? { students: true }
-          : { _count: { select: { students: true } } }),
-        ...(showStructure && { FeeStructure: true }), // only if requested
+          : { _count: { select: { students: true, FeeStructure: true } } }),
+        ...(showStructure && { FeeStructure: true }),
       },
-    })
+    });
 
-    // 🔹 post-process to always add isStructureAssigned
-    const result = classes.map((cls) => ({
-      ...cls,
-      isStructureAssigned:
-        (cls.FeeStructure && cls.FeeStructure.length > 0) ||
-        (cls._count?.FeeStructure ?? 0) > 0,
-    }))
+    //post process the count of fee structure to show the user that fee is assigned or not
+
+    const result = await Promise.all(
+      classes.map(async (cls) => {
+        const assigned = await prisma.class.findFirst({
+          where: {
+            id: cls.id,
+            academicYearId, //  match the year
+
+            // Student: {
+            //   classId: cls.id, //  restrict to this class
+            // },
+            // feeParticulars: {
+            //   some: {
+            //     globalParticular: {
+            //       feeStructure: {
+            //         classId: cls.id, //  ensure the fee structure belongs to this class
+            //       },
+            //     },
+            //   },
+            // },
+          },
+          include: {
+            FeeStructure: true,
+          }
+          // select: { id: true },
+        });
+
+        return {
+          ...cls,
+          isStructureAssigned: !!assigned,
+        };
+      })
+    );
     return NextResponse.json(result)
   } catch (error) {
     console.error("[CLASS_GET_ERROR]", error)

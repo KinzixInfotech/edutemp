@@ -26,29 +26,77 @@ export async function POST(req) {
             );
         }
 
-        // Normalize classId into an array
+        // Normalize classId into array
         const classIds = Array.isArray(classId)
             ? classId
             : classId
                 ? [classId]
                 : [];
 
-        // Collect students
         let students = [];
 
         if (applyToAllStudents) {
-            // All students of this academic year
             students = await prisma.student.findMany({
                 where: { academicYearId },
             });
         } else if (classIds.length > 0) {
-            // Specific classes
+            // Check if *this* feeStructure is already linked to this class
+            const alreadyLinked = await prisma.feeStructure.findFirst({
+                where: {
+                    id: feeStructure.id,
+                    classId: { in: classIds },
+                    academicYearId,
+                },
+            });
+
+            if (alreadyLinked) {
+                return NextResponse.json(
+                    { error: "Fee structure already assigned to this class" },
+                    { status: 400 }
+                );
+            }
+
+            // Check if another FeeStructure exists for this class
+            const oldStructure = await prisma.feeStructure.findFirst({
+                where: {
+                    classId: { in: classIds },
+                    academicYearId,
+                    NOT: { id: feeStructure.id },
+                },
+            });
+
+            if (oldStructure) {
+                // Remove all old student mappings
+                await prisma.studentFeeParticular.deleteMany({
+                    where: {
+                        studentFeeStructure: {
+                            academicYearId,
+                            schoolId: feeStructure.schoolId,
+                            student: { classId: { in: classIds } },
+                        },
+                    },
+                });
+
+                await prisma.studentFeeStructure.deleteMany({
+                    where: {
+                        academicYearId,
+                        schoolId: feeStructure.schoolId,
+                        student: { classId: { in: classIds } },
+                    },
+                });
+            }
+
+            // Link new FeeStructure to this class
+            await prisma.feeStructure.update({
+                where: { id: feeStructure.id },
+                data: { classId: classIds[0] }, // single class at a time
+            });
+
+            // Fetch students of this class
             students = await prisma.student.findMany({
                 where: {
                     academicYearId,
-                    classId: {
-                        in: classIds.map((id) => Number(id)), // handles [1], [1,2,3]
-                    },
+                    classId: { in: classIds.map((id) => Number(id)) },
                 },
             });
         }
@@ -60,14 +108,25 @@ export async function POST(req) {
             );
         }
 
-        // Assign fee structure to each student
+        // Assign FeeStructure to each student
         for (const student of students) {
+            const alreadyAssigned = await prisma.studentFeeStructure.findFirst({
+                where: {
+                    studentId: student.userId,
+                    academicYearId,
+                    feeStructureId: feeStructure.id,
+                },
+            });
+
+            if (alreadyAssigned) continue;
+
             const studentFeeStructure = await prisma.studentFeeStructure.create({
                 data: {
                     studentId: student.userId,
                     academicYearId,
                     schoolId: student.schoolId,
                     studentUserId: student.userId,
+                    feeStructureId: feeStructure.id,
                 },
             });
 

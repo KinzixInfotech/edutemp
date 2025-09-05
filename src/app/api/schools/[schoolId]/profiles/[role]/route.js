@@ -23,7 +23,7 @@ const baseUserSchema = z.object({
 const studentSchema = baseUserSchema.extend({
     studentName: z.string(),
     admissionNo: z.string(),
-    academicYearId: z.string(),
+    // academicYearId: z.string(),
     schoolId: z.string().uuid(),
     dob: z.coerce.date(),
     profilePicture: z.string(),
@@ -120,7 +120,7 @@ export async function POST(req, context) {
         }
 
         const body = await req.json();
-        console.log(body, 'from edu');
+        console.log(body, "from edu");
 
         let parsed;
 
@@ -141,6 +141,21 @@ export async function POST(req, context) {
                 return NextResponse.json({ error: "Unsupported role" }, { status: 400 });
         }
 
+        //  Fetch active academic year only for student/staff
+        let activeAcademicYear = null;
+        if (["STUDENT", "TEACHING_STAFF", "NON_TEACHING_STAFF"].includes(mappedRole)) {
+            if (rawRole?.toLowerCase() !== "busdrivers") {
+                activeAcademicYear = await prisma.academicYear.findFirst({
+                    where: { schoolId, isActive: true },
+                });
+
+                if (!activeAcademicYear) {
+                    throw new Error("No active academic year found. Please create one before creating users.");
+                }
+            }
+        }
+
+        // ✅ Supabase user creation
         const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
             email: parsed.email,
             password: parsed.password,
@@ -153,140 +168,168 @@ export async function POST(req, context) {
 
         createdUserId = authUser.user.id;
 
-        const created = await prisma.$transaction(async (tx) => {
-            // Ensure Role exists
-            const role = await tx.role.upsert({
-                where: { name: mappedRole },
-                update: {},
-                create: { name: mappedRole },
-            });
+        const created = await prisma.$transaction(
+            async (tx) => {
+                // Ensure Role exists
+                const role = await tx.role.upsert({
+                    where: { name: mappedRole },
+                    update: {},
+                    create: { name: mappedRole },
+                });
 
-            // Create user with role connection
-            const user = await tx.user.create({
-                data: {
-                    id: createdUserId,
-                    password: parsed.password,
-                    profilePicture: parsed.profilePicture,
-                    name: parsed.name,
-                    email: parsed.email,
-                    school: { connect: { id: parsed.schoolId } },
-                    role: { connect: { id: role.id } },
-                },
-                include: {
-                    role: true,
-                    school: true,
-                },
-            });
+                // Create user with role connection
+                const user = await tx.user.create({
+                    data: {
+                        id: createdUserId,
+                        password: parsed.password,
+                        profilePicture: parsed.profilePicture,
+                        name: parsed.name,
+                        email: parsed.email,
+                        school: { connect: { id: parsed.schoolId } },
+                        role: { connect: { id: role.id } },
+                    },
+                    include: {
+                        role: true,
+                        school: true,
+                    },
+                });
 
-            let profile = null;
+                let profile = null;
 
-            switch (mappedRole) {
-                case "STUDENT":
-                    profile = await tx.student.create({
-                        data: {
-                            name: parsed.studentName,
-                            admissionNo: parsed.admissionNo,
-                            AcademicYear: { connect: { id: parsed.academicYearId } },
-                            school: { connect: { id: parsed.schoolId } },
-                            user: { connect: { id: user.id } }, //  REQUIRED!
-                            class: { connect: { id: parsed.classId } },
-                            dob: parsed.dob.toISOString(),
-                            gender: parsed.gender,
-                            PreviousSchoolName: parsed.previousSchoolName,
-                            Address: parsed.address,
-                            FatherName: parsed.fatherName,
-                            MotherName: parsed.motherName,
-                            FatherNumber: parsed.fatherMobileNumber || "",
-                            MotherNumber: parsed.motherMobileNumber || "",
-                            bloodGroup: parsed.bloodGroup || "",
-                            contactNumber: parsed.contactNumber || "",
-                            email: parsed.email,
-                            FeeStatus: "PENDING",
-                            admissionDate: parsed.admissionDate?.toISOString() || new Date().toISOString(),
-                            rollNumber: parsed.rollNumber || "",
-                            city: parsed.city || "",
-                            state: parsed.state || "",
-                            country: parsed.country || "",
-                            postalCode: parsed.postalCode || "",
-                            DateOfLeaving: parsed.dateOfLeaving || "",
-                            parentId: parsed.parentId || null,
-                            GuardianName: parsed.guardianName || "",
-                            GuardianRelation: parsed.guardianRelation || "",
-                            House: parsed.house || "",
-                            section: { connect: { id: Number(parsed.sectionId) } },
-                        },
-                    });
-                    break;
-
-                case "TEACHING_STAFF":
-                    profile = await tx.teachingStaff.create({
-                        data: {
-                            // userId: user.id,
-                            school: { connect: { id: parsed.schoolId } },
-                            user: { connect: { id: user.id } }, //  REQUIRED!
-                            // department: parsed.department,
-                            designation: parsed.designation,
-                            gender: parsed.gender,
-                            employeeId: parsed.empployeeId,
-                            name: parsed.name,
-                            age: parsed.age,
-                            bloodGroup: parsed.bloodGroup,
-                            dob: parsed.dob.toISOString(),
-                            contactNumber: parsed.contactNumber,
-                            email: parsed.email,
-                            address: parsed.address,
-                            City: parsed.city,
-                            district: parsed.district || "",
-                            state: parsed.state || "",
-                            country: parsed.country || "",
-                            PostalCode: parsed.postalCode || "",
-                        },
-                    });
-                    break;
-
-                case "NON_TEACHING_STAFF":
-                    profile = await tx.NonTeachingStaff.create({
-                        data: {
-                            // userId: user.id,
-                            school: { connect: { id: parsed.schoolId } },
-                            user: { connect: { id: user.id } }, //  REQUIRED!
-                            // department: parsed.department,
-                            designation: parsed.designation,
-                            gender: parsed.gender,
-                            employeeId: parsed.empployeeId,
-                            name: parsed.name,
-                            age: parsed.age,
-                            bloodGroup: parsed.bloodGroup,
-                            dob: parsed.dob.toISOString(),
-                            contactNumber: parsed.contactNumber,
-                            email: parsed.email,
-                            address: parsed.address,
-                            City: parsed.city,
-                            district: parsed.district || "",
-                            state: parsed.state || "",
-                            country: parsed.country || "",
-                            PostalCode: parsed.postalCode || "",
-                        },
-                    });
-                    break;
-
-                case "PARENT":
-                    profile = await tx.parent.create({
-                        data: {
-                            userId: user.id,
-                            guardianName: parsed.guardianName,
-                            students: {
-                                connect: { userId: parsed.childId },
+                switch (mappedRole) {
+                    case "STUDENT":
+                        profile = await tx.student.create({
+                            data: {
+                                name: parsed.studentName,
+                                admissionNo: parsed.admissionNo,
+                                AcademicYear: { connect: { id: activeAcademicYear.id } },
+                                school: { connect: { id: parsed.schoolId } },
+                                user: { connect: { id: user.id } },
+                                class: { connect: { id: parsed.classId } },
+                                dob: parsed.dob.toISOString(),
+                                gender: parsed.gender,
+                                PreviousSchoolName: parsed.previousSchoolName,
+                                Address: parsed.address,
+                                FatherName: parsed.fatherName,
+                                MotherName: parsed.motherName,
+                                FatherNumber: parsed.fatherMobileNumber || "",
+                                MotherNumber: parsed.motherMobileNumber || "",
+                                bloodGroup: parsed.bloodGroup || "",
+                                contactNumber: parsed.contactNumber || "",
+                                email: parsed.email,
+                                FeeStatus: "PENDING",
+                                admissionDate:
+                                    parsed.admissionDate?.toISOString() || new Date().toISOString(),
+                                rollNumber: parsed.rollNumber || "",
+                                city: parsed.city || "",
+                                state: parsed.state || "",
+                                country: parsed.country || "",
+                                postalCode: parsed.postalCode || "",
+                                DateOfLeaving: parsed.dateOfLeaving || "",
+                                parentId: parsed.parentId || null,
+                                GuardianName: parsed.guardianName || "",
+                                GuardianRelation: parsed.guardianRelation || "",
+                                House: parsed.house || "",
+                                section: { connect: { id: Number(parsed.sectionId) } },
                             },
-                        },
-                    });
-                    break;
-            }
+                        });
+                        break;
 
-            return { user, profile };
-        }, {
-            timeout: 10000 // 10 seconds (default is 5000)
-        });;
+                    case "TEACHING_STAFF":
+                        profile = await tx.teachingStaff.create({
+                            data: {
+                                school: { connect: { id: parsed.schoolId } },
+                                user: { connect: { id: user.id } },
+                                designation: parsed.designation,
+                                gender: parsed.gender,
+                                employeeId: parsed.empployeeId,
+                                name: parsed.name,
+                                age: parsed.age,
+                                bloodGroup: parsed.bloodGroup,
+                                dob: parsed.dob.toISOString(),
+                                contactNumber: parsed.contactNumber,
+                                email: parsed.email,
+                                address: parsed.address,
+                                City: parsed.city,
+                                district: parsed.district || "",
+                                state: parsed.state || "",
+                                country: parsed.country || "",
+                                PostalCode: parsed.postalCode || "",
+                                AcademicYear: { connect: { id: activeAcademicYear.id } },
+                            },
+                        });
+                        break;
+
+                    case "NON_TEACHING_STAFF":
+                        if (rawRole?.toLowerCase() === "busdrivers") {
+                            // ❌ Bus drivers: no academic year
+                            profile = await tx.NonTeachingStaff.create({
+                                data: {
+                                    school: { connect: { id: parsed.schoolId } },
+                                    user: { connect: { id: user.id } },
+                                    designation: parsed.designation,
+                                    gender: parsed.gender,
+                                    employeeId: parsed.empployeeId,
+                                    name: parsed.name,
+                                    age: parsed.age,
+                                    bloodGroup: parsed.bloodGroup,
+                                    dob: parsed.dob.toISOString(),
+                                    contactNumber: parsed.contactNumber,
+                                    email: parsed.email,
+                                    address: parsed.address,
+                                    City: parsed.city,
+                                    district: parsed.district || "",
+                                    state: parsed.state || "",
+                                    country: parsed.country || "",
+                                    PostalCode: parsed.postalCode || "",
+                                },
+                            });
+                        } else {
+                            // ✅ Other non-teaching staff: with academic year
+                            profile = await tx.NonTeachingStaff.create({
+                                data: {
+                                    school: { connect: { id: parsed.schoolId } },
+                                    user: { connect: { id: user.id } },
+                                    designation: parsed.designation,
+                                    gender: parsed.gender,
+                                    employeeId: parsed.empployeeId,
+                                    name: parsed.name,
+                                    age: parsed.age,
+                                    bloodGroup: parsed.bloodGroup,
+                                    dob: parsed.dob.toISOString(),
+                                    contactNumber: parsed.contactNumber,
+                                    email: parsed.email,
+                                    address: parsed.address,
+                                    City: parsed.city,
+                                    district: parsed.district || "",
+                                    state: parsed.state || "",
+                                    country: parsed.country || "",
+                                    PostalCode: parsed.postalCode || "",
+                                    AcademicYear: { connect: { id: activeAcademicYear.id } },
+                                },
+                            });
+                        }
+                        break;
+
+                    case "PARENT":
+                        profile = await tx.parent.create({
+                            data: {
+                                userId: user.id,
+                                guardianName: parsed.guardianName,
+                                students: {
+                                    connect: { userId: parsed.childId },
+                                },
+                            },
+                        });
+                        break;
+                }
+
+                return { user, profile };
+            },
+            {
+                timeout: 10000, // 10 seconds
+            }
+        );
 
         return NextResponse.json({ success: true, ...created });
     } catch (error) {

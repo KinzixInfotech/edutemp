@@ -73,7 +73,7 @@ export default function NewProfilePage() {
         admissionNo: "",
         admissionDate: null, // ✅ Date object
         rollNumber: "",
-        academicYearId: "",
+        // academicYearId: "",
         bloodGroup: "",
         adhaarNo: "",
         empployeeId: "",
@@ -203,17 +203,17 @@ export default function NewProfilePage() {
                     </>
                 )
             case "students":
-                useEffect(() => {
-                    const fetchYears = async () => {
-                        const res = await fetch(`/api/schools/academic-years?schoolId=${schoolId}`)
-                        const data = await res.json()
-                        setYears(data)
-                    }
-                    fetchYears()
-                }, [])
+                // useEffect(() => {
+                //     const fetchYears = async () => {
+                //         const res = await fetch(`/api/schools/academic-years?schoolId=${schoolId}`)
+                //         const data = await res.json()
+                //         setYears(data)
+                //     }
+                //     fetchYears()
+                // }, [])
                 return (
                     <>
-                        <Select
+                        {/* <Select
                             value={form.academicYearId}
                             onValueChange={(value) => setForm({ ...form, academicYearId: value })}
                         >
@@ -227,7 +227,7 @@ export default function NewProfilePage() {
                                     </SelectItem>
                                 ))}
                             </SelectContent>
-                        </Select>
+                        </Select> */}
                         <Input
                             placeholder="Admission Number"
                             value={form.admissionNo}
