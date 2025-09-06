@@ -1,243 +1,120 @@
-// 'use client';
-
-// import { createContext, useContext, useEffect, useState } from 'react';
-// import { supabase } from '@/lib/supabase';
-
-// const AuthContext = createContext();
-
-// export function AuthProvider({ children }) {
-//     const [user, setUser] = useState(null);        // Supabase user
-//     const [fullUser, setFullUser] = useState(null); // Prisma user with role + schoolId
-//     const [loading, setLoading] = useState(false);
-//     const [loadingMsg, setLoadingMsg] = useState('');
-
-//     // ⛳ Unified fetch user method
-//     const fetchUser = async (sessionUser) => {
-//         try {
-//             setUser(sessionUser);
-
-//             if (!sessionUser) {
-//                 setFullUser(null);
-//                 return;
-//             }
-
-//             // 1️⃣ Try localStorage first
-//             const cached = localStorage.getItem("user");
-//             if (cached) {
-//                 setFullUser(JSON.parse(cached));
-//                 return;
-//             }
-
-//             // 2️⃣ Otherwise fetch from API
-//             setLoading(true);
-//             setLoadingMsg('Initializing....');
-//             const res = await fetch(`/api/auth/user?userId=${sessionUser.id}`, {
-//                 headers: {
-//                     "Content-Type": "application/json",
-//                     Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-//                 },
-//             });
-//             const data = await res.json();
-
-
-
-//             if (res.ok) {
-//                 setFullUser(data);
-//             } else {
-//                 console.error("API failed:", res.status, data);
-//             }
-//         } catch (err) {
-//             console.error("❌ Error fetching user:", err);
-//             setLoadingMsg('Initialization Failed. Check your connection....');
-//         } finally {
-//             setLoading(false);
-//         }
-//     };
-
-//     useEffect(() => {
-//         //  Function to get initial session and user
-//         const getInitialSession = async () => {
-
-//             try {
-//                 setLoading(true)
-//                 const { data } = await supabase.auth.getSession();
-//                 // console.log(data);
-
-//                 // Get current user from session
-//                 const currentUser = data.session?.user ?? null;
-
-
-//                 // 🔹 First try cached user
-//                 const cachedUser = localStorage.getItem("user");
-//                 if (cachedUser) {
-//                     setFullUser(JSON.parse(cachedUser));
-//                 }
-
-//                 // 🔹 If no cached user or session changed → fetch fresh
-//                 if (currentUser && !cachedUser) {
-//                     await fetchUser(currentUser);
-//                 }
-//             } catch (error) {
-//                 console.error("Error getting initial session:", error);
-//             } finally {
-//                 setLoading(false)
-//             }
-//         };
-
-//         getInitialSession();
-
-//         //  Listen for auth state changes
-//         const {
-//             data: { subscription },
-//         } = supabase.auth.onAuthStateChange((_event, session) => {
-//             const currentUser = session?.user ?? null;
-
-//             if (currentUser) {
-//                 fetchUser(currentUser); // updates cache + fullUser
-//             } else {
-//                 setUser(null);
-//                 setFullUser(null);
-//                 localStorage.removeItem("user"); // optional: clear cache on logout
-//             }
-//         });
-//         // Cleanup subscription on unmount
-//         return () => subscription.unsubscribe();
-//     }, []);
-
-//     useEffect(() => {
-
-//         console.log(fullUser, 'from auth context');
-
-//     }, [fullUser])
-
-
-//     return (
-//         <AuthContext.Provider value={{ user, fullUser, loading, loadingMsg }}>
-//             {children}
-//         </AuthContext.Provider>
-//     );
-// }
-
-// export const useAuth = () => useContext(AuthContext);
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { supabase } from '@/lib/supabase'
 
-const AuthContext = createContext();
+const AuthContext = createContext()
 
 export function AuthProvider({ children }) {
-    const [user, setUser] = useState(null);        // Supabase user
-    const [fullUser, setFullUser] = useState(null); // Prisma user with role + schoolId
-    const [loading, setLoading] = useState(false);
-    const [loadingMsg, setLoadingMsg] = useState('');
+    const [user, setUser] = useState(null)
+    const [fullUser, setFullUser] = useState(null) // ✅ you were missing this
+    const [loading, setLoading] = useState(false)
+    const [loadingMsg, setLoadingMsg] = useState('')
 
-    // ⛳ Unified fetch user method
+    // ✅ safe setter (prevents re-renders if data is same)
+    const safeSetFullUser = (newUser) => {
+        setFullUser((prev) => {
+            if (!prev && newUser) return newUser
+            if (!newUser && prev) return null
+
+            const same =
+                prev &&
+                Object.keys(newUser || {}).length === Object.keys(prev).length &&
+                Object.keys(newUser || {}).every((k) => prev[k] === newUser[k])
+
+            return same ? prev : newUser
+        })
+    }
+
     const fetchUser = async (sessionUser) => {
         try {
-            setUser(sessionUser);
-
+            setUser(sessionUser)
             if (!sessionUser) {
-                setFullUser(null);
-                return;
+                setFullUser(null)
+                return
             }
 
-            // 1️⃣ Try localStorage first
-            const cached = localStorage.getItem("user");
+            // 1️⃣ Try cache first
+            const cached = localStorage.getItem('user')
             if (cached) {
-                setFullUser(JSON.parse(cached));
-                return;
+                safeSetFullUser(JSON.parse(cached))
+                return
             }
 
-            // 2️⃣ Otherwise fetch from API
-            setLoading(true);
-            setLoadingMsg('Initializing....');
+            // 2️⃣ Fetch from API
+            setLoading(true)
+            setLoadingMsg('Initializing...')
+            const token = (await supabase.auth.getSession()).data.session?.access_token
             const res = await fetch(`/api/auth/user?userId=${sessionUser.id}`, {
                 headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
                 },
-            });
-            const data = await res.json();
+            })
 
-
-
+            const data = await res.json()
             if (res.ok) {
-                setFullUser(data);
-                localStorage.setItem("user", JSON.stringify(data));
+                safeSetFullUser(data)
+                localStorage.setItem('user', JSON.stringify(data))
             } else {
-                console.error("API failed:", res.status, data);
+                console.error('API failed:', res.status, data)
             }
         } catch (err) {
-            console.error("❌ Error fetching user:", err);
-            setLoadingMsg('Initialization Failed. Check your connection....');
+            console.error('❌ Error fetching user:', err)
+            setLoadingMsg('Initialization Failed. Check your connection...')
         } finally {
-            setLoading(false);
+            setLoading(false)
         }
-    };
+    }
 
     useEffect(() => {
-        //  Function to get initial session and user
         const getInitialSession = async () => {
-
             try {
                 setLoading(true)
-                const { data } = await supabase.auth.getSession();
-                // console.log(data);
+                const { data } = await supabase.auth.getSession()
+                const currentUser = data.session?.user ?? null
 
-                // Get current user from session
-                const currentUser = data.session?.user ?? null;
-
-
-                // 🔹 First try cached user
-                const cachedUser = localStorage.getItem("user");
+                // load from cache
+                const cachedUser = localStorage.getItem('user')
                 if (cachedUser) {
-                    setFullUser(JSON.parse(cachedUser));
+                    safeSetFullUser(JSON.parse(cachedUser))
                 }
 
-                // 🔹 If no cached user or session changed → fetch fresh
+                // fetch fresh only if logged in but no cache
                 if (currentUser && !cachedUser) {
-                    await fetchUser(currentUser);
+                    await fetchUser(currentUser)
                 }
-            } catch (error) {
-                console.error("Error getting initial session:", error);
+            } catch (err) {
+                console.error('Error getting initial session:', err)
             } finally {
                 setLoading(false)
             }
-        };
+        }
 
-        getInitialSession();
+        getInitialSession()
 
-        //  Listen for auth state changes
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((_event, session) => {
-            const currentUser = session?.user ?? null;
-
+            const currentUser = session?.user ?? null
             if (currentUser) {
-                fetchUser(currentUser); // updates cache + fullUser
+                fetchUser(currentUser)
             } else {
-                setUser(null);
-                setFullUser(null);
-                localStorage.removeItem("user"); // optional: clear cache on logout
+                setUser(null)
+                setFullUser(null)
+                localStorage.removeItem('user')
             }
-        });
-        // Cleanup subscription on unmount
-        return () => subscription.unsubscribe();
-    }, []);
+        })
 
-    useEffect(() => {
+        return () => subscription.unsubscribe()
+    }, [])
 
-        console.log(fullUser, 'from auth context');
+    const value = useMemo(
+        () => ({ user, fullUser, loading, loadingMsg }),
+        [user, fullUser, loading, loadingMsg]
+    )
 
-    }, [fullUser])
-
-
-    return (
-        <AuthContext.Provider value={{ user, fullUser, loading, loadingMsg }}>
-            {children}
-        </AuthContext.Provider>
-    );
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => useContext(AuthContext)

@@ -548,7 +548,6 @@ model FeeParticular {
   StudentFeeParticular StudentFeeParticular[]
 }
 
-
 model StudentFeeStructure {
   id             String  @id @default(uuid()) @db.Uuid
   studentId      String  @db.Uuid
@@ -557,9 +556,10 @@ model StudentFeeStructure {
   studentUserId  String? @db.Uuid
 
   // 🔹 Relation to FeeStructure
-  feeStructureId String       @db.Uuid
-  feeStructure   FeeStructure @relation(fields: [feeStructureId], references: [id])
-
+  feeStructureId String                 @db.Uuid
+  feeStructure   FeeStructure           @relation(fields: [feeStructureId], references: [id])
+  status         String                 @default("UNPAID") // overall status: UNPAID / PARTIAL / PAID
+  
   feeParticulars StudentFeeParticular[]
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @default(now()) @updatedAt
@@ -573,7 +573,7 @@ model StudentFeeParticular {
   studentFeeStructureId String                  @db.Uuid
   globalParticularId    String                  @db.Uuid
   amount                Float?
-  status                String                  @default("unpaid")
+  // status                String                  @default("unpaid")
   studentFeeStructure   StudentFeeStructure     @relation(fields: [studentFeeStructureId], references: [id])
   globalParticular      FeeParticular           @relation(fields: [globalParticularId], references: [id])
   StudentFeeInstallment StudentFeeInstallment[]
@@ -699,6 +699,7 @@ enum AuditAction {
 enum FeeStatus {
   PAID
   UNPAID
+  PARTIAL
   PENDING
 }
 

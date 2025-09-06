@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/form";
 import Link from "next/link";
 import { numberToWordsIndian } from "@/lib/utils";
+import LoaderPage from "@/components/loader-page";
 
 // Schema for assigning custom fee structure
 const assignSchema = z.object({
@@ -82,7 +83,7 @@ export default function FeeStructuresTable() {
     });
 
     // Fetch data
-    const fetchData = useCallback(async () => {
+    const fetchData = (async () => {
         if (!fullUser?.schoolId) return;
         setLoading(true);
         try {
@@ -132,11 +133,11 @@ export default function FeeStructuresTable() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    });
 
     useEffect(() => {
         fetchData();
-    }, [fetchData]);
+    }, [fullUser?.schoolId]);
 
     // Filter students based on search, class, and section
     useEffect(() => {
@@ -291,9 +292,9 @@ export default function FeeStructuresTable() {
                     </TableHeader>
                     <TableBody>
                         {loading ? (
-                            <TableRow>
-                                <TableCell colSpan={7} className="text-center py-4">
-                                    Loading...
+                            <TableRow className='flex items-center justify-center'>
+                                <TableCell colSpan={7} className="flex items-center justify-center   w-full py-4">
+                                    <Loader2 size={30} className="animate-spin"/>
                                 </TableCell>
                             </TableRow>
                         ) : filteredStudents.length > 0 ? (

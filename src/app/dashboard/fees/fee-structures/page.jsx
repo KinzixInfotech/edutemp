@@ -74,15 +74,33 @@ export default function FeeStructuresTable() {
   });
 
   // Fetch fee structures
-  const fetchFeeStructures = useCallback(async () => {
-    if (!fullUser?.schoolId) return;
+  // const fetchFeeStructures = useCallback(async () => {
+  //   if (!fullUser?.schoolId) return;
+  //   setLoading(true);
+  //   try {
+  //     const res = await fetch(`/api/schools/fee/structures?schoolId=${fullUser.schoolId}`, {
+  //       method: "GET",
+  //     }
+  //     );
+
+  //     if (!res.ok) throw new Error("Failed to fetch fee structures");
+  //     const data = await res.json();
+  //     setFeeStructures(data);
+  //     setFilteredFeeStructures(data);
+  //   } catch (err) {
+  //     console.error(err);
+  //     toast.error(err.message || "Failed to load fee structures");
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // }, [fullUser]);
+
+  const fetchFeeStructures = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/schools/fee/structures?schoolId=${fullUser.schoolId}`, {
-        method: "GET",
-      }
+      const res = await fetch(
+        `/api/schools/fee/structures?schoolId=${fullUser.schoolId}`
       );
-
       if (!res.ok) throw new Error("Failed to fetch fee structures");
       const data = await res.json();
       setFeeStructures(data);
@@ -93,11 +111,12 @@ export default function FeeStructuresTable() {
     } finally {
       setLoading(false);
     }
-  }, [fullUser]);
-
+  };
   useEffect(() => {
+    if (!fullUser?.schoolId) return; // don't fetch until fullUser is ready
     fetchFeeStructures();
-  }, [fetchFeeStructures]);
+  }, [fullUser?.schoolId]);
+
 
   // Handle search
   useEffect(() => {

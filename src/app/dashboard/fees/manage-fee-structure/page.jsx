@@ -139,10 +139,12 @@ export default function FeeStructureTableForm() {
     }, [fullUser]);
 
     useEffect(() => {
-        if (fullUser?.schoolId) {
-            fetchData();
-        }
-    }, [fetchData]);
+        if (!fullUser?.schoolId) return;
+
+        if (classes.length > 0 && activeAcademicYear) return; // data already fetched
+
+        fetchData();
+    }, [fullUser?.schoolId]);
 
     const onSubmit = async (values) => {
         if (!fullUser?.schoolId) {

@@ -301,6 +301,7 @@ export async function POST(req) {
                         schoolId,
                         studentUserId: student.userId,
                         feeStructureId: feeStructure.id,
+                        status: "unpaid",
                     },
                 });
 
@@ -309,7 +310,7 @@ export async function POST(req) {
                         studentFeeStructureId: studentFeeStructure.id,
                         globalParticularId: particular.id,
                         amount: particular.defaultAmount,
-                        status: "unpaid",
+
                     })),
                 });
             }
