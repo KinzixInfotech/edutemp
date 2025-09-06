@@ -36,8 +36,51 @@ model School {
   FeeStructure        FeeStructure[]
   StudentFeeStructure StudentFeeStructure[]
   FeePayment          FeePayment[]
+  Notice              Notice[]
 
   @@index([name])
+}
+
+model Notice {
+  id          String    @id @default(uuid()) @db.Uuid
+  schoolId    String    @db.Uuid
+  title       String
+  description String
+  fileUrl     String? // optional file attachment
+  audience    Audience  @default(ALL) // enum: target audience
+  priority    Priority  @default(NORMAL) // enum: notice importance
+  status      Status    @default(DRAFT) // enum: DRAFT, PUBLISHED, ARCHIVED
+  publishedAt DateTime? // optional published date
+  expiryDate  DateTime? // optional expiry date
+  createdById String?   @db.Uuid // staff/admin who created
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+
+  // Relations
+  School       School         @relation(fields: [schoolId], references: [id])
+  Author       User?          @relation(fields: [createdById], references: [id])
+  NoticeTarget NoticeTarget[]
+
+  @@index([schoolId])
+  @@index([status])
+  @@index([priority])
+  @@index([publishedAt])
+  @@index([expiryDate])
+}
+
+model NoticeTarget {
+  id        String @id @default(uuid()) @db.Uuid
+  noticeId  String @db.Uuid
+  classId   Int? // optional, for class-specific notice
+  sectionId Int? // optional, for section-specific notice
+
+  Notice  Notice   @relation(fields: [noticeId], references: [id])
+  Class   Class?   @relation(fields: [classId], references: [id])
+  Section Section? @relation(fields: [sectionId], references: [id])
+
+  @@index([noticeId])
+  @@index([classId])
+  @@index([sectionId])
 }
 
 model Role {
@@ -72,6 +115,7 @@ model User {
   AuditLog              AuditLog[]
   Admin                 Admin?
   MasterAdmin           MasterAdmin?
+  Notice                Notice[]
 
   @@index([schoolId])
   @@index([roleId])
@@ -290,6 +334,7 @@ model Class {
   teachingStaffUserId String?        @db.Uuid
   AcademicYear        AcademicYear?  @relation(fields: [academicYearId], references: [id])
   academicYearId      String?        @db.Uuid // ✅ fixed
+  NoticeTarget        NoticeTarget[]
 
   @@unique([id, schoolId])
   @@index([schoolId])
@@ -307,6 +352,7 @@ model Section {
   students        Student[]
   timetables      Timetable[]
   subjectTeachers SectionSubjectTeacher[]
+  NoticeTarget    NoticeTarget[]
 
   @@unique([classId, name])
   @@index([classId])
@@ -548,6 +594,7 @@ model FeeParticular {
   StudentFeeParticular StudentFeeParticular[]
 }
 
+//model used for custom fee assign
 model StudentFeeStructure {
   id             String  @id @default(uuid()) @db.Uuid
   studentId      String  @db.Uuid
@@ -556,10 +603,10 @@ model StudentFeeStructure {
   studentUserId  String? @db.Uuid
 
   // 🔹 Relation to FeeStructure
-  feeStructureId String                 @db.Uuid
-  feeStructure   FeeStructure           @relation(fields: [feeStructureId], references: [id])
-  status         String                 @default("UNPAID") // overall status: UNPAID / PARTIAL / PAID
-  
+  feeStructureId String       @db.Uuid
+  feeStructure   FeeStructure @relation(fields: [feeStructureId], references: [id])
+  status         String       @default("UNPAID") // overall status: UNPAID / PARTIAL / PAID
+
   feeParticulars StudentFeeParticular[]
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @default(now()) @updatedAt
@@ -731,4 +778,25 @@ enum FeeMode {
   QUARTERLY
   HALF_YEARLY
   YEARLY
+}
+
+enum Audience {
+  ALL // all students, staff, parents
+  STUDENTS
+  TEACHERS
+  PARENTS
+  CLASS // if you want to assign to specific class
+  SECTION // if you want to assign to a specific section
+}
+
+enum Priority {
+  NORMAL
+  IMPORTANT
+  URGENT
+}
+
+enum Status {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
 }

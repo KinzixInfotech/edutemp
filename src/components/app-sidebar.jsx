@@ -35,7 +35,7 @@ import {
 } from "@tabler/icons-react"
 import { NavSidebarSections } from "./nav-main"
 import { Separator } from "./ui/separator"
-import { BookMarked, CalendarCog, Coins, DollarSign, Ellipsis, Grip, House, MonitorCog, Send, User, UserPen } from "lucide-react"
+import { BookMarked, CalendarCog, Coins, DollarSign, Ellipsis, Flag, Grip, House, MonitorCog, Send, User, UserPen } from "lucide-react"
 const sidebarData = [
     {
         // title: "Main",
@@ -81,7 +81,7 @@ const sidebarData = [
             { label: "Manage Student", url: "/dashboard/schools/manage-student", icon: User, roles: ["ADMIN"] },
             { label: "Manage Academic Year", url: "/dashboard/schools/academic-years", icon: CalendarCog, roles: ["ADMIN"] },
             { label: "Manage Attendance", url: "/dashboard/attendance/", icon: MonitorCog, roles: ["ADMIN"] },
-            { label: "Send Notification", url: "/dashboard/schools/send-notifcation", icon: Send, roles: ["ADMIN"] },
+            { label: "Notices & Circulars", url: "/dashboard/schools/manage-notice", icon: Flag, roles: ["ADMIN"] },
         ]
     },
 

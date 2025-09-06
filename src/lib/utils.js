@@ -30,56 +30,58 @@ export function adjustScheduleToCurrentWeek(events) {
 }
 // Convert number to words in Indian numbering system (Rupees & Paise)
 export function numberToWordsIndian(num) {
-  if (num === 0) return "Zero Rupees Only"
+  if (num === 0) return "Zero Rupees Only";
 
   const a = [
     "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
     "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen",
     "Seventeen", "Eighteen", "Nineteen"
-  ]
+  ];
   const b = [
     "", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"
-  ]
+  ];
 
   function inWords(n) {
-    if (n < 20) return a[n]
-    if (n < 100) return b[Math.floor(n / 10)] + (n % 10 ? " " + a[n % 10] : "")
+    if (n < 20) return a[n];
+    if (n < 100) return b[Math.floor(n / 10)] + (n % 10 ? " " + a[n % 10] : "");
     if (n < 1000)
       return (
         a[Math.floor(n / 100)] +
         " Hundred" +
         (n % 100 ? " " + inWords(n % 100) : "")
-      )
+      );
     if (n < 100000)
       return (
         inWords(Math.floor(n / 1000)) +
         " Thousand" +
         (n % 1000 ? " " + inWords(n % 1000) : "")
-      )
+      );
     if (n < 10000000)
       return (
         inWords(Math.floor(n / 100000)) +
         " Lakh" +
         (n % 100000 ? " " + inWords(n % 100000) : "")
-      )
+      );
     return (
       inWords(Math.floor(n / 10000000)) +
       " Crore" +
       (n % 10000000 ? " " + inWords(n % 10000000) : "")
-    )
+    );
   }
 
-  const [rupees, paise] = num.toFixed(2).split(".")
+  const [rupees, paise] = num.toFixed(2).split(".");
 
-  let words = ""
+  let words = "";
   if (parseInt(rupees, 10) > 0) {
-    words += inWords(parseInt(rupees, 10)) + " Rupees"
+    // Add commas between major units
+    words += inWords(parseInt(rupees, 10))
+      .replace(/(?<=\b(Crore|Lakh|Thousand|Hundred)\b)/g, ",") + " Rupees";
   }
   if (parseInt(paise, 10) > 0) {
-    words += " and " + inWords(parseInt(paise, 10)) + " Paise"
+    words += " and " + inWords(parseInt(paise, 10)) + " Paise";
   }
 
-  return words + " Only"
+  return words + " Only";
 }
 
 export function formatDate(dateString) {

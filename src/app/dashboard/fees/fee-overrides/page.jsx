@@ -270,9 +270,9 @@ export default function FeeStructuresTable() {
                                 ))}
                         </SelectContent>
                     </Select>
-                    <Link href="./manage-fee-structure">
+                    {/* <Link href="./manage-fee-structure">
                         <Button className="lg:w-fit w-full">Add Fee Structure</Button>
-                    </Link>
+                    </Link> */}
                     <Button variant="outline" className="lg:w-fit w-full">Export</Button>
                 </div>
             </div>

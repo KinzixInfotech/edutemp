@@ -151,6 +151,7 @@ import { z } from "zod";
 const createSchema = z.object({
     name: z.string().min(1, "Fee structure name is required"),
     schoolId: z.string().uuid("Invalid school ID"),
+    installment: z.boolean(),
     classId: z.number().int().positive("Invalid class ID"),
     mode: z.enum(["MONTHLY", "QUARTERLY", "HALF_YEARLY", "YEARLY"], {
         message: "Invalid fee mode",
@@ -256,7 +257,7 @@ export async function POST(req) {
                 { status: 400 }
             );
         }
-        const { name, schoolId, classId, mode, fees } = parsed.data;
+        const { name, schoolId, classId, mode, fees, installment } = parsed.data;
 
         const result = await prisma.$transaction(async (tx) => {
             const school = await tx.school.findUnique({ where: { id: schoolId } });
@@ -293,6 +294,13 @@ export async function POST(req) {
 
             const students = await tx.student.findMany({ where: { classId } });
 
+            const installmentCountMap = { MONTHLY: 12, QUARTERLY: 4, HALF_YEARLY: 2, YEARLY: 1 };
+            const installmentsCount = installmentCountMap[mode] || 1;
+            if (installmentsCount === 1 && installment) {
+                // Optional: Warn or handle if mode implies no split but installment is true
+                console.warn(`Mode ${mode} implies no split, but installment is enabled`);
+            }
+
             for (const student of students) {
                 const studentFeeStructure = await tx.studentFeeStructure.create({
                     data: {
@@ -310,9 +318,59 @@ export async function POST(req) {
                         studentFeeStructureId: studentFeeStructure.id,
                         globalParticularId: particular.id,
                         amount: particular.defaultAmount,
-
                     })),
                 });
+
+                if (installment) {
+                    const studentFeeParticulars = await tx.studentFeeParticular.findMany({
+                        where: { studentFeeStructureId: studentFeeStructure.id },
+                        select: { id: true, amount: true },
+                    });
+
+                    const installmentData = [];
+                    const baseDueDate = new Date(); // Consistent start date
+
+                    for (const particular of studentFeeParticulars) {
+                        const amount = Number(particular.amount); // Ensure numeric
+                        const baseAmount = Math.floor((amount / installmentsCount) * 100) / 100;
+                        const lastAmount = amount - baseAmount * (installmentsCount - 1);
+
+                        for (let i = 0; i < installmentsCount; i++) {
+                            const dueDate = new Date(baseDueDate);
+                            let monthMultiplier = 0;
+                            switch (mode) {
+                                case 'MONTHLY':
+                                    monthMultiplier = i;
+                                    break;
+                                case 'QUARTERLY':
+                                    monthMultiplier = i * 3;
+                                    break;
+                                case 'HALF_YEARLY':
+                                    monthMultiplier = i * 6;
+                                    break;
+                                case 'YEARLY':
+                                    monthMultiplier = i * 12; // Equivalent to adding years
+                                    break;
+                                default:
+                                    throw new Error(`Invalid mode: ${mode}`);
+                            }
+                            dueDate.setMonth(dueDate.getMonth() + monthMultiplier);
+
+                            installmentData.push({
+                                studentFeeParticularId: particular.id,
+                                dueDate,
+                                amount: i === installmentsCount - 1 ? lastAmount : baseAmount,
+                                status: 'UNPAID',
+                            });
+                        }
+                    }
+
+                    if (installmentData.length > 0) {
+                        await tx.studentFeeInstallment.createMany({
+                            data: installmentData,
+                        });
+                    }
+                }
             }
 
             return feeStructure;
@@ -327,7 +385,6 @@ export async function POST(req) {
         return NextResponse.json({ error: err.message || "Internal server error" }, { status: 400 });
     }
 }
-
 // PATCH: Update fee structure
 // export async function PATCH(req) {
 //     try {

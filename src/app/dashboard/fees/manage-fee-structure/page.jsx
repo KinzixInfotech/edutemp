@@ -27,10 +27,13 @@ import { useAuth } from '@/context/AuthContext';
 import LoaderPage from '@/components/loader-page';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { Checkbox } from '@/components/ui/checkbox';
+import { numberToWordsIndian } from '@/lib/utils';
 
 // Schema aligned with API
 const schema = z.object({
     name: z.string().min(1, 'Fee structure name is required'),
+    installment: z.boolean(),
     classId: z.string().transform((val, ctx) => {
         const parsed = parseInt(val);
         if (isNaN(parsed) || parsed <= 0) {
@@ -69,6 +72,7 @@ export default function FeeStructureTableForm() {
         defaultValues: {
             name: '',
             classId: '',
+            installment: false,
             mode: 'MONTHLY',
             fees: [{ name: '', amount: 0 }],
         },
@@ -159,6 +163,7 @@ export default function FeeStructureTableForm() {
                 schoolId: fullUser.schoolId,
                 classId: values.classId, // Already transformed to number
                 mode: values.mode,
+                installment: values.installment,
                 fees: values.fees,
             };
 
@@ -290,14 +295,97 @@ export default function FeeStructureTableForm() {
                                         </FormItem>
                                     )}
                                 />
-                            </div>
 
+                            </div>
+                            <FormField
+                                control={form.control}
+                                name="installment"
+                                render={({ field }) => (
+                                    <FormItem className="flex items-center space-x-2">
+                                        <FormLabel className="m-0">Installment</FormLabel>
+                                        <FormControl>
+                                            <Checkbox
+                                                checked={field.value}           // boolean
+                                                onCheckedChange={(checked) => field.onChange(!!checked)}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
                             {activeAcademicYear && (
                                 <div className="text-sm">
                                     <span className="font-medium">Active Academic Year:</span>{' '}
                                     {activeAcademicYear.name}
                                 </div>
                             )}
+
+                            {/* Total Installment Breakdown */}
+                            {form.watch('installment') && (
+                                <div className="mt-6 border rounded-lg overflow-hidden bg-white dark:bg-transparent">
+                                    <div className='text-center bg-gray-50 dark:bg-gray-800 font-medium py-1'>Installment Breakdown</div>
+                                    <div className="grid grid-cols-12 bg-gray-50 dark:bg-gray-800 text-sm font-medium px-4 py-2">
+                                        <div className="col-span-6">Total Amount</div>
+                                        <div className="col-span-6">Installments ({form.watch('mode')})</div>
+                                    </div>
+                                    <div className="grid grid-cols-12 gap-2.5 items-center px-4 py-2 border-t text-sm">
+                                        <div className="col-span-6 font-medium">
+                                            ₹{Number.isFinite(total) ? total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+                                            <div
+                                                className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-h-16 overflow-auto break-words p-1"
+                                                style={{ wordBreak: 'break-word' }}
+                                            >
+                                                {Number.isFinite(total) ? numberToWordsIndian(total) : ''}
+                                            </div>
+                                        </div>
+                                        <div className="col-span-6">
+                                            <div className="flex flex-wrap gap-2 max-h-20 overflow-auto">
+                                                {(() => {
+                                                    let installmentsCount = 1;
+                                                    let prefix = '';
+                                                    switch (form.watch('mode')) {
+                                                        case 'MONTHLY':
+                                                            installmentsCount = 12;
+                                                            prefix = 'M';
+                                                            break;
+                                                        case 'QUARTERLY':
+                                                            installmentsCount = 4;
+                                                            prefix = 'Q';
+                                                            break;
+                                                        case 'HALF_YEARLY':
+                                                            installmentsCount = 2;
+                                                            prefix = 'H';
+                                                            break;
+                                                        case 'YEARLY':
+                                                            installmentsCount = 1;
+                                                            prefix = 'Y';
+                                                            break;
+                                                    }
+
+                                                    if (!Number.isFinite(total)) return null;
+
+                                                    const baseAmount = Math.floor((total / installmentsCount) * 100) / 100;
+                                                    const lastAmount = (total - baseAmount * (installmentsCount - 1)).toFixed(2);
+
+                                                    return Array.from({ length: installmentsCount }).map((_, i) => {
+                                                        const amount = i === installmentsCount - 1 ? lastAmount : baseAmount.toFixed(2);
+                                                        return (
+                                                            <span
+                                                                key={i}
+                                                                className="px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-xs font-medium"
+                                                            >
+                                                                {i + 1}. {prefix}{i + 1} ₹{Number(amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            </span>
+                                                        );
+                                                    });
+                                                })()}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+
 
                             <div className="border rounded-lg overflow-hidden bg-white dark:bg-transparent">
                                 <div className="grid grid-cols-12 bg-gray-50 dark:bg-gray-800 text-sm font-medium px-4 py-2">
@@ -384,8 +472,17 @@ export default function FeeStructureTableForm() {
                                 <span className="text-lg font-normal">
                                     Total:{' '}
                                     <span className="font-semibold">
-                                        ₹{Number.isFinite(total) ? total.toFixed(2) : '0.00'}
+                                        ₹{Number.isFinite(total) ? total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
                                     </span>
+                                    <div className="col-span-6 font-medium">
+                                        <div
+                                            className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-full max-h-16 overflow-auto break-words p-1 mr-10"
+                                            style={{ wordBreak: 'break-word' }}
+                                        >
+                                            {Number.isFinite(total) ? numberToWordsIndian(total) : ''}
+                                        </div>
+                                    </div>
+
                                 </span>
                                 <Button
                                     type="submit"

@@ -66,6 +66,12 @@ export function AuthProvider({ children }) {
             setLoading(false)
         }
     }
+useEffect(() => {
+  
+
+ console.log(fullUser);
+ 
+}, [fullUser])
 
     useEffect(() => {
         const getInitialSession = async () => {
@@ -109,6 +115,7 @@ export function AuthProvider({ children }) {
         return () => subscription.unsubscribe()
     }, [])
 
+ 
     const value = useMemo(
         () => ({ user, fullUser, loading, loadingMsg }),
         [user, fullUser, loading, loadingMsg]
