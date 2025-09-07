@@ -42,20 +42,20 @@ model School {
 }
 
 model Notice {
-  id          String    @id @default(uuid()) @db.Uuid
-  schoolId    String    @db.Uuid
-  title       String
-  description String
-  fileUrl     String? // optional file attachment
-  audience    Audience  @default(ALL) // enum: target audience
-  priority    Priority  @default(NORMAL) // enum: notice importance
-  status      Status    @default(DRAFT) // enum: DRAFT, PUBLISHED, ARCHIVED
-  publishedAt DateTime? // optional published date
-  expiryDate  DateTime? // optional expiry date
-  createdById String?   @db.Uuid // staff/admin who created
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @default(now()) @updatedAt
-
+  id           String         @id @default(uuid()) @db.Uuid
+  schoolId     String         @db.Uuid
+  title        String
+  description  String
+  fileUrl      String? // optional file attachment
+  audience     Audience       @default(ALL) // enum: target audience
+  priority     Priority       @default(NORMAL) // enum: notice importance
+  status       Status         @default(DRAFT) // enum: DRAFT, PUBLISHED, ARCHIVED
+  publishedAt  DateTime? // optional published date
+  expiryDate   DateTime? // optional expiry date
+  createdById  String?        @db.Uuid // staff/admin who created
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @default(now()) @updatedAt
+  category     String? // Must exist and match the enum values
   // Relations
   School       School         @relation(fields: [schoolId], references: [id])
   Author       User?          @relation(fields: [createdById], references: [id])

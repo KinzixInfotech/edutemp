@@ -23,6 +23,7 @@ export function SiteHeader() {
     const pageTitles = [
         { url: "/dashboard", name: "Dashboard" },
         { url: "/dashboard/fees", name: "Fees" },
+          { url: "/dashboard/schools/noticeboard", name: "Noticeboard" },
         { url: "/dashboard/fees/fee-structures", name: "All Fee Structures" },
         { url: "/dashboard/manage-students", name: "Manage All Students" },
     ]

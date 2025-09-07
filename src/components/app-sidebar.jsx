@@ -41,6 +41,7 @@ const sidebarData = [
         // title: "Main",
         items: [
             { label: "Home", url: "/dashboard/", icon: House, roles: ["SUPER_ADMIN", "STUDENT", "ADMIN", "MASTER_ADMIN", "TEACHER", "STAFF"] },
+            { label: "Noticeboard", url: "/dashboard/schools/noticeboard", icon: Flag, roles: ["ADMIN"] },
             { label: "Create Super Admin", url: "/dashboard/edubreezy/add-user", icon: IconListDetails, roles: ["SUPER_ADMIN"] },
             { label: "Audit Log", url: "/dashboard/auditlog", icon: IconChartBar, roles: ["SUPER_ADMIN"] },
         ],
@@ -61,19 +62,6 @@ const sidebarData = [
             { label: "All Schools", url: "/dashboard/schools/all-schools", icon: IconDatabase, roles: ['SUPER_ADMIN'] },
         ],
     },
-    // {
-    //     title: "Manage Students",
-    //     items: [
-    //         {
-    //             label: "Students",  icon: IconDatabase, roles: ["ADMIN"], subItems: [
-    //                 { label: "Manage Students", url: "/dashboard/schools/manage-student",  roles: ["ADMIN"] },
-    //                 { label: "Manage Alumni ", url: "/dashboard/schools/manage-gallery", roles: ["ADMIN"] },
-    //             ]
-    //         },
-
-
-    //     ]
-    // },
     {
         title: "Manage Classes",
         items: [

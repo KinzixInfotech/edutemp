@@ -21,6 +21,49 @@ import { ChartPieLabel } from '@/components/chart-pie';
 import { ChartBarHorizontal, } from '@/components/bar-chart';
 import { ChartLineLabel } from '@/components/line-chart';
 import BigCalendar from '@/components/big-calendar';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+
+const LatestNotice = () => {
+  // Dummy data
+  const latestNotice = {
+    title: "Holiday Announcement",
+    description: "School will remain closed on 15th September due to festival celebrations.",
+    priority: "URGENT", // Can be NORMAL, IMPORTANT, URGENT
+    date: "September 5, 2025",
+  };
+
+  // Color based on priority
+  const priorityColor = {
+    NORMAL: "bg-blue-100 text-blue-800",
+    IMPORTANT: "bg-yellow-100 text-yellow-800",
+    URGENT: "bg-red-100 text-red-800",
+  };
+
+  return (
+    <div className="w-full  bg-muted dark:bg-[#18181b]  rounded-xl p-4 ">
+      <div className={`px-2 py-1 w-fit rounded-full text-xs font-medium ${priorityColor[latestNotice.priority]}`}>
+        {latestNotice.priority}
+      </div>
+      <div className="flex px-1 py-2 items-start gap-4">
+
+        <div>
+          <h3 className="text-lg font-semibold text-foreground border-b w-fit">{latestNotice.title}</h3>
+          <p className="text-sm text-muted-foreground mt-1">{latestNotice.description}</p>
+          <p className="text-xs text-muted-foreground mt-2 mb-2">{latestNotice.date}</p>
+          <Link href="/dashboard/schools/noticeboard">
+            <span className='border-b py-1 text-sm  cursor-pointer '>
+              View Notice
+            </span>
+          </Link>
+        </div>
+
+      </div>
+
+    </div>
+  );
+};
+
 
 export default function Dashboard() {
   const { fullUser, loading } = useAuth();
@@ -149,11 +192,15 @@ export default function Dashboard() {
       case "ADMIN":
         return (
           <>
+            <div className='px-4'>
+              <LatestNotice />
+            </div>
             <SectionCards data={cards} />
             <div className="flex flex-col gap-3.5 px-4">
               {/* <ChartAreaInteractive chartData={chartDataSuper} /> */}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full">
+
                 <ChartPieLabel chartData={chartData} title="Students" date="January - June 2024" />
                 {/* <ChartBarMultiple chartData={barchartData} title="Attendance" date="Today" />
                  */}
