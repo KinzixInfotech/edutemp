@@ -24,16 +24,105 @@ import BigCalendar from '@/components/big-calendar';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
-const LatestNotice = () => {
-  // Dummy data
-  const latestNotice = {
-    title: "Holiday Announcement",
-    description: "School will remain closed on 15th September due to festival celebrations.",
-    priority: "URGENT", // Can be NORMAL, IMPORTANT, URGENT
-    date: "September 5, 2025",
+// const LatestNotice = () => {
+//   // Dummy data
+//   const latestNotice = {
+//     title: "Holiday Announcement",
+//     description: "School will remain closed on 15th September due to festival celebrations.",
+//     priority: "URGENT", // Can be NORMAL, IMPORTANT, URGENT
+//     date: "September 5, 2025",
+//   };
+
+//   // Color based on priority
+//   const priorityColor = {
+//     NORMAL: "bg-blue-100 text-blue-800",
+//     IMPORTANT: "bg-yellow-100 text-yellow-800",
+//     URGENT: "bg-red-100 text-red-800",
+//   };
+
+//   return (
+//     <div className="w-full  bg-muted dark:bg-[#18181b]  rounded-xl p-4 ">
+//       <div className={`px-2 py-1 w-fit rounded-full text-xs font-medium ${priorityColor[latestNotice.priority]}`}>
+//         {latestNotice.priority}
+//       </div>
+//       <div className="flex px-1 py-2 items-start gap-4">
+
+//         <div>
+//           <h3 className="text-lg font-semibold text-foreground border-b w-fit">{latestNotice.title}</h3>
+//           <p className="text-sm text-muted-foreground mt-1">{latestNotice.description}</p>
+//           <p className="text-xs text-muted-foreground mt-2 mb-2">{latestNotice.date}</p>
+//           <Link href="/dashboard/schools/noticeboard">
+//             <span className='border-b py-1 text-sm  cursor-pointer '>
+//               View Notice
+//             </span>
+//           </Link>
+//           <Link href="/dashboard/schools/noticeboard" className='ml-1.5'>
+//             <span className='border-b py-1 text-sm  cursor-pointer '>
+//               Dismiss
+//             </span>
+//           </Link>
+//         </div>
+
+//       </div>
+
+//     </div>
+//   );
+// };
+// import { useEffect, useState } from 'react';
+// import Link from 'next/link';
+
+const LatestNotice = ({ fullUser }) => {
+  if (!fullUser) return
+  const [latestNotice, setLatestNotice] = useState(null);
+  const [dismissedNoticeId, setDismissedNoticeId] = useState(null);
+
+  // Load dismissed notice ID from localStorage
+  useEffect(() => {
+    const dismissed = localStorage.getItem('dismissedNoticeId');
+    if (dismissed) {
+      setDismissedNoticeId(dismissed);
+    }
+  }, []);
+
+  // Fetch latest notice from API
+  useEffect(() => {
+    const fetchLatestNotice = async () => {
+      const params = new URLSearchParams({
+        userId: fullUser.id,
+        schoolId: fullUser.schoolId,
+
+        limit: "1",
+        offset: "0",
+      });
+
+      try {
+        const res = await fetch(`/api/schools/notice/get?${params}`);
+        const data = await res.json();
+        if (data.notices && data.notices.length > 0) {
+          setLatestNotice(data.notices[0]);
+        }
+      } catch (error) {
+        console.error("Error fetching latest notice:", error);
+      }
+    };
+
+    fetchLatestNotice();
+    console.log(fullUser, 'from notice');
+
+  }, [fullUser?.schoolId]);
+
+  const handleDismiss = () => {
+    if (latestNotice) {
+      localStorage.setItem('dismissedNoticeId', latestNotice.id);
+      setDismissedNoticeId(latestNotice.id);
+    }
   };
 
-  // Color based on priority
+  // If there's no notice or the latest notice was dismissed, show nothing
+  if (!latestNotice || latestNotice.id === dismissedNoticeId) {
+    return null;
+  }
+
   const priorityColor = {
     NORMAL: "bg-blue-100 text-blue-800",
     IMPORTANT: "bg-yellow-100 text-yellow-800",
@@ -41,33 +130,29 @@ const LatestNotice = () => {
   };
 
   return (
-    <div className="w-full  bg-muted dark:bg-[#18181b]  rounded-xl p-4 ">
-      <div className={`px-2 py-1 w-fit rounded-full text-xs font-medium ${priorityColor[latestNotice.priority]}`}>
+    <div className="w-full bg-muted dark:bg-[#18181b] rounded-xl p-4">
+      <div className={`px-2 py-1 w-fit rounded-full text-xs font-medium ${priorityColor[latestNotice.priority] || 'bg-gray-100 text-gray-800'}`}>
         {latestNotice.priority}
       </div>
       <div className="flex px-1 py-2 items-start gap-4">
-
         <div>
           <h3 className="text-lg font-semibold text-foreground border-b w-fit">{latestNotice.title}</h3>
           <p className="text-sm text-muted-foreground mt-1">{latestNotice.description}</p>
-          <p className="text-xs text-muted-foreground mt-2 mb-2">{latestNotice.date}</p>
+          <p className="text-xs text-muted-foreground mt-2 mb-2">{new Date(latestNotice.publishedAt).toLocaleDateString()}</p>
           <Link href="/dashboard/schools/noticeboard">
-            <span className='border-b py-1 text-sm  cursor-pointer '>
+            <span className='border-b py-1 text-sm cursor-pointer'>
               View Notice
             </span>
           </Link>
-          <Link href="/dashboard/schools/noticeboard" className='ml-1.5'>
-            <span className='border-b py-1 text-sm  cursor-pointer '>
-              Dismiss
-            </span>
-          </Link>
+          <button onClick={handleDismiss} className='ml-2 border-b py-1 text-sm cursor-pointer bg-transparent'>
+            Dismiss
+          </button>
         </div>
-
       </div>
-
     </div>
   );
 };
+
 
 
 export default function Dashboard() {
@@ -198,7 +283,7 @@ export default function Dashboard() {
         return (
           <>
             <div className='px-4'>
-              <LatestNotice />
+              <LatestNotice fullUser={fullUser} />
             </div>
             <SectionCards data={cards} />
             <div className="flex flex-col gap-3.5 px-4">
