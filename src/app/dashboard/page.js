@@ -56,6 +56,11 @@ const LatestNotice = () => {
               View Notice
             </span>
           </Link>
+          <Link href="/dashboard/schools/noticeboard" className='ml-1.5'>
+            <span className='border-b py-1 text-sm  cursor-pointer '>
+              Dismiss
+            </span>
+          </Link>
         </div>
 
       </div>
