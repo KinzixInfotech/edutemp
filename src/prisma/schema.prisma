@@ -37,8 +37,73 @@ model School {
   StudentFeeStructure StudentFeeStructure[]
   FeePayment          FeePayment[]
   Notice              Notice[]
+  InventoryItem       InventoryItem[]
 
   @@index([name])
+}
+
+model InventoryItem {
+  id              String   @id @default(uuid())
+  name            String
+  category        String
+  schoolId        String   @db.Uuid
+  description     String?
+  quantity        Int
+  minimumQuantity Int
+  maximumQuantity Int
+  unit            String
+  purchaseDate    DateTime
+  costPerUnit     Float
+  vendorName      String
+  vendorContact   String
+  warrantyPeriod  String?
+  location        String
+  status          String // e.g., ACTIVE, UNDER_REPAIR, DISPOSED
+  barcode         String?
+  notes           String?
+
+  transactions   InventoryTransaction[]
+  purchaseOrders PurchaseOrderItem[]
+  School         School                 @relation(fields: [schoolId], references: [id])
+}
+
+model InventoryTransaction {
+  id              String        @id @default(uuid())
+  item            InventoryItem @relation(fields: [itemId], references: [id])
+  itemId          String
+  transactionType String // e.g., ISSUE, RETURN, ADJUSTMENT, PURCHASE
+  quantity        Int
+  date            DateTime
+  issuedToId      String?
+  issuedToName    String?
+  handledById     String
+  handledByName   String
+  remarks         String?
+  status          String // e.g., COMPLETED, PENDING, LOST, DAMAGED
+}
+
+model PurchaseOrder {
+  id               String   @id @default(uuid())
+  orderDate        DateTime
+  expectedDelivery DateTime
+  vendorName       String
+  vendorContact    String
+  approvedById     String
+  approvedByName   String
+  status           String // e.g., ORDERED, DELIVERED, CANCELLED
+
+  items PurchaseOrderItem[]
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(uuid())
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  purchaseOrderId String
+  item            InventoryItem @relation(fields: [itemId], references: [id])
+  itemId          String
+  name            String
+  quantity        Int
+  costPerUnit     Float
 }
 
 model Notice {
