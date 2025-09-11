@@ -180,7 +180,7 @@ export default function SyllabusManagement() {
                                             href={`syllabus-managment/view?url=${encodeURIComponent(syllabus.fileUrl)}`}
                                         // className="text-blue-500 underline"
                                         >
-                                            <Button variant='outline'>View Pdf</Button>
+                                            <Button variant='outline'>View Syllabus</Button>
                                         </Link>
                                     </TableCell>
                                     <TableCell>
