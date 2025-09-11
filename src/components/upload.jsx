@@ -1,14 +1,15 @@
+// components/PdfUploadButton.jsx (Customized for PDF)
 "use client"
 
 import { useEffect, useRef } from "react"
-import { AlertCircleIcon, ImageIcon, UploadIcon, XIcon } from "lucide-react"
+import { AlertCircleIcon, FileIcon, UploadIcon, XIcon } from "lucide-react"
 
 import { useFileUpload } from '@/lib/useFileupload'
 import { Button } from '@/components/ui/button'
 
-export default function FileUploadButton({ field, onChange, resetKey }) {
-    const maxSizeMB = 2
-    const maxSize = maxSizeMB * 1024 * 1024 // 2MB
+export default function PdfUploadButton({ field, onFileChange, resetKey }) {
+    const maxSizeMB = 10
+    const maxSize = maxSizeMB * 1024 * 1024 // 10MB
 
     const [
         { files, isDragging, errors },
@@ -20,32 +21,33 @@ export default function FileUploadButton({ field, onChange, resetKey }) {
             openFileDialog,
             removeFile,
             getInputProps,
-            clearFiles, // ✅ this is already exposed
+            clearFiles,
         },
     ] = useFileUpload({
-        accept: "image/,image/png,image/jpeg,image/jpg,image/gif",
+        accept: "application/pdf",
         maxSize,
     })
 
-
     const previewUrl = files[0]?.preview || null
 
-    // Send previewUrl to parent only when changed
-    const previousUrlRef = useRef(null)
+    // Send file to parent when changed
+    const previousFileRef = useRef(null)
     useEffect(() => {
-        if (onChange && previewUrl && previewUrl !== previousUrlRef.current) {
-            previousUrlRef.current = previewUrl
-            onChange(previewUrl)
+        const file = files[0]?.file
+        if (onFileChange && file && file !== previousFileRef.current) {
+            previousFileRef.current = file
+            onFileChange(file)
         }
-    }, [previewUrl, onChange])
+    }, [files, onFileChange])
 
-    // Clear preview when resetKey changes
+    // Clear when resetKey changes
     useEffect(() => {
         if (clearFiles) {
             clearFiles()
-            previousUrlRef.current = null // ensures onChange works again with same file
+            previousFileRef.current = null
         }
-    }, [resetKey])
+    }, [resetKey, clearFiles])
+
     const fileName = files[0]?.file.name || null
 
     return (
@@ -62,14 +64,14 @@ export default function FileUploadButton({ field, onChange, resetKey }) {
                     <input
                         {...getInputProps()}
                         className="sr-only"
-                        aria-label="Upload image file"
+                        aria-label="Upload PDF file"
                     />
                     {previewUrl ? (
                         <div className="absolute inset-0 flex items-center justify-center p-4">
-                            <img
+                            <iframe
                                 src={previewUrl}
-                                alt={fileName || "Uploaded image"}
-                                className="mx-auto max-h-full rounded object-contain"
+                                title={fileName || "Uploaded PDF"}
+                                className="mx-auto w-full h-96"
                             />
                         </div>
                     ) : (
@@ -78,11 +80,11 @@ export default function FileUploadButton({ field, onChange, resetKey }) {
                                 className="bg-background mb-2 flex size-11 shrink-0 items-center justify-center rounded-full border"
                                 aria-hidden="true"
                             >
-                                <ImageIcon className="size-4 opacity-60" />
+                                <FileIcon className="size-4 opacity-60" />
                             </div>
-                            <p className="mb-1.5 text-sm font-medium">Drop {field} image here</p>
+                            <p className="mb-1.5 text-sm font-medium">Drop {field} PDF here</p>
                             <p className="text-muted-foreground text-xs">
-                                PNG, JPG or GIF (max. {maxSizeMB}MB)
+                                PDF (max. {maxSizeMB}MB)
                             </p>
                             <Button
                                 variant="outline"
@@ -93,18 +95,19 @@ export default function FileUploadButton({ field, onChange, resetKey }) {
                                     className="-ms-1 size-4 opacity-60"
                                     aria-hidden="true"
                                 />
-                                Select image
+                                Select PDF
                             </Button>
                         </div>
                     )}
                 </div>
+
                 {previewUrl && (
                     <div className="absolute top-4 right-4">
                         <button
                             type="button"
                             className="focus-visible:border-ring focus-visible:ring-ring/50 z-50 flex size-8 cursor-pointer items-center justify-center rounded-full bg-black/60 text-white transition-[color,box-shadow] outline-none hover:bg-black/80 focus-visible:ring-[3px]"
                             onClick={() => removeFile(files[0]?.id)}
-                            aria-label="Remove image"
+                            aria-label="Remove PDF"
                         >
                             <XIcon className="size-4" aria-hidden="true" />
                         </button>
