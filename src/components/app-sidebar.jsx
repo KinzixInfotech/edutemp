@@ -35,17 +35,19 @@ import {
 } from "@tabler/icons-react"
 import { NavSidebarSections } from "./nav-main"
 import { Separator } from "./ui/separator"
-import { BookMarked, CalendarCog, Coins, DollarSign, Ellipsis, Flag, Grip, House, MonitorCog, Send, User, UserPen } from "lucide-react"
+import { BookMarked, BotMessageSquare, CalendarCog, Coins, DollarSign, Ellipsis, Flag, FlaskRound, Grip, House, Library, MonitorCog, Send, User, UserPen } from "lucide-react"
 const sidebarData = [
     {
         // title: "Main",
         items: [
             { label: "Home", url: "/dashboard/", icon: House, roles: ["SUPER_ADMIN", "STUDENT", "ADMIN", "MASTER_ADMIN", "TEACHER", "STAFF"] },
+            { label: "Self Attendance", url: "/dashboard/markattendance", icon: House, roles: ["SUPER_ADMIN", "STUDENT", "ADMIN", "MASTER_ADMIN", "TEACHER", "STAFF"] },
             { label: "Inventory", url: "/dashboard/schools/inventory", icon: House, roles: ["SUPER_ADMIN", "STUDENT", "ADMIN", "MASTER_ADMIN", "TEACHER", "STAFF"] },
             { label: "Noticeboard", url: "/dashboard/schools/noticeboard", icon: Flag, roles: ["ADMIN"] },
-            { label: "Syllabus Managment", url: "/dashboard/schools/syllabus-managment/", icon: House, roles: ["ADMIN"] },
+            { label: "Syllabus Management", url: "/dashboard/schools/syllabus-managment/", icon: House, roles: ["ADMIN"] },
             { label: "Create Super Admin", url: "/dashboard/edubreezy/add-user", icon: IconListDetails, roles: ["SUPER_ADMIN"] },
             { label: "Audit Log", url: "/dashboard/auditlog", icon: IconChartBar, roles: ["SUPER_ADMIN"] },
+            { label: "Edu AI", url: "/dashboard/schools/eduai", icon: BotMessageSquare , roles: ["ADMIN"] },
         ],
     },
     {
@@ -102,6 +104,43 @@ const sidebarData = [
         ],
     },
     {
+        title: "Library Management",
+        items: [
+            {
+                label: "Manage Library",
+                icon: Library,
+                roles: ["ADMIN"],
+                submenu: [
+                    {
+                        label: "Manage Books", url: "/dashboard/fees / manage - fee - structure", roles: ["ADMIN"]
+                    },
+                    { label: "Issue & Return", url: "/dashboard/fees/fee-structures", roles: ["ADMIN"] },
+                    { label: "Book Categories", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
+                    { label: "Fines & Reports", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
+                ],
+            },
+        ],
+    },
+    {
+        title: "Examination",
+        items: [
+            {
+                label: "Manage Exams",
+                icon: FlaskRound,
+                roles: ["ADMIN"],
+                submenu: [
+                    {
+                        label: "Create Exam", url: "/dashboard/fees / manage - fee - structure", roles: ["ADMIN"]
+                    },
+                    { label: "Schedule Exam", url: "/dashboard/fees/fee-structures", roles: ["ADMIN"] },
+                    { label: "Input Marks", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
+                    { label: "Results & Reports", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
+                    { label: "Question Banks", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
+                ],
+            },
+        ],
+    },
+    {
         title: "Edu Employees",
         items: [
 
@@ -118,10 +157,7 @@ const sidebarData = [
                 roles: ["ADMIN"],
                 submenu: [
                     { label: "Manage Transport ", url: "/dashboard/schools/manage-gallery", roles: ["ADMIN"] },
-                    { label: "Manage Library ", url: "/dashboard/schools/manage-gallery", roles: ["ADMIN"] },
-                    { label: "View Fees ", url: "/dashboard/schools/manage-gallery", roles: ["ADMIN"] },
                     { label: "Manage Time Table ", url: "/dashboard/schools/manage-time-table", roles: ["ADMIN"] },
-                    { label: "Manage Examination ", url: "/dashboard/schools/manage-gallery", roles: ["ADMIN"] },
                     { label: "Manage Gallery", url: "/dashboard/schools/manage-gallery", roles: ["ADMIN"] },
                 ]
             },
