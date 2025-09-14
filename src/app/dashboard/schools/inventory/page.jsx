@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
@@ -9,80 +10,118 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/context/AuthContext";
-import axios from 'axios';
+import axios from "axios";
 
 export default function InventoryItemsTable() {
     const { fullUser } = useAuth();
-    const [items, setItems] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
+
     const [selectedItem, setSelectedItem] = useState(null);
-    const [drawerMode, setDrawerMode] = useState(null); // 'add' or 'edit'
+    const [drawerMode, setDrawerMode] = useState(null);
     const [formData, setFormData] = useState({});
     const [formError, setFormError] = useState('');
     const [transactions, setTransactions] = useState([]);
     const [txLoading, setTxLoading] = useState(false);
 
-    useEffect(() => {
-        async function fetchItems() {
-            if (!fullUser?.schoolId) return;
+    // Fetch Inventory Items
+    const { data: items = [], isLoading: loading } = useQuery({
+        queryKey: ['inventory-items', fullUser?.schoolId],
+        queryFn: async () => {
+            const res = await axios.get(`/api/schools/inventory/inventory-items?schoolId=${fullUser.schoolId}`);
+            return res.data;
+        },
+        enabled: !!fullUser?.schoolId,
+        staleTime: 0, // notices are often dynamic, no caching
+        refetchOnWindowFocus: false,
+    });
 
-            try {
-                const res = await axios.get(`/api/schools/inventory/inventory-items?schoolId=${fullUser.schoolId}`);
-                setItems(res.data);
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setLoading(false);
+    // Fetch Transactions for selected item
+    const fetchTransactions = async (itemId) => {
+        setTxLoading(true);
+        try {
+            const res = await axios.get(`/api/schools/inventory/transactions?itemId=${itemId}`);
+            setTransactions(res.data);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setTxLoading(false);
+        }
+    };
+
+    const handleAdd = () => {
+        setDrawerMode('add');
+        setSelectedItem(null);
+        setFormData({
+            name: '',
+            category: '',
+            description: '',
+            quantity: 0,
+            minimumQuantity: 0,
+            maximumQuantity: 0,
+            unit: '',
+            costPerUnit: 0,
+            vendorName: '',
+            vendorContact: '',
+            warrantyPeriod: '',
+            location: '',
+            status: 'ACTIVE',
+            barcode: '',
+            notes: '',
+        });
+    };
+
+    const handleEdit = (item) => {
+        setDrawerMode('edit');
+        setSelectedItem(item);
+        setFormData({ ...item });
+        fetchTransactions(item.id);
+    };
+
+    // Mutation for add/edit
+    const saveItemMutation = useMutation({
+        mutationFn: async (data) => {
+            if (drawerMode === 'add') {
+                return axios.post('/api/schools/inventory/inventory-items', { ...data, schoolId: fullUser.schoolId }).then(res => res.data);
+            } else {
+                return axios.put('/api/schools/inventory/inventory-items', { id: selectedItem.id, ...data }).then(res => res.data);
             }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['inventory-items', fullUser?.schoolId]);
+            setDrawerMode(null);
+        },
+        onError: (err) => {
+            setFormError('An error occurred while saving the item.');
+            console.error(err);
         }
+    });
 
-        fetchItems();
-    }, [fullUser?.schoolId]);
-
-    useEffect(() => {
-        if (drawerMode === 'edit' && selectedItem) {
-            // setFormData({
-            //     ...selectedItem,
-            //     purchaseDate: selectedItem.purchaseDate ? new Date(selectedItem.purchaseDate).toISOString().split('T')[0] : '',
-            // });
-        } else if (drawerMode === 'add') {
-            setFormData({
-                name: '',
-                category: '',
-                description: '',
-                quantity: 0,
-                minimumQuantity: 0,
-                maximumQuantity: 0,
-                unit: '',
-                costPerUnit: 0.0,
-                vendorName: '',
-                vendorContact: '',
-                warrantyPeriod: '',
-                location: '',
-                status: 'ACTIVE',
-                barcode: '',
-                notes: '',
-            });
+    const handleSubmit = () => {
+        if (!formData.name || !formData.category || !formData.unit || !formData.vendorName || !formData.vendorContact || !formData.location || !formData.status) {
+            setFormError('Please fill in all required fields.');
+            return;
         }
-    }, [drawerMode, selectedItem]);
+        setFormError('');
+        const data = {
+            ...formData,
+            quantity: parseInt(formData.quantity),
+            minimumQuantity: parseInt(formData.minimumQuantity),
+            maximumQuantity: parseInt(formData.maximumQuantity),
+            costPerUnit: parseFloat(formData.costPerUnit),
+        };
+        saveItemMutation.mutate(data);
+    };
 
-    useEffect(() => {
-        if (selectedItem) {
-            async function fetchTransactions() {
-                setTxLoading(true);
-                try {
-                    const res = await axios.get(`/api/schools/inventory/transactions?itemId=${selectedItem.id}`);
-                    setTransactions(res.data);
-                } catch (err) {
-                    console.error(err);
-                } finally {
-                    setTxLoading(false);
-                }
-            }
+    // Mutation for delete
+    const deleteItemMutation = useMutation({
+        mutationFn: async (id) => axios.delete('/api/schools/inventory/inventory-items', { data: { id } }),
+        onSuccess: () => queryClient.invalidateQueries(['inventory-items', fullUser?.schoolId]),
+    });
 
-            fetchTransactions();
-        }
-    }, [selectedItem]);
+    const handleDelete = (id) => {
+        if (!confirm('Are you sure you want to delete this item?')) return;
+        deleteItemMutation.mutate(id);
+    };
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -93,61 +132,6 @@ export default function InventoryItemsTable() {
         setFormData({ ...formData, [name]: value });
     };
 
-    const handleSubmit = async () => {
-        if (!formData.name || !formData.category || !formData.unit || !formData.vendorName || !formData.vendorContact || !formData.location || !formData.status) {
-            setFormError('Please fill in all required fields.');
-            return;
-        }
-
-        setFormError('');
-        const data = {
-            ...formData,
-            quantity: parseInt(formData.quantity, 10),
-            minimumQuantity: parseInt(formData.minimumQuantity, 10),
-            maximumQuantity: parseInt(formData.maximumQuantity, 10),
-            costPerUnit: parseFloat(formData.costPerUnit),
-            // purchaseDate: new Date().toISOString().split('T')[0],
-            description: formData.description || null,
-            warrantyPeriod: formData.warrantyPeriod || null,
-            barcode: formData.barcode || null,
-            notes: formData.notes || null,
-        };
-
-        try {
-            let res;
-            if (drawerMode === 'add') {
-                res = await axios.post('/api/schools/inventory/inventory-items', { ...data, schoolId: fullUser.schoolId });
-                setItems([...items, res.data]);
-            } else if (drawerMode === 'edit') {
-                res = await axios.put('/api/schools/inventory/inventory-items', { id: selectedItem.id, ...data });
-                setItems(items.map((i) => (i.id === res.data.id ? res.data : i)));
-            }
-            setDrawerMode(null);
-        } catch (err) {
-            setFormError('An error occurred while saving the item.');
-            console.error(err);
-        }
-    };
-
-    const handleAdd = () => {
-        setDrawerMode('add');
-        setSelectedItem(null);
-    };
-
-    const handleEdit = (item) => {
-        setDrawerMode('edit');
-        setSelectedItem(item);
-    };
-
-    const handleDelete = async (id) => {
-        if (!confirm('Are you sure you want to delete this item?')) return;
-        try {
-            await axios.delete('/api/schools/inventory/inventory-items', { data: { id } });
-            setItems(items.filter((i) => i.id !== id));
-        } catch (err) {
-            console.error(err);
-        }
-    };
 
     return (
         <div className="p-6">

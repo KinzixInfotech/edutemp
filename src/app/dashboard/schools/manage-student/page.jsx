@@ -1,165 +1,88 @@
-
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Input } from '@/components/ui/input'
-import {
-    Table, TableBody, TableCell, TableHead,
-    TableHeader, TableRow
-} from '@/components/ui/table'
-import {
-    Avatar, AvatarFallback, AvatarImage
-} from '@/components/ui/avatar'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from "@/lib/utils"
 import { Badge } from '@/components/ui/badge'
-
 import { Button } from '@/components/ui/button'
-import {
-    Select, SelectTrigger, SelectValue,
-    SelectContent, SelectItem
-} from '@/components/ui/select'
-import {
-    Pagination, PaginationContent, PaginationItem,
-    PaginationNext, PaginationPrevious
-} from '@/components/ui/pagination'
-import {
-    Dialog, DialogContent, DialogHeader, DialogTitle
-} from '@/components/ui/dialog'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
+import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from '@/components/ui/pagination'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Plus, RefreshCw, Loader2, Trash2, Slash } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
+import { useQuery } from '@tanstack/react-query'
+import axios from 'axios'
 
 export default function StudentListPage() {
     const { fullUser } = useAuth()
     const schoolId = fullUser?.schoolId
 
-    const [students, setStudents] = useState([])
     const [selected, setSelected] = useState([])
     const [dialogData, setDialogData] = useState(null)
     const [search, setSearch] = useState('')
-    const [allParents, setAllParents] = useState([])
     const [selectedParentId, setSelectedParentId] = useState(null)
     const [classFilter, setClassFilter] = useState('ALL')
     const [sectionFilter, setSectionFilter] = useState('ALL')
-    const [loading, setLoading] = useState(false)
     const [page, setPage] = useState(1)
-    const [total, setTotal] = useState(0)
     const itemsPerPage = 5
 
-    const fetchStudents = async () => {
-        if (!schoolId) return
-        setLoading(true)
-        try {
-            // const res = await fetch(
-            //     `/api/schools/${schoolId}/students?page=${page}&limit=${itemsPerPage}&classId=${classFilter === 'ALL' ? '' : classFilter}&sectionId=${sectionFilter === 'ALL' ? '' : sectionFilter}&search=${search}`
-            // )
-            const classIdForApi = classFilter === 'ALL'
-                ? ''
-                : students.find(s => s.class?.className === classFilter)?.classId || '';
+    // Fetch classes & sections
+    const { data: allClasses = [] } = useQuery({
+        queryKey: ['classes', schoolId],
+        queryFn: async () => {
+            const res = await axios.get(`/api/schools/${schoolId}/classes`)
+            return res.data || []
+        },
+        enabled: !!schoolId
+    })
 
-            const sectionIdForApi = sectionFilter === 'ALL'
-                ? ''
-                : students.find(s => s.section?.name === sectionFilter)?.sectionId || '';
+    // Derive sections dynamically based on selected class
+    const allSections = classFilter === 'ALL'
+        ? allClasses.flatMap(c => c.sections || [])
+        : allClasses.find(c => c.className === classFilter)?.sections || []
 
-            const res = await fetch(
-                `/api/schools/${schoolId}/students?page=${page}&limit=${itemsPerPage}&classId=${classIdForApi}&sectionId=${sectionIdForApi}&search=${search}`
-            )
-            const json = await res.json()
-            setStudents(json.students || [])
-            setTotal(json.total || 0)
-        } catch (err) {
-            console.error(err)
-        } finally {
-            setLoading(false)
-        }
-    }
+    // Fetch students with pagination, search, class & section filter
+    const { data: studentData = {}, isLoading: studentsLoading, refetch: refetchStudents } = useQuery({
+        queryKey: ['students', schoolId, page, search, classFilter, sectionFilter],
+        queryFn: async () => {
+            const classId = classFilter === 'ALL' ? '' : allClasses.find(c => c.className === classFilter)?.classId || ''
+            const sectionId = sectionFilter === 'ALL' ? '' : allSections.find(s => s.name === sectionFilter)?.sectionId || ''
+            const res = await axios.get(`/api/schools/${schoolId}/students`, {
+                params: { page, limit: itemsPerPage, classId, sectionId, search }
+            })
+            return res.data || {}
+        },
+        enabled: !!schoolId
+    })
 
-    useEffect(() => {
-        if (dialogData) {
-            setSelectedParentId(dialogData.parent?.userId || null)
-            fetchAllParents()
-        }
-    }, [dialogData])
+    const students = studentData.students || []
+    const total = studentData.total || 0
+    const pageCount = Math.ceil(total / itemsPerPage)
 
-    const fetchAllParents = async () => {
-        try {
-            const res = await fetch(`/api/schools/${schoolId}/parents`)
-            const { parents } = await res.json()
-            setAllParents(parents || [])
-        } catch (err) {
-            console.error("Failed to fetch parents", err)
-        }
-    }
-
-    useEffect(() => {
-        fetchStudents()
-    }, [schoolId, page, classFilter, sectionFilter, search])
+    // Fetch all parents (for dialog linking)
+    const { data: allParents = [] } = useQuery({
+        queryKey: ['parents', schoolId],
+        queryFn: async () => {
+            const res = await axios.get(`/api/schools/${schoolId}/parents`)
+            return res.data.parents || []
+        },
+        enabled: !!schoolId && !!dialogData
+    })
 
     const toggleSelect = (id) => {
-        setSelected(prev =>
-            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-        )
+        setSelected(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
     }
 
-    const handleDeleteSelected = () => {
-        console.log('Deleting:', selected)
-        // Replace with real API call
-    }
+    const handleDeleteSelected = () => console.log('Deleting:', selected)
+    const handleInactivateSelected = () => console.log('Inactivating:', selected)
 
-    const handleInactivateSelected = () => {
-        console.log('Inactivating:', selected)
-        // Replace with real API call
-    }
-
-    const openDialog = async (student) => {
+    const openDialog = (student) => {
         setDialogData(student)
         setSelectedParentId(student.parentId || null)
-
-        const res = await fetch(`/api/schools/${schoolId}/parents`)
-        const json = await res.json()
-        setAllParents(json?.parents || [])
     }
-
-    // Extract unique classes and sections for filters
-    const [allClasses, setAllClasses] = useState([]);
-    const [allSections, setAllSections] = useState([]);
-
-    const fetchClasses = async () => {
-        if (!schoolId) return;
-        try {
-            const res = await fetch(`/api/schools/${schoolId}/classes`);
-            const classes = await res.json();
-
-            // Extract class names
-            setAllClasses(classes);
-
-            // Extract all sections across all classes
-            const sections = classes.flatMap(c => c.sections.map(s => s.name));
-            setAllSections(sections);
-
-        } catch (err) {
-            console.error("Failed to fetch classes", err);
-        }
-    };
-
-    useEffect(() => {
-        fetchClasses();
-    }, [schoolId]);
-    useEffect(() => {
-        if (!schoolId || !allClasses.length) return;
-
-        if (classFilter === 'ALL') {
-            // If "ALL Classes" selected, show **all sections** combined
-            const sections = allClasses.flatMap(c => c.sections);
-            setAllSections(sections);
-
-        } else {
-            // Show only sections linked to selected class
-            const selectedClass = allClasses.find(c => c.className === classFilter);
-            setAllSections(selectedClass?.sections || []);
-        }
-    }, [classFilter, allClasses, schoolId]);
-    const pageCount = Math.ceil(total / itemsPerPage)
 
     return (
         <div className="p-6 space-y-6">
@@ -195,11 +118,10 @@ export default function StudentListPage() {
                             {allSections.map(sec => (
                                 <SelectItem key={sec.id} value={sec.name}>{sec.name}</SelectItem>
                             ))}
-
                         </SelectContent>
                     </Select>
 
-                    <Button variant="outline" className="bg-muted" onClick={() => fetchStudents()}>
+                    <Button variant="outline" className="bg-muted" onClick={refetchStudents}>
                         <RefreshCw size={16} />
                     </Button>
 
@@ -230,9 +152,7 @@ export default function StudentListPage() {
                                 <input
                                     type="checkbox"
                                     checked={selected.length === students.length && students.length > 0}
-                                    onChange={(e) =>
-                                        setSelected(e.target.checked ? students.map(s => s.userId) : [])
-                                    }
+                                    onChange={(e) => setSelected(e.target.checked ? students.map(s => s.userId) : [])}
                                 />
                             </TableHead>
                             <TableHead>Photo</TableHead>
@@ -244,7 +164,7 @@ export default function StudentListPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {loading ? (
+                        {studentsLoading ? (
                             <TableRow>
                                 <TableCell colSpan={7} className="text-center py-10">
                                     <Loader2 className="animate-spin w-6 h-6 mx-auto text-muted-foreground" />
@@ -252,7 +172,7 @@ export default function StudentListPage() {
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            students.map((student) => (
+                            students.map(student => (
                                 <TableRow key={student.userId}>
                                     <TableCell>
                                         <input
@@ -269,25 +189,14 @@ export default function StudentListPage() {
                                     </TableCell>
                                     <TableCell>{student.name}</TableCell>
                                     <TableCell>{student.user?.email || 'N/A'}</TableCell>
+                                    <TableCell>{student.class?.className || 'N/A'} - {student.section?.name || 'N/A'}</TableCell>
                                     <TableCell>
-                                        {student.class?.className || 'N/A'} ' {student.section?.name || 'N/A'}
-                                    </TableCell>
-                                    <TableCell>
-                                        <span
-                                            className={`inline-block w-16 text-center px-1 py-0.5 rounded-full text-xs font-medium border ${student.user?.status === "ACTIVE"
-                                                ? "text-green-700 border-green-700 bg-green-100"
-                                                : "text-red-700 border-red-700 bg-red-100"
-                                                }`}
-                                        >
+                                        <span className={`inline-block w-16 text-center px-1 py-0.5 rounded-full text-xs font-medium border ${student.user?.status === "ACTIVE" ? "text-green-700 border-green-700 bg-green-100" : "text-red-700 border-red-700 bg-red-100"}`}>
                                             {student.user?.status}
                                         </span>
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => openDialog(student)}
-                                        >
+                                        <Button variant="outline" size="sm" onClick={() => openDialog(student)}>
                                             View
                                         </Button>
                                     </TableCell>
@@ -304,9 +213,7 @@ export default function StudentListPage() {
                                 <PaginationPrevious onClick={() => setPage(p => Math.max(p - 1, 1))} />
                             </PaginationItem>
                             <PaginationItem>
-                                <span className="text-sm px-2">
-                                    Page {page} of {pageCount}
-                                </span>
+                                <span className="text-sm px-2">Page {page} of {pageCount}</span>
                             </PaginationItem>
                             <PaginationItem>
                                 <PaginationNext onClick={() => setPage(p => Math.min(p + 1, pageCount))} />
@@ -315,6 +222,7 @@ export default function StudentListPage() {
                     </Pagination>
                 )}
             </div>
+
 
             {/* Dialog remains exactly the same */}
             {dialogData && (

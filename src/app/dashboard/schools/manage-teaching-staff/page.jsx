@@ -1,88 +1,50 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent } from '@/components/ui/card'
-import {
-    Table, TableBody, TableCell, TableHead,
-    TableHeader, TableRow
-} from '@/components/ui/table'
-import {
-    Avatar, AvatarFallback, AvatarImage
-} from '@/components/ui/avatar'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from "@/lib/utils"
 import { Button } from '@/components/ui/button'
-import {
-    Select, SelectTrigger, SelectValue,
-    SelectContent, SelectItem
-} from '@/components/ui/select'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Badge } from "@/components/ui/badge"
-import {
-    Pagination, PaginationContent, PaginationItem,
-    PaginationNext, PaginationPrevious
-} from '@/components/ui/pagination'
-import {
-    Dialog, DialogContent, DialogHeader, DialogTitle
-} from '@/components/ui/dialog'
+import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from '@/components/ui/pagination'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Plus, RefreshCw, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
+import { useQuery } from '@tanstack/react-query'
+import axios from 'axios'
 
 export default function TeacherListPage() {
     const { fullUser } = useAuth()
     const schoolId = fullUser?.schoolId
-    const [teachers, setTeachers] = useState([])
+
     const [filtered, setFiltered] = useState([])
     const [search, setSearch] = useState('')
-    const [loading, setLoading] = useState(false)
     const [subjectFilter, setSubjectFilter] = useState('ALL')
     const [page, setPage] = useState(1)
     const [dialogData, setDialogData] = useState(null)
     const itemsPerPage = 5
 
-    const fetchTeachers = async () => {
-        setLoading(true)
-        try {
-            const res = await fetch(`/api/schools/teaching-staff/${schoolId}`)
-            const { data } = await res.json()
-            setTeachers(data || [])
-            setFiltered(data || [])
-        } catch (err) {
-            console.error("Failed to fetch teachers:", err)
-            setTeachers([])
-            setFiltered([])
-        } finally {
-            setLoading(false)
-        }
-    }
+    const { data: teachers = [], isLoading, refetch } = useQuery({
+        queryKey: ['teachers', schoolId],
+        queryFn: async () => {
+            const res = await axios.get(`/api/schools/teaching-staff/${schoolId}`)
+            return res.data.data || []
+        },
+        enabled: !!schoolId
+    })
 
+    // Filter and search
+    const filteredTeachers = teachers.filter(t => {
+        const matchesSubject = subjectFilter === 'ALL' || t.subjects?.some(sub => sub.name === subjectFilter)
+        const matchesSearch = !search || t.name.toLowerCase().includes(search.toLowerCase()) || t.email.toLowerCase().includes(search.toLowerCase())
+        return matchesSubject && matchesSearch
+    })
 
-    useEffect(() => {
-        if (schoolId) fetchTeachers()
-    }, [schoolId])
-
-    useEffect(() => {
-        let filteredList = [...teachers]
-
-        if (subjectFilter !== 'ALL') {
-            filteredList = filteredList.filter(t =>
-                t.subjects?.some(sub => sub.name === subjectFilter)
-            )
-        }
-
-        if (search) {
-            filteredList = filteredList.filter(t =>
-                t.name.toLowerCase().includes(search.toLowerCase()) ||
-                t.email.toLowerCase().includes(search.toLowerCase())
-            )
-        }
-
-        setFiltered(filteredList)
-        setPage(1)
-    }, [search, subjectFilter, teachers])
-
-    const paginated = filtered.slice((page - 1) * itemsPerPage, page * itemsPerPage)
-    const pageCount = Math.ceil(filtered.length / itemsPerPage)
+    const paginated = filteredTeachers.slice((page - 1) * itemsPerPage, page * itemsPerPage)
+    const pageCount = Math.ceil(filteredTeachers.length / itemsPerPage)
 
     return (
         <div className="p-6 space-y-6">
@@ -93,11 +55,11 @@ export default function TeacherListPage() {
                     placeholder="Search by name or email"
                     className="w-[180px] bg-muted"
                     value={search}
-                    onChange={e => setSearch(e.target.value)}
+                    onChange={e => { setSearch(e.target.value); setPage(1) }}
                 />
 
                 <div className='flex flex-row gap-2 items-center'>
-                    <Select value={subjectFilter} onValueChange={setSubjectFilter}>
+                    <Select value={subjectFilter} onValueChange={val => { setSubjectFilter(val); setPage(1) }}>
                         <SelectTrigger className="w-[180px] bg-muted">
                             <SelectValue placeholder="Filter by subject" />
                         </SelectTrigger>
@@ -110,7 +72,7 @@ export default function TeacherListPage() {
                         </SelectContent>
                     </Select>
 
-                    <Button variant='outline' className='bg-muted' onClick={fetchTeachers}>
+                    <Button variant='outline' className='bg-muted' onClick={refetch}>
                         <RefreshCw size={16} />
                     </Button>
 
@@ -135,14 +97,14 @@ export default function TeacherListPage() {
                     </TableHeader>
 
                     <TableBody>
-                        {loading ? (
+                        {isLoading ? (
                             <TableRow>
                                 <TableCell colSpan={5} className="text-center py-10">
                                     <Loader2 className="w-6 h-6 mx-auto animate-spin text-muted-foreground" />
                                     <p className="text-sm mt-2 text-muted-foreground">Loading teachers...</p>
                                 </TableCell>
                             </TableRow>
-                        ) : (
+                        ) : paginated.length > 0 ? (
                             paginated.map(teacher => (
                                 <TableRow key={teacher.userId}>
                                     <TableCell>
@@ -153,10 +115,7 @@ export default function TeacherListPage() {
                                     </TableCell>
                                     <TableCell>{teacher.name}</TableCell>
                                     <TableCell>{teacher.email}</TableCell>
-                                    <TableCell>
-                                        {/* {teacher.subjects?.map(s => s.name).join(', ') || 'N/A'} */}
-                                        {teacher?.gender}
-                                    </TableCell>
+                                    <TableCell>{teacher.gender || 'N/A'}</TableCell>
                                     <TableCell className="text-right">
                                         <Button
                                             variant="outline"
@@ -168,11 +127,15 @@ export default function TeacherListPage() {
                                     </TableCell>
                                 </TableRow>
                             ))
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={5} className="text-center py-10">No teachers found.</TableCell>
+                            </TableRow>
                         )}
                     </TableBody>
                 </Table>
 
-                {filtered.length > itemsPerPage && (
+                {filteredTeachers.length > itemsPerPage && (
                     <Pagination className="mt-4">
                         <PaginationContent>
                             <PaginationItem>
@@ -193,18 +156,14 @@ export default function TeacherListPage() {
                 <Dialog open={!!dialogData} onOpenChange={() => setDialogData(null)} >
                     <DialogContent className="max-w-md w-full border max-h-[90vh] overflow-y-auto bg-muted">
                         <DialogHeader className="items-center">
-
                             <div className='bg-white dark:bg-[#18181b] w-full rounded-lg py-3.5 flex items-center flex-col gap-2'>
                                 <Avatar className="w-24 h-24 mx-auto">
                                     <AvatarImage src={dialogData.user?.profilePicture} />
                                     <AvatarFallback>{dialogData.name?.[0]}</AvatarFallback>
                                 </Avatar>
-                                <DialogTitle className="text-center mt-2 text-xl font-bold">
-                                    {dialogData.name}
-                                </DialogTitle>
+                                <DialogTitle className="text-center mt-2 text-xl font-bold">{dialogData.name}</DialogTitle>
                                 <span className="text-center font-regular text-sm text-gray-500">
                                     {dialogData.email} - <span className="underline">{dialogData.employeeId}</span>
-
                                 </span>
                                 <Badge
                                     variant="outline"
@@ -250,7 +209,6 @@ export default function TeacherListPage() {
                     </DialogContent>
                 </Dialog>
             )}
-
         </div>
     )
 }

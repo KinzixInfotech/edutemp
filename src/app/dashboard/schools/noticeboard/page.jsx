@@ -1,76 +1,52 @@
 'use client'
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, Loader2 } from "lucide-react";
-import { format } from "date-fns";
+import { Loader2 } from "lucide-react";
 import { useAuth } from '@/context/AuthContext';
 
+const fetchNotices = async ({ queryKey }) => {
+  const [_key, { userId, schoolId, searchQuery, category }] = queryKey;
+
+  const params = new URLSearchParams({
+    userId,
+    schoolId,
+    ...(searchQuery && { search: searchQuery }),
+    ...(category !== 'all' && { category }),
+    limit: '10',
+    offset: '0',
+  });
+
+  const res = await fetch(`/api/schools/notice/get?${params}`);
+  if (!res.ok) {
+    const errorData = await res.json();
+    throw new Error(errorData.error || 'Failed to fetch notices');
+  }
+  return res.json();
+};
+
 const Noticeboard = () => {
-  const { fullUser } = useAuth(); // Get user details (id, role, schoolId, classId?, sectionId?)
+  const { fullUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
-  const [dateRange, setDateRange] = useState({ start: null, end: null });
-  const [sortBy, setSortBy] = useState("publishedAt");
   const [category, setCategory] = useState("all");
-  const [notices, setNotices] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
 
-  // Handle admin role
-  // if (fullUser?.role?.name === 'ADMIN') {
-  //   return (
-  //     <div className="min-h-screen bg-background p-6">
-  //       <div className="container mx-auto">
-  //         <p className="text-red-500 text-center text-xl">
-  //           Please use the admin dashboard to view notices.
-  //         </p>
-  //       </div>
-  //     </div>
-  //   );
-  // }
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['notices', {
+      userId: fullUser?.id,
+      schoolId: fullUser?.schoolId,
+      searchQuery,
+      category
+    }],
+    queryFn: fetchNotices,
+    enabled: !!fullUser?.id && !!fullUser?.schoolId,
+    staleTime: 0, // no caching, always fetch fresh
+    refetchOnWindowFocus: false, // optional
+  });
 
-  // Fetch notices based on filters
-  useEffect(() => {
-    if (!fullUser) return;
-
-    const fetchNotices = async () => {
-
-      setLoading(true);
-      setError(null);
-
-      try {
-        const params = new URLSearchParams({
-          userId: fullUser.id,
-          schoolId: fullUser.schoolId,
-          ...(searchQuery && { search: searchQuery }),
-          ...(category !== "all" && { category }),
-          limit: "10",
-          offset: "0",
-        });
-
-        const response = await fetch(`/api/schools/notice/get?${params}`);
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to fetch notices');
-        }
-
-        const data = await response.json();
-        setNotices(data.notices);
-        setTotal(data.total);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchNotices();
-  }, [fullUser?.schoolId, searchQuery, category]);
+  const notices = data?.notices || [];
 
   const getPriorityColor = (priority) => {
     switch (priority) {
@@ -101,42 +77,35 @@ const Noticeboard = () => {
             onChange={(e) => setSearchQuery(e.target.value)}
             aria-label="Search notices"
           />
-          <div>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="bg-white border lg:w-[180px] rounded-lg">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="Academic">Academic</SelectItem>
-                <SelectItem value="Events">Events</SelectItem>
-                <SelectItem value="General">General</SelectItem>
-                <SelectItem value="Emergency">Emergency</SelectItem>
-                <SelectItem value="Others">Others</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-
+          <Select value={category} onValueChange={setCategory}>
+            <SelectTrigger className="bg-white border lg:w-[180px] rounded-lg">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              <SelectItem value="Academic">Academic</SelectItem>
+              <SelectItem value="Events">Events</SelectItem>
+              <SelectItem value="General">General</SelectItem>
+              <SelectItem value="Emergency">Emergency</SelectItem>
+              <SelectItem value="Others">Others</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {loading && (
-            <div className=' col-span-full  place-items-center'>
-            <Loader2 size={30} className='animate-spin'   />
+          {isLoading && (
+            <div className='col-span-full place-items-center'>
+              <Loader2 size={30} className='animate-spin' />
             </div>
           )}
           {error && (
-            <p className="text-red-500 col-span-full text-center">Error: {error}</p>
+            <p className="text-red-500 col-span-full text-center">Error: {error.message}</p>
           )}
-          {!loading && !error && notices.length === 0 && (
+          {!isLoading && !error && notices.length === 0 && (
             <p className="text-foreground/60 col-span-full text-center">No notices found.</p>
           )}
-          {!loading && !error && notices.map((notice) => (
-            <div
-              key={notice.id}
-              className="bg-muted dark:bg-[#18181b] rounded-lg p-6 flex flex-col gap-4"
-            >
+          {!isLoading && !error && notices.map((notice) => (
+            <div key={notice.id} className="bg-muted dark:bg-[#18181b] rounded-lg p-6 flex flex-col gap-4">
               <div className="flex justify-between items-start">
                 <h2 className="text-xl font-semibold text-foreground">{notice.title}</h2>
                 <Badge className={getPriorityColor(notice.priority)}>

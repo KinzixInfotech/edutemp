@@ -1,19 +1,17 @@
-// components/SyllabusManagement.jsx (Main component, adapted and professional)
 'use client'
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-// import { useUploadThing } from "@uploadthing/react"; // Assuming setup
-import axios from 'axios';
-import dynamic from 'next/dynamic';
-import { uploadFiles, useUploadThing } from "@/app/components/utils/uploadThing";
+import { useUploadThing } from "@/app/components/utils/uploadThing";
 import { useAuth } from "@/context/AuthContext";
+import dynamic from "next/dynamic";
+import axios from "axios";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 
@@ -21,131 +19,84 @@ const PdfUploadButton = dynamic(() => import('@/components/upload'), { ssr: fals
 
 export default function SyllabusManagement() {
     const { startUpload } = useUploadThing("syllabus");
-
     const { fullUser } = useAuth();
-    const [syllabi, setSyllabi] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [uploading, setuploading] = useState(false)
+    const queryClient = useQueryClient();
+
     const [drawerOpen, setDrawerOpen] = useState(false);
-    const [classes, setClasses] = useState([]);
-    const [academicYears, setAcademicYears] = useState([]);
     const [formData, setFormData] = useState({ classId: '', academicYearId: '' });
     const [selectedFile, setSelectedFile] = useState(null);
     const [formError, setFormError] = useState('');
+    const [uploading, setUploading] = useState(false);
     const [resetKey, setResetKey] = useState(0);
 
+    // Fetch classes
+    const { data: classes = [] } = useQuery({
+        queryKey: ['classes', fullUser?.schoolId],
+        queryFn: async () => {
+            const res = await axios.get(`/api/schools/${fullUser.schoolId}/classes`);
+            return res.data;
+        },
+        enabled: !!fullUser?.schoolId,
+    });
 
+    // Fetch syllabi
+    const { data: syllabi = [], isLoading: loading } = useQuery({
+        queryKey: ['syllabi', fullUser?.schoolId],
+        queryFn: async () => {
+            const res = await axios.get(`/api/schools/syllabus?schoolId=${fullUser?.schoolId}`);
+            return res.data;
+        },
+        enabled: !!fullUser?.schoolId,
+    });
 
-    useEffect(() => {
-        if (!fullUser?.schoolId) return;
-        console.log('fetchig');
+    const handleChange = (name, value) => setFormData({ ...formData, [name]: value });
 
-        const schoolId = fullUser?.schoolId;
+    const uploadSyllabusMutation = useMutation({
+        mutationFn: async () => {
+            if (!selectedFile) throw new Error('Please upload a PDF file.');
+            if (!formData.classId) throw new Error('Please select a class.');
 
-        async function fetchData() {
-            try {
-                // Fetch syllabus
-                const syllabusRes = await fetch(`/api/schools/syllabus?schoolId=${schoolId}`);
-                if (!syllabusRes.ok) {
-                    throw new Error(`Failed to fetch syllabus: ${syllabusRes.statusText}`);
-                }
-                const syllabiData = await syllabusRes.json();
-
-                // Fetch classes
-                const classesRes = await fetch(`/api/schools/${schoolId}/classes`);
-                if (!classesRes.ok) {
-                    throw new Error(`Failed to fetch classes: ${classesRes.statusText}`);
-                }
-                const classesData = await classesRes.json();
-                // // Fetch academic years
-                // const yearsRes = await fetch(`/api/academic-years?schoolId=${schoolId}`);
-                // if (!yearsRes.ok) {
-                //     throw new Error(`Failed to fetch academic years: ${yearsRes.statusText}`);
-                // }
-                // const yearsData = await yearsRes.json();
-
-                // Set state
-                setSyllabi(syllabiData);
-                setClasses(classesData);
-            } catch (err) {
-                console.error("Fetching error:", err);
-            } finally {
-                setLoading(false);
-            }
-        }
-
-
-        fetchData();
-    }, [fullUser?.schoolId]);
-
-    const handleChange = (name, value) => {
-        setFormData({ ...formData, [name]: value });
-    };
-
-    const handleSubmit = async () => {
-        if (!selectedFile) {
-            setFormError('Please upload a PDF file.');
-            return;
-        }
-        if (!formData.classId) {
-            setFormError('Please select a class.');
-            return;
-        }
-
-        setFormError('');
-        try {
-            setuploading(true)
-            // const uploadRes = await startUpload([selectedFile]);
+            setUploading(true);
             const uploadRes = await startUpload([selectedFile], {
                 schoolId: fullUser?.schoolId,
                 classId: formData?.classId,
             });
-            if (!uploadRes || !uploadRes[0].ufsUrl) {
-                throw new Error('Upload failed');
-            }
-            const fileUrl = uploadRes[0].ufsUrl;
-            console.log(fileUrl,'uploaded one');
-            
-            console.log({
-                fileUrl,
-                schoolId: fullUser?.schoolId,
-                classId: formData?.classId,
-                academicYearId: formData.academicYearId || null,
-            });
 
-            const res = await axios.post('/api/schools/syllabus', {
-                fileUrl,
+            if (!uploadRes || !uploadRes[0].ufsUrl) throw new Error('Upload failed');
+
+            return axios.post('/api/schools/syllabus', {
+                fileUrl: uploadRes[0].ufsUrl,
                 schoolId: fullUser?.schoolId,
                 classId: formData?.classId,
                 academicYearId: formData.academicYearId || null,
-            });
-            setSyllabi([...syllabi, res.data]);
+            }).then(res => res.data);
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries(['syllabi', fullUser?.schoolId]);
             setDrawerOpen(false);
             setSelectedFile(null);
             setFormData({ classId: '', academicYearId: '' });
-            setResetKey((prev) => prev + 1);
-        } catch (err) {
-            setFormError(err);
-            console.error(err);
-        } finally {
-            setuploading(false)
-        }
-    };
-    useEffect(() => {
-        console.log(syllabi);
+            setResetKey(prev => prev + 1);
+            setUploading(false);
+        },
+        onError: (err) => {
+            setFormError(err.message || 'Upload failed');
+            setUploading(false);
+        },
+    });
 
-    }, [syllabi])
+    const handleSubmit = () => uploadSyllabusMutation.mutate();
 
+    const deleteSyllabusMutation = useMutation({
+        mutationFn: async (id) => axios.delete('/api/schools/syllabus', { data: { id } }),
+        onSuccess: () => queryClient.invalidateQueries(['syllabi', fullUser?.schoolId]),
+    });
 
-    const handleDelete = async (id) => {
+    const handleDelete = (id) => {
         if (!confirm('Are you sure you want to delete this syllabus?')) return;
-        try {
-            await axios.delete('/api/schools/syllabus', { data: { id } });
-            setSyllabi(syllabi.filter((s) => s.id !== id));
-        } catch (err) {
-            console.error(err);
-        }
+        deleteSyllabusMutation.mutate(id);
     };
+
 
     return (
         <div className="p-6">
@@ -250,7 +201,7 @@ export default function SyllabusManagement() {
                             </div>
                         </div>
                         <Button onClick={handleSubmit} className="mt-4 w-full flex items-center justify-center" disabled={uploading}>{uploading ? (
-                            <Loader2 className="animate-spin" color="white" size={30}/>
+                            <Loader2 className="animate-spin" color="white" size={30} />
                         ) : ('Save')}</Button>
                     </div>
                 </DrawerContent>
