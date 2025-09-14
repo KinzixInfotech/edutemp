@@ -1,5 +1,5 @@
 'use client'
-
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, useCallback } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -52,12 +52,13 @@ export default function FeeStructuresTable() {
   const [feeStructures, setFeeStructures] = useState([]);
   const [filteredFeeStructures, setFilteredFeeStructures] = useState([]);
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [selectedFees, setSelectedFees] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedFeeStructure, setSelectedFeeStructure] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const queryClient = useQueryClient();
 
   const form = useForm({
     resolver: zodResolver(editSchema),
@@ -95,27 +96,75 @@ export default function FeeStructuresTable() {
   //   }
   // }, [fullUser]);
 
+  // const fetchFeeStructures = async () => {
+  //   setLoading(true);
+  //   try {
+  //     const res = await fetch(
+  //       `/api/schools/fee/structures?schoolId=${fullUser.schoolId}`
+  //     );
+  //     if (!res.ok) throw new Error("Failed to fetch fee structures");
+  //     const data = await res.json();
+  //     setFeeStructures(data);
+  //     setFilteredFeeStructures(data);
+  //   } catch (err) {
+  //     console.error(err);
+  //     toast.error(err.message || "Failed to load fee structures");
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+  // useEffect(() => {
+  //   if (!fullUser?.schoolId) return; // don't fetch until fullUser is ready
+  //   fetchFeeStructures();
+  // }, [fullUser?.schoolId]);
+  // Define the query function
+  useEffect(() => {
+    if (!fullUser?.schoolId) return;
+
+    queryClient.prefetchQuery({
+      queryKey: ['feeStructures', fullUser.schoolId],
+      queryFn: async () => {
+        const res = await fetch(`/api/schools/fee/structures?schoolId=${fullUser.schoolId}`);
+        if (!res.ok) throw new Error("Failed to fetch fee structures");
+        return res.json();
+      }
+    });
+  }, [fullUser?.schoolId, queryClient]);
+
   const fetchFeeStructures = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(
-        `/api/schools/fee/structures?schoolId=${fullUser.schoolId}`
-      );
-      if (!res.ok) throw new Error("Failed to fetch fee structures");
-      const data = await res.json();
-      setFeeStructures(data);
-      setFilteredFeeStructures(data);
-    } catch (err) {
+    const res = await fetch(
+      `/api/schools/fee/structures?schoolId=${fullUser.schoolId}`
+    );
+    if (!res.ok) throw new Error("Failed to fetch fee structures");
+    return res.json();
+  };
+
+  // Use useQuery to fetch and cache data
+
+  const { data, error, isLoading } = useQuery({
+    queryKey: ['feeStructures', fullUser?.schoolId],
+    queryFn: fetchFeeStructures,
+    staleTime: 1000 * 60 * 5, // 5 minutes before considering data stale
+    cacheTime: 1000 * 60 * 10, // 10 minutes before garbage collecting the cache
+    enabled: !!fullUser?.schoolId,
+    onError: (err) => {
       console.error(err);
       toast.error(err.message || "Failed to load fee structures");
-    } finally {
-      setLoading(false);
     }
-  };
+  });
+
+  // Sync the loading state with isLoading from useQuery
   useEffect(() => {
-    if (!fullUser?.schoolId) return; // don't fetch until fullUser is ready
-    fetchFeeStructures();
-  }, [fullUser?.schoolId]);
+    setLoading(isLoading);
+  }, [isLoading]);
+
+  // Update feeStructures and filteredFeeStructures when data is fetched
+  useEffect(() => {
+    if (data) {
+      setFeeStructures(data);
+      setFilteredFeeStructures(data);
+    }
+  }, [data]);
 
 
   // Handle search

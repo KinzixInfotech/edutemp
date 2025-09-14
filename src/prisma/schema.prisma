@@ -239,7 +239,7 @@ model Student {
   parentId            String?               @db.Uuid
   name                String
   email               String
-  dob                 String
+  dob                 DateTime
   gender              String
   admissionDate       String
   sectionId           Int

@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from "@/context/AuthContext";
 import {
     Dialog,
@@ -50,18 +51,19 @@ const assignSchema = z.object({
 
 export default function FeeStructuresTable() {
     const { fullUser } = useAuth();
-    const [students, setStudents] = useState([]);
-    const [loadingFee, setloadingFee] = useState(false)
-    const [filteredStudents, setFilteredStudents] = useState([]);
-    const [feeStructures, setFeeStructures] = useState([]);
-    const [academicYears, setAcademicYears] = useState([]);
-    const [classes, setClasses] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
+    // const [students, setStudents] = useState([]);
+    // const [loadingFee, setloadingFee] = useState(false)
+    // const [filteredStudents, setFilteredStudents] = useState([]);
+    // const [feeStructures, setFeeStructures] = useState([]);
+    // const [academicYears, setAcademicYears] = useState([]);
+    // const [classes, setClasses] = useState([]);
+    // const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [viewFeesOpen, setViewFeesOpen] = useState(false);
     const [assignOpen, setAssignOpen] = useState(false);
     const [selectedStudent, setSelectedStudent] = useState(null);
-    const [selectedFees, setSelectedFees] = useState(null);
+    // const [selectedFees, setSelectedFees] = useState(null);
     const [search, setSearch] = useState("");
     const [selectedClass, setSelectedClass] = useState("");
     const [selectedSection, setSelectedSection] = useState("");
@@ -82,36 +84,108 @@ export default function FeeStructuresTable() {
         name: "particulars",
     });
 
-    // Fetch data
-    const fetchData = (async () => {
+    // Prefetch all queries when schoolId is available
+    useEffect(() => {
         if (!fullUser?.schoolId) return;
-        setLoading(true);
-        try {
-            const [studentsRes, classesRes, yearsRes, feeStructuresRes] = await Promise.all([
-                fetch(`/api/students?schoolId=${fullUser.schoolId}`),
-                fetch(`/api/schools/${fullUser.schoolId}/classes`),
-                fetch(`/api/schools/academic-years?schoolId=${fullUser.schoolId}`),
-                fetch(`/api/schools/fee/structures/get?schoolId=${fullUser.schoolId}`),
-            ]);
 
-            if (!studentsRes.ok) throw new Error("Failed to fetch students");
-            if (!classesRes.ok) throw new Error("Failed to fetch classes");
-            if (!yearsRes.ok) throw new Error("Failed to fetch academic years");
-            if (!feeStructuresRes.ok) throw new Error("Failed to fetch fee structures");
+        queryClient.prefetchQuery({
+            queryKey: ['students', fullUser.schoolId],
+            queryFn: async () => {
+                const res = await fetch(`/api/students?schoolId=${fullUser.schoolId}`);
+                if (!res.ok) throw new Error("Failed to fetch students");
+                return res.json();
+            }
+        });
 
-            const [studentsData, classesData, yearsData, feeStructuresData] = await Promise.all([
-                studentsRes.json(),
-                classesRes.json(),
-                yearsRes.json(),
-                feeStructuresRes.json(),
-            ]);
+        queryClient.prefetchQuery({
+            queryKey: ['classes', fullUser.schoolId],
+            queryFn: async () => {
+                const res = await fetch(`/api/schools/${fullUser.schoolId}/classes`);
+                if (!res.ok) throw new Error("Failed to fetch classes");
+                return res.json();
+            },
+            // Transform data during prefetch
+            select: (classesData) => {
+                return (Array.isArray(classesData) ? classesData : []).flatMap((cls) => {
+                    const sections = Array.isArray(cls.sections) ? cls.sections : [];
+                    return sections.length > 0
+                        ? sections.map((sec) => ({
+                            label: `${cls.className}'${sec.name}`,
+                            value: `${cls.id}-${sec.id}`,
+                            classId: cls.id,
+                            sectionId: sec.id,
+                        }))
+                        : [
+                            {
+                                label: `Class ${cls.className}`,
+                                value: `${cls.id}`,
+                                classId: cls.id,
+                                sectionId: null,
+                            },
+                        ];
+                });
+            },
+        });
 
-            console.log(studentsData);
 
-            setStudents(studentsData);
-            setFilteredStudents(studentsData);
+        queryClient.prefetchQuery({
+            queryKey: ['academicYears', fullUser.schoolId],
+            queryFn: async () => {
+                const res = await fetch(`/api/schools/academic-years?schoolId=${fullUser.schoolId}`);
+                if (!res.ok) throw new Error("Failed to fetch academic years");
+                return res.json();
+            }
+        });
 
-            const mappedClasses = (Array.isArray(classesData) ? classesData : []).flatMap((cls) => {
+        queryClient.prefetchQuery({
+            queryKey: ['feeStructures', fullUser.schoolId],
+            queryFn: async () => {
+                const res = await fetch(`/api/schools/fee/structures/get?schoolId=${fullUser.schoolId}`);
+                if (!res.ok) throw new Error("Failed to fetch fee structures");
+                return res.json();
+            }
+        });
+
+    }, [fullUser?.schoolId, queryClient]);
+
+    // Use useQuery for students
+    const { data: students = [], isLoading: studentsLoading } = useQuery({
+        queryKey: ['students', fullUser?.schoolId],
+        queryFn: async () => {
+            const res = await fetch(`/api/students?schoolId=${fullUser.schoolId}`);
+            if (!res.ok) throw new Error("Failed to fetch students");
+            return res.json();
+        },
+        enabled: !!fullUser?.schoolId,
+        staleTime: 1000 * 60 * 5, // 5 minutes
+        onError: (err) => toast.error(err.message || "Error loading students"),
+    });
+
+    // Use useQuery for classes
+    // const { data: classes = [], isLoading: classesLoading } = useQuery({
+    //     queryKey: ['classes', fullUser?.schoolId],
+    //     queryFn: async () => {
+    //         const res = await fetch(`/api/schools/${fullUser.schoolId}/classes`);
+    //         if (!res.ok) throw new Error("Failed to fetch classes");
+    //         return res.json();
+    //     },
+    //     enabled: !!fullUser?.schoolId,
+    //     staleTime: 1000 * 60 * 5,
+    //     onError: (err) => toast.error(err.message || "Error loading classes"),
+    // });
+    // Use useQuery for classes and map them directly
+    const { data: classes = [], isLoading: classesLoading } = useQuery({
+        queryKey: ['classes', fullUser?.schoolId],
+        queryFn: async () => {
+            const res = await fetch(`/api/schools/${fullUser.schoolId}/classes`);
+            if (!res.ok) throw new Error("Failed to fetch classes");
+            return res.json();
+        },
+        enabled: !!fullUser?.schoolId,
+        staleTime: 1000 * 60 * 5,
+        select: (classesData) => {
+            // Map classes here
+            return (Array.isArray(classesData) ? classesData : []).flatMap((cls) => {
                 const sections = Array.isArray(cls.sections) ? cls.sections : [];
                 return sections.length > 0
                     ? sections.map((sec) => ({
@@ -120,61 +194,211 @@ export default function FeeStructuresTable() {
                         classId: cls.id,
                         sectionId: sec.id,
                     }))
-                    : [{ label: `Class ${cls.className}`, value: `${cls.id}`, classId: cls.id, sectionId: null }];
+                    : [
+                        {
+                            label: `Class ${cls.className}`,
+                            value: `${cls.id}`,
+                            classId: cls.id,
+                            sectionId: null,
+                        },
+                    ];
             });
-
-            setClasses(mappedClasses);
-
-            setAcademicYears(yearsData || []);
-            setFeeStructures(feeStructuresData || []);
-        } catch (err) {
-            console.error(err);
-            toast.error(err.message || "Failed to load data");
-        } finally {
-            setLoading(false);
-        }
+        },
+        onError: (err) => toast.error(err.message || "Error loading classes"),
     });
 
+    // Use useQuery for academic years
+    const { data: academicYears = [], isLoading: yearsLoading } = useQuery({
+        queryKey: ['academicYears', fullUser?.schoolId],
+        queryFn: async () => {
+            const res = await fetch(`/api/schools/academic-years?schoolId=${fullUser.schoolId}`);
+            if (!res.ok) throw new Error("Failed to fetch academic years");
+            return res.json();
+        },
+        enabled: !!fullUser?.schoolId,
+        staleTime: 1000 * 60 * 5,
+        onError: (err) => toast.error(err.message || "Error loading academic years"),
+    });
     useEffect(() => {
-        fetchData();
-    }, [fullUser?.schoolId]);
+        console.log(classes);
+    }, [classes])
+
+    // Use useQuery for fee structures
+    const { data: feeStructures = [], isLoading: feeStructuresLoading } = useQuery({
+        queryKey: ['feeStructures', fullUser?.schoolId],
+        queryFn: async () => {
+            const res = await fetch(`/api/schools/fee/structures/get?schoolId=${fullUser.schoolId}`);
+            if (!res.ok) throw new Error("Failed to fetch fee structures");
+            return res.json();
+        },
+        enabled: !!fullUser?.schoolId,
+        staleTime: 1000 * 60 * 5,
+        onError: (err) => toast.error(err.message || "Error loading fee structures"),
+    });
+
+    // Your component logic here, use students, classes, academicYears, feeStructures as needed
+    const loading = studentsLoading || classesLoading || yearsLoading || feeStructuresLoading;
+    // Fetch data
+
+    // const fetchData = (async () => {
+    //     if (!fullUser?.schoolId) return;
+    //     setLoading(true);
+    //     try {
+    //         const [studentsRes, classesRes, yearsRes, feeStructuresRes] = await Promise.all([
+    //             fetch(`/api/students?schoolId=${fullUser.schoolId}`),
+    //             fetch(`/api/schools/${fullUser.schoolId}/classes`),
+    //             fetch(`/api/schools/academic-years?schoolId=${fullUser.schoolId}`),
+    //             fetch(`/api/schools/fee/structures/get?schoolId=${fullUser.schoolId}`),
+    //         ]);
+
+    //         if (!studentsRes.ok) throw new Error("Failed to fetch students");
+    //         if (!classesRes.ok) throw new Error("Failed to fetch classes");
+    //         if (!yearsRes.ok) throw new Error("Failed to fetch academic years");
+    //         if (!feeStructuresRes.ok) throw new Error("Failed to fetch fee structures");
+
+    //         const [studentsData, classesData, yearsData, feeStructuresData] = await Promise.all([
+    //             studentsRes.json(),
+    //             classesRes.json(),
+    //             yearsRes.json(),
+    //             feeStructuresRes.json(),
+    //         ]);
+
+    //         console.log(studentsData);
+
+    //         setStudents(studentsData);
+    //         setFilteredStudents(studentsData);
+
+    //         const mappedClasses = (Array.isArray(classesData) ? classesData : []).flatMap((cls) => {
+    //             const sections = Array.isArray(cls.sections) ? cls.sections : [];
+    //             return sections.length > 0
+    //                 ? sections.map((sec) => ({
+    //                     label: `${cls.className}'${sec.name}`,
+    //                     value: `${cls.id}-${sec.id}`,
+    //                     classId: cls.id,
+    //                     sectionId: sec.id,
+    //                 }))
+    //                 : [{ label: `Class ${cls.className}`, value: `${cls.id}`, classId: cls.id, sectionId: null }];
+    //         });
+
+    //         setClasses(mappedClasses);
+
+    //         setAcademicYears(yearsData || []);
+    //         setFeeStructures(feeStructuresData || []);
+    //     } catch (err) {
+    //         console.error(err);
+    //         toast.error(err.message || "Failed to load data");
+    //     } finally {
+    //         setLoading(false);
+    //     }
+    // });
+
+    // useEffect(() => {
+    //     fetchData();
+    // }, [fullUser?.schoolId]);
 
     // Filter students based on search, class, and section
-    useEffect(() => {
-        let filtered = students;
-        if (search) {
-            filtered = filtered.filter((student) =>
-                student.admissionNumber?.toLowerCase().includes(search.toLowerCase()) ||
+    // useEffect(() => {
+    //     let filtered = students;
+    //     if (search) {
+    //         filtered = filtered.filter((student) =>
+    //             student.admissionNumber?.toLowerCase().includes(search.toLowerCase()) ||
+    //             student.User?.name?.toLowerCase().includes(search.toLowerCase())
+    //         );
+    //     }
+    //     if (selectedClass) {
+    //         filtered = filtered.filter((student) => student.classId === parseInt(selectedClass));
+    //     }
+    //     if (selectedSection) {
+    //         filtered = filtered.filter((student) => student.sectionId === selectedSection);
+    //     }
+    //     setFilteredStudents(filtered);
+    // }, [search, selectedClass, selectedSection, students]);
+
+    // useEffect(() => {
+    //     let filtered = students;
+    //     if (search) {
+    //         filtered = filtered.filter(student =>
+    //             student.admissionNumber?.toLowerCase().includes(search.toLowerCase()) ||
+    //             student.User?.name?.toLowerCase().includes(search.toLowerCase())
+    //         );
+    //     }
+    //     if (selectedClass) {
+    //         filtered = filtered.filter(student => student.classId === parseInt(selectedClass));
+    //     }
+    //     if (selectedSection) {
+    //         filtered = filtered.filter(student => student.sectionId === selectedSection);
+    //     }
+    //     setFilteredStudents(filtered);
+    // }, [search, selectedClass, selectedSection, students]);
+    // const filteredStudents = useMemo(() => {
+    //     return students.filter((student) => {
+    //         let matchesSearch = search
+    //             ? student.admissionNumber?.toLowerCase().includes(search.toLowerCase()) ||
+    //             student.User?.name?.toLowerCase().includes(search.toLowerCase())
+    //             : true;
+    //         let matchesClass = selectedClass
+    //             ? student.classId === parseInt(selectedClass)
+    //             : true;
+    //         let matchesSection = selectedSection
+    //             ? student.sectionId === selectedSection
+    //             : true;
+    //         return matchesSearch && matchesClass && matchesSection;
+    //     });
+    // }, [search, selectedClass, selectedSection, students]);
+
+
+    // const filteredStudents = useMemo(() => {
+    //     return students.filter((student) => {
+    //         let matchesSearch = search
+    //             ? student.admissionNumber?.toLowerCase().includes(search.toLowerCase()) ||
+    //             student.User?.name?.toLowerCase().includes(search.toLowerCase())
+    //             : true;
+    //         let matchesClass = selectedClass
+    //             ? student.classId === parseInt(selectedClass)
+    //             : true;
+    //         let matchesSection = selectedSection
+    //             ? student.sectionId === selectedSection
+    //             : true;
+    //         return matchesSearch && matchesClass && matchesSection;
+    //     });
+    // }, [search, selectedClass, selectedSection, students]);
+    const filteredStudents = useMemo(() => {
+        return students.filter((student) => {
+            let matchesSearch = search
+                ? student.admissionNumber?.toLowerCase().includes(search.toLowerCase()) ||
                 student.User?.name?.toLowerCase().includes(search.toLowerCase())
-            );
-        }
-        if (selectedClass) {
-            filtered = filtered.filter((student) => student.classId === parseInt(selectedClass));
-        }
-        if (selectedSection) {
-            filtered = filtered.filter((student) => student.sectionId === selectedSection);
-        }
-        setFilteredStudents(filtered);
+                : true;
+
+            let matchesClass = selectedClass && selectedClass !== "All"
+                ? student.classId === parseInt(selectedClass)
+                : true;
+
+            let matchesSection = selectedSection && selectedSection !== "All"
+                ? student.sectionId === selectedSection
+                : true;
+
+            return matchesSearch && matchesClass && matchesSection;
+        });
     }, [search, selectedClass, selectedSection, students]);
 
-    // Handle view fee structures
-    const handleViewFees = async (student) => {
-        try {
-            setloadingFee(true)
-            const res = await fetch(`/api/students/${student.userId}/fee-structures`);
+    // Query for student's fee structures
+    const { data: selectedFees, isLoading: loadingFee, refetch: refetchFees } = useQuery({
+        queryKey: ['studentFees', selectedStudent?.userId],
+        queryFn: async () => {
+            if (!selectedStudent) return [];
+            const res = await fetch(`/api/students/${selectedStudent.userId}/fee-structures`);
             if (!res.ok) throw new Error("Failed to fetch fee structures");
-            const data = await res.json();
-            setSelectedFees(data);
-            console.log(data);
+            return res.json();
+        },
+        enabled: !!selectedStudent, // only fetch when a student is selected
+        onError: (err) => toast.error(err.message || "Failed to load fee structures"),
+    });
 
-            setSelectedStudent(student);
-            setViewFeesOpen(true);
-        } catch (err) {
-            console.error(err);
-            toast.error(err.message || "Failed to load fee structures");
-        } finally {
-            setloadingFee(false)
-        }
+    // Handler to open dialog and trigger query
+    const handleViewFees = (student) => {
+        setSelectedStudent(student);
+        setViewFeesOpen(true);
+        // refetchFees(); // optional: force refetch if needed
     };
 
     // Handle assign fee structure
@@ -247,12 +471,13 @@ export default function FeeStructuresTable() {
                         <SelectContent>
                             <SelectItem value="All">All Classes</SelectItem>
                             {classes.map((cls) => (
-                                <SelectItem key={cls.value} value={cls.classId.toString()}>
+                                <SelectItem key={cls.value} value={cls.classId?.toString()}>
                                     {cls.label}
                                 </SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
+
                     <Select value={selectedSection} onValueChange={setSelectedSection} aria-label="Select section">
                         <SelectTrigger className="lg:w-[180px] w-full">
                             <SelectValue placeholder="Select Section" />
@@ -294,7 +519,7 @@ export default function FeeStructuresTable() {
                         {loading ? (
                             <TableRow className='flex items-center justify-center'>
                                 <TableCell colSpan={7} className="flex items-center justify-center   w-full py-4">
-                                    <Loader2 size={30} className="animate-spin"/>
+                                    <Loader2 size={30} className="animate-spin" />
                                 </TableCell>
                             </TableRow>
                         ) : filteredStudents.length > 0 ? (
