@@ -1,6 +1,7 @@
 import { clsx } from "clsx";
 import { useMemo } from "react";
 import { twMerge } from "tailwind-merge"
+// import { api } from "~/trpc/react";
 
 export function cn(...inputs) {
   return twMerge(clsx(inputs));
@@ -11,6 +12,8 @@ export const useGlobalLoading = (queries) => {
     return queries.some(query => query.isLoading);
   }, [queries]);
 };
+
+
 
 // utils.ts
 export function adjustScheduleToCurrentWeek(events) {

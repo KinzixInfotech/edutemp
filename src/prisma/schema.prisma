@@ -185,6 +185,9 @@ model User {
   role                  Role              @relation(fields: [roleId], references: [id])
   student               Student?
   teacher               TeachingStaff?
+  // Add to User model (optional but recommended):
+  issuedBooks           LibraryBook[]     @relation("IssuedBooks")
+  reservedBooks         LibraryBook[]     @relation("ReservedBooks")
   nonTeachingStaff      NonTeachingStaff?
   attendance            Attendance[]
   sentNotifications     Notification[]    @relation("Sender")
@@ -239,7 +242,7 @@ model Student {
   parentId            String?               @db.Uuid
   name                String
   email               String
-  dob                 DateTime
+  dob                 String
   gender              String
   admissionDate       String
   sectionId           Int
@@ -781,15 +784,33 @@ model Transport {
   @@index([schoolId])
 }
 
+// Add the new LibraryBook model:
 model LibraryBook {
-  id       Int     @id @default(autoincrement())
-  schoolId String  @db.Uuid
-  title    String
-  author   String?
+  id           String    @id @default(uuid()) @db.Uuid
+  title        String
+  ISBN         String
+  author       String
+  publisher    String
+  edition      String?
+  category     String
+  status       String // "available", "issued", "reserved", "damaged"
+  schoolId     String    @db.Uuid
+  issuedToId   String?   @db.Uuid
+  issuedAt     DateTime?
+  dueAt        DateTime?
+  reservedById String?   @db.Uuid
+  reservedAt   DateTime?
+  fineAmount   Float?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  school School @relation(fields: [schoolId], references: [id])
+  school     School @relation(fields: [schoolId], references: [id])
+  issuedTo   User?  @relation("IssuedBooks", fields: [issuedToId], references: [id])
+  reservedBy User?  @relation("ReservedBooks", fields: [reservedById], references: [id])
 
   @@index([schoolId])
+  @@index([status])
+  @@index([ISBN])
 }
 
 model Gallery {

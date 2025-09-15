@@ -47,7 +47,7 @@ const sidebarData = [
             { label: "Syllabus Management", url: "/dashboard/schools/syllabus-managment/", icon: House, roles: ["ADMIN"] },
             { label: "Create Super Admin", url: "/dashboard/edubreezy/add-user", icon: IconListDetails, roles: ["SUPER_ADMIN"] },
             { label: "Audit Log", url: "/dashboard/auditlog", icon: IconChartBar, roles: ["SUPER_ADMIN"] },
-            { label: "Edu AI", url: "/dashboard/schools/eduai", icon: BotMessageSquare , roles: ["ADMIN"] },
+            { label: "Edu AI", url: "/dashboard/schools/eduai", icon: BotMessageSquare, roles: ["ADMIN"] },
         ],
     },
     {
@@ -112,7 +112,7 @@ const sidebarData = [
                 roles: ["ADMIN"],
                 submenu: [
                     {
-                        label: "Manage Books", url: "/dashboard/fees / manage - fee - structure", roles: ["ADMIN"]
+                        label: "Manage Books", url: "/dashboard/schools/library/catalog", roles: ["ADMIN"]
                     },
                     { label: "Issue & Return", url: "/dashboard/fees/fee-structures", roles: ["ADMIN"] },
                     { label: "Book Categories", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
