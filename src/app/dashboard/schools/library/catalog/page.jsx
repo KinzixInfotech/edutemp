@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 // import { useToast } from "@/components/ui/use-toast";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import { Loader2 } from "lucide-react";
 
 
 
@@ -51,8 +52,12 @@ async function deleteBook(id) {
     const response = await fetch(`/api/schools/library/books/${id}`, {
         method: "DELETE",
     });
-    if (!response.ok) throw new Error("Failed to delete book");
-    return response.json();
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to delete book");
+    }
+    // return true; // or nothing
+    return true; // or nothing
 }
 
 async function fetchHistory(userId) {
@@ -62,6 +67,7 @@ async function fetchHistory(userId) {
 }
 
 export default function LibraryCatalog() {
+    const [saving, setsaving] = useState(false)
     const { fullUser } = useAuth()
     const [drawerMode, setDrawerMode] = useState(null);
     const [formData, setFormData] = useState({});
@@ -89,17 +95,20 @@ export default function LibraryCatalog() {
 
     const createMutation = useMutation({
         mutationFn: createBook,
+        onMutate: () => setsaving(true),
         onSuccess: () => {
             queryClient.invalidateQueries(["books"]);
             setDrawerMode(null);
             // toast({ title: "Book added successfully" });
             toast.success("Book added successfully");
         },
+        onSettled: () => setsaving(false), // always reset saving
         onError: () => toast.error("Failed To Add Book"),
     });
 
     const updateMutation = useMutation({
         mutationFn: updateBook,
+        onMutate: () => setsaving(true),
         onSuccess: () => {
             queryClient.invalidateQueries(["books"]);
             setDrawerMode(null);
@@ -107,17 +116,23 @@ export default function LibraryCatalog() {
             toast.success("Book updated successfully");
 
         },
+        onSettled: () => setsaving(false), // always reset saving
         onError: () => toast.error("Failed To Update Book"),
     });
 
     const deleteMutation = useMutation({
         mutationFn: deleteBook,
+        onMutate: () => setsaving(true),
         onSuccess: () => {
             queryClient.invalidateQueries(["books"]);
             toast.success("Book deleted successfully");
 
         },
-        onError: () => toast.error("Failed To Delete Book"),
+        onSettled: () => setsaving(false), //  always reset saving
+        onError: (err) => {
+            console.error("Delete error:", err);
+            toast.error("Failed to delete book");
+        },
     });
 
     const handleChange = (e) => {
@@ -129,6 +144,8 @@ export default function LibraryCatalog() {
     };
 
     const handleSubmit = () => {
+
+
         if (!formData.title || !formData.ISBN || !formData.author || !formData.publisher || !formData.category) {
             setFormError("Required fields missing");
             return;
@@ -139,6 +156,7 @@ export default function LibraryCatalog() {
         } else {
             updateMutation.mutate({ id: formData.id, ...formData });
         }
+
     };
 
     const handleAdd = () => {
@@ -213,7 +231,7 @@ export default function LibraryCatalog() {
                                     <TableCell>{book.author}</TableCell>
                                     <TableCell>
                                         <span
-                                            className={`px-2 py-1 rounded-sm text-sm font-medium ${book.status === "available" ? "bg-green-100 text-green-800" :
+                                            className={`px-2 py-1 rounded-sm capitalize text-sm font-medium ${book.status === "available" ? "bg-green-100 text-green-800" :
                                                 book.status === "issued" ? "bg-yellow-100 text-yellow-800" :
                                                     book.status === "reserved" ? "bg-blue-100 text-blue-800" :
                                                         "bg-red-100 text-red-800"
@@ -328,8 +346,16 @@ export default function LibraryCatalog() {
                                 </Select>
                             </div>
                         </div>
-                        <Button onClick={handleSubmit} className="mt-6 w-full">
-                            Save
+                        <Button onClick={handleSubmit}
+                            disabled={saving}
+                            className={`mt-6 w-full ${saving ? "opacity-50 cursor-not-allowed" : ""}`}>
+                            {saving ? (
+                                <div className="flex items-center gap-2 justify-center">
+                                    <Loader2 className="animate-spin" size={20} />
+                                    <span>Saving</span>
+                                </div>
+                            ) : "Save"}
+
                         </Button>
                     </div>
                 </DrawerContent>

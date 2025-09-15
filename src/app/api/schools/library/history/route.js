@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 export default async function handler(req, res) {
     // const session = await getSession({ req });
     // if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
+    
     if (req.method === "GET") {
         const { userId } = req.query;
         try {
