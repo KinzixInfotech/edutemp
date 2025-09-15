@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { useAuth } from '@/context/AuthContext';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const fetchNotices = async ({ queryKey }) => {
   const [_key, { userId, schoolId, searchQuery, category }] = queryKey;
@@ -93,45 +94,78 @@ const Noticeboard = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {isLoading && (
-            <div className='col-span-full place-items-center'>
-              <Loader2 size={30} className='animate-spin' />
-            </div>
-          )}
-          {error && (
+          {isLoading ? (
+            // Multiple Skeleton Cards to Match Grid
+            Array(3).fill(0).map((_, index) => (
+              <div
+                key={index}
+                className="bg-muted dark:bg-[#18181b] rounded-lg p-6 flex flex-col gap-2"
+              >
+                <div className="flex justify-between items-start">
+                  {/* Title Skeleton */}
+                  <Skeleton className="h-6 w-32" />
+                  {/* Priority Badge Skeleton */}
+                  <Skeleton className="h-6 w-24 rounded-md" />
+                </div>
+                {/* Description Skeleton */}
+                <Skeleton className="h-4 w-3/4" />
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {/* Badge Skeletons */}
+                  <Skeleton className="h-6 w-16 rounded-md" />
+                  <Skeleton className="h-6 w-16 rounded-md" />
+                  <Skeleton className="h-6 w-16 rounded-md" />
+                </div>
+                <div className="flex flex-col gap-1 mt-2 text-sm text-foreground/60">
+                  {/* Metadata Skeletons */}
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-4 w-40" />
+                </div>
+                {/* Button Skeleton */}
+                <Skeleton className="h-8 w-32 mt-auto" />
+              </div>
+            ))
+          ) : error ? (
             <p className="text-red-500 col-span-full text-center">Error: {error.message}</p>
-          )}
-          {!isLoading && !error && notices.length === 0 && (
+          ) : notices.length === 0 ? (
             <p className="text-foreground/60 col-span-full text-center">No notices found.</p>
+          ) : (
+            notices.map((notice) => (
+              <div
+                key={notice.id}
+                className="bg-muted dark:bg-[#18181b] rounded-lg p-6 flex flex-col gap-2"
+              >
+                <div className="flex justify-between items-start">
+                  <h2 className="text-xl font-semibold text-foreground">{notice.title}</h2>
+                  <Badge className={getPriorityColor(notice.priority)}>
+                    {notice.priority}
+                  </Badge>
+                </div>
+                <p className="text-foreground/80 line-clamp-3">{notice.description}</p>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <Badge variant="outline">{notice.audience}</Badge>
+                  <Badge variant="outline">{notice.category || "Others"}</Badge>
+                  <Badge className={getStatusColor(notice.status)}>{notice.status}</Badge>
+                </div>
+                <div className="flex flex-col text-sm text-foreground/60 gap-1">
+                  <p>
+                    Published: {notice.publishedAt ? new Date(notice.publishedAt).toLocaleDateString() : "-"}
+                  </p>
+                  <p>
+                    Expires: {notice.expiryDate ? new Date(notice.expiryDate).toLocaleDateString() : "-"}
+                  </p>
+                  <p>Author: {notice.Author?.name || "-"}</p>
+                </div>
+                {notice.fileUrl && (
+                  <Button variant="link" asChild className="mt-auto">
+                    <a href={notice.fileUrl} target="_blank" rel="noopener noreferrer">
+                      View Attachment
+                    </a>
+                  </Button>
+                )}
+              </div>
+            ))
           )}
-          {!isLoading && !error && notices.map((notice) => (
-            <div key={notice.id} className="bg-muted dark:bg-[#18181b] rounded-lg p-6 flex flex-col gap-4">
-              <div className="flex justify-between items-start">
-                <h2 className="text-xl font-semibold text-foreground">{notice.title}</h2>
-                <Badge className={getPriorityColor(notice.priority)}>
-                  {notice.priority}
-                </Badge>
-              </div>
-              <p className="text-foreground/80 line-clamp-3">{notice.description}</p>
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="outline">{notice.audience}</Badge>
-                <Badge variant="outline">{notice.category || "Others"}</Badge>
-                <Badge className={getStatusColor(notice.status)}>{notice.status}</Badge>
-              </div>
-              <div className="text-sm text-foreground/60">
-                <p>Published: {notice.publishedAt ? new Date(notice.publishedAt).toLocaleDateString() : "-"}</p>
-                <p>Expires: {notice.expiryDate ? new Date(notice.expiryDate).toLocaleDateString() : "-"}</p>
-                <p>Author: {notice.Author?.name || "-"}</p>
-              </div>
-              {notice.fileUrl && (
-                <Button variant="link" asChild className="mt-auto">
-                  <a href={notice.fileUrl} target="_blank" rel="noopener noreferrer">
-                    View Attachment
-                  </a>
-                </Button>
-              )}
-            </div>
-          ))}
         </div>
       </div>
     </div>

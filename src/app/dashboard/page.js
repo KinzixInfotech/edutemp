@@ -15,6 +15,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { useEffect, useMemo, useState } from 'react';
 import { ChartAreaInteractive } from '@/components/chart-area-interactive';
 import { SectionCards } from '@/components/section-cards';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import LoaderPage from '@/components/loader-page';
 import { CalendarClock } from "lucide-react";
 import { ChartPieLabel } from '@/components/chart-pie';
@@ -23,6 +24,7 @@ import { ChartLineLabel } from '@/components/line-chart';
 import BigCalendar from '@/components/big-calendar';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { useGlobalLoading } from '@/lib/utils';
 
 // const LatestNotice = () => {
 //   // Dummy data
@@ -56,7 +58,8 @@ import Link from 'next/link';
 //               View Notice
 //             </span>
 //           </Link>
-//           <Link href="/dashboard/schools/noticeboard" className='ml-1.5'>
+//           <
+// Link href="/dashboard/schools/noticeboard" className='ml-1.5'>
 //             <span className='border-b py-1 text-sm  cursor-pointer '>
 //               Dismiss
 //             </span>
@@ -71,9 +74,8 @@ import Link from 'next/link';
 // import { useEffect, useState } from 'react';
 // import Link from 'next/link';
 
-const LatestNotice = ({ fullUser }) => {
+const LatestNotice = ({ fullUser, queryClient }) => {
   if (!fullUser) return
-  const [latestNotice, setLatestNotice] = useState(null);
   const [dismissedNoticeId, setDismissedNoticeId] = useState(null);
 
   // Load dismissed notice ID from localStorage
@@ -83,33 +85,63 @@ const LatestNotice = ({ fullUser }) => {
       setDismissedNoticeId(dismissed);
     }
   }, []);
+  const fetchLatestNotice = async ({ queryKey }) => {
+    const [_key, { userId, schoolId }] = queryKey;
+    const params = new URLSearchParams({
+      userId,
+      schoolId,
+      limit: "1",
+      offset: "0"
+    });
 
-  // Fetch latest notice from API
+    const res = await fetch(`/api/schools/notice/get?${params}`);
+    if (!res.ok) throw new Error('Failed to fetch notice');
+    const data = await res.json();
+    return data.notices[0] || null;
+  };
+  // Prefetch the notice on page load
   useEffect(() => {
-    const fetchLatestNotice = async () => {
-      const params = new URLSearchParams({
-        userId: fullUser.id,
-        schoolId: fullUser.schoolId,
-
-        limit: "1",
-        offset: "0",
+    if (fullUser) {
+      queryClient.prefetchQuery({
+        queryKey: ['latestNotice', { userId: fullUser.id, schoolId: fullUser.schoolId }],
+        queryFn: fetchLatestNotice
       });
+    }
+  }, [fullUser, queryClient]);
 
-      try {
-        const res = await fetch(`/api/schools/notice/get?${params}`);
-        const data = await res.json();
-        if (data.notices && data.notices.length > 0) {
-          setLatestNotice(data.notices[0]);
-        }
-      } catch (error) {
-        console.error("Error fetching latest notice:", error);
-      }
-    };
+  // Use the query to access data
+  const { data: latestNotice, isLoading, error } = useQuery({
+    queryKey: ['latestNotice', { userId: fullUser.id, schoolId: fullUser.schoolId }],
+    queryFn: fetchLatestNotice,
+    enabled: !!fullUser, // ensure fullUser exists before fetching
+    staleTime: 1000 * 60 * 5 // cache for 5 minutes
+  });
+  // Fetch latest notice from API
+  // useEffect(() => {
+  //   const fetchLatestNotice = async () => {
+  //     const params = new URLSearchParams({
+  //       userId: fullUser.id,
+  //       schoolId: fullUser.schoolId,
 
-    fetchLatestNotice();
-    console.log(fullUser, 'from notice');
+  //       limit: "1",
+  //       offset: "0",
+  //     });
 
-  }, [fullUser?.schoolId]);
+  //     try {
+  //       const res = await fetch(`/api/schools/notice/get?${params}`);
+  //       const data = await res.json();
+  //       if (data.notices && data.notices.length > 0) {
+  //         setLatestNotice(data.notices[0]);
+  //       }
+  //     } catch (error) {
+  //       console.error("Error fetching latest notice:", error);
+  //     }
+  //   };
+
+  //   fetchLatestNotice();
+  //   console.log(fullUser, 'from notice');
+
+  // }, [fullUser?.schoolId]);
 
   const handleDismiss = () => {
     if (latestNotice) {
@@ -153,93 +185,125 @@ const LatestNotice = ({ fullUser }) => {
   );
 };
 
+// Define your fetch functions outside useQuery for reuse
+const fetchSchoolTrend = async () => {
+  const res = await fetch('/api/school-trend');
+  if (!res.ok) throw new Error('Failed to fetch school trend');
+  const data = await res.json();
+  return data;
+};
+
+const fetchActiveAccounts = async () => {
+  const res = await fetch('/api/account-status');
+  if (!res.ok) throw new Error('Failed to fetch active accounts');
+  const data = await res.json();
+  return data.active ?? 0;
+};
+
+const fetchAdminStatsTeacher = async (schoolId) => {
+  const res = await fetch(`/api/schools/teaching-staff/${schoolId}/count`);
+  if (!res.ok) throw new Error("Failed to fetch teaching staff count");
+  const count = await res.json();
+
+  const genderRes = await fetch(`/api/schools/gender-count/${schoolId}`);
+  if (!genderRes.ok) throw new Error("Failed to fetch gender count");
+  const genderData = await genderRes.json();
+
+  return {
+    adminTeacherCount: count.count,
+    maleCount: genderData.male ?? 0,
+    femaleCount: genderData.female ?? 0,
+    totalStudentCount: genderData.total ?? 0,
+  };
+};
+
+// Use the global loading hook
+
+const fetchAdminStatsNonTeacher = async (schoolId) => {
+  const res = await fetch(`/api/schools/non-teaching-staff/${schoolId}/count`);
+  if (!res.ok) throw new Error("Failed to fetch non-teaching staff count");
+  const data = await res.json();
+  return { adminNonTeacherCount: data.count };
+};
 
 
 export default function Dashboard() {
-  const { fullUser, loading } = useAuth();
+
+  const queryClient = useQueryClient();
   const [date, setDate] = useState(new Date());
-  const [chartDataSuper, setChartDataSuper] = useState([])
-  const [maleCount, setMaleCount] = useState(0);
-  const [femaleCount, setFemaleCount] = useState(0);
-  const [totalStudentCount, setTotalStudentCount] = useState(0);
-  const [schoolCount, setSchoolCount] = useState(0);
-  const [trend, setTrend] = useState(0);
-  const [direction, setDirection] = useState("neutral");
-  const [activeCount, setActiveCount] = useState(0);
-  const [adminTeacherCount, setAdminTeacherCount] = useState(0);
-  const [adminNonTeacherCount, setAdminNonTeacherCount] = useState(0);
+  const { fullUser, loading } = useAuth();
 
+  // Super Admin Queries
+  const schoolTrendQuery = useQuery({
+    queryKey: ['schoolTrend'],
+    queryFn: fetchSchoolTrend,
+    enabled: fullUser?.role?.name === 'SUPER_ADMIN',
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const activeAccountsQuery = useQuery({
+    queryKey: ['activeAccounts'],
+    queryFn: fetchActiveAccounts,
+    enabled: fullUser?.role?.name === 'SUPER_ADMIN',
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const adminTeacherStatsQuery = useQuery({
+    queryKey: ['adminTeacherStats', fullUser?.schoolId],
+    queryFn: () => fetchAdminStatsTeacher(fullUser.schoolId),
+    enabled: fullUser?.role?.name === 'ADMIN' && !!fullUser?.schoolId,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const adminNonTeacherStatsQuery = useQuery({
+    queryKey: ['adminNonTeacherStats', fullUser?.schoolId],
+    queryFn: () => fetchAdminStatsNonTeacher(fullUser.schoolId),
+    enabled: fullUser?.role?.name === 'ADMIN' && !!fullUser?.schoolId,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Data extraction
+  const schoolTrendData = schoolTrendQuery.data || {};
+  const chartDataSuper = schoolTrendData.data?.map(item => ({
+    date: item.date,
+    schools: item.schools,
+  })) || [];
+  const schoolCount = schoolTrendData.data?.[schoolTrendData.data.length - 1]?.schools || 0;
+  const trend = schoolTrendData.trend ?? 0;
+  const direction = schoolTrendData.direction ?? "neutral";
+
+  const activeCount = activeAccountsQuery.data || 0;
+
+  const adminTeacherStats = adminTeacherStatsQuery.data || {};
+  const adminTeacherCount = adminTeacherStats.adminTeacherCount || 0;
+  const maleCount = adminTeacherStats.maleCount || 0;
+  const femaleCount = adminTeacherStats.femaleCount || 0;
+  const totalStudentCount = adminTeacherStats.totalStudentCount || 0;
+
+  const adminNonTeacherStats = adminNonTeacherStatsQuery.data || {};
+  const adminNonTeacherCount = adminNonTeacherStats.adminNonTeacherCount || 0;
+
+  //  Use global loading hook
+  const isLoading = useGlobalLoading([
+    schoolTrendQuery,
+    activeAccountsQuery,
+    adminTeacherStatsQuery,
+    adminNonTeacherStatsQuery,
+  ]);
+  // Prefetch if needed (optional, you can remove this block if not required)
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        // 1️⃣ Fetch school trend data
-        const res = await fetch('/api/school-trend');
-        if (!res.ok) throw new Error("Failed to fetch school trend");
+    if (!fullUser) return;
 
-        const data = await res.json();
-        // format the data for chart 
-        const formatted = data.data.map(item => ({
-          date: item.date,
-          schools: item.schools,
-        }))
-
-        setChartDataSuper(formatted)
-        const latest = data?.data?.[data.data.length - 1];
-
-        setSchoolCount(latest?.schools ?? 0);
-        setTrend(data?.trend ?? 0);
-        setDirection(data?.direction ?? "neutral");
-      } catch (err) {
-        console.error("❌ School trend error:", err);
-        setSchoolCount(0);
-        setTrend(0);
-        setDirection("neutral");
-      }
-
-      try {
-        // Fetch active accounts (queued after school trend)
-        const activeRes = await fetch('/api/account-status');
-        if (!activeRes.ok) throw new Error("Failed to fetch active accounts");
-
-        const activeData = await activeRes.json();
-        setActiveCount(activeData?.active ?? 0);
-      } catch (err) {
-        console.error("❌ Active account fetch error:", err);
-        setActiveCount(0);
-      }
-    };
-    const fetchAdminStatsTeacher = async () => {
-      try {
-        const res = await fetch(`/api/schools/teaching-staff/${fullUser?.schoolId}/count`);
-        const json = await res.json();
-        setAdminTeacherCount(json.count);
-        // Gender-based student count
-        const genderRes = await fetch(`/api/schools/gender-count/${fullUser?.schoolId}`);
-        const genderData = await genderRes.json();
-
-        setMaleCount(genderData.male ?? 0);
-        setFemaleCount(genderData.female ?? 0);
-        setTotalStudentCount(genderData.total ?? 0);
-      } catch (err) {
-        console.error("❌ Admin stats fetch error:", err);
-      }
-    };
-    const fetchAdminStatsTNoneacher = async () => {
-      try {
-        const res = await fetch(`/api/schools/non-teaching-staff/${fullUser?.schoolId}/count`);
-        const json = await res.json();
-        setAdminNonTeacherCount(json.count);
-      } catch (err) {
-        console.error("❌ Admin stats fetch error:", err);
-      }
-    };
-    if (fullUser?.role?.name === 'SUPER_ADMIN') {
-      fetchStats();
-    } else if (fullUser?.role?.name === 'ADMIN') {
-      fetchAdminStatsTeacher();
-      fetchAdminStatsTNoneacher();
+    if (fullUser.role.name === 'SUPER_ADMIN') {
+      queryClient.prefetchQuery(['schoolTrend'], fetchSchoolTrend);
+      queryClient.prefetchQuery(['activeAccounts'], fetchActiveAccounts);
+    } else if (fullUser.role.name === 'ADMIN') {
+      queryClient.prefetchQuery(['adminTeacherStats', fullUser.schoolId], () => fetchAdminStatsTeacher(fullUser.schoolId));
+      queryClient.prefetchQuery(['adminNonTeacherStats', fullUser.schoolId], () => fetchAdminStatsNonTeacher(fullUser.schoolId));
     }
-  }, [fullUser]);
+  }, [fullUser, queryClient]);
+
+
   const events = [
     { title: "Product Strategy Meeting", time: "12:00 PM – 02:00 PM", description: "Align roadmap and define Q4 deliverables." },
     { title: "UX Audit Review", time: "03:00 PM – 04:30 PM", description: "Review accessibility and UI consistency." },
@@ -283,18 +347,18 @@ export default function Dashboard() {
         return (
           <>
             <div className='px-4'>
-              <LatestNotice fullUser={fullUser} />
+              <LatestNotice fullUser={fullUser} queryClient={queryClient} />
             </div>
-            <SectionCards data={cards} />
+            <SectionCards data={cards} isloading={isLoading} />
             <div className="flex flex-col gap-3.5 px-4">
               {/* <ChartAreaInteractive chartData={chartDataSuper} /> */}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full">
 
-                <ChartPieLabel chartData={chartData} title="Students" date="January - June 2024" />
+                <ChartPieLabel chartData={chartData} title="Students" date="January - June 2024" isLoading={isLoading} />
                 {/* <ChartBarMultiple chartData={barchartData} title="Attendance" date="Today" />
                  */}
-                <ChartBarHorizontal />
+                <ChartBarHorizontal isLoading={isLoading} />
               </div>
               {/* <ChartLineLabel chartData={linechartData} title="Finance" date="Today" /> */}
             </div>

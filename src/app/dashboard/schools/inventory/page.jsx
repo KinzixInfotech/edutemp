@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/context/AuthContext";
 import axios from "axios";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function InventoryItemsTable() {
     const { fullUser } = useAuth();
@@ -135,7 +136,7 @@ export default function InventoryItemsTable() {
 
     return (
         <div className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Inventory Items Overview</h2>
+            {/* <h2 className="text-lg font-semibold mb-4">Inventory Items Overview</h2> */}
             <Button onClick={handleAdd} className="mb-4">Add Item</Button>
             <div className="overflow-x-auto rounded-lg border">
                 <Table className="min-w-[800px]">
@@ -151,9 +152,16 @@ export default function InventoryItemsTable() {
                     </TableHeader>
                     <TableBody>
                         {loading ? (
-                            <TableRow>
-                                <TableCell colSpan={6} className="text-center py-4">Loading...</TableCell>
-                            </TableRow>
+                            Array(6).fill(0).map((_, index) => (
+                                <TableRow key={index}>
+                                    <TableCell><Skeleton className="h-6 w-6" /></TableCell>
+                                    <TableCell><Skeleton className="h-6 w-32" /></TableCell>
+                                    <TableCell><Skeleton className="h-6 w-32" /></TableCell>
+                                    <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+                                    <TableCell><Skeleton className="h-6 w-32" /></TableCell>
+                                    <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                                </TableRow>
+                            ))
                         ) : items.length > 0 ? (
                             items.map((item, index) => (
                                 <TableRow key={item.id} className={index % 2 === 0 ? "bg-muted" : "bg-background"}>

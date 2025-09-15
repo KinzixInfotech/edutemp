@@ -14,6 +14,7 @@ import dynamic from "next/dynamic";
 import axios from "axios";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const PdfUploadButton = dynamic(() => import('@/components/upload'), { ssr: false });
 
@@ -100,7 +101,7 @@ export default function SyllabusManagement() {
 
     return (
         <div className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Syllabus Management</h2>
+            {/* <h2 className="text-lg font-semibold mb-4">Syllabus Management</h2> */}
             <Button onClick={() => setDrawerOpen(true)} className="mb-4">Upload New Syllabus</Button>
             <div className="overflow-x-auto rounded-lg border">
                 <Table className="min-w-[800px]">
@@ -116,9 +117,16 @@ export default function SyllabusManagement() {
                     </TableHeader>
                     <TableBody>
                         {loading ? (
-                            <TableRow>
-                                <TableCell colSpan={6} className="text-center py-4">Loading...</TableCell>
-                            </TableRow>
+                            Array(6).fill(0).map((_, index) => (
+                                <TableRow key={index}>
+                                    <TableCell><Skeleton className="h-6 w-6" /></TableCell>
+                                    <TableCell><Skeleton className="h-6 w-32" /></TableCell>
+                                    <TableCell><Skeleton className="h-6 w-32" /></TableCell>
+                                    <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+                                    <TableCell><Skeleton className="h-6 w-32" /></TableCell>
+                                    <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                                </TableRow>
+                            ))
                         ) : syllabi.length > 0 ? (
                             syllabi.map((syllabus, index) => (
                                 <TableRow key={syllabus.id} className={index % 2 === 0 ? "bg-muted" : "bg-background"}>
@@ -127,11 +135,8 @@ export default function SyllabusManagement() {
                                     <TableCell>{syllabus.AcademicYear?.name || 'N/A'}</TableCell>
                                     <TableCell>{new Date(syllabus.uploadedAt).toLocaleDateString()}</TableCell>
                                     <TableCell>
-                                        <Link
-                                            href={`syllabus-managment/view?url=${encodeURIComponent(syllabus.fileUrl)}`}
-                                        // className="text-blue-500 underline"
-                                        >
-                                            <Button variant='outline'>View Syllabus</Button>
+                                        <Link href={`syllabus-managment/view?url=${encodeURIComponent(syllabus.fileUrl)}`}>
+                                            <Button variant="outline">View Syllabus</Button>
                                         </Link>
                                     </TableCell>
                                     <TableCell>
@@ -145,6 +150,7 @@ export default function SyllabusManagement() {
                             </TableRow>
                         )}
                     </TableBody>
+
                 </Table>
             </div>
 

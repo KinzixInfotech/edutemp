@@ -2,7 +2,6 @@
 
 import { TrendingUp } from "lucide-react"
 import { Bar, BarChart, XAxis, YAxis } from "recharts"
-
 import {
     Card,
     CardContent,
@@ -17,6 +16,7 @@ import {
     ChartTooltip,
     ChartTooltipContent,
 } from "@/components/ui/chart"
+import { Skeleton } from "@/components/ui/skeleton"
 
 export const description = "A horizontal bar chart"
 
@@ -36,48 +36,71 @@ const chartConfig = {
     },
 }
 
-export function ChartBarHorizontal() {
+export function ChartBarHorizontal({ isLoading }) {
     return (
-        <Card className='bg-muted dark:bg-[#18181b] rounded-sm border-none'>
-            <CardHeader>
-                <CardTitle>Attendance</CardTitle>
-                <CardDescription>January - June 2024</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <ChartContainer config={chartConfig}>
-                    <BarChart
-                        accessibilityLayer
-                        data={chartData}
-                        layout="vertical"
-                        margin={{
-                            left: -20,
-                        }}
-                    >
-                        <XAxis type="number" dataKey="desktop" hide />
-                        <YAxis
-                            dataKey="month"
-                            type="category"
-                            tickLine={false}
-                            tickMargin={10}
-                            axisLine={false}
-                            tickFormatter={(value) => String(value).slice(0, 3)}
-                        />
-                        <ChartTooltip
-                            cursor={false}
-                            content={<ChartTooltipContent hideLabel />}
-                        />
-                        <Bar dataKey="desktop" fill="#2b7fff" radius={5} />
-                    </BarChart>
-                </ChartContainer>
-            </CardContent>
-            <CardFooter className="flex-col items-start gap-2 text-sm">
-                <div className="flex gap-2 leading-none font-medium">
-                    Trending up by 5.2% this month <TrendingUp className="h-4 w-4" />
-                </div>
-                <div className="text-muted-foreground leading-none">
-                    Showing total visitors for the last 6 months
-                </div>
-            </CardFooter>
+        <Card className="bg-muted dark:bg-[#18181b] rounded-sm border-none">
+            {isLoading ? (
+                <>
+                    <CardHeader>
+                        {/* Title Skeleton */}
+                        <Skeleton className="h-6 w-32" />
+                        {/* Description Skeleton */}
+                        <Skeleton className="mt-2 h-4 w-40" />
+                    </CardHeader>
+                    <CardContent>
+                        {/* Bar Chart Skeleton */}
+                        <Skeleton className="h-[200px] w-full" />
+                    </CardContent>
+                    <CardFooter className="flex-col items-start gap-2 text-sm">
+                        {/* Footer Trend Skeleton */}
+                        <Skeleton className="h-4 w-36" />
+                        {/* Footer Description Skeleton */}
+                        <Skeleton className="h-4 w-48" />
+                    </CardFooter>
+                </>
+            ) : (
+                <>
+                    <CardHeader>
+                        <CardTitle>Attendance</CardTitle>
+                        <CardDescription>January - June 2024</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ChartContainer config={chartConfig}>
+                            <BarChart
+                                accessibilityLayer
+                                data={chartData}
+                                layout="vertical"
+                                margin={{
+                                    left: -20,
+                                }}
+                            >
+                                <XAxis type="number" dataKey="desktop" hide />
+                                <YAxis
+                                    dataKey="month"
+                                    type="category"
+                                    tickLine={false}
+                                    tickMargin={10}
+                                    axisLine={false}
+                                    tickFormatter={(value) => String(value).slice(0, 3)}
+                                />
+                                <ChartTooltip
+                                    cursor={false}
+                                    content={<ChartTooltipContent hideLabel />}
+                                />
+                                <Bar dataKey="desktop" fill="#2b7fff" radius={5} />
+                            </BarChart>
+                        </ChartContainer>
+                    </CardContent>
+                    <CardFooter className="flex-col items-start gap-2 text-sm">
+                        <div className="flex gap-2 leading-none font-medium">
+                            Trending up by 5.2% this month <TrendingUp className="h-4 w-4" />
+                        </div>
+                        <div className="text-muted-foreground leading-none">
+                            Showing total visitors for the last 6 months
+                        </div>
+                    </CardFooter>
+                </>
+            )}
         </Card>
     )
 }
