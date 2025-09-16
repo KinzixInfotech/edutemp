@@ -1,23 +1,38 @@
-
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
-export default async function handler(req, res) {
-    // const session = await getSession({ req });
-    // if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    
-    if (req.method === "GET") {
-        const { userId } = req.query;
-        try {
-            const history = await prisma.libraryBook.findMany({
-                where: { OR: [{ issuedToId: userId }, { reservedById: userId }] },
-                include: { issuedTo: true, reservedBy: true },
-            });
-            return NextResponse.json(history);
-        } catch (error) {
-            return NextResponse.json({ error: "Failed to fetch history" }, { status: 500 });
-        }
-    }
+// GET - Fetch book issue/reservation history for a specific user
+export async function GET(req) {
+    try {
+        const { searchParams } = new URL(req.url);
+        const bookId = searchParams.get("bookId");
 
-    return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
+        if (!bookId) {
+            return NextResponse.json({ error: "Missing Book Id" }, { status: 400 });
+        }
+
+        // const session = await getServerSession(authOptions);
+        // if (!session) {
+        //     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        // }
+
+        const history = await prisma.libraryBook.findMany({
+            where: {
+                OR: [
+                    { id: bookId },
+                    // { reservedById: userId }
+                ]
+            },
+            include: {
+                issuedTo: true,
+                reservedBy: true
+            }
+        });
+
+        return NextResponse.json({ success: true, history }, { status: 200 });
+    } catch (error) {
+        console.error("Error fetching history:", error);
+        return NextResponse.json({ error: "Failed to fetch history" }, { status: 500 });
+    }
 }
+

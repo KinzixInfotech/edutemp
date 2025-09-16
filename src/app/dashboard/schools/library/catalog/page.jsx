@@ -60,8 +60,8 @@ async function deleteBook(id) {
     return true; // or nothing
 }
 
-async function fetchHistory(userId) {
-    const response = await fetch(`/api/schools/library/history?userId=${userId}`);
+async function fetchHistory(id) {
+    const response = await fetch(`/api/schools/library/history?bookId=${id}`);
     if (!response.ok) throw new Error("Failed to fetch history");
     return response.json();
 }
@@ -87,11 +87,13 @@ export default function LibraryCatalog() {
     });
 
     const { data: history, isLoading: txLoading } = useQuery({
-        queryKey: ["history", selectedBook?.issuedToId],
-        queryFn: () => fetchHistory(selectedBook?.issuedToId),
+        queryKey: ["history", selectedBook?.id],
+        queryFn: () => fetchHistory(selectedBook?.id),
         enabled: !!selectedBook?.issuedToId,
         staleTime: 5 * 60 * 1000,
     });
+    console.log(history);
+
 
     const createMutation = useMutation({
         mutationFn: createBook,
@@ -252,8 +254,13 @@ export default function LibraryCatalog() {
                                                     <DialogTitle>History - {selectedBook?.title}</DialogTitle>
                                                 </DialogHeader>
                                                 {txLoading ? (
-                                                    <p className="text-center py-4">Loading history...</p>
-                                                ) : history?.length > 0 ? (
+                                                    <div className="flex flex-col gap-1 py-4 items-center justify-center">
+                                                        <Loader2 className="animate-spin" size={30} />
+                                                        <p className="text-center my-2.5">
+
+                                                            Loading history...</p>
+                                                    </div>
+                                                ) : history?.history?.length > 0 ? (
                                                     <div className="overflow-x-auto rounded-lg border">
                                                         <Table>
                                                             <TableHeader>
@@ -265,12 +272,12 @@ export default function LibraryCatalog() {
                                                                 </TableRow>
                                                             </TableHeader>
                                                             <TableBody>
-                                                                {history.map((tx, idx) => (
+                                                                {history.history.map((tx, idx) => (
                                                                     <TableRow key={idx} className={idx % 2 === 0 ? "bg-muted" : "bg-background"}>
                                                                         <TableCell>{tx.issuedTo?.name || "N/A"}</TableCell>
                                                                         <TableCell>{tx.issuedAt ? new Date(tx.issuedAt).toLocaleDateString() : "N/A"}</TableCell>
                                                                         <TableCell>{tx.dueAt ? new Date(tx.dueAt).toLocaleDateString() : "N/A"}</TableCell>
-                                                                        <TableCell>{tx.fineAmount || 0}</TableCell>
+                                                                        <TableCell>₹ {tx.fineAmount || 0}</TableCell>
                                                                     </TableRow>
                                                                 ))}
                                                             </TableBody>
@@ -339,8 +346,8 @@ export default function LibraryCatalog() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="available">Available</SelectItem>
-                                        <SelectItem value="issued">Issued</SelectItem>
-                                        <SelectItem value="reserved">Reserved</SelectItem>
+                                        {/* <SelectItem value="issued">Issued</SelectItem> */}
+                                        {/* <SelectItem value="reserved">Reserved</SelectItem> */}
                                         <SelectItem value="damaged">Damaged</SelectItem>
                                     </SelectContent>
                                 </Select>

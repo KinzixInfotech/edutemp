@@ -24,12 +24,16 @@ export async function GET(req) {
         }),
         ...(category && { category }),
         ...(status && { status }),
+
     };
 
     try {
         const books = await prisma.libraryBook.findMany({
             where,
             include: { school: true, issuedTo: true, reservedBy: true },
+            orderBy: {
+                createdAt: 'desc', // latest first
+            },
         });
         return NextResponse.json(books);
     } catch (error) {

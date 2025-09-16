@@ -1,74 +1,76 @@
-// pages/api/library/issue.js
-
+// app/api/library/issue/route.js
 import prisma from "@/lib/prisma";
-import { NextResponse } from "next/server";
+// import { authOptions } from "@/app/api/auth/[...nextauth]/route"; // Uncomment when using authentication
 
-export default async function handler(req, res) {
-    
-  
+export async function POST(req) {
+    try {
+        // const session = await getServerSession(authOptions);
+        // if (!session) {
+        //     return Response.json({ error: 'Unauthorized' }, { status: 401 });
+        // }
 
-    if (req.method === "POST") {
-        const { bookId, userId, action, dueDateDays = 14, additionalDays = 14 } = req.body;
-        try {
-            if (action === "issue") {
-                const book = await prisma.libraryBook.findUnique({ where: { id: bookId } });
-                if (!book || book.status !== "available") {
-                    return NextResponse.json({ error: "Book not available" }, { status: 400 });
-                }
-                const dueAt = new Date();
-                dueAt.setDate(dueAt.getDate() + Number(dueDateDays));
-                const updatedBook = await prisma.libraryBook.update({
-                    where: { id: bookId },
-                    data: { status: "issued", issuedToId: userId, issuedAt: new Date(), dueAt },
-                });
-                return NextResponse.json(updatedBook);
-            }
+        const body = await req.json();
+        const { bookId, issuedToId, issuedAt, dueAt, role, fineAmount} = body;
 
-            if (action === "return") {
-                const book = await prisma.libraryBook.findUnique({ where: { id: bookId } });
-                if (!book || book.status !== "issued") {
-                    return NextResponse.json({ error: "Book not issued" }, { status: 400 });
-                }
-                const now = new Date();
-                const fineAmount = book.dueAt && now > book.dueAt ? (now.getTime() - book.dueAt.getTime()) / (1000 * 3600 * 24) * 1 : 0; // $1 per day late
-                const updatedBook = await prisma.libraryBook.update({
-                    where: { id: bookId },
-                    data: { status: "available", issuedToId: null, issuedAt: null, dueAt: null, fineAmount },
-                });
-                return NextResponse.json(updatedBook);
-            }
-
-            if (action === "renew") {
-                const book = await prisma.libraryBook.findUnique({ where: { id: bookId } });
-                if (!book || book.status !== "issued") {
-                    return NextResponse.json({ error: "Book not issued" }, { status: 400 });
-                }
-                const newDueAt = new Date(book.dueAt);
-                newDueAt.setDate(newDueAt.getDate() + Number(additionalDays));
-                const updatedBook = await prisma.libraryBook.update({
-                    where: { id: bookId },
-                    data: { dueAt: newDueAt },
-                });
-                return NextResponse.json(updatedBook);
-            }
-
-            if (action === "reserve") {
-                const book = await prisma.libraryBook.findUnique({ where: { id: bookId } });
-                if (!book || (book.status !== "available" && book.status !== "issued")) {
-                    return NextResponse.json({ error: "Cannot reserve" }, { status: 400 });
-                }
-                const updatedBook = await prisma.libraryBook.update({
-                    where: { id: bookId },
-                    data: { status: "reserved", reservedById: userId, reservedAt: new Date() },
-                });
-                return NextResponse.json(updatedBook);
-            }
-
-            return NextResponse.json({ error: "Invalid action" }, { status: 400 });
-        } catch (error) {
-            return NextResponse.json({ error: "Failed to process request" }, { status: 500 });
+        if (!bookId) {
+            return Response.json({ error: 'Missing bookId' }, { status: 400 });
         }
-    }
 
-    return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
+        const user = await prisma.user.findUnique({ where: { id: issuedToId } });
+        if (!user) {
+            return Response.json({ error: 'User not found' }, { status: 404 });
+        }
+
+        let targetUserId = issuedToId;
+
+        if (role === 'ADMIN') {
+            if (!issuedToId) {
+                return Response.json({ error: 'Missing issuedToId for admin' }, { status: 400 });
+            }
+            const targetUser = await prisma.user.findUnique({
+                where: { id: issuedToId },
+                include: {
+                    role: {
+                        select: { name: true }
+                    }
+                }
+            });
+
+            if (!targetUser || (targetUser.role.name !== 'STUDENT' && targetUser.role.name !== 'TeachingStaff')) {
+                return Response.json({ error: 'Target user not eligible' }, { status: 400 });
+            }
+        } else if (role === 'STUDENT' || role === 'TeachingStaff') {
+            // Uncomment below when using session
+            // targetUserId = session.user.id;
+            targetUserId = issuedToId; // For now, fallback to issuedToId for testing
+        } else {
+            return Response.json({ error: 'Not allowed to issue books' }, { status: 403 });
+        }
+
+        const book = await prisma.libraryBook.findUnique({ where: { id: bookId } });
+        if (!book || book.status !== 'available') {
+            return Response.json({ error: 'Book not available' }, { status: 400 });
+        }
+
+        // ✅ Check if the book is already issued to this user
+        if (book.issuedToId === targetUserId && book.status === 'issued') {
+            return Response.json({ error: 'Book already issued to this user' }, { status: 400 });
+        }
+
+        const updatedBook = await prisma.libraryBook.update({
+            where: { id: bookId },
+            data: {
+                status: 'issued',
+                fineAmount:fineAmount,
+                issuedToId: targetUserId,
+                issuedAt: new Date(issuedAt || Date.now()),
+                dueAt: new Date(dueAt || Date.now() + 7 * 24 * 60 * 60 * 1000),
+            },
+        });
+
+        return Response.json({ success: true, book: updatedBook }, { status: 200 });
+    } catch (error) {
+        console.error(error);
+        return Response.json({ error: 'Server error' }, { status: 500 });
+    }
 }
