@@ -255,7 +255,7 @@ export default function AdminIssueBookPage() {
                         </div>
                         {/* Due date */}
                         <div>
-                            <Label htmlFor="due-date">Due Date</Label>
+                            <Label htmlFor="due-date">Return Date</Label>
                             <Input
                                 id="due-date"
                                 type="date"

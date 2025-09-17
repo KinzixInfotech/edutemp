@@ -7,7 +7,7 @@ export const ourFileRouter = {
     profilePictureUploader: f({ image: { maxFileSize: "4MB" } })
         .input(z.object({ profileId: z.string(), username: z.string() }))
         .onUploadComplete(({ metadata, file }) => {
-            console.log("Upload complete for:", metadata.username);
+            console.log("Upload completed",);
             console.log("File URL:", file.ufsUrl);
         }),
 

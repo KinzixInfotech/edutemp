@@ -35,7 +35,7 @@ import {
 } from "@tabler/icons-react"
 import { NavSidebarSections } from "./nav-main"
 import { Separator } from "./ui/separator"
-import { BookMarked, BotMessageSquare, CalendarCog, Coins, DollarSign, Ellipsis, Flag, FlaskRound, Grip, House, Library, MonitorCog, Send, User, UserPen } from "lucide-react"
+import { BookMarked, BotMessageSquare, CalendarCog, Car, Coins, DollarSign, Ellipsis, Flag, FlaskRound, Grip, House, Library, MonitorCog, Send, User, UserPen } from "lucide-react"
 const sidebarData = [
     {
         // title: "Main",
@@ -115,8 +115,29 @@ const sidebarData = [
                         label: "Manage Books", url: "/dashboard/schools/library/catalog", roles: ["ADMIN"]
                     },
                     { label: "Issue & Return", url: "/dashboard/schools/library/issue", roles: ["ADMIN"] },
-                    { label: "Book Categories", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
+                    // { label: "Book Categories", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
                     { label: "Fines & Reports", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
+                ],
+            },
+        ],
+    },
+    {
+        title: "Transport Management",
+        items: [
+            {
+                label: "Manage Transport",
+                icon: Car,
+                roles: ["ADMIN"],
+                submenu: [
+                    {
+                        label: "Manage Vehicle & Fleet", url: "/dashboard/schools/transport/vehicles", roles: ["ADMIN"]
+                    },
+                    { label: "Route Planning", url: "/dashboard/schools/transport/route-planning", roles: ["ADMIN"] },
+                    { label: "Student Assignment", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
+                    { label: "Attendance & Tracking", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
+                    { label: "Fee Management", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
+                    // { label: "Alerts & Notifications", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
+                    { label: "Reporting", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
                 ],
             },
         ],

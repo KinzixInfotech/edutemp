@@ -8,46 +8,124 @@ datasource db {
 }
 
 model School {
-  id               String    @id @default(uuid()) @db.Uuid
-  name             String
-  domain           String    @unique
-  schoolCode       String    @unique
-  profilePicture   String
-  location         String
-  contactNumber    String
-  SubscriptionType String
-  Language         String
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  deletedAt        DateTime?
-
-  classes             Class[]
-  users               User[]
-  admins              Admin[]
-  transport           Transport[]
-  libraryBooks        LibraryBook[]
-  galleries           Gallery[]
-  exams               Exam[]
-  Student             Student[]
-  MasterAdmin         MasterAdmin?
-  TeachingStaff       TeachingStaff[]
-  NonTeachingStaff    NonTeachingStaff[]
+  id                  String                @id @default(uuid()) @db.Uuid
+  name                String
+  domain              String                @unique
+  schoolCode          String                @unique
+  profilePicture      String
+  location            String
+  contactNumber       String
+  SubscriptionType    String
+  Language            String
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  deletedAt           DateTime?
   AcademicYear        AcademicYear[]
-  FeeStructure        FeeStructure[]
-  StudentFeeStructure StudentFeeStructure[]
+  admins              Admin[]
+  classes             Class[]
+  exams               Exam[]
   FeePayment          FeePayment[]
-  Notice              Notice[]
+  FeeStructure        FeeStructure[]
+  galleries           Gallery[]
   InventoryItem       InventoryItem[]
+  libraryBooks        LibraryBook[]
+  MasterAdmin         MasterAdmin?
+  NonTeachingStaff    NonTeachingStaff[]
+  Notice              Notice[]
+  Student             Student[]
+  StudentFeeStructure StudentFeeStructure[]
   Syllabus            Syllabus[]
+  TeachingStaff       TeachingStaff[]
+  // Transport           Transport[]
+  users               User[]
+  Vehicle             Vehicle[]
+  Route               Route[]
+  Assignment          Assignment[]
 
   @@index([name])
 }
 
+// Transport Models
+model Vehicle {
+  id             String            @id @default(uuid()) @db.Uuid
+  schoolId       String            @db.Uuid
+  licensePlate   String            @unique
+  model          String
+  capacity       Int
+  maintenanceDue DateTime?
+  status         String // e.g., "active", "maintenance", "inactive"
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  school         School            @relation(fields: [schoolId], references: [id])
+  routes         Route[]
+  locations      VehicleLocation[]
+
+  @@index([schoolId])
+  @@index([licensePlate])
+}
+
+model Route {
+  id                 String                   @id @default(uuid()) @db.Uuid
+  schoolId           String                   @db.Uuid
+  name               String
+  stops              Json // Array of {name: string, lat: float, lng: float}
+  assignedVehicleId  String?                  @db.Uuid
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  school             School                   @relation(fields: [schoolId], references: [id])
+  vehicle            Vehicle?                 @relation(fields: [assignedVehicleId], references: [id])
+  studentAssignments StudentRouteAssignment[]
+
+  @@index([schoolId])
+  @@index([name])
+}
+
+model StudentRouteAssignment {
+  id         String   @id @default(uuid()) @db.Uuid
+  studentId  String   @db.Uuid
+  routeId    String   @db.Uuid
+  assignedAt DateTime @default(now())
+  student    Student  @relation(fields: [studentId], references: [userId])
+  route      Route    @relation(fields: [routeId], references: [id])
+
+  @@index([studentId])
+  @@index([routeId])
+}
+
+model VehicleLocation {
+  id        String   @id @default(uuid()) @db.Uuid
+  vehicleId String   @db.Uuid
+  latitude  Float
+  longitude Float
+  timestamp DateTime @default(now())
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id])
+
+  @@index([vehicleId])
+  @@index([timestamp])
+}
+
+model Assignment {
+  id          String   @id @default(uuid()) @db.Uuid
+  schoolId    String   @db.Uuid
+  classId     Int
+  title       String
+  description String?
+  dueDate     DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  school      School   @relation(fields: [schoolId], references: [id])
+  class       Class    @relation(fields: [classId], references: [id])
+
+  @@index([schoolId])
+  @@index([classId])
+  @@index([dueDate])
+}
+
 model InventoryItem {
-  id              String   @id @default(uuid())
+  id              String                 @id @default(uuid())
   name            String
   category        String
-  schoolId        String   @db.Uuid
+  schoolId        String                 @db.Uuid
   description     String?
   quantity        Int
   minimumQuantity Int
@@ -59,32 +137,30 @@ model InventoryItem {
   vendorContact   String
   warrantyPeriod  String?
   location        String
-  status          String // e.g., ACTIVE, UNDER_REPAIR, DISPOSED
+  status          String
   barcode         String?
   notes           String?
-
-  transactions   InventoryTransaction[]
-  purchaseOrders PurchaseOrderItem[]
-  School         School                 @relation(fields: [schoolId], references: [id])
+  School          School                 @relation(fields: [schoolId], references: [id])
+  transactions    InventoryTransaction[]
+  purchaseOrders  PurchaseOrderItem[]
 }
 
 model Syllabus {
   id             String        @id @default(uuid())
   academicYearId String?       @db.Uuid
-  classId        Int?
-  fileUrl        String // URL or path to the uploaded PDF
+  fileUrl        String
   uploadedAt     DateTime      @default(now())
   schoolId       String        @db.Uuid
-  School         School        @relation(fields: [schoolId], references: [id])
+  classId        Int?
   AcademicYear   AcademicYear? @relation(fields: [academicYearId], references: [id])
   Class          Class?        @relation(fields: [classId], references: [id])
+  School         School        @relation(fields: [schoolId], references: [id])
 }
 
 model InventoryTransaction {
   id              String        @id @default(uuid())
-  item            InventoryItem @relation(fields: [itemId], references: [id])
   itemId          String
-  transactionType String // e.g., ISSUE, RETURN, ADJUSTMENT, PURCHASE
+  transactionType String
   quantity        Int
   date            DateTime
   issuedToId      String?
@@ -92,31 +168,31 @@ model InventoryTransaction {
   handledById     String
   handledByName   String
   remarks         String?
-  status          String // e.g., COMPLETED, PENDING, LOST, DAMAGED
+  status          String
+  item            InventoryItem @relation(fields: [itemId], references: [id])
 }
 
 model PurchaseOrder {
-  id               String   @id @default(uuid())
+  id               String              @id @default(uuid())
   orderDate        DateTime
   expectedDelivery DateTime
   vendorName       String
   vendorContact    String
   approvedById     String
   approvedByName   String
-  status           String // e.g., ORDERED, DELIVERED, CANCELLED
-
-  items PurchaseOrderItem[]
+  status           String
+  items            PurchaseOrderItem[]
 }
 
 model PurchaseOrderItem {
   id              String        @id @default(uuid())
-  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
   purchaseOrderId String
-  item            InventoryItem @relation(fields: [itemId], references: [id])
   itemId          String
   name            String
   quantity        Int
   costPerUnit     Float
+  item            InventoryItem @relation(fields: [itemId], references: [id])
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
 }
 
 model Notice {
@@ -124,19 +200,18 @@ model Notice {
   schoolId     String         @db.Uuid
   title        String
   description  String
-  fileUrl      String? // optional file attachment
-  audience     Audience       @default(ALL) // enum: target audience
-  priority     Priority       @default(NORMAL) // enum: notice importance
-  status       Status         @default(DRAFT) // enum: DRAFT, PUBLISHED, ARCHIVED
-  publishedAt  DateTime? // optional published date
-  expiryDate   DateTime? // optional expiry date
-  createdById  String?        @db.Uuid // staff/admin who created
+  fileUrl      String?
+  audience     Audience       @default(ALL)
+  priority     Priority       @default(NORMAL)
+  status       Status         @default(DRAFT)
+  publishedAt  DateTime?
+  expiryDate   DateTime?
+  createdById  String?        @db.Uuid
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @default(now()) @updatedAt
-  category     String? // Must exist and match the enum values
-  // Relations
-  School       School         @relation(fields: [schoolId], references: [id])
+  category     String?
   Author       User?          @relation(fields: [createdById], references: [id])
+  School       School         @relation(fields: [schoolId], references: [id])
   NoticeTarget NoticeTarget[]
 
   @@index([schoolId])
@@ -147,14 +222,13 @@ model Notice {
 }
 
 model NoticeTarget {
-  id        String @id @default(uuid()) @db.Uuid
-  noticeId  String @db.Uuid
-  classId   Int? // optional, for class-specific notice
-  sectionId Int? // optional, for section-specific notice
-
-  Notice  Notice   @relation(fields: [noticeId], references: [id])
-  Class   Class?   @relation(fields: [classId], references: [id])
-  Section Section? @relation(fields: [sectionId], references: [id])
+  id        String   @id @default(uuid()) @db.Uuid
+  noticeId  String   @db.Uuid
+  classId   Int?
+  sectionId Int?
+  Class     Class?   @relation(fields: [classId], references: [id])
+  Notice    Notice   @relation(fields: [noticeId], references: [id])
+  Section   Section? @relation(fields: [sectionId], references: [id])
 
   @@index([noticeId])
   @@index([classId])
@@ -168,58 +242,36 @@ model Role {
 }
 
 model User {
-  id             String     @id @db.Uuid
-  schoolId       String?    @db.Uuid
-  roleId         Int
-  email          String     @unique
-  password       String
-  name           String?
-  profilePicture String     @default("default.png")
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-  deletedAt      DateTime?
-  status         UserStatus @default(ACTIVE)
-
-  // Relations
-  school                School?           @relation(fields: [schoolId], references: [id])
-  role                  Role              @relation(fields: [roleId], references: [id])
-  student               Student?
-  teacher               TeachingStaff?
-  // Add to User model (optional but recommended):
+  id                    String            @id @db.Uuid
+  schoolId              String?           @db.Uuid
+  roleId                Int
+  email                 String            @unique
+  password              String
+  name                  String?
+  profilePicture        String            @default("default.png")
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  deletedAt             DateTime?
+  status                UserStatus        @default(ACTIVE)
+  Admin                 Admin?
+  attendance            Attendance[]
+  AuditLog              AuditLog[]
+  Document              Document[]
   issuedBooks           LibraryBook[]     @relation("IssuedBooks")
   reservedBooks         LibraryBook[]     @relation("ReservedBooks")
-  nonTeachingStaff      NonTeachingStaff?
-  attendance            Attendance[]
-  sentNotifications     Notification[]    @relation("Sender")
-  receivedNotifications Notification[]    @relation("Receiver")
-  Document              Document[]
-  AuditLog              AuditLog[]
-  Admin                 Admin?
   MasterAdmin           MasterAdmin?
+  nonTeachingStaff      NonTeachingStaff?
   Notice                Notice[]
+  receivedNotifications Notification[]    @relation("Receiver")
+  sentNotifications     Notification[]    @relation("Sender")
+  student               Student?
+  teacher               TeachingStaff?
+  role                  Role              @relation(fields: [roleId], references: [id])
+  school                School?           @relation(fields: [schoolId], references: [id])
 
   @@index([schoolId])
   @@index([roleId])
 }
-
-// model AcademicYear {
-//   id        String   @id @default(uuid()) @db.Uuid
-//   name      String
-//   startDate DateTime
-//   endDate   DateTime
-//   isActive  Boolean  @default(false)
-//   createdAt DateTime @default(now())
-
-//   schoolId     String         @db.Uuid
-//   school       School         @relation(fields: [schoolId], references: [id])
-//   students     Student[]
-//   classes      Class[]
-//   FeeStructure FeeStructure[]
-//   FeePayment   FeePayment[]
-
-//   @@unique([schoolId, name])
-//   @@index([schoolId])
-// }
 
 model Admin {
   userId   String @id @db.Uuid
@@ -230,54 +282,54 @@ model Admin {
 
 model MasterAdmin {
   userId   String @id @unique @db.Uuid
-  schoolId String @unique @db.Uuid //  @unique to enforce one-to-one
-
-  school School @relation(fields: [schoolId], references: [id])
-  User   User   @relation(fields: [userId], references: [id])
+  schoolId String @unique @db.Uuid
+  school   School @relation(fields: [schoolId], references: [id])
+  User     User   @relation(fields: [userId], references: [id])
 }
 
 model Student {
-  userId              String                @id @db.Uuid
-  classId             Int
-  parentId            String?               @db.Uuid
-  name                String
-  email               String
-  dob                 String
-  gender              String
-  admissionDate       String
-  sectionId           Int
-  section             Section               @relation(fields: [sectionId], references: [id])
-  bloodGroup          String
-  rollNumber          String
-  PreviousSchoolName  String?
-  FeeStatus           FeeStatus             @default(PENDING)
-  DateOfLeaving       String?
-  contactNumber       String
-  Address             String
-  city                String
-  state               String
-  country             String
-  postalCode          String
-  FatherName          String
-  MotherName          String
-  FatherNumber        String?
-  MotherNumber        String?
-  GuardianName        String?
-  GuardianRelation    String?
-  House               String?
-  admissionNo         String
-  schoolId            String                @db.Uuid
-  school              School                @relation(fields: [schoolId], references: [id])
-  user                User                  @relation(fields: [userId], references: [id])
-  class               Class                 @relation(fields: [classId], references: [id])
-  examResults         ExamResult[]
-  ExamIssue           ExamIssue[]
-  HomeworkSubmission  HomeworkSubmission[]
-  FeeStructure        FeeStructure[]
-  FeePayment          FeePayment[]
-  AcademicYear        AcademicYear?         @relation(fields: [academicYearId], references: [id])
-  academicYearId      String?               @db.Uuid
-  StudentFeeStructure StudentFeeStructure[]
+  userId                 String                   @id @db.Uuid
+  classId                Int
+  parentId               String?                  @db.Uuid
+  name                   String
+  email                  String
+  dob                    String
+  gender                 String
+  admissionDate          String
+  sectionId              Int
+  bloodGroup             String
+  rollNumber             String
+  PreviousSchoolName     String?
+  FeeStatus              FeeStatus                @default(PENDING)
+  DateOfLeaving          String?
+  contactNumber          String
+  Address                String
+  city                   String
+  state                  String
+  country                String
+  postalCode             String
+  FatherName             String
+  MotherName             String
+  FatherNumber           String?
+  MotherNumber           String?
+  GuardianName           String?
+  GuardianRelation       String?
+  House                  String?
+  admissionNo            String
+  schoolId               String                   @db.Uuid
+  academicYearId         String?                  @db.Uuid
+  ExamIssue              ExamIssue[]
+  examResults            ExamResult[]
+  FeePayment             FeePayment[]
+  FeeStructure           FeeStructure[]
+  HomeworkSubmission     HomeworkSubmission[]
+  AcademicYear           AcademicYear?            @relation(fields: [academicYearId], references: [id])
+  class                  Class                    @relation(fields: [classId], references: [id])
+  school                 School                   @relation(fields: [schoolId], references: [id])
+  section                Section                  @relation(fields: [sectionId], references: [id])
+  user                   User                     @relation(fields: [userId], references: [id])
+  StudentFeeStructure    StudentFeeStructure[]
+  StudentRouteAssignment StudentRouteAssignment[]
 
   @@index([classId])
   @@index([sectionId])
@@ -298,64 +350,53 @@ model ExamIssue {
   student   Student  @relation(fields: [studentId], references: [userId])
 }
 
-model Vehicle {
-  id     Int         @id @default(autoincrement())
-  number String
-  routes Transport[]
-}
-
 model HomeworkSubmission {
   id             Int      @id @default(autoincrement())
   homeworkId     Int
   studentId      String   @db.Uuid
   submissionDate DateTime
-
-  homework Homework @relation(fields: [homeworkId], references: [id])
-  student  Student  @relation(fields: [studentId], references: [userId])
+  homework       Homework @relation(fields: [homeworkId], references: [id])
+  student        Student  @relation(fields: [studentId], references: [userId])
 }
 
 model TeachingStaff {
-  userId         String       @id @db.Uuid
-  departmentId   Int?
-  employeeId     String
-  name           String
-  AcademicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
-  academicYearId String       @db.Uuid
-  designation    String
-  gender         String
-  age            String
-  bloodGroup     String
-  contactNumber  String
-  dob            String
-  email          String
-  address        String
-  City           String
-  district       String?
-  state          String?
-  country        String?
-  PostalCode     String?
-
-  school                School                  @relation(fields: [schoolId], references: [id])
-  subjects              Subject[]
-  user                  User                    @relation(fields: [userId], references: [id])
-  department            Department?             @relation(fields: [departmentId], references: [id])
-  homework              Homework[]
+  userId                String                  @id @db.Uuid
+  departmentId          Int?
+  employeeId            String
+  name                  String
+  designation           String
+  gender                String
+  age                   String
+  bloodGroup            String
+  contactNumber         String
+  dob                   String
+  email                 String
+  address               String
+  City                  String
+  district              String?
+  state                 String?
+  country               String?
+  PostalCode            String?
   subjectId             Int?
-  Class                 Class[]
   schoolId              String                  @db.Uuid
-  SectionSubjectTeacher SectionSubjectTeacher[]
+  academicYearId        String                  @db.Uuid
+  Class                 Class[]
+  homework              Homework[]
   Section               Section[]
+  SectionSubjectTeacher SectionSubjectTeacher[]
+  AcademicYear          AcademicYear            @relation(fields: [academicYearId], references: [id])
+  department            Department?             @relation(fields: [departmentId], references: [id])
+  school                School                  @relation(fields: [schoolId], references: [id])
+  user                  User                    @relation(fields: [userId], references: [id])
+  subjects              Subject[]               @relation("SubjectToTeachingStaff")
 
   @@index([departmentId])
 }
 
 model NonTeachingStaff {
-  userId       String @id @db.Uuid
-  departmentId Int?
-
+  userId         String       @id @db.Uuid
+  departmentId   Int?
   employeeId     String
-  AcademicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
-  academicYearId String       @db.Uuid
   name           String
   designation    String
   gender         String
@@ -370,128 +411,79 @@ model NonTeachingStaff {
   state          String?
   country        String?
   PostalCode     String?
+  schoolId       String       @db.Uuid
+  academicYearId String       @db.Uuid
+  AcademicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
+  department     Department?  @relation(fields: [departmentId], references: [id])
   school         School       @relation(fields: [schoolId], references: [id])
-
-  user       User        @relation(fields: [userId], references: [id])
-  department Department? @relation(fields: [departmentId], references: [id])
-  schoolId   String      @db.Uuid
+  user           User         @relation(fields: [userId], references: [id])
 
   @@index([departmentId])
 }
 
-// model Class {
-//   id        Int    @id @default(autoincrement())
-//   schoolId  String @db.Uuid
-//   className String
-//   capacity  Int
-
-//   school              School         @relation(fields: [schoolId], references: [id])
-//   students            Student[]
-//   subjects            Subject[]
-//   homework            Homework[]
-//   sections            Section[]
-//   FeeStructure        FeeStructure[]
-//   TeachingStaff       TeachingStaff? @relation(fields: [teachingStaffUserId], references: [userId])
-//   teachingStaffUserId String?        @db.Uuid
-//   AcademicYear        AcademicYear?  @relation(fields: [academicYearId], references: [id])
-//   academicYearId      String?
-
-//   @@unique([id, schoolId])
-//   @@index([schoolId])
-// }
 model Class {
-  id        Int    @id @default(autoincrement())
-  schoolId  String @db.Uuid
-  className String
-  capacity  Int
-
+  id                  Int            @id @default(autoincrement())
+  schoolId            String         @db.Uuid
+  className           String
+  capacity            Int
+  teachingStaffUserId String?        @db.Uuid
+  academicYearId      String?        @db.Uuid
+  AcademicYear        AcademicYear?  @relation(fields: [academicYearId], references: [id])
   school              School         @relation(fields: [schoolId], references: [id])
+  TeachingStaff       TeachingStaff? @relation(fields: [teachingStaffUserId], references: [userId])
+  FeeStructure        FeeStructure[]
+  homework            Homework[]
+  NoticeTarget        NoticeTarget[]
+  sections            Section[]
   students            Student[]
   subjects            Subject[]
-  homework            Homework[]
-  sections            Section[]
-  FeeStructure        FeeStructure[]
-  TeachingStaff       TeachingStaff? @relation(fields: [teachingStaffUserId], references: [userId])
-  teachingStaffUserId String?        @db.Uuid
-  AcademicYear        AcademicYear?  @relation(fields: [academicYearId], references: [id])
-  academicYearId      String?        @db.Uuid // ✅ fixed
-  NoticeTarget        NoticeTarget[]
   Syllabi             Syllabus[]
+  Assignment          Assignment[]
 
   @@unique([id, schoolId])
   @@index([schoolId])
 }
 
 model Section {
-  id                  Int            @id @default(autoincrement())
+  id                  Int                     @id @default(autoincrement())
   name                String
   classId             Int
-  schoolId            String         @db.Uuid
-  teachingStaffUserId String?        @db.Uuid // Section Supervisor
-  supervisor          TeachingStaff? @relation(fields: [teachingStaffUserId], references: [userId])
-
-  class           Class                   @relation(fields: [classId], references: [id])
-  students        Student[]
-  timetables      Timetable[]
-  subjectTeachers SectionSubjectTeacher[]
-  NoticeTarget    NoticeTarget[]
+  schoolId            String                  @db.Uuid
+  teachingStaffUserId String?                 @db.Uuid
+  NoticeTarget        NoticeTarget[]
+  class               Class                   @relation(fields: [classId], references: [id])
+  supervisor          TeachingStaff?          @relation(fields: [teachingStaffUserId], references: [userId])
+  subjectTeachers     SectionSubjectTeacher[]
+  students            Student[]
+  timetables          Timetable[]
 
   @@unique([classId, name])
   @@index([classId])
 }
 
 model SectionSubjectTeacher {
-  id                  Int    @id @default(autoincrement())
+  id                  Int           @id @default(autoincrement())
   sectionId           Int
   subjectId           Int
-  teachingStaffUserId String @db.Uuid
-
-  section Section       @relation(fields: [sectionId], references: [id])
-  subject Subject       @relation(fields: [subjectId], references: [id])
-  teacher TeachingStaff @relation(fields: [teachingStaffUserId], references: [userId])
+  teachingStaffUserId String        @db.Uuid
+  section             Section       @relation(fields: [sectionId], references: [id])
+  subject             Subject       @relation(fields: [subjectId], references: [id])
+  teacher             TeachingStaff @relation(fields: [teachingStaffUserId], references: [userId])
 
   @@unique([sectionId, subjectId])
 }
 
 model Timetable {
-  id        String  @id @default(uuid()) @db.Uuid
+  id        String   @id @default(uuid()) @db.Uuid
   sectionId Int
   day       String
   period    Int
   subject   String
   teacher   String?
-
-  section Section @relation(fields: [sectionId], references: [id])
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  section   Section  @relation(fields: [sectionId], references: [id])
 }
-
-// model SectionTeacher {
-//   id        Int    @id @default(autoincrement())
-//   sectionId Int
-//   teacherId String @db.Uuid
-
-//   section Section       @relation(fields: [sectionId], references: [id])
-//   // teacher TeachingStaff @relation(fields: [teacherId], references: [userId])
-
-//   @@unique([sectionId, teacherId])
-//   @@index([sectionId])
-//   @@index([teacherId])
-// }
-
-// model ClassTeacher {
-//   id        Int    @id @default(autoincrement())
-//   classId   Int
-//   teacherId String @db.Uuid
-
-//   class   Class         @relation(fields: [classId], references: [id])
-//   teacher TeachingStaff @relation(fields: [teacherId], references: [userId])
-
-//   @@unique([classId, teacherId])
-//   @@index([classId])
-//   @@index([teacherId])
-// }
 
 model Document {
   id          Int          @id @default(autoincrement())
@@ -502,47 +494,42 @@ model Document {
   type        DocumentType @default(OTHER)
   isPublic    Boolean      @default(false)
   uploadedAt  DateTime     @default(now())
-
-  user User @relation(fields: [userId], references: [id])
+  user        User         @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([type])
 }
 
 model Subject {
-  id           Int     @id @default(autoincrement())
-  subjectName  String
-  subjectCode  String?
-  classId      Int
-  departmentId Int
-
-  class      Class      @relation(fields: [classId], references: [id])
-  department Department @relation(fields: [departmentId], references: [id])
-
-  homework              Homework[]
+  id                    Int                     @id @default(autoincrement())
+  subjectName           String
+  subjectCode           String?
+  classId               Int
+  departmentId          Int
   examResults           ExamResult[]
-  Teacher               TeachingStaff[]
+  homework              Homework[]
   SectionSubjectTeacher SectionSubjectTeacher[]
+  class                 Class                   @relation(fields: [classId], references: [id])
+  department            Department              @relation(fields: [departmentId], references: [id])
+  Teacher               TeachingStaff[]         @relation("SubjectToTeachingStaff")
 
   @@index([classId])
   @@index([departmentId])
 }
 
 model Department {
-  id   Int    @id @default(autoincrement())
-  name String @unique
-
-  teachers         TeachingStaff[]
-  subjects         Subject[]
+  id               Int                @id @default(autoincrement())
+  name             String             @unique
   NonTeachingStaff NonTeachingStaff[]
+  subjects         Subject[]
+  teachers         TeachingStaff[]
 }
 
 model Homework {
-  id        Int    @id @default(autoincrement())
-  classId   Int
-  subjectId Int
-  teacherId String @db.Uuid
-
+  id                 Int                  @id @default(autoincrement())
+  classId            Int
+  subjectId          Int
+  teacherId          String               @db.Uuid
   class              Class                @relation(fields: [classId], references: [id])
   subject            Subject              @relation(fields: [subjectId], references: [id])
   teacher            TeachingStaff        @relation(fields: [teacherId], references: [userId])
@@ -554,11 +541,10 @@ model Homework {
 }
 
 model Exam {
-  id        Int      @id @default(autoincrement())
-  schoolId  String   @db.Uuid
-  title     String
-  createdAt DateTime @default(now())
-
+  id         Int          @id @default(autoincrement())
+  schoolId   String       @db.Uuid
+  title      String
+  createdAt  DateTime     @default(now())
   school     School       @relation(fields: [schoolId], references: [id])
   results    ExamResult[]
   examSeries ExamSeries[]
@@ -567,64 +553,19 @@ model Exam {
 }
 
 model ExamResult {
-  id        Int    @id @default(autoincrement())
+  id        Int     @id @default(autoincrement())
   examId    Int
-  studentId String @db.Uuid
+  studentId String  @db.Uuid
   subjectId Int
-
-  exam    Exam    @relation(fields: [examId], references: [id])
-  student Student @relation(fields: [studentId], references: [userId])
-  subject Subject @relation(fields: [subjectId], references: [id])
+  exam      Exam    @relation(fields: [examId], references: [id])
+  student   Student @relation(fields: [studentId], references: [userId])
+  subject   Subject @relation(fields: [subjectId], references: [id])
 
   @@unique([examId, studentId, subjectId])
   @@index([examId])
   @@index([studentId])
   @@index([subjectId])
 }
-
-// model FeeStructure {
-//   id             String   @id @default(uuid()) @db.Uuid
-//   schoolId       String   @db.Uuid
-//   academicYearId String   @db.Uuid
-//   classId        Int?
-//   studentId      String?  @db.Uuid
-//   issueDate      DateTime
-//   mode           FeeMode
-//   name           String
-//   amount         Float
-
-//   // relations
-//   school       School       @relation(fields: [schoolId], references: [id])
-//   academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
-//   class        Class?       @relation(fields: [classId], references: [id])
-//   student      Student?     @relation(fields: [studentId], references: [userId])
-
-//   studentFeeStructures StudentFeeStructure[]
-//   payments             FeePayment[]
-
-//   @@index([schoolId])
-//   @@index([academicYearId])
-//   @@index([classId])
-//   @@index([studentId])
-// }
-
-// model StudentFeeStructure {
-//   id             String @id @default(uuid()) @db.Uuid
-//   schoolId       String @db.Uuid
-//   feeStructureId String @db.Uuid
-//   studentId      String @db.Uuid
-//   customAmount   Float?
-
-//   // relations
-//   school       School       @relation(fields: [schoolId], references: [id])
-//   feeStructure FeeStructure @relation(fields: [feeStructureId], references: [id])
-//   student      Student      @relation(fields: [studentId], references: [userId])
-//   payments     FeePayment[]
-
-//   @@index([schoolId])
-//   @@index([feeStructureId])
-//   @@index([studentId])
-// }
 
 model AcademicYear {
   id               String             @id @default(uuid()) @db.Uuid
@@ -635,13 +576,13 @@ model AcademicYear {
   createdAt        DateTime           @default(now())
   schoolId         String             @db.Uuid
   school           School             @relation(fields: [schoolId], references: [id])
-  students         Student[]
   classes          Class[]
-  FeeStructures    FeeStructure[]
   FeePayments      FeePayment[]
-  TeachingStaff    TeachingStaff[]
+  FeeStructures    FeeStructure[]
   NonTeachingStaff NonTeachingStaff[]
+  students         Student[]
   Syllabus         Syllabus[]
+  TeachingStaff    TeachingStaff[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -652,19 +593,19 @@ model FeeStructure {
   schoolId            String?               @db.Uuid
   academicYearId      String                @db.Uuid
   issueDate           DateTime              @default(now())
-  isInstallment       Boolean               @default(false) // false = fixed, true = has installments
   name                String
-  mode                FeeMode               @default(MONTHLY) // <-- enum used here
-  feeParticulars      FeeParticular[]
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @default(now()) @updatedAt
-  Student             Student?              @relation(fields: [studentUserId], references: [userId])
   studentUserId       String?               @db.Uuid
-  Class               Class?                @relation(fields: [classId], references: [id])
   classId             Int?
+  mode                FeeMode               @default(MONTHLY)
+  isInstallment       Boolean               @default(false)
+  feeParticulars      FeeParticular[]
   FeePayments         FeePayment[]
-  School              School?               @relation(fields: [schoolId], references: [id])
   AcademicYear        AcademicYear          @relation(fields: [academicYearId], references: [id])
+  Class               Class?                @relation(fields: [classId], references: [id])
+  School              School?               @relation(fields: [schoolId], references: [id])
+  Student             Student?              @relation(fields: [studentUserId], references: [userId])
   StudentFeeStructure StudentFeeStructure[]
 }
 
@@ -677,25 +618,21 @@ model FeeParticular {
   StudentFeeParticular StudentFeeParticular[]
 }
 
-//model used for custom fee assign
 model StudentFeeStructure {
-  id             String  @id @default(uuid()) @db.Uuid
-  studentId      String  @db.Uuid
-  academicYearId String  @db.Uuid
-  schoolId       String? @db.Uuid
-  studentUserId  String? @db.Uuid
-
-  // 🔹 Relation to FeeStructure
-  feeStructureId String       @db.Uuid
-  feeStructure   FeeStructure @relation(fields: [feeStructureId], references: [id])
-  status         String       @default("UNPAID") // overall status: UNPAID / PARTIAL / PAID
-
-  feeParticulars StudentFeeParticular[]
+  id             String                 @id @default(uuid()) @db.Uuid
+  studentId      String                 @db.Uuid
+  academicYearId String                 @db.Uuid
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @default(now()) @updatedAt
+  schoolId       String?                @db.Uuid
+  studentUserId  String?                @db.Uuid
+  feeStructureId String                 @db.Uuid
+  status         String                 @default("UNPAID")
+  FeePayments    FeePayment[]
+  feeParticulars StudentFeeParticular[]
+  feeStructure   FeeStructure           @relation(fields: [feeStructureId], references: [id])
   School         School?                @relation(fields: [schoolId], references: [id])
   Student        Student?               @relation(fields: [studentUserId], references: [userId])
-  FeePayments    FeePayment[]
 }
 
 model StudentFeeParticular {
@@ -703,28 +640,26 @@ model StudentFeeParticular {
   studentFeeStructureId String                  @db.Uuid
   globalParticularId    String                  @db.Uuid
   amount                Float?
-  // status                String                  @default("unpaid")
-  studentFeeStructure   StudentFeeStructure     @relation(fields: [studentFeeStructureId], references: [id])
-  globalParticular      FeeParticular           @relation(fields: [globalParticularId], references: [id])
   StudentFeeInstallment StudentFeeInstallment[]
+  globalParticular      FeeParticular           @relation(fields: [globalParticularId], references: [id])
+  studentFeeStructure   StudentFeeStructure     @relation(fields: [studentFeeStructureId], references: [id])
 }
 
 model FeePayment {
-  id                    String   @id @default(uuid()) @db.Uuid
-  schoolId              String   @db.Uuid
-  academicYearId        String   @db.Uuid
-  studentId             String   @db.Uuid
-  feeStructureId        String?  @db.Uuid
-  studentFeeStructureId String?  @db.Uuid
+  id                    String               @id @default(uuid()) @db.Uuid
+  schoolId              String               @db.Uuid
+  academicYearId        String               @db.Uuid
+  studentId             String               @db.Uuid
+  feeStructureId        String?              @db.Uuid
+  studentFeeStructureId String?              @db.Uuid
   amount                Float
-  paymentDate           DateTime @default(now())
+  paymentDate           DateTime             @default(now())
   paymentMode           String
-
-  school              School               @relation(fields: [schoolId], references: [id])
-  academicYear        AcademicYear         @relation(fields: [academicYearId], references: [id])
-  student             Student              @relation(fields: [studentId], references: [userId])
-  feeStructure        FeeStructure?        @relation(fields: [feeStructureId], references: [id])
-  studentFeeStructure StudentFeeStructure? @relation(fields: [studentFeeStructureId], references: [id])
+  academicYear          AcademicYear         @relation(fields: [academicYearId], references: [id])
+  feeStructure          FeeStructure?        @relation(fields: [feeStructureId], references: [id])
+  school                School               @relation(fields: [schoolId], references: [id])
+  studentFeeStructure   StudentFeeStructure? @relation(fields: [studentFeeStructureId], references: [id])
+  student               Student              @relation(fields: [studentId], references: [userId])
 
   @@index([schoolId])
   @@index([academicYearId])
@@ -734,15 +669,14 @@ model FeePayment {
 }
 
 model StudentFeeInstallment {
-  id                     String   @id @default(uuid()) @db.Uuid
-  studentFeeParticularId String   @db.Uuid
+  id                     String               @id @default(uuid()) @db.Uuid
+  studentFeeParticularId String               @db.Uuid
   dueDate                DateTime
   amount                 Float
-  status                 String   @default("UNPAID") // UNPAID / PAID / PARTIAL
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @default(now()) @updatedAt
-
-  studentFeeParticular StudentFeeParticular @relation(fields: [studentFeeParticularId], references: [id])
+  status                 String               @default("UNPAID")
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @default(now()) @updatedAt
+  studentFeeParticular   StudentFeeParticular @relation(fields: [studentFeeParticularId], references: [id])
 
   @@index([studentFeeParticularId])
 }
@@ -752,8 +686,7 @@ model Attendance {
   userId String           @db.Uuid
   date   DateTime
   status AttendanceStatus
-
-  user User @relation(fields: [userId], references: [id])
+  user   User             @relation(fields: [userId], references: [id])
 
   @@unique([userId, date])
 }
@@ -764,49 +697,34 @@ model Notification {
   receiverId String   @db.Uuid
   message    String
   createdAt  DateTime @default(now())
-
-  sender   User @relation("Sender", fields: [senderId], references: [id])
-  receiver User @relation("Receiver", fields: [receiverId], references: [id])
+  receiver   User     @relation("Receiver", fields: [receiverId], references: [id])
+  sender     User     @relation("Sender", fields: [senderId], references: [id])
 
   @@index([receiverId])
   @@index([senderId])
 }
 
-model Transport {
-  id       Int     @id @default(autoincrement())
-  schoolId String  @db.Uuid
-  route    String?
-
-  school    School   @relation(fields: [schoolId], references: [id])
-  Vehicle   Vehicle? @relation(fields: [vehicleId], references: [id])
-  vehicleId Int?
-
-  @@index([schoolId])
-}
-
-// Add the new LibraryBook model:
 model LibraryBook {
-  id           String    @id @default(uuid()) @db.Uuid
-  title        String
-  ISBN         String
-  author       String
-  publisher    String
-  edition      String?
-  category     String
-  status       String // "available", "issued", "reserved", "damaged"
   schoolId     String    @db.Uuid
-  issuedToId   String?   @db.Uuid
-  issuedAt     DateTime?
-  dueAt        DateTime?
-  reservedById String?   @db.Uuid
-  reservedAt   DateTime?
-  fineAmount   Float?
+  title        String
+  author       String
+  ISBN         String
+  category     String
   createdAt    DateTime  @default(now())
+  dueAt        DateTime?
+  edition      String?
+  fineAmount   Float?
+  issuedAt     DateTime?
+  issuedToId   String?   @db.Uuid
+  publisher    String
+  reservedAt   DateTime?
+  reservedById String?   @db.Uuid
+  status       String
   updatedAt    DateTime  @updatedAt
-
-  school     School @relation(fields: [schoolId], references: [id])
-  issuedTo   User?  @relation("IssuedBooks", fields: [issuedToId], references: [id])
-  reservedBy User?  @relation("ReservedBooks", fields: [reservedById], references: [id])
+  id           String    @id @default(uuid()) @db.Uuid
+  issuedTo     User?     @relation("IssuedBooks", fields: [issuedToId], references: [id])
+  reservedBy   User?     @relation("ReservedBooks", fields: [reservedById], references: [id])
+  school       School    @relation(fields: [schoolId], references: [id])
 
   @@index([schoolId])
   @@index([status])
@@ -817,8 +735,7 @@ model Gallery {
   id       Int    @id @default(autoincrement())
   schoolId String @db.Uuid
   title    String
-
-  school School @relation(fields: [schoolId], references: [id])
+  school   School @relation(fields: [schoolId], references: [id])
 
   @@index([schoolId])
 }
@@ -833,8 +750,7 @@ model AuditLog {
   oldData   Json?
   newData   Json?
   error     String?
-
-  user User? @relation(fields: [userId], references: [id])
+  user      User?       @relation(fields: [userId], references: [id])
 }
 
 enum AuditAction {
@@ -847,8 +763,8 @@ enum AuditAction {
 enum FeeStatus {
   PAID
   UNPAID
-  PARTIAL
   PENDING
+  PARTIAL
 }
 
 enum UserStatus {
@@ -882,12 +798,12 @@ enum FeeMode {
 }
 
 enum Audience {
-  ALL // all students, staff, parents
+  ALL
   STUDENTS
   TEACHERS
   PARENTS
-  CLASS // if you want to assign to specific class
-  SECTION // if you want to assign to a specific section
+  CLASS
+  SECTION
 }
 
 enum Priority {

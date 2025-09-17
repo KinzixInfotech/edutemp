@@ -267,7 +267,7 @@ export default function LibraryCatalog() {
                                                                 <TableRow className="bg-muted">
                                                                     <TableHead>Issued To</TableHead>
                                                                     <TableHead>Issued At</TableHead>
-                                                                    <TableHead>Due At</TableHead>
+                                                                    <TableHead>Return At</TableHead>
                                                                     <TableHead>Fine</TableHead>
                                                                 </TableRow>
                                                             </TableHeader>
