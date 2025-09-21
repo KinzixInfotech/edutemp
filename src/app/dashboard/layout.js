@@ -3,9 +3,10 @@ import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/components/theme-provider";
 import ClientLayout from "@/components/layout/client-layout"; // <- New
 import { Toaster } from "@/components/ui/sonner"
-import { SettingsDialog } from "@/components/sidebar-dialog";
+// import { SettingsDialog } from "@/components/sidebar-dialog";
 import { SettingsDialogProvider } from "@/context/Settingsdialog-context";
 import { LoaderProvider } from './context/Loader';
+import { Profile } from '@/components/profile';
 export default async function RootLayout({ children }) {
 
     return (
@@ -25,7 +26,8 @@ export default async function RootLayout({ children }) {
                         />
                     </ThemeProvider>
                 </LoaderProvider>
-                <SettingsDialog />
+                {/* <SettingsDialog /> */}
+                <Profile />
             </SettingsDialogProvider>
         </AuthProvider>
     );
