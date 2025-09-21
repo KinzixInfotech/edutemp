@@ -174,76 +174,78 @@ function FileUploadAvatar({ field, onChange, resetKey, defValue }) {
   }, [resetKey])
   const fileName = files[0]?.file.name || null
   return (
-    <div className='px-6 pt-4 flex items-center justify-center  lg:justify-start' >
-      <div className="relative">
-        <div className='relative'>
-          <button
-            className="border-input hover:bg-accent/50 data-[dragging=true]:bg-accent/50 focus-visible:border-ring focus-visible:ring-ring/50 relative flex size-16 items-center justify-center overflow-hidden rounded-full border border-dashed transition-colors outline-none focus-visible:ring-[3px] has-disabled:pointer-events-none has-disabled:opacity-50 has-[img]:border-none"
-            onClick={openFileDialog}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-            data-dragging={isDragging || undefined}
-            aria-label={previewUrl ? "Change image" : "Upload image"}
-          >
-            {previewUrl && previewUrl.trim() !== "" ? (
-              <img
-                className="size-full object-cover"
-                src={previewUrl}
-                alt={files[0]?.file?.name || "Uploaded image"}
-                width={64}
-                height={64}
-                style={{ objectFit: "cover" }}
-              />
-            ) : defValue && defValue.trim() !== "" ? (
-              <div className="relative w-16 h-16 group cursor-pointer">
+    <div className="-mt-10 px-6 flex items-center justify-center ">
+      <div className="bg-muted relative flex size-20 items-center justify-center overflow-hidden rounded-full border-4 shadow-xs shadow-black/10">
+        <div className="relative">
+          <div className='relative'>
+            <button
+              className="border-input hover:bg-accent/50 data-[dragging=true]:bg-accent/50 focus-visible:border-ring focus-visible:ring-ring/50 relative flex size-16 items-center justify-center overflow-hidden rounded-full border border-dashed transition-colors outline-none focus-visible:ring-[3px] has-disabled:pointer-events-none has-disabled:opacity-50 has-[img]:border-none"
+              onClick={openFileDialog}
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              data-dragging={isDragging || undefined}
+              aria-label={previewUrl ? "Change image" : "Upload image"}
+            >
+              {previewUrl && previewUrl.trim() !== "" ? (
                 <img
                   className="size-full object-cover"
-                  src={defValue}
+                  src={previewUrl}
                   alt={files[0]?.file?.name || "Uploaded image"}
                   width={64}
                   height={64}
                   style={{ objectFit: "cover" }}
                 />
-                {/* Hover overlay */}
-                <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-center items-center text-white text-xs font-semibold">
-                  <Camera className="mb-1" size={40} strokeWidth={0.9} />
-                  {/* Change Image */}
+              ) : defValue && defValue.trim() !== "" ? (
+                <div className="relative w-16 h-16 group cursor-pointer">
+                  <img
+                    className="size-full object-cover"
+                    src={defValue}
+                    alt={files[0]?.file?.name || "Uploaded image"}
+                    width={64}
+                    height={64}
+                    style={{ objectFit: "cover" }}
+                  />
+                  {/* Hover overlay */}
+                  <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-center items-center text-white text-xs font-semibold">
+                    <Camera className="mb-1" size={40} strokeWidth={0.9} />
+                    {/* Change Image */}
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div aria-hidden="true" className="size-4 opacity-60">
-                <CircleUserRoundIcon />
-              </div>
+              ) : (
+                <div aria-hidden="true" className="size-4 opacity-60">
+                  <CircleUserRoundIcon />
+                </div>
+              )}
+            </button>
+            {previewUrl && (
+              <Button
+                onClick={() => removeFile(files[0]?.id)}
+                size="icon"
+                className="border-background focus-visible:border-background absolute top-0 -right-1 size-6 rounded-full border-2 shadow-none"
+                aria-label="Remove image"
+              >
+                <XIcon className="size-3.5 dark:text-white" />
+              </Button>
             )}
-          </button>
-          {previewUrl && (
-            <Button
-              onClick={() => removeFile(files[0]?.id)}
-              size="icon"
-              className="border-background focus-visible:border-background absolute top-0 -right-1 size-6 rounded-full border-2 shadow-none"
-              aria-label="Remove image"
-            >
-              <XIcon className="size-3.5 dark:text-white" />
-            </Button>
-          )}
-          <input
-            {...getInputProps()}
-            className="sr-only"
-            aria-label="Upload image file"
-            tabIndex={-1}
-          />
+            <input
+              {...getInputProps()}
+              className="sr-only"
+              aria-label="Upload image file"
+              tabIndex={-1}
+            />
+          </div>
+
         </div>
 
+        {errors.length > 0 && (
+          <div className="text-destructive flex items-center gap-1 text-xs" role="alert">
+            <AlertCircleIcon className="size-3 shrink-0" />
+            <span>{errors[0]}</span>
+          </div>
+        )}
       </div>
-
-      {errors.length > 0 && (
-        <div className="text-destructive flex items-center gap-1 text-xs" role="alert">
-          <AlertCircleIcon className="size-3 shrink-0" />
-          <span>{errors[0]}</span>
-        </div>
-      )}
     </div>
   )
 }
@@ -1008,12 +1010,12 @@ export function Profile() {
   )
 }
 
-// function Avatar({ defValue, onChange, resetKey }) {
+// function Avatar({defValue, onChange, resetKey}) {
 //   const maxSizeMB = 2
 //   const maxSize = maxSizeMB * 1024 * 1024 // 2MB
 
 //   const [
-//     { files, isDragging, errors },
+//     {files, isDragging, errors},
 //     {
 //       handleDragEnter,
 //       handleDragLeave,
@@ -1167,15 +1169,15 @@ function ProfileBg() {
           />
         )}
         <div className="absolute inset-0 flex items-center justify-center gap-2">
-          <button
+          {/* <button
             type="button"
             className="focus-visible:border-ring focus-visible:ring-ring/50 z-50 flex size-10 cursor-pointer items-center justify-center rounded-full bg-black/60 text-white transition-[color,box-shadow] outline-none hover:bg-black/80 focus-visible:ring-[3px]"
             onClick={openFileDialog}
             aria-label={currentImage ? "Change image" : "Upload image"}
           >
             <ImagePlusIcon size={16} aria-hidden="true" />
-          </button>
-          {currentImage && (
+          </button> */}
+          {/* {currentImage && (
             <button
               type="button"
               className="focus-visible:border-ring focus-visible:ring-ring/50 z-50 flex size-10 cursor-pointer items-center justify-center rounded-full bg-black/60 text-white transition-[color,box-shadow] outline-none hover:bg-black/80 focus-visible:ring-[3px]"
@@ -1184,7 +1186,7 @@ function ProfileBg() {
             >
               <XIcon size={16} aria-hidden="true" />
             </button>
-          )}
+          )} */}
         </div>
       </div>
       <input
