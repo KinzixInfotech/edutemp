@@ -63,6 +63,10 @@ export async function GET(req) {
 export async function POST(req) {
     try {
         const data = await req.json();
+        // Fix: if assignedVehicleId is not a valid UUID, set it to null
+        if (!data.assignedVehicleId || data.assignedVehicleId === "none") {
+            data.assignedVehicleId = null;
+        }
         const route = await prisma.route.create({
             data,
             select: {

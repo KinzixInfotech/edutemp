@@ -59,9 +59,11 @@ export async function GET(req) {
 export async function POST(req) {
     try {
         const data = await req.json();
+       
         const assignment = await prisma.studentRouteAssignment.create({
-            data,
+            data: data,
             select: {
+
                 id: true,
                 studentId: true,
                 student: { select: { name: true } },

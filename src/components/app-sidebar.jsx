@@ -132,11 +132,10 @@ const sidebarData = [
                     {
                         label: "Manage Vehicle & Fleet", url: "/dashboard/schools/transport/vehicles", roles: ["ADMIN"]
                     },
-                    { label: "Route Planning", url: "/dashboard/schools/transport/route-planning", roles: ["ADMIN"] },
-                    { label: "Student Assignment", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
+                    { label: "Route", url: "/dashboard/schools/transport/route", roles: ["ADMIN"] },
+                    { label: "Student Assignment", url: "/dashboard/schools/transport/student-assign", roles: ["ADMIN"] },
                     { label: "Attendance & Tracking", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
                     { label: "Fee Management", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
-                    // { label: "Alerts & Notifications", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
                     { label: "Reporting", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
                 ],
             },

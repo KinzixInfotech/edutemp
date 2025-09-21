@@ -41,12 +41,20 @@ export async function GET(req, { params }) {
 }
 
 export async function PUT(req, { params }) {
-    const { id } = params;
     try {
+        const { id } = params;
         const data = await req.json();
+
+        // Only keep fields Prisma accepts on update
+        const cleanData = {
+            ...(data.name && { name: data.name }),
+            ...(data.stops && { stops: data.stops }),
+            assignedVehicleId: data.assignedVehicleId || null,
+        };
+
         const route = await prisma.route.update({
             where: { id },
-            data,
+            data: cleanData,
             select: {
                 id: true,
                 name: true,
@@ -57,10 +65,11 @@ export async function PUT(req, { params }) {
                 updatedAt: true,
             },
         });
+
         return NextResponse.json({ route });
     } catch (error) {
         console.error(error);
-        return NextResponse.json({ error: 'Failed to update route' }, { status: 500 });
+        return NextResponse.json({ error: "Failed to update route" }, { status: 500 });
     }
 }
 

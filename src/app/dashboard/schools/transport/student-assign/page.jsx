@@ -17,19 +17,19 @@ import { Loader2 } from "lucide-react";
 async function fetchAssignments({ schoolId, search }) {
     const params = new URLSearchParams({ schoolId });
     if (search) params.append("search", search);
-    const response = await fetch(`/ api / schools / transport / student - routes ? ${params} `);
+    const response = await fetch(`/api/schools/transport/student-routes?${params} `);
     if (!response.ok) throw new Error("Failed to fetch assignments");
     return response.json();
 }
 
 async function fetchStudents({ schoolId }) {
-    const response = await fetch(`/ api / schools / students ? schoolId = ${schoolId} `);
+    const response = await fetch(`/api/schools/students?schoolId=${schoolId}`);
     if (!response.ok) throw new Error("Failed to fetch students");
     return response.json();
 }
 
 async function fetchRoutes({ schoolId }) {
-    const response = await fetch(`/ api / schools / transport / routes ? schoolId = ${schoolId} `);
+    const response = await fetch(`/api/schools/transport/routes?schoolId=${schoolId} `);
     if (!response.ok) throw new Error("Failed to fetch routes");
     return response.json();
 }
@@ -45,7 +45,7 @@ async function createAssignment(data) {
 }
 
 async function deleteAssignment(id) {
-    const response = await fetch(`/ api / schools / transport / student - routes / ${id} `, {
+    const response = await fetch(`/api/schools/transport/student-routes/${id} `, {
         method: "DELETE",
     });
     if (!response.ok) throw new Error("Failed to delete assignment");
@@ -213,7 +213,7 @@ export default function StudentAssignments() {
                         <Button
                             onClick={handleSubmit}
                             disabled={saving}
-                            className={`mt - 6 w - full ${saving ? "opacity-50 cursor-not-allowed" : ""} `}
+                            className={`mt-6 w-full ${saving ? "opacity-50 cursor-not-allowed" : ""} `}
                         >
                             {saving ? (
                                 <div className="flex items-center gap-2 justify-center">

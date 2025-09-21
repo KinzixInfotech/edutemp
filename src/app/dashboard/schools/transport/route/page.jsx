@@ -24,7 +24,7 @@ async function fetchRoutes({ schoolId, search }) {
 }
 
 async function fetchVehicles({ schoolId }) {
-    const response = await fetch(`/api/schools/transport/vehicles?schoolId=${schoolId}`);
+    const response = await fetch(`/api/schools/transport/vehicle?schoolId=${schoolId}`);
     if (!response.ok) throw new Error("Failed to fetch vehicles");
     return response.json();
 }
@@ -58,18 +58,19 @@ async function deleteRoute(id) {
 }
 
 async function fetchRouteAssignments(routeId) {
-    const response = await fetch(`/api/schools/transport/student-routes?routeId=${routeId}`);
+    alert(true)
+    const response = await fetch(`/api/schools/transport/student-routes?schoolId=${schoolId}&routeId=${routeId}`);
     if (!response.ok) throw new Error("Failed to fetch route assignments");
     return response.json();
 }
 
 export default function RoutePlanning() {
-    const [saving, setSaving] = useState(false);
     const { fullUser } = useAuth();
     const [drawerMode, setDrawerMode] = useState(null);
     const [formData, setFormData] = useState({ stops: [] });
     const [selectedRoute, setSelectedRoute] = useState(null);
     const [search, setSearch] = useState("");
+    const [saving, setSaving] = useState(false)
     const [formError, setFormError] = useState("");
 
     const queryClient = useQueryClient();
@@ -288,7 +289,7 @@ export default function RoutePlanning() {
                                         <SelectValue placeholder="Select vehicle" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="">None</SelectItem>
+                                        <SelectItem value="none">None</SelectItem>
                                         {vehicles.map((vehicle) => (
                                             <SelectItem key={vehicle.id} value={vehicle.id}>{vehicle.licensePlate}</SelectItem>
                                         ))}

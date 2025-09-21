@@ -152,7 +152,7 @@ export default function NewProfilePage() {
                 body: JSON.stringify(cleanForm)
             })
             if (!res.ok) throw new Error("Failed to create profile")
-            toast.success(`${role} profile created`)
+            toast.success(`${role[0].toUpperCase()} Profile Created`)
             setResetKey((prev) => prev + 1)
             router.push(`/dashboard/schools/${schoolId}/manage`)
         } catch {

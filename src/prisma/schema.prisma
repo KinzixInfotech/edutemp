@@ -84,6 +84,7 @@ model StudentRouteAssignment {
   id         String   @id @default(uuid()) @db.Uuid
   studentId  String   @db.Uuid
   routeId    String   @db.Uuid
+  schoolId   String   @db.Uuid
   assignedAt DateTime @default(now())
   student    Student  @relation(fields: [studentId], references: [userId])
   route      Route    @relation(fields: [routeId], references: [id])
