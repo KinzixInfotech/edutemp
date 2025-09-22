@@ -35,7 +35,7 @@ import {
 } from "@tabler/icons-react"
 import { NavSidebarSections } from "./nav-main"
 import { Separator } from "./ui/separator"
-import { BookMarked, BotMessageSquare, CalendarCog, Car, Coins, DollarSign, Ellipsis, Flag, FlaskRound, Grip, House, Library, MonitorCog, Send, User, UserPen } from "lucide-react"
+import { BookCopy, BookMarked, BotMessageSquare, CalendarCog, Car, Coins, DollarSign, Ellipsis, Flag, FlaskRound, Grip, House, Library, MonitorCog, Send, Timer, User, UserPen } from "lucide-react"
 const sidebarData = [
     {
         // title: "Main",
@@ -134,8 +134,8 @@ const sidebarData = [
                     },
                     { label: "Route", url: "/dashboard/schools/transport/route", roles: ["ADMIN"] },
                     { label: "Student Assignment", url: "/dashboard/schools/transport/student-assign", roles: ["ADMIN"] },
-                    { label: "Attendance & Tracking", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
-                    { label: "Fee Management", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
+
+                    // { label: "Fee Management", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
                     { label: "Reporting", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
                 ],
             },
@@ -161,11 +161,36 @@ const sidebarData = [
         ],
     },
     {
+        title: "Admission  Management",
+        items: [
+            {
+                label: "Manage Admission",
+                icon: BookCopy,
+                roles: ["ADMIN"],
+                submenu: [
+                    {
+                        label: "Create Exam", url: "/dashboard/fees/ manage - fee - structure", roles: ["ADMIN"]
+                    },
+                    { label: "Schedule Exam", url: "/dashboard/fees/fee-structures", roles: ["ADMIN"] },
+                    { label: "Input Marks", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
+                    { label: "Results & Reports", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
+                    { label: "Question Banks", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
+                ],
+            },
+        ],
+    },
+    {
         title: "Edu Employees",
         items: [
 
             { label: "All Employees", url: "/dashboard/edubreezy/employees", icon: IconDatabase, roles: ['SUPER_ADMIN'] },
             { label: "Add Employee", url: "#", icon: IconReport, roles: ['SUPER_ADMIN'] },
+        ],
+    },
+    {
+        title: "Almuni",
+        items: [
+            { label: "Alumni Management", url: "/dashboard/schools/alumni/", icon: Timer, roles: ["SUPER_ADMIN", "STUDENT", "ADMIN", "MASTER_ADMIN", "TEACHER", "STAFF"] },
         ],
     },
     {
@@ -176,7 +201,7 @@ const sidebarData = [
                 icon: Grip,
                 roles: ["ADMIN"],
                 submenu: [
-                    { label: "Manage Transport ", url: "/dashboard/schools/manage-gallery", roles: ["ADMIN"] },
+                    // { label: "Manage Transport ", url: "/dashboard/schools/manage-gallery", roles: ["ADMIN"] },
                     { label: "Manage Time Table ", url: "/dashboard/schools/manage-time-table", roles: ["ADMIN"] },
                     { label: "Manage Gallery", url: "/dashboard/schools/manage-gallery", roles: ["ADMIN"] },
                 ]
@@ -184,8 +209,6 @@ const sidebarData = [
 
         ]
     },
-
-
 ]
 const navUser = {
     user: {

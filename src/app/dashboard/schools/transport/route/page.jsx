@@ -57,11 +57,19 @@ async function deleteRoute(id) {
     return true;
 }
 
-async function fetchRouteAssignments(routeId) {
-    alert(true)
-    const response = await fetch(`/api/schools/transport/student-routes?schoolId=${schoolId}&routeId=${routeId}`);
+async function fetchRouteAssignments(routeId, schoolId) {
+    console.log(true, routeId, schoolId);
+
+    const response = await fetch(
+        `/api/schools/transport/student-routes?schoolId=${schoolId}&routeId=${routeId}`
+    );
+    console.log("fetching assignment");
+
     if (!response.ok) throw new Error("Failed to fetch route assignments");
-    return response.json();
+
+    const data = await response.json();
+    console.log(data); // <- now you’ll see the object
+    return data;
 }
 
 export default function RoutePlanning() {
@@ -90,7 +98,7 @@ export default function RoutePlanning() {
 
     const { data: assignments, isLoading: assignmentsLoading } = useQuery({
         queryKey: ["routeAssignments", selectedRoute?.id],
-        queryFn: () => fetchRouteAssignments(selectedRoute?.id),
+        queryFn: () => fetchRouteAssignments(selectedRoute?.id, schoolId),
         enabled: !!selectedRoute?.id,
         staleTime: 5 * 60 * 1000,
     });
