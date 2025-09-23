@@ -1,0 +1,237 @@
+// app/admissions/applications.jsx
+'use client'
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+
+async function fetchApplications({ schoolId, stageId, formId }) {
+    const params = new URLSearchParams({ schoolId });
+    if (stageId) params.append("stageId", stageId);
+    if (formId) params.append("formId", formId);
+    const response = await fetch(`/api/schools/admissions/applications?${params}`);
+    if (!response.ok) throw new Error("Failed to fetch applications");
+    return response.json();
+}
+
+async function fetchForms(schoolId) {
+    const response = await fetch(`/api/schools/admissions/forms?schoolId=${schoolId}`);
+    if (!response.ok) throw new Error("Failed to fetch forms");
+    return response.json();
+}
+
+async function fetchStages(schoolId) {
+    const response = await fetch(`/api/schools/admissions/settings?schoolId=${schoolId}`);
+    if (!response.ok) throw new Error("Failed to fetch stages");
+    return response.json();
+}
+
+async function fetchApplication(id) {
+    const response = await fetch(`/api/schools/admissions/applications/${id}`);
+    if (!response.ok) throw new Error("Failed to fetch application");
+    return response.json();
+}
+
+async function moveApplication(data) {
+    const response = await fetch(`/api/schools/admissions/applications/${data.id}/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error("Failed to move application");
+    return response.json();
+}
+
+export default function Applications() {
+    const { fullUser } = useAuth();
+    const schoolId = fullUser?.schoolId;
+    const movedById = fullUser?.id;
+    const [stageId, setStageId] = useState("");
+    const [formId, setFormId] = useState("");
+    const [selectedApplication, setSelectedApplication] = useState(null);
+    const [search, setSearch] = useState("");
+    const [notes, setNotes] = useState("");
+
+    const queryClient = useQueryClient();
+
+    const { data: { applications = [] } = {}, isLoading: appsLoading } = useQuery({
+        queryKey: ["applications", schoolId, stageId, formId],
+        queryFn: () => fetchApplications({ schoolId, stageId, formId }),
+        enabled: !!schoolId,
+    });
+
+    const { data: { forms = [] } = {} } = useQuery({
+        queryKey: ["forms", schoolId],
+        queryFn: () => fetchForms(schoolId),
+        enabled: !!schoolId,
+    });
+
+    const { data: { stages = [] } = {} } = useQuery({
+        queryKey: ["stages", schoolId],
+        queryFn: () => fetchStages(schoolId),
+        enabled: !!schoolId,
+    });
+
+    const { data: selectedApp, isLoading: appLoading } = useQuery({
+        queryKey: ["application", selectedApplication?.id],
+        queryFn: () => fetchApplication(selectedApplication?.id),
+        enabled: !!selectedApplication?.id,
+    });
+
+    const moveMutation = useMutation({
+        mutationFn: moveApplication,
+        onSuccess: () => {
+            queryClient.invalidateQueries(["applications"]);
+            toast.success("Application moved");
+            setNotes("");
+            setSelectedApplication(null);
+        },
+        onError: () => toast.error("Failed to move"),
+    });
+
+    const handleMove = (id, stageId) => {
+        moveMutation.mutate({ id, stageId, movedById, notes });
+    };
+
+    return (
+        <div className="p-6">
+            <h2 className="text-2xl font-bold mb-4">Applications</h2>
+            <div className="flex gap-4 mb-4">
+                <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-md" />
+                <Select value={stageId} onValueChange={setStageId}>
+                    <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Filter by stage" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="">All Stages</SelectItem>
+                        {stages.map((stage) => (
+                            <SelectItem key={stage.id} value={stage.id}>{stage.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <Select value={formId} onValueChange={setFormId}>
+                    <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Filter by form" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="">All Forms</SelectItem>
+                        {forms.map((form) => (
+                            <SelectItem key={form.id} value={form.id}>{form.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="overflow-x-auto rounded-lg border">
+                <Table className="min-w-[800px]">
+                    <TableHeader>
+                        <TableRow className="bg-muted sticky top-0 z-10">
+                            <TableHead>#</TableHead>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Submitted At</TableHead>
+                            <TableHead>Stage</TableHead>
+                            <TableHead>Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {appsLoading ? (
+                            Array(6).fill(0).map((_, index) => (
+                                <TableRow key={index}>
+                                    <TableCell><Skeleton className="h-6 w-6" /></TableCell>
+                                    <TableCell><Skeleton className="h-6 w-32" /></TableCell>
+                                    <TableCell><Skeleton className="h-6 w-32" /></TableCell>
+                                    <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+                                    <TableCell><Skeleton className="h-6 w-32" /></TableCell>
+                                    <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                                </TableRow>
+                            ))
+                        ) : applications.length > 0 ? (
+                            applications.filter(app => app.applicantName.toLowerCase().includes(search.toLowerCase())).map((app, index) => (
+                                <TableRow key={app.id} className={index % 2 === 0 ? "bg-muted" : "bg-background"}>
+                                    <TableCell>{index + 1}</TableCell>
+                                    <TableCell>{app.applicantName}</TableCell>
+                                    <TableCell>{app.applicantEmail}</TableCell>
+                                    <TableCell>{new Date(app.submittedAt).toLocaleDateString()}</TableCell>
+                                    <TableCell>{app.currentStage.name}</TableCell>
+                                    <TableCell className="flex gap-2">
+                                        <Dialog>
+                                            <DialogTrigger asChild>
+                                                <Button size="sm" variant="outline" onClick={() => setSelectedApplication(app)}>
+                                                    View
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogContent className="max-w-3xl">
+                                                <DialogHeader>
+                                                    <DialogTitle>{selectedApplication?.applicantName}</DialogTitle>
+                                                </DialogHeader>
+                                                {appLoading ? (
+                                                    <Loader2 className="animate-spin" size={30} />
+                                                ) : selectedApp ? (
+                                                    <div>
+                                                        <p>Email: {selectedApp.application.applicantEmail}</p>
+                                                        <p>Data: {JSON.stringify(selectedApp.application.data)}</p>
+                                                        <h3>Documents</h3>
+                                                        {selectedApp.application.documents.map(doc => (
+                                                            <a key={doc.id} href={doc.fileUrl}>{doc.fileName}</a>
+                                                        ))}
+                                                        <h3>Stage History</h3>
+                                                        <Table>
+                                                            <TableHeader>
+                                                                <TableRow>
+                                                                    <TableHead>Stage</TableHead>
+                                                                    <TableHead>Moved By</TableHead>
+                                                                    <TableHead>Date</TableHead>
+                                                                    <TableHead>Notes</TableHead>
+                                                                </TableRow>
+                                                            </TableHeader>
+                                                            <TableBody>
+                                                                {selectedApp.application.stageHistory.map((h, idx) => (
+                                                                    <TableRow key={idx}>
+                                                                        <TableCell>{h.stage.name}</TableCell>
+                                                                        <TableCell>{h.movedBy?.name || "System"}</TableCell>
+                                                                        <TableCell>{new Date(h.movedAt).toLocaleDateString()}</TableCell>
+                                                                        <TableCell>{h.notes}</TableCell>
+                                                                    </TableRow>
+                                                                ))}
+                                                            </TableBody>
+                                                        </Table>
+                                                        <div className="mt-4">
+                                                            <Label>Move to Stage</Label>
+                                                            <Select onValueChange={(val) => handleMove(selectedApp.application.id, val)}>
+                                                                <SelectTrigger>
+                                                                    <SelectValue placeholder="Select stage" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    {stages.map((stage) => (
+                                                                        <SelectItem key={stage.id} value={stage.id}>{stage.name}</SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                            <Input placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-2" />
+                                                        </div>
+                                                    </div>
+                                                ) : null}
+                                            </DialogContent>
+                                        </Dialog>
+                                        <Button size="sm" variant="outline" onClick={() => handleMove(app.id, "screening-stage-id")}>Assign to Screening</Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={6} className="text-center py-4">No applications found.</TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
+        </div>
+    );
+}

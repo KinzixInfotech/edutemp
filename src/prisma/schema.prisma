@@ -41,10 +41,126 @@ model School {
   Vehicle             Vehicle[]
   Route               Route[]
   Assignment          Assignment[]
+  AdmissionForm       AdmissionForm[]
+  Application         Application[]
+  Stage               Stage[]
 
   @@index([name])
 }
 
+// admission module
+model AdmissionForm {
+  id           String        @id @default(uuid()) @db.Uuid
+  schoolId     String        @db.Uuid
+  name         String
+  description  String?
+  slug         String?       @unique
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  school       School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  fields       FormField[]
+  applications Application[]
+
+  @@index([schoolId])
+  @@index([slug])
+}
+
+model FormField {
+  id              String        @id @default(uuid()) @db.Uuid
+  admissionFormId String        @db.Uuid
+  name            String
+  type            String // e.g., "text", "email", "file", "select"
+  required        Boolean       @default(false)
+  options         Json? // for select fields
+  order           Int
+  admissionForm   AdmissionForm @relation(fields: [admissionFormId], references: [id], onDelete: Cascade)
+
+  @@index([admissionFormId])
+}
+
+model Application {
+  id              String                @id @default(uuid()) @db.Uuid
+  schoolId        String                @db.Uuid
+  admissionFormId String                @db.Uuid
+  applicantName   String
+  applicantEmail  String
+  data            Json // submitted form data
+  submittedAt     DateTime              @default(now())
+  currentStageId  String                @db.Uuid
+  createdById     String?               @db.Uuid // optional user who submitted
+  school          School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  admissionForm   AdmissionForm         @relation(fields: [admissionFormId], references: [id], onDelete: Cascade)
+  currentStage    Stage                 @relation("CurrentStage", fields: [currentStageId], references: [id])
+  createdBy       User?                 @relation(fields: [createdById], references: [id])
+  documents       ApplicationDocument[]
+  stageHistory    StageHistory[]
+  payments        Payment[]
+
+  @@index([schoolId])
+  @@index([admissionFormId])
+  @@index([currentStageId])
+  @@index([submittedAt])
+  @@index([applicantEmail])
+}
+
+model ApplicationDocument {
+  id            String      @id @default(uuid()) @db.Uuid
+  applicationId String      @db.Uuid
+  fileUrl       String
+  fileName      String
+  mimeType      String
+  size          Int
+  uploadedAt    DateTime    @default(now())
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+}
+
+model Stage {
+  id                  String         @id @default(uuid()) @db.Uuid
+  schoolId            String         @db.Uuid
+  name                String
+  order               Int
+  requiresTest        Boolean        @default(false)
+  requiresInterview   Boolean        @default(false)
+  feeRequired         Boolean        @default(false)
+  school              School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  currentApplications Application[]  @relation("CurrentStage")
+  stageHistory        StageHistory[]
+
+  @@index([schoolId])
+  @@index([order])
+}
+
+model StageHistory {
+  id            String      @id @default(uuid()) @db.Uuid
+  applicationId String      @db.Uuid
+  stageId       String      @db.Uuid
+  movedById     String?     @db.Uuid // Made optional for system/public actions
+  movedAt       DateTime    @default(now())
+  notes         String?
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  stage         Stage       @relation(fields: [stageId], references: [id])
+  movedBy       User?       @relation(fields: [movedById], references: [id])
+
+  @@index([applicationId])
+  @@index([movedAt])
+}
+
+model Payment {
+  id            String        @id @default(uuid()) @db.Uuid
+  applicationId String?       @db.Uuid
+  amount        Float
+  status        PaymentStatus @default(PENDING)
+  transactionId String?
+  paidAt        DateTime?
+  application   Application?  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@index([status])
+}
+
+// Note: Use PostgreSQL provider as in current schema.
 // Transport Models
 model Vehicle {
   id             String            @id @default(uuid()) @db.Uuid
@@ -269,6 +385,8 @@ model User {
   teacher               TeachingStaff?
   role                  Role              @relation(fields: [roleId], references: [id])
   school                School?           @relation(fields: [schoolId], references: [id])
+  Application           Application[]
+  StageHistory          StageHistory[]
 
   @@index([schoolId])
   @@index([roleId])
@@ -817,4 +935,10 @@ enum Status {
   DRAFT
   PUBLISHED
   ARCHIVED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
 }

@@ -169,12 +169,17 @@ const sidebarData = [
                 roles: ["ADMIN"],
                 submenu: [
                     {
-                        label: "Create Exam", url: "/dashboard/fees/ manage - fee - structure", roles: ["ADMIN"]
+                        label: "OverView", url: "/dashboard/schools/admissions/overview", roles: ["ADMIN"]
                     },
-                    { label: "Schedule Exam", url: "/dashboard/fees/fee-structures", roles: ["ADMIN"] },
-                    { label: "Input Marks", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
-                    { label: "Results & Reports", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
-                    { label: "Question Banks", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
+                    { label: "Applications", url: "/dashboard/schools/admissions/applications", roles: ["ADMIN"] },
+                    { label: "Screening", url: "/dashboard/schools/admissions/screening", roles: ["ADMIN"] },
+                    { label: "Shortlisting", url: "/dashboard/schools/admissions/shortlisting", roles: ["ADMIN"] },
+                    { label: "Tests/Interviews", url: "/dashboard/schools/admissions/test-interviews", roles: ["ADMIN"] },
+                    { label: "Offers", url: "/dashboard/schools/admissions/offers", roles: ["ADMIN"] },
+                    { label: "Fee & Document Verification", url: "/dashboard/schools/admissions/fees-verification", roles: ["ADMIN"] },
+                    { label: "Enrolled Students", url: "/dashboard/schools/admissions/enrolled", roles: ["ADMIN"] },
+                    { label: "Waitlist/Rejected", url: "/dashboard/schools/admissions/waitlist-rejected", roles: ["ADMIN"] },
+                    { label: "Form Builder/Settings", url: "/dashboard/schools/admissions/form-settings", roles: ["ADMIN"] },
                 ],
             },
         ],
