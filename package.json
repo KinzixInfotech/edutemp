@@ -47,6 +47,7 @@
     "@react-pdf-viewer/core": "^3.12.0",
     "@react-pdf-viewer/default-layout": "^3.12.0",
     "@statuspage/status-widget": "^1.0.5",
+    "@stepperize/react": "^5.1.8",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.50.3",
