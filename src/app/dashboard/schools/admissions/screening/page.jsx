@@ -7,13 +7,16 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+// import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 async function fetchScreeningApplications(schoolId) {
-    const response = await fetch(`/api/schools/admissions/applications?schoolId=${schoolId}&stageId=pending-review-id`); // Assume pending stage id
+    const response = await fetch(`/api/schools/admissions/applications?schoolId=${schoolId}`); // Assume pending stage id
     if (!response.ok) throw new Error("Failed to fetch screening applications");
+    // console.log(await response.json());
     return response.json();
 }
 
@@ -114,11 +117,33 @@ export default function Screening() {
                                                     View
                                                 </Button>
                                             </DialogTrigger>
-                                            <DialogContent>
+                                            <DialogContent className="max-w-lg">
                                                 <DialogHeader>
                                                     <DialogTitle>{selectedApplication?.applicantName}</DialogTitle>
                                                 </DialogHeader>
-                                                {/* Detail view similar to previous */}
+
+                                                {selectedApplication ? (
+                                                    <div className="overflow-x-auto">
+                                                        <Table className="w-full">
+                                                            <TableHeader>
+                                                                <TableRow>
+                                                                    <TableHead>Field Name</TableHead>
+                                                                    <TableHead>Value</TableHead>
+                                                                </TableRow>
+                                                            </TableHeader>
+                                                            <TableBody>
+                                                                {Object.entries(selectedApplication.data).map(([fieldId, value]) => (
+                                                                    <TableRow key={fieldId}>
+                                                                        <TableCell>{fieldId}</TableCell> {/* Replace with field display name if you have mapping */}
+                                                                        <TableCell>{value}</TableCell>
+                                                                    </TableRow>
+                                                                ))}
+                                                            </TableBody>
+                                                        </Table>
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-center py-4">No data available</p>
+                                                )}
                                             </DialogContent>
                                         </Dialog>
                                         <Button size="sm" onClick={() => handleApprove(app.id)}>Approve</Button>

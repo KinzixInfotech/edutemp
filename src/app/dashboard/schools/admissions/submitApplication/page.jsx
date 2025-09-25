@@ -1,4 +1,3 @@
-// components/admissions/SubmitApplication.jsx
 'use client'
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -29,9 +28,11 @@ async function submitApplication(data) {
 
 export default function SubmitApplication({ formId }) {
     const { fullUser } = useAuth();
-    const schoolId = fullUser?.schoolId || new URLSearchParams(window.location.search).get("schoolId");
+    const schoolId = fullUser?.schoolId;
     const createdById = fullUser?.id;
-    const [formData, setFormData] = useState({ name: "", email: "" });
+
+    // formData will store values keyed by field id
+    const [formData, setFormData] = useState({});
     const [documents, setDocuments] = useState([]);
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState("");
@@ -48,7 +49,7 @@ export default function SubmitApplication({ formId }) {
         onSuccess: () => {
             setSaving(false);
             toast.success("Application submitted successfully");
-            setFormData({ name: "", email: "" });
+            setFormData({});
             setDocuments([]);
         },
         onError: (err) => {
@@ -57,34 +58,51 @@ export default function SubmitApplication({ formId }) {
         },
     });
 
-    const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-    };
-
-    const handleSelectChange = (name, val) => {
-        setFormData({ ...formData, [name]: val });
+    const handleChange = (fieldId, value) => {
+        setFormData({ ...formData, [fieldId]: value });
     };
 
     const handleSubmit = () => {
-        if (!formData.name || !formData.email) {
-            setFormError("Name and email are required");
-            return;
-        }
+        // Basic required check
+        // if (!formData.name || !formData.email) {
+        //     setFormError("Name and email are required");
+        //     return;
+        // }
+
         const form = forms[0];
         if (!form) {
             setFormError("Form not found");
             return;
         }
+
+        // Collect dynamic field values
+        const dynamicData = {};
+        form.fields.forEach((field) => {
+            if (formData[field.id] !== undefined && formData[field.id] !== "") {
+                dynamicData[field.id] = formData[field.id];
+            }
+        });
+
+        // Prepare documents
+        const preparedDocs = documents.map((doc) => ({
+            fileUrl: doc.fileUrl,
+            fileName: doc.fileName,
+            mimeType: doc.mimeType,
+            size: doc.size,
+            fieldId: doc.fieldId || null, // optional association with a field
+        }));
+
         mutation.mutate({
             admissionFormId: formId,
             schoolId,
             applicantName: formData.name,
             applicantEmail: formData.email,
-            createdById: createdById || null, // Optional for public submission
-            data: formData,
-            documents,
+            createdById: createdById || null,
+            data: dynamicData,
+            documents: preparedDocs,
         });
     };
+
 
     if (!schoolId) {
         return <div className="p-6 text-center">Please provide a valid school ID.</div>;
@@ -104,80 +122,93 @@ export default function SubmitApplication({ formId }) {
     }
 
     return (
-        <div className="p-6">
-            {/* <h2 className="text-2xl font-bold mb-4">{form.name}</h2> */}
-            {/* {form.description && <p className="text-muted-foreground mb-4">{form.description}</p>} */}
-            <div className="space-y-4">
-                {/* <div>
-                    <Label htmlFor="name" className="mb-2 text-muted-foreground">Name*</Label>
-                    <Input id="name" name="name" value={formData.name} onChange={handleChange} />
-                </div>
-                <div>
-                    <Label htmlFor="email" className="mb-2 text-muted-foreground">Email*</Label>
-                    <Input id="email" name="email" type="email" value={formData.email} onChange={handleChange} />
-                </div> */}
-                {form.fields.map((field, index) => (
-                    <div key={field.id}>
-                        <Label className="mb-2 text-muted-foreground">
-                            {field.name}
-                            {field.required ? "*" : ""}
-                        </Label>
-                        {field.type === "file" ? (
-                            <div>
-                                <UploadButton
-                                    endpoint="imageUploader"
-                                    onClientUploadComplete={(res) => {
-                                        setDocuments([
-                                            ...documents,
-                                            ...res.map((r) => ({
-                                                fileUrl: r.url,
-                                                fileName: r.name,
-                                                mimeType: r.type,
-                                                size: r.size,
-                                            })),
-                                        ]);
-                                        toast.success("File uploaded");
-                                    }}
-                                    onUploadError={(err) => toast.error(err.message)}
-                                />
-                            </div>
-                        ) : field.type === "select" ? (
-                            <Select onValueChange={(val) => handleSelectChange(field.name, val)}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder={`Select ${field.name}`} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {field.options?.map((opt, idx) => (
-                                        <SelectItem key={idx} value={opt}>{opt}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        ) : (
-                            <Input
-                                name={field.name}
-                                onChange={handleChange}
-                                type={field.type}
-                                required={field.required}
-                            />
-                        )}
-                    </div>
-                ))}
-                {formError && <p className="text-red-500">{formError}</p>}
-                <Button
-                    onClick={handleSubmit}
-                    disabled={saving}
-                    className={`w-full ${saving ? "opacity-50 cursor-not-allowed" : ""}`}
-                >
-                    {saving ? (
-                        <div className="flex items-center gap-2 justify-center">
-                            <Loader2 className="animate-spin" size={20} />
-                            <span>Submitting</span>
-                        </div>
-                    ) : (
-                        "Submit Application"
-                    )}
-                </Button>
+        <div className="p-6 space-y-4">
+
+            <div> <Label htmlFor="name" className="mb-2 text-muted-foreground">Name*</Label>
+
+                <Input
+                    id="name"
+                    name="name"
+                    value={formData.name || ""}
+                    onChange={(e) => handleChange("name", e.target.value)}
+                />
+
             </div>
+            <div>
+                <Label htmlFor="email" className="mb-2 text-muted-foreground">Email*</Label>
+
+                <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={formData.email || ""}
+                    onChange={(e) => handleChange("email", e.target.value)}
+                />
+            </div>
+            {form.fields.map((field) => (
+                <div key={field.id}>
+                    <Label className="mb-2 text-muted-foreground">
+                        {field.name}{field.required ? "*" : ""}
+                    </Label>
+
+                    {field.type === "file" ? (
+                        <UploadButton
+                            endpoint="imageUploader"
+                            onClientUploadComplete={(res) => {
+                                setDocuments([
+                                    ...documents,
+                                    ...res.map((r) => ({
+                                        fileUrl: r.url,
+                                        fileName: r.name,
+                                        mimeType: r.type,
+                                        size: r.size,
+                                        fieldId: field.id, // store which field uploaded
+                                    })),
+                                ]);
+                                toast.success("File uploaded");
+                            }}
+                            onUploadError={(err) => toast.error(err.message)}
+                        />
+                    ) : field.type === "select" ? (
+                        <Select onValueChange={(val) => handleChange(field.id, val)}>
+                            <SelectTrigger>
+                                <SelectValue placeholder={`Select ${field.name}`} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {field.options?.map((opt, idx) => (
+                                    <SelectItem key={idx} value={opt}>{opt}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    ) : (
+                        <Input
+                            id={field.id}
+                            name={field.name}
+                            type={field.type}
+                            required={field.required}
+                            value={formData[field.id] || ""}
+                            onChange={(e) => handleChange(field.id, e.target.value)}
+                        />
+                    )}
+                </div>
+            ))}
+
+            {formError && <p className="text-red-500">{formError}</p>}
+
+            <Button
+                onClick={handleSubmit}
+                disabled={saving}
+                className={`w-full ${saving ? "opacity-50 cursor-not-allowed" : ""}`}
+            >
+                {saving ? (
+                    <div className="flex items-center gap-2 justify-center">
+                        <Loader2 className="animate-spin" size={20} />
+                        <span>Submitting</span>
+                    </div>
+                ) : (
+                    "Submit Application"
+                )}
+            </Button>
         </div>
     );
 }

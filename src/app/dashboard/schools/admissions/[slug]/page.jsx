@@ -16,7 +16,7 @@ async function fetchFormBySlug(slug, schoolId) {
 export default function FormPage({ params }) {
     const { slug } = params;
     const { fullUser } = useAuth();
-    const schoolId = fullUser?.schoolId || new URLSearchParams(window.location.search).get("schoolId");
+    const schoolId = fullUser?.schoolId;
 
     const { data: form, isLoading, error } = useQuery({
         queryKey: ["form", slug, schoolId],

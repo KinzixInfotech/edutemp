@@ -18,6 +18,7 @@ async function fetchApplications({ schoolId, stageId, formId }) {
     if (stageId) params.append("stageId", stageId);
     if (formId) params.append("formId", formId);
     const response = await fetch(`/api/schools/admissions/applications?${params}`);
+    // console.log(response.json());
     if (!response.ok) throw new Error("Failed to fetch applications");
     return response.json();
 }
@@ -67,6 +68,8 @@ export default function Applications() {
         queryFn: () => fetchApplications({ schoolId, stageId, formId }),
         enabled: !!schoolId,
     });
+    // console.log(applications);
+
 
     const { data: { forms = [] } = {} } = useQuery({
         queryKey: ["forms", schoolId],
@@ -100,7 +103,7 @@ export default function Applications() {
     const handleMove = (id, stageId) => {
         console.log(id, stageId, 'move hanlder');
 
-        // moveMutation.mutate({ id, stageId, movedById, notes });
+        moveMutation.mutate({ id, stageId, movedById, notes });
     };
 
     return (
@@ -227,7 +230,7 @@ export default function Applications() {
                                                 ) : null}
                                             </DialogContent>
                                         </Dialog>
-                                        <Button size="sm" variant="outline" onClick={() => handleMove(app.id)}>Assign to Screening</Button>
+                                        <Button size="sm" variant="outline" onClick={() => handleMove(app.id, app.currentStage.id)}>Assign to Screening</Button>
                                     </TableCell>
                                 </TableRow>
                             ))

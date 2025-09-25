@@ -37,17 +37,17 @@ async function createForm(data) {
 }
 
 async function updateForm({ id, ...data }) {
-    const response = await fetch(`/api/schools/admissions/forms/${id}`, {
+    const response = await fetch(`/api/schools/admissions/forms?id=${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(data), // only the rest of the data
     });
     if (!response.ok) throw new Error("Failed to update form");
     return response.json();
 }
 
 async function deleteForm(id) {
-    const response = await fetch(`/api/schools/admissions/forms/${id}`, {
+    const response = await fetch(`/api/schools/admissions/forms?id=${id}`, {
         method: "DELETE",
     });
     if (!response.ok) throw new Error("Failed to delete form");
@@ -123,7 +123,10 @@ export default function FormsSettings() {
             toast.success("Form created");
             setSaving(false);
         },
-        onError: () => toast.error("Failed to create form"),
+        onError: () => {
+            setSaving(false);
+            toast.error("Failed to create form")
+        }
     });
 
     const updateFormMutation = useMutation({
@@ -135,7 +138,10 @@ export default function FormsSettings() {
             toast.success("Form updated");
             setSaving(false);
         },
-        onError: () => toast.error("Failed to update form"),
+        onError: () => {
+            setSaving(false);
+            toast.error("Failed to update form")
+        }
     });
 
     const deleteFormMutation = useMutation({
@@ -144,7 +150,10 @@ export default function FormsSettings() {
             queryClient.invalidateQueries(["forms"]);
             toast.success("Form deleted");
         },
-        onError: () => toast.error("Failed to delete form"),
+        onError: () => {
+            setSaving(false);
+            toast.error("Failed to delete form")
+        }
     });
 
     const generateLinkMutation = useMutation({
@@ -162,7 +171,10 @@ export default function FormsSettings() {
             toast.success("Stage created");
             setSaving(false);
         },
-        onError: () => toast.error("Failed to create stage"),
+        onError: () => {
+            setSaving(false);
+            toast.error("Failed to create stage")
+        }
     });
 
     const updateStageMutation = useMutation({
@@ -174,7 +186,10 @@ export default function FormsSettings() {
             toast.success("Stage updated");
             setSaving(false);
         },
-        onError: () => toast.error("Failed to update stage"),
+        onError: () => {
+            setSaving(false);
+            toast.error("Failed to update stage")
+        }
     });
 
     const deleteStageMutation = useMutation({
@@ -183,7 +198,10 @@ export default function FormsSettings() {
             queryClient.invalidateQueries(["stages"]);
             toast.success("Stage deleted");
         },
-        onError: () => toast.error("Failed to delete stage"),
+        onError: () => {
+            setSaving(false);
+            toast.error("Failed to delete stage")
+        }
     });
 
     const handleFormChange = (e) => {
@@ -412,7 +430,7 @@ export default function FormsSettings() {
                                     </div>
                                     <div>
                                         <Label className="mb-2 text-muted-foreground">Fields</Label>
-                                    
+
                                         {formData.fields?.map((field, index) => (
                                             <div key={index} className="flex gap-2 mb-2">
                                                 <Input placeholder="Field Name" value={field.name} onChange={(e) => handleFieldChange(index, "name", e.target.value)} />
