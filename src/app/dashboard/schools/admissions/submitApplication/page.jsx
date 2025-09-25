@@ -105,17 +105,17 @@ export default function SubmitApplication({ formId }) {
 
     return (
         <div className="p-6">
-            <h2 className="text-2xl font-bold mb-4">{form.name}</h2>
-            {form.description && <p className="text-muted-foreground mb-4">{form.description}</p>}
+            {/* <h2 className="text-2xl font-bold mb-4">{form.name}</h2> */}
+            {/* {form.description && <p className="text-muted-foreground mb-4">{form.description}</p>} */}
             <div className="space-y-4">
-                <div>
+                {/* <div>
                     <Label htmlFor="name" className="mb-2 text-muted-foreground">Name*</Label>
                     <Input id="name" name="name" value={formData.name} onChange={handleChange} />
                 </div>
                 <div>
                     <Label htmlFor="email" className="mb-2 text-muted-foreground">Email*</Label>
                     <Input id="email" name="email" type="email" value={formData.email} onChange={handleChange} />
-                </div>
+                </div> */}
                 {form.fields.map((field, index) => (
                     <div key={field.id}>
                         <Label className="mb-2 text-muted-foreground">

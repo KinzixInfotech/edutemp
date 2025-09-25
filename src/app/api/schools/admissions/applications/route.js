@@ -20,7 +20,9 @@ const applicationSchema = z.object({
 export async function POST(req) {
     try {
         const data = await req.json();
+        console.log(data);
         const validated = applicationSchema.parse(data);
+        console.log(validated);
 
         // Verify user if createdById is provided
         if (validated.createdById) {
@@ -95,8 +97,8 @@ export async function POST(req) {
 
 const getSchema = z.object({
     schoolId: z.string().uuid(),
-    stageId: z.string().uuid().optional(),
-    formId: z.string().uuid().optional(),
+    stageId: z.string().uuid().optional().nullable(),
+    formId: z.string().uuid().optional().nullable(),
     page: z.number().optional().default(1),
     limit: z.number().optional().default(10),
 });

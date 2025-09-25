@@ -6,8 +6,15 @@ const idSchema = z.object({
     id: z.string().uuid(),
 });
 
-export async function GET(req, { params }) {
+export async function GET(req, context) {
+    const params = await context.params;
+    console.log("params resolved:", params);
+    console.log("params:", params);
+
+    console.log("type of params:", typeof params, params);
+
     const validated = idSchema.parse(params);
+
     try {
         const application = await prisma.application.findUnique({
             where: { id: validated.id },
@@ -30,9 +37,11 @@ export async function GET(req, { params }) {
                 },
             },
         });
+
         if (!application) {
             return NextResponse.json({ error: "Application not found" }, { status: 404 });
         }
+
         return NextResponse.json({ success: true, application });
     } catch (err) {
         console.error(err);

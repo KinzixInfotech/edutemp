@@ -50,8 +50,8 @@ export async function POST(req) {
 
 const getSchema = z.object({
     schoolId: z.string().uuid(),
-    slug: z.string().optional(),
-    id: z.string().uuid().optional(),
+    slug: z.string().optional().nullable(),
+    id: z.string().uuid().optional().nullable(),
 });
 
 export async function GET(req) {

@@ -4,13 +4,16 @@ import prisma from "@/lib/prisma";
 
 const moveSchema = z.object({
     id: z.string().uuid(),
-    stageId: z.string().uuid(),
+    stageId: z.string(),
     notes: z.string().optional(),
     movedById: z.string().uuid(),
 });
 
-export async function POST(req, { params }) {
+export async function POST(req, ctx) {
+    const {params} = await ctx
     const data = await req.json();
+    console.log(data,'move');
+    
     const validated = moveSchema.parse({ ...data, id: params.id });
     try {
         const application = await prisma.application.findUnique({

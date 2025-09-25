@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { Label } from "recharts";
 
 async function fetchApplications({ schoolId, stageId, formId }) {
     const params = new URLSearchParams({ schoolId });
@@ -97,7 +98,9 @@ export default function Applications() {
     });
 
     const handleMove = (id, stageId) => {
-        moveMutation.mutate({ id, stageId, movedById, notes });
+        console.log(id, stageId, 'move hanlder');
+
+        // moveMutation.mutate({ id, stageId, movedById, notes });
     };
 
     return (
@@ -110,18 +113,19 @@ export default function Applications() {
                         <SelectValue placeholder="Filter by stage" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="">All Stages</SelectItem>
+                        <SelectItem value="All">All Stages</SelectItem>
                         {stages.map((stage) => (
                             <SelectItem key={stage.id} value={stage.id}>{stage.name}</SelectItem>
                         ))}
                     </SelectContent>
                 </Select>
+
                 <Select value={formId} onValueChange={setFormId}>
                     <SelectTrigger className="w-[180px]">
                         <SelectValue placeholder="Filter by form" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="">All Forms</SelectItem>
+                        <SelectItem value="ALL">All Forms</SelectItem>
                         {forms.map((form) => (
                             <SelectItem key={form.id} value={form.id}>{form.name}</SelectItem>
                         ))}
@@ -153,8 +157,11 @@ export default function Applications() {
                                 </TableRow>
                             ))
                         ) : applications.length > 0 ? (
+
                             applications.filter(app => app.applicantName.toLowerCase().includes(search.toLowerCase())).map((app, index) => (
+
                                 <TableRow key={app.id} className={index % 2 === 0 ? "bg-muted" : "bg-background"}>
+                                    {/* {console.log(app)} */}
                                     <TableCell>{index + 1}</TableCell>
                                     <TableCell>{app.applicantName}</TableCell>
                                     <TableCell>{app.applicantEmail}</TableCell>
@@ -220,7 +227,7 @@ export default function Applications() {
                                                 ) : null}
                                             </DialogContent>
                                         </Dialog>
-                                        <Button size="sm" variant="outline" onClick={() => handleMove(app.id, "screening-stage-id")}>Assign to Screening</Button>
+                                        <Button size="sm" variant="outline" onClick={() => handleMove(app.id)}>Assign to Screening</Button>
                                     </TableCell>
                                 </TableRow>
                             ))
