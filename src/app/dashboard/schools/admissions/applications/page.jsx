@@ -63,12 +63,12 @@ export default function Applications() {
 
     const queryClient = useQueryClient();
 
-    const { data: { applications = [] } = {}, isLoading: appsLoading } = useQuery({
+    const { data: { applications = [], total } = {}, isLoading: appsLoading } = useQuery({
         queryKey: ["applications", schoolId, stageId, formId],
         queryFn: () => fetchApplications({ schoolId, stageId, formId }),
         enabled: !!schoolId,
     });
-    // console.log(applications);
+
 
 
     const { data: { forms = [] } = {} } = useQuery({
@@ -88,6 +88,7 @@ export default function Applications() {
         queryFn: () => fetchApplication(selectedApplication?.id),
         enabled: !!selectedApplication?.id,
     });
+
 
     const moveMutation = useMutation({
         mutationFn: moveApplication,
@@ -109,6 +110,10 @@ export default function Applications() {
     return (
         <div className="p-6">
             <h2 className="text-2xl font-bold mb-4">Applications</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+                Showing <span className="font-medium">{applications.length}</span> out of{" "}
+                <span className="font-medium">{total}</span> Applications
+            </p>
             <div className="flex gap-4 mb-4">
                 <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-md" />
                 <Select value={stageId} onValueChange={setStageId}>
@@ -182,15 +187,26 @@ export default function Applications() {
                                                     <DialogTitle>{selectedApplication?.applicantName}</DialogTitle>
                                                 </DialogHeader>
                                                 {appLoading ? (
-                                                    <Loader2 className="animate-spin" size={30} />
+                                                    <div className="w-full h-full flex items-center justify-center">
+                                                        <Loader2 className="animate-spin" size={30} />
+                                                    </div>
                                                 ) : selectedApp ? (
                                                     <div>
-                                                        <p>Email: {selectedApp.application.applicantEmail}</p>
-                                                        <p>Data: {JSON.stringify(selectedApp.application.data)}</p>
-                                                        <h3>Documents</h3>
+                                                        <p>Email: <span className="border-b-2"> {selectedApp.application.applicantEmail}</span></p>
+                                                        <div className="flex flex-row gap-2.5">
+                                                            <Button size="sm" className='my-2' variant="outline">
+                                                                View Data
+                                                            </Button>
+                                                            <Button size="sm" className='my-2' variant="outline">
+                                                                View Documents
+                                                            </Button>
+                                                        </div>
+
+                                                        {/* <p>Data: {JSON.stringify(selectedApp.application.data)}</p> */}
+                                                        {/* <h3>Documents</h3>
                                                         {selectedApp.application.documents.map(doc => (
                                                             <a key={doc.id} href={doc.fileUrl}>{doc.fileName}</a>
-                                                        ))}
+                                                        ))} */}
                                                         <h3>Stage History</h3>
                                                         <Table>
                                                             <TableHeader>
@@ -201,9 +217,13 @@ export default function Applications() {
                                                                     <TableHead>Notes</TableHead>
                                                                 </TableRow>
                                                             </TableHeader>
-                                                            <TableBody>
+                                                            <TableBody className="w-full  max-h-64 overflow-y-auto">
                                                                 {selectedApp.application.stageHistory.map((h, idx) => (
-                                                                    <TableRow key={idx}>
+                                                                    <TableRow
+                                                                        key={idx}
+                                                                        className={` ${idx % 2 === 0 ? "bg-background" : "bg-muted"
+                                                                            }`}
+                                                                    >
                                                                         <TableCell>{h.stage.name}</TableCell>
                                                                         <TableCell>{h.movedBy?.name || "System"}</TableCell>
                                                                         <TableCell>{new Date(h.movedAt).toLocaleDateString()}</TableCell>
@@ -215,7 +235,7 @@ export default function Applications() {
                                                         <div className="mt-4">
                                                             <Label>Move to Stage</Label>
                                                             <Select onValueChange={(val) => handleMove(selectedApp.application.id, val)}>
-                                                                <SelectTrigger>
+                                                                <SelectTrigger className='w-full'>
                                                                     <SelectValue placeholder="Select stage" />
                                                                 </SelectTrigger>
                                                                 <SelectContent>
@@ -230,7 +250,7 @@ export default function Applications() {
                                                 ) : null}
                                             </DialogContent>
                                         </Dialog>
-                                        <Button size="sm" variant="outline" onClick={() => handleMove(app.id, app.currentStage.id)}>Assign to Screening</Button>
+                                        {/* <Button size="sm" variant="outline" onClick={() => handleMove(app.id, app.currentStage.id)}>Assign to Screening</Button> */}
                                     </TableCell>
                                 </TableRow>
                             ))
@@ -241,6 +261,7 @@ export default function Applications() {
                         )}
                     </TableBody>
                 </Table>
+
             </div>
         </div>
     );

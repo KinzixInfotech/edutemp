@@ -11,7 +11,7 @@ import { Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 async function fetchTestApplications(schoolId) {
-    const response = await fetch(`/api/schools/admissions/applications?schoolId=${schoolId}&stageId=test-interview-id`); // Assume stage id
+    const response = await fetch(`/api/schools/admissions/applications?schoolId=${schoolId}`); // Assume stage id
     if (!response.ok) throw new Error("Failed to fetch test applications");
     return response.json();
 }
