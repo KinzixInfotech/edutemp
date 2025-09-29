@@ -59,10 +59,6 @@ import prisma from "@/lib/prisma";
 // }
 
 // app/api/schools/admissions/applications/[id]/move/route.js
-import { NextResponse } from "next/server";
-import { z } from "zod";
-import prisma from "@/lib/prisma";
-
 const moveSchema = z.object({
   stageId: z.string().uuid(),
   movedById: z.string().uuid().optional(),
