@@ -128,7 +128,7 @@ function defineStepper(...steps) {
                 const childMap = useStepChildren(children);
 
                 const title = childMap.get("title");
-                console.log(title);
+                // console.log(title);
 
                 const description = childMap.get("description");
                 const panel = childMap.get("panel");
@@ -138,7 +138,7 @@ function defineStepper(...steps) {
                         <li
                             date-component="stepper-step"
                             className={cn(
-                                "flex shrink-0 items-center gap-4 rounded-md transition-colors",
+                                "flex  shrink-0 items-center gap-4 rounded-md transition-colors",
                                 className
                             )}
                         >
@@ -150,7 +150,7 @@ function defineStepper(...steps) {
                                 date-component="stepper-step-content"
                                 className="flex flex-col items-start gap-1"
                             >
-                                {title}
+                                {title} 
                                 {description}
                             </div>
                         </li>

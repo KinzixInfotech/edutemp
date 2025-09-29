@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import Link from 'next/link';
 import { useAuth } from "@/context/AuthContext";
 import { Label } from "recharts";
 
@@ -83,23 +84,23 @@ export default function Applications() {
         enabled: !!schoolId,
     });
 
-    const { data: selectedApp, isLoading: appLoading } = useQuery({
-        queryKey: ["application", selectedApplication?.id],
-        queryFn: () => fetchApplication(selectedApplication?.id),
-        enabled: !!selectedApplication?.id,
-    });
+    // const { data: selectedApp, isLoading: appLoading } = useQuery({
+    //     queryKey: ["application", selectedApplication?.id],
+    //     queryFn: () => fetchApplication(selectedApplication?.id),
+    //     enabled: !!selectedApplication?.id,
+    // });
 
 
-    const moveMutation = useMutation({
-        mutationFn: moveApplication,
-        onSuccess: () => {
-            queryClient.invalidateQueries(["applications"]);
-            toast.success("Application moved");
-            setNotes("");
-            setSelectedApplication(null);
-        },
-        onError: () => toast.error("Failed to move"),
-    });
+    // const moveMutation = useMutation({
+    //     mutationFn: moveApplication,
+    //     onSuccess: () => {
+    //         queryClient.invalidateQueries(["applications"]);
+    //         toast.success("Application moved");
+    //         setNotes("");
+    //         setSelectedApplication(null);
+    //     },
+    //     onError: () => toast.error("Failed to move"),
+    // });
 
     const handleMove = (id, stageId) => {
         console.log(id, stageId, 'move hanlder');
@@ -176,81 +177,9 @@ export default function Applications() {
                                     <TableCell>{new Date(app.submittedAt).toLocaleDateString()}</TableCell>
                                     <TableCell>{app.currentStage.name}</TableCell>
                                     <TableCell className="flex gap-2">
-                                        <Dialog>
-                                            <DialogTrigger asChild>
-                                                <Button size="sm" variant="outline" onClick={() => setSelectedApplication(app)}>
-                                                    View
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent className="max-w-3xl">
-                                                <DialogHeader>
-                                                    <DialogTitle>{selectedApplication?.applicantName}</DialogTitle>
-                                                </DialogHeader>
-                                                {appLoading ? (
-                                                    <div className="w-full h-full flex items-center justify-center">
-                                                        <Loader2 className="animate-spin" size={30} />
-                                                    </div>
-                                                ) : selectedApp ? (
-                                                    <div>
-                                                        <p>Email: <span className="border-b-2"> {selectedApp.application.applicantEmail}</span></p>
-                                                        <div className="flex flex-row gap-2.5">
-                                                            <Button size="sm" className='my-2' variant="outline">
-                                                                View Data
-                                                            </Button>
-                                                            <Button size="sm" className='my-2' variant="outline">
-                                                                View Documents
-                                                            </Button>
-                                                        </div>
-
-                                                        {/* <p>Data: {JSON.stringify(selectedApp.application.data)}</p> */}
-                                                        {/* <h3>Documents</h3>
-                                                        {selectedApp.application.documents.map(doc => (
-                                                            <a key={doc.id} href={doc.fileUrl}>{doc.fileName}</a>
-                                                        ))} */}
-                                                        <h3>Stage History</h3>
-                                                        <Table>
-                                                            <TableHeader>
-                                                                <TableRow>
-                                                                    <TableHead>Stage</TableHead>
-                                                                    <TableHead>Moved By</TableHead>
-                                                                    <TableHead>Date</TableHead>
-                                                                    <TableHead>Notes</TableHead>
-                                                                </TableRow>
-                                                            </TableHeader>
-                                                            <TableBody className="w-full  max-h-64 overflow-y-auto">
-                                                                {selectedApp.application.stageHistory.map((h, idx) => (
-                                                                    <TableRow
-                                                                        key={idx}
-                                                                        className={` ${idx % 2 === 0 ? "bg-background" : "bg-muted"
-                                                                            }`}
-                                                                    >
-                                                                        <TableCell>{h.stage.name}</TableCell>
-                                                                        <TableCell>{h.movedBy?.name || "System"}</TableCell>
-                                                                        <TableCell>{new Date(h.movedAt).toLocaleDateString()}</TableCell>
-                                                                        <TableCell>{h.notes}</TableCell>
-                                                                    </TableRow>
-                                                                ))}
-                                                            </TableBody>
-                                                        </Table>
-                                                        <div className="mt-4">
-                                                            <Label>Move to Stage</Label>
-                                                            <Select onValueChange={(val) => handleMove(selectedApp.application.id, val)}>
-                                                                <SelectTrigger className='w-full'>
-                                                                    <SelectValue placeholder="Select stage" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    {stages.map((stage) => (
-                                                                        <SelectItem key={stage.id} value={stage.id}>{stage.name}</SelectItem>
-                                                                    ))}
-                                                                </SelectContent>
-                                                            </Select>
-                                                            <Input placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-2" />
-                                                        </div>
-                                                    </div>
-                                                ) : null}
-                                            </DialogContent>
-                                        </Dialog>
-                                        {/* <Button size="sm" variant="outline" onClick={() => handleMove(app.id, app.currentStage.id)}>Assign to Screening</Button> */}
+                                        <Link href={`applications/${app.id}/view`}>
+                                            <Button size="sm" variant="outline">View</Button>
+                                        </Link>
                                     </TableCell>
                                 </TableRow>
                             ))
