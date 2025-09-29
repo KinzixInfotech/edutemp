@@ -67,6 +67,31 @@ const sidebarData = [
         ],
     },
     {
+        title: "Admission  Management",
+        items: [
+            {
+                label: "Manage Admission",
+                icon: BookCopy,
+                roles: ["ADMIN"],
+                submenu: [
+                    {
+                        label: "OverView", url: "/dashboard/schools/admissions/overview", roles: ["ADMIN"]
+                    },
+                    { label: "Form Builder/Settings", url: "/dashboard/schools/admissions/form-settings", roles: ["ADMIN"] },
+                    { label: "Registration Fee", url: "/dashboard/schools/admissions/fees-verification", roles: ["ADMIN"] },
+                    { label: "All Applications", url: "/dashboard/schools/admissions/applications", roles: ["ADMIN"] },
+                    { label: "Enrolled Students", url: "/dashboard/schools/admissions/enrolled", roles: ["ADMIN"] },
+                    { label: "Waitlist/Rejected", url: "/dashboard/schools/admissions/waitlist-rejected", roles: ["ADMIN"] },
+                    // { label: "Screening", url: "/dashboard/schools/admissions/screening", roles: ["ADMIN"] },
+                    // { label: "Shortlisting", url: "/dashboard/schools/admissions/shortlisting", roles: ["ADMIN"] },
+                    // { label: "Tests/Interviews", url: "/dashboard/schools/admissions/test-interviews", roles: ["ADMIN"] },
+                    // { label: "Offers", url: "/dashboard/schools/admissions/offers", roles: ["ADMIN"] },
+
+                ],
+            },
+        ],
+    },
+    {
         title: "Manage Classes",
         items: [
             { label: "Manage Classes", url: "/dashboard/schools/create-classes", icon: BookMarked, roles: ["ADMIN"] },
@@ -160,31 +185,7 @@ const sidebarData = [
             },
         ],
     },
-    {
-        title: "Admission  Management",
-        items: [
-            {
-                label: "Manage Admission",
-                icon: BookCopy,
-                roles: ["ADMIN"],
-                submenu: [
-                    {
-                        label: "OverView", url: "/dashboard/schools/admissions/overview", roles: ["ADMIN"]
-                    },
-                    { label: "Form Builder/Settings", url: "/dashboard/schools/admissions/form-settings", roles: ["ADMIN"] },
-                    { label: "Registration Fee", url: "/dashboard/schools/admissions/fees-verification", roles: ["ADMIN"] },
-                    { label: "All Applications", url: "/dashboard/schools/admissions/applications", roles: ["ADMIN"] },
-                    { label: "Enrolled Students", url: "/dashboard/schools/admissions/enrolled", roles: ["ADMIN"] },
-                    { label: "Waitlist/Rejected", url: "/dashboard/schools/admissions/waitlist-rejected", roles: ["ADMIN"] },
-                    // { label: "Screening", url: "/dashboard/schools/admissions/screening", roles: ["ADMIN"] },
-                    // { label: "Shortlisting", url: "/dashboard/schools/admissions/shortlisting", roles: ["ADMIN"] },
-                    // { label: "Tests/Interviews", url: "/dashboard/schools/admissions/test-interviews", roles: ["ADMIN"] },
-                    // { label: "Offers", url: "/dashboard/schools/admissions/offers", roles: ["ADMIN"] },
 
-                ],
-            },
-        ],
-    },
     {
         title: "Edu Employees",
         items: [
