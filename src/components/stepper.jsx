@@ -4,6 +4,7 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useMemo } from "react";
 
 const StepperContext = React.createContext(null);
 
@@ -13,6 +14,34 @@ function useStepperProvider() {
         throw new Error("useStepper must be used within a StepperProvider.");
     }
     return context;
+}
+
+function Title({ children, className, asChild, ...props }) {
+    const Comp = asChild ? Slot : "h4";
+
+    return (
+        <Comp
+            date-component="stepper-step-title"
+            className={cn("text-base font-medium", className)}
+            {...props}
+        >
+            {children}
+        </Comp>
+    );
+}
+
+function Description({ children, className, asChild, ...props }) {
+    const Comp = asChild ? Slot : "p";
+
+    return (
+        <Comp
+            date-component="stepper-step-description"
+            className={cn("text-sm text-muted-foreground", className)}
+            {...props}
+        >
+            {children}
+        </Comp>
+    );
 }
 
 function defineStepper(...steps) {
@@ -99,6 +128,8 @@ function defineStepper(...steps) {
                 const childMap = useStepChildren(children);
 
                 const title = childMap.get("title");
+                console.log(title);
+
                 const description = childMap.get("description");
                 const panel = childMap.get("panel");
 
@@ -212,32 +243,8 @@ function defineStepper(...steps) {
                     </>
                 );
             },
-            Title: ({ children, className, asChild, ...props }) => {
-                const Comp = asChild ? Slot : "h4";
-
-                return (
-                    <Comp
-                        date-component="stepper-step-title"
-                        className={cn("text-base font-medium", className)}
-                        {...props}
-                    >
-                        {children}
-                    </Comp>
-                );
-            },
-            Description: ({ children, className, asChild, ...props }) => {
-                const Comp = asChild ? Slot : "p";
-
-                return (
-                    <Comp
-                        date-component="stepper-step-description"
-                        className={cn("text-sm text-muted-foreground", className)}
-                        {...props}
-                    >
-                        {children}
-                    </Comp>
-                );
-            },
+            Title,
+            Description,
             Panel: ({ children, asChild, ...props }) => {
                 const Comp = asChild ? Slot : "div";
                 const { tracking } = useStepperProvider();
@@ -266,34 +273,6 @@ function defineStepper(...steps) {
             },
         },
     };
-}
-
-function Title({ children, className, asChild, ...props }) {
-    const Comp = asChild ? Slot : "h4";
-
-    return (
-        <Comp
-            date-component="stepper-step-title"
-            className={cn("text-base font-medium", className)}
-            {...props}
-        >
-            {children}
-        </Comp>
-    );
-}
-
-function Description({ children, className, asChild, ...props }) {
-    const Comp = asChild ? Slot : "p";
-
-    return (
-        <Comp
-            date-component="stepper-step-description"
-            className={cn("text-sm text-muted-foreground", className)}
-            {...props}
-        >
-            {children}
-        </Comp>
-    );
 }
 
 function StepperSeparator({
@@ -393,7 +372,7 @@ function scrollIntoStepperPanel(node, tracking) {
 }
 
 function useStepChildren(children) {
-    return React.useMemo(() => extractChildren(children), [children]);
+    return useMemo(() => extractChildren(children), [children]);
 }
 
 function extractChildren(children) {

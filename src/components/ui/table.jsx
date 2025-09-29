@@ -84,20 +84,48 @@ function TableHead({
   );
 }
 
-function TableCell({
-  className,
-  ...props
-}) {
+// function TableCell({
+//   className,
+//   ...props
+// }) {
+//   return (
+//     <td
+//       data-slot="table-cell"
+//       className={cn(
+//         "p-2 align-middle border border-b-0 border-t-0 whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+//         className
+//       )}
+//       {...props} />
+//   );
+// }
+
+function TableCell({ className, ...props }) {
   return (
     <td
       data-slot="table-cell"
       className={cn(
-        "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "p-2 align-middle whitespace-nowrap border border-b-0 border-t-0", // base borders
+        "first:border-l-0 last:border-r-0", // remove left for first, right for last
+        "[&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         className
       )}
-      {...props} />
-  );
+      {...props}
+    />
+  )
 }
+// function TableCell({ className, ...props }) {
+//   return (
+//     <td
+//       data-slot="table-cell"
+//       className={cn(
+//         "p-2 align-middle whitespace-nowrap border", // 👈 added border here
+//         "[&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+//         className
+//       )}
+//       {...props}
+//     />
+//   )
+// }
 
 function TableCaption({
   className,

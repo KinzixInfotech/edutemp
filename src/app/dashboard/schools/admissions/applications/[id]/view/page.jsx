@@ -11,7 +11,7 @@ import { ArrowRight, Star, X } from "lucide-react";
 import { useParams } from "next/navigation";
 import { defineStepper } from "@/components/stepper";
 import { Fragment } from "react";
-
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 async function fetchJobApplication(jobId) {
     // Dummy data for now; replace with real API fetch in the future
@@ -88,8 +88,8 @@ export default function JobApplicationDetails() {
                                         of={step.id}
                                         onClick={() => methods.goTo(step.id)}
                                     >
-                                        {step.title}
-                                        <Stepper.Title className='text-blue-100'>{step.title}</Stepper.Title>
+                                        {/* {step.title} */}
+                                        <Stepper.Title>{step.title}</Stepper.Title>
                                         <Stepper.Description>{step.description}</Stepper.Description>
                                     </Stepper.Step>
                                 ))}
@@ -118,99 +118,74 @@ export default function JobApplicationDetails() {
                     )}
                 </Stepper.Provider>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card>
-                    <CardHeader>
-                        <h2 className="text-xl font-semibold">Candidate Information</h2>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        {isLoading ? (
-                            <>
-                                {Array(6)
-                                    .fill(0)
-                                    .map((_, index) => (
-                                        <Skeleton key={index} className="h-6 w-full" />
-                                    ))}
-                            </>
-                        ) : (
-                            <>
-                                <div className="flex justify-between items-center">
-                                    <Label>Job Id</Label>
-                                    <span>{data?.id}</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <Label>Owner</Label>
-                                    <div className="flex items-center">
-                                        <span>{data?.owner}</span>
-                                        <Star className="ml-2 h-4 w-4 text-purple-500" />
-                                    </div>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <Label>Candidate Name</Label>
-                                    <span>{data?.candidateName}</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <Label>Stages</Label>
-                                    <Badge>{data?.stage}</Badge>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <Label>Offer Extended</Label>
-                                    <span>{data?.offerAmount}</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <Label>Notice Period</Label>
-                                    <span>{data?.noticePeriod}</span>
-                                </div>
-                            </>
-                        )}
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <h2 className="text-xl font-semibold">Details</h2>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        {isLoading ? (
-                            <>
-                                {Array(6)
-                                    .fill(0)
-                                    .map((_, index) => (
-                                        <Skeleton key={index} className="h-6 w-full" />
-                                    ))}
-                            </>
-                        ) : (
-                            <>
-                                <div className="flex justify-between items-center">
-                                    <Label>Job Id</Label>
-                                    <span>{data?.id}</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <Label>Owner</Label>
-                                    <div className="flex items-center">
-                                        <span>{data?.owner}</span>
-                                        <Star className="ml-2 h-4 w-4 text-purple-500" />
-                                    </div>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <Label>Candidate Name</Label>
-                                    <span>{data?.candidateName}</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <Label>Stages</Label>
-                                    <Badge>{data?.stage}</Badge>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <Label>Offer Extended</Label>
-                                    <span>{data?.offerAmount}</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <Label>Notice Period</Label>
-                                    <span>{data?.noticePeriod}</span>
-                                </div>
-                            </>
-                        )}
-                    </CardContent>
-                </Card>
+            <div>
+                <div className="overflow-x-auto rounded-lg border w-full">
+                    <Table className="min-w-full">
+                        <TableHeader>
+                            <TableRow className="bg-muted sticky top-0 z-10">
+                                <TableHead>#</TableHead>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Description</TableHead>
+                                <TableHead>Fields</TableHead>
+                                <TableHead>Link</TableHead>
+                                <TableHead>Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {/* {formsLoading ? (
+                                Array(6).fill(0).map((_, index) => (
+                                    <TableRow key={index}>
+                                        <TableCell><Skeleton className="h-6 w-6" /></TableCell>
+                                        <TableCell><Skeleton className="h-6 w-32" /></TableCell>
+                                        <TableCell><Skeleton className="h-6 w-32" /></TableCell>
+                                        <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+                                        <TableCell><Skeleton className="h-6 w-32" /></TableCell>
+                                        <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                                    </TableRow>
+                                ))
+                            ) : forms.length > 0 ? (
+                                forms.map((form, index) => (
+                                    <TableRow key={form.id} className={index % 2 === 0 ? "bg-muted" : "bg-background"}>
+                                        <TableCell>{index + 1}</TableCell>
+                                        <TableCell>{form.name}</TableCell>
+                                        <TableCell>{form.description}</TableCell>
+                                        <TableCell>{form.fields.length}</TableCell>
+                                        <TableCell>{form.slug ? `/admissions/${form.slug}` : "Not generated"}</TableCell>
+                                        <TableCell className="flex gap-2">
+                                            <Button size="sm" variant="outline" onClick={() => handleEditForm(form)}>Edit</Button>
+                                            <Button size="sm" variant="destructive" onClick={() => handleDeleteForm(form.id)}>Delete</Button>
+                                            <Button size="sm" variant="outline" onClick={() => handleGenerateLink(form.id)}>Generate Link</Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="text-center py-4">No forms found.</TableCell>
+                                </TableRow>
+                            )} */}
+                            <TableRow>
+                                <TableCell>
+                                    5
+                                </TableCell>
+                                <TableCell>
+                                    Mansha Jami
+                                </TableCell>
+                                <TableCell>
+                                    Mansha Jami
+                                </TableCell>
+                                <TableCell>
+                                    Mansha Jami
+                                </TableCell>
+                                <TableCell>
+                                    Mansha Jami
+                                </TableCell>
+                                <TableCell>
+                                    Mansha Jami
+                                </TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+                </div>
             </div>
         </div>
     );
