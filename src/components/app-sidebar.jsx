@@ -51,22 +51,6 @@ const sidebarData = [
         ],
     },
     {
-        title: "Staff Management",
-        items: [
-            {
-                label: "Manage Staff", url: "/dashboard/schools/manage-teaching-staff", icon: UserPen, roles: ["ADMIN"],
-                submenu: [
-                    { label: "Manage Teaching Staff", url: "/dashboard/schools/manage-teaching-staff", roles: ["ADMIN"] },
-                    { label: "Manage Non Teaching Staff", url: "/dashboard/schools/manage-non-teaching-staff", roles: ["ADMIN"] },
-                    // { label: "Fee Strcuture", url: "/dashboard/fees/manage-fee-structure", roles: ["ADMIN"] },
-                    // { label: "Report", url: "/dashboard/fees/manage-fee-structure", roles: ["ADMIN"] },
-                ],
-            },
-
-            { label: "All Schools", url: "/dashboard/schools/all-schools", icon: IconDatabase, roles: ['SUPER_ADMIN'] },
-        ],
-    },
-    {
         title: "Admission  Management",
         items: [
             {
@@ -91,6 +75,23 @@ const sidebarData = [
             },
         ],
     },
+    {
+        title: "Staff Management",
+        items: [
+            {
+                label: "Manage Staff", url: "/dashboard/schools/manage-teaching-staff", icon: UserPen, roles: ["ADMIN"],
+                submenu: [
+                    { label: "Manage Teaching Staff", url: "/dashboard/schools/manage-teaching-staff", roles: ["ADMIN"] },
+                    { label: "Manage Non Teaching Staff", url: "/dashboard/schools/manage-non-teaching-staff", roles: ["ADMIN"] },
+                    // { label: "Fee Strcuture", url: "/dashboard/fees/manage-fee-structure", roles: ["ADMIN"] },
+                    // { label: "Report", url: "/dashboard/fees/manage-fee-structure", roles: ["ADMIN"] },
+                ],
+            },
+
+            { label: "All Schools", url: "/dashboard/schools/all-schools", icon: IconDatabase, roles: ['SUPER_ADMIN'] },
+        ],
+    },
+
     {
         title: "Manage Classes",
         items: [
