@@ -68,11 +68,11 @@ export default function ApplicationDetails() {
         onError: (err) => toast.error(`Failed to save: ${err.message}`),
     });
 
-     if (stagesLoading || appLoading) {
+    if (stagesLoading || appLoading) {
         return <LoaderPage />
     }
 
-    
+
     if (!application) {
         return <div className="p-6 text-center text-red-500">Application not found</div>;
     }
@@ -114,15 +114,15 @@ export default function ApplicationDetails() {
                 return (
                     <div className="space-y-4">
                         <div>
-                            <Label>Applicant Name</Label>
+                            <Label className='mb-4'>Applicant Name</Label>
                             <Input value={application.applicantName} disabled />
                         </div>
                         <div>
-                            <Label>Email</Label>
+                            <Label className='mb-4'>Email</Label>
                             <Input value={application.applicantEmail} disabled />
                         </div>
                         <div>
-                            <Label>Comments</Label>
+                            <Label className='mb-4'>Comments</Label>
                             <Input
                                 placeholder="Add comments"
                                 value={stageData.notes || ""}
@@ -135,7 +135,7 @@ export default function ApplicationDetails() {
                 return (
                     <div className="space-y-4">
                         <div>
-                            <Label>Eligibility Notes</Label>
+                            <Label className='mb-4'>Eligibility Notes</Label>
                             <Input
                                 placeholder="Enter eligibility notes"
                                 value={stageData.eligibilityNotes || ""}
@@ -143,7 +143,7 @@ export default function ApplicationDetails() {
                             />
                         </div>
                         <div>
-                            <Label>Comments</Label>
+                            <Label className='mb-4'>Comments</Label>
                             <Input
                                 placeholder="Add comments"
                                 value={stageData.notes || ""}
@@ -156,7 +156,7 @@ export default function ApplicationDetails() {
                 return (
                     <div className="space-y-4">
                         <div>
-                            <Label>Test Score</Label>
+                            <Label className='mb-4'>Test Score</Label>
                             <Input
                                 type="number"
                                 placeholder="Enter test score"
@@ -165,7 +165,7 @@ export default function ApplicationDetails() {
                             />
                         </div>
                         <div>
-                            <Label>Interview Date</Label>
+                            <Label className='mb-4'>Interview Date</Label>
                             <Input
                                 type="date"
                                 value={stageData.interviewDate || ""}
@@ -173,7 +173,7 @@ export default function ApplicationDetails() {
                             />
                         </div>
                         <div>
-                            <Label>Comments</Label>
+                            <Label className='mb-4'>Comments</Label>
                             <Input
                                 placeholder="Add comments"
                                 value={stageData.notes || ""}
@@ -186,7 +186,7 @@ export default function ApplicationDetails() {
                 return (
                     <div className="space-y-4">
                         <div>
-                            <Label>Offer Amount</Label>
+                            <Label className='mb-4'>Offer Amount</Label>
                             <Input
                                 placeholder="Enter offer amount"
                                 value={stageData.offerAmount || application.offerAmount || ""}
@@ -194,7 +194,7 @@ export default function ApplicationDetails() {
                             />
                         </div>
                         <div>
-                            <Label>Notice Period</Label>
+                            <Label className='mb-4'>Notice Period</Label>
                             <Input
                                 placeholder="Enter notice period"
                                 value={stageData.noticePeriod || application.noticePeriod || ""}
@@ -202,7 +202,7 @@ export default function ApplicationDetails() {
                             />
                         </div>
                         <div>
-                            <Label>Comments</Label>
+                            <Label className='mb-4'>Comments</Label>
                             <Input
                                 placeholder="Add comments"
                                 value={stageData.notes || ""}
@@ -215,7 +215,7 @@ export default function ApplicationDetails() {
                 return (
                     <div className="space-y-4">
                         <div>
-                            <Label>Fee Status</Label>
+                            <Label className='mb-4'>Fee Status</Label>
                             <Input
                                 placeholder="Enter fee status"
                                 value={stageData.feeStatus || ""}
@@ -223,7 +223,7 @@ export default function ApplicationDetails() {
                             />
                         </div>
                         <div>
-                            <Label>Comments</Label>
+                            <Label className='mb-4'>Comments</Label>
                             <Input
                                 placeholder="Add comments"
                                 value={stageData.notes || ""}
@@ -237,7 +237,7 @@ export default function ApplicationDetails() {
                 return (
                     <div className="space-y-4">
                         <div>
-                            <Label>Class Assigned</Label>
+                            <Label className='mb-4'>Class Assigned</Label>
                             <Input
                                 placeholder="Enter class assigned"
                                 value={stageData.classAssigned || ""}
@@ -245,7 +245,7 @@ export default function ApplicationDetails() {
                             />
                         </div>
                         <div>
-                            <Label>Roll Number</Label>
+                            <Label className='mb-4'>Roll Number</Label>
                             <Input
                                 placeholder="Enter roll number"
                                 value={stageData.rollNumber || ""}
@@ -253,7 +253,7 @@ export default function ApplicationDetails() {
                             />
                         </div>
                         <div>
-                            <Label>Comments</Label>
+                            <Label className='mb-4'>Comments</Label>
                             <Input
                                 placeholder="Add comments"
                                 value={stageData.notes || ""}
@@ -266,7 +266,7 @@ export default function ApplicationDetails() {
                 return (
                     <div className="space-y-4">
                         <div>
-                            <Label>Waitlist Position</Label>
+                            <Label className='mb-4'>Waitlist Position</Label>
                             <Input
                                 placeholder="Enter waitlist position"
                                 value={stageData.waitlistPosition || ""}
@@ -274,7 +274,7 @@ export default function ApplicationDetails() {
                             />
                         </div>
                         <div>
-                            <Label>Comments</Label>
+                            <Label className='mb-4'>Comments</Label>
                             <Input
                                 placeholder="Add comments"
                                 value={stageData.notes || ""}
@@ -288,7 +288,7 @@ export default function ApplicationDetails() {
                 return (
                     <div className="space-y-4">
                         <div>
-                            <Label>Rejection Reason</Label>
+                            <Label className='mb-4'>Rejection Reason</Label>
                             <Input
                                 placeholder="Enter rejection reason"
                                 value={stageData.rejectionReason || ""}
@@ -296,7 +296,7 @@ export default function ApplicationDetails() {
                             />
                         </div>
                         <div>
-                            <Label>Comments</Label>
+                            <Label className='mb-4'>Comments</Label>
                             <Input
                                 placeholder="Add comments"
                                 value={stageData.notes || ""}
