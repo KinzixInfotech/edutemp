@@ -10,9 +10,7 @@ import { Profile } from '@/components/profile';
 export default async function RootLayout({ children }) {
 
     return (
-
         <AuthProvider>
-
             <SettingsDialogProvider>
                 <LoaderProvider>
 

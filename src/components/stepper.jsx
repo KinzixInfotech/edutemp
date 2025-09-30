@@ -5,6 +5,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useMemo } from "react";
+import { Check } from "lucide-react";
 
 const StepperContext = React.createContext(null);
 
@@ -150,7 +151,7 @@ function defineStepper(...steps) {
                                 date-component="stepper-step-content"
                                 className="flex flex-col items-start gap-1"
                             >
-                                {title} 
+                                {title}
                                 {description}
                             </div>
                         </li>
@@ -196,7 +197,8 @@ function defineStepper(...steps) {
                                 }
                                 {...props}
                             >
-                                {icon || stepIndex + 1}
+                                {/* {icon || stepIndex + 1} */}
+                                {dataState === "completed" ? <Check strokeWidth={2.75} size={25} /> : stepIndex + 1}
                             </Button>
                             {variant === "horizontal" && labelOrientation === "vertical" && (
                                 <StepperSeparator
