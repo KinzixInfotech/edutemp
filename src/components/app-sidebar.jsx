@@ -70,7 +70,6 @@ const sidebarData = [
                     // { label: "Shortlisting", url: "/dashboard/schools/admissions/shortlisting", roles: ["ADMIN"] },
                     // { label: "Tests/Interviews", url: "/dashboard/schools/admissions/test-interviews", roles: ["ADMIN"] },
                     // { label: "Offers", url: "/dashboard/schools/admissions/offers", roles: ["ADMIN"] },
-
                 ],
             },
         ],

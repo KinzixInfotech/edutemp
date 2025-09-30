@@ -58,8 +58,19 @@ export default function SubmitApplication({ formId }) {
         },
     });
 
+    // const handleChange = (fieldId, value) => {
+    //     setFormData({ ...formData, [fieldId]: value });
+    // };
+
     const handleChange = (fieldId, value) => {
-        setFormData({ ...formData, [fieldId]: value });
+        const fieldEl = document.getElementById(fieldId);
+        const fieldName = fieldEl?.name || "";
+
+        setFormData((prev) => ({
+            ...prev,
+            [fieldId]: value,
+            [`${fieldId}_meta`]: { id: fieldId, name: fieldName },
+        }));
     };
 
     const handleSubmit = () => {
@@ -79,7 +90,10 @@ export default function SubmitApplication({ formId }) {
         const dynamicData = {};
         form.fields.forEach((field) => {
             if (formData[field.id] !== undefined && formData[field.id] !== "") {
-                dynamicData[field.id] = formData[field.id];
+                dynamicData[field.id] = {
+                    value: formData[field.id],
+                    name: formData[`${field.id}_meta`]?.name || ""
+                };
             }
         });
 

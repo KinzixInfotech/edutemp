@@ -92,53 +92,55 @@ export default function ClientLayout({ children }) {
     };
 
     return (
-        
-            <QueryClientProvider client={queryClient}>
-                <SidebarProvider
-                    style={{
-                        "--sidebar-width": "calc(var(--spacing) * 72)",
-                        "--header-height": "calc(var(--spacing) * 12)",
-                    }}
-                >
-                    <OnboardingDialog />
-                    {!hideUI && <AppSidebar variant="inset" />}
-                    <TopProgressBar />
-                    <SidebarInset>
-                        {!hideUI && <SiteHeader />}
-                        <main className="w-full h-full relative">
-                            {loading ? (
-                                <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-50">
-                                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                                </div>
-                            ) : (
-                                children
-                            )}
-                        </main>
-                        <footer className="w-full border-t bg-muted dark:bg-muted/30 rounded-b-lg  text-xs text-muted-foreground mt-8">
-                            <div className="max-w-7xl mx-auto px-4 py-3  flex flex-col md:flex-row justify-between items-center gap-2">
-                                <div className="flex items-center gap-2">
-                                    {/* <span className="font-medium">System Status:</span> */}
-                                    {status ? (
-                                        <span
-                                            className={`${getStatusStyles(status.indicator)} px-2 py-1.5 rounded-full`}
-                                        >
-                                            {status.description}
-                                        </span>
-                                    ) : (
-                                        <Skeleton className="h-6 w-48 rounded-full" />
-                                    )}
-                                </div>
 
-                                <div className="flex items-center gap-4">
-                                    <span>Dashboard Version: <strong>v{pkg.version}</strong></span>
-                                    <span className="text-muted-foreground">A Kinzix Product</span>
-                                </div>
+        <QueryClientProvider client={queryClient}>
+            <SidebarProvider
+                style={{
+                    "--sidebar-width": "calc(var(--spacing) * 72)",
+                    "--header-height": "calc(var(--spacing) * 12)",
+                }}
+            >
+                <OnboardingDialog />
+                {!hideUI && <AppSidebar variant="inset" />}
+                <TopProgressBar />
+               
+                <SidebarInset>
+                    
+                    {!hideUI && <SiteHeader />}
+                    <main className="w-full h-full relative">
+                        {loading ? (
+                            <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-50">
+                                <Loader2 className="h-10 w-10 animate-spin text-primary" />
                             </div>
-                        </footer>
+                        ) : (
+                            children
+                        )}
+                    </main>
+                    <footer className="w-full border-t bg-muted dark:bg-muted/30 rounded-b-lg  text-xs text-muted-foreground mt-8">
+                        <div className="max-w-7xl mx-auto px-4 py-3  flex flex-col md:flex-row justify-between items-center gap-2">
+                            <div className="flex items-center gap-2">
+                                {/* <span className="font-medium">System Status:</span> */}
+                                {status ? (
+                                    <span
+                                        className={`${getStatusStyles(status.indicator)} px-2 py-1.5 rounded-full`}
+                                    >
+                                        {status.description}
+                                    </span>
+                                ) : (
+                                    <Skeleton className="h-6 w-48 rounded-full" />
+                                )}
+                            </div>
 
-                    </SidebarInset>
-                </SidebarProvider>
-            </QueryClientProvider>
-        
+                            <div className="flex items-center gap-4">
+                                <span>Dashboard Version: <strong>v{pkg.version}</strong></span>
+                                <span className="text-muted-foreground">A Kinzix Product</span>
+                            </div>
+                        </div>
+                    </footer>
+
+                </SidebarInset>
+            </SidebarProvider>
+        </QueryClientProvider>
+
     );
 }

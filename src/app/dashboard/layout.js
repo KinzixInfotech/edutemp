@@ -12,10 +12,14 @@ export default async function RootLayout({ children }) {
     return (
 
         <AuthProvider>
+
             <SettingsDialogProvider>
                 <LoaderProvider>
+
                     <ThemeProvider attribute="class" defaultTheme="system" enableSystem >
+                 
                         <ClientLayout>{children}</ClientLayout>
+
                         <Toaster
                             theme="system"
                             toastOptions={{

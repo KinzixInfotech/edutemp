@@ -107,7 +107,7 @@ const LatestNotice = ({ fullUser, queryClient }) => {
         queryFn: fetchLatestNotice
       });
     }
-  }, [fullUser, queryClient]);
+  }, [fullUser?.schoolId, queryClient]);
 
   // Use the query to access data
   const { data: latestNotice, isLoading, error } = useQuery({
