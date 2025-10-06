@@ -598,7 +598,7 @@ export default function ApplicationDetails() {
                                     </div>
 
                                     <Stepper.Controls className="mt-4 w-full flex justify-between ">
-                                        <div></div>
+                                        {/* <div></div> */}
                                         <div className="flex gap-3">
                                             <Button type="button" variant="secondary" onClick={methods.prev} disabled={methods.isFirst}>
                                                 Previous
@@ -613,7 +613,7 @@ export default function ApplicationDetails() {
                                         >
                                             {application.currentStage.id === methods.current.id
                                                 ? 'Marked'
-                                                : `Marked`}
+                                                : `Mark`}
                                         </Button>
                                     </Stepper.Controls>
                                 </>

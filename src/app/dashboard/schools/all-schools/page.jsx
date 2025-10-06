@@ -151,30 +151,19 @@ export default function Page() {
                         ) : (
                             schools.map((school) => (
                                 <TableRow key={school.id}>
-                                    <TableCell >
-                                        {school.schoolCode}</TableCell>
+                                    <TableCell>{school.schoolCode}</TableCell>
                                     <TableCell>{school.name}</TableCell>
                                     <TableCell>{school.location}</TableCell>
                                     {/* <TableCell>{school.adminem}</TableCell> */}
                                     <TableCell>{school.contactNumber}</TableCell>
                                     <TableCell>
-                                        <img src={school.profilePicture} className="w-7 h-7" />
+                                        <img src={school.profilePicture} className="w-7 h-7 rounded-full" />
                                     </TableCell>
                                     <TableCell>{school.domain}</TableCell>
                                     <TableCell className="text-right space-x-2">
                                         <Link href={`/dashboard/schools/${school.id}/manage`}>
                                             <Button size="sm" variant="outline">View</Button>
                                         </Link>
-                                        {/* <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => {
-                                                setEditSchool(school)
-                                                setEditDrawerOpen(true)
-                                            }}
-                                        >
-                                            Edit
-                                        </Button> */}
                                     </TableCell>
                                 </TableRow>
                             ))

@@ -141,9 +141,9 @@ export default function Applications() {
                     </SelectContent>
                 </Select>
             </div>
-            <div className="overflow-x-auto rounded-lg border">
+            <div className="overflow-x-auto rounded-lg border bg-">
                 <Table className="min-w-[800px]">
-                    <TableHeader>
+                    <TableHeader >
                         <TableRow className="bg-muted sticky top-0 z-10">
                             <TableHead>#</TableHead>
                             <TableHead>Name</TableHead>
