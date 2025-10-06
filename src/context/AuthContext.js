@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
 const AuthContext = createContext()
@@ -11,20 +11,25 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(false)
     const [loadingMsg, setLoadingMsg] = useState('')
 
-    // ✅ safe setter (prevents re-renders if data is same)
+    const fullUserRef = useRef(null);
+
     const safeSetFullUser = (newUser) => {
-        setFullUser((prev) => {
-            if (!prev && newUser) return newUser
-            if (!newUser && prev) return null
-
-            const same =
-                prev &&
-                Object.keys(newUser || {}).length === Object.keys(prev).length &&
-                Object.keys(newUser || {}).every((k) => prev[k] === newUser[k])
-
-            return same ? prev : newUser
-        })
+        if (JSON.stringify(fullUserRef.current) !== JSON.stringify(newUser)) {
+            fullUserRef.current = newUser;
+            setFullUser(newUser);
+        }
     }
+    // ✅ safe setter (prevents re-renders if data is same)
+    // const safeSetFullUser = (newUser) => {
+    //     setFullUser((prev) => {
+    //         if (!prev && newUser) return newUser
+    //         if (!newUser && prev) return null
+
+    //         // Deep compare
+    //         const same = JSON.stringify(prev) === JSON.stringify(newUser)
+    //         return same ? prev : newUser
+    //     })
+    // }
 
     const fetchUser = async (sessionUser) => {
         try {
@@ -66,12 +71,12 @@ export function AuthProvider({ children }) {
             setLoading(false)
         }
     }
-useEffect(() => {
-  
+    useEffect(() => {
 
- console.log(fullUser);
- 
-}, [fullUser])
+
+        console.log(fullUser);
+
+    }, [fullUser])
 
     useEffect(() => {
         const getInitialSession = async () => {
@@ -115,7 +120,7 @@ useEffect(() => {
         return () => subscription.unsubscribe()
     }, [])
 
- 
+
     const value = useMemo(
         () => ({ user, fullUser, loading, loadingMsg }),
         [user, fullUser, loading, loadingMsg]

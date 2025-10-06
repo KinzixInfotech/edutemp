@@ -1,15 +1,21 @@
 
 'use client'
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2 } from "lucide-react";
+import { AlertCircleIcon, Loader2 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { defineStepper } from "@/components/stepper";
 import LoaderPage from "@/components/loader-page";
+import {
+    Alert,
+    AlertDescription,
+    AlertTitle,
+} from "@/components/ui/alert"
+
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -43,16 +49,28 @@ async function moveApplication({ id, stageId, movedById, stageData }) {
     return response.json();
 }
 
+// Outside the component
+let cachedStepper = null;
+let cachedStagesLength = 0;
 
 
 export default function ApplicationDetails() {
     const params = useParams();
     const applicationId = params.id;
-    const { fullUser } = useAuth();
+    // const { fullUser } = useAuth();
+    // const { fullUser } = useAuth();
+    const local = localStorage.getItem('user');
+    const fullUser = JSON.parse(local);
+    // console.log(user.id);
+
+
     const schoolId = fullUser?.schoolId;
+    // const schoolId = '8386c0aa-af56-45aa-86a5-c9ecefd9614d';
+
     const movedById = fullUser?.id;
 
     const [stageData, setStageData] = useState({}); // Store stage-specific data
+    console.log(stageData);
 
     // const { data: { stages = [] } = {}, isLoading: stagesLoading } = useQuery({
     //     queryKey: ["stages", schoolId],
@@ -84,11 +102,13 @@ export default function ApplicationDetails() {
         staleTime: 1000 * 60 * 5, // 5 minutes
         cacheTime: 1000 * 60 * 10, // 10 minutes
     });
+    console.log(stages, application);
+
     // useEffect(() => {
     //     console.log("schoolId:", schoolId, "applicationId:", applicationId);
     // }, [schoolId, applicationId]);
     // console.log('remounted');
-    
+
 
     // useEffect(() => {
     //     if (application.currentStage.name === 'Rejected') {
@@ -134,8 +154,13 @@ export default function ApplicationDetails() {
         description: stage.description || "",
     }));
 
-    // Directly call defineStepper
-    const { Stepper } = defineStepper(...stepperConfig);
+
+    // Inside component
+    if (!cachedStepper || cachedStagesLength !== filteredStages.length) {
+        cachedStepper = defineStepper(...stepperConfig);
+        cachedStagesLength = filteredStages.length;
+    }
+    const { Stepper } = cachedStepper;
     // const { Stepper } = defineStepper(
     //     ...filteredStages.map((stage) => ({
     //         id: stage.id,
@@ -144,9 +169,10 @@ export default function ApplicationDetails() {
     //     }))
     // );
     const renderFieldsForStage = (stageName, methods) => {
-        const handleStageDataChange = (field, value) => {
+
+        const handleStageDataChange = useCallback((field, value) => {
             setStageData(prev => ({ ...prev, [field]: value }));
-        };
+        }, []);
 
         switch (stageName) {
             case "Pending Review":
@@ -263,7 +289,9 @@ export default function ApplicationDetails() {
                                         onClick={() => {
                                             if (rejectedStage) {
                                                 // methods.goTo(rejectedStage.id);
-                                                handleStageDataChange("rejectionReason", "Rejected in initial review");
+                                                // handleStageDataChange("rejectionReason", "Rejected in initial review");
+                                                console.log(stageData);
+
                                                 moveMutation.mutate({
                                                     id: applicationId,
                                                     stageId: 'cca3c432-2650-44c0-95ad-14c9081d4b4e',
@@ -495,8 +523,59 @@ export default function ApplicationDetails() {
                     {({ methods }) => (
                         <>
                             {application.currentStage.name === 'Rejected' ? (
-                                <div className="flex items-center justify-center w-full h-max mt-4 p-4 bg-muted  border rounded-md">
-                                    <span className="text-red-600 text-3xl font-normal">Application Rejected</span>
+                                <div className="flex  w-full h-max mt-4 p-4 bg-muted  border rounded-md  flex-col gap-2.5">
+                                    <Alert variant="destructive"  >
+                                        <AlertCircleIcon />
+
+                                        <AlertTitle>Application Rejected.</AlertTitle>
+                                        <AlertDescription>
+                                            {/* <Input className='bg-background'
+                                                placeholder="Enter rejection reason"
+                                                value={stageData.rejectionReason || ""}
+                                                onChange={(e) => handleStageDataChange("rejectionReason", e.target.value)}
+                                            /> */}
+                                            <p>Reason: {application.data?.[application.currentStage.id]?.rejectionReason}</p>
+
+                                            {/* <ul className="list-inside list-disc text-sm">
+                                                <li>Check your card details</li>
+                                                <li>Ensure sufficient funds</li>
+                                                <li>Verify billing address</li>
+                                            </ul> */}
+                                        </AlertDescription>
+
+                                    </Alert>
+                                    <div>
+                                        <Button
+                                            className="w-full"
+                                            onClick={() => {
+                                                if (rejectedStage) {
+                                                    // handleStageDataChange("activated", "Application Re-Activated");
+                                                    moveMutation.mutate({
+                                                        id: applicationId,
+                                                        stageId: "884287a7-3e39-49ce-aa86-5f7e130befa9",
+                                                        movedById,
+                                                        stageData,
+                                                    });
+                                                } else {
+                                                    toast.error("Rejected stage not found");
+                                                }
+                                            }}
+                                            disabled={!rejectedStage || moveMutation.isPending}
+                                            variant="outline"
+                                        >
+                                            {moveMutation.isPending ? (
+                                                <span className="flex items-center justify-center gap-2">
+                                                    <Loader2 className="h-4 w-4 animate-spin" /> {/* from lucide-react */}
+                                                    Activating...
+                                                </span>
+                                            ) : (
+                                                "Activate"
+                                            )}
+                                        </Button>
+
+                                    </div>
+                                    {/* <span className="text-red-600 text-3xl font-normal">Application Rejected</span> */}
+
                                 </div>
                             ) : (
                                 <>
@@ -534,7 +613,7 @@ export default function ApplicationDetails() {
                                         >
                                             {application.currentStage.id === methods.current.id
                                                 ? 'Marked'
-                                                : `Mark (${methods.current.title}) as complete`}
+                                                : `Marked`}
                                         </Button>
                                     </Stepper.Controls>
                                 </>

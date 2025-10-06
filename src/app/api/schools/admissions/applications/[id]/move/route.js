@@ -69,6 +69,8 @@ export async function POST(req, { params }) {
   try {
     const data = await req.json();
     const validated = moveSchema.parse(data);
+
+    
     const applicationId = z.string().uuid().parse(params.id);
 
     const application = await prisma.application.findUnique({
