@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertCircleIcon, Copy, Loader2, Phone } from "lucide-react";
+import { AlertCircleIcon, Copy, Loader2, Mail, Phone } from "lucide-react";
 import { useParams } from "next/navigation";
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,8 +27,11 @@ import {
     DialogFooter,
     DialogTitle,
     DialogClose,
+    DialogDescription,
 } from "@/components/ui/dialog"
 import { DialogTrigger } from "@radix-ui/react-dialog";
+import { Calendar } from "@/components/ui/calendar";
+import { Textarea } from "@/components/ui/textarea";
 async function fetchApplication({ applicationId, schoolId }) {
     const response = await fetch(`/api/schools/admissions/applications/${applicationId}?schoolId=${schoolId}`);
     if (!response.ok) throw new Error("Failed to fetch application");
@@ -307,6 +310,124 @@ export default function ApplicationDetails() {
             case "TEST_INTERVIEW":
                 return (
                     <div className="space-y-4">
+                        {/* Test Score */}
+                        <div>
+                            <Label className="mb-4">Test Score</Label>
+                            <Input
+                                className="bg-background"
+                                type="number"
+                                placeholder="Enter test score"
+                                value={stageData.testScore || ""}
+                                onChange={(e) => handleStageDataChange("testScore", e.target.value)}
+                            />
+                        </div>
+
+                        {/* Interview Date */}
+                        <div>
+                            <Label className="mb-4">Interview Date</Label>
+                            <Input
+                                className="bg-background"
+                                type="date"
+                                value={stageData.interviewDate || ""}
+                                onChange={(e) => handleStageDataChange("interviewDate", e.target.value)}
+                            />
+                        </div>
+
+                        {/* Comments */}
+                        <div>
+                            <Label className="mb-4">Comments</Label>
+                            <Input
+                                className="bg-background"
+                                placeholder="Add comments"
+                                value={stageData.notes || ""}
+                                onChange={(e) => handleStageDataChange("notes", e.target.value)}
+                            />
+                        </div>
+
+                        {/* Schedule Test Button */}
+                        <Dialog >
+                            <DialogTrigger asChild>
+                                <Button variant="secondary" className="w-full">
+                                    Schedule Test
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent  className="bg-white max-h-[95vh]   overflow-y-auto shadow-none dark:bg-[#171717] w-[384px] h-fit p-0 text-foreground space-y-0 gap-0 rounded-md ">
+                                {/* <DialogHeader>
+                                    <DialogTitle>Schedule Test for Candidate</DialogTitle>
+                                    <DialogDescription>
+                                        Set the test details and inform the candidate.
+                                    </DialogDescription>
+                                </DialogHeader> */}
+
+                                <div className="space-y-4 mt-4">
+                                    <div>
+                                        <DialogHeader className='border-b  py-2  h-min flex  justify-center px-3.5'>
+                                            <DialogTitle className="flex text-lg tracking-tight leading-tight dark:text-white text-black font-semibold">
+                                                Schedule Test
+                                            </DialogTitle>
+                                        </DialogHeader>
+
+                                        <div className='border-b  dark:text-white text-black h-min flex py-3.5   px-4'>
+                                            Set the test date and venue, then inform the candidate for clarity and coordination.
+                                        </div>
+                                        <div className="px-3.5 py-3.5">
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <Label className={'mb-3'}>Test Date</Label>
+                                                    <Input
+                                                        type="date"
+                                                        className="bg-background"
+                                                        value={stageData.testDate || ""}
+                                                        onChange={(e) => handleStageDataChange("testDate", e.target.value)}
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <Label className={'mb-3'}>Venue / Location</Label>
+                                                    <Input
+                                                        placeholder="Enter test venue or location"
+                                                        className="bg-background"
+                                                        value={stageData.testVenue || ""}
+                                                        onChange={(e) => handleStageDataChange("testVenue", e.target.value)}
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <Label className={'mb-3'}>Custom Message (Optional)</Label>
+                                                    <Textarea className={'shadow-none'} placeholder="Custom Message...." />
+                                                    {/* <Input
+                                                        placeholder="Enter test venue or location"
+                                                        className="bg-background"
+                                                        value={stageData.testVenue || ""}
+                                                        onChange={(e) => handleStageDataChange("testVenue", e.target.value)}
+                                                    /> */}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+
+                                <DialogFooter className="mb-4 px-4 border-t pt-3.5">
+                                    <Button
+                                        onClick={() => {
+                                            // add logic to notify candidate
+                                            toast.success("Candidate informed successfully!");
+                                        }}
+                                        className={'flex w-full justify-center items-center'}
+                                    >
+                                        <Mail size={35} strokeWidth={2} />
+                                        Inform Candidate
+
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
+                );
+                return (
+                    <div className="space-y-4">
+
                         <div>
                             <Label className='mb-4'>Test Score</Label>
                             <Input className='bg-background'
@@ -519,7 +640,7 @@ export default function ApplicationDetails() {
                                 {application.currentStage?.name || "N/A"}
                             </Badge> */}
                             <Badge
-                                className={`px-2 py-1 text-md font-medium ${getStageStyle(application.currentStage?.name)} capitalize`}
+                                className={`px-2 py-1 text-sm font-medium ${getStageStyle(application.currentStage?.name)} capitalize`}
                             >
                                 {application.currentStage?.name.replace("_", " ")}
                             </Badge>
