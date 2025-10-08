@@ -12,7 +12,7 @@ export async function GET(req) {
         const params = { schoolId: searchParams.get("schoolId") };
         const validated = getSchema.parse(params);
         const stages = await prisma.stage.findMany({
-            where: { schoolId: validated.schoolId },
+          
             select: {
                 id: true,
                 name: true,

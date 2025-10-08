@@ -70,7 +70,7 @@ export async function POST(req) {
 
         // Get default stage
         const defaultStage = await prisma.stage.findFirst({
-            where: { schoolId: validated.schoolId, order: 1 },
+            where: {  order: 1 },
             select: { id: true },
         });
         if (!defaultStage) {

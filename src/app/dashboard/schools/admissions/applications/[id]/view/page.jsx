@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertCircleIcon, Loader2 } from "lucide-react";
+import { AlertCircleIcon, Copy, Loader2, Phone } from "lucide-react";
 import { useParams } from "next/navigation";
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { defineStepper } from "@/components/stepper";
 import LoaderPage from "@/components/loader-page";
 import {
@@ -57,34 +59,15 @@ let cachedStagesLength = 0;
 export default function ApplicationDetails() {
     const params = useParams();
     const applicationId = params.id;
-    // const { fullUser } = useAuth();
-    // const { fullUser } = useAuth();
     const local = localStorage.getItem('user');
     const fullUser = JSON.parse(local);
-    // console.log(user.id);
-
 
     const schoolId = fullUser?.schoolId;
-    // const schoolId = '8386c0aa-af56-45aa-86a5-c9ecefd9614d';
 
     const movedById = fullUser?.id;
 
     const [stageData, setStageData] = useState({}); // Store stage-specific data
     console.log(stageData);
-
-    // const { data: { stages = [] } = {}, isLoading: stagesLoading } = useQuery({
-    //     queryKey: ["stages", schoolId],
-    //     queryFn: () => fetchStages(schoolId),
-    //     enabled: !!schoolId,
-    //     refetchOnWindowFocus: false,
-    // });
-
-    // const { data: { application } = {}, isLoading: appLoading } = useQuery({
-    //     queryKey: ["application", applicationId, schoolId],
-    //     queryFn: () => fetchApplication({ applicationId, schoolId }),
-    //     enabled: !!schoolId && !!applicationId,
-    //     refetchOnWindowFocus: false, //  disables auto-refetch
-    // });
     const { data: { stages = [] } = {}, isLoading: stagesLoading } = useQuery({
         queryKey: ["stages", schoolId],
         queryFn: () => fetchStages(schoolId),
@@ -102,19 +85,6 @@ export default function ApplicationDetails() {
         staleTime: 1000 * 60 * 5, // 5 minutes
         cacheTime: 1000 * 60 * 10, // 10 minutes
     });
-    console.log(stages, application);
-
-    // useEffect(() => {
-    //     console.log("schoolId:", schoolId, "applicationId:", applicationId);
-    // }, [schoolId, applicationId]);
-    // console.log('remounted');
-
-
-    // useEffect(() => {
-    //     if (application.currentStage.name === 'Rejected') {
-
-    //     }
-    // }, [application])
     const queryClient = useQueryClient();
 
     const moveMutation = useMutation({
@@ -139,11 +109,20 @@ export default function ApplicationDetails() {
     // const currentStageIndex = stages.findIndex(stage => stage.id === application.currentStage.id);
     const rejectedStage = stages.findIndex(stage => stage?.name === "Rejected");
 
-    const excludedStageIds = ["36bf836d-c63e-474b-9da5-e16909612ebf", "cca3c432-2650-44c0-95ad-14c9081d4b4e"];
+    const excludedStageIds = ["36bf836d-c63e-474b-9da5-e16909612ebf", "99493d9e-2f0c-42ff-8da4-904e3bc78450"];
 
     const filteredStages = stages.filter(
         (stage) => !excludedStageIds.includes(stage.id)
     );
+    const formatDate = (dateString) => {
+        return new Date(dateString).toLocaleDateString("en-US", {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+        });
+    };
+
 
     const currentStageIndex = filteredStages.findIndex(
         (stage) => stage.id === application.currentStage.id
@@ -161,13 +140,16 @@ export default function ApplicationDetails() {
         cachedStagesLength = filteredStages.length;
     }
     const { Stepper } = cachedStepper;
-    // const { Stepper } = defineStepper(
-    //     ...filteredStages.map((stage) => ({
-    //         id: stage.id,
-    //         title: stage?.name,
-    //         description: stage.description || "",
-    //     }))
-    // );
+
+    const handleCopy = async () => {
+        try {
+            await navigator.clipboard.writeText(applicationId);
+            toast.success("Copied successfully");
+
+        } catch (err) {
+            toast.error("Failde To Copy");
+        }
+    };
     const renderFieldsForStage = (stageName, methods) => {
 
         const handleStageDataChange = useCallback((field, value) => {
@@ -175,7 +157,7 @@ export default function ApplicationDetails() {
         }, []);
 
         switch (stageName) {
-            case "Pending Review":
+            case "REVIEW":
                 return (
                     <div className="space-y-4">
                         <div>
@@ -221,21 +203,6 @@ export default function ApplicationDetails() {
                             <DialogTrigger>
                                 <Button
                                     variant="destructive"
-                                // onClick={() => {
-                                //     if (rejectedStage) {
-                                //         // methods.goTo(rejectedStage.id);
-                                //         handleStageDataChange("rejectionReason", "Rejected in initial review");
-                                //         moveMutation.mutate({
-                                //             id: applicationId,
-                                //             stageId: 'cca3c432-2650-44c0-95ad-14c9081d4b4e',
-                                //             movedById,
-                                //             stageData,
-                                //         });
-                                //     } else {
-                                //         toast.error("Rejected stage not found");
-                                //     }
-                                // }}
-                                // disabled={!rejectedStage}
                                 >
                                     Reject
                                 </Button>
@@ -244,32 +211,21 @@ export default function ApplicationDetails() {
                                 <div>
                                     <DialogHeader className='border-b  h-min flex  justify-center px-3.5'>
                                         <DialogTitle className="flex py-3.5  text-lg tracking-tight leading-tight dark:text-white text-black font-semibold">
-                                            {/* {title} */}
                                             Rejection Reason
-                                            {/* Confirm deletion of kinzixinfotech@gmail.com's Project */}
                                         </DialogTitle>
                                     </DialogHeader>
 
                                     <div className='border-b  dark:text-white text-black h-min flex py-3.5   px-4'>
-                                        {/* {description} */}
                                         Please provide a reason for rejection to help the applicant understand and maintain transparency
                                     </div>
                                     <div className="px-3.5 py-3.5">
                                         <div className="space-y-4">
                                             <div>
-                                                <Label className='mb-4'>Rejection Reason</Label>
+                                                <Label className='mb-4'>Rejection Reason*</Label>
                                                 <Input className='bg-background'
                                                     placeholder="Enter rejection reason"
                                                     value={stageData.rejectionReason || ""}
                                                     onChange={(e) => handleStageDataChange("rejectionReason", e.target.value)}
-                                                />
-                                            </div>
-                                            <div>
-                                                <Label className='mb-4'>Comments</Label>
-                                                <Input className='bg-background'
-                                                    placeholder="Add comments"
-                                                    value={stageData.notes || ""}
-                                                    onChange={(e) => handleStageDataChange("notes", e.target.value)}
                                                 />
                                             </div>
                                         </div>
@@ -282,19 +238,13 @@ export default function ApplicationDetails() {
                                         </Button>
                                     </DialogClose>
                                     <Button
-                                        variant='destructive'
-                                        className="w-full sm:w-auto bg-[#541c15] border-2 cursor-pointer  dark:text-white text-black border-[#541c15] hover:bg-[#e54d2e80] hover:border-red-600 hover:border-2 "
-                                        // onClick={onConfirm}
-                                        // disabled={loading}
+                                        variant="destructive"
+                                        disabled={!rejectedStage || moveMutation.isPending || !stageData.rejectionReason}
                                         onClick={() => {
                                             if (rejectedStage) {
-                                                // methods.goTo(rejectedStage.id);
-                                                // handleStageDataChange("rejectionReason", "Rejected in initial review");
-                                                console.log(stageData);
-
                                                 moveMutation.mutate({
                                                     id: applicationId,
-                                                    stageId: 'cca3c432-2650-44c0-95ad-14c9081d4b4e',
+                                                    stageId: "99493d9e-2f0c-42ff-8da4-904e3bc78450",
                                                     movedById,
                                                     stageData,
                                                 });
@@ -302,9 +252,14 @@ export default function ApplicationDetails() {
                                                 toast.error("Rejected stage not found");
                                             }
                                         }}
-                                        disabled={!rejectedStage}
                                     >
-                                        Reject
+                                        {moveMutation.isPending ? (
+                                            <div className="flex items-center gap-2">
+                                                <Loader2 className="w-4 h-4 animate-spin" /> Rejecting...
+                                            </div>
+                                        ) : (
+                                            "Reject"
+                                        )}
                                     </Button>
                                 </DialogFooter>
                             </DialogContent>
@@ -332,7 +287,7 @@ export default function ApplicationDetails() {
                         </div>
                     </div>
                 );
-            case "Test/Interview":
+            case "TEST_INTERVIEW":
                 return (
                     <div className="space-y-4">
                         <div>
@@ -362,7 +317,7 @@ export default function ApplicationDetails() {
                         </div>
                     </div>
                 );
-            case "Offer":
+            case "OFFER":
                 return (
                     <div className="space-y-4">
                         <div>
@@ -413,7 +368,7 @@ export default function ApplicationDetails() {
                         <Button>Verify Documents</Button>
                     </div>
                 );
-            case "Enrolled":
+            case "ENROLLED":
                 return (
                     <div className="space-y-4">
                         <div>
@@ -492,55 +447,77 @@ export default function ApplicationDetails() {
 
     return (
         <div className="p-4 space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-5">
-                <div className="flex flex-col gap-0.5 ">
-                    {/* <h1 className="text-2xl font-bold">Registration Application</h1> */}
-                    <span className="text-muted-foreground">Application ID: <span className="border-b-2">{applicationId}</span></span>
-                    <span className="text-muted-foreground">Name: <span className="border-b-2">{application.applicantName}</span></span>
-                    <span className="text-muted-foreground">Email: <span className="border-b-2">{application.applicantEmail}</span></span>
-                    {/* stages[currentStageIndex].name */}
-                    <span className="text-muted-foreground">
-                        Submitted On:{" "}
-                        <span className="border-b-2">
-                            {new Date(application.submittedAt
-                            ).toLocaleDateString("en-US", {
-                                weekday: "long",
-                                year: "numeric",
-                                month: "long",
-                                day: "numeric",
-                            })}
-                        </span>
-                    </span>
-                    <span className="text-muted-foreground">Current Stage: <span className="border-b-2">{application.currentStage?.name}</span></span>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center px-4 justify-between">
+                <Card className="shadow-md w-full">
+                    {/* Header for Primary Info (Name, Email) and Action Button 
+            -----------------------------------------------------------
+            */}
+                    <CardHeader className="flex flex-row items-start justify-between">
+                        <div className="space-y-1">
+                            {/* Name as the main title */}
+                            <CardTitle className="text-2xl font-medium  tracking-tight">
+                                {application.applicantName}
+                            </CardTitle>
+                            {/* Email as the description, styled as a clickable link */}
+                            <CardDescription className="text-base text-blue-600 hover:text-blue-700 cursor-pointer">
+                                {application.applicantEmail}
+                            </CardDescription>
+                        </div>
 
-                </div>
-                <div className="mt-2 sm:mt-0 space-x-2">
-                    <Button variant="outline">Call Candidate</Button>
-                </div>
+                        {/* Action Button */}
+
+                        {/* <Button className="ml-4" variant="default">
+                            <Phone className="mr-2 h-4 w-4" /> Call Candidate
+                        </Button> */}
+                    </CardHeader>
+
+                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 pt-4">
+
+                        {/* 1. Application ID */}
+                        <div className="flex w flex-col space-y-1">
+                            <span className="text-xs font-semibold uppercase text-muted-foreground">Application ID</span>
+                            <div className="flex items-center w-full space-x-2">
+                                {/* Use a Badge for visual distinction and allow copying */}
+                                <Badge variant="secondary" className="font-mono text-sm py-1 px-3">
+                                    {applicationId}
+                                </Badge>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopy}>
+                                    <Copy className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* 2. Submitted On */}
+                        <div className="flex flex-col space-y-1">
+                            <span className="text-xs font-semibold uppercase text-muted-foreground">Submitted On</span>
+                            <span className="text-base font-medium text-foreground">
+                                {formatDate(application.submittedAt)}
+                            </span>
+                        </div>
+
+                        {/* 3. Current Stage */}
+                        <div className="flex flex-col space-y-1">
+                            <span className="text-xs font-semibold uppercase text-muted-foreground">Current Stage</span>
+                            <Badge variant="default" className="bg-blue-500 hover:bg-blue-600 w-fit text-base">
+                                {application.currentStage?.name || "N/A"}
+                            </Badge>
+                        </div>
+
+                    </CardContent>
+                </Card>
             </div>
-            <div className="flex flex-wrap items-center gap-2 bg-background p-4 rounded-md">
+            <div className="flex flex-wrap items-center gap-2 bg-white dark:bg-background p-4 rounded-md">
                 <Stepper.Provider variant="horizontal" labelOrientation="vertical" initialStep={stages[currentStageIndex]?.id}>
                     {({ methods }) => (
                         <>
-                            {application.currentStage.name === 'Rejected' ? (
+                            {application.currentStage.name === 'REJECTED' ? (
                                 <div className="flex  w-full h-max mt-4 p-4 bg-muted  border rounded-md  flex-col gap-2.5">
                                     <Alert variant="destructive"  >
                                         <AlertCircleIcon />
 
                                         <AlertTitle>Application Rejected.</AlertTitle>
                                         <AlertDescription>
-                                            {/* <Input className='bg-background'
-                                                placeholder="Enter rejection reason"
-                                                value={stageData.rejectionReason || ""}
-                                                onChange={(e) => handleStageDataChange("rejectionReason", e.target.value)}
-                                            /> */}
                                             <p>Reason: {application.data?.[application.currentStage.id]?.rejectionReason}</p>
-
-                                            {/* <ul className="list-inside list-disc text-sm">
-                                                <li>Check your card details</li>
-                                                <li>Ensure sufficient funds</li>
-                                                <li>Verify billing address</li>
-                                            </ul> */}
                                         </AlertDescription>
 
                                     </Alert>
@@ -549,10 +526,9 @@ export default function ApplicationDetails() {
                                             className="w-full"
                                             onClick={() => {
                                                 if (rejectedStage) {
-                                                    // handleStageDataChange("activated", "Application Re-Activated");
                                                     moveMutation.mutate({
                                                         id: applicationId,
-                                                        stageId: "884287a7-3e39-49ce-aa86-5f7e130befa9",
+                                                        stageId: "0a2d4db8-05df-4fe4-b05e-dff8454124ba",
                                                         movedById,
                                                         stageData,
                                                     });
@@ -565,7 +541,7 @@ export default function ApplicationDetails() {
                                         >
                                             {moveMutation.isPending ? (
                                                 <span className="flex items-center justify-center gap-2">
-                                                    <Loader2 className="h-4 w-4 animate-spin" /> {/* from lucide-react */}
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
                                                     Activating...
                                                 </span>
                                             ) : (
@@ -574,12 +550,11 @@ export default function ApplicationDetails() {
                                         </Button>
 
                                     </div>
-                                    {/* <span className="text-red-600 text-3xl font-normal">Application Rejected</span> */}
 
                                 </div>
                             ) : (
                                 <>
-                                    <Stepper.Navigation className='border p-4 bg-muted  rounded-md overflow-x-auto overflow-hidden'>
+                                    <Stepper.Navigation className='border p-4 shadow-md bg-white dark:bg-muted  rounded-md overflow-x-auto overflow-hidden'>
                                         {methods.all.map((step) => (
                                             <Stepper.Step
                                                 key={step.id}
@@ -587,13 +562,20 @@ export default function ApplicationDetails() {
                                                 onClick={() => methods.goTo(step.id)}
                                                 disabled={stages.findIndex(s => s.id === step.id) > currentStageIndex && !methods.isLast}
                                             >
-                                                <Stepper.Title>{step.title}</Stepper.Title>
+                                                <Stepper.Title>
+                                                    {step.title
+                                                        .replace("_", " ")                       // replace underscore with space
+                                                        .toLowerCase()                           // convert all to lowercase
+                                                        .replace(/^\w/, (c) => c.toUpperCase()) // capitalize first letter
+                                                    }
+                                                </Stepper.Title>
+
                                                 <Stepper.Description>{step.description}</Stepper.Description>
                                             </Stepper.Step>
                                         ))}
                                     </Stepper.Navigation>
 
-                                    <div className="mt-4 p-4 bg-muted border rounded-md">
+                                    <div className="mt-4 p-4 bg-white shadow-md dark:bg-muted border rounded-md">
                                         {renderFieldsForStage(methods.current.title, methods)}
                                     </div>
 

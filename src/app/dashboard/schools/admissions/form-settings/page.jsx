@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 async function fetchForms(schoolId) {
@@ -301,7 +301,7 @@ export default function FormsSettings() {
                 <div>
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="text-xl font-semibold">Admission Forms</h3>
-                        <Button onClick={handleAddForm}>Create Form</Button>
+                        <Button onClick={handleAddForm}>Create Form <Plus strokeWidth={2} /> </Button>
                     </div>
                     <div className="overflow-x-auto rounded-lg border">
                         <Table className="min-w-[800px]">
@@ -334,7 +334,12 @@ export default function FormsSettings() {
                                             <TableCell>{form.name}</TableCell>
                                             <TableCell>{form.description}</TableCell>
                                             <TableCell>{form.fields.length}</TableCell>
-                                            <TableCell>{form.slug ? `/admissions/${form.slug}` : "Not generated"}</TableCell>
+
+                                            <TableCell>
+                                                <a target="_blank" className="underline text-blue-700 hover:text-blue-500" href={`/dashboard/schools${form.slug ? `/admissions/${form.slug}` : "#"}`}>{form.slug ? `/admissions/${form.slug}` : "Not generated"}
+                                                </a>
+                                            </TableCell>
+
                                             <TableCell className="flex gap-2">
                                                 <Button size="sm" variant="outline" onClick={() => handleEditForm(form)}>Edit</Button>
                                                 <Button size="sm" variant="destructive" onClick={() => handleDeleteForm(form.id)}>Delete</Button>
@@ -356,7 +361,7 @@ export default function FormsSettings() {
                 <div>
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="text-xl font-semibold">Admission Stages</h3>
-                        <Button onClick={handleAddStage}>Create Stage</Button>
+                        {/* <Button onClick={handleAddStage}>Create Stage</Button> */}
                     </div>
                     <div className="overflow-x-auto rounded-lg border">
                         <Table className="min-w-[800px]">
@@ -365,8 +370,8 @@ export default function FormsSettings() {
                                     <TableHead>#</TableHead>
                                     <TableHead>Name</TableHead>
                                     <TableHead>Order</TableHead>
-                                    <TableHead>Requires Test</TableHead>
-                                    <TableHead>Actions</TableHead>
+                                    {/* <TableHead>Requires Test</TableHead> */}
+                                    {/* <TableHead>Actions</TableHead> */}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -376,8 +381,8 @@ export default function FormsSettings() {
                                             <TableCell><Skeleton className="h-6 w-6" /></TableCell>
                                             <TableCell><Skeleton className="h-6 w-32" /></TableCell>
                                             <TableCell><Skeleton className="h-6 w-24" /></TableCell>
-                                            <TableCell><Skeleton className="h-6 w-24" /></TableCell>
-                                            <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                                            {/* <TableCell><Skeleton className="h-6 w-24" /></TableCell> */}
+                                            {/* <TableCell><Skeleton className="h-6 w-20" /></TableCell> */}
                                         </TableRow>
                                     ))
                                 ) : stages.length > 0 ? (
@@ -386,11 +391,11 @@ export default function FormsSettings() {
                                             <TableCell>{index + 1}</TableCell>
                                             <TableCell>{stage.name}</TableCell>
                                             <TableCell>{stage.order}</TableCell>
-                                            <TableCell>{stage.requiresTest ? "Yes" : "No"}</TableCell>
-                                            <TableCell className="flex gap-2">
+                                            {/* <TableCell>{stage.requiresTest ? "Yes" : "No"}</TableCell> */}
+                                            {/* <TableCell className="flex gap-2">
                                                 <Button size="sm" variant="outline" onClick={() => handleEditStage(stage)}>Edit</Button>
                                                 <Button size="sm" variant="destructive" onClick={() => handleDeleteStage(stage.id)}>Delete</Button>
-                                            </TableCell>
+                                            </TableCell> */}
                                         </TableRow>
                                     ))
                                 ) : (
@@ -428,6 +433,14 @@ export default function FormsSettings() {
                                         <Label htmlFor="description" className="mb-2 text-muted-foreground">Description</Label>
                                         <Input id="description" name="description" value={formData.description || ""} onChange={handleFormChange} />
                                     </div>
+                                    <div className="flex items-center gap-2">
+                                        <Label htmlFor="requiresTest" className="text-muted-foreground">Requires Payment</Label>
+                                        <Switch
+                                            id="requiresTest"
+                                            checked={stageData.requiresTest}
+                                            onCheckedChange={handleStageSwitch}
+                                        />
+                                    </div>
                                     <div>
                                         <Label className="mb-2 text-muted-foreground">Fields</Label>
 
@@ -450,6 +463,7 @@ export default function FormsSettings() {
                                         ))}
                                         <Button variant="outline" size="sm" onClick={addField}>Add Field</Button>
                                     </div>
+
                                 </div>
                                 <Button
                                     onClick={handleFormSubmit}
@@ -502,6 +516,6 @@ export default function FormsSettings() {
                     </div>
                 </DrawerContent>
             </Drawer>
-        </div>
+        </div >
     );
 }

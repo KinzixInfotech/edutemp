@@ -13,6 +13,7 @@ import { Loader2 } from "lucide-react";
 import Link from 'next/link';
 import { useAuth } from "@/context/AuthContext";
 import { Label } from "recharts";
+import { Badge } from "@/components/ui/badge";
 
 async function fetchApplications({ schoolId, stageId, formId }) {
     const params = new URLSearchParams({ schoolId });
@@ -83,6 +84,23 @@ export default function Applications() {
         queryFn: () => fetchStages(schoolId),
         enabled: !!schoolId,
     });
+
+    const getStageStyle = (stage) => {
+        switch (stage) {
+            case "REVIEW":
+                return "bg-blue-100 text-blue-700 border-blue-200";
+            case "TEST_INTERVIEW":
+                return "bg-yellow-100 text-yellow-800 border-yellow-200";
+            case "OFFER":
+                return "bg-green-100 text-green-700 border-green-200";
+            case "ENROLLED":
+                return "bg-emerald-100 text-emerald-700 border-emerald-200";
+            case "REJECTED":
+                return "bg-red-100 text-red-700 border-red-200";
+            default:
+                return "bg-gray-100 text-gray-700 border-gray-200";
+        }
+    };
 
     // const { data: selectedApp, isLoading: appLoading } = useQuery({
     //     queryKey: ["application", selectedApplication?.id],
@@ -175,7 +193,13 @@ export default function Applications() {
                                     <TableCell>{app.applicantName}</TableCell>
                                     <TableCell>{app.applicantEmail}</TableCell>
                                     <TableCell>{new Date(app.submittedAt).toLocaleDateString()}</TableCell>
-                                    <TableCell>{app.currentStage.name}</TableCell>
+                                    <TableCell>
+                                        <Badge
+                                            className={`px-2 py-1 text-xs font-medium ${getStageStyle(app.currentStage.name)} capitalize`}
+                                        >
+                                            {app.currentStage.name.replace("_", " ")}
+                                        </Badge>
+                                    </TableCell>
                                     <TableCell className="flex gap-2">
                                         <Link href={`applications/${app.id}/view`}>
                                             <Button size="sm" variant="outline">View</Button>
