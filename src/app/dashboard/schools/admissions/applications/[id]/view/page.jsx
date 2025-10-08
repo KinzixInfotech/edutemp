@@ -101,6 +101,23 @@ export default function ApplicationDetails() {
         return <LoaderPage />
     }
 
+    const getStageStyle = (stage) => {
+        switch (stage) {
+            case "REVIEW":
+                return "bg-blue-100 text-blue-700 border-blue-200";
+            case "TEST_INTERVIEW":
+                return "bg-yellow-100 text-yellow-800 border-yellow-200";
+            case "OFFER":
+                return "bg-green-100 text-green-700 border-green-200";
+            case "ENROLLED":
+                return "bg-emerald-100 text-emerald-700 border-emerald-200";
+            case "REJECTED":
+                return "bg-red-100 text-red-700 border-red-200";
+            default:
+                return "bg-gray-100 text-gray-700 border-gray-200";
+        }
+    };
+
 
     if (!application) {
         return <div className="p-6 text-center text-red-500">Application not found</div>;
@@ -498,8 +515,13 @@ export default function ApplicationDetails() {
                         {/* 3. Current Stage */}
                         <div className="flex flex-col space-y-1">
                             <span className="text-xs font-semibold uppercase text-muted-foreground">Current Stage</span>
-                            <Badge variant="default" className="bg-blue-500 hover:bg-blue-600 w-fit text-base">
+                            {/* <Badge variant="default" className="bg-blue-500 hover:bg-blue-600 w-fit text-base">
                                 {application.currentStage?.name || "N/A"}
+                            </Badge> */}
+                            <Badge
+                                className={`px-2 py-1 text-md font-medium ${getStageStyle(application.currentStage?.name)} capitalize`}
+                            >
+                                {application.currentStage?.name.replace("_", " ")}
                             </Badge>
                         </div>
 
