@@ -357,7 +357,7 @@ export default function ApplicationDetails() {
                                             if (rejectedStage) {
                                                 moveMutation.mutate({
                                                     id: applicationId,
-                                                    stageId: "49ee66f1-06c3-4589-b5a8-8e3768350868",
+                                                    stageId: '49ee66f1-06c3-4589-b5a8-8e3768350868',
                                                     movedById,
                                                     stageData,
                                                 });
@@ -486,7 +486,7 @@ export default function ApplicationDetails() {
                                                             <Input
                                                                 type="time"
                                                                 className="bg-background"
-                                                                value={stageData.testStartTime ||new Date(Date.now()).toTimeString().slice(0, 5)}
+                                                                value={stageData.testStartTime || new Date(Date.now()).toTimeString().slice(0, 5)}
                                                                 onChange={(e) => handleStageDataChange("testDate", e.target.value)}
                                                             />
                                                         </div>
