@@ -31,4 +31,3 @@ CREATE UNIQUE INDEX "Stage_order_key" ON "public"."Stage"("order");
 
 -- AddForeignKey
 ALTER TABLE "public"."Stage" ADD CONSTRAINT "Stage_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "public"."School"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-

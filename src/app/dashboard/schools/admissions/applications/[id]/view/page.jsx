@@ -222,7 +222,7 @@ export default function ApplicationDetails() {
     // const currentStageIndex = stages.findIndex(stage => stage.id === application.currentStage.id);
     const rejectedStage = stages.findIndex(stage => stage?.name === "Rejected");
 
-    const excludedStageIds = ["36bf836d-c63e-474b-9da5-e16909612ebf", "99493d9e-2f0c-42ff-8da4-904e3bc78450"];
+    const excludedStageIds = ["36bf836d-c63e-474b-9da5-e16909612ebf", "49ee66f1-06c3-4589-b5a8-8e3768350868"];
 
     const filteredStages = stages.filter(
         (stage) => !excludedStageIds.includes(stage.id)
@@ -357,7 +357,7 @@ export default function ApplicationDetails() {
                                             if (rejectedStage) {
                                                 moveMutation.mutate({
                                                     id: applicationId,
-                                                    stageId: "99493d9e-2f0c-42ff-8da4-904e3bc78450",
+                                                    stageId: "49ee66f1-06c3-4589-b5a8-8e3768350868",
                                                     movedById,
                                                     stageData,
                                                 });
@@ -793,7 +793,7 @@ export default function ApplicationDetails() {
                                                 if (rejectedStage) {
                                                     moveMutation.mutate({
                                                         id: applicationId,
-                                                        stageId: "0a2d4db8-05df-4fe4-b05e-dff8454124ba",
+                                                        stageId: "670a599b-b5b9-4c4c-9f50-4b4d31ae0cf5",
                                                         movedById,
                                                         stageData,
                                                     });
