@@ -11,6 +11,7 @@ import { useParams } from "next/navigation";
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { defineStepper } from "@/components/stepper";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import LoaderPage from "@/components/loader-page";
 import {
     Alert,
@@ -404,6 +405,22 @@ export default function ApplicationDetails() {
                     <div className="space-y-4">
                         {/* Test Score */}
                         <div>
+                            <Label className="mb-4">Test Result</Label>
+                            <Select
+                                value={stageData.testResult || ""}
+                                onValueChange={(value) => handleStageDataChange("testResult", value)}
+                            >
+                                <SelectTrigger className="bg-background w-full">
+                                    <SelectValue placeholder="Select result" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="pass">Pass</SelectItem>
+                                    <SelectItem value="fail">Fail</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div>
                             <Label className="mb-4">Test Score</Label>
                             <Input
                                 className="bg-background"
@@ -413,18 +430,6 @@ export default function ApplicationDetails() {
                                 onChange={(e) => handleStageDataChange("testScore", e.target.value)}
                             />
                         </div>
-
-                        {/* Interview Date */}
-                        <div>
-                            <Label className="mb-4">Interview Date</Label>
-                            <Input
-                                className="bg-background"
-                                type="date"
-                                value={stageData.interviewDate || ""}
-                                onChange={(e) => handleStageDataChange("interviewDate", e.target.value)}
-                            />
-                        </div>
-
                         {/* Comments */}
                         <div>
                             <Label className="mb-4">Comments</Label>
@@ -439,7 +444,7 @@ export default function ApplicationDetails() {
                         {/* Schedule Test Button */}
                         <Dialog >
                             <DialogTrigger asChild>
-                                <Button variant="secondary" className="w-full">
+                                <Button className="w-fit">
                                     Schedule Test
                                 </Button>
                             </DialogTrigger>
@@ -459,9 +464,9 @@ export default function ApplicationDetails() {
                                             </DialogTitle>
                                         </DialogHeader>
 
-                                        <div className='border-b  dark:text-white text-black h-min flex py-3.5   px-4'>
+                                        {/* <div className='border-b  dark:text-white text-black h-min flex py-3.5   px-4'>
                                             Set the test date and venue, then inform the candidate for clarity and coordination.
-                                        </div>
+                                        </div> */}
                                         <div className="px-3.5 py-3.5">
                                             <div className="space-y-4">
                                                 <div>
@@ -472,6 +477,30 @@ export default function ApplicationDetails() {
                                                         value={stageData.testDate || ""}
                                                         onChange={(e) => handleStageDataChange("testDate", e.target.value)}
                                                     />
+                                                </div>
+                                                <div>
+                                                    {/* <Label className={'mb-3'}>Test Time</Label> */}
+                                                    <div className="grid grid-cols-2 gap-2.5">
+                                                        <div>
+                                                            <Label className={'mb-3'}>Start Time</Label>
+                                                            <Input
+                                                                type="time"
+                                                                className="bg-background"
+                                                                value={stageData.testStartTime ||new Date(Date.now()).toTimeString().slice(0, 5)}
+                                                                onChange={(e) => handleStageDataChange("testDate", e.target.value)}
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <Label className={'mb-3'}>End Time</Label>
+                                                            <Input
+                                                                type="time"
+                                                                className="bg-background"
+                                                                value={stageData.testEndTime || new Date(Date.now() + 2 * 60 * 60 * 1000).toTimeString().slice(0, 5)}
+                                                                onChange={(e) => handleStageDataChange("testDate", e.target.value)}
+                                                            />
+                                                        </div>
+                                                    </div>
+
                                                 </div>
 
                                                 <div>
@@ -507,10 +536,10 @@ export default function ApplicationDetails() {
                                             // add logic to notify candidate
                                             toast.success("Candidate informed successfully!");
                                         }}
-                                        className={'flex w-full justify-center items-center'}
+                                        className={'inline-flex w-full justify-center items-center'}
                                     >
-                                        <Mail size={35} strokeWidth={2} />
-                                        Inform Candidate
+                                        <Mail strokeWidth={2} />
+                                        Inform & Save
 
                                     </Button>
                                 </DialogFooter>
@@ -735,7 +764,7 @@ export default function ApplicationDetails() {
                             <Badge
                                 className={`px-2 py-1 text-sm font-medium ${getStageStyle(application.currentStage?.name)} capitalize`}
                             >
-                                {application.currentStage?.name.replace("_", " ")}
+                                {application.currentStage?.name.replace("_", " & ")}
                             </Badge>
                         </div>
 

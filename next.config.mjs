@@ -1,9 +1,25 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    domains: ["utfs.io", "uploadthing.com",'ufs.sh','sea1.ingest.uploadthing.com'], // ← REQUIRED for image display
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "utfs.io",
+      },
+      {
+        protocol: "https",
+        hostname: "uploadthing.com",
+      },
+      {
+        protocol: "https",
+        hostname: "ufs.sh",
+      },
+      {
+        protocol: "https",
+        hostname: "sea1.ingest.uploadthing.com",
+      },
+    ],
   },
- 
-};
+}
 
-export default nextConfig;
+export default nextConfig
