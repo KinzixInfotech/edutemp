@@ -182,7 +182,7 @@ model StageHistory {
   stage       Stage       @relation(fields: [stageId], references: [id])
   movedBy     User?       @relation(fields: [movedById], references: [id])
 
-  @@unique([applicationId, stageId]) // ensures 1 record per applicant per stage
+  // @@unique([applicationId, stageId]) // ensures 1 record per applicant per stage
   @@index([applicationId])
   @@index([movedAt])
 }
