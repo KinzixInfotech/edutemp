@@ -58,7 +58,99 @@ async function moveApplication({ id, stageId, movedById, stageData }) {
 let cachedStepper = null;
 let cachedStagesLength = 0;
 
+// Debounce helper to limit API calls
+function useDebounce(value, delay = 400) {
+    const [debounced, setDebounced] = useState(value)
+    useEffect(() => {
+        const handler = setTimeout(() => setDebounced(value), delay)
+        return () => clearTimeout(handler)
+    }, [value, delay])
+    return debounced
+}
 
+export function LocationInput({ stageData, handleStageDataChange, queryClient }) {
+    const [query, setQuery] = useState("")
+    const debouncedQuery = useDebounce(query, 400)
+    //   const queryClient = useQueryClient()
+
+    // Fetch suggestions using Nominatim API
+    const { data: suggestions = [], isFetching } = useQuery({
+        queryKey: ["location-suggestions-india", debouncedQuery],
+        queryFn: async ({ signal }) => {
+            if (!debouncedQuery || debouncedQuery.length < 2) return []
+            const res = await fetch(
+                `https://nominatim.openstreetmap.org/search?format=json&countrycodes=in&addressdetails=1&q=${encodeURIComponent(
+                    debouncedQuery
+                )}&limit=6`,
+                { signal }
+            )
+            return res.json()
+        },
+        enabled: !!debouncedQuery,
+        staleTime: 1000 * 60 * 10, // cache for 10 min
+        gcTime: 1000 * 60 * 30, // garbage collect after 30 min
+        retry: 1,
+    })
+
+    // Prefetch for next possible input (improves UX)
+    useEffect(() => {
+        if (debouncedQuery && debouncedQuery.length > 2) {
+            queryClient.prefetchQuery({
+                queryKey: ["location-suggestions-india", debouncedQuery + " "],
+                queryFn: async () =>
+                    fetch(
+                        `https://nominatim.openstreetmap.org/search?format=json&countrycodes=in&addressdetails=1&q=${encodeURIComponent(
+                            debouncedQuery + " "
+                        )}&limit=6`
+                    ).then((r) => r.json()),
+            })
+        }
+    }, [debouncedQuery, queryClient])
+
+    return (
+        <div className="relative">
+            <Label className="mb-3">Venue / Location</Label>
+            <Input
+                placeholder="Enter test venue or location"
+                className="bg-background"
+                value={stageData.testVenue || ""}
+                onChange={(e) => {
+                    const val = e.target.value
+                    setQuery(val)
+                    handleStageDataChange("testVenue", val)
+                }}
+            />
+
+            {/* Suggestion dropdown */}
+            {debouncedQuery && suggestions.length > 0 && (
+                <div className="absolute  mt-3 z-40 w-full rounded-md  bg-white dark:bg-muted border shadow-md max-h-[240px] overflow-y-auto">
+                    {suggestions.map((item) => (
+                        <div
+                            key={item.place_id}
+                            onClick={() => {
+                                handleStageDataChange("testVenue", item.display_name)
+                                setQuery("")
+                            }}
+                            className="cursor-pointer border-t border-b px-3 py-2 hover:bg-muted"
+                        >
+                            {item.display_name}
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Fetching indicator */}
+            {isFetching && (
+                <div className="absolute mt-2 z-40 text-sm py-2 w-full  inline-flex border rounded-md px-3 shadow-lg bg-white dark:bg-muted text-muted-foreground ">
+
+                    <span className="animate-pulse">
+                        Fetching location suggestions....
+                    </span>
+                </div>
+            )}
+        </div>
+    )
+}
 export default function ApplicationDetails() {
     const params = useParams();
     const applicationId = params.id;
@@ -351,7 +443,7 @@ export default function ApplicationDetails() {
                                     Schedule Test
                                 </Button>
                             </DialogTrigger>
-                            <DialogContent  className="bg-white max-h-[95vh]   overflow-y-auto shadow-none dark:bg-[#171717] w-[384px] h-fit p-0 text-foreground space-y-0 gap-0 rounded-md ">
+                            <DialogContent className="bg-white max-h-[95vh]   overflow-y-auto shadow-none dark:bg-[#171717] w-[384px] h-fit p-0 text-foreground space-y-0 gap-0 rounded-md ">
                                 {/* <DialogHeader>
                                     <DialogTitle>Schedule Test for Candidate</DialogTitle>
                                     <DialogDescription>
@@ -383,13 +475,14 @@ export default function ApplicationDetails() {
                                                 </div>
 
                                                 <div>
-                                                    <Label className={'mb-3'}>Venue / Location</Label>
+                                                    {/* <Label className={'mb-3'}>Venue / Location</Label>
                                                     <Input
                                                         placeholder="Enter test venue or location"
                                                         className="bg-background"
                                                         value={stageData.testVenue || ""}
                                                         onChange={(e) => handleStageDataChange("testVenue", e.target.value)}
-                                                    />
+                                                    /> */}
+                                                    <LocationInput queryClient={queryClient} stageData={stageData} handleStageDataChange={handleStageDataChange} />
                                                 </div>
 
                                                 <div>
