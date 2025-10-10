@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/sonner"
 import { SettingsDialogProvider } from "@/context/Settingsdialog-context";
 import { LoaderProvider } from './context/Loader';
 import { Profile } from '@/components/profile';
+import { CommandMenu } from '@/components/commandmenu';
 export default async function RootLayout({ children }) {
 
     return (
@@ -23,6 +24,7 @@ export default async function RootLayout({ children }) {
                                 }
                             }}
                         />
+                        <CommandMenu/>
                     </ThemeProvider>
                 </LoaderProvider>
                 {/* <SettingsDialog /> */}

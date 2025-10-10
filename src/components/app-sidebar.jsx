@@ -36,7 +36,7 @@ import {
 import { NavSidebarSections } from "./nav-main"
 import { Separator } from "./ui/separator"
 import { BookCopy, BookMarked, BotMessageSquare, CalendarCog, Car, Coins, DollarSign, Ellipsis, Flag, FlaskRound, Grip, House, Library, MonitorCog, Send, Timer, User, UserPen } from "lucide-react"
-const sidebarData = [
+export const SidebarData = [
     {
         // title: "Main",
         items: [
@@ -264,7 +264,7 @@ export function AppSidebar({ ...props }) {
 
             <SidebarContent>
                 <NavSidebarSections
-                    sections={sidebarData}
+                    sections={SidebarData}
                     userRole={fullUser?.role?.name}
                     activePath={pathname}
                 />
