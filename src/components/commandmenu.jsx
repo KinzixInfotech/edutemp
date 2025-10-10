@@ -241,12 +241,13 @@ export function CommandMenu() {
                             setOpen(true);
                             setOpenCmd(false);
                         }}
+                        // className={'border-t border-b rounded-none'}
                     >
                         <CircleUserRound className="mr-2 h-4 w-4" /> {/* Icon added here */}
                         Profile
                     </CommandItem>
                 </CommandGroup>
-                
+
                 {SidebarData.map((section, sectionIndex) => {
                     const visibleItems =
                         section.items?.filter(
@@ -263,6 +264,7 @@ export function CommandMenu() {
                                     );
                                     return visibleSubItems.map((sub, subIndex) => (
                                         <CommandItem
+                                            className={'border-t rounded-none'}
                                             key={`${itemIndex}-${subIndex}`}
                                             onSelect={() => {
                                                 router.push(sub.url);
@@ -277,6 +279,7 @@ export function CommandMenu() {
 
                                 return (
                                     <CommandItem
+                                        className={'border-t  rounded-none'}
                                         key={itemIndex}
                                         onSelect={() => {
                                             router.push(item.url);
