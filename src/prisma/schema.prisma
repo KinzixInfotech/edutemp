@@ -44,6 +44,7 @@ model School {
   AdmissionForm       AdmissionForm[]
   Application         Application[]
   Stage               Stage[]
+  Upload              Upload[]
 
   @@index([name])
 }
@@ -173,16 +174,20 @@ model StageHistory {
   notes         String?
 
   // Stage-specific fields
-  testScore      Float? // if stage requires test
-  testDate       DateTime?
-  interviewDate  DateTime?
+  testPassed    Boolean?
+  testScore     Float?
+  testDate      DateTime?
+  interviewDate DateTime?
+  testStartTime DateTime?
+  testEndTime   DateTime?
+  testVenue     String?
+
   interviewNotes String?
 
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   stage       Stage       @relation(fields: [stageId], references: [id])
   movedBy     User?       @relation(fields: [movedById], references: [id])
 
-  // @@unique([applicationId, stageId]) // ensures 1 record per applicant per stage
   @@index([applicationId])
   @@index([movedAt])
 }
@@ -888,6 +893,18 @@ model LibraryBook {
   @@index([schoolId])
   @@index([status])
   @@index([ISBN])
+}
+
+model Upload {
+  id        String   @id @default(uuid())
+  userId    String?
+  fileUrl   String
+  fileName  String
+  mimeType  String
+  size      Int
+  createdAt DateTime @default(now())
+  School    School?  @relation(fields: [schoolId], references: [id])
+  schoolId  String?  @db.Uuid
 }
 
 model Gallery {

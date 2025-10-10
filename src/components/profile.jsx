@@ -940,8 +940,9 @@ export function Profile() {
               const res = await uploadFiles("profilePictureUploader", {
                 files: [file],
                 input: {
-                  profileId: crypto.randomUUID(),
+                  profileId: fullUser?.id || "no profile id",
                   username: fullUser?.name || "User",
+                  schoolId: fullUser?.schoolId || null,
                 },
               });
               if (res && res[0]?.url) {

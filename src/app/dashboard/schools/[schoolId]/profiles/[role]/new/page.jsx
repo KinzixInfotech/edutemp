@@ -571,8 +571,7 @@ export default function NewProfilePage() {
                         }
                     }}
                     uploading={uploading}
-
-                    open={cropDialogOpen}
+                       open={cropDialogOpen}
                     // onClose={() => setCropDialogOpen(false)}
                     onCropComplete={async (croppedBlob) => {
                         const now = new Date();
@@ -584,12 +583,16 @@ export default function NewProfilePage() {
                         setTempImage(file);
                         try {
                             setUploading(true)
-
                             const res = await uploadFiles("profilePictureUploader", {
                                 files: [file],
+                                // input: {
+                                //     profileId: crypto.randomUUID(),
+                                //     username: form.name || "User",
+                                // },
                                 input: {
-                                    profileId: crypto.randomUUID(),
-                                    username: form.name || "User",
+                                    // profileId: fullUser?.id || "no profile id",
+                                    username: form?.name || "User",
+                                    schoolId: fullUser?.schoolId || null,
                                 },
                             });
                             if (res && res[0]?.url) {

@@ -13,7 +13,8 @@ import {
 } from "@/components/ui/sidebar"
 import { useLoader } from "@/app/dashboard/context/Loader"
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
-import { ChevronDown, ChevronUp } from "lucide-react"
+import { ChevronDown, ChevronUp, SearchIcon } from "lucide-react"
+import { useCommandMenu } from "./CommandMenuContext"
 
 export function NavSidebarSections({ sections, userRole, activePath }) {
     const { setLoading } = useLoader()
@@ -21,9 +22,20 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
 
     const normalize = (path) => path?.replace(/\/$/, "")
 
-
+    const { setOpen } = useCommandMenu()
     return (
         <>
+            {/* <SidebarGroup >
+                <SidebarMenuItem>
+                    <SidebarMenuButton
+                        asChild
+                    // className={'fixed right-0 left-0 top-4 mx-4'}
+                    >
+                    
+
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+            </SidebarGroup> */}
             {sections.map((section) => {
                 const visibleItems = section.items.filter(
                     (item) => !item.roles || item.roles.includes(userRole)
@@ -36,6 +48,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                             <SidebarGroupLabel>{section.title}</SidebarGroupLabel>
                         )}
                         <SidebarMenu>
+
                             {visibleItems.map((item) => {
                                 const isActive = normalize(activePath) === normalize(item.url)
 
@@ -46,7 +59,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                             <SidebarMenuItem>
                                                 <CollapsibleTrigger asChild>
                                                     <SidebarMenuButton
-                                                        className={`group w-full justify-between py-4 hover:!bg-white hover:!text-black transition-all hover:cursor-pointer ${isActive
+                                                        className={`group w-full justify-between py-4 hover:!bg-white rounded-none border-b hover:!text-black transition-all hover:cursor-pointer ${isActive
                                                             ? "bg-white dark:text-white dark:bg-[#171717] shadow-xs font-semibold text-bl border"
                                                             : ""
                                                             }`}
@@ -72,7 +85,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                             <SidebarMenuSubItem key={sub.label} >
                                                                 <SidebarMenuSubButton
                                                                     asChild
-                                                                    className={`transition-all  ${isSubActive ? "bg-white shadow-md dark:text-black  font-semibold text-bl border dark:hover:!text-white" : ""
+                                                                    className={`transition-all   ${isSubActive ? "bg-white  shadow-md dark:text-black  font-semibold text-bl border dark:hover:!text-white" : ""
                                                                         }`}
                                                                 >
                                                                     <Link href={sub.url} onClick={handleClick}>
@@ -94,8 +107,8 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                     <SidebarMenuItem key={item.label}>
                                         <SidebarMenuButton
                                             asChild
-                                            className={`w-full  py-4 hover:!bg-white hover:!text-black transition-all hover:cursor-pointer ${isActive
-                                                ? "bg-white dark:text-white dark:bg-[#171717]  shadow-xs font-semibold text-bl border"
+                                            className={`w-full  py-4 hover:!bg-white hover:!text-black transition-all border-b rounded-none hover:cursor-pointer ${isActive
+                                                ? "bg-[#f6f6f6] dark:text-white dark:bg-[#171717]  font-semibold text-bl"
                                                 : ""
                                                 }`}
                                         >
@@ -110,6 +123,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                         </SidebarMenu>
                     </SidebarGroup>
                 )
+
             })}
         </>
     )

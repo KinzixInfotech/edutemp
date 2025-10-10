@@ -257,7 +257,7 @@ export default function ApplicationDetails() {
     const handleCopy = async () => {
         try {
             await navigator.clipboard.writeText(applicationId);
-            toast.success("Copied successfully");
+            toast.success("Application Id Copied!");
 
         } catch (err) {
             toast.error("Failde To Copy");

@@ -35,13 +35,14 @@ import {
 } from "@tabler/icons-react"
 import { NavSidebarSections } from "./nav-main"
 import { Separator } from "./ui/separator"
-import { BookCopy, BookMarked, BotMessageSquare, CalendarCog, Car, Coins, DollarSign, Ellipsis, Flag, FlaskRound, Grip, House, Library, MonitorCog, Send, Timer, User, UserPen } from "lucide-react"
+import { BookCopy, BookMarked, BotMessageSquare, CalendarCog, Car, Coins, DollarSign, Ellipsis, Flag, FlaskRound, Grip, House, Library, MonitorCog, Newspaper, SearchIcon, Send, Timer, User, UserPen } from "lucide-react"
+import { useCommandMenu } from "./CommandMenuContext"
 export const SidebarData = [
     {
         // title: "Main",
         items: [
             { label: "Home", url: "/dashboard/", icon: House, roles: ["SUPER_ADMIN", "STUDENT", "ADMIN", "MASTER_ADMIN", "TEACHER", "STAFF"] },
-            { label: "Self Attendance", url: "/dashboard/markattendance", icon: House, roles: ["SUPER_ADMIN", "STUDENT", "ADMIN", "MASTER_ADMIN", "TEACHER", "STAFF"] },
+            { label: "Self Attendance", url: "/dashboard/markattendance", icon: Newspaper, roles: ["SUPER_ADMIN", "STUDENT", "ADMIN", "MASTER_ADMIN", "TEACHER", "STAFF"] },
 
             { label: "Noticeboard", url: "/dashboard/schools/noticeboard", icon: Flag, roles: ["ADMIN"] },
 
@@ -240,36 +241,56 @@ const navUser = {
 export function AppSidebar({ ...props }) {
     const { resolvedTheme } = useTheme()
     const { fullUser } = useAuth()
+    const { setOpen } = useCommandMenu();
     const pathname = usePathname()
     const logo = resolvedTheme === "dark" ? logoWhite : logoBlack
     return (
         <Sidebar collapsible="offcanvas" {...props}>
-            <SidebarHeader>
+            <SidebarHeader className={'border mb-2.5  rounded-md  bg-background shadow-xs'}>
                 <SidebarMenu>
-                    <SidebarMenuItem className='border-b pb-2'>
+                    <SidebarMenuItem className=''>
                         <SidebarMenuButton
                             asChild
-                            className="data-[slot=sidebar-menu-button]:!p-1.5 h-fit flex items-center justify-center pointer-events-none"
+                            className="data-[slot=sidebar-menu-button]:!p-1.5 h-fit flex items-center justify-center dark:bg-[#171717] border bg-white pointer-events-none"
                         >
                             {/* <a href="/"> */}
                             <div>
-                                <Image src={logo} width={210} height={200} alt="EduBreezy" />
+                                <Image src={logo} width={195} height={200} alt="EduBreezy" />
                             </div>
                             {/* </a> */}
+                        </SidebarMenuButton>
+                        <SidebarMenuButton asChild className={'mt-1.5'}>
+                            <button
+                                className="inline-flex h-9 w-fit dark:bg-[#171717] rounded-md  bg-white  px-3 py-2 text-sm  text-muted-foreground/80 mb-0 border shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                                onClick={() => setOpen(true)}
+                            >
+                                <span className="flex grow items-center">
+                                    <SearchIcon
+                                        className="-ms-1 me-3 text-muted-foreground/80 dark:text-white"
+                                        size={16}
+                                        aria-hidden="true"
+                                    />
+                                    <span className="font-normal text-muted-foreground/70">Search</span>
+                                </span>
+                                <kbd className="ms-12 -me-1 inline-flex h-5 max-h-full items-center rounded border bg-muted px-1 font-[inherit] text-[0.625rem] font-medium dark:text-white text-muted-foreground/70">
+                                    ⌘K
+                                </kbd>
+                            </button>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
 
                 </SidebarMenu>
             </SidebarHeader>
 
-            <SidebarContent>
+            <SidebarContent className={'bg-background rounded-md border shadow-xs'} >
+                
                 <NavSidebarSections
                     sections={SidebarData}
                     userRole={fullUser?.role?.name}
                     activePath={pathname}
                 />
             </SidebarContent>
-            <SidebarFooter className='border-t'>
+            <SidebarFooter className='border-t rounded-md mt-2.5 border shadow-xs bg-background'>
                 <NavUser user={navUser.user} />
             </SidebarFooter>
         </Sidebar>
