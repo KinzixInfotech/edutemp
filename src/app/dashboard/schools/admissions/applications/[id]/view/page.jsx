@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertCircleIcon, Copy, Loader2, Mail, Phone } from "lucide-react";
+import { AlertCircleIcon, CalendarCheck, Copy, Loader2, Mail, Phone } from "lucide-react";
 import { useParams } from "next/navigation";
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -403,59 +403,16 @@ export default function ApplicationDetails() {
             case "TEST_INTERVIEW":
                 return (
                     <div className="space-y-4">
-                        {/* Test Score */}
-                        <div>
-                            <Label className="mb-4">Test Result</Label>
-                            <Select
-                                value={stageData.testResult || ""}
-                                onValueChange={(value) => handleStageDataChange("testResult", value)}
-                            >
-                                <SelectTrigger className="bg-background w-full">
-                                    <SelectValue placeholder="Select result" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="pass">Pass</SelectItem>
-                                    <SelectItem value="fail">Fail</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div>
-                            <Label className="mb-4">Test Score</Label>
-                            <Input
-                                className="bg-background"
-                                type="number"
-                                placeholder="Enter test score"
-                                value={stageData.testScore || ""}
-                                onChange={(e) => handleStageDataChange("testScore", e.target.value)}
-                            />
-                        </div>
-                        {/* Comments */}
-                        <div>
-                            <Label className="mb-4">Comments</Label>
-                            <Input
-                                className="bg-background"
-                                placeholder="Add comments"
-                                value={stageData.notes || ""}
-                                onChange={(e) => handleStageDataChange("notes", e.target.value)}
-                            />
-                        </div>
-
                         {/* Schedule Test Button */}
                         <Dialog >
                             <DialogTrigger asChild>
-                                <Button className="w-fit">
+                                <Button variant={'outline'} className="w-fit inline-flex items-center justify-center">
                                     Schedule Test
+                                    <CalendarCheck />
+                                    
                                 </Button>
                             </DialogTrigger>
                             <DialogContent className="bg-white max-h-[95vh]   overflow-y-auto shadow-none dark:bg-[#171717] w-[384px] h-fit p-0 text-foreground space-y-0 gap-0 rounded-md ">
-                                {/* <DialogHeader>
-                                    <DialogTitle>Schedule Test for Candidate</DialogTitle>
-                                    <DialogDescription>
-                                        Set the test details and inform the candidate.
-                                    </DialogDescription>
-                                </DialogHeader> */}
-
                                 <div className="space-y-4 mt-4">
                                     <div>
                                         <DialogHeader className='border-b  py-2  h-min flex  justify-center px-3.5'>
@@ -463,10 +420,6 @@ export default function ApplicationDetails() {
                                                 Schedule Test
                                             </DialogTitle>
                                         </DialogHeader>
-
-                                        {/* <div className='border-b  dark:text-white text-black h-min flex py-3.5   px-4'>
-                                            Set the test date and venue, then inform the candidate for clarity and coordination.
-                                        </div> */}
                                         <div className="px-3.5 py-3.5">
                                             <div className="space-y-4">
                                                 <div>
@@ -545,6 +498,45 @@ export default function ApplicationDetails() {
                                 </DialogFooter>
                             </DialogContent>
                         </Dialog>
+                        {/* Test Score */}
+                        <div>
+                            <Label className="mb-4">Test Result</Label>
+                            <Select
+                                value={stageData.testResult || ""}
+                                onValueChange={(value) => handleStageDataChange("testResult", value)}
+                            >
+                                <SelectTrigger className="bg-background w-full">
+                                    <SelectValue placeholder="Select result" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="pass">Pass</SelectItem>
+                                    <SelectItem value="fail">Fail</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div>
+                            <Label className="mb-4">Test Score</Label>
+                            <Input
+                                className="bg-background"
+                                type="number"
+                                placeholder="Enter test score"
+                                value={stageData.testScore || ""}
+                                onChange={(e) => handleStageDataChange("testScore", e.target.value)}
+                            />
+                        </div>
+                        {/* Comments */}
+                        <div>
+                            <Label className="mb-4">Comments</Label>
+                            <Input
+                                className="bg-background"
+                                placeholder="Add comments"
+                                value={stageData.notes || ""}
+                                onChange={(e) => handleStageDataChange("notes", e.target.value)}
+                            />
+                        </div>
+
+
                     </div>
                 );
                 return (
