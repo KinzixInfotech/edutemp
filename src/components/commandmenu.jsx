@@ -35,9 +35,9 @@ export default function CommandMenu({ open, setOpen }) {
     return (
         <CommandDialog open={open} onOpenChange={setOpen}>
             <CommandInput placeholder="Search & Navigate..." />
-            <CommandList>
+            <CommandList >
                 <CommandEmpty>No results found.</CommandEmpty>
-                <CommandGroup heading="Profile">
+                <CommandGroup heading="Profile" >
                     <CommandItem
                         onSelect={() => {
                             setProfileOpen(true)

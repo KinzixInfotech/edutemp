@@ -59,7 +59,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                             <SidebarMenuItem>
                                                 <CollapsibleTrigger asChild>
                                                     <SidebarMenuButton
-                                                        className={`group w-full justify-between py-4 hover:!bg-white rounded-none border-b hover:!text-black transition-all hover:cursor-pointer ${isActive
+                                                        className={`group w-full justify-between py-4 hover:!bg-white rounded-md  hover:!text-black transition-all hover:cursor-pointer ${isActive
                                                             ? "bg-white dark:text-white dark:bg-[#171717] shadow-xs font-semibold text-bl border"
                                                             : ""
                                                             }`}
@@ -107,7 +107,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                     <SidebarMenuItem key={item.label}>
                                         <SidebarMenuButton
                                             asChild
-                                            className={`w-full  py-4 hover:!bg-white hover:!text-black transition-all border-b rounded-none hover:cursor-pointer ${isActive
+                                            className={`w-full  py-4 hover:!bg-white hover:!text-black transition-all  rounded-md hover:cursor-pointer ${isActive
                                                 ? "bg-[#f6f6f6] dark:text-white dark:bg-[#171717]  font-semibold text-bl"
                                                 : ""
                                                 }`}
