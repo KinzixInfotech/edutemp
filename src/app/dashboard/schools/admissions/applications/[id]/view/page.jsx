@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertCircleIcon, CalendarCheck, Copy, Loader2, Mail, Phone } from "lucide-react";
+import { AlertCircleIcon, CalendarCheck, CheckCircle2Icon, Copy, Loader2, Mail, Phone } from "lucide-react";
 import { useParams } from "next/navigation";
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,7 @@ import {
     AlertDescription,
     AlertTitle,
 } from "@/components/ui/alert"
-
+import { CheckCircle2, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -154,13 +154,114 @@ export function LocationInput({ stageData, handleStageDataChange, queryClient })
 }
 export default function ApplicationDetails() {
     const params = useParams();
+
     const applicationId = params.id;
     const local = localStorage.getItem('user');
     const fullUser = JSON.parse(local);
 
+    const [scopen, setScopen] = useState(false);
+
     const schoolId = fullUser?.schoolId;
 
     const movedById = fullUser?.id;
+    const { mutate: updateTestResult, isPending: isLoadingtestRes } = useUpdateTestResult();
+
+    function useUpdateTestResult() {
+        const queryClient = useQueryClient();
+
+        return useMutation({
+            mutationFn: async (payload) => {
+                const res = await fetch("/api/schools/admissions/applications/stage/schedule", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Failed to update test result");
+                return data;
+            },
+            onSuccess: (data, variables) => {
+                toast.success("Test result saved!");
+                // Refetch the application test details
+                queryClient.invalidateQueries(["applicationTest", applicationId]);
+
+                setStageData((prev) => ({
+                    ...prev,
+                    testScore: data.updated.testScore,
+                    testResult:
+                        data.updated.testPassed === true
+                            ? "pass"
+                            : data.updated.testPassed === false
+                                ? "fail"
+                                : "",
+                    notes: data.updated.notes,
+                }));
+            },
+            onError: (err) => {
+                toast.error(err.message);
+            },
+        });
+    }
+    function useScheduleTest() {
+        return useMutation({
+            mutationFn: async (payload) => {
+                const res = await fetch("/api/schools/admissions/applications/stage/schedule", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Failed to schedule test");
+                return data;
+            },
+            onSuccess: () => {
+                toast.success("Test scheduled successfully!");
+                // Refetch the test details for this application
+                queryClient.invalidateQueries(["applicationTest", applicationId]);
+
+                setScopen(false);
+                setStageData({}); // Reset stage data after scheduling
+            },
+            onError: (err) => {
+                toast.error(err.message);
+            },
+        });
+    }
+    function useApplicationTest(applicationId) {
+        return useQuery({
+            queryKey: ["applicationTest", applicationId],
+            queryFn: async () => {
+                const res = await fetch(`/api/schools/admissions/applications/stage/schedule?applicationId=${applicationId}`);
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Failed to fetch test");
+                return data.schedule;
+            },
+            enabled: !!applicationId, // only run when ID is available
+        });
+    }
+    function useApplicationTestScore(applicationId) {
+        return useQuery({
+            queryKey: ["applicationTest", applicationId],
+            queryFn: async () => {
+                const res = await fetch(`/api/schools/admissions/applications/stage/stageHistory?applicationId=${applicationId}&stageId=${application?.currentStage.id}`);
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Failed to fetch test");
+                return data.schedule;
+            },
+            onSuccess: (data) => {
+                console.log(data);
+
+            },
+            enabled: !!applicationId, // only run when ID is available
+        });
+    }
+    const { data: test, isPending: isLoadingtest } = useApplicationTest(applicationId);
+    const { data: testScore, isPending } = useApplicationTestScore(applicationId);
+    console.log(testScore);
+
+    const { mutate: scheduleTest, isPending: isLoading } = useScheduleTest();
+    console.log(isLoading);
+
 
     const [stageData, setStageData] = useState({}); // Store stage-specific data
     console.log(stageData);
@@ -263,6 +364,7 @@ export default function ApplicationDetails() {
             toast.error("Failde To Copy");
         }
     };
+
     const renderFieldsForStage = (stageName, methods) => {
 
         const handleStageDataChange = useCallback((field, value) => {
@@ -401,15 +503,16 @@ export default function ApplicationDetails() {
                     </div>
                 );
             case "TEST_INTERVIEW":
+
                 return (
                     <div className="space-y-4">
                         {/* Schedule Test Button */}
-                        <Dialog >
+
+                        <Dialog open={scopen} onOpenChange={setScopen}>
                             <DialogTrigger asChild>
                                 <Button variant={'outline'} className="w-fit inline-flex items-center justify-center">
-                                    Schedule Test
                                     <CalendarCheck />
-                                    
+                                    {test ? ('Update Scheduled Test') : "Schedule Test"}
                                 </Button>
                             </DialogTrigger>
                             <DialogContent className="bg-white max-h-[95vh]   overflow-y-auto shadow-none dark:bg-[#171717] w-[384px] h-fit p-0 text-foreground space-y-0 gap-0 rounded-md ">
@@ -484,16 +587,25 @@ export default function ApplicationDetails() {
                                 </div>
 
                                 <DialogFooter className="mb-4 px-4 border-t pt-3.5">
+
                                     <Button
+                                        disabled={isLoading}
                                         onClick={() => {
-                                            // add logic to notify candidate
-                                            toast.success("Candidate informed successfully!");
+                                            scheduleTest({
+                                                applicationId: applicationId,
+                                                stageId: application.currentStage.id,
+                                                movedById,
+                                                testDate: stageData.testDate,
+                                                testStartTime: stageData.testStartTime,
+                                                testEndTime: stageData.testEndTime,
+                                                testVenue: stageData.testVenue,
+                                                customMessage: stageData.customMessage,
+                                            });
                                         }}
-                                        className={'inline-flex w-full justify-center items-center'}
+                                        className="inline-flex w-full justify-center items-center"
                                     >
                                         <Mail strokeWidth={2} />
-                                        Inform & Save
-
+                                        {isLoading ? "Scheduling..." : "Inform & Save"}
                                     </Button>
                                 </DialogFooter>
                             </DialogContent>
@@ -536,8 +648,23 @@ export default function ApplicationDetails() {
                             />
                         </div>
 
+                        <Button
+                            onClick={() =>
+                                updateTestResult({
+                                    applicationId: applicationId,
+                                    stageId: application.currentStage.id,
+                                    testResult: stageData.testResult,
+                                    testScore: Number(stageData.testScore),
+                                    notes: stageData.notes,
+                                })
+                            }
+                            className="w-full inline-flex items-center justify-center"
+                            disabled={isLoadingtestRes}
+                        >
+                            {isLoadingtestRes ? "Saving..." : "Save"}
+                        </Button>
 
-                    </div>
+                    </div >
                 );
                 return (
                     <div className="space-y-4">
@@ -764,6 +891,38 @@ export default function ApplicationDetails() {
                 </Card>
             </div>
             <div className="flex flex-wrap items-center gap-2 bg-white dark:bg-background p-4 rounded-md">
+                {
+                    test && (
+                        <Alert className="flex transition-all items-start gap-2 mb-2.5 border-green-400 shadow-sm bg-green-50 text-green-800">
+                            <CheckCircle2Icon />
+
+                            <div>
+                                <AlertTitle>Scheduled Test Details</AlertTitle>
+                                {/* <AlertTitle>Test Scheduled</AlertTitle> */}
+                                <AlertDescription className="space-y-1 mt-2.5" >
+                                    <ul className="space-y-1 font-normal text-black text-sm">
+                                        <li> <span className="font-semibold">Test Date: </span>{new Date(test.testDate).toLocaleDateString()}</li>
+                                        <li>
+                                            <span className="font-semibold">Test Time: </span>{" "}
+                                            {new Date(test.testStartTime).toLocaleTimeString([], {
+                                                hour: "2-digit",
+                                                minute: "2-digit",
+                                            })}{" "}
+                                            –{" "}
+                                            {new Date(test.testEndTime).toLocaleTimeString([], {
+                                                hour: "2-digit",
+                                                minute: "2-digit",
+                                            })}
+                                        </li>
+                                        <li className="flex items-center gap-1">
+                                            <span className="font-semibold">Test Venue: </span>
+                                            <span>{test.testVenue}</span>
+                                        </li>
+                                    </ul>
+                                </AlertDescription>
+                            </div>
+                        </Alert>
+                    )}
                 <Stepper.Provider variant="horizontal" labelOrientation="vertical" initialStep={stages[currentStageIndex]?.id}>
                     {({ methods }) => (
                         <>

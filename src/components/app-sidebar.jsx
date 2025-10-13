@@ -278,10 +278,8 @@ export function AppSidebar({ ...props }) {
                             </button>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
-
                 </SidebarMenu>
             </SidebarHeader>
-
             <SidebarContent className={'bg-background rounded-md border shadow-xs'} >
                 
                 <NavSidebarSections
