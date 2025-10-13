@@ -234,7 +234,7 @@ const Composer = ({ onClose }) => {
                     <Button variant="outline">Cancel</Button>
                 </DialogClose>
                 <Button onClick={handleSend}>
-                    <Send className="mr-2 h-4 w-4" /> Send
+                    <Send className="h-4 w-4" /> Send
                 </Button>
             </div>
         </div>
@@ -343,7 +343,7 @@ function GmailAccountDropdown({ userId, setOpen }) {
     if (error) return <span>Error loading accounts</span>;
 
     return (
-        
+
         <DropdownMenu>
             <DropdownMenuTrigger asChild className="bg-muted rounded-lg px-2 py-1 border">
                 <div className="flex items-center cursor-pointer">
@@ -439,12 +439,10 @@ const Inbox = () => {
     const { data: emails, refetch, isPending: isFetchingmsgs } = useEmails(pageToken);
 
     useEffect(() => {
-        const cookie = document.cookie.includes("gmail_access_token")
-        console.log("Gmail Connected:", cookie)
-        setConnected(cookie)
-    }, [])
-
-
+        const hasEmailCookie = document.cookie.includes("gmail_user_email");
+        console.log("Gmail Connected:", hasEmailCookie);
+        setConnected(hasEmailCookie);
+    }, []);
     // const [emails, setEmails] = useState([]);
     const [filteredEmails, setFilteredEmails] = useState([]);
     const [isSyncing, setIsSyncing] = useState(false);
@@ -494,23 +492,23 @@ const Inbox = () => {
         const endIndex = startIndex + ITEMS_PER_PAGE;
         setFilteredEmails(filtered.slice(startIndex, endIndex));
     };
-
-
     const handlePageChange = (newPage) => {
         setCurrentPage(newPage);
     };
 
     const totalPages = Math.ceil(emails?.length / ITEMS_PER_PAGE);
     const [open, setOpen] = useState(false)
+
     const { data, isSuccess, isFetching } = useQuery({
         queryKey: ["gmailAuthUrl"],
         queryFn: async () => {
             const res = await fetch(`/api/gmail/auth-url?userId=${fullUser?.id}`)
-            if (!res.ok) throw new Error("Failed to get auth URL")
+            if (!res.ok) throw        new Error("Failed to get auth URL")
             return res.json()
         },
         enabled: open, // only run query when dialog is opened
     })
+
     useEffect(() => {
         if (isSuccess && data?.url) {
             const timer = setTimeout(() => {
@@ -519,7 +517,6 @@ const Inbox = () => {
             return () => clearTimeout(timer)
         }
     }, [isSuccess, data])
-
     return (
         <div className="container mx-auto h-full p-4">
             <div className="flex justify-between items-center mb-4">
@@ -542,7 +539,7 @@ const Inbox = () => {
                             <Dialog>
                                 <DialogTrigger asChild>
                                     <Button>
-                                        <Send className="mr-2 h-4 w-4" /> Send Message
+                                        <Send className="h-4 w-4" /> Send Mail
                                     </Button>
                                 </DialogTrigger>
                                 <DialogContent>
