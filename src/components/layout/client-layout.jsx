@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/lib/supabase";
 import LoaderPage from "../loader-page";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import NetworkStatusDialog from "../NetworkIndicatordialog";
 
 const TopProgressBar = dynamic(() => import("@/app/components/TopProgressBar"), {
     ssr: false,
@@ -103,9 +104,9 @@ export default function ClientLayout({ children }) {
                 <OnboardingDialog />
                 {!hideUI && <AppSidebar variant="inset" />}
                 <TopProgressBar />
-               
+
                 <SidebarInset>
-                    
+
                     {!hideUI && <SiteHeader />}
                     <main className="w-full h-full relative">
                         {loading ? (
@@ -137,9 +138,9 @@ export default function ClientLayout({ children }) {
                             </div>
                         </div>
                     </footer>
-
                 </SidebarInset>
             </SidebarProvider>
+            <NetworkStatusDialog />
         </QueryClientProvider>
 
     );
