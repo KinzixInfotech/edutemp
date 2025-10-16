@@ -10,6 +10,8 @@ const getTestSchema = z.object({
 
 export async function GET(req) {
     try {
+        console.log("🔥 Hit stageHistory route");
+
         const { searchParams } = new URL(req.url);
 
         const params = getTestSchema.parse({
@@ -23,10 +25,10 @@ export async function GET(req) {
             orderBy: { movedAt: "desc" },
             select: {
                 id: true,
-                testDate: true,
-                testStartTime: true,
-                testEndTime: true,
-                testVenue: true,
+                // testDate: true,
+                // testStartTime: true,
+                // testEndTime: true,
+                // testVenue: true,
                 testPassed: true,
                 testScore: true,
                 notes: true,
@@ -34,6 +36,7 @@ export async function GET(req) {
                 movedBy: { select: { id: true, name: true, email: true } },
             },
         });
+console.log("latestTest:", latestTest);
 
         return NextResponse.json({ success: true, test: latestTest || null });
     } catch (err) {

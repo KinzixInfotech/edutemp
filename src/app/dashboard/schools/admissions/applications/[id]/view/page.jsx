@@ -1,6 +1,6 @@
 
 'use client'
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,6 +71,7 @@ function useDebounce(value, delay = 400) {
 
 export function LocationInput({ stageData, handleStageDataChange, queryClient }) {
     const [query, setQuery] = useState("")
+
     const debouncedQuery = useDebounce(query, 400)
     //   const queryClient = useQueryClient()
 
@@ -155,6 +156,8 @@ export function LocationInput({ stageData, handleStageDataChange, queryClient })
 export default function ApplicationDetails() {
     const params = useParams();
 
+    const stepperMethodsRef = useRef(null);
+    const [activeStep, setActiveStep] = useState(null);
     const applicationId = params.id;
     const local = localStorage.getItem('user');
     const fullUser = JSON.parse(local);
@@ -165,7 +168,14 @@ export default function ApplicationDetails() {
 
     const movedById = fullUser?.id;
     const { mutate: updateTestResult, isPending: isLoadingtestRes } = useUpdateTestResult();
-
+    const { data: { application } = {}, isLoading: appLoading } = useQuery({
+        queryKey: ["application", applicationId, schoolId],
+        queryFn: () => fetchApplication({ applicationId, schoolId }),
+        enabled: !!schoolId && !!applicationId,
+        refetchOnWindowFocus: false,
+        staleTime: 1000 * 60 * 5, // 5 minutes
+        cacheTime: 1000 * 60 * 10, // 10 minutes
+    });
     function useUpdateTestResult() {
         const queryClient = useQueryClient();
 
@@ -239,26 +249,96 @@ export default function ApplicationDetails() {
             enabled: !!applicationId, // only run when ID is available
         });
     }
-    function useApplicationTestScore(applicationId) {
-        return useQuery({
-            queryKey: ["applicationTest", applicationId],
-            queryFn: async () => {
-                const res = await fetch(`/api/schools/admissions/applications/stage/stageHistory?applicationId=${applicationId}&stageId=${application?.currentStage.id}`);
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || "Failed to fetch test");
-                return data.schedule;
-            },
-            onSuccess: (data) => {
-                console.log(data);
 
+    // function useApplicationTestScore(applicationId, stageid) {
+    //     console.log("🎯 Hook mounted with ID:", stageid);
+
+    //     return useQuery({
+    //         queryKey: ["applicationTest", applicationId],
+    //         queryFn: async () => {
+    //             console.log("🚀 QueryFn triggered!");
+    //             const url = `/api/schools/admissions/applications/stage/stageHistory?applicationId=ab11bcd5-4022-4fef-92a4-256e59a0e048&stageId=50efcbd6-8c84-4e10-a982-26babc696a10`;
+    //             console.log("➡️ Fetching:", url);
+
+    //             const res = await fetch(url, { credentials: "include" });
+    //             console.log("📥 Response status:", res.status);
+
+    //             const data = await res.json();
+    //             console.log("📦 Data received:", data);
+
+    //             if (!res.ok) throw new Error(data.error || "Failed to fetch test");
+    //             return data.test;
+    //         },
+    //         onSuccess: (data) => {
+    //             console.log("✅ Query success:", data);
+    //         },
+    //         onError: (err) => {
+    //             console.error("❌ Query failed:", err);
+    //         },
+    //         enabled: !!applicationId,
+    //     });
+    // }
+
+    const { data: test, isPending: isLoadingtest } = useApplicationTest(applicationId);
+
+    useEffect(() => {
+        if (test) {
+            const formattedDate = test.testDate ? test.testDate.split("T")[0] : "";
+            setStageData((prev) => ({
+                ...prev,
+                testDate: formattedDate,
+                testStartTime: test?.testStartTime || "",
+                testEndTime: test?.testEndTime || "",
+                testVenue: test?.testVenue || "",
+            }));
+        }
+    }, [test]);
+
+
+
+    function useApplicationTestScore(applicationId, stageId) {
+        return useQuery({
+            queryKey: ["applicationTest", applicationId, stageId],
+            enabled: !!applicationId && !!stageId,
+            staleTime: 5 * 60 * 1000, // 5 minutes: data is considered fresh for 5 minutes
+            cacheTime: 30 * 60 * 1000, // 30 minutes: cached even if not used
+            queryFn: async () => {
+                const url = `/api/schools/admissions/applications/stage/stageHistory?applicationId=${applicationId}&stageId=${stageId}`;
+                const res = await fetch(url, { credentials: "include" });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Failed to fetch test score");
+                return data.test;
             },
-            enabled: !!applicationId, // only run when ID is available
         });
     }
-    const { data: test, isPending: isLoadingtest } = useApplicationTest(applicationId);
-    const { data: testScore, isPending } = useApplicationTestScore(applicationId);
-    console.log(testScore);
+    // const {
+    //     data: testScoremut,
+    //     isPending,
+    //     refetch,
+    // } = useApplicationTestScore(applicationId, application?.currentStage?.id);
 
+    const { data: testScoremut, refetch, isPending } = useApplicationTestScore(applicationId, activeStep);
+
+    // Sync test data to stageData whenever testScoremut or activeStep changes
+    useEffect(() => {
+        if (testScoremut) {
+            setStageData((prev) => ({
+                ...prev,
+                testScore: testScoremut?.testScore || "",
+                testResult:
+                    testScoremut?.testPassed === true
+                        ? "pass"
+                        : testScoremut?.testPassed === false
+                            ? "fail"
+                            : "",
+                notes: testScoremut?.notes || "",
+            }));
+        }
+    }, [testScoremut, activeStep]);
+    // force refetch whenever step changes
+    useEffect(() => {
+        if (activeStep) refetch();
+    }, [activeStep, refetch]);
     const { mutate: scheduleTest, isPending: isLoading } = useScheduleTest();
     console.log(isLoading);
 
@@ -274,14 +354,7 @@ export default function ApplicationDetails() {
         cacheTime: 1000 * 60 * 10, // 10 minutes
     });
 
-    const { data: { application } = {}, isLoading: appLoading } = useQuery({
-        queryKey: ["application", applicationId, schoolId],
-        queryFn: () => fetchApplication({ applicationId, schoolId }),
-        enabled: !!schoolId && !!applicationId,
-        refetchOnWindowFocus: false,
-        staleTime: 1000 * 60 * 5, // 5 minutes
-        cacheTime: 1000 * 60 * 10, // 10 minutes
-    });
+
     const queryClient = useQueryClient();
 
     const moveMutation = useMutation({
@@ -354,6 +427,24 @@ export default function ApplicationDetails() {
         cachedStagesLength = filteredStages.length;
     }
     const { Stepper } = cachedStepper;
+
+    const isStageDataChanged = () => {
+        if (!testScoremut) {
+            // no fetched data yet, enable if any field has value
+            return !!(stageData.testScore || stageData.testResult || stageData.notes);
+        }
+        // compare with fetched data
+        return (
+            stageData.testScore !== (testScoremut?.testScore || "") ||
+            stageData.testResult !==
+            (testScoremut?.testPassed === true
+                ? "pass"
+                : testScoremut?.testPassed === false
+                    ? "fail"
+                    : "") ||
+            stageData.notes !== (testScoremut?.notes || "")
+        );
+    };
 
     const handleCopy = async () => {
         try {
@@ -560,13 +651,6 @@ export default function ApplicationDetails() {
                                                 </div>
 
                                                 <div>
-                                                    {/* <Label className={'mb-3'}>Venue / Location</Label>
-                                                    <Input
-                                                        placeholder="Enter test venue or location"
-                                                        className="bg-background"
-                                                        value={stageData.testVenue || ""}
-                                                        onChange={(e) => handleStageDataChange("testVenue", e.target.value)}
-                                                    /> */}
                                                     <LocationInput queryClient={queryClient} stageData={stageData} handleStageDataChange={handleStageDataChange} />
                                                 </div>
 
@@ -656,13 +740,17 @@ export default function ApplicationDetails() {
                                     testResult: stageData.testResult,
                                     testScore: Number(stageData.testScore),
                                     notes: stageData.notes,
+                                }).then(() => {
+                                    // Invalidate the cached query so react-query refetches fresh data
+                                    queryClient.invalidateQueries(["applicationTest", applicationId, activeStep]);
                                 })
                             }
                             className="w-full inline-flex items-center justify-center"
-                            disabled={isLoadingtestRes}
+                            disabled={isLoadingtestRes || !isStageDataChanged()}
                         >
                             {isLoadingtestRes ? "Saving..." : "Save"}
                         </Button>
+
 
                     </div >
                 );
@@ -924,100 +1012,113 @@ export default function ApplicationDetails() {
                         </Alert>
                     )}
                 <Stepper.Provider variant="horizontal" labelOrientation="vertical" initialStep={stages[currentStageIndex]?.id}>
-                    {({ methods }) => (
-                        <>
-                            {application.currentStage.name === 'REJECTED' ? (
-                                <div className="flex  w-full h-max mt-4 p-4 bg-muted  border rounded-md  flex-col gap-2.5">
-                                    <Alert variant="destructive"  >
-                                        <AlertCircleIcon />
+                    {({ methods }) => {
+                        // store methods in ref
+                        stepperMethodsRef.current = methods;
 
-                                        <AlertTitle>Application Rejected.</AlertTitle>
-                                        <AlertDescription>
-                                            <p>Reason: {application.data?.[application.currentStage.id]?.rejectionReason}</p>
-                                        </AlertDescription>
+                        // update state whenever current step changes
+                        useEffect(() => {
+                            if (methods.current.id !== activeStep) {
+                                console.log("Active step changed:", methods.current.id);
+                                setActiveStep(methods.current.id);
+                            }
+                        }, [methods.current.id, activeStep]);
 
-                                    </Alert>
-                                    <div>
-                                        <Button
-                                            className="w-full"
-                                            onClick={() => {
-                                                if (rejectedStage) {
-                                                    moveMutation.mutate({
-                                                        id: applicationId,
-                                                        stageId: "670a599b-b5b9-4c4c-9f50-4b4d31ae0cf5",
-                                                        movedById,
-                                                        stageData,
-                                                    });
-                                                } else {
-                                                    toast.error("Rejected stage not found");
-                                                }
-                                            }}
-                                            disabled={!rejectedStage || moveMutation.isPending}
-                                            variant="outline"
-                                        >
-                                            {moveMutation.isPending ? (
-                                                <span className="flex items-center justify-center gap-2">
-                                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                                    Activating...
-                                                </span>
-                                            ) : (
-                                                "Activate"
-                                            )}
-                                        </Button>
+                        return (
+                            <>
+                                {application.currentStage.name === 'REJECTED' ? (
+                                    <div className="flex  w-full h-max mt-4 p-4 bg-muted  border rounded-md  flex-col gap-2.5">
+                                        <Alert variant="destructive"  >
+                                            <AlertCircleIcon />
 
-                                    </div>
+                                            <AlertTitle>Application Rejected.</AlertTitle>
+                                            <AlertDescription>
+                                                <p>Reason: {application.data?.[application.currentStage.id]?.rejectionReason}</p>
+                                            </AlertDescription>
 
-                                </div>
-                            ) : (
-                                <>
-                                    <Stepper.Navigation className='border p-4 shadow-md bg-white dark:bg-muted  rounded-md overflow-x-auto overflow-hidden'>
-                                        {methods.all.map((step) => (
-                                            <Stepper.Step
-                                                key={step.id}
-                                                of={step.id}
-                                                onClick={() => methods.goTo(step.id)}
-                                                disabled={stages.findIndex(s => s.id === step.id) > currentStageIndex && !methods.isLast}
-                                            >
-                                                <Stepper.Title>
-                                                    {step.title
-                                                        .replace("_", " ")                       // replace underscore with space
-                                                        .toLowerCase()                           // convert all to lowercase
-                                                        .replace(/^\w/, (c) => c.toUpperCase()) // capitalize first letter
+                                        </Alert>
+                                        <div>
+                                            <Button
+                                                className="w-full"
+                                                onClick={() => {
+                                                    if (rejectedStage) {
+                                                        moveMutation.mutate({
+                                                            id: applicationId,
+                                                            stageId: "670a599b-b5b9-4c4c-9f50-4b4d31ae0cf5",
+                                                            movedById,
+                                                            stageData,
+                                                        });
+                                                    } else {
+                                                        toast.error("Rejected stage not found");
                                                     }
-                                                </Stepper.Title>
-
-                                                <Stepper.Description>{step.description}</Stepper.Description>
-                                            </Stepper.Step>
-                                        ))}
-                                    </Stepper.Navigation>
-
-                                    <div className="mt-4 p-4 bg-white shadow-md dark:bg-muted border rounded-md">
-                                        {renderFieldsForStage(methods.current.title, methods)}
-                                    </div>
-
-                                    <Stepper.Controls className="mt-4 w-full flex justify-between ">
-                                        {/* <div></div> */}
-                                        <div className="flex gap-3">
-                                            <Button type="button" variant="secondary" onClick={methods.prev} disabled={methods.isFirst}>
-                                                Previous
+                                                }}
+                                                disabled={!rejectedStage || moveMutation.isPending}
+                                                variant="outline"
+                                            >
+                                                {moveMutation.isPending ? (
+                                                    <span className="flex items-center justify-center gap-2">
+                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                        Activating...
+                                                    </span>
+                                                ) : (
+                                                    "Activate"
+                                                )}
                                             </Button>
-                                            <Button type="button" variant="secondary" onClick={methods.isLast ? methods.reset : methods.next} disabled={methods.isLast}>
-                                                {methods.isLast ? "Reset" : "Next"}
-                                            </Button>
+
                                         </div>
-                                        <Button
-                                            onClick={() => moveMutation.mutate({ id: applicationId, stageId: methods.current.id, movedById, stageData })}
-                                            disabled={application.currentStage.id === methods.current.id}
-                                        >
-                                            {application.currentStage.id === methods.current.id
-                                                ? 'Marked'
-                                                : `Mark`}
-                                        </Button>
-                                    </Stepper.Controls>
-                                </>
-                            )}
-                        </>
-                    )}
+
+                                    </div>
+                                ) : (
+                                    <>
+                                        <Stepper.Navigation className='border p-4 shadow-md bg-white dark:bg-muted  rounded-md overflow-x-auto overflow-hidden'>
+                                            {methods.all.map((step) => (
+                                                <Stepper.Step
+                                                    key={step.id}
+                                                    of={step.id}
+                                                    onClick={() => methods.goTo(step.id)}
+                                                    disabled={stages.findIndex(s => s.id === step.id) > currentStageIndex && !methods.isLast}
+                                                >
+                                                    <Stepper.Title>
+                                                        {step.title
+                                                            .replace("_", " ")                       // replace underscore with space
+                                                            .toLowerCase()                           // convert all to lowercase
+                                                            .replace(/^\w/, (c) => c.toUpperCase()) // capitalize first letter
+                                                        }
+                                                    </Stepper.Title>
+
+                                                    <Stepper.Description>{step.description}</Stepper.Description>
+                                                </Stepper.Step>
+                                            ))}
+                                        </Stepper.Navigation>
+
+                                        <div className="mt-4 p-4 bg-white shadow-md dark:bg-muted border rounded-md">
+                                            {renderFieldsForStage(methods.current.title, methods)}
+                                        </div>
+
+                                        <Stepper.Controls className="mt-4 w-full flex justify-between ">
+                                            {/* <div></div> */}
+                                            <div className="flex gap-3">
+                                                <Button type="button" variant="secondary" onClick={methods.prev} disabled={methods.isFirst}>
+                                                    Previous
+                                                </Button>
+                                                <Button type="button" variant="secondary" onClick={methods.isLast ? methods.reset : methods.next} disabled={methods.isLast}>
+                                                    {methods.isLast ? "Reset" : "Next"}
+                                                </Button>
+                                            </div>
+                                            <Button
+                                                onClick={() => moveMutation.mutate({ id: applicationId, stageId: methods.current.id, movedById, stageData })}
+                                                disabled={application.currentStage.id === methods.current.id}
+                                            >
+                                                {application.currentStage.id === methods.current.id
+                                                    ? 'Marked'
+                                                    : `Mark`}
+                                            </Button>
+                                        </Stepper.Controls>
+                                    </>
+                                )}
+                            </>
+                        );
+                    }}
                 </Stepper.Provider>
             </div>
         </div>
