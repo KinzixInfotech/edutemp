@@ -981,7 +981,7 @@ export default function ApplicationDetails() {
             <div className="flex flex-wrap items-center gap-2 bg-white dark:bg-background p-4 rounded-md">
                 {
                     test && (
-                        <Alert className="flex transition-all items-start gap-2 mb-2.5 border-green-400 shadow-sm bg-green-50 text-green-800">
+                        <Alert className="flex transition-all items-start gap-2 mb-2.5 border-green-400 shadow-sm bg-green-50  text-green-800">
                             <CheckCircle2Icon />
 
                             <div>

@@ -843,11 +843,7 @@ export function Profile() {
                 name="email"
                 onChange={handleInputChange}
               />
-              {/* <ProfileItem
-                                label="Role"
-                                value={updatedFields.role || fullUser?.role?.name}
-                                name="role"
-                            /> */}
+
               <ProfileItem
                 label="School"
                 value={updatedFields.school || fullUser?.school?.name}
@@ -858,6 +854,11 @@ export function Profile() {
                 label="School Domain"
                 value={updatedFields.domain || fullUser?.school?.domain}
                 name="domain"
+              />
+              <ProfileItem
+                label="School Code"
+                value={fullUser?.school?.schoolCode}
+                name="code"
               />
             </div>
           </div>
@@ -899,6 +900,35 @@ export function Profile() {
       </div>
     )
   }
+
+  // Function to check if there are actual changes compared to the original data
+  const hasChanges = () => {
+    if (!fullUser) return false;
+
+    // Get the reference original data based on role
+    let originalData = {};
+    switch (fullUser.role?.name) {
+      case "STUDENT":
+        originalData = { ...fullUser.studentdatafull, admissionNo: fullUser?.admissionNo, class: fullUser?.classs?.className, ...fullUser?.section }; // add any top-level fields you need
+        break;
+      case "TEACHING_STAFF":
+        originalData = { ...fullUser.teacherdata, name: fullUser?.name, email: fullUser?.email };
+        break;
+      case "ADMIN":
+        originalData = { ...fullUser.school, name: fullUser?.name, email: fullUser?.email, id: fullUser?.id, domain: fullUser?.school?.domain };
+        break;
+      case "SUPER_ADMIN":
+        originalData = { name: fullUser?.name, email: fullUser?.email, role: fullUser?.role?.name };
+        break;
+      default:
+        originalData = {};
+    }
+
+    // Check if any key in updatedFields differs from originalData
+    return Object.keys(updatedFields).some((key) => updatedFields[key] !== (originalData[key] ?? ""));
+  };
+
+
   const [previewUrl, setPreviewUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [errorUpload, setErrorupload] = useState(false);
@@ -978,7 +1008,7 @@ export function Profile() {
             Make changes to your profile here. You can change your photo and set a
             username.
           </DialogDescription>
-          <div className="overflow-y-scroll">
+          <div className="overflow-y-scroll ">
             <ProfileBg />
             <FileUploadAvatar defValue={fullUser?.profilePicture} onChange={(previewUrl) => handleImageUpload(previewUrl)} resetKey={resetKey} />
             <div className="px-6 pt-4 pb-6">
@@ -986,155 +1016,59 @@ export function Profile() {
                 <div className="flex flex-col gap-4 sm:flex-row">
                   <div className="flex-1 space-y-2">
                     {renderContent()}
+
                   </div>
                 </div>
               </form>
             </div>
           </div>
-          <DialogFooter className="border-t px-6 py-4">
-            <DialogClose asChild>
-              <Button type="button" variant="outline">
-                Cancel
-              </Button>
-            </DialogClose>
-            <DialogClose asChild>
-              {Object.keys(updatedFields).length > 0 && (
-                <Button type="button" onClick={handleSave} disabled={isSaving}>
-                  {isSaving ? 'Saving...' : 'Save changes'}
+          <DialogFooter className="w-full border-t px-6 py-4 grid grid-cols-1 md:grid-cols-2 gap-2.5 items-center">
+            {/* Left side: Change Password */}
+            <Button variant="outline" className="w-full text-center ">
+              Change Your Password
+            </Button>
+
+            {/* Spacer for desktop alignment */}
+            {/* <div className="hidden md:block"></div> */}
+
+            {/* Right side: Cancel + Save */}
+            <div className="flex flex-col lg:flex-row gap-2.5 w-full md:justify-end">
+              {/* <DialogClose asChild>
+                <Button type="button" variant="outline" className="w-full lg:w-fit">
+                  Cancel
                 </Button>
-              )}
-            </DialogClose>
+              </DialogClose> */}
+
+              <DialogClose asChild>
+                {/* {Object.keys(updatedFields).length > 0 && (
+                  <Button
+                    type="button"
+                    onClick={handleSave}
+                    className="w-full lg:w-fit"
+                    disabled={isSaving}
+                  >
+                    {isSaving ? "Saving..." : "Save changes"}
+                  </Button>
+                )} */}
+                <Button
+                  type="button"
+                  onClick={handleSave}
+                  className="w-full transition-all"
+                  disabled={isSaving || !hasChanges()} // disabled if saving or no changes
+                >
+                  {isSaving ? "Saving..." : "Save changes"}
+                </Button>
+
+              </DialogClose>
+            </div>
           </DialogFooter>
+
         </DialogContent>
       </Dialog>
     </>
   )
 }
 
-// function Avatar({defValue, onChange, resetKey}) {
-//   const maxSizeMB = 2
-//   const maxSize = maxSizeMB * 1024 * 1024 // 2MB
-
-//   const [
-//     {files, isDragging, errors},
-//     {
-//       handleDragEnter,
-//       handleDragLeave,
-//       handleDragOver,
-//       handleDrop,
-//       openFileDialog,
-//       removeFile,
-//       getInputProps,
-//       clearFiles, // ✅ this is already exposed
-//     },
-//   ] = useFileUpload({
-//     accept: "image/,image/png,image/jpeg,image/jpg,image/gif",
-//     maxSize,
-//   })
-
-//   const previewUrl = files[0]?.preview;
-
-//   // Send previewUrl to parent only when changed
-//   const previousUrlRef = useRef(null)
-//   useEffect(() => {
-//     if (onChange && previewUrl && previewUrl !== previousUrlRef.current) {
-//       previousUrlRef.current = previewUrl
-//       onChange(previewUrl)
-//     }
-//   }, [previewUrl, onChange])
-
-//   // Clear preview when resetKey changes
-//   useEffect(() => {
-//     if (clearFiles) {
-//       clearFiles()
-//       previousUrlRef.current = null // ensures onChange works again with same file
-//     }
-//   }, [resetKey])
-
-//   const currentImage = previewUrl || defValue;
-
-//   return (
-//     <div className="-mt-10 px-6">
-//       <div
-//         className="border-background bg-muted relative flex size-20 items-center justify-center overflow-hidden rounded-full border-4 shadow-xs shadow-black/10">
-//         {currentImage && (
-//           <img
-//             src={currentImage}
-//             className="size-full object-cover"
-//             width={80}
-//             height={80}
-//             alt="Profile image" />
-//         )}
-//         <button
-//           type="button"
-//           className="focus-visible:border-ring focus-visible:ring-ring/50 absolute flex size-8 cursor-pointer items-center justify-center rounded-full bg-black/60 text-white transition-[color,box-shadow] outline-none hover:bg-black/80 focus-visible:ring-[3px]"
-//           onClick={openFileDialog}
-//           aria-label="Change profile picture">
-//           <ImagePlusIcon size={16} aria-hidden="true" />
-//         </button>
-//         <input
-//           {...getInputProps()}
-//           className="sr-only"
-//           aria-label="Upload profile picture" />
-//       </div>
-//     </div>
-//   );
-// }
-
-// function ProfileBg() {
-//   const [{ files }, { removeFile, openFileDialog, getInputProps }] =
-//     useFileUpload({
-//       accept: "image/*",
-//       initialFiles: '',
-//     })
-
-//   const currentImage = files[0]?.preview || null
-
-//   return (
-//     <div className="h-32">
-//       <div className="bg-muted relative flex size-full items-center justify-center overflow-hidden">
-//         {currentImage && (
-//           <img
-//             className="size-full object-cover"
-//             src={currentImage}
-//             alt={
-//               files[0]?.preview
-//                 ? "Preview of uploaded image"
-//                 : "Default profile background"
-//             }
-//             width={512}
-//             height={96}
-//           />
-//         )}
-//         <div className="absolute inset-0 flex items-center justify-center gap-2">
-//           <button
-//             type="button"
-//             className="focus-visible:border-ring focus-visible:ring-ring/50 z-50 flex size-10 cursor-pointer items-center justify-center rounded-full bg-black/60 text-white transition-[color,box-shadow] outline-none hover:bg-black/80 focus-visible:ring-[3px]"
-//             onClick={openFileDialog}
-//             aria-label={currentImage ? "Change image" : "Upload image"}
-//           >
-//             <ImagePlusIcon size={16} aria-hidden="true" />
-//           </button>
-//           {currentImage && (
-//             <button
-//               type="button"
-//               className="focus-visible:border-ring focus-visible:ring-ring/50 z-50 flex size-10 cursor-pointer items-center justify-center rounded-full bg-black/60 text-white transition-[color,box-shadow] outline-none hover:bg-black/80 focus-visible:ring-[3px]"
-//               onClick={() => removeFile(files[0]?.id)}
-//               aria-label="Remove image"
-//             >
-//               <XIcon size={16} aria-hidden="true" />
-//             </button>
-//           )}
-//         </div>
-//       </div>
-//       <input
-//         {...getInputProps()}
-//         className="sr-only"
-//         aria-label="Upload image file"
-//       />
-//     </div>
-//   )
-// }
 const initialBgImage = [
   {
     name: "profile-bg.jpg",
