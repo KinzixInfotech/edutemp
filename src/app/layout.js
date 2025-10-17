@@ -5,6 +5,8 @@ import "./product.css";
 // import ClientLayout from "./ClientLayout";
 import { Toaster } from "@/components/ui/sonner"
 import LoaderPage from "@/components/loader-page";
+import Provider from "./Provider";
+
 
 export const metadata = {
   title: "EduBreezy",
@@ -12,22 +14,24 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
- 
-  return (
-    <html lang="en" suppressHydrationWarning={true}>
 
-      <body className="min-h-screen flex flex-col">
-        
-        <ClientProduct>{children}</ClientProduct>
-        <Toaster
-          theme="system"
-          toastOptions={{
-            classNames: {
-              description: "text-sm mt-1 !text-black dark:!text-white",
-            },
-          }}
-        />
-      </body>
-    </html>
+  return (
+    <Provider>
+      <html lang="en" suppressHydrationWarning={true}>
+
+        <body className="min-h-screen flex flex-col">
+
+          <ClientProduct>{children}</ClientProduct>
+          <Toaster
+            theme="system"
+            toastOptions={{
+              classNames: {
+                description: "text-sm mt-1 !text-black dark:!text-white",
+              },
+            }}
+          />
+        </body>
+      </html>
+    </Provider>
   );
 }

@@ -33,9 +33,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
-  Bell, Check, Globe, Home, Keyboard, Link, Lock, Menu, MessageCircle,
+  Bell, Check, Globe, Home, Keyboard, Lock, Menu, MessageCircle,
   Paintbrush, Settings, Video
 } from "lucide-react"
+import Link from 'next/link';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { useSettingsDialog } from "@/context/Settingsdialog-context"
 import { ModeToggle } from './toggle';
@@ -1024,9 +1025,11 @@ export function Profile() {
           </div>
           <DialogFooter className="w-full border-t px-6 py-4 grid grid-cols-1 md:grid-cols-2 gap-2.5 items-center">
             {/* Left side: Change Password */}
-            <Button variant="outline" className="w-full text-center ">
-              Change Your Password
-            </Button>
+            <Link href="../auth/ChangePassword">
+              <Button variant="outline" className="w-full text-center ">
+                Change Your Password
+              </Button>
+            </Link>
 
             {/* Spacer for desktop alignment */}
             {/* <div className="hidden md:block"></div> */}

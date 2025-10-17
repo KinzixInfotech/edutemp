@@ -120,7 +120,7 @@ export function NavUser({ }) {
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator />
                         <div onClick={handleLogout}>
-                            <DropdownMenuItem >
+                        <DropdownMenuItem >
                                 <IconLogout />
                                 Log out
                             </DropdownMenuItem>

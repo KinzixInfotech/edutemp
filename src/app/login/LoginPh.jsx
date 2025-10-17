@@ -39,6 +39,18 @@ export default function LoginPhoto({ className, ...props }) {
             }
         })
     }, [])
+    // useEffect(() => {
+    //     const checkSession = async () => {
+    //         const { data: { session } } = await supabase.auth.getSession();
+    //         if (session) {
+    //             console.log("User is still logged in:", session);
+    //         } else {
+    //             console.log("No active session");
+    //         }
+    //     };
+    //     checkSession();
+    // }, []);
+
     useEffect(() => {
         if (!schoolCode) {
             setLoadingl(false)
@@ -116,6 +128,11 @@ export default function LoginPhoto({ className, ...props }) {
     //         setLoading(false)
     //     }
     // }
+    // useEffect(() => {
+
+    //     supabase.auth.signOut()
+    // }, [])
+    
     const handleLogin = async (e) => {
         e.preventDefault();
         setErrorMsg("");

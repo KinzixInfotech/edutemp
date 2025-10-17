@@ -11,10 +11,10 @@ import { Toaster } from '@/components/ui/sonner'
 import { SettingsDialog } from '@/components/sidebar-dialog'
 
 export default function ClientProviders({ children }) {
-    const [queryClient] = useState(() => new QueryClient())
+    // const [queryClient] = useState(() => new QueryClient())
 
     return (
-        <QueryClientProvider client={queryClient}>
+        // <QueryClientProvider client={queryClient}>
             <AuthProvider>
                 <SettingsDialogProvider>
                     <LoaderProvider>
@@ -31,6 +31,6 @@ export default function ClientProviders({ children }) {
                     <SettingsDialog />
                 </SettingsDialogProvider>
             </AuthProvider>
-        </QueryClientProvider>
+        // </QueryClientProvider>
     )
 }
