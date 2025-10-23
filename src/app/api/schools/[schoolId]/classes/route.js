@@ -22,7 +22,7 @@ export async function POST(req) {
       data: {
         className: name,
         schoolId,
-        capacity,
+        // capacity,
         // Automatically connect to the active academic year if it exists
         ...(activeAcademicYear && {
           academicYearId: activeAcademicYear.id,

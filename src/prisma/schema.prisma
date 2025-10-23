@@ -8,43 +8,47 @@ datasource db {
 }
 
 model School {
-  id                  String                @id @default(uuid()) @db.Uuid
-  name                String
-  domain              String                @unique
-  schoolCode          String                @unique
-  profilePicture      String
-  location            String
-  contactNumber       String
-  SubscriptionType    String
-  Language            String
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  deletedAt           DateTime?
-  AcademicYear        AcademicYear[]
-  admins              Admin[]
-  classes             Class[]
-  exams               Exam[]
-  FeePayment          FeePayment[]
-  FeeStructure        FeeStructure[]
-  galleries           Gallery[]
-  InventoryItem       InventoryItem[]
-  libraryBooks        LibraryBook[]
-  MasterAdmin         MasterAdmin?
-  NonTeachingStaff    NonTeachingStaff[]
-  Notice              Notice[]
-  Student             Student[]
-  StudentFeeStructure StudentFeeStructure[]
-  Syllabus            Syllabus[]
-  TeachingStaff       TeachingStaff[]
+  id                   String                 @id @default(uuid()) @db.Uuid
+  name                 String
+  domain               String                 @unique
+  schoolCode           String                 @unique
+  profilePicture       String
+  location             String
+  contactNumber        String
+  SubscriptionType     String
+  Language             String
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  deletedAt            DateTime?
+  AcademicYear         AcademicYear[]
+  admins               Admin[]
+  classes              Class[]
+  exams                Exam[]
+  FeePayment           FeePayment[]
+  FeeStructure         FeeStructure[]
+  galleries            Gallery[]
+  InventoryItem        InventoryItem[]
+  libraryBooks         LibraryBook[]
+  MasterAdmin          MasterAdmin?
+  NonTeachingStaff     NonTeachingStaff[]
+  Notice               Notice[]
+  Student              Student[]
+  StudentFeeStructure  StudentFeeStructure[]
+  Syllabus             Syllabus[]
+  TeachingStaff        TeachingStaff[]
   // Transport           Transport[]
-  users               User[]
-  Vehicle             Vehicle[]
-  Route               Route[]
-  Assignment          Assignment[]
-  AdmissionForm       AdmissionForm[]
-  Application         Application[]
-  Stage               Stage[]
-  Upload              Upload[]
+  users                User[]
+  Vehicle              Vehicle[]
+  Route                Route[]
+  Assignment           Assignment[]
+  AdmissionForm        AdmissionForm[]
+  Application          Application[]
+  Stage                Stage[]
+  Upload               Upload[]
+  CertificateTemplate  CertificateTemplate[]
+  CertificateGenerated CertificateGenerated[]
+  DigitalIdCard        DigitalIdCard[]
+  AdmitCard            AdmitCard[]
 
   @@index([name])
 }
@@ -404,35 +408,37 @@ model Role {
 }
 
 model User {
-  id                    String            @id @db.Uuid
-  schoolId              String?           @db.Uuid
+  id                    String                 @id @db.Uuid
+  schoolId              String?                @db.Uuid
   roleId                Int
-  email                 String            @unique
+  email                 String                 @unique
   password              String
   name                  String?
-  profilePicture        String            @default("default.png")
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime          @updatedAt
+  profilePicture        String                 @default("default.png")
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
   deletedAt             DateTime?
-  status                UserStatus        @default(ACTIVE)
+  status                UserStatus             @default(ACTIVE)
   Admin                 Admin?
   attendance            Attendance[]
   AuditLog              AuditLog[]
   Document              Document[]
-  issuedBooks           LibraryBook[]     @relation("IssuedBooks")
-  reservedBooks         LibraryBook[]     @relation("ReservedBooks")
+  issuedBooks           LibraryBook[]          @relation("IssuedBooks")
+  reservedBooks         LibraryBook[]          @relation("ReservedBooks")
   MasterAdmin           MasterAdmin?
   nonTeachingStaff      NonTeachingStaff?
   Notice                Notice[]
-  receivedNotifications Notification[]    @relation("Receiver")
-  sentNotifications     Notification[]    @relation("Sender")
+  receivedNotifications Notification[]         @relation("Receiver")
+  sentNotifications     Notification[]         @relation("Sender")
   student               Student?
   teacher               TeachingStaff?
-  role                  Role              @relation(fields: [roleId], references: [id])
-  school                School?           @relation(fields: [schoolId], references: [id])
+  role                  Role                   @relation(fields: [roleId], references: [id])
+  school                School?                @relation(fields: [schoolId], references: [id])
   Application           Application[]
   StageHistory          StageHistory[]
   GmailAccount          GmailAccount[]
+  CertificateTemplate   CertificateTemplate[]
+  CertificateGenerated  CertificateGenerated[]
 
   @@index([schoolId])
   @@index([roleId])
@@ -525,6 +531,9 @@ model Student {
   user                   User                     @relation(fields: [userId], references: [id])
   StudentFeeStructure    StudentFeeStructure[]
   StudentRouteAssignment StudentRouteAssignment[]
+  CertificateGenerated   CertificateGenerated[]
+  DigitalIdCard          DigitalIdCard[]
+  AdmitCard              AdmitCard[]
 
   @@index([classId])
   @@index([sectionId])
@@ -620,7 +629,7 @@ model Class {
   id                  Int            @id @default(autoincrement())
   schoolId            String         @db.Uuid
   className           String
-  capacity            Int
+  capacity            Int?
   teachingStaffUserId String?        @db.Uuid
   academicYearId      String?        @db.Uuid
   AcademicYear        AcademicYear?  @relation(fields: [academicYearId], references: [id])
@@ -743,6 +752,7 @@ model Exam {
   school     School       @relation(fields: [schoolId], references: [id])
   results    ExamResult[]
   examSeries ExamSeries[]
+  AdmitCard  AdmitCard[]
 
   @@index([schoolId])
 }
@@ -778,6 +788,7 @@ model AcademicYear {
   students         Student[]
   Syllabus         Syllabus[]
   TeachingStaff    TeachingStaff[]
+  DigitalIdCard    DigitalIdCard[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -945,6 +956,84 @@ model Gallery {
   school   School @relation(fields: [schoolId], references: [id])
 
   @@index([schoolId])
+}
+
+// certificates generation models
+
+model CertificateTemplate {
+  id           String                 @id @default(uuid()) @db.Uuid
+  name         String
+  description  String?
+  type         String // e.g. "character", "bonafide", "transfer", etc.
+  schoolId     String                 @db.Uuid
+  school       School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  layoutConfig Json // Stores positions, fonts, colors, placeholders
+  createdById  String?                @db.Uuid
+  createdBy    User?                  @relation(fields: [createdById], references: [id])
+  isDefault    Boolean                @default(false)
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  certificates CertificateGenerated[]
+
+  @@index([schoolId])
+  @@index([type])
+}
+
+model CertificateGenerated {
+  id                String              @id @default(uuid()) @db.Uuid
+  certificateNumber String              @unique
+  templateId        String              @db.Uuid
+  template          CertificateTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  studentId         String              @db.Uuid
+  student           Student             @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  schoolId          String              @db.Uuid
+  school            School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  issuedById        String?             @db.Uuid
+  issuedBy          User?               @relation(fields: [issuedById], references: [id])
+  issueDate         DateTime            @default(now())
+  customFields      Json // Additional dynamic values like event name, remarks, etc.
+  fileUrl           String? // If PDF is stored
+  status            String              @default("issued") // issued, pending, revoked
+  createdAt         DateTime            @default(now())
+
+  @@index([schoolId])
+  @@index([studentId])
+  @@index([templateId])
+  @@index([status])
+}
+
+model DigitalIdCard {
+  id             String        @id @default(uuid()) @db.Uuid
+  studentId      String        @db.Uuid
+  student        Student       @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  schoolId       String        @db.Uuid
+  school         School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYearId String?       @db.Uuid
+  academicYear   AcademicYear? @relation(fields: [academicYearId], references: [id])
+  qrCodeUrl      String?
+  layoutConfig   Json
+  generatedAt    DateTime      @default(now())
+
+  @@index([schoolId])
+  @@index([studentId])
+}
+
+model AdmitCard {
+  id           String   @id @default(uuid()) @db.Uuid
+  studentId    String   @db.Uuid
+  student      Student  @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  examId       Int
+  exam         Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  schoolId     String   @db.Uuid
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  seatNumber   String
+  center       String?
+  layoutConfig Json
+  issueDate    DateTime @default(now())
+
+  @@index([schoolId])
+  @@index([studentId])
+  @@index([examId])
 }
 
 model AuditLog {

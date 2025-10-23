@@ -176,6 +176,38 @@ export default function ApplicationDetails() {
         staleTime: 1000 * 60 * 5, // 5 minutes
         cacheTime: 1000 * 60 * 10, // 10 minutes
     });
+    const fetchClasses = async (schoolId) => {
+        if (!schoolId) throw new Error("schoolId is required")
+        const res = await fetch(`/api/schools/${schoolId}/classes`)
+        if (!res.ok) throw new Error("Failed to fetch classes")
+        const data = await res.json()
+        if (!Array.isArray(data)) throw new Error("Invalid data format")
+        return data
+    }
+    // TanStack Query hook for fetching classes
+    const { data: classes = [], isLoading: loadingClasses, error } = useQuery({
+        queryKey: ['classes', schoolId],
+        queryFn: () => fetchClasses(schoolId),
+        enabled: !!schoolId, // Only fetch when schoolId is available
+        retry: 1,
+        staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    })
+    // Handle fetch error with toast
+    if (error) {
+        toast.error("Failed to load classes")
+        console.error("[CLASS_FETCH_ERROR]", error)
+    }
+
+    // Function to convert class names to display format (e.g., 1 to I, Nursery to Nursery)
+    const displayClassName = (name) => {
+        const num = parseInt(name, 10)
+        if (isNaN(num)) {
+            return name
+        } else {
+            const romanNumerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII']
+            return romanNumerals[num - 1] || name
+        }
+    }
     function useUpdateTestResult() {
         const queryClient = useQueryClient();
 
@@ -731,7 +763,9 @@ export default function ApplicationDetails() {
                                 onChange={(e) => handleStageDataChange("notes", e.target.value)}
                             />
                         </div>
-
+                        <Button variant={'outline'} className={'inline-flex cursor-pointerß'}>
+                            <Mail /> Send Mail To Candidate
+                        </Button>
                         <Button
                             onClick={() =>
                                 updateTestResult({
@@ -837,26 +871,77 @@ export default function ApplicationDetails() {
                 );
             case "ENROLLED":
                 return (
-                    <div className="space-y-4">
+                    // <div className="space-y-4">
+                    //     <div>
+                    //         <Label className='mb-4'>Class Assigned</Label>
+                    //         <Input className='bg-background'
+                    //             placeholder="Enter class assigned"
+                    //             value={stageData.classAssigned || ""}
+                    //             onChange={(e) => handleStageDataChange("classAssigned", e.target.value)}
+                    //         />
+                    //     </div>
+                    //     <div>
+                    //         <Label className='mb-4'>Roll Number</Label>
+                    //         <Input className='bg-background'
+                    //             placeholder="Enter roll number"
+                    //             value={stageData.rollNumber || ""}
+                    //             onChange={(e) => handleStageDataChange("rollNumber", e.target.value)}
+                    //         />
+                    //     </div>
+                    //     <div>
+                    //         <Label className='mb-4'>Comments</Label>
+                    //         <Input className='bg-background'
+                    //             placeholder="Add comments"
+                    //             value={stageData.notes || ""}
+                    //             onChange={(e) => handleStageDataChange("notes", e.target.value)}
+                    //         />
+                    //     </div>
+                    // </div>
+                    <div className="space-y-4 p-4">
                         <div>
-                            <Label className='mb-4'>Class Assigned</Label>
-                            <Input className='bg-background'
-                                placeholder="Enter class assigned"
-                                value={stageData.classAssigned || ""}
-                                onChange={(e) => handleStageDataChange("classAssigned", e.target.value)}
-                            />
+                            <Label className="text-gray-700 font-semibold mb-2 block">Class Assigned</Label>
+                            {loadingClasses ? (
+                                <div className="flex items-center gap-2 text-gray-500">
+                                    <Loader2 className="animate-spin w-5 h-5" />
+                                    <span>Loading classes...</span>
+                                </div>
+                            ) : (
+                                <Select
+                                    value={stageData.classAssigned || ""}
+                                    onValueChange={(value) => handleStageDataChange("classAssigned", value)}
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Select Class" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {classes.length === 0 ? (
+                                            <SelectItem value="" disabled>
+                                                No classes available
+                                            </SelectItem>
+                                        ) : (
+                                            classes.map((cls) => (
+                                                <SelectItem key={cls.id} value={cls.className}>
+                                                    {displayClassName(cls.className)}
+                                                </SelectItem>
+                                            ))
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                            )}
                         </div>
                         <div>
-                            <Label className='mb-4'>Roll Number</Label>
-                            <Input className='bg-background'
+                            <Label className="text-gray-700 font-semibold mb-2 block">Roll Number</Label>
+                            <Input
+                                // className="w-full bg-white border-gray-300 focus:ring-2 focus:ring-blue-500"
                                 placeholder="Enter roll number"
                                 value={stageData.rollNumber || ""}
                                 onChange={(e) => handleStageDataChange("rollNumber", e.target.value)}
                             />
                         </div>
                         <div>
-                            <Label className='mb-4'>Comments</Label>
-                            <Input className='bg-background'
+                            <Label className="text-gray-700 font-semibold mb-2 block">Comments</Label>
+                            <Input
+                                // className="w-full bg-white border-gray-300 focus:ring-2 focus:ring-blue-500"
                                 placeholder="Add comments"
                                 value={stageData.notes || ""}
                                 onChange={(e) => handleStageDataChange("notes", e.target.value)}

@@ -291,6 +291,17 @@ export default function Dashboard() {
     adminNonTeacherStatsQuery,
   ]);
   // Prefetch if needed (optional, you can remove this block if not required)
+  // useEffect(() => {
+  //   if (!fullUser) return;
+
+  //   if (fullUser.role.name === 'SUPER_ADMIN') {
+  //     queryClient.prefetchQuery(['schoolTrend'], fetchSchoolTrend);
+  //     queryClient.prefetchQuery(['activeAccounts'], fetchActiveAccounts);
+  //   } else if (fullUser.role.name === 'ADMIN') {
+  //     queryClient.prefetchQuery(['adminTeacherStats', fullUser.schoolId], () => fetchAdminStatsTeacher(fullUser.schoolId));
+  //     queryClient.prefetchQuery(['adminNonTeacherStats', fullUser.schoolId], () => fetchAdminStatsNonTeacher(fullUser.schoolId));
+  //   }
+  // }, [fullUser, queryClient]);
   useEffect(() => {
     if (!fullUser) return;
 

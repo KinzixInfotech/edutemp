@@ -14,8 +14,12 @@ export const useGlobalLoading = (queries) => {
 };
 
 
+export function generateCertificateNumber() {
+  return `CERT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+}
 
-// utils.ts
+
+// utils.js
 export function adjustScheduleToCurrentWeek(events) {
   const now = new Date();
   const startOfWeek = new Date(now);

@@ -35,7 +35,7 @@ import {
 } from "@tabler/icons-react"
 import { NavSidebarSections } from "./nav-main"
 import { Separator } from "./ui/separator"
-import { BookCopy, BookMarked, BotMessageSquare, CalendarCog, Car, Coins, DollarSign, Ellipsis, Flag, FlaskRound, Grip, House, Inbox, Library, MonitorCog, Newspaper, SearchIcon, Send, Timer, User, UserPen } from "lucide-react"
+import { BookCopy, BookMarked, BotMessageSquare, CalendarCog, Car, Coins, DollarSign, Ellipsis, FileBadge, Flag, FlaskRound, Grip, House, IdCard, Inbox, Library, MonitorCog, Newspaper, SearchIcon, Send, Settings, Timer, User, UserPen } from "lucide-react"
 import { useCommandMenu } from "./CommandMenuContext"
 export const SidebarData = [
     {
@@ -68,6 +68,137 @@ export const SidebarData = [
                     // { label: "Shortlisting", url: "/dashboard/schools/admissions/shortlisting", roles: ["ADMIN"] },
                     // { label: "Tests/Interviews", url: "/dashboard/schools/admissions/test-interviews", roles: ["ADMIN"] },
                     // { label: "Offers", url: "/dashboard/schools/admissions/offers", roles: ["ADMIN"] },
+                ],
+            },
+        ],
+    },
+    {
+        title: "Documents & Certificates",
+        items: [
+            {
+                label: "Templates",
+                icon: BookCopy,
+                roles: ["ADMIN"],
+                submenu: [
+                    {
+                        label: "Certificate Templates",
+                        url: "/dashboard/schools/documents/templates/certificates",
+                        roles: ["ADMIN"],
+                    },
+                    {
+                        label: "ID Card Templates",
+                        url: "/dashboard/schools/documents/templates/id-cards",
+                        roles: ["ADMIN"],
+                    },
+                    {
+                        label: "Admit Card Templates",
+                        url: "/dashboard/schools/documents/templates/admit-cards",
+                        roles: ["ADMIN"],
+                    },
+                ],
+            },
+            {
+                label: "Generate Certificates",
+                icon: FileBadge,
+                roles: ["ADMIN", "TEACHER"],
+                submenu: [
+                    {
+                        label: "Character Certificate",
+                        url: "/dashboard/schools/documents/generate/character",
+                        roles: ["ADMIN", "TEACHER"],
+                    },
+                    {
+                        label: "Bonafide Certificate",
+                        url: "/dashboard/schools/documents/generate/bonafide",
+                        roles: ["ADMIN", "TEACHER"],
+                    },
+                    {
+                        label: "Transfer Certificate",
+                        url: "/dashboard/schools/documents/generate/transfer",
+                        roles: ["ADMIN"],
+                    },
+                    {
+                        label: "School Leaving Certificate",
+                        url: "/dashboard/schools/documents/generate/school-leaving",
+                        roles: ["ADMIN"],
+                    },
+                    {
+                        label: "Competition Certificate",
+                        url: "/dashboard/schools/documents/generate/competition",
+                        roles: ["ADMIN", "TEACHER"],
+                    },
+                    {
+                        label: "Custom Certificate",
+                        url: "/dashboard/schools/documents/generate/custom",
+                        roles: ["ADMIN"],
+                    },
+                ],
+            },
+            {
+                label: "Admit Cards",
+                icon: IdCard,
+
+                roles: ["ADMIN"],
+                submenu: [
+                    {
+                        label: "Generate Admit Cards",
+                        url: "/dashboard/schools/documents/admitcards/generate",
+                        roles: ["ADMIN"],
+                    },
+                    {
+                        label: "Bulk Generation (per Class / Exam)",
+                        url: "/dashboard/schools/documents/admitcards/bulk",
+                        roles: ["ADMIN"],
+                    },
+                    {
+                        label: "Download / Print History",
+                        url: "/dashboard/schools/documents/admitcards/history",
+                        roles: ["ADMIN"],
+                    },
+                ],
+            },
+            {
+                label: "Digital ID Cards",
+                icon: IdCard,
+                roles: ["ADMIN"],
+                submenu: [
+                    {
+                        label: "Generate Student ID",
+                        url: "/dashboard/schools/documents/idcards/generate",
+                        roles: ["ADMIN"],
+                    },
+                    {
+                        label: "Design / Customize Layout",
+                        url: "/dashboard/schools/documents/idcards/design",
+                        roles: ["ADMIN"],
+                    },
+                    {
+                        label: "Reissue / Expire Old IDs",
+                        url: "/dashboard/schools/documents/idcards/manage",
+                        roles: ["ADMIN"],
+                    },
+                ],
+            },
+            {
+                label: "Settings",
+                icon: Settings,
+                roles: ["ADMIN"],
+                submenu: [
+                    {
+                        label: "Signature & Stamp Management",
+                        url: "/dashboard/documents/settings/",
+                        roles: ["ADMIN"],
+                    },
+                    {
+                        label: "QR / Verification Settings",
+                        url: "/dashboard/schools/documents/settings/verification",
+                        roles: ["ADMIN"],
+                    },
+                    {
+                        label: "PDF Output Settings",
+                        url: "/dashboard/schools/documents/settings/pdf-output",
+                        roles: ["ADMIN"],
+                    },
                 ],
             },
         ],
@@ -281,7 +412,7 @@ export function AppSidebar({ ...props }) {
                 </SidebarMenu>
             </SidebarHeader>
             <SidebarContent className={'bg-background rounded-md border shadow-xs'} >
-                
+
                 <NavSidebarSections
                     sections={SidebarData}
                     userRole={fullUser?.role?.name}

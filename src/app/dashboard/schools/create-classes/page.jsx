@@ -22,7 +22,6 @@ export default function ManageClassSectionPage() {
     const schoolId = fullUser?.schoolId
     const [teachers, setTeachers] = useState([])
     const [className, setClassName] = useState("")
-    const [capacity, setCapacity] = useState("")
     const [sectionName, setSectionName] = useState("")
     const [selectedClassId, setSelectedClassId] = useState("")
     const [classes, setClasses] = useState([])
@@ -32,6 +31,37 @@ export default function ManageClassSectionPage() {
     const [confirmOpen, setConfirmOpen] = useState(false)
     const [selectedTeacher, setSelectedTeacher] = useState(null)
     const [selectedClassIdToUpdate, setSelectedClassIdToUpdate] = useState(null)
+
+    const predefinedClasses = [
+        { value: "NURSERY", label: "Nursery" },
+        { value: "LKG", label: "LKG" },
+        { value: "UKG", label: "UKG" },
+        { value: "PREP", label: "Prep" },
+        { value: "1", label: "I" },
+        { value: "2", label: "II" },
+        { value: "3", label: "III" },
+        { value: "4", label: "IV" },
+        { value: "5", label: "V" },
+        { value: "6", label: "VI" },
+        { value: "7", label: "VII" },
+        { value: "8", label: "VIII" },
+        { value: "9", label: "IX" },
+        { value: "10", label: "X" },
+        { value: "11", label: "XI" },
+        { value: "12", label: "XII" },
+    ]
+
+    const sectionsList = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+
+    const displayClassName = (name) => {
+        const num = parseInt(name, 10)
+        if (isNaN(num)) {
+            return name
+        } else {
+            const romanNumerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII']
+            return romanNumerals[num - 1] || name
+        }
+    }
 
     useEffect(() => {
         if (schoolId) {
@@ -102,7 +132,6 @@ export default function ManageClassSectionPage() {
                 body: JSON.stringify({
                     name: className.toUpperCase(),
                     schoolId,
-                    capacity: parseInt(capacity, 10)
                 })
 
             })
@@ -148,62 +177,76 @@ export default function ManageClassSectionPage() {
                 confirmText="Yes, assign"
                 confirmName="" // Optional – use if you want type-to-confirm
             />
-            <h1 className="text-xl font-semibold">Manage Classes & Sections</h1>
+            <h1 className="text-xl font-semibold ">Manage Classes & Sections</h1>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Create Class */}
+                <Card>
+                    <CardContent className="p-4 flex flex-col sm:flex-row items-center gap-4">
+                        <Select value={className} onValueChange={setClassName}>
+                            <SelectTrigger className="w-full bg-muted">
+                                <SelectValue placeholder="Select Class" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {predefinedClasses.map(({ value, label }) => (
+                                    <SelectItem key={value} value={value}>
+                                        {label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Button
+                            className="text-white flex gap-2 items-center"
+                            disabled={loadingClass}
+                            onClick={handleAddClass}
+                        >
+                            {loadingClass && <Loader2 className="animate-spin w-4 h-4" />}
+                            Add Class
+                        </Button>
+                    </CardContent>
+                </Card>
+                {/* Create Section */}
+                <Card>
+                    <CardContent className="p-4 flex flex-col sm:flex-row items-center gap-4">
+                        <Select
+                            value={selectedClassId}
+                            onValueChange={(value) => setSelectedClassId(value)}
+                        >
+                            <SelectTrigger className="w-full bg-muted">
+                                <SelectValue placeholder="Select Class" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {classes.map((cls) => (
+                                    <SelectItem key={cls.id} value={cls.id}>
+                                        {displayClassName(cls.className)}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
 
-            {/* Create Class */}
-            <Card>
-                <CardContent className="p-4 flex flex-col sm:flex-row items-center gap-4">
-                    <Input
-                        placeholder="Class Name (e.g., 10)"
-                        className="uppercase bg-muted"
-                        type='number'
-                        value={className}
-                        onChange={(e) => setClassName(e.target.value)}
-                    />
-                    <Input
-                        placeholder="capacity"
-                        className="uppercase bg-muted"
-                        type='number'
-                        value={capacity}
-                        onChange={(e) => setCapacity(e.target.value)}
-                    />
-                    <Button className="text-white flex gap-2 items-center" disabled={loadingClass} onClick={handleAddClass}>
-                        {loadingClass && <Loader2 className="animate-spin w-4 h-4" />}
-                        Add Class
-                    </Button>
-                </CardContent>
-            </Card>
-            {/* Create Section */}
-            <Card>
-                <CardContent className="p-4 flex flex-col sm:flex-row items-center gap-4">
-                    <Select
-                        value={selectedClassId}
-                        onValueChange={(value) => setSelectedClassId(value)}
-                    >
-                        <SelectTrigger className="w-full bg-muted">
-                            <SelectValue placeholder="Select Class" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="ALL">Select Class</SelectItem>
-                            {classes.map((cls) => (
-                                <SelectItem key={cls.id} value={cls.id}>
-                                    {cls.className}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Input
-                        placeholder="Section Name (e.g., A)"
-                        className="uppercase bg-muted"
-                        value={sectionName}
-                        onChange={(e) => setSectionName(e.target.value)}
-                    />
-                    <Button className="text-white flex gap-2 items-center" disabled={loadingSection} onClick={handleAddSection}>
-                        {loadingSection && <Loader2 className="animate-spin w-4 h-4" />}
-                        Add Section
-                    </Button>
-                </CardContent>
-            </Card>
+                        <Select value={sectionName} onValueChange={setSectionName}>
+                            <SelectTrigger className="w-full bg-muted">
+                                <SelectValue placeholder="Select Section" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {sectionsList.map((sec) => (
+                                    <SelectItem key={sec} value={sec}>
+                                        {sec}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+
+                        <Button
+                            className="text-white flex gap-2 items-center"
+                            disabled={loadingSection}
+                            onClick={handleAddSection}
+                        >
+                            {loadingSection && <Loader2 className="animate-spin w-4 h-4" />}
+                            Add Section
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
 
             {/* Table */}
             <div className="overflow-x-auto overflow-hidden rounded-lg border">
@@ -211,16 +254,15 @@ export default function ManageClassSectionPage() {
                 <Table className="min-w-[800px]">
                     <TableHeader className="bg-muted sticky top-0 z-10">
                         <TableRow>
-                            <TableHead className="w-[25%]">Class</TableHead>
-                            <TableHead className="w-[25%]">Sections</TableHead>
-                            <TableHead className="w-[25%]">Capacity</TableHead>
-                            <TableHead className="w-[25%]">Class Teacher</TableHead>
+                            <TableHead className="w-[33%]">Class</TableHead>
+                            <TableHead className="w-[33%]">Sections</TableHead>
+                            <TableHead className="w-[33%]">Class Teacher</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {fetchingLoading ? (
                             <TableRow>
-                                <TableCell colSpan={4} className="text-center py-4">
+                                <TableCell colSpan={3} className="text-center py-4">
                                     <div className="flex items-center justify-center gap-2 text-muted-foreground">
                                         <Loader2 className="animate-spin w-4 h-4" />
                                         Loading classes...
@@ -229,7 +271,7 @@ export default function ManageClassSectionPage() {
                             </TableRow>
                         ) : classes.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={4} className="text-center text-muted-foreground">
+                                <TableCell colSpan={3} className="text-center text-muted-foreground">
                                     No classes or sections found.
                                 </TableCell>
                             </TableRow>
@@ -238,9 +280,8 @@ export default function ManageClassSectionPage() {
                                 cls.sections?.length > 0 ? (
                                     cls.sections.map((sec) => (
                                         <TableRow key={sec.id}>
-                                            <TableCell>{cls.className}</TableCell>
+                                            <TableCell>{displayClassName(cls.className)}</TableCell>
                                             <TableCell>{sec.name}</TableCell>
-                                            <TableCell>{cls.capacity}</TableCell>
                                             <TableCell>
                                                 <Select
                                                     value={sec.teachingStaffUserId || ""}
@@ -249,14 +290,19 @@ export default function ManageClassSectionPage() {
                                                     }
                                                 >
                                                     <SelectTrigger className="w-full">
-                                                        <SelectValue placeholder="Assign Supervisor" />
+                                                        <SelectValue placeholder="Assign Class Teacher" />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        {teachers.map((t) => (
-                                                            <SelectItem key={t.userId} value={t.userId}>
-                                                                {t.name}
-                                                            </SelectItem>
-                                                        ))}
+                                                        {teachers.length > 0 ? (
+                                                            teachers.map((t) => (
+                                                                <SelectItem key={t.userId} value={t.userId}>
+                                                                    {t.name}
+                                                                </SelectItem>
+                                                            ))
+                                                        ) : (
+                                                            <div className="px-2  text-muted-foreground">No Teachers Found</div>
+                                                        )}
+
                                                     </SelectContent>
                                                 </Select>
                                             </TableCell>
@@ -264,8 +310,8 @@ export default function ManageClassSectionPage() {
                                     ))
                                 ) : (
                                     <TableRow key={`empty-${cls.id}`}>
-                                        <TableCell>{cls.className}</TableCell>
-                                        <TableCell colSpan={3}>No sections</TableCell>
+                                        <TableCell>{displayClassName(cls.className)}</TableCell>
+                                        <TableCell colSpan={2}>No sections</TableCell>
                                     </TableRow>
                                 )
                             )
