@@ -191,12 +191,12 @@ export const SidebarData = [
                     },
                     {
                         label: "QR / Verification Settings",
-                        url: "/dashboard/schools/documents/settings/verification",
+                        url: "/dashboard/documents/settings/qr-settings",
                         roles: ["ADMIN"],
                     },
                     {
                         label: "PDF Output Settings",
-                        url: "/dashboard/schools/documents/settings/pdf-output",
+                        url: "/dashboard/documents/settings/pdf-export-settings",
                         roles: ["ADMIN"],
                     },
                 ],

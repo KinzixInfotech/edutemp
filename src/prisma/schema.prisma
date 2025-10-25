@@ -8,47 +8,49 @@ datasource db {
 }
 
 model School {
-  id                   String                 @id @default(uuid()) @db.Uuid
-  name                 String
-  domain               String                 @unique
-  schoolCode           String                 @unique
-  profilePicture       String
-  location             String
-  contactNumber        String
-  SubscriptionType     String
-  Language             String
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime               @updatedAt
-  deletedAt            DateTime?
-  AcademicYear         AcademicYear[]
-  admins               Admin[]
-  classes              Class[]
-  exams                Exam[]
-  FeePayment           FeePayment[]
-  FeeStructure         FeeStructure[]
-  galleries            Gallery[]
-  InventoryItem        InventoryItem[]
-  libraryBooks         LibraryBook[]
-  MasterAdmin          MasterAdmin?
-  NonTeachingStaff     NonTeachingStaff[]
-  Notice               Notice[]
-  Student              Student[]
-  StudentFeeStructure  StudentFeeStructure[]
-  Syllabus             Syllabus[]
-  TeachingStaff        TeachingStaff[]
+  id                     String                  @id @default(uuid()) @db.Uuid
+  name                   String
+  domain                 String                  @unique
+  schoolCode             String                  @unique
+  profilePicture         String
+  location               String
+  contactNumber          String
+  SubscriptionType       String
+  Language               String
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  deletedAt              DateTime?
+  AcademicYear           AcademicYear[]
+  admins                 Admin[]
+  classes                Class[]
+  exams                  Exam[]
+  FeePayment             FeePayment[]
+  FeeStructure           FeeStructure[]
+  galleries              Gallery[]
+  InventoryItem          InventoryItem[]
+  libraryBooks           LibraryBook[]
+  MasterAdmin            MasterAdmin?
+  NonTeachingStaff       NonTeachingStaff[]
+  Notice                 Notice[]
+  Student                Student[]
+  StudentFeeStructure    StudentFeeStructure[]
+  Syllabus               Syllabus[]
+  TeachingStaff          TeachingStaff[]
   // Transport           Transport[]
-  users                User[]
-  Vehicle              Vehicle[]
-  Route                Route[]
-  Assignment           Assignment[]
-  AdmissionForm        AdmissionForm[]
-  Application          Application[]
-  Stage                Stage[]
-  Upload               Upload[]
-  CertificateTemplate  CertificateTemplate[]
-  CertificateGenerated CertificateGenerated[]
-  DigitalIdCard        DigitalIdCard[]
-  AdmitCard            AdmitCard[]
+  users                  User[]
+  Vehicle                Vehicle[]
+  Route                  Route[]
+  Assignment             Assignment[]
+  AdmissionForm          AdmissionForm[]
+  Application            Application[]
+  Stage                  Stage[]
+  Upload                 Upload[]
+  CertificateTemplate    CertificateTemplate[]
+  CertificateGenerated   CertificateGenerated[]
+  DigitalIdCard          DigitalIdCard[]
+  AdmitCard              AdmitCard[]
+  QrVerificationSettings QrVerificationSettings?
+  PdfExportSettings      PdfExportSettings?
 
   @@index([name])
 }
@@ -959,6 +961,99 @@ model Gallery {
 }
 
 // certificates generation models
+model QrVerificationSettings {
+  id       String @id @default(cuid())
+  schoolId String @db.Uuid // CRITICAL: @db.Uuid
+  school   School @relation(fields: [schoolId], references: [id])
+
+  // Enablement
+  enabledForCertificates Boolean @default(true)
+  enabledForIdCards      Boolean @default(true)
+  enabledForAdmitCards   Boolean @default(false)
+
+  // Data Encoding
+  encodeStudentId       Boolean @default(true)
+  encodeCertificateId   Boolean @default(true)
+  encodeIssueDate       Boolean @default(true)
+  encodeSchoolId        Boolean @default(true)
+  encodeVerificationUrl Boolean @default(true)
+  customFields          Json?
+
+  // Placement
+  qrPlacementX Float @default(500)
+  qrPlacementY Float @default(720)
+  qrSize       Float @default(120)
+
+  // Design
+  qrColor              String  @default("#000000")
+  qrBackground         String  @default("#FFFFFF")
+  errorCorrectionLevel String  @default("M")
+  logoOverlayUrl       String?
+
+  // Verification Portal
+  verificationBaseUrl String  @default("https://your-school.com/verify")
+  portalTitle         String  @default("Verify Certificate")
+  portalLogoUrl       String?
+  portalPrimaryColor  String  @default("#1e40af")
+
+  // Security
+  useHashEncryption Boolean @default(true)
+  hashAlgorithm     String  @default("SHA256")
+  qrValidityDays    Int?
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([schoolId])
+}
+
+model PdfExportSettings {
+  id       String @id @default(cuid())
+  schoolId String @db.Uuid
+  school   School @relation(fields: [schoolId], references: [id])
+
+  // Page Layout
+  paperSize    String @default("A4") // A4, A5, Letter, Custom
+  customWidth  Float? // mm
+  customHeight Float? // mm
+  orientation  String @default("portrait") // portrait, landscape
+  marginTop    Float  @default(20) // mm
+  marginBottom Float  @default(20) // mm
+  marginLeft   Float  @default(20) // mm
+  marginRight  Float  @default(20) // mm
+
+  // Output Quality
+  resolution  String  @default("standard") // standard, high, ultra
+  compression String  @default("medium") // low, medium, high
+  embedFonts  Boolean @default(true)
+
+  // Branding & Header/Footer
+  headerImageUrl    String?
+  footerImageUrl    String?
+  schoolLogoUrl     String?
+  watermarkType     String  @default("none") // none, text, image
+  watermarkText     String?
+  watermarkImageUrl String?
+  footerText        String?
+  pageNumbering     Boolean @default(true)
+
+  // Security & Protection
+  passwordProtect    Boolean @default(false)
+  password           String? // Encrypted in production
+  disablePrint       Boolean @default(false)
+  disableCopy        Boolean @default(false)
+  digitalSignature   Boolean @default(false)
+  saveAsDefault   Boolean @default(false)     
+  // File Handling
+  fileNameFormat     String  @default("{student_name}_{document_type}.pdf")
+  autoSaveLocation   String  @default("cloud") // cloud, local
+  bulkExportBehavior String  @default("separate") // combine, separate
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([schoolId])
+}
 
 model CertificateTemplate {
   id           String                 @id @default(uuid()) @db.Uuid

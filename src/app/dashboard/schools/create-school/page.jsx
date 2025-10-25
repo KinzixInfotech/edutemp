@@ -346,90 +346,97 @@ export default function CreateSchoolPage() {
                   </FormItem>
                 )}
               />
-              {/* School Email */}
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>School Email</FormLabel>
-                    <FormControl>
-                      <Input placeholder="mail@example.com" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              {/* School Name */}
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>School Phone Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Phone Number" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              {/*master admin email*/}
-              <FormField
-                control={form.control}
-                name="masteradminemail"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Master Admin Email</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Master Admin Email" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              {/*master admin password*/}
-              <FormField
-                control={form.control}
-                name="masteradminpassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Master Admin Password</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Master Admin Password" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="adminem"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Admin Email</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Admin Email" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              {/*admin password*/}
-              <FormField
-                control={form.control}
-                name="adminPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Admin Password</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Admin Password" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="dark:bg-background bg-muted py-4 border px-2 rounded-md flex gap-2.5 flex-col">
 
+                {/* School Email */}
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>School Email</FormLabel>
+                      <FormControl>
+                        <Input placeholder="mail@example.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {/* School Name */}
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>School Phone Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Phone Number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              {/*master admin email*/}
+              <div className="dark:bg-background bg-muted py-4 border px-2 rounded-md flex gap-2.5 flex-col">
+                <FormField
+                  control={form.control}
+                  name="masteradminemail"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Master Admin Email</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Master Admin Email" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {/*master admin password*/}
+                <FormField
+                  control={form.control}
+                  name="masteradminpassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Master Admin Password</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Master Admin Password" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="dark:bg-background bg-muted py-4 border px-2 rounded-md flex gap-2.5 flex-col">
+
+                <FormField
+                  control={form.control}
+                  name="adminem"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Admin Email</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Admin Email" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {/*admin password*/}
+                <FormField
+                  control={form.control}
+                  name="adminPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Admin Password</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Admin Password" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               {/* Logo Upload or URL */}
               <div className="space-y-2">
                 <Label>School Logo</Label>
