@@ -17,7 +17,7 @@ NProgress.configure({
 export default function NavigationProgress() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-
+ 
   useEffect(() => {
     // Complete progress when route changes
     NProgress.done();

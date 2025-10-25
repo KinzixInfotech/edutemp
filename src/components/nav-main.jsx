@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useEffect, useRef, useState } from "react"
 import {
     SidebarGroup,
     SidebarGroupLabel,
@@ -10,32 +11,84 @@ import {
     SidebarMenuSub,
     SidebarMenuSubItem,
     SidebarMenuSubButton,
+    useSidebar,
 } from "@/components/ui/sidebar"
 import { useLoader } from "@/app/dashboard/context/Loader"
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
-import { ChevronDown, ChevronUp, SearchIcon } from "lucide-react"
-import { useCommandMenu } from "./CommandMenuContext"
+import { ChevronDown, ChevronUp } from "lucide-react"
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 export function NavSidebarSections({ sections, userRole, activePath }) {
     const { setLoading } = useLoader()
+    const { state } = useSidebar()
+    const isCollapsed = state === "collapsed"
+    const activeItemRef = useRef(null)
+    const [openMenus, setOpenMenus] = useState({})
+    const previousPath = useRef(null)
+    const isManualToggle = useRef(false)
+    const hasInitialized = useRef(false)
+
     const handleClick = () => setLoading(true)
 
     const normalize = (path) => path?.replace(/\/$/, "")
 
-    const { setOpen } = useCommandMenu()
-    return (
-        <>
-            {/* <SidebarGroup >
-                <SidebarMenuItem>
-                    <SidebarMenuButton
-                        asChild
-                    // className={'fixed right-0 left-0 top-4 mx-4'}
-                    >
-                    
+    // Check if any submenu item is active
+    const hasActiveSubmenu = (submenu) => {
+        if (!submenu) return false
+        return submenu.some((sub) => normalize(activePath) === normalize(sub.url))
+    }
 
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
-            </SidebarGroup> */}
+    // Initialize and handle path changes
+    useEffect(() => {
+        const pathChanged = previousPath.current !== activePath
+        const isInitialMount = !hasInitialized.current
+
+        // Run on initial mount OR when path changes
+        if (isInitialMount || (pathChanged && !isManualToggle.current)) {
+            previousPath.current = activePath
+            hasInitialized.current = true
+
+            // Find and expand parent menus for active items
+            const newOpenMenus = {}
+            sections.forEach((section) => {
+                section.items.forEach((item) => {
+                    if (item.submenu && hasActiveSubmenu(item.submenu)) {
+                        newOpenMenus[item.label] = true
+                    }
+                })
+            })
+            setOpenMenus(newOpenMenus)
+
+            // Scroll to active item after menus are expanded
+            setTimeout(() => {
+                if (activeItemRef.current) {
+                    activeItemRef.current.scrollIntoView({
+                        behavior: isInitialMount ? "auto" : "smooth",
+                        block: "center",
+                    })
+                }
+            }, isInitialMount ? 200 : 150)
+        }
+
+        // Reset manual toggle flag
+        if (pathChanged) {
+            isManualToggle.current = false
+        }
+    }, [activePath, sections])
+
+    // Handle manual menu toggle (user clicking to expand/collapse)
+    const handleMenuToggle = (menuLabel, open) => {
+        isManualToggle.current = true
+        setOpenMenus((prev) => ({ ...prev, [menuLabel]: open }))
+    }
+
+    return (
+        <TooltipProvider delayDuration={0}>
             {sections.map((section) => {
                 const visibleItems = section.items.filter(
                     (item) => !item.roles || item.roles.includes(userRole)
@@ -44,24 +97,69 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
 
                 return (
                     <SidebarGroup key={section.title}>
-                        {section.title && (
+                        {section.title && !isCollapsed && (
                             <SidebarGroupLabel>{section.title}</SidebarGroupLabel>
                         )}
                         <SidebarMenu>
-
                             {visibleItems.map((item) => {
                                 const isActive = normalize(activePath) === normalize(item.url)
+                                const isParentActive = hasActiveSubmenu(item.submenu)
 
                                 // has submenu → make collapsible
                                 if (item.submenu && item.submenu.length > 0) {
+                                    if (isCollapsed) {
+                                        // In collapsed mode, show icon with tooltip
+                                        return (
+                                            <Tooltip key={item.label}>
+                                                <TooltipTrigger asChild>
+                                                    <SidebarMenuItem
+                                                        ref={isParentActive ? activeItemRef : null}
+                                                    >
+                                                        <SidebarMenuButton
+                                                            className={`w-full justify-center py-4 hover:!bg-white rounded-md hover:!text-black transition-all hover:cursor-pointer ${isActive || isParentActive
+                                                                    ? "bg-white dark:text-white dark:bg-[#171717] shadow-xs font-semibold text-bl border"
+                                                                    : ""
+                                                                }`}
+                                                        >
+                                                            {item.icon && <item.icon className="w-4 h-4" />}
+                                                        </SidebarMenuButton>
+                                                    </SidebarMenuItem>
+                                                </TooltipTrigger>
+                                                <TooltipContent side="right" className="flex flex-col gap-1">
+                                                    <span className="font-semibold dark:text-white">{item.label}</span>
+                                                    {item.submenu.map((sub) => {
+                                                        if (sub.roles && !sub.roles.includes(userRole)) return null
+                                                        return (
+                                                            <Link
+                                                                key={sub.label}
+                                                                href={sub.url}
+                                                                onClick={handleClick}
+                                                                className="text-xs dark:text-white hover:underline"
+                                                            >
+                                                                {sub.label}
+                                                            </Link>
+                                                        )
+                                                    })}
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        )
+                                    }
+
                                     return (
-                                        <Collapsible key={item.label} className="w-full transition-all">
-                                            <SidebarMenuItem>
+                                        <Collapsible
+                                            key={item.label}
+                                            className="w-full transition-all"
+                                            open={openMenus[item.label]}
+                                            onOpenChange={(open) => handleMenuToggle(item.label, open)}
+                                        >
+                                            <SidebarMenuItem
+                                                ref={isParentActive && !isCollapsed ? activeItemRef : null}
+                                            >
                                                 <CollapsibleTrigger asChild>
                                                     <SidebarMenuButton
-                                                        className={`group w-full justify-between py-4 hover:!bg-white rounded-md  hover:!text-black transition-all hover:cursor-pointer ${isActive
-                                                            ? "bg-white dark:text-white dark:bg-[#171717] shadow-xs font-semibold text-bl border"
-                                                            : ""
+                                                        className={`group w-full justify-between py-4 hover:!bg-white rounded-md hover:!text-black transition-all hover:cursor-pointer ${isActive || isParentActive
+                                                                ? "bg-white dark:text-white dark:bg-[#171717] shadow-xs font-semibold text-bl border"
+                                                                : ""
                                                             }`}
                                                     >
                                                         <div className="flex items-center gap-2">
@@ -74,7 +172,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                 </CollapsibleTrigger>
                                             </SidebarMenuItem>
 
-                                            <CollapsibleContent >
+                                            <CollapsibleContent>
                                                 <SidebarMenuSub className='mt-1.5'>
                                                     {item.submenu.map((sub) => {
                                                         if (sub.roles && !sub.roles.includes(userRole)) return null
@@ -82,10 +180,15 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                             normalize(activePath) === normalize(sub.url)
 
                                                         return (
-                                                            <SidebarMenuSubItem key={sub.label} >
+                                                            <SidebarMenuSubItem
+                                                                key={sub.label}
+                                                                ref={isSubActive ? activeItemRef : null}
+                                                            >
                                                                 <SidebarMenuSubButton
                                                                     asChild
-                                                                    className={`transition-all   ${isSubActive ? "bg-white  shadow-md dark:text-black  font-semibold text-bl border dark:hover:!text-white" : ""
+                                                                    className={`transition-all ${isSubActive
+                                                                            ? "bg-white shadow-md dark:text-black font-semibold text-bl border dark:hover:!text-white"
+                                                                            : ""
                                                                         }`}
                                                                 >
                                                                     <Link href={sub.url} onClick={handleClick}>
@@ -103,13 +206,43 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                 }
 
                                 // fallback → normal item
+                                if (isCollapsed) {
+                                    return (
+                                        <Tooltip key={item.label}>
+                                            <TooltipTrigger asChild>
+                                                <SidebarMenuItem
+                                                    ref={isActive ? activeItemRef : null}
+                                                >
+                                                    <SidebarMenuButton
+                                                        asChild
+                                                        className={`w-full justify-center py-4 hover:!bg-white hover:!text-black transition-all rounded-md hover:cursor-pointer ${isActive
+                                                                ? "bg-[#f6f6f6] dark:text-white dark:bg-[#171717] font-semibold text-bl"
+                                                                : ""
+                                                            }`}
+                                                    >
+                                                        <Link href={item.url} onClick={handleClick}>
+                                                            {item.icon && <item.icon className="w-4 h-4" />}
+                                                        </Link>
+                                                    </SidebarMenuButton>
+                                                </SidebarMenuItem>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="right">
+                                                <span className="dark:text-white">{item.label}</span>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    )
+                                }
+
                                 return (
-                                    <SidebarMenuItem key={item.label}>
+                                    <SidebarMenuItem
+                                        key={item.label}
+                                        ref={isActive ? activeItemRef : null}
+                                    >
                                         <SidebarMenuButton
                                             asChild
-                                            className={`w-full  py-4 hover:!bg-white hover:!text-black transition-all  rounded-md hover:cursor-pointer ${isActive
-                                                ? "bg-[#f6f6f6] dark:text-white dark:bg-[#171717]  font-semibold text-bl"
-                                                : ""
+                                            className={`w-full py-4 hover:!bg-white hover:!text-black transition-all rounded-md hover:cursor-pointer ${isActive
+                                                    ? "bg-[#f6f6f6] dark:text-white dark:bg-[#171717] font-semibold text-bl"
+                                                    : ""
                                                 }`}
                                         >
                                             <Link href={item.url} onClick={handleClick}>
@@ -123,8 +256,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                         </SidebarMenu>
                     </SidebarGroup>
                 )
-
             })}
-        </>
+        </TooltipProvider>
     )
 }
