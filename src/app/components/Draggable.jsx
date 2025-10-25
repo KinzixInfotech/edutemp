@@ -1,5 +1,7 @@
 // components/Draggable.jsx
-'use client'
+'use client';
+export const dynamic = 'force-dynamic';
+
 import { useDraggable } from '@dnd-kit/core';
 
 export function Draggable({ id, children, style }) {

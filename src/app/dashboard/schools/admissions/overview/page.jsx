@@ -1,5 +1,7 @@
 // app/admissions/dashboard.jsx
-'use client'
+'use client';
+export const dynamic = 'force-dynamic';
+
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

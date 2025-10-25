@@ -1,5 +1,7 @@
 // components/TemplateBuilder.jsx
-'use client'
+'use client';
+export const dynamic = 'force-dynamic';
+
 import { useState, useRef } from 'react';
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import {Draggable} from '@/app/components/Draggable'

@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/sonner"
 import LoaderPage from "@/components/loader-page";
 import Provider from "./Provider";
 import NavigationProgress from "./components/NavigationProgress";
+import { Suspense } from "react";
 
 
 export const metadata = {
@@ -23,7 +24,9 @@ export default function RootLayout({ children }) {
         <body className="min-h-screen flex flex-col">
 
           <ClientProduct>{children}</ClientProduct>
-          <NavigationProgress/>
+          <Suspense fallback={<div />}>
+            <NavigationProgress />
+          </Suspense>
           <Toaster
             theme="system"
             toastOptions={{

@@ -1,4 +1,6 @@
-'use client'
+'use client';
+export const dynamic = 'force-dynamic';
+
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";

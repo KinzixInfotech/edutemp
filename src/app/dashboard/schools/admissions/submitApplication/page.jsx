@@ -1,4 +1,6 @@
-'use client'
+'use client';
+export const dynamic = 'force-dynamic';
+
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
