@@ -6,6 +6,7 @@ import "./product.css";
 import { Toaster } from "@/components/ui/sonner"
 import LoaderPage from "@/components/loader-page";
 import Provider from "./Provider";
+import NavigationProgress from "./components/NavigationProgress";
 
 
 export const metadata = {
@@ -22,6 +23,7 @@ export default function RootLayout({ children }) {
         <body className="min-h-screen flex flex-col">
 
           <ClientProduct>{children}</ClientProduct>
+          <NavigationProgress/>
           <Toaster
             theme="system"
             toastOptions={{

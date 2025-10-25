@@ -186,7 +186,7 @@ export const SidebarData = [
                 submenu: [
                     {
                         label: "Signature & Stamp Management",
-                        url: "/dashboard/documents/settings/",
+                        url: "/dashboard/documents/settings/stamp-settings",
                         roles: ["ADMIN"],
                     },
                     {

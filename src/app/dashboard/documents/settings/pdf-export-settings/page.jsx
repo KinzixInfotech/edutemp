@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import jsPDF from 'jspdf';
@@ -31,16 +31,16 @@ const formSchema = z.object({
     resolution: z.enum(['standard', 'high', 'ultra']),
     compression: z.enum(['low', 'medium', 'high']),
     embedFonts: z.boolean(),
-    headerImageUrl: z.string().url().optional().or(z.literal('')),
-    footerImageUrl: z.string().url().optional().or(z.literal('')),
-    schoolLogoUrl: z.string().url().optional().or(z.literal('')),
+    headerImageUrl: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
+    footerImageUrl: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
+    schoolLogoUrl: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
     watermarkType: z.enum(['none', 'text', 'image']),
     watermarkText: z.string().optional(),
-    watermarkImageUrl: z.string().url().optional().or(z.literal('')),
+    watermarkImageUrl: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
     footerText: z.string().optional(),
     pageNumbering: z.boolean(),
     passwordProtect: z.boolean(),
-    password: z.string().min(6).optional(),
+    password: z.string().optional(),
     disablePrint: z.boolean(),
     disableCopy: z.boolean(),
     digitalSignature: z.boolean(),
@@ -48,6 +48,15 @@ const formSchema = z.object({
     autoSaveLocation: z.enum(['cloud', 'local']),
     bulkExportBehavior: z.enum(['combine', 'separate']),
     saveAsDefault: z.boolean(),
+}).refine((data) => {
+    // Only require password if passwordProtect is true
+    if (data.passwordProtect && (!data.password || data.password.length < 6)) {
+        return false;
+    }
+    return true;
+}, {
+    message: "Password must be at least 6 characters when protection is enabled",
+    path: ["password"],
 });
 
 export default function PdfExportSettings() {
@@ -62,6 +71,7 @@ export default function PdfExportSettings() {
         handleSubmit,
         watch,
         setValue,
+        control,
         formState: { errors },
     } = useForm({
         resolver: zodResolver(formSchema),
@@ -217,11 +227,33 @@ export default function PdfExportSettings() {
     }, [previewPdf]);
 
     const onSubmit = (data) => {
+        console.log('✅ Form submitted with data:', data);
         if (data.passwordProtect && !data.password) {
             toast.error('Password is required when protection is enabled');
             return;
         }
         saveMutation.mutate(data);
+    };
+
+    const onError = (errors) => {
+        console.error('❌ Form validation errors:', errors);
+        console.error('Error keys:', Object.keys(errors));
+        
+        // Show each error as a toast
+        Object.entries(errors).forEach(([field, error]) => {
+            toast.error(`${field}: ${error.message}`);
+        });
+    };
+
+    const handleSaveClick = async () => {
+        console.log('🔵 Save button clicked!');
+        console.log('Current form values:', watched);
+        console.log('Form state errors:', errors);
+        console.log('Error keys:', Object.keys(errors));
+        
+        // Try to submit
+        const result = await handleSubmit(onSubmit, onError)();
+        console.log('Submit result:', result);
     };
 
     if (!schoolId || isLoading) {
@@ -234,7 +266,7 @@ export default function PdfExportSettings() {
 
     return (
         <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6 sm:space-y-8">
-            {/* Header Section - Responsive */}
+            {/* Header Section */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="space-y-1">
                     <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
@@ -246,9 +278,10 @@ export default function PdfExportSettings() {
                     </p>
                 </div>
                 <Button
-                    onClick={handleSubmit(onSubmit)}
+                    onClick={handleSaveClick}
                     disabled={saveMutation.isPending}
                     className="w-full sm:w-auto"
+                    type="button"
                 >
                     {saveMutation.isPending ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -261,37 +294,30 @@ export default function PdfExportSettings() {
 
             <TooltipProvider>
                 <Tabs defaultValue="layout" className="space-y-4 sm:space-y-6">
-                    {/* Responsive Tabs List */}
                     <TabsList className="grid grid-cols-3 sm:grid-cols-6 w-full h-auto gap-1">
                         <TabsTrigger value="layout" className="flex flex-col sm:flex-row items-center gap-1 text-xs sm:text-sm py-2">
                             <Layout className="w-4 h-4" />
-                            <span className="hidden sm:inline">Layout</span>
-                            <span className="sm:hidden">Layout</span>
+                            <span>Layout</span>
                         </TabsTrigger>
                         <TabsTrigger value="quality" className="flex flex-col sm:flex-row items-center gap-1 text-xs sm:text-sm py-2">
                             <Eye className="w-4 h-4" />
-                            <span className="hidden sm:inline">Quality</span>
-                            <span className="sm:hidden">Quality</span>
+                            <span>Quality</span>
                         </TabsTrigger>
                         <TabsTrigger value="branding" className="flex flex-col sm:flex-row items-center gap-1 text-xs sm:text-sm py-2">
                             <Upload className="w-4 h-4" />
-                            <span className="hidden sm:inline">Branding</span>
-                            <span className="sm:hidden">Brand</span>
+                            <span>Brand</span>
                         </TabsTrigger>
                         <TabsTrigger value="security" className="flex flex-col sm:flex-row items-center gap-1 text-xs sm:text-sm py-2">
                             <Lock className="w-4 h-4" />
-                            <span className="hidden sm:inline">Security</span>
-                            <span className="sm:hidden">Security</span>
+                            <span>Security</span>
                         </TabsTrigger>
                         <TabsTrigger value="file" className="flex flex-col sm:flex-row items-center gap-1 text-xs sm:text-sm py-2">
                             <FileText className="w-4 h-4" />
-                            <span className="hidden sm:inline">Files</span>
-                            <span className="sm:hidden">Files</span>
+                            <span>Files</span>
                         </TabsTrigger>
                         <TabsTrigger value="preview" className="flex flex-col sm:flex-row items-center gap-1 text-xs sm:text-sm py-2">
                             <Eye className="w-4 h-4" />
-                            <span className="hidden sm:inline">Preview</span>
-                            <span className="sm:hidden">Preview</span>
+                            <span>Preview</span>
                         </TabsTrigger>
                     </TabsList>
 
@@ -393,7 +419,16 @@ export default function PdfExportSettings() {
                                 </div>
                                 <div className="flex items-center justify-between py-2">
                                     <Label className="text-sm sm:text-base">Embed Fonts</Label>
-                                    <Switch checked={watched.embedFonts} onCheckedChange={(v) => setValue('embedFonts', v)} />
+                                    <Controller
+                                        name="embedFonts"
+                                        control={control}
+                                        render={({ field }) => (
+                                            <Switch
+                                                checked={field.value}
+                                                onCheckedChange={field.onChange}
+                                            />
+                                        )}
+                                    />
                                 </div>
                             </CardContent>
                         </Card>
@@ -444,25 +479,70 @@ export default function PdfExportSettings() {
                             <CardContent className="space-y-4 sm:space-y-6">
                                 <div className="flex items-center justify-between py-2">
                                     <Label className="text-sm sm:text-base">Password Protect</Label>
-                                    <Switch checked={watched.passwordProtect} onCheckedChange={(v) => setValue('passwordProtect', v)} />
+                                    <Controller
+                                        name="passwordProtect"
+                                        control={control}
+                                        render={({ field }) => (
+                                            <Switch
+                                                checked={field.value}
+                                                onCheckedChange={field.onChange}
+                                            />
+                                        )}
+                                    />
                                 </div>
                                 {watched.passwordProtect && (
                                     <div className="flex flex-col gap-2.5">
-                                        <Label className="text-sm sm:text-base">Password</Label>
-                                        <Input type="password" {...register('password')} className="text-sm" />
+                                        <Label className="text-sm sm:text-base">Password (min 6 characters)</Label>
+                                        <Input 
+                                            type="password" 
+                                            {...register('password')} 
+                                            className="text-sm" 
+                                        />
+                                        {errors.password && (
+                                            <p className="text-xs text-red-500 mt-1">
+                                                {errors.password.message}
+                                            </p>
+                                        )}
                                     </div>
                                 )}
                                 <div className="flex items-center justify-between py-2">
                                     <Label className="text-sm sm:text-base">Disable Print</Label>
-                                    <Switch checked={watched.disablePrint} onCheckedChange={(v) => setValue('disablePrint', v)} />
+                                    <Controller
+                                        name="disablePrint"
+                                        control={control}
+                                        render={({ field }) => (
+                                            <Switch
+                                                checked={field.value}
+                                                onCheckedChange={field.onChange}
+                                            />
+                                        )}
+                                    />
                                 </div>
                                 <div className="flex items-center justify-between py-2">
                                     <Label className="text-sm sm:text-base">Disable Copy</Label>
-                                    <Switch checked={watched.disableCopy} onCheckedChange={(v) => setValue('disableCopy', v)} />
+                                    <Controller
+                                        name="disableCopy"
+                                        control={control}
+                                        render={({ field }) => (
+                                            <Switch
+                                                checked={field.value}
+                                                onCheckedChange={field.onChange}
+                                            />
+                                        )}
+                                    />
                                 </div>
                                 <div className="flex items-center justify-between py-2">
                                     <Label className="text-sm sm:text-base">Digital Signature</Label>
-                                    <Switch checked={watched.digitalSignature} onCheckedChange={(v) => setValue('digitalSignature', v)} />
+                                    <Controller
+                                        name="digitalSignature"
+                                        control={control}
+                                        render={({ field }) => (
+                                            <Switch
+                                                checked={field.value}
+                                                onCheckedChange={field.onChange}
+                                            />
+                                        )}
+                                    />
                                 </div>
                             </CardContent>
                         </Card>
@@ -478,6 +558,11 @@ export default function PdfExportSettings() {
                                 <div className="flex flex-col gap-2.5">
                                     <Label className="text-sm sm:text-base">File Name Format</Label>
                                     <Input {...register('fileNameFormat')} className="text-sm" />
+                                    {errors.fileNameFormat && (
+                                        <p className="text-xs text-red-500 mt-1">
+                                            {errors.fileNameFormat.message}
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="flex flex-col gap-2.5">
                                     <Label className="text-sm sm:text-base">Auto Save Location</Label>
@@ -514,6 +599,7 @@ export default function PdfExportSettings() {
                                     onClick={generatePreview}
                                     disabled={uploading}
                                     className="w-full sm:w-auto"
+                                    type="button"
                                 >
                                     Generate Preview
                                 </Button>
