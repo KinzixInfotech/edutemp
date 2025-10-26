@@ -33,7 +33,7 @@ export default function StampsTab() {
   const { data: stamps = [], isLoading } = useQuery({
     queryKey: ['stamps', schoolId],
     queryFn: async () => {
-      const res = await fetch(`/api/stamps/${schoolId}`);
+      const res = await fetch(`/api/documents/stamps/${schoolId}`);
       if (!res.ok) throw new Error('Failed to fetch stamps');
       return res.json();
     },
@@ -43,7 +43,7 @@ export default function StampsTab() {
   const saveMutation = useMutation({
     mutationFn: async (data) => {
       const method = editingId ? 'PUT' : 'POST';
-      const url = editingId ? `/api/stamps/${editingId}` : `/api/stamps/${schoolId}`;
+      const url = editingId ? `/api/documents/stamps/manage/${editingId}` : `/api/documents/stamps/${schoolId}`;
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },

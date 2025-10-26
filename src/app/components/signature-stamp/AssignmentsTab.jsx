@@ -27,7 +27,7 @@ export default function AssignmentsTab() {
     const { data: templates = [], isLoading } = useQuery({
         queryKey: ['templates', schoolId],
         queryFn: async () => {
-            const res = await fetch(`/api/templates/${schoolId}`); // Assume endpoint for templates
+            const res = await fetch(`/api/documents/templates/${schoolId}`); // Assume endpoint for templates
             return res.json();
         },
     });
@@ -35,7 +35,7 @@ export default function AssignmentsTab() {
     const { data: signatures = [] } = useQuery({
         queryKey: ['signatures', schoolId],
         queryFn: async () => {
-            const res = await fetch(`/api/signatures/${schoolId}`);
+            const res = await fetch(`/api/documents/signatures/${schoolId}`);
             return res.json();
         },
     });
@@ -43,7 +43,7 @@ export default function AssignmentsTab() {
     const { data: stamps = [] } = useQuery({
         queryKey: ['stamps', schoolId],
         queryFn: async () => {
-            const res = await fetch(`/api/stamps/${schoolId}`);
+            const res = await fetch(`/api/documents/stamps/${schoolId}`);
             return res.json();
         },
     });
@@ -52,7 +52,7 @@ export default function AssignmentsTab() {
         mutationFn: async () => {
             if (!templateId || !signatureId) return;
             const data = { signatureId, ...positions[sigId] || { x: 0, y: 0, scale: 1, rotation: 0 }, templateType: 'idcard' }; // Adjust type
-            const res = await fetch(`/api/templates/${templateId}/assign-signature`, {
+            const res = await fetch(`/api/documents/templates/${templateId}/assign-signature`, {
                 method: 'POST',
                 body: JSON.stringify(data),
             });
@@ -65,7 +65,7 @@ export default function AssignmentsTab() {
         mutationFn: async () => {
             if (!templateId || !stampId) return;
             const data = { stampId, ...positions[stampId] || { x: 0, y: 0, scale: 1, rotation: 0 }, templateType: 'idcard' };
-            const res = await fetch(`/api/templates/${templateId}/assign-stamp`, {
+            const res = await fetch(`/api/documents/templates/${templateId}/assign-stamp`, {
                 method: 'POST',
                 body: JSON.stringify(data),
             });

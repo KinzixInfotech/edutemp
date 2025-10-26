@@ -33,7 +33,7 @@ export default function SignaturesTab() {
   const { data: signatures = [], isLoading } = useQuery({
     queryKey: ['signatures', schoolId],
     queryFn: async () => {
-      const res = await fetch(`/api/signatures/${schoolId}`);
+      const res = await fetch(`/api/documents/signatures/${schoolId}`);
       if (!res.ok) throw new Error('Failed to fetch');
       return res.json();
     },
@@ -43,7 +43,7 @@ export default function SignaturesTab() {
   const saveMutation = useMutation({
     mutationFn: async (data) => {
       const method = editingId ? 'PUT' : 'POST';
-      const url = editingId ? `/api/signatures/${editingId}` : `/api/signatures/${schoolId}`;
+      const url = editingId ? `/api/documents/signatures/manage/${editingId}` : `/api/documents/signatures/${schoolId}`;
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
