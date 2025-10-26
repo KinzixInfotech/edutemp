@@ -892,7 +892,7 @@ export function Profile() {
         break;
 
       default:
-        console.warn("Unknown role:", fullUser?.role?.name);
+        // console.warn("Unknown role:", fullUser?.role?.name);
         profileFields = <p className="text-muted-foreground">No profile information available for this role.</p>;
     }
     return (

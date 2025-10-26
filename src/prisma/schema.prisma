@@ -51,6 +51,8 @@ model School {
   AdmitCard              AdmitCard[]
   QrVerificationSettings QrVerificationSettings?
   PdfExportSettings      PdfExportSettings?
+  Signature              Signature[]
+  Stamp                  Stamp[]
 
   @@index([name])
 }
@@ -961,6 +963,70 @@ model Gallery {
 }
 
 // certificates generation models
+
+// Add to your existing schema.prisma
+
+model Signature {
+  id                 String              @id @default(uuid()) @db.Uuid
+  schoolId           String              @db.Uuid
+  name               String
+  designation        String?
+  imageUrl           String
+  isDefault          Boolean             @default(false)
+  isActive           Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  school             School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  templateSignatures TemplateSignature[]
+
+  @@index([schoolId])
+}
+
+model Stamp {
+  id             String          @id @default(uuid()) @db.Uuid
+  schoolId       String          @db.Uuid
+  name           String
+  imageUrl       String
+  position       Json? // { x: number, y: number }
+  forDocument    String? // e.g., 'certificate', 'idcard'
+  isDefault      Boolean         @default(false)
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  school         School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  templateStamps TemplateStamp[]
+
+  @@index([schoolId])
+}
+
+model TemplateSignature {
+  id           String              @id @default(uuid()) @db.Uuid
+  templateId   String              @db.Uuid
+  signatureId  String              @db.Uuid
+  x            Float
+  y            Float
+  scale        Float               @default(1.0)
+  rotation     Float               @default(0.0)
+  templateType String // e.g., 'certificate', 'idcard'
+  createdAt    DateTime            @default(now())
+  template     CertificateTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade) // Assume CertificateTemplate; adjust for other templates
+  signature    Signature           @relation(fields: [signatureId], references: [id], onDelete: Cascade)
+}
+
+model TemplateStamp {
+  id           String              @id @default(uuid()) @db.Uuid
+  templateId   String              @db.Uuid
+  stampId      String              @db.Uuid
+  x            Float
+  y            Float
+  scale        Float               @default(1.0)
+  rotation     Float               @default(0.0)
+  templateType String // e.g., 'certificate', 'idcard'
+  createdAt    DateTime            @default(now())
+  template     CertificateTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade) // Adjust for other
+  stamp        Stamp               @relation(fields: [stampId], references: [id], onDelete: Cascade)
+}
+
 model QrVerificationSettings {
   id       String @id @default(cuid())
   schoolId String @db.Uuid // CRITICAL: @db.Uuid
@@ -1043,7 +1109,7 @@ model PdfExportSettings {
   disablePrint       Boolean @default(false)
   disableCopy        Boolean @default(false)
   digitalSignature   Boolean @default(false)
-  saveAsDefault   Boolean @default(false)     
+  saveAsDefault      Boolean @default(false)
   // File Handling
   fileNameFormat     String  @default("{student_name}_{document_type}.pdf")
   autoSaveLocation   String  @default("cloud") // cloud, local
@@ -1056,19 +1122,21 @@ model PdfExportSettings {
 }
 
 model CertificateTemplate {
-  id           String                 @id @default(uuid()) @db.Uuid
-  name         String
-  description  String?
-  type         String // e.g. "character", "bonafide", "transfer", etc.
-  schoolId     String                 @db.Uuid
-  school       School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  layoutConfig Json // Stores positions, fonts, colors, placeholders
-  createdById  String?                @db.Uuid
-  createdBy    User?                  @relation(fields: [createdById], references: [id])
-  isDefault    Boolean                @default(false)
-  createdAt    DateTime               @default(now())
-  updatedAt    DateTime               @updatedAt
-  certificates CertificateGenerated[]
+  id                String                 @id @default(uuid()) @db.Uuid
+  name              String
+  description       String?
+  type              String // e.g. "character", "bonafide", "transfer", etc.
+  schoolId          String                 @db.Uuid
+  school            School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  layoutConfig      Json // Stores positions, fonts, colors, placeholders
+  createdById       String?                @db.Uuid
+  createdBy         User?                  @relation(fields: [createdById], references: [id])
+  isDefault         Boolean                @default(false)
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  certificates      CertificateGenerated[]
+  TemplateSignature TemplateSignature[]
+  TemplateStamp     TemplateStamp[]
 
   @@index([schoolId])
   @@index([type])

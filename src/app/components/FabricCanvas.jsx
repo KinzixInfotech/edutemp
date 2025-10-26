@@ -1,101 +1,92 @@
-// components/TemplateBuilder.jsx
 'use client';
-export const dynamic = 'force-dynamic';
 
-import { useState, useRef } from 'react';
-import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import {Draggable} from '@/app/components/Draggable'
-import { v4 as uuidv4 } from 'uuid';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
+import { useEffect, useRef, useCallback } from 'react';
+import dynamic from 'next/dynamic'; // For SSR safety
+import { Canvas, Text, Image } from 'fabric'; // v6 import style
 
+// Dynamic import for any SSR-sensitive parts (optional)
+const QRCodeComponent = dynamic(() => import('qrcode.react'), { ssr: false });
 
-export default function TemplateBuilder({ layoutConfig, onUpdate, placeholders }) {
-  const [elements, setElements] = useState(layoutConfig.elements || []);
-  const containerRef = useRef(null);
+export default function FabricCanvas({ layoutJson = {}, onUpdate, placeholders = [], width = 800, height = 600, backgroundImageUrl = null }) {
+    const canvasRef = useRef(null);
+    const fabricCanvasRef = useRef(null);
+    const debounceRef = useRef(null);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 },
-    })
-  );
+    // Debounced update to prevent rapid re-renders
+    const debouncedUpdate = useCallback((config) => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => onUpdate(config), 300);
+    }, [onUpdate]);
 
+    useEffect(() => {
+        if (!canvasRef.current || fabricCanvasRef.current) return;
 
-  const handleDragEnd = (event) => {
-    const { active, delta } = event;
-    const id = active.id;
+        // Initialize v6 Canvas
+        fabricCanvasRef.current = new Canvas(canvasRef.current, {
+            width,
+            height,
+            backgroundColor: '#ffffff',
+            preserveObjectStacking: true, // For layering
+        });
 
-    setElements((prev) => {
-      return prev.map((el) => {
-        if (el.id === id) {
-          return {
-            ...el,
-            x: el.x + delta.x,
-            y: el.y + delta.y,
-          };
+        // Set background if provided
+        if (backgroundImageUrl) {
+            fabric.Image.fromURL(backgroundImageUrl, (img) => {
+                img.scaleToWidth(width);
+                img.scaleToHeight(height);
+                fabricCanvasRef.current.setBackgroundImage(img, fabricCanvasRef.current.renderAll.bind(fabricCanvasRef.current));
+            });
         }
-        return el;
-      });
-    });
 
-    // Update parent
-    onUpdate({ elements });
-  };
+        // Add snap grid (optional, from docs)
+        fabricCanvasRef.current.on('object:moving', (e) => {
+            const obj = e.target;
+            obj.set({
+                left: Math.round(obj.left / 10) * 10, // Snap to 10px grid
+                top: Math.round(obj.top / 10) * 10,
+            });
+        });
 
-  const addElement = (placeholder) => {
-    const newElement = {
-      id: uuidv4(),
-      text: placeholder,
-      x: 50, // Default position
-      y: 50,
-      fontSize: 16,
-      color: '#000',
-    };
-    const newElements = [...elements, newElement];
-    setElements(newElements);
-    onUpdate({ elements: newElements });
-  };
+        // Add initial placeholders as draggable Text objects
+        placeholders.forEach((ph, index) => {
+            const text = new Text(ph, {
+                left: 50 + (index % 3) * 150,
+                top: 50 + Math.floor(index / 3) * 80,
+                fontSize: 16,
+                fill: '#999999',
+                editable: true,
+                selectable: true,
+                evented: true, // Enable drag events
+            });
+            fabricCanvasRef.current.add(text);
+        });
 
-  return (
-    <div className="flex gap-4">
+        // Listen for modifications (drag, resize, rotate)
+        fabricCanvasRef.current.on('object:modified', () => {
+            const config = fabricCanvasRef.current.toJSON(['left', 'top', 'fontSize', 'fill', 'scaleX', 'scaleY', 'angle']); // Full JSON export
+            debouncedUpdate(config); // Debounced to avoid loops
+        });
 
-      {/* Sidebar for placeholders */}
-      <div className="w-48 border p-4">
-        <Label>Fields</Label>
-        <ul className="space-y-2">
-          {placeholders.map((ph) => (
-            <li key={ph}>
-              <Button variant="outline" onClick={() => addElement(ph)} className="w-full">
-                {ph}
-              </Button>
-            </li>
-          ))}
-        </ul>
-      </div>
+        // Load existing layoutJson
+        if (layoutJson && Object.keys(layoutJson).length > 0) {
+            fabricCanvasRef.current.loadFromJSON(layoutJson, fabricCanvasRef.current.renderAll.bind(fabricCanvasRef.current));
+        }
 
-      {/* Canvas */}
-      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-        <div
-          ref={containerRef}
-          className="relative w-[800px] h-[600px] border bg-gray-100"
-          style={{
-            backgroundImage: 'url(/path/to/default-background.png)', // Add your predefined background
-            backgroundSize: 'cover',
-            overflow: 'hidden',
-          }}
-        >
-          {elements.map((el) => (
-            <Draggable key={el.id} id={el.id} style={{ position: 'absolute', left: el.x, top: el.y }}>
-              <div
-                className="p-2 bg-white border cursor-move"
-                style={{ fontSize: `${el.fontSize}px`, color: el.color }}
-              >
-                {el.text}
-              </div>
-            </Draggable>
-          ))}
+        return () => {
+            if (fabricCanvasRef.current) {
+                fabricCanvasRef.current.dispose();
+                fabricCanvasRef.current = null;
+            }
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+        };
+    }, [width, height, backgroundImageUrl, placeholders, debouncedUpdate, layoutJson]);
+
+    return (
+        <div className="border rounded-lg overflow-hidden shadow-sm">
+            <canvas ref={canvasRef} className="w-full h-[400px] bg-white" />
+            <div className="p-2 bg-gray-50 text-xs text-gray-600">
+                Drag placeholders to position. Snap to 10px grid enabled.
+            </div>
         </div>
-      </DndContext>
-    </div>
-  );
+    );
 }
