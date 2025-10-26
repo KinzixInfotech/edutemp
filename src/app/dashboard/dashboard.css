@@ -132,6 +132,22 @@
   color: black !important;
 }
 
+[data-sidebar="sidebar"] [data-collapsed="true"] {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+[data-sidebar="sidebar"] [data-collapsed="true"]::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide-collapsed {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide-collapsed::-webkit-scrollbar {
+  display: none;
+}
 .rbc-btn-group:first-child {
   display: none !important;
 }
@@ -200,7 +216,8 @@
     visibility: hidden;
   }
 
-  #timetable, #timetable * {
+  #timetable,
+  #timetable * {
     visibility: visible;
   }
 
