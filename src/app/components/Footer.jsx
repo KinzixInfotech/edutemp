@@ -115,9 +115,10 @@ export default function Footer() {
                                 rel="noopener noreferrer"
                                 className="font-medium text-blue-600 hover:underline"
                             >
-                                A Kinzix Product
+                                A Kinzix Product <br />
                             </a>
                         </p>
+                        <span>Under Development</span>
                     </div>
 
                     {/* Right - Kinzix Logo */}

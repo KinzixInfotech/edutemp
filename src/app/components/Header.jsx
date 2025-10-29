@@ -76,7 +76,7 @@ export default function Header() {
                 </div>
 
                 {/* Mobile Menu */}
-                {isMenuOpen || pathname !=='/schoollogin' && (
+                {/* {isMenuOpen || pathname !=='/schoollogin' && (
                     <div className="lg:hidden absolute top-full left-0 right-0 bg-white shadow-xl py-4 px-6 space-y-3 border-t">
                         <a href="#" className="block text-gray-700 hover:text-[#0569ff] transition-colors font-medium py-2">Home</a>
                         <a href="#" className="block text-gray-700 hover:text-[#0569ff] transition-colors font-medium py-2">About</a>
@@ -87,7 +87,7 @@ export default function Header() {
                             Request Free Demo
                         </button>
                     </div>
-                )}
+                )} */}
             </nav>
         </div>
     );
