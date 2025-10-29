@@ -20,9 +20,7 @@ export default function RootLayout({ children }) {
   return (
     <Provider>
       <html lang="en" suppressHydrationWarning={true}>
-
         <body className="min-h-screen flex flex-col">
-
           <ClientProduct>{children}</ClientProduct>
           <Suspense fallback={<div />}>
             <NavigationProgress />

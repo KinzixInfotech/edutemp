@@ -217,6 +217,8 @@ export default function CreateSchoolPage() {
       setLoading(false)
     }
   }
+
+
   function SchoolCodeField({ field }) {
     const [copied, setCopied] = useState(false)
     const value = `${field?.value || ""}`
