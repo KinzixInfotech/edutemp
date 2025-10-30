@@ -12,7 +12,8 @@ import {
     NavigationMenuLink,
     NavigationMenuList,
 } from "@/components/ui/navigation-menu"
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 const navigationLinks = [
     // { href: "#", label: "Home", active: true },
@@ -21,8 +22,16 @@ const navigationLinks = [
 
 export default function Header() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [AlreadyLoggedIn, setAlreadyLoggedIn] = useState(false)
     const pathname = usePathname();
-
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data }) => {
+            if (data.session) {
+                setAlreadyLoggedIn(true);
+                // router.push("/dashboard")
+            }
+        })
+    }, [])
     return (
         <div className="fixed w-full border-b-black bg-white left-0 right-0 top-0 z-50 border-b border-gray-200">
             <nav className="px-6 lg:px-16 py-1">
@@ -60,19 +69,30 @@ export default function Header() {
                     </div>
 
                     {/* Right side - Request Demo Button */}
-                    <div className="flex items-center gap-2">
-                        {pathname !== "/schoollogin" && (
-                            <Link href={'/schoollogin'}>
+                    <div className=" items-center hidden md:flex gap-2">
+                        {AlreadyLoggedIn ? (
+                            <Link href="/dashboard">
                                 <Button
-                                    // asChild
-                                    size={'lg'}
-                                    className="font-bold transition-all bg-primary rounded-full py-5  text-white hover:bg-transparent cursor-pointer border border-black hover:text-black"
+                                    size="lg"
+                                    className="font-bold transition-all bg-primary rounded-full  text-white hover:bg-transparent cursor-pointer border lg:py-6  border-black hover:text-black"
                                 >
-                                    <span>Login</span>
+                                    <span className="lg:text-lg">Go To Dashboard</span>
                                 </Button>
                             </Link>
+                        ) : (
+                            pathname !== "/schoollogin" && (
+                                <Link href="/schoollogin">
+                                    <Button
+                                        size="lg"
+                                        className="font-bold lg:py-6   transition-all bg-primary rounded-full  text-white hover:bg-transparent cursor-pointer border border-black hover:text-black"
+                                    >
+                                        <span className="lg:text-lg">Login</span>
+                                    </Button>
+                                </Link>
+                            )
                         )}
                     </div>
+
                 </div>
 
                 {/* Mobile Menu */}
