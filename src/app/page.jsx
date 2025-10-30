@@ -2,6 +2,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Menu, X, ChevronDown } from 'lucide-react';
 import { Camera, Upload, Globe, Palette, CheckCircle, Database, Shield, RefreshCw, Users, BookOpen, Calendar, Bell, Star } from 'lucide-react';
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from "@/components/ui/accordion"
+
 // Content JSON
 const content = {
     header: {
@@ -67,6 +74,7 @@ const content = {
         title: "Are you Ready to",
         highlightedText: "Upgrade your School",
         subtitle: "with Smart AI-powered",
+        image: "https://classonapp.com/frontend-assets/images/best-school-software.webp",
         highlightedSubtitle: "School Management Software?",
         description: "EduBreezy is one of the most experienced school service providers in India, with 20 years of experience in the IT field and over 8 years of experience in the Ed-tech industry",
         features: [
@@ -89,7 +97,7 @@ const content = {
         ctaButtons: ["Call Us Now", "Book a free demo"]
     },
     smarterSchool: {
-        badge: "SAY GOODBYE TO STRESS WITH EduBreezy",
+        badge: "SAY GOODBYE TO STRESS WITH EDU BREEZY",
         title: "Here's How We Make Your School",
         highlightedText: "Smarter",
         features: [
@@ -98,7 +106,7 @@ const content = {
             "Enjoy auto reminders for school fees, track school buses, manage visitors and gate passes, and effortlessly generate certificates and ID cards.",
             "Keep your lesson plans, teaching materials, and school documents organized in one central hub. Find what you need instantly!"
         ],
-        imagePlaceholder: "/api/placeholder/600/700"
+        imagePlaceholder: "https://classonapp.com/frontend-assets/images/home_page_icon/best-school-erp-software.webp"
     },
     statistics: {
         title: "Your School is Unique",
@@ -125,7 +133,7 @@ const content = {
             "User-Friendly Interface",
             "Effortlessly Boost Admissions"
         ],
-        imagePlaceholder: "/api/placeholder/400/600"
+        imagePlaceholder: "https://classonapp.com/frontend-assets/images/smart-school-app.webp"
     },
     smartFeatures: {
         title: "Make your School",
@@ -265,8 +273,8 @@ export default function HeroSection() {
     };
 
     return (
-        <div>
-            <div className="min-h-screen bg-gradient-to-br bg-[#0569ff] relative overflow-hidden">
+        <div >
+            <div className="min-h-screen pt-15  pb-20 lg:pb-0 lg:pt-0 bg-gradient-to-br bg-[#0569ff] relative overflow-hidden">
                 {/* Tilted Wave Pattern Background */}
                 {/* <div className="absolute inset-0 opacity-10">
                 <svg className="absolute w-full h-full" xmlns="http://www.w3.org/2000/svg">
@@ -283,16 +291,16 @@ export default function HeroSection() {
                 <AnimatedWavePattern />
                 {/* Hero Content */}
                 <div className="relative z-10 flex items-center justify-center  px-6 lg:px-16 py-12 lg:py-40">
-                    <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
+                    <div className="max-w-7xl text-center lg:text-start mx-auto grid lg:grid-cols-2 gap-12 items-center">
                         {/* Left Content */}
                         <div className="text-white space-y-8">
-                            <h1 className="text-4xl lg:text-6xl font-bold leading-tight">
+                            <h1 className="text-4xl  lg:text-6xl font-bold leading-tight">
                                 AI-Powered School Management Software for Indian Schools
                             </h1>
                             <p className="text-lg lg:text-xl text-red-100 leading-relaxed">
                                 India's first AI-powered school Management Software with a powerful toolkit to boost school management systems! We provide a complete education management software solution featuring over 90 modules, 4 mobile apps, and 15+ specialized services tailored for Indian schools. Our School ERP Software streamlines administration, enhances communication, and ensures seamless learning with automation and real-time analytics.
                             </p>
-                            <div className="flex items-center space-x-4">
+                            <div className="flex flex-col lg:flex-row items-center space-x-4">
                                 <div className="text-6xl lg:text-7xl font-bold">100<span className="text-4xl">%</span></div>
                                 <div className="text-lg">
                                     <div className="font-semibold">Secure & Reliable Cloud Based</div>
@@ -407,19 +415,22 @@ export default function HeroSection() {
                 </svg>
             </div> */}
             </div>
-            <Himage />
-            <AppsSection />
-            <UpgradeSection />
-            <SmarterSchoolSection />
-            <StatisticsSection />
-            <WhyClassOnSection />
-            <SmartFeaturesSection />
 
-            <TestimonialsSection />
-            <FAQSection />
-            <FinalCTASection />
-            {/* <Footer /> */}
+            <div className='px-5 lg:px-0'>
 
+                <Himage />
+                <AppsSection />
+                <UpgradeSection />
+                <SmarterSchoolSection />
+                <StatisticsSection />
+                <WhyClassOnSection />
+                <SmartFeaturesSection />
+
+                <TestimonialsSection />
+                <FAQSection />
+            </div>
+                <FinalCTASection />
+                {/* <Footer /> */}
         </div>
     );
 }
@@ -511,7 +522,7 @@ const FAQSection = () => {
     const [openIndex, setOpenIndex] = React.useState(null);
 
     return (
-        <section className="py-16 bg-white">
+        <section className="py-16">
             <div className="max-w-7xl mx-auto px-6 lg:px-16">
                 <div className="text-center mb-12">
                     <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
@@ -522,23 +533,16 @@ const FAQSection = () => {
 
                 <div className="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto">
                     {content.faq.questions.map((question, idx) => (
-                        <div
-                            key={idx}
-                            className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition cursor-pointer"
-                            onClick={() => setOpenIndex(openIndex === idx ? null : idx)}
-                        >
-                            <div className="flex items-center justify-between">
-                                <p className="text-gray-800 font-medium pr-4">{question}</p>
-                                <span className="text-2xl text-gray-400 flex-shrink-0">
-                                    {openIndex === idx ? '−' : '+'}
-                                </span>
-                            </div>
-                            {openIndex === idx && (
-                                <div className="mt-4 text-gray-600 text-sm">
+                        <Accordion type="single" collapsible className={'border-b'} key={idx} >
+                            <AccordionItem value={`item-${idx}`}>
+                                <AccordionTrigger className="text-gray-800 text-lg font-medium text-left">
+                                    {question}
+                                </AccordionTrigger>
+                                <AccordionContent className="text-gray-600 text-lg">
                                     This is where the answer would appear. Click to toggle.
-                                </div>
-                            )}
-                        </div>
+                                </AccordionContent>
+                            </AccordionItem>
+                        </Accordion>
                     ))}
                 </div>
             </div>
@@ -552,14 +556,14 @@ const FinalCTASection = () => (
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
             <div className="grid md:grid-cols-2 gap-12 items-center">
                 <div className="text-white">
-                    <p className="text-yellow-300 mb-4">{content.finalCta.badge}</p>
+                    <p className="text-white mb-4">{content.finalCta.badge}</p>
                     <h2 className="text-3xl md:text-4xl font-bold mb-4">{content.finalCta.title}</h2>
                     <p className="text-xl mb-8">{content.finalCta.description}</p>
                     <div className="flex flex-col sm:flex-row gap-4">
                         {content.finalCta.buttons.map((btn, idx) => (
                             <button
                                 key={idx}
-                                className={`px-8 py-3 rounded-md transition ${idx === 0 ? 'bg-white text-red-600 hover:bg-gray-100' : 'border-2 border-white text-white hover:bg-white hover:text-red-600'}`}
+                                className={`px-8 py-3  hover:cursor-pointer rounded-md text-3xl font-semibold text-left transition ${idx === 0 ? 'bg-white text-[#0469ff] hover:bg-gray-100' : 'border-2 border-white text-white hover:bg-white hover:text-[#0469ff]'}`}
                             >
                                 {btn}
                             </button>
@@ -567,12 +571,7 @@ const FinalCTASection = () => (
                     </div>
                 </div>
                 <div className="bg-white/10 backdrop-blur-sm rounded-3xl overflow-hidden aspect-video">
-                    <div className="w-full h-full flex items-center justify-center text-white">
-                        <div className="text-center">
-                            <Users className="w-16 h-16 mx-auto mb-2" />
-                            <p>Teachers & Students Image</p>
-                        </div>
-                    </div>
+                    <img src={'https://classonapp.com/frontend-assets/images/7.webp'} alt="School Management App" className="max-w-[100%] object-cover h-auto" />
                 </div>
             </div>
         </div>
@@ -626,91 +625,71 @@ const Footer = () => (
 
 // Apps Section Component
 const AppsSection = () => (
-    <section className="py-16 bg-white">
-        <div className="max-w-7xl mx-auto px-6 lg:px-16">
-            <div className="text-center mb-12">
-                <div className="text-sm text-gray-500 mb-2">{content.apps.badge}</div>
-                <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-                    {content.apps.title} <span className="text-[#0569ff]">{content.apps.highlightedText}</span>
-                </h2>
-                <p className="text-gray-600 max-w-3xl mx-auto">{content.apps.description}</p>
+    <section className="py-16 bg-gradient-to-br from-blue-50 to-white">
+        <div className="max-w-7xl mx-auto px-6 lg:px-16 lg:gap-12 grid lg:grid-cols-2 auto-rows-auto gap-5">
+            <div className='h-fit'>
+                <div className="text-left mb-4">
+                    <div className="text-2xl font-semibold text-gray-500 mb-2">{content.apps.badge}</div>
+                    <h2 className="text-6xl tracking-tight leading-tight font-semibold text-gray-900 mb-4">
+                        {content.apps.title} <span className="text-[#0569ff]">{content.apps.highlightedText}</span>
+                    </h2>
+                    <p className="text-muted-foreground max-w-3xl text-[1rem] mx-auto">{content.apps.description}</p>
+                </div>
+
+                <div className="mb-12">
+                    <ul className="space-y-4 max-w-3xl mx-auto">
+                        {content.apps.points.map((point, idx) => (
+                            <li key={idx} className="flex items-start gap-3">
+                                <div className="w-2 h-2 bg-[#0569ff] rounded-full mt-2 flex-shrink-0"></div>
+                                <p className="text-muted-foreground !text-[1rem]">{point}</p>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+                <div className="text-left">
+                    <button className="bg-[#0569ff] text-white px-8 py-3 rounded-md hover:bg-red-600 transition shadow-lg">
+                        {content.apps.ctaButton} →
+                    </button>
+                </div>
             </div>
 
-            <div className="mb-12">
-                <ul className="space-y-4 max-w-3xl mx-auto">
-                    {content.apps.points.map((point, idx) => (
-                        <li key={idx} className="flex items-start gap-3">
-                            <div className="w-2 h-2 bg-[#0569ff] rounded-full mt-2 flex-shrink-0"></div>
-                            <p className="text-gray-700">{point}</p>
-                        </li>
-                    ))}
-                </ul>
-            </div>
-
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6 mb-8">
                 {content.apps.cards.map((card, idx) => (
-                    <div key={idx} className="bg-gray-50 p-6 rounded-lg hover:shadow-lg transition">
-                        <div className="w-16 h-16 bg-pink-100 rounded-lg flex items-center justify-center mb-4">
-                            <Users className="w-8 h-8" style={{ color: card.color }} />
+                    <div
+                        key={idx}
+                        className="bg-white p-6 rounded-lg hover:shadow-lg transition"
+                    >
+                        <div className='w-full flex lg:items-start lg:justify-start items-center justify-center'>
+                            <div className="w-16 h-16 bg-pink-100 rounded-lg flex items-center justify-center mb-4">
+                                <Users className="w-8 h-8" style={{ color: card.color }} />
+                            </div>
                         </div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">{card.title}</h3>
+                        <h3 className="text-xl font-medium text-gray-900 mb-2">{card.title}</h3>
                         <p className="text-gray-600">{card.description}</p>
                     </div>
                 ))}
             </div>
 
-            <div className="text-center">
-                <button className="bg-[#0569ff] text-white px-8 py-3 rounded-md hover:bg-red-600 transition shadow-lg">
-                    {content.apps.ctaButton} →
-                </button>
-            </div>
+
         </div>
     </section>
 );
 
 // Upgrade Section Component
 const UpgradeSection = () => (
-    <section className="py-16 bg-gradient-to-br from-blue-50 to-white">
+    <section className="py-16 ">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
             <div className="text-center mb-12">
                 <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
                     {content.upgrade.title} <span className="text-[#0569ff]">{content.upgrade.highlightedText}</span> {content.upgrade.subtitle} <span className="text-[#0569ff]">{content.upgrade.highlightedSubtitle}</span>
                 </h2>
                 <p className="text-gray-600 max-w-3xl mx-auto">{content.upgrade.description}</p>
+
             </div>
 
             <div className="grid md:grid-cols-2 gap-8 items-center mb-12">
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-white p-6 rounded-lg shadow-md">
-                        <div className="w-16 h-16 bg-blue-100 rounded-lg mb-4 flex items-center justify-center">
-                            <BookOpen className="w-8 h-8 text-blue-600" />
-                        </div>
-                        <p className="text-sm font-semibold">Device-Less Van Tracking</p>
-                    </div>
-                    <div className="bg-white p-6 rounded-lg shadow-md">
-                        <div className="w-16 h-16 bg-green-100 rounded-lg mb-4 flex items-center justify-center">
-                            <Database className="w-8 h-8 text-green-600" />
-                        </div>
-                        <p className="text-sm font-semibold">Fee Collection</p>
-                    </div>
-                    <div className="bg-white p-6 rounded-lg shadow-md col-span-2">
-                        <div className="bg-gradient-to-br from-purple-200 to-pink-200 rounded-lg h-32 mb-2 flex items-center justify-center">
-                            <p className="text-sm text-gray-600">Certificate Image</p>
-                        </div>
-                        <p className="text-sm font-semibold">One Click Certificates</p>
-                    </div>
-                    <div className="bg-white p-6 rounded-lg shadow-md">
-                        <div className="w-16 h-16 bg-pink-100 rounded-lg mb-4 flex items-center justify-center">
-                            <Star className="w-8 h-8 text-pink-600" />
-                        </div>
-                        <p className="text-sm font-semibold">Festival Banners</p>
-                    </div>
-                    <div className="bg-white p-6 rounded-lg shadow-md">
-                        <div className="w-16 h-16 bg-blue-100 rounded-lg mb-4 flex items-center justify-center">
-                            <Database className="w-8 h-8 text-blue-600" />
-                        </div>
-                        <p className="text-sm font-semibold">100% Cloud Based</p>
-                    </div>
+                <div >
+                    <img src={content.upgrade.image} alt="School Management App" className="max-w-[100%]  h-auto" />
                 </div>
 
                 <div className="space-y-6">
@@ -725,51 +704,46 @@ const UpgradeSection = () => (
                             </div>
                         </div>
                     ))}
+                    <div className="text-center flex flex-col sm:flex-row gap-4 justify-start">
+                        {content.upgrade.ctaButtons.map((btn, idx) => (
+                            <button
+                                key={idx}
+                                className={`px-8 py-3 rounded-md transition ${idx === 0 ? 'bg-[#0569ff] text-white hover:bg-red-600' : 'bg-gray-900 text-white hover:bg-gray-800'}`}
+                            >
+                                {btn}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
-            <div className="text-center flex flex-col sm:flex-row gap-4 justify-center">
-                {content.upgrade.ctaButtons.map((btn, idx) => (
-                    <button
-                        key={idx}
-                        className={`px-8 py-3 rounded-md transition ${idx === 0 ? 'bg-[#0569ff] text-white hover:bg-red-600' : 'bg-gray-900 text-white hover:bg-gray-800'}`}
-                    >
-                        {btn}
-                    </button>
-                ))}
-            </div>
+
         </div>
     </section>
 );
 
 // Smarter School Section Component
 const SmarterSchoolSection = () => (
-    <section className="py-16 bg-gray-50">
+    <section className="py-16">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
-            <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div className="grid md:grid-cols-2 gap-12 px-4 rounded-lg items-center bg-[#f9f4f4]">
                 <div>
-                    <div className="text-sm text-gray-500 mb-2">{content.smarterSchool.badge}</div>
-                    <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
+                    <div className="text-2xl font-medium text-gray-500 mb-2">{content.smarterSchool.badge}</div>
+                    <h2 className="text-5xl tracking-tight leading-tight font-bold text-gray-900 mb-6">
                         {content.smarterSchool.title} <span className="text-[#0569ff]">{content.smarterSchool.highlightedText}</span>
                     </h2>
-                    <ul className="space-y-4">
+                    <ul className="list-disc pl-6 space-y-4 marker:text-[#0569ff] marker:text-2xl">
                         {content.smarterSchool.features.map((feature, idx) => (
-                            <li key={idx} className="flex items-start gap-3">
-                                <CheckCircle className="w-5 h-5 text-[#0569ff] flex-shrink-0 mt-1" />
-                                <span className="text-gray-700">{feature}</span>
+                            <li key={idx} className="text-gray-700 font-light">
+                                {feature}
                             </li>
                         ))}
                     </ul>
+
+
                 </div>
                 <div className="relative">
-                    <div className="bg-gradient-to-br from-red-200 to-orange-200 rounded-3xl overflow-hidden aspect-[3/4]">
-                        <div className="w-full h-full flex items-center justify-center text-gray-600">
-                            <div className="text-center">
-                                <Users className="w-16 h-16 mx-auto mb-2" />
-                                <p>Teacher Image Placeholder</p>
-                            </div>
-                        </div>
-                    </div>
+                    <img src={content.smarterSchool.imagePlaceholder} alt="School Management App" className="!w-full h-auto" />
                     <div className="absolute top-8 right-8 bg-white p-3 rounded-lg shadow-lg">
                         <CheckCircle className="w-6 h-6 text-green-500" />
                     </div>
@@ -802,25 +776,30 @@ const StatisticsSection = () => (
 
 // Why EduBreezy Section Component
 const WhyClassOnSection = () => (
-    <section className="py-16 bg-gradient-to-br from-purple-50 to-white">
+    <section className="py-16">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
             <div className="grid md:grid-cols-2 gap-12 items-center">
-                <div className="relative order-2 md:order-1">
-                    <div className="bg-gradient-to-br from-green-200 to-blue-200 rounded-3xl overflow-hidden aspect-[3/4]">
-                        <div className="w-full h-full flex items-center justify-center text-gray-600">
-                            <div className="text-center">
-                                <BookOpen className="w-16 h-16 mx-auto mb-2" />
-                                <p>App Interface Placeholder</p>
-                            </div>
-                        </div>
-                    </div>
+                {/* Image first always */}
+                <div className="relative order-1">
+                    <img
+                        src={content.whyClassOn.imagePlaceholder}
+                        alt="School Management App"
+                        className="!w-full object-cover h-auto"
+                    />
                 </div>
-                <div className="order-1 md:order-2">
-                    <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-                        {content.whyClassOn.title} <span className="text-[#0569ff]">{content.whyClassOn.highlightedText}</span>
+
+                {/* Text second */}
+                <div className="order-2">
+                    <h2 className="text-3xl md:text-5xl tracking-tight leading-tight font-semibold text-gray-900 mb-4">
+                        {content.whyClassOn.title}{' '}
+                        <span className="text-[#0569ff]">{content.whyClassOn.highlightedText}</span>
                     </h2>
-                    <p className="text-gray-600 mb-6">{content.whyClassOn.description}</p>
-                    <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-4">{content.whyClassOn.title2}</h3>
+                    <p className="text-gray-600 mb-6 leading-[1.5em] tracking-wide">
+                        {content.whyClassOn.description}
+                    </p>
+                    <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-4">
+                        {content.whyClassOn.title2}
+                    </h3>
                     <ul className="space-y-3">
                         {content.whyClassOn.features.map((feature, idx) => (
                             <li key={idx} className="flex items-start gap-3">
@@ -872,14 +851,14 @@ const Himage = () => (
     <section className="py-16">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
             <div className="grid md:grid-cols-2 gap-12 items-center">
-                  <div className="rounded-3xl overflow-hidden">
-                        <img src={content.hero.imagePlaceholder} alt="School Management App" className="w-full h-auto" />
-                    </div>
-                <div>
+                <div className="rounded-3xl overflow-hidden">
+                    <img src={content.hero.imagePlaceholder} alt="School Management App" className="lg:!w-full w-lg h-auto" />
+                </div>
+                <div className=''>
                     <div className="bg-white inline-block px-4 py-2 rounded-full text-sm text-gray-600 mb-4">
                         {content.hero.badge}
                     </div>
-                    <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
+                    <h1 className="text-6xl tracking-tight leading-tight lg:text-5xl font-bold text-gray-900 mb-4">
                         {content.hero.title} <span className="text-[#0569ff]">{content.hero.highlightedText}</span>
                     </h1>
                     <p className="text-gray-600 mb-6 leading-relaxed">{content.hero.description}</p>
@@ -895,7 +874,7 @@ const Himage = () => (
                         {content.hero.ctaButton}
                     </button>
                 </div>
-                <div className="relative">
+                {/* <div className="relative">
                     <div className="absolute -left-8 top-1/4 bg-white p-4 rounded-lg shadow-lg">
                         <Database className="w-8 h-8 text-green-500 mb-2" />
                         <p className="text-sm font-semibold">Lifetime Free Updates</p>
@@ -904,8 +883,8 @@ const Himage = () => (
                         <Shield className="w-8 h-8 text-green-500 mb-2" />
                         <p className="text-sm font-semibold">100% Data Protection</p>
                     </div>
-                   
-                </div>
+
+                </div> */}
             </div>
         </div>
     </section>
