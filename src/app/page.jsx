@@ -416,7 +416,7 @@ export default function HeroSection() {
             </div> */}
             </div>
 
-            <div className='px-5 lg:px-0'>
+        
 
                 <Himage />
                 <AppsSection />
@@ -428,7 +428,7 @@ export default function HeroSection() {
 
                 <TestimonialsSection />
                 <FAQSection />
-            </div>
+           
                 <FinalCTASection />
                 {/* <Footer /> */}
         </div>
@@ -563,7 +563,7 @@ const FinalCTASection = () => (
                         {content.finalCta.buttons.map((btn, idx) => (
                             <button
                                 key={idx}
-                                className={`px-8 py-3  hover:cursor-pointer rounded-md text-3xl font-semibold text-left transition ${idx === 0 ? 'bg-white text-[#0469ff] hover:bg-gray-100' : 'border-2 border-white text-white hover:bg-white hover:text-[#0469ff]'}`}
+                                className={`px-8 py-3  hover:cursor-pointer rounded-md text-3xl font-semibold lg:text-left transition ${idx === 0 ? 'bg-white text-[#0469ff] hover:bg-gray-100' : 'border-2 border-white text-white hover:bg-white hover:text-[#0469ff]'}`}
                             >
                                 {btn}
                             </button>
@@ -629,8 +629,8 @@ const AppsSection = () => (
         <div className="max-w-7xl mx-auto px-6 lg:px-16 lg:gap-12 grid lg:grid-cols-2 auto-rows-auto gap-5">
             <div className='h-fit'>
                 <div className="text-left mb-4">
-                    <div className="text-2xl font-semibold text-gray-500 mb-2">{content.apps.badge}</div>
-                    <h2 className="text-6xl tracking-tight leading-tight font-semibold text-gray-900 mb-4">
+                    <div className="lg:text-2xl text-lg font-semibold text-gray-500 mb-2">{content.apps.badge}</div>
+                    <h2 className="lg:text-6xl text-4xl tracking-tight leading-tight font-semibold text-gray-900 mb-4">
                         {content.apps.title} <span className="text-[#0569ff]">{content.apps.highlightedText}</span>
                     </h2>
                     <p className="text-muted-foreground max-w-3xl text-[1rem] mx-auto">{content.apps.description}</p>
@@ -679,8 +679,8 @@ const AppsSection = () => (
 const UpgradeSection = () => (
     <section className="py-16 ">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
-            <div className="text-center mb-12">
-                <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+            <div className="lg:text-center mb-12">
+                <h2 className="text-3xl leading-tight tracking-tight md:text-4xl font-bold text-gray-900 mb-4">
                     {content.upgrade.title} <span className="text-[#0569ff]">{content.upgrade.highlightedText}</span> {content.upgrade.subtitle} <span className="text-[#0569ff]">{content.upgrade.highlightedSubtitle}</span>
                 </h2>
                 <p className="text-gray-600 max-w-3xl mx-auto">{content.upgrade.description}</p>
@@ -726,10 +726,10 @@ const UpgradeSection = () => (
 const SmarterSchoolSection = () => (
     <section className="py-16">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
-            <div className="grid md:grid-cols-2 gap-12 px-4 rounded-lg items-center bg-[#f9f4f4]">
-                <div>
-                    <div className="text-2xl font-medium text-gray-500 mb-2">{content.smarterSchool.badge}</div>
-                    <h2 className="text-5xl tracking-tight leading-tight font-bold text-gray-900 mb-6">
+            <div className="grid md:grid-cols-2 gap-12 px-4 py-4 rounded-lg items-center bg-[#f9f4f4]">
+                <div className='order-2'>
+                    <div className="lg:text-2xl font-medium text-gray-500 mb-2">{content.smarterSchool.badge}</div>
+                    <h2 className="lg:text-5xl text-4xl tracking-tight leading-tight font-bold text-gray-900 mb-6">
                         {content.smarterSchool.title} <span className="text-[#0569ff]">{content.smarterSchool.highlightedText}</span>
                     </h2>
                     <ul className="list-disc pl-6 space-y-4 marker:text-[#0569ff] marker:text-2xl">
@@ -743,7 +743,7 @@ const SmarterSchoolSection = () => (
 
                 </div>
                 <div className="relative">
-                    <img src={content.smarterSchool.imagePlaceholder} alt="School Management App" className="!w-full h-auto" />
+                    <img src={content.smarterSchool.imagePlaceholder} alt="School Management App" className="!w-full order-1 h-auto" />
                     <div className="absolute top-8 right-8 bg-white p-3 rounded-lg shadow-lg">
                         <CheckCircle className="w-6 h-6 text-green-500" />
                     </div>
@@ -790,7 +790,7 @@ const WhyClassOnSection = () => (
 
                 {/* Text second */}
                 <div className="order-2">
-                    <h2 className="text-3xl md:text-5xl tracking-tight leading-tight font-semibold text-gray-900 mb-4">
+                    <h2 className="text-3xl md:text-5xl tracking-tight leading-10 font-semibold text-gray-900 mb-4">
                         {content.whyClassOn.title}{' '}
                         <span className="text-[#0569ff]">{content.whyClassOn.highlightedText}</span>
                     </h2>
@@ -825,7 +825,7 @@ const SmartFeaturesSection = () => (
                 <p className="text-gray-600">{content.smartFeatures.description}</p>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8">
+            <div className="grid lg:grid-cols-2 grid-rows-2 md:grid-cols-3 gap-6 mb-8">
                 {content.smartFeatures.features.map((feature, idx) => (
                     <div key={idx} className="border border-gray-200 rounded-lg p-6 hover:shadow-lg transition text-center">
                         <div className="w-16 h-16 bg-pink-100 rounded-lg mx-auto mb-4 flex items-center justify-center">
@@ -852,13 +852,13 @@ const Himage = () => (
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
             <div className="grid md:grid-cols-2 gap-12 items-center">
                 <div className="rounded-3xl overflow-hidden">
-                    <img src={content.hero.imagePlaceholder} alt="School Management App" className="lg:!w-full w-lg h-auto" />
+                    <img src={content.hero.imagePlaceholder} alt="School Management App" className="lg:!w-full w-[300px] h-auto" />
                 </div>
-                <div className=''>
+                <div>
                     <div className="bg-white inline-block px-4 py-2 rounded-full text-sm text-gray-600 mb-4">
                         {content.hero.badge}
                     </div>
-                    <h1 className="text-6xl tracking-tight leading-tight lg:text-5xl font-bold text-gray-900 mb-4">
+                    <h1 className="text-4xl tracking-tight leading-tight lg:text-5xl font-bold text-gray-900 mb-4">
                         {content.hero.title} <span className="text-[#0569ff]">{content.hero.highlightedText}</span>
                     </h1>
                     <p className="text-gray-600 mb-6 leading-relaxed">{content.hero.description}</p>
