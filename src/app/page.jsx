@@ -647,7 +647,7 @@ const AppsSection = () => (
                     </ul>
                 </div>
                 <div className="text-left">
-                    <button className="bg-[#0569ff] text-white px-8 py-3 rounded-md hover:bg-red-600 transition shadow-lg">
+                    <button className="bg-[#0569ff] lg:text-3xl font-bold text-white px-8 py-3 rounded-md transition shadow-lg">
                         {content.apps.ctaButton} →
                     </button>
                 </div>
@@ -680,7 +680,7 @@ const UpgradeSection = () => (
     <section className="py-16 ">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
             <div className="lg:text-center mb-12">
-                <h2 className="text-3xl leading-tight tracking-tight md:text-4xl font-bold text-gray-900 mb-4">
+                <h2 className="text-3xl leading-tight tracking-tight md:text-5xl font-semibold text-gray-900 mb-4">
                     {content.upgrade.title} <span className="text-[#0569ff]">{content.upgrade.highlightedText}</span> {content.upgrade.subtitle} <span className="text-[#0569ff]">{content.upgrade.highlightedSubtitle}</span>
                 </h2>
                 <p className="text-gray-600 max-w-3xl mx-auto">{content.upgrade.description}</p>
@@ -708,7 +708,7 @@ const UpgradeSection = () => (
                         {content.upgrade.ctaButtons.map((btn, idx) => (
                             <button
                                 key={idx}
-                                className={`px-8 py-3 rounded-md transition ${idx === 0 ? 'bg-[#0569ff] text-white hover:bg-red-600' : 'bg-gray-900 text-white hover:bg-gray-800'}`}
+                                className={`px-8 py-3 lg:text-3xl font-bold rounded-md transition ${idx === 0 ? 'bg-[#0569ff] text-white' : 'bg-gray-900 text-white hover:bg-gray-800'}`}
                             >
                                 {btn}
                             </button>
@@ -870,7 +870,7 @@ const Himage = () => (
                             </li>
                         ))}
                     </ul>
-                    <button className="bg-[#0569ff] text-white px-8 py-3 rounded-md hover:bg-red-600 transition">
+                    <button className="bg-[#0569ff] font-bold lg:text-3xl text-white px-8 py-3 rounded-md transition">
                         {content.hero.ctaButton}
                     </button>
                 </div>

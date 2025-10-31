@@ -69,7 +69,7 @@ export default function Header() {
                     </div>
 
                     {/* Right side - Request Demo Button */}
-                    <div className=" items-center hidden md:flex gap-2">
+                    <div className=" items-center flex gap-2">
                         {AlreadyLoggedIn ? (
                             <Link href="/dashboard">
                                 <Button
