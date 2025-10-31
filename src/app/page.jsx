@@ -579,7 +579,7 @@ const FinalCTASection = () => (
 
 // Footer Component
 const Footer = () => (
-    <footer className="bg-gray-900 text-white py-12">
+    <footer className="bg-gray-900  text-white py-12">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
                 <div>
@@ -676,7 +676,7 @@ const AppsSection = () => (
 
 // Upgrade Section Component
 const UpgradeSection = () => (
-    <section className="py-16 ">
+    <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
             <div className="lg:text-center mb-12">
                 <h2 className="text-3xl leading-tight tracking-tight md:text-5xl font-semibold text-gray-900 mb-4">
@@ -723,7 +723,7 @@ const UpgradeSection = () => (
 
 // Smarter School Section Component
 const SmarterSchoolSection = () => (
-    <section className="py-16">
+    <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
             <div className="grid md:grid-cols-2 gap-12 px-4 py-4 rounded-lg items-center bg-[#f9f4f4]">
                 <div className='order-2'>
@@ -775,7 +775,7 @@ const StatisticsSection = () => (
 
 // Why EduBreezy Section Component
 const WhyClassOnSection = () => (
-    <section className="py-16">
+    <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
             <div className="grid md:grid-cols-2 gap-12 items-center">
                 {/* Image first always */}
@@ -847,7 +847,7 @@ const SmartFeaturesSection = () => (
 
 // Hero Section Component
 const Himage = () => (
-    <section className="py-16">
+    <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-6 lg:px-16">
             <div className="grid md:grid-cols-2 gap-12 items-center">
                 <div className="rounded-3xl overflow-hidden">
