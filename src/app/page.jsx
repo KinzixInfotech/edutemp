@@ -388,7 +388,7 @@ export default function HeroSection() {
 
                                 <button
                                     onClick={handleSubmit}
-                                    className="w-full bg-gradient-to-r from-gray-600 to-gray-700 text-white py-4 rounded-lg font-semibold text-lg hover:from-gray-700 hover:to-gray-800 transition-all duration-300 shadow-lg hover:shadow-xl"
+                                    className="w-full bg-gradient-to-r from-gray-600 to-gray-700 text-white  py-4 rounded-lg font-semibold lg:text-3xl  hover:from-gray-700 hover:to-gray-800 transition-all duration-300 shadow-lg hover:shadow-xl"
                                 >
                                     Submit
                                 </button>
@@ -425,7 +425,6 @@ export default function HeroSection() {
                 <StatisticsSection />
                 <WhyClassOnSection />
                 <SmartFeaturesSection />
-
                 <TestimonialsSection />
                 <FAQSection />
            
@@ -790,7 +789,7 @@ const WhyClassOnSection = () => (
 
                 {/* Text second */}
                 <div className="order-2">
-                    <h2 className="text-3xl md:text-5xl tracking-tight leading-10 font-semibold text-gray-900 mb-4">
+                    <h2 className="text-3xl md:text-5xl tracking-tight leading-14 font-semibold text-gray-900 mb-4">
                         {content.whyClassOn.title}{' '}
                         <span className="text-[#0569ff]">{content.whyClassOn.highlightedText}</span>
                     </h2>
