@@ -1,85 +1,128 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-// GET - Fetch single admit card template
 export async function GET(request, { params }) {
     try {
         const { schoolId, id } = params;
 
-        const template = await prisma.$queryRaw`
-            SELECT * FROM "AdmitCardTemplate" 
-            WHERE id = ${id}::uuid AND "schoolId" = ${schoolId}::uuid
-        `;
+        const template = await prisma.documentTemplate.findFirst({
+            where: {
+                id,
+                schoolId,
+                templateType: 'admitcard',
+                isActive: true,
+            },
+            include: {
+                createdBy: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                    },
+                },
+            },
+        });
 
-        if (!template || template.length === 0) {
-            return NextResponse.json(
-                { error: 'Template not found' },
-                { status: 404 }
-            );
+        if (!template) {
+            return NextResponse.json({ error: 'Template not found' }, { status: 404 });
         }
 
-        return NextResponse.json(template[0]);
+        return NextResponse.json({
+            id: template.id,
+            name: template.name,
+            description: template.description,
+            examType: template.subType,
+            layoutType: template.layoutConfig?.layoutType || 'standard',
+            isDefault: template.isDefault,
+            createdAt: template.createdAt,
+            updatedAt: template.updatedAt,
+            createdBy: template.createdBy,
+            layoutConfig: template.layoutConfig,
+        });
     } catch (error) {
         console.error('Error fetching admit card template:', error);
-        return NextResponse.json(
-            { error: 'Failed to fetch template' },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: 'Failed to fetch template' }, { status: 500 });
     }
 }
 
-// PUT - Update admit card template
 export async function PUT(request, { params }) {
     try {
         const { schoolId, id } = params;
         const body = await request.json();
 
-        const {
-            name,
-            description,
-            examType,
-            layoutType,
-            layoutConfig,
-            isDefault,
-        } = body;
+        const { name, description, type, layoutConfig, isDefault } = body;
 
-        const template = await prisma.$queryRaw`
-            UPDATE "AdmitCardTemplate" 
-            SET 
-                name = ${name},
-                description = ${description},
-                "examType" = ${examType},
-                "layoutType" = ${layoutType},
-                "layoutConfig" = ${JSON.stringify(layoutConfig)},
-                "isDefault" = ${isDefault},
-                "updatedAt" = NOW()
-            WHERE id = ${id}::uuid AND "schoolId" = ${schoolId}::uuid
-            RETURNING *
-        `;
+        if (isDefault) {
+            await prisma.documentTemplate.updateMany({
+                where: {
+                    schoolId,
+                    templateType: 'admitcard',
+                    subType: type,
+                    isDefault: true,
+                    id: { not: id },
+                },
+                data: { isDefault: false },
+            });
+        }
 
-        return NextResponse.json(template[0]);
+        const template = await prisma.documentTemplate.update({
+            where: { id },
+            data: {
+                name,
+                description,
+                subType: type,
+                layoutConfig,
+                isDefault,
+                updatedAt: new Date(),
+            },
+            include: {
+                createdBy: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                    },
+                },
+            },
+        });
+
+        return NextResponse.json({
+            id: template.id,
+            name: template.name,
+            description: template.description,
+            examType: template.subType,
+            layoutType: template.layoutConfig?.layoutType || 'standard',
+            isDefault: template.isDefault,
+            createdAt: template.createdAt,
+            updatedAt: template.updatedAt,
+            createdBy: template.createdBy,
+            layoutConfig: template.layoutConfig,
+        });
     } catch (error) {
         console.error('Error updating admit card template:', error);
-        return NextResponse.json(
-            { error: 'Failed to update template' },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: 'Failed to update template' }, { status: 500 });
     }
 }
 
-// DELETE - Delete admit card template
 export async function DELETE(request, { params }) {
     try {
         const { schoolId, id } = params;
 
-        // Check if template is being used
+        const template = await prisma.documentTemplate.findFirst({
+            where: { id, schoolId, templateType: 'admitcard' },
+        });
+
+        if (!template) {
+            return NextResponse.json({ error: 'Template not found' }, { status: 404 });
+        }
+
         const usageCount = await prisma.admitCard.count({
             where: {
                 schoolId,
                 layoutConfig: {
                     path: ['templateId'],
-                    equals: id
-                }
+                    equals: id,
+                },
             },
         });
 
@@ -90,17 +133,14 @@ export async function DELETE(request, { params }) {
             );
         }
 
-        await prisma.$queryRaw`
-            DELETE FROM "AdmitCardTemplate" 
-            WHERE id = ${id}::uuid AND "schoolId" = ${schoolId}::uuid
-        `;
+        await prisma.documentTemplate.update({
+            where: { id },
+            data: { isActive: false },
+        });
 
         return NextResponse.json({ message: 'Template deleted successfully' });
     } catch (error) {
         console.error('Error deleting admit card template:', error);
-        return NextResponse.json(
-            { error: 'Failed to delete template' },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: 'Failed to delete template' }, { status: 500 });
     }
 }

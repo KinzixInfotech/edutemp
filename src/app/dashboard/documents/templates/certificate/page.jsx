@@ -4,12 +4,12 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { 
-  Plus, 
-  Eye, 
-  Edit, 
-  Trash2, 
-  Loader2, 
+import {
+  Plus,
+  Eye,
+  Edit,
+  Trash2,
+  Loader2,
   Award,
   Search,
   Filter
@@ -105,7 +105,7 @@ export default function CertificateTemplatePage() {
           </p>
         </div>
         <Button
-          onClick={() => router.push('/dashboard/documents/templates/certificatetemplate/create')}
+          onClick={() => router.push('/dashboard/documents/templates/create/certificate')}
           className="w-full sm:w-auto"
           size="sm"
         >
@@ -157,12 +157,12 @@ export default function CertificateTemplatePage() {
             <Award className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mb-3 sm:mb-4" />
             <h3 className="text-base sm:text-lg font-semibold mb-2">No templates found</h3>
             <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4 text-center px-4">
-              {searchTerm || typeFilter !== 'all' 
+              {searchTerm || typeFilter !== 'all'
                 ? 'Try adjusting your filters'
                 : 'Create your first certificate template to get started'}
             </p>
             <Button
-              onClick={() => router.push('/dashboard/documents/templates/certificatetemplate/create')}
+              onClick={() => router.push('/dashboard/documents/templates/create/certificate')}
               size="sm"
             >
               <Plus className="mr-2 h-4 w-4" />
@@ -204,7 +204,7 @@ export default function CertificateTemplatePage() {
                     </span>
                   </div>
                 </div>
-                
+
                 <div className="flex flex-col gap-2 pt-2 sm:flex-row">
                   <Button
                     variant="outline"

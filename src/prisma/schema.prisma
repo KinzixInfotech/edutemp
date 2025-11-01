@@ -53,6 +53,7 @@ model School {
   PdfExportSettings      PdfExportSettings?
   Signature              Signature[]
   Stamp                  Stamp[]
+  DocumentTemplate       DocumentTemplate[]
 
   @@index([name])
 }
@@ -443,6 +444,7 @@ model User {
   GmailAccount          GmailAccount[]
   CertificateTemplate   CertificateTemplate[]
   CertificateGenerated  CertificateGenerated[]
+  DocumentTemplate      DocumentTemplate[]
 
   @@index([schoolId])
   @@index([roleId])
@@ -1125,10 +1127,10 @@ model CertificateTemplate {
   id                String                 @id @default(uuid()) @db.Uuid
   name              String
   description       String?
-  type              String // e.g. "character", "bonafide", "transfer", etc.
+  type              String // character, bonafide, transfer, etc.
   schoolId          String                 @db.Uuid
   school            School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  layoutConfig      Json // Stores positions, fonts, colors, placeholders
+  layoutConfig      Json // Stores ALL design settings
   createdById       String?                @db.Uuid
   createdBy         User?                  @relation(fields: [createdById], references: [id])
   isDefault         Boolean                @default(false)
@@ -1140,6 +1142,28 @@ model CertificateTemplate {
 
   @@index([schoolId])
   @@index([type])
+}
+
+model DocumentTemplate {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String
+  description  String?
+  templateType String // 'certificate', 'idcard', 'admitcard'
+  subType      String // specific type (character, student, midterm, etc.)
+  schoolId     String   @db.Uuid
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  layoutConfig Json
+  createdById  String?  @db.Uuid
+  createdBy    User?    @relation(fields: [createdById], references: [id])
+  isDefault    Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([schoolId, templateType, subType, name])
+  @@index([schoolId])
+  @@index([templateType])
+  @@index([subType])
 }
 
 model CertificateGenerated {

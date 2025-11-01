@@ -105,7 +105,7 @@ export default function AdmitCardTemplatePage() {
                     </p>
                 </div>
                 <Button
-                    onClick={() => router.push('/dashboard/schools/documents/templates/admit-cards/create')}
+                    onClick={() => router.push('/dashboard/documents/templates/create/admitcard')}
                     className="w-full sm:w-auto"
                     size="sm"
                 >
@@ -161,7 +161,7 @@ export default function AdmitCardTemplatePage() {
                                 : 'Create your first admit card template to get started'}
                         </p>
                         <Button
-                            onClick={() => router.push('/dashboard/schools/documents/templates/admit-cards/create')}
+                            onClick={() => router.push('/dashboard/documents/templates/create/admitcard')}
                             size="sm"
                         >
                             <Plus className="mr-2 h-4 w-4" />

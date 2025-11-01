@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-// GET - Fetch single certificate template
 export async function GET(request, { params }) {
     try {
         const { schoolId, id } = params;
 
-        const template = await prisma.certificateTemplate.findFirst({
+        const template = await prisma.documentTemplate.findFirst({
             where: {
                 id,
                 schoolId,
+                templateType: 'certificate',
+                isActive: true,
             },
             include: {
                 createdBy: {
@@ -23,42 +24,39 @@ export async function GET(request, { params }) {
         });
 
         if (!template) {
-            return NextResponse.json(
-                { error: 'Template not found' },
-                { status: 404 }
-            );
+            return NextResponse.json({ error: 'Template not found' }, { status: 404 });
         }
 
-        return NextResponse.json(template);
+        return NextResponse.json({
+            id: template.id,
+            name: template.name,
+            description: template.description,
+            type: template.subType,
+            isDefault: template.isDefault,
+            createdAt: template.createdAt,
+            updatedAt: template.updatedAt,
+            createdBy: template.createdBy,
+            layoutConfig: template.layoutConfig,
+        });
     } catch (error) {
         console.error('Error fetching certificate template:', error);
-        return NextResponse.json(
-            { error: 'Failed to fetch template' },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: 'Failed to fetch template' }, { status: 500 });
     }
 }
 
-// PUT - Update certificate template
 export async function PUT(request, { params }) {
     try {
         const { schoolId, id } = params;
         const body = await request.json();
 
-        const {
-            name,
-            description,
-            type,
-            layoutConfig,
-            isDefault,
-        } = body;
+        const { name, description, type, layoutConfig, isDefault } = body;
 
-        // If setting as default, unset other defaults of same type
         if (isDefault) {
-            await prisma.certificateTemplate.updateMany({
+            await prisma.documentTemplate.updateMany({
                 where: {
                     schoolId,
-                    type,
+                    templateType: 'certificate',
+                    subType: type,
                     isDefault: true,
                     id: { not: id },
                 },
@@ -66,12 +64,12 @@ export async function PUT(request, { params }) {
             });
         }
 
-        const template = await prisma.certificateTemplate.update({
+        const template = await prisma.documentTemplate.update({
             where: { id },
             data: {
                 name,
                 description,
-                type,
+                subType: type,
                 layoutConfig,
                 isDefault,
                 updatedAt: new Date(),
@@ -87,37 +85,35 @@ export async function PUT(request, { params }) {
             },
         });
 
-        return NextResponse.json(template);
+        return NextResponse.json({
+            id: template.id,
+            name: template.name,
+            description: template.description,
+            type: template.subType,
+            isDefault: template.isDefault,
+            createdAt: template.createdAt,
+            updatedAt: template.updatedAt,
+            createdBy: template.createdBy,
+            layoutConfig: template.layoutConfig,
+        });
     } catch (error) {
         console.error('Error updating certificate template:', error);
-        return NextResponse.json(
-            { error: 'Failed to update template' },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: 'Failed to update template' }, { status: 500 });
     }
 }
 
-// DELETE - Delete certificate template
 export async function DELETE(request, { params }) {
     try {
         const { schoolId, id } = params;
 
-        // Check if template exists and belongs to school
-        const template = await prisma.certificateTemplate.findFirst({
-            where: {
-                id,
-                schoolId,
-            },
+        const template = await prisma.documentTemplate.findFirst({
+            where: { id, schoolId, templateType: 'certificate' },
         });
 
         if (!template) {
-            return NextResponse.json(
-                { error: 'Template not found' },
-                { status: 404 }
-            );
+            return NextResponse.json({ error: 'Template not found' }, { status: 404 });
         }
 
-        // Check if template is being used
         const usageCount = await prisma.certificateGenerated.count({
             where: { templateId: id },
         });
@@ -129,16 +125,14 @@ export async function DELETE(request, { params }) {
             );
         }
 
-        await prisma.certificateTemplate.delete({
+        await prisma.documentTemplate.update({
             where: { id },
+            data: { isActive: false },
         });
 
         return NextResponse.json({ message: 'Template deleted successfully' });
     } catch (error) {
         console.error('Error deleting certificate template:', error);
-        return NextResponse.json(
-            { error: 'Failed to delete template' },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: 'Failed to delete template' }, { status: 500 });
     }
 }
