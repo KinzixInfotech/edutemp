@@ -83,17 +83,17 @@ export const SidebarData = [
                 submenu: [
                     {
                         label: "Certificate Templates",
-                        url: "/dashboard/schools/documents/templates/certificates",
+                        url: "/dashboard/documents/templates/certificate",
                         roles: ["ADMIN"],
                     },
                     {
                         label: "ID Card Templates",
-                        url: "/dashboard/schools/documents/templates/id-cards",
+                        url: "/dashboard/documents/templates/id-card",
                         roles: ["ADMIN"],
                     },
                     {
                         label: "Admit Card Templates",
-                        url: "/dashboard/schools/documents/templates/admit-cards",
+                        url: "/dashboard/documents/templates/admit-cards",
                         roles: ["ADMIN"],
                     },
                 ],

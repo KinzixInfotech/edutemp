@@ -116,7 +116,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                         ref={isParentActive ? activeItemRef : null}
                                                     >
                                                         <SidebarMenuButton
-                                                            className={`w-full justify-center py-4 hover:!bg-white rounded-md hover:!text-black transition-all hover:cursor-pointer ${isActive || isParentActive
+                                                            className={`w-full  justify-center py-4 hover:!bg-white rounded-md hover:!text-black transition-all hover:cursor-pointer ${isActive || isParentActive
                                                                     ? "bg-white dark:text-white dark:bg-[#171717] shadow-xs font-semibold text-bl border"
                                                                     : ""
                                                                 }`}
@@ -157,7 +157,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                             >
                                                 <CollapsibleTrigger asChild>
                                                     <SidebarMenuButton
-                                                        className={`group w-full justify-between py-4 hover:!bg-white rounded-md hover:!text-black transition-all hover:cursor-pointer ${isActive || isParentActive
+                                                        className={`group  w-full justify-between py-4 hover:!bg-white rounded-md hover:!text-black transition-all hover:cursor-pointer ${isActive || isParentActive
                                                                 ? "bg-white dark:text-white dark:bg-[#171717] shadow-xs font-semibold text-bl border"
                                                                 : ""
                                                             }`}
