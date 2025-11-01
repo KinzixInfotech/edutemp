@@ -668,8 +668,6 @@ const AppsSection = () => (
                     </div>
                 ))}
             </div>
-
-
         </div>
     </section>
 );
