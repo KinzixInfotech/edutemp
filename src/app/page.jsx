@@ -8,6 +8,7 @@ import {
     AccordionItem,
     AccordionTrigger,
 } from "@/components/ui/accordion"
+import { HeroVideoDialog } from '@/components/ui/hero-video-dialog';
 
 // Content JSON
 const content = {
@@ -415,21 +416,19 @@ export default function HeroSection() {
                 </svg>
             </div> */}
             </div>
+            <Himage />
+            <VideoShowcaseSection/>
+            <AppsSection />
+            <UpgradeSection />
+            <SmarterSchoolSection />
+            <StatisticsSection />
+            <WhyClassOnSection />
+            <SmartFeaturesSection />
+            <TestimonialsSection />
+            <FAQSection />
 
-        
-
-                <Himage />
-                <AppsSection />
-                <UpgradeSection />
-                <SmarterSchoolSection />
-                <StatisticsSection />
-                <WhyClassOnSection />
-                <SmartFeaturesSection />
-                <TestimonialsSection />
-                <FAQSection />
-           
-                <FinalCTASection />
-                {/* <Footer /> */}
+            <FinalCTASection />
+            {/* <Footer /> */}
         </div>
     );
 }
@@ -882,6 +881,84 @@ const Himage = () => (
                     </div>
 
                 </div> */}
+            </div>
+        </div>
+    </section>
+);
+
+const VideoShowcaseSection = () => (
+    <section className="relative py-20 bg-gradient-to-b from-white via-blue-50 to-white overflow-hidden">
+        {/* Glowing background effect */}
+        <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-[600px] h-[600px] bg-[#0569ff]/20 rounded-full blur-[120px] animate-pulse"></div>
+        </div>
+
+        {/* Decorative circles */}
+        <div className="absolute top-10 left-10 w-32 h-32 bg-[#0569ff]/10 rounded-full blur-2xl"></div>
+        <div className="absolute bottom-10 right-10 w-40 h-40 bg-purple-500/10 rounded-full blur-2xl"></div>
+
+        <div className="max-w-7xl mx-auto px-6 lg:px-16 relative z-10">
+            {/* Heading */}
+            <div className="text-center mb-12">
+                <div className="inline-block bg-[#0569ff]/10 text-[#0569ff] px-6 py-2 rounded-full text-sm font-semibold mb-4">
+                    SEE IT IN ACTION
+                </div>
+                <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-4 tracking-tight leading-tight">
+                    Experience the Future of{' '}
+                    <span className="text-[#0569ff]">School Management</span>
+                </h2>
+                <p className="text-gray-600 text-lg md:text-xl max-w-3xl mx-auto leading-relaxed">
+                    Watch how EduBreezy transforms your school operations with smart,
+                    AI-powered solutions that save time and boost efficiency
+                </p>
+            </div>
+
+            {/* Video Container with Glow */}
+            <div className="relative max-w-5xl mx-auto">
+                {/* Glowing border effect */}
+                <div className="absolute -inset-4 bg-gradient-to-r from-[#0569ff] via-purple-500 to-pink-500 rounded-3xl blur-xl opacity-30 animate-pulse"></div>
+
+                {/* Video Dialog */}
+                <div className="relative bg-white rounded-2xl shadow-2xl p-2 md:p-4">
+
+                    <HeroVideoDialog
+                        className="w-full rounded-xl overflow-hidden"
+                        animationStyle="top-in-bottom-out"
+                        videoSrc="./herovideo.mp4"
+                        thumbnailSrc="./thumbnail.png"
+                        thumbnailAlt="EduBreezy School Management Demo"
+                    />
+                </div>
+
+                {/* Floating badges */}
+                <div className="hidden md:block absolute -left-8 top-1/4 bg-white px-4 py-3 rounded-lg shadow-xl border border-[#0569ff]/20">
+                    <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                        <span className="text-sm font-semibold text-gray-800">Live Demo</span>
+                    </div>
+                </div>
+
+                <div className="hidden md:block absolute -right-8 bottom-1/4 bg-white px-4 py-3 rounded-lg shadow-xl border border-[#0569ff]/20">
+                    <div className="flex items-center gap-2">
+                        <span className="text-2xl">⚡</span>
+                        <span className="text-sm font-semibold text-gray-800">AI-Powered</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Bottom CTA */}
+            <div className="text-center mt-12">
+                <p className="text-gray-600 mb-4">
+                    Join 600+ schools already using EduBreezy
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                    <button className="bg-[#0569ff] text-white px-8 py-3 rounded-full font-bold text-lg hover:bg-[#0454d4] transition-all duration-300 shadow-lg hover:shadow-xl">
+                        Book Your Free Demo
+                    </button>
+                    <button className="border-2 border-gray-900 text-gray-900 px-8 py-3 rounded-full font-bold text-lg hover:bg-gray-900 hover:text-white transition-all duration-300">
+                        Learn More
+                    </button>
+                </div>
             </div>
         </div>
     </section>

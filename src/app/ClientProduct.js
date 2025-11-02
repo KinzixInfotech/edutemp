@@ -16,8 +16,11 @@ export default function ClientProduct({ children }) {
             {!hideheader && <Header />}
             {/* px-3.5 pt-4 */}
             <main className="flex-1">{children}</main>
-            <CalBtn/>
             {!hidefooter && <Footer />}
+            <div className="cal-hide-mobile">
+                <CalBtn />
+            </div>
+
         </>
     );
 }
