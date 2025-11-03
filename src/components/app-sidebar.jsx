@@ -105,32 +105,32 @@ export const SidebarData = [
                 submenu: [
                     {
                         label: "Character Certificate",
-                        url: "/dashboard/schools/documents/generate/character",
+                        url: "/dashboard/documents/generate/character",
                         roles: ["ADMIN", "TEACHER"],
                     },
                     {
                         label: "Bonafide Certificate",
-                        url: "/dashboard/schools/documents/generate/bonafide",
+                        url: "/dashboard/documents/generate/bonafide",
                         roles: ["ADMIN", "TEACHER"],
                     },
                     {
                         label: "Transfer Certificate",
-                        url: "/dashboard/schools/documents/generate/transfer",
+                        url: "/dashboard/documents/generate/transfer",
                         roles: ["ADMIN"],
                     },
                     {
                         label: "School Leaving Certificate",
-                        url: "/dashboard/schools/documents/generate/school-leaving",
+                        url: "/dashboard/documents/generate/school-leaving",
                         roles: ["ADMIN"],
                     },
                     {
                         label: "Competition Certificate",
-                        url: "/dashboard/schools/documents/generate/competition",
+                        url: "/dashboard/documents/generate/competition",
                         roles: ["ADMIN", "TEACHER"],
                     },
                     {
                         label: "Custom Certificate",
-                        url: "/dashboard/schools/documents/generate/custom",
+                        url: "/dashboard/documents/generate/custom",
                         roles: ["ADMIN"],
                     },
                 ],
@@ -143,17 +143,17 @@ export const SidebarData = [
                 submenu: [
                     {
                         label: "Generate Admit Cards",
-                        url: "/dashboard/schools/documents/admitcards/generate",
+                        url: "/dashboard/documents/admitcards/generate",
                         roles: ["ADMIN"],
                     },
                     {
                         label: "Bulk Generation (per Class / Exam)",
-                        url: "/dashboard/schools/documents/admitcards/bulk",
+                        url: "/dashboard/documents/admitcards/bulk",
                         roles: ["ADMIN"],
                     },
                     {
                         label: "Download / Print History",
-                        url: "/dashboard/schools/documents/admitcards/history",
+                        url: "/dashboard/documents/admitcards/history",
                         roles: ["ADMIN"],
                     },
                 ],
@@ -165,17 +165,17 @@ export const SidebarData = [
                 submenu: [
                     {
                         label: "Generate Student ID",
-                        url: "/dashboard/schools/documents/idcards/generate",
+                        url: "/dashboard/documents/idcards/generate",
                         roles: ["ADMIN"],
                     },
                     {
                         label: "Design / Customize Layout",
-                        url: "/dashboard/schools/documents/idcards/design",
+                        url: "/dashboard/documents/idcards/design",
                         roles: ["ADMIN"],
                     },
                     {
                         label: "Reissue / Expire Old IDs",
-                        url: "/dashboard/schools/documents/idcards/manage",
+                        url: "/dashboard/documents/idcards/manage",
                         roles: ["ADMIN"],
                     },
                 ],

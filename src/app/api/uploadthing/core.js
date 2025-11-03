@@ -29,13 +29,13 @@ const f = createUploadthing()
 
 export const ourFileRouter = {
     profilePictureUploader: f({ image: { maxFileSize: "4MB" } })
-        .input(
-            z.object({
-                profileId: z.string(),
-                username: z.string(),
-                schoolId: z.string().optional(),
-            })
-        )
+        // .input(
+        //     z.object({
+        //         profileId: z.string().optional(),
+        //         username: z.string().optional(),
+        //         schoolId: z.string().optional(),
+        //     })
+        // )
         .onUploadComplete(async ({ metadata, file }) => {
             console.log("Profile picture uploaded for:", metadata.username);
             console.log("File URL:", file.ufsUrl);

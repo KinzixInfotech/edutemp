@@ -141,7 +141,7 @@ export default function StudentListPage() {
                         <Trash2 size={16} className="mr-2" /> Delete Selected
                     </Button>
                     <Button variant="outline" onClick={handleInactivateSelected}>
-                        <Slash size={16} className="mr-2" /> Inactivate Selected
+                     Inactivate Selected
                     </Button>
                 </div>
             )}
