@@ -146,7 +146,7 @@ const Hero = () => {
                                 onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
                             >
                                 <div className="text-white px-2 sm:px-3 py-1 rounded-lg font-bold text-xs sm:text-sm flex-shrink-0" style={{ background: 'linear-gradient(135deg, #0c65f1 0%, #0a52c6 100%)' }}>
-                                    EB-
+                                    EB - 
                                 </div>
                                 <input
                                     type="text"
@@ -189,9 +189,9 @@ const Hero = () => {
                         {/* Helper Text */}
                         <p className="text-xs text-gray-500 mt-3 text-left">
                             Don't have a school code?{" "}
-                            <a href="#" className="font-semibold underline hover:opacity-80" style={{ color: '#0c65f1' }}>
+                            <Link href="/" className="font-semibold underline hover:opacity-80" style={{ color: '#0c65f1' }}>
                                 Contact us
-                            </a>
+                            </Link>
                         </p>
                     </div>
                 </div>

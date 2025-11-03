@@ -20,80 +20,70 @@ const content = {
     hero: {
         badge: "NOW SIMPLY SCHOOL MANAGEMENT SYSTEM",
         title: "Simplify Your Daily School Tasks with",
-        highlightedText: "Smart School Management Software",
-        description: "Imagine manually handling daily school tasks like attendance, timetables, fees, report cards, and certificates - it's tricky. But fear not! We provide all in one school ERP Software to save your time, money, and energy. An eco-friendly choice for schools, it's like a helpful friend, making school life a breeze",
+        highlightedText: "Smart School Management System",
+        description: "Modern schools manage more than academics — they handle admissions, administration, communication, transport, finances, and strategic growth. Edubreezy brings all these critical functions together under one platform, enabling schools to operate like high-performing organizations with better speed, transparency, and data-driven decision-making. From admissions to alumni, Edubreezy ensures every process is automated, organized, and accessible to the right people at the right time.",
         features: [
-            "90+ Useful Modules meshed with Mobile Apps",
-            "100% Secure and Reliable Cloud System",
-            "SMS, WhatsApp, Email, Payment Gateway Integrations",
-            "GPS, RFID, QR Scanner, Biometrics Supported",
-            "Flexible Payment System and Low Cost of Ownership",
-            "24/7 Dedicated Support Team",
-            "Every Month New Update Guaranteed"
+            "Seamlessly integrated modules with powerful mobile apps",
+            "Highly secure and reliable cloud-based infrastructure",
+            "Built-in integrations for SMS, WhatsApp, Email, and Payments",
+            // "Supports GPS tracking Systems",
+            "Flexible payment options with a low total cost of ownership",
+            "Round-the-clock dedicated customer support",
+            "Guaranteed monthly updates with new features and improvements"
         ],
         ctaButton: "Call Us Now",
         imagePlaceholder: "https://classonapp.com/frontend-assets/images/school-parent-app.webp"
     },
     apps: {
-        badge: "ONE STOP SOLUTIONS",
-        title: "Improve Your School Management with",
-        highlightedText: "Smart Apps",
-        description: "Mobile apps provide a simple communication link between students, parents, teachers, staff, and the school, keeping everyone connected easily.",
+        badge: "",
+        title: "ONE APP",
+        highlightedText: "TOTAL CONTROL",
+        description: "EduBreezy unites your entire school community — students, parents, teachers, staff, and administrators — through one powerful Android app. It blends academics, administration, and communication into a seamless digital ecosystem. Manage attendance, assignments, and announcements effortlessly while keeping everyone informed in real time. Simple, secure, and smart — EduBreezy is the future of connected education.",
         points: [
-            "Boost your school's efficiency with our advanced apps, offering a complete solution that effortlessly integrates various aspects of school management software.",
-            "Improve teamwork among teachers, students, and parents with our easy-to-use platform, keeping everyone informed and engaged."
+            "Unified app connecting students, parents, teachers, and staff effortlessly.",
+            "Integrated academic, administrative, and communication modules for a smarter campus.",
+            "Real-time updates and notifications that keep everyone informed and engaged.",
+            "Simplifies daily operations while enhancing collaboration and accountability."
         ],
         ctaButton: "Make Your School Digital",
         cards: [
-            {
-                icon: "school",
-                title: "School App",
-                description: "Your All-in-One Solution for Easy Management and Communication.",
-                color: "#FF6B6B"
-            },
-            {
-                icon: "parent",
-                title: "Parent App",
-                description: "Easily track your child's progress, fees, attendance, and other activities effortlessly.",
-                color: "#FFA94D"
-            },
-            {
-                icon: "teacher",
-                title: "Teacher App",
-                description: "The Teacher App helps teachers manage classrooms and connect with parents easily.",
-                color: "#FF6B6B"
-            },
-            {
-                icon: "driver",
-                title: "Driver App",
-                description: "Easily find your child routes & communicate with drivers in real time.",
-                color: "#FFA94D"
-            }
+            { icon: "school", title: "School App", color: "#FF6B6B" },
+            { icon: "teacher", title: "Teacher App", color: "#FFA94D" },
+            { icon: "parent", title: "Parent App", color: "#FF6B6B" },
+            { icon: "student", title: "Student App", color: "#FFA94D" },
+            { icon: "driver", title: "Driver App", color: "#FF6B6B" },
+            { icon: "admin", title: "Admin App", color: "#FFA94D" }
         ]
     },
+
     upgrade: {
-        title: "Are you Ready to",
-        highlightedText: "Upgrade your School",
-        subtitle: "with Smart AI-powered",
+        title: "Real-Time Dashboard ",
+        highlightedText: "& AI Insights",
+        // subtitle: "with Smart AI-powered",
         image: "https://classonapp.com/frontend-assets/images/best-school-software.webp",
-        highlightedSubtitle: "School Management Software?",
-        description: "EduBreezy is one of the most experienced school service providers in India, with 20 years of experience in the IT field and over 8 years of experience in the Ed-tech industry",
+        // highlightedSubtitle: "School Management Software?",
+        description: "Edubreezy empowers school leadership with real-time control and clarity",
         features: [
             {
                 icon: "modules",
-                title: "Built with more than 100+ Modules",
-                description: "Over 100+ modules are designed to simplify school operations and improve the experience for everyone involved, including students, teachers, and parents."
+                title: "Business Performance Metrics",
+                description: "Fee collection, admissions, revenue, and expenses at a glance."
             },
             {
                 icon: "portal",
-                title: "User Friendly Portal & Apps",
-                description: "Simplicity meets efficiency! Our easy-to-use design ensures smooth navigation for all users. Save time effortlessly with our user-friendly solution."
+                title: "Academic Analytics",
+                description: "Track student performance, attendance patterns, subject trends, and exam results."
             },
             {
                 icon: "updates",
-                title: "Free Lifetime Updates",
-                description: "We believe in continuous innovation, delivering updates every month to ensure your school is always at the forefront. Get everything you need, first-hand, for your school's success."
-            }
+                title: "Department & Staff Reports",
+                description: "View teacher performance, attendance, and departmental KPIs."
+            },
+            {
+                icon: "updates",
+                title: " Customizable Data Views",
+                description: " Filter insights by branch, class, department, or term."
+            },
         ],
         ctaButtons: ["Call Us Now", "Book a free demo"]
     },
@@ -121,8 +111,8 @@ const content = {
         ]
     },
     whyClassOn: {
-        title: "Why Is EduBreezy India's Fastest-growing",
-        highlightedText: "School Management Software?",
+        title: "Real-Time Dashboard ",
+        highlightedText: "& AI Insights",
         description: "Experience Triple Assurance from us: Best Value, Peace of Mind, and Continuous updates. We stand apart from other school management software providers with our mission to make every school 100% Smart & Digital. Our unique strategies and modules are designed to save your school money, paper, and time.",
         title2: "With EduBreezy App, you get:",
         features: [
@@ -296,10 +286,10 @@ export default function HeroSection() {
                         {/* Left Content */}
                         <div className="text-white space-y-8">
                             <h1 className="text-4xl  lg:text-6xl font-bold leading-tight">
-                                AI-Powered School Management Software for Indian Schools
+                                AI-Powered Cloud Based School Management System
                             </h1>
                             <p className="text-lg lg:text-xl text-red-100 leading-relaxed">
-                                India's first AI-powered school Management Software with a powerful toolkit to boost school management systems! We provide a complete education management software solution featuring over 90 modules, 4 mobile apps, and 15+ specialized services tailored for Indian schools. Our School ERP Software streamlines administration, enhances communication, and ensures seamless learning with automation and real-time analytics.
+                                Edubreezy is an AI-driven school management platform built to simplify operations, boost efficiency, and give educational institutions complete control — all through one secure, intelligent, and scalable system.
                             </p>
                             <div className="flex flex-col lg:flex-row items-center space-x-4">
                                 <div className="text-6xl lg:text-7xl font-bold">100<span className="text-4xl">%</span></div>
@@ -417,7 +407,7 @@ export default function HeroSection() {
             </div> */}
             </div>
             <Himage />
-            <VideoShowcaseSection/>
+            <VideoShowcaseSection />
             <AppsSection />
             <UpgradeSection />
             <SmarterSchoolSection />
@@ -629,7 +619,7 @@ const AppsSection = () => (
                 <div className="text-left mb-4">
                     <div className="lg:text-2xl text-lg font-semibold text-gray-500 mb-2">{content.apps.badge}</div>
                     <h2 className="lg:text-6xl text-4xl tracking-tight leading-tight font-semibold text-gray-900 mb-4">
-                        {content.apps.title} <span className="text-[#0569ff]">{content.apps.highlightedText}</span>
+                        {content.apps.title} <br /><span className="text-[#0569ff] border-b">{content.apps.highlightedText}</span>
                     </h2>
                     <p className="text-muted-foreground max-w-3xl text-[1rem] mx-auto">{content.apps.description}</p>
                 </div>
