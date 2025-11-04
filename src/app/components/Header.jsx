@@ -149,23 +149,24 @@ export default function Header() {
             <nav className="px-6 lg:px-16 py-1">
                 <div className="max-w-7xl mx-auto flex h-16 items-center justify-between gap-4">
                     {/* Logo - Left side */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-row justify-center">
                         <Link href="/" className="text-primary hover:text-primary/90">
                             <Image src='/edu.png' width={200} height={200} alt="EduBreezy" priority />
                         </Link>
+                       
                     </div>
 
                     {/* Desktop Navigation - Middle */}
                     <div className="hidden lg:flex items-center gap-6">
                         {menuConfig.menus.map((menu, index) => (
-                            <div 
+                            <div
                                 key={index}
                                 className="relative"
                                 onMouseEnter={() => menu.type === 'submenu' && handleMouseEnter(menu.name)}
                                 onMouseLeave={handleMouseLeave}
                             >
                                 {menu.type === 'link' ? (
-                                    <Link 
+                                    <Link
                                         href={menu.link}
                                         target={menu.target}
                                         className="text-gray-700 hover:text-[#026df3] transition-colors font-medium"
@@ -174,14 +175,13 @@ export default function Header() {
                                     </Link>
                                 ) : (
                                     <>
-                                        <button 
+                                        <button
                                             className="text-gray-700 hover:text-[#026df3] transition-colors font-medium flex items-center"
                                         >
-                                            {menu.name} 
-                                            <ChevronDown 
-                                                className={`ml-1 w-4 h-4 transition-transform duration-300 ${
-                                                    activeSubmenu === menu.name ? 'rotate-180' : ''
-                                                }`} 
+                                            {menu.name}
+                                            <ChevronDown
+                                                className={`ml-1 w-4 h-4 transition-transform duration-300 ${activeSubmenu === menu.name ? 'rotate-180' : ''
+                                                    }`}
                                             />
                                         </button>
 
@@ -247,13 +247,14 @@ export default function Header() {
                                 </Link>
                             )
                         )}
+                        
                     </div>
                 </div>
             </nav>
 
             {/* Backdrop overlay when menu is open */}
             {activeSubmenu && (
-                <div 
+                <div
                     className="fixed inset-0 bg-black/20 backdrop-blur-sm -z-10"
                     onMouseEnter={handleMouseLeave}
                 ></div>

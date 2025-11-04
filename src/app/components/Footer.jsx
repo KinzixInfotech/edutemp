@@ -1,3 +1,4 @@
+import { StatusIndicator } from "@/components/layout/client-layout";
 import Image from "next/image";
 
 const footerData = {
@@ -30,6 +31,20 @@ const footerData = {
             ],
         },
     ],
+};
+const getStatusStyles = (indicator) => {
+    switch (indicator) {
+        case "none": // operational
+            return "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
+        case "minor": // minor issues
+            return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300";
+        case "major": // major outage
+            return "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300";
+        case "critical": // critical outage
+            return "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300";
+        default:
+            return "bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300";
+    }
 };
 
 export default function Footer() {
@@ -156,9 +171,9 @@ export default function Footer() {
                     <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                         {/* Left - Copyright and Links */}
                         <div className="text-center md:text-left space-y-3">
-                            <p className="text-slate-600 text-sm font-medium">
+                            {/* <p className="text-slate-600 text-sm font-medium">
                                 © {new Date().getFullYear()} EduBreezy. All rights reserved.
-                            </p>
+                            </p> */}
                             <div className="flex flex-wrap gap-4 justify-center md:justify-start text-sm">
                                 <a href="/privacy" className="text-slate-500 hover:text-[#026df3] transition-colors duration-200 relative group">
                                     <span className="relative">
@@ -185,18 +200,19 @@ export default function Footer() {
                                     A Kinzix Product
                                 </a>
                             </p>
-                            <span className="inline-block px-3 py-1 bg-amber-100 text-amber-800 text-xs font-medium rounded-full">
+                            <span className="inline-block px-2 py-1.5  bg-amber-100 text-amber-800 rounded-full">
                                 🚧 Under Development
                             </span>
+
                         </div>
 
                         {/* Right - Kinzix Logo */}
-                        <div className="mt-4 md:mt-0">
+                        <div className="mt-4 md:mt-0 flex items-center justify-center flex-col">
                             <a
                                 href="https://www.kinzix.com"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="block transition-transform duration-300 hover:scale-105"
+                                className="block transition-transform duration-300 hover:scale-105 relative overflow-hidden"
                             >
                                 <Image
                                     src="/kinzix-black.webp"
@@ -205,8 +221,37 @@ export default function Footer() {
                                     height={40}
                                     className="opacity-80 hover:opacity-100 transition-opacity duration-300"
                                 />
+                                {/* Continuous shimmer overlay */}
+                                <div className="absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-white/40 to-transparent pointer-events-none"></div>
                             </a>
+                            <div className="block  transition-transform cursor-pointer border rounded-full duration-300 hover:scale-105">
+                                <StatusIndicator />
+                            </div>
                         </div>
+                    </div>
+                </div>
+                 {/* Very Bottom - Developed By */}
+                {/* Very Bottom - Developed By */}
+                <div className="border-t border-slate-200 mt-8 pt-6">
+                    <div className="flex flex-col items-center justify-center gap-2 text-sm text-slate-600">
+                        <div className="flex items-center gap-2">
+                            <span>Developed with</span>
+                            <span className="text-red-500 animate-pulse text-base">❤️</span>
+                            <span>by</span>
+                            <a 
+                                href="https://www.kinzix.com" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="font-semibold text-[#026df3] hover:text-[#0256c4] transition-colors duration-200"
+                            >
+                                Kinzix Infotech
+                            </a>
+                            {/* <span>India</span>
+                            <span className="text-base">🇮🇳</span> */}
+                        </div>
+                        <p className="text-xs text-slate-500">
+                            © {new Date().getFullYear()} Kinzix Infotech. All rights reserved.
+                        </p>
                     </div>
                 </div>
             </div>

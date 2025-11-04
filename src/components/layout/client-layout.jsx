@@ -9,6 +9,7 @@ import dynamic from "next/dynamic";
 import { useAuth } from "@/context/AuthContext";
 import pkg from "../../../package.json";
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 import { useLoader } from "@/app/dashboard/context/Loader";
 import OnboardingDialog from "../OnboardDialog";
@@ -17,6 +18,7 @@ import { supabase } from "@/lib/supabase";
 import LoaderPage from "../loader-page";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import NetworkStatusDialog from "../NetworkIndicatordialog";
+import Link from "next/link";
 
 const TopProgressBar = dynamic(() => import("@/app/components/TopProgressBar"), {
     ssr: false,
@@ -29,7 +31,6 @@ export default function ClientLayout({ children }) {
     const [queryClient] = useState(() => new QueryClient());
 
     const router = useRouter();
-    const [status, setStatus] = useState(null);
     const pathname = usePathname();
     const [loading, setLoading] = useState(false);
     // useEffect(() => {
@@ -63,34 +64,9 @@ export default function ClientLayout({ children }) {
         return <LoaderPage showmsg={false} />; // or a spinner
     }
 
-    useEffect(() => {
-        async function fetchStatus() {
-            try {
-                const res = await fetch("https://ch3yy55ly4fq.statuspage.io/api/v2/summary.json");
-                const data = await res.json();
-                setStatus(data.status);
-            } catch (error) {
-                console.error("Error fetching status:", error);
-            }
-        }
-        fetchStatus();
-    }, []);
+
 
     const hideUI = ["/dashboard/login"].includes(pathname);
-    const getStatusStyles = (indicator) => {
-        switch (indicator) {
-            case "none": // operational
-                return "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
-            case "minor": // minor issues
-                return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300";
-            case "major": // major outage
-                return "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300";
-            case "critical": // critical outage
-                return "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300";
-            default:
-                return "bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300";
-        }
-    };
 
     return (
 
@@ -119,19 +95,7 @@ export default function ClientLayout({ children }) {
                     </main>
                     <footer className="w-full border-t bg-muted dark:bg-muted/30 rounded-b-lg  text-xs text-muted-foreground mt-8">
                         <div className="max-w-7xl mx-auto px-4 py-3  flex flex-col md:flex-row justify-between items-center gap-2">
-                            <div className="flex items-center gap-2">
-                                {/* <span className="font-medium">System Status:</span> */}
-                                {status ? (
-                                    <span
-                                        className={`${getStatusStyles(status.indicator)} px-2 py-1.5 rounded-full`}
-                                    >
-                                        {status.description}
-                                    </span>
-                                ) : (
-                                    <Skeleton className="h-6 w-48 rounded-full" />
-                                )}
-                            </div>
-
+                            <StatusIndicator />
                             <div className="flex items-center gap-4">
                                 <span>Dashboard Version: <strong>v{pkg.version}</strong></span>
                                 <span className="text-muted-foreground">A Kinzix Product</span>
@@ -144,4 +108,55 @@ export default function ClientLayout({ children }) {
         </QueryClientProvider>
 
     );
+}
+
+export const StatusIndicator = (className) => {
+    const [status, setStatus] = useState(null);
+    const getStatusStyles = (indicator) => {
+        switch (indicator) {
+            case "none": // operational
+                return "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
+            case "minor": // minor issues
+                return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300";
+            case "major": // major outage
+                return "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300";
+            case "critical": // critical outage
+                return "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300";
+            default:
+                return "bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300";
+        }
+    };
+    useEffect(() => {
+        async function fetchStatus() {
+            try {
+                const res = await fetch("https://ch3yy55ly4fq.statuspage.io/api/v2/summary.json");
+                const data = await res.json();
+                setStatus(data.status);
+            } catch (error) {
+                console.error("Error fetching status:", error);
+            }
+        }
+        fetchStatus();
+    }, []);
+    return (
+        <Link href={'https://ch3yy55ly4fq.statuspage.io/'} target="_blank">
+            <div className="flex items-center gap-2">
+                {/* <span className="font-medium">System Status:</span> */}
+                {status ? (
+                    <span
+                        className={cn(
+                            getStatusStyles(status.indicator),
+                            "px-2 py-1.5 rounded-full",
+                            className
+                        )}
+                    >
+
+                        {status.description}
+                    </span>
+                ) : (
+                    <Skeleton className="h-6 w-48 rounded-full" />
+                )}
+            </div>
+        </Link>
+    )
 }
