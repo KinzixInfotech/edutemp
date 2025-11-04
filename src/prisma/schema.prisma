@@ -1123,27 +1123,50 @@ model PdfExportSettings {
   @@unique([schoolId])
 }
 
+// model CertificateTemplate {
+//   id                String                 @id @default(uuid()) @db.Uuid
+//   name              String
+//   description       String?
+//   type              String // character, bonafide, transfer, etc.
+//   schoolId          String                 @db.Uuid
+//   school            School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+//   layoutConfig      Json // Stores ALL design settings
+//   createdById       String?                @db.Uuid
+//   createdBy         User?                  @relation(fields: [createdById], references: [id])
+//   isDefault         Boolean                @default(false)
+//   createdAt         DateTime               @default(now())
+//   updatedAt         DateTime               @updatedAt
+//   certificates      CertificateGenerated[]
+//   TemplateSignature TemplateSignature[]
+//   TemplateStamp     TemplateStamp[]
+
+//   @@index([schoolId])
+//   @@index([type])
+// }
 model CertificateTemplate {
-  id                String                 @id @default(uuid()) @db.Uuid
-  name              String
-  description       String?
-  type              String // character, bonafide, transfer, etc.
-  schoolId          String                 @db.Uuid
-  school            School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  layoutConfig      Json // Stores ALL design settings
-  createdById       String?                @db.Uuid
-  createdBy         User?                  @relation(fields: [createdById], references: [id])
-  isDefault         Boolean                @default(false)
-  createdAt         DateTime               @default(now())
-  updatedAt         DateTime               @updatedAt
-  certificates      CertificateGenerated[]
-  TemplateSignature TemplateSignature[]
-  TemplateStamp     TemplateStamp[]
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String
+  description  String?
+  type         String // character, bonafide, transfer, etc.
+  schoolId     String   @db.Uuid
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  layoutConfig Json // Stores design settings for signatures/stamps
+  createdById  String?  @db.Uuid
+  createdBy    User?    @relation(fields: [createdById], references: [id])
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations for signatures/stamps positioning
+  templateSignatures TemplateSignature[]
+  templateStamps     TemplateStamp[]
+  DocumentTemplate   DocumentTemplate[]
 
   @@index([schoolId])
   @@index([type])
 }
 
+// DocumentTemplate: Main template with all content
 model DocumentTemplate {
   id           String   @id @default(uuid()) @db.Uuid
   name         String
@@ -1160,28 +1183,86 @@ model DocumentTemplate {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  // ADDED: Link to CertificateTemplate for signatures/stamps
+  certificateTemplateId String?              @db.Uuid
+  certificateTemplate   CertificateTemplate? @relation(fields: [certificateTemplateId], references: [id])
+
+  // Generated certificates reference this
+  certificatesGenerated CertificateGenerated[]
+
   @@unique([schoolId, templateType, subType, name])
   @@index([schoolId])
   @@index([templateType])
   @@index([subType])
 }
 
+// model DocumentTemplate {
+//   id                   String                 @id @default(uuid()) @db.Uuid
+//   name                 String
+//   description          String?
+//   templateType         String // 'certificate', 'idcard', 'admitcard'
+//   subType              String // specific type (character, student, midterm, etc.)
+//   schoolId             String                 @db.Uuid
+//   school               School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+//   layoutConfig         Json
+//   createdById          String?                @db.Uuid
+//   createdBy            User?                  @relation(fields: [createdById], references: [id])
+//   isDefault            Boolean                @default(false)
+//   isActive             Boolean                @default(true)
+//   createdAt            DateTime               @default(now())
+//   updatedAt            DateTime               @updatedAt
+//   CertificateGenerated CertificateGenerated[]
+
+//   @@unique([schoolId, templateType, subType, name])
+//   @@index([schoolId])
+//   @@index([templateType])
+//   @@index([subType])
+// }
+
+// model CertificateGenerated {
+//   id                String              @id @default(uuid()) @db.Uuid
+//   certificateNumber String              @unique
+//   templateId        String              @db.Uuid
+//   template          CertificateTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+//   studentId         String              @db.Uuid
+//   student           Student             @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+//   schoolId          String              @db.Uuid
+//   school            School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+//   issuedById        String?             @db.Uuid
+//   issuedBy          User?               @relation(fields: [issuedById], references: [id])
+//   issueDate         DateTime            @default(now())
+//   customFields      Json // Additional dynamic values like event name, remarks, etc.
+//   fileUrl           String? // If PDF is stored
+//   status            String              @default("issued") // issued, pending, revoked
+//   createdAt         DateTime            @default(now())
+
+//   @@index([schoolId])
+//   @@index([studentId])
+//   @@index([templateId])
+//   @@index([status])
+// }
 model CertificateGenerated {
-  id                String              @id @default(uuid()) @db.Uuid
-  certificateNumber String              @unique
-  templateId        String              @db.Uuid
-  template          CertificateTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  studentId         String              @db.Uuid
-  student           Student             @relation(fields: [studentId], references: [userId], onDelete: Cascade)
-  schoolId          String              @db.Uuid
-  school            School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  issuedById        String?             @db.Uuid
-  issuedBy          User?               @relation(fields: [issuedById], references: [id])
-  issueDate         DateTime            @default(now())
-  customFields      Json // Additional dynamic values like event name, remarks, etc.
-  fileUrl           String? // If PDF is stored
-  status            String              @default("issued") // issued, pending, revoked
-  createdAt         DateTime            @default(now())
+  id                String @id @default(uuid()) @db.Uuid
+  certificateNumber String @unique
+
+  // Reference to DocumentTemplate ONLY
+  templateId String           @db.Uuid
+  template   DocumentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  studentId String  @db.Uuid
+  student   Student @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+
+  schoolId String @db.Uuid
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  issuedById String? @db.Uuid
+  issuedBy   User?   @relation(fields: [issuedById], references: [id])
+
+  issueDate    DateTime @default(now())
+  customFields Json
+  fileUrl      String?
+  status       String   @default("issued")
+  createdAt    DateTime @default(now())
 
   @@index([schoolId])
   @@index([studentId])

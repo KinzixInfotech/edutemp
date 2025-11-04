@@ -160,7 +160,7 @@ export default function Footer() {
                                 <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                                 </svg>
-                                <span className="text-sm">+1 (555) 123-4567</span>
+                                <span className="text-sm">+91 9471 532 682</span>
                             </li>
                         </ul>
                     </div>
@@ -175,7 +175,7 @@ export default function Footer() {
                                 © {new Date().getFullYear()} EduBreezy. All rights reserved.
                             </p> */}
                             <div className="flex flex-wrap gap-4 justify-center md:justify-start text-sm">
-                                <a href="/privacy" className="text-slate-500 hover:text-[#026df3] transition-colors duration-200 relative group">
+                                <a href="/privacy-policy" className="text-slate-500 hover:text-[#026df3] transition-colors duration-200 relative group">
                                     <span className="relative">
                                         Privacy Policy
                                         <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#026df3] transition-all duration-300 group-hover:w-full"></span>
@@ -200,7 +200,7 @@ export default function Footer() {
                                     A Kinzix Product
                                 </a>
                             </p>
-                            <span className="inline-block px-2 py-1.5  bg-amber-100 text-amber-800 rounded-full">
+                            <span className="inline-block px-2 py-1.5  bg-amber-100 border text-amber-800 rounded-full">
                                 🚧 Under Development
                             </span>
 
@@ -230,19 +230,18 @@ export default function Footer() {
                         </div>
                     </div>
                 </div>
-                 {/* Very Bottom - Developed By */}
                 {/* Very Bottom - Developed By */}
                 <div className="border-t border-slate-200 mt-8 pt-6">
-                    <div className="flex flex-col items-center justify-center gap-2 text-sm text-slate-600">
+                    <div className="flex flex-col items-center justify-center gap-2 text-sm text-slate-700">
                         <div className="flex items-center gap-2">
                             <span>Developed with</span>
                             <span className="text-red-500 animate-pulse text-base">❤️</span>
                             <span>by</span>
-                            <a 
-                                href="https://www.kinzix.com" 
-                                target="_blank" 
+                            <a
+                                href="https://www.kinzix.com"
+                                target="_blank"
                                 rel="noopener noreferrer"
-                                className="font-semibold text-[#026df3] hover:text-[#0256c4] transition-colors duration-200"
+                                className="font-semibold border-b text-[#026df3] hover:text-[#0256c4] transition-colors duration-200"
                             >
                                 Kinzix Infotech
                             </a>

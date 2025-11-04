@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { generatePDF } from '@/lib/pdf-generator'; // You'll need to create this utility
+import { generatePDF } from '@/lib/pdf-generator';
+import { toBase64 } from '@/lib/utils';
 
 export async function POST(request, { params }) {
     try {
@@ -16,7 +17,9 @@ export async function POST(request, { params }) {
             ...customFields
         } = body;
 
-        // Fetch student details
+        // console.log('📝 Generate Request:', { studentId, templateId, certificateType });
+
+        // 1. Fetch student
         const student = await prisma.student.findUnique({
             where: { userId: studentId },
             include: {
@@ -27,72 +30,75 @@ export async function POST(request, { params }) {
         });
 
         if (!student) {
-            return NextResponse.json(
-                { error: 'Student not found' },
-                { status: 404 }
-            );
+            return NextResponse.json({ error: 'Student not found' }, { status: 404 });
         }
 
-        // Fetch template
+        // 2. Fetch template
         const template = await prisma.documentTemplate.findFirst({
             where: {
                 id: templateId,
                 schoolId,
+                templateType: 'certificate',
                 subType: certificateType,
                 isActive: true,
             },
         });
-        console.log(template);
 
         if (!template) {
-            console.error('Template not found:', { templateId, schoolId, certificateType });
-            return NextResponse.json({ error: 'Template not found or inactive' }, { status: 404 });
+            console.error('❌ Template not found');
+            return NextResponse.json({ error: 'Template not found' }, { status: 404 });
         }
 
-        // Generate unique certificate number
+        // console.log('✅ Template found:', template.name);
+
+        // 3. Generate certificate number
         const certificateNumber = `CERT-${schoolId.slice(0, 4).toUpperCase()}-${Date.now()}`;
-        // console.log(template, student, certificateNumber, customFields);
-        // Fix: Convert logoUrl to base64 before generating PDF
-        if (template?.layoutConfig?.logoUrl) {
-            try {
-                const response = await fetch(template.layoutConfig.logoUrl);
-                const buffer = await response.arrayBuffer();
-                const base64Image = Buffer.from(buffer).toString("base64");
-                template.layoutConfig.logoUrl = `data:image/png;base64,${base64Image}`;
-            } catch (error) {
-                console.error("Failed to fetch and convert logo:", error);
-            }
-        }
 
-        // Generate PDF using template and data
+        // 4. Convert logo to base64 if needed
+        let layoutConfig = { ...template.layoutConfig };
+        console.log(layoutConfig);
+        // if (layoutConfig?.logoUrl && !layoutConfig.logoUrl.startsWith('data:')) {
+        //     try {
+        //         const response = await fetch(layoutConfig.logoUrl);
+        //         if (response.ok) {
+        //             const buffer = await response.arrayBuffer();
+        //             const base64 = Buffer.from(buffer).toString("base64");
+        //             const mime = response.headers.get('content-type') || 'image/png';
+        //             layoutConfig.logoUrl = `data:${mime};base64,${base64}`;
+        //         }
+        //     } catch (error) {
+        //         // console.warn('⚠️ Failed to convert logo:', error.message);
+        //     }
+        // }
+        if (layoutConfig) {
+            if (layoutConfig.logoUrl) layoutConfig.logoUrl = await toBase64(layoutConfig.logoUrl);
+            if (layoutConfig.backgroundImage) layoutConfig.backgroundImage = await toBase64(layoutConfig.backgroundImage);
+            if (layoutConfig.signatureUrl) layoutConfig.signatureUrl = await toBase64(layoutConfig.signatureUrl);
+            if (layoutConfig.stampUrl) layoutConfig.stampUrl = await toBase64(layoutConfig.stampUrl);
+        }
+        // 5. Generate PDF
+        // console.log('📄 Generating PDF...');
         const pdfUrl = await generatePDF({
-            template,
+            template: { ...template, layoutConfig },
             student,
             certificateNumber,
             issueDate,
             customFields,
         });
 
-        // Generate PDF using template and data
-        // const pdfUrl = await generatePDF({
-        //     template,
-        //     student,
-        //     certificateNumber,
-        //     issueDate,
-        //     customFields,
-        // });
+        // console.log('✅ PDF generated:', pdfUrl);
 
-        // Save certificate record
+        // 6. Save certificate (SIMPLIFIED - only required fields)
         const certificate = await prisma.certificateGenerated.create({
             data: {
                 certificateNumber,
-                templateId, // This should reference the CertificateTemplate if you have one
+                templateId,
                 studentId,
                 schoolId,
                 issuedById: issuedById || null,
                 issueDate: new Date(issueDate),
-                customFields: customFields || {},
-                fileUrl:template.layoutConfig.logoUrl,
+                customFields: customFields,
+                fileUrl: pdfUrl,
                 status: 'issued',
             },
             include: {
@@ -106,7 +112,8 @@ export async function POST(request, { params }) {
                 template: {
                     select: {
                         name: true,
-                        type: true,
+                        templateType: true,
+                        subType: true,
                     },
                 },
                 issuedBy: {
@@ -118,11 +125,18 @@ export async function POST(request, { params }) {
             },
         });
 
+        // console.log('✅ Certificate saved:', certificate.id);
+
         return NextResponse.json(certificate, { status: 201 });
+
     } catch (error) {
-        console.error('Error generating certificate:', error);
+        console.error('❌ Error:', error);
         return NextResponse.json(
-            { error: 'Failed to generate certificate' },
+            {
+                error: 'Failed to generate certificate',
+                message: error.message,
+                ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
+            },
             { status: 500 }
         );
     }

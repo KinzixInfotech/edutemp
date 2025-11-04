@@ -1,3 +1,4 @@
+
 import { clsx } from "clsx";
 import { useMemo } from "react";
 import { twMerge } from "tailwind-merge"
@@ -129,4 +130,18 @@ export function formatDate(dateString) {
 export function capitalizeFirstLetter(text) {
   if (!text) return "";
   return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+}
+
+
+export async function toBase64(url) {
+  if (!url || url.startsWith('data:')) return url;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return url;
+    const buffer = await res.arrayBuffer();
+    const mime = res.headers.get('content-type') || 'image/png';
+    return `data:${mime};base64,${Buffer.from(buffer).toString("base64")}`;
+  } catch {
+    return url;
+  }
 }

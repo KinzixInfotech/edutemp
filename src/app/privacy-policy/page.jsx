@@ -1,229 +1,397 @@
-// app/privacy/page.jsx
-"use client";
+import React from 'react';
 
-import React from "react";
-
-export default function PrivacyPolicyPage() {
+const PrivacyPolicy = () => {
     return (
-        <div className="prose mx-auto max-w-4xl p-8">
-            <h1>[SCHOOL_NAME] — Privacy Policy</h1>
-            <p>
-                <strong>Effective date:</strong> [EFFECTIVE_DATE]
+        <div className="privacy-policy mt-16 container mx-auto px-4 py-8 max-w-4xl">
+            <h1 className="text-3xl font-bold mb-4">Privacy Policy</h1>
+            <p className="mb-6 text-sm text-gray-600">
+                Last updated: <strong>November 04, 2025</strong>
+            </p>
+            <p className="mb-6">
+                This Privacy Policy describes Our policies and procedures on the collection, use and disclosure of Your information when You use the Service and tells You about Your privacy rights and how the law protects You.
+            </p>
+            <p className="mb-6">
+                We use Your Personal data to provide and improve the Service. By using the Service, You agree to the collection and use of information in accordance with this Privacy Policy. This Privacy Policy has been created with the help of the{' '}
+                {/* <a href="https://www.termsfeed.com/privacy-policy-generator/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    Privacy Policy Generator
+                </a>. */}
             </p>
 
-            <p>
-                At <strong>[SCHOOL_NAME]</strong> ("we", "us", "our"), we take the privacy
-                and security of personal data seriously. This Privacy Policy explains
-                what personal information we collect when using our School Management
-                System (the "Service"), how we use it, with whom we share it, and the
-                rights and choices available to you.
+            <h2 className="text-2xl font-semibold mt-10 mb-4">Interpretation and Definitions</h2>
+
+            <h3 className="text-xl font-medium mt-8 mb-3">Interpretation</h3>
+            <p className="mb-6">
+                The words whose initial letters are capitalized have meanings defined under the following conditions. The following definitions shall have the same meaning regardless of whether they appear in singular or in plural.
             </p>
 
-            <h2>1. Data Controller</h2>
-            <p>
-                The data controller for the Service is <strong>[SCHOOL_NAME]</strong>.
-                For questions about this policy or our data practices, contact us at{" "}
-                <a href={`mailto:${"[CONTACT_EMAIL]"}`}>{"[CONTACT_EMAIL]"}</a>.
-            </p>
-
-            <h2>2. Scope</h2>
-            <p>
-                This policy covers personal data collected from students, parents or
-                guardians, teachers, staff, and other users of the Service. It applies
-                to information collected through our website, mobile app, administrative
-                portal, and related services.
-            </p>
-
-            <h2>3. Personal Data We Collect</h2>
-            <p>We collect information necessary to provide the Service. Typical data:</p>
-            <ul>
+            <h3 className="text-xl font-medium mt-8 mb-3">Definitions</h3>
+            <p className="mb-4">For the purposes of this Privacy Policy:</p>
+            <ul className="list-disc pl-6 mb-6 space-y-3">
                 <li>
-                    <strong>Student data:</strong> name, date of birth, student ID,
-                    class/grade, attendance records, enrollment information, academic
-                    records, grades, behaviour records, medical/allergy notes (if
-                    provided), assessment results, photographs for identification, and
-                    other education-related information.
+                    <p>
+                        <strong>Account</strong> means a unique account created for You to access our Service or parts of our Service.
+                    </p>
                 </li>
                 <li>
-                    <strong>Parent / guardian data:</strong> name, relationship, contact
-                    details (email, phone, address), emergency contacts, billing
-                    information (if applicable).
+                    <p>
+                        <strong>Affiliate</strong> means an entity that controls, is controlled by, or is under common control with a party, where &quot;control&quot; means ownership of 50% or more of the shares, equity interest or other securities entitled to vote for election of directors or other managing authority.
+                    </p>
                 </li>
                 <li>
-                    <strong>Staff & teacher data:</strong> name, contact details, role,
-                    qualifications, employment records, payroll identifiers (if used),
-                    schedules and performance assessments.
+                    <p>
+                        <strong>Application</strong> refers to EduBreezy, the software program provided by the Company.
+                    </p>
                 </li>
                 <li>
-                    <strong>Platform usage data:</strong> login credentials, IP addresses,
-                    device information, usage logs, timestamps, and cookies or similar
-                    technologies.
+                    <p>
+                        <strong>Company</strong> (referred to as either &quot;the Company&quot;, &quot;We&quot;, &quot;Us&quot; or &quot;Our&quot; in this Agreement) refers to Kinzix Infotech, Dr Zakir Hussain Road India.
+                    </p>
                 </li>
                 <li>
-                    <strong>Optional data:</strong> uploaded files (assignments,
-                    attachments), third-party integrations data (when authorized), and any
-                    other information you or permitted users provide.
-                </li>
-            </ul>
-
-            <h2>4. How We Use Personal Data</h2>
-            <p>We use personal data to:</p>
-            <ul>
-                <li>Provide and maintain the Service and access control.</li>
-                <li>Manage student enrollment, attendance, grades, timetables, and
-                    school communications.</li>
-                <li>Enable parents and guardians to view student progress and contact
-                    teachers.</li>
-                <li>Perform administrative tasks such as billing, scheduling, and
-                    reporting.</li>
-                <li>Send important notifications, alerts, and announcements.</li>
-                <li>Improve and develop features, perform analytics, and monitor usage
-                    for security and performance.</li>
-                <li>Comply with legal obligations and protect the safety and rights of
-                    users (including safeguarding duties).</li>
-            </ul>
-
-            <h2>5. Legal Bases for Processing</h2>
-            <p>
-                Where required by applicable law (for example, in the EU), we process
-                personal data on the following legal bases:
-            </p>
-            <ul>
-                <li>Performance of a contract (to provide the Service).</li>
-                <li>Compliance with legal obligations (education, safeguarding, audit).</li>
-                <li>Consent (for optional or sensitive processing where required).</li>
-                <li>Legitimate interests (improving the Service, security, fraud
-                    prevention), balanced against user rights.</li>
-            </ul>
-
-            <h2>6. Data Sharing & Disclosure</h2>
-            <p>We may share personal data with:</p>
-            <ul>
-                <li>
-                    <strong>Service providers:</strong> third-party vendors who perform
-                    services on our behalf (hosting, email, analytics, payments). They
-                    only receive the data necessary to perform their function and are
-                    contractually required to protect it.
+                    <p>
+                        <strong>Cookies</strong> are small files that are placed on Your computer, mobile device or any other device by a website, containing the details of Your browsing history on that website among its many uses.
+                    </p>
                 </li>
                 <li>
-                    <strong>Education authorities & regulators:</strong> when required by
-                    law, or to comply with reporting obligations.
+                    <p>
+                        <strong>Country</strong> refers to: Jharkhand, India
+                    </p>
                 </li>
                 <li>
-                    <strong>Legal & safety:</strong> to respond to lawful requests by
-                    public authorities, to prevent harm, or to enforce our policies.
+                    <p>
+                        <strong>Device</strong> means any device that can access the Service such as a computer, a cell phone or a digital tablet.
+                    </p>
                 </li>
                 <li>
-                    <strong>Third parties with consent:</strong> when parents or guardians
-                    explicitly authorize integrations (e.g., third-party learning tools).
+                    <p>
+                        <strong>Personal Data</strong> is any information that relates to an identified or identifiable individual.
+                    </p>
+                </li>
+                <li>
+                    <p>
+                        <strong>Service</strong> refers to the Application or the Website or both.
+                    </p>
+                </li>
+                <li>
+                    <p>
+                        <strong>Service Provider</strong> means any natural or legal person who processes the data on behalf of the Company. It refers to third-party companies or individuals employed by the Company to facilitate the Service, to provide the Service on behalf of the Company, to perform services related to the Service or to assist the Company in analyzing how the Service is used.
+                    </p>
+                </li>
+                <li>
+                    <p>
+                        <strong>Usage Data</strong> refers to data collected automatically, either generated by the use of the Service or from the Service infrastructure itself (for example, the duration of a page visit).
+                    </p>
+                </li>
+                <li>
+                    <p>
+                        <strong>Website</strong> refers to EduBreezy, accessible from{' '}
+                        <a href="https://www.edubreezy.com" rel="external nofollow noopener" target="_blank" className="text-blue-600 hover:underline">
+                            https://www.edubreezy.com
+                        </a>
+                    </p>
+                </li>
+                <li>
+                    <p>
+                        <strong>You</strong> means the individual accessing or using the Service, or the company, or other legal entity on behalf of which such individual is accessing or using the Service, as applicable.
+                    </p>
                 </li>
             </ul>
 
-            <h2>7. Data Retention</h2>
-            <p>
-                We retain personal data only as long as necessary for the purposes
-                described in this policy and in accordance with applicable legal and
-                regulatory requirements. Retention periods vary by data type (e.g.,
-                student records may be retained for several years after graduation or
-                leaving, per local regulations). When no longer needed, we securely
-                delete or anonymize data.
-            </p>
+            <h2 className="text-2xl font-semibold mt-10 mb-4">Collecting and Using Your Personal Data</h2>
 
-            <h2>8. Security</h2>
-            <p>
-                We implement reasonable technical and organizational measures to protect
-                personal data from unauthorized access, loss, or misuse. Measures may
-                include encryption in transit, access controls, secure hosting,
-                regular security assessments, and staff training. While we strive to
-                protect data, no system is 100% secure—if a security incident occurs we
-                will follow legal obligations for notification.
-            </p>
+            <h3 className="text-xl font-medium mt-8 mb-3">Types of Data Collected</h3>
 
-            <h2>9. Cookies and Tracking</h2>
-            <p>
-                Our Service uses cookies and similar technologies for functionality,
-                analytics, and performance. You can manage cookie preferences through
-                your browser settings. Minimal cookies necessary for login and session
-                management are required for the Service to function.
+            <h4 className="text-lg font-medium mt-6 mb-2">Personal Data</h4>
+            <p className="mb-4">
+                While using Our Service, We may ask You to provide Us with certain personally identifiable information that can be used to contact or identify You. Personally identifiable information may include, but is not limited to:
             </p>
-
-            <h2>10. Cross-Border Transfers</h2>
-            <p>
-                Data may be stored and processed in servers located outside your country
-                of residence. When transferring personal data across borders we will
-                follow applicable legal safeguards (standard contractual clauses,
-                privacy frameworks) or rely on legally permitted exceptions.
-            </p>
-
-            <h2>11. Third-Party Services & Integrations</h2>
-            <p>
-                We may offer integrations with third-party educational tools (LMS,
-                assessment platforms, payment processors). Those services are managed
-                by their own privacy policies. We recommend reviewing the privacy
-                policies of any third-party services you enable.
-            </p>
-
-            <h2>12. Rights of Data Subjects</h2>
-            <p>
-                Depending on your jurisdiction, you may have rights including:
-            </p>
-            <ul>
-                <li>Access to personal data we hold about you</li>
-                <li>Correction of inaccurate data</li>
-                <li>Deletion (right to be forgotten) where permitted</li>
-                <li>Restriction or objection to processing</li>
-                <li>Data portability (to obtain a copy in a machine-readable format)</li>
-                <li>Withdraw consent where processing is based on consent</li>
+            <ul className="list-disc pl-6 mb-6 space-y-1">
+                <li>
+                    <p>Email address</p>
+                </li>
+                <li>
+                    <p>First name and last name</p>
+                </li>
+                <li>
+                    <p>Phone number</p>
+                </li>
+                <li>
+                    <p>Address, State, Province, ZIP/Postal code, City</p>
+                </li>
+                <li>
+                    <p>Usage Data</p>
+                </li>
             </ul>
-            <p>
-                To exercise your rights, contact us at{" "}
-                <a href={`mailto:${"[CONTACT_EMAIL]"}`}>{"[CONTACT_EMAIL]"}</a>. We may
-                need to verify your identity before fulfilling requests.
+
+            <h4 className="text-lg font-medium mt-6 mb-2">Usage Data</h4>
+            <p className="mb-4">Usage Data is collected automatically when using the Service.</p>
+            <p className="mb-4">
+                Usage Data may include information such as Your Device's Internet Protocol address (e.g. IP address), browser type, browser version, the pages of our Service that You visit, the time and date of Your visit, the time spent on those pages, unique device identifiers and other diagnostic data.
+            </p>
+            <p className="mb-4">
+                When You access the Service by or through a mobile device, We may collect certain information automatically, including, but not limited to, the type of mobile device You use, Your mobile device's unique ID, the IP address of Your mobile device, Your mobile operating system, the type of mobile Internet browser You use, unique device identifiers and other diagnostic data.
+            </p>
+            <p className="mb-6">
+                We may also collect information that Your browser sends whenever You visit Our Service or when You access the Service by or through a mobile device.
             </p>
 
-            <h2>13. Processing of Minors</h2>
-            <p>
-                Our Service is intended to be used for educational purposes by schools
-                and authorized users. We take special care with data relating to minors
-                (students). Where required by law, parental consent may be obtained for
-                certain processing activities.
+            <h4 className="text-lg font-medium mt-6 mb-2">Information Collected while Using the Application</h4>
+            <p className="mb-4">
+                While using Our Application, in order to provide features of Our Application, We may collect, with Your prior permission:
+            </p>
+            <ul className="list-disc pl-6 mb-6">
+                <li>Information regarding your location</li>
+            </ul>
+            <p className="mb-4">
+                We use this information to provide features of Our Service, to improve and customize Our Service. The information may be uploaded to the Company's servers and/or a Service Provider's server or it may be simply stored on Your device.
+            </p>
+            <p className="mb-6">
+                You can enable or disable access to this information at any time, through Your Device settings.
             </p>
 
-            <h2>14. Changes to this Privacy Policy</h2>
-            <p>
-                We may update this Privacy Policy from time to time. When we make
-                material changes we will notify affected users by posting the updated
-                policy and changing the "Effective date" above. Please review this page
-                periodically.
+            <h4 className="text-lg font-medium mt-6 mb-2">Tracking Technologies and Cookies</h4>
+            <p className="mb-4">
+                We use Cookies and similar tracking technologies to track the activity on Our Service and store certain information. Tracking technologies We use include beacons, tags, and scripts to collect and track information and to improve and analyze Our Service. The technologies We use may include:
+            </p>
+            <ul className="list-disc pl-6 mb-6 space-y-4">
+                <li>
+                    <p>
+                        <strong>Cookies or Browser Cookies.</strong> A cookie is a small file placed on Your Device. You can instruct Your browser to refuse all Cookies or to indicate when a Cookie is being sent. However, if You do not accept Cookies, You may not be able to use some parts of our Service. Unless you have adjusted Your browser setting so that it will refuse Cookies, our Service may use Cookies.
+                    </p>
+                </li>
+                <li>
+                    <p>
+                        <strong>Web Beacons.</strong> Certain sections of our Service and our emails may contain small electronic files known as web beacons (also referred to as clear gifs, pixel tags, and single-pixel gifs) that permit the Company, for example, to count users who have visited those pages or opened an email and for other related website statistics (for example, recording the popularity of a certain section and verifying system and server integrity).
+                    </p>
+                </li>
+            </ul>
+            <p className="mb-4">
+                Cookies can be &quot;Persistent&quot; or &quot;Session&quot; Cookies. Persistent Cookies remain on Your personal computer or mobile device when You go offline, while Session Cookies are deleted as soon as You close Your web browser. You can learn more about cookies on{' '}
+                {/* <a href="https://www.termsfeed.com/blog/cookies/#What_Are_Cookies" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    TermsFeed website
+                </a>{' '} */}
+                article.
+            </p>
+            <p className="mb-4">We use both Session and Persistent Cookies for the purposes set out below:</p>
+            <ul className="list-disc pl-6 mb-6 space-y-6">
+                <li>
+                    <p>
+                        <strong>Necessary / Essential Cookies</strong>
+                    </p>
+                    <p>Type: Session Cookies</p>
+                    <p>Administered by: Us</p>
+                    <p>
+                        Purpose: These Cookies are essential to provide You with services available through the Website and to enable You to use some of its features. They help to authenticate users and prevent fraudulent use of user accounts. Without these Cookies, the services that You have asked for cannot be provided, and We only use these Cookies to provide You with those services.
+                    </p>
+                </li>
+                <li>
+                    <p>
+                        <strong>Cookies Policy / Notice Acceptance Cookies</strong>
+                    </p>
+                    <p>Type: Persistent Cookies</p>
+                    <p>Administered by: Us</p>
+                    <p>Purpose: These Cookies identify if users have accepted the use of cookies on the Website.</p>
+                </li>
+                <li>
+                    <p>
+                        <strong>Functionality Cookies</strong>
+                    </p>
+                    <p>Type: Persistent Cookies</p>
+                    <p>Administered by: Us</p>
+                    <p>
+                        Purpose: These Cookies allow us to remember choices You make when You use the Website, such as remembering your login details or language preference. The purpose of these Cookies is to provide You with a more personal experience and to avoid You having to re-enter Your preferences every time You use the Website.
+                    </p>
+                </li>
+            </ul>
+            <p className="mb-6">
+                For more information about the cookies we use and your choices regarding cookies, please visit our Cookies Policy or the Cookies section of our Privacy Policy.
             </p>
 
-            <h2>15. Contact Us</h2>
-            <p>
-                If you have questions, concerns, or requests related to privacy, please
-                contact:
+            <h3 className="text-xl font-medium mt-8 mb-3">Use of Your Personal Data</h3>
+            <p className="mb-4">The Company may use Personal Data for the following purposes:</p>
+            <ul className="list-disc pl-6 mb-6 space-y-4">
+                <li>
+                    <p>
+                        <strong>To provide and maintain our Service</strong>, including to monitor the usage of our Service.
+                    </p>
+                </li>
+                <li>
+                    <p>
+                        <strong>To manage Your Account:</strong> to manage Your registration as a user of the Service. The Personal Data You provide can give You access to different functionalities of the Service that are available to You as a registered user.
+                    </p>
+                </li>
+                <li>
+                    <p>
+                        <strong>For the performance of a contract:</strong> the development, compliance and undertaking of the purchase contract for the products, items or services You have purchased or of any other contract with Us through the Service.
+                    </p>
+                </li>
+                <li>
+                    <p>
+                        <strong>To contact You:</strong> To contact You by email, telephone calls, SMS, or other equivalent forms of electronic communication, such as a mobile application's push notifications regarding updates or informative communications related to the functionalities, products or contracted services, including the security updates, when necessary or reasonable for their implementation.
+                    </p>
+                </li>
+                <li>
+                    <p>
+                        <strong>To provide You</strong> with news, special offers, and general information about other goods, services and events which We offer that are similar to those that you have already purchased or inquired about unless You have opted not to receive such information.
+                    </p>
+                </li>
+                <li>
+                    <p>
+                        <strong>To manage Your requests:</strong> To attend and manage Your requests to Us.
+                    </p>
+                </li>
+                <li>
+                    <p>
+                        <strong>For business transfers:</strong> We may use Your information to evaluate or conduct a merger, divestiture, restructuring, reorganization, dissolution, or other sale or transfer of some or all of Our assets, whether as a going concern or as part of bankruptcy, liquidation, or similar proceeding, in which Personal Data held by Us about our Service users is among the assets transferred.
+                    </p>
+                </li>
+                <li>
+                    <p>
+                        <strong>For other purposes</strong>: We may use Your information for other purposes, such as data analysis, identifying usage trends, determining the effectiveness of our promotional campaigns and to evaluate and improve our Service, products, services, marketing and your experience.
+                    </p>
+                </li>
+            </ul>
+            <p className="mb-4">We may share Your personal information in the following situations:</p>
+            <ul className="list-disc pl-6 mb-6 space-y-3">
+                <li>
+                    <strong>With Service Providers:</strong> We may share Your personal information with Service Providers to monitor and analyze the use of our Service, to contact You.
+                </li>
+                <li>
+                    <strong>For business transfers:</strong> We may share or transfer Your personal information in connection with, or during negotiations of, any merger, sale of Company assets, financing, or acquisition of all or a portion of Our business to another company.
+                </li>
+                <li>
+                    <strong>With Affiliates:</strong> We may share Your information with Our affiliates, in which case we will require those affiliates to honor this Privacy Policy. Affiliates include Our parent company and any other subsidiaries, joint venture partners or other companies that We control or that are under common control with Us.
+                </li>
+                <li>
+                    <strong>With business partners:</strong> We may share Your information with Our business partners to offer You certain products, services or promotions.
+                </li>
+                <li>
+                    <strong>With other users:</strong> when You share personal information or otherwise interact in the public areas with other users, such information may be viewed by all users and may be publicly distributed outside.
+                </li>
+                <li>
+                    <strong>With Your consent</strong>: We may disclose Your personal information for any other purpose with Your consent.
+                </li>
+            </ul>
+
+            <h3 className="text-xl font-medium mt-8 mb-3">Retention of Your Personal Data</h3>
+            <p className="mb-4">
+                The Company will retain Your Personal Data only for as long as is necessary for the purposes set out in this Privacy Policy. We will retain and use Your Personal Data to the extent necessary to comply with our legal obligations (for example, if we are required to retain your data to comply with applicable laws), resolve disputes, and enforce our legal agreements and policies.
             </p>
-            <p>
-                <strong>{"[SCHOOL_NAME]"}</strong>
-                <br />
-                Email: <a href={`mailto:${"[CONTACT_EMAIL]"}`}>{"[CONTACT_EMAIL]"}</a>
-                <br />
-                Address: {"[SCHOOL_ADDRESS]"} (optional)
+            <p className="mb-6">
+                The Company will also retain Usage Data for internal analysis purposes. Usage Data is generally retained for a shorter period of time, except when this data is used to strengthen the security or to improve the functionality of Our Service, or We are legally obligated to retain this data for longer periods.
             </p>
 
-            <h2>16. Legal & Regulatory Notes</h2>
-            <p>
-                This policy is intended as a general statement of our privacy practices.
-                It does not create contractual rights. Where local privacy or education
-                laws impose specific obligations (for example FERPA in the U.S., GDPR in
-                the EU, or similar), this policy will be read in conjunction with those
-                legal requirements.
+            <h3 className="text-xl font-medium mt-8 mb-3">Transfer of Your Personal Data</h3>
+            <p className="mb-4">
+                Your information, including Personal Data, is processed at the Company's operating offices and in any other places where the parties involved in the processing are located. It means that this information may be transferred to — and maintained on — computers located outside of Your state, province, country or other governmental jurisdiction where the data protection laws may differ from those from Your jurisdiction.
+            </p>
+            <p className="mb-4">
+                Your consent to this Privacy Policy followed by Your submission of such information represents Your agreement to that transfer.
+            </p>
+            <p className="mb-6">
+                The Company will take all steps reasonably necessary to ensure that Your data is treated securely and in accordance with this Privacy Policy and no transfer of Your Personal Data will take place to an organization or a country unless there are adequate controls in place including the security of Your data and other personal information.
             </p>
 
-            <p>
-                <em>
-                    Last updated: <strong>{'[EFFECTIVE_DATE]'}</strong>
-                </em>
+            <h3 className="text-xl font-medium mt-8 mb-3">Delete Your Personal Data</h3>
+            <p className="mb-4">
+                You have the right to delete or request that We assist in deleting the Personal Data that We have collected about You.
             </p>
+            <p className="mb-4">
+                Our Service may give You the ability to delete certain information about You from within the Service.
+            </p>
+            <p className="mb-4">
+                You may update, amend, or delete Your information at any time by signing in to Your Account, if you have one, and visiting the account settings section that allows you to manage Your personal information. You may also contact Us to request access to, correct, or delete any personal information that You have provided to Us.
+            </p>
+            <p className="mb-6">
+                Please note, however, that We may need to retain certain information when we have a legal obligation or lawful basis to do so.
+            </p>
+
+            <h3 className="text-xl font-medium mt-8 mb-3">Disclosure of Your Personal Data</h3>
+
+            <h4 className="text-lg font-medium mt-6 mb-2">Business Transactions</h4>
+            <p className="mb-6">
+                If the Company is involved in a merger, acquisition or asset sale, Your Personal Data may be transferred. We will provide notice before Your Personal Data is transferred and becomes subject to a different Privacy Policy.
+            </p>
+
+            <h4 className="text-lg font-medium mt-6 mb-2">Law enforcement</h4>
+            <p className="mb-6">
+                Under certain circumstances, the Company may be required to disclose Your Personal Data if required to do so by law or in response to valid requests by public authorities (e.g. a court or a government agency).
+            </p>
+
+            <h4 className="text-lg font-medium mt-6 mb-2">Other legal requirements</h4>
+            <p className="mb-4">
+                The Company may disclose Your Personal Data in the good faith belief that such action is necessary to:
+            </p>
+            <ul className="list-disc pl-6 mb-6 space-y-1">
+                <li>Comply with a legal obligation</li>
+                <li>Protect and defend the rights or property of the Company</li>
+                <li>Prevent or investigate possible wrongdoing in connection with the Service</li>
+                <li>Protect the personal safety of Users of the Service or the public</li>
+                <li>Protect against legal liability</li>
+            </ul>
+
+            <h3 className="text-xl font-medium mt-8 mb-3">Security of Your Personal Data</h3>
+            <p className="mb-6">
+                The security of Your Personal Data is important to Us, but remember that no method of transmission over the Internet, or method of electronic storage is 100% secure. While We strive to use commercially reasonable means to protect Your Personal Data, We cannot guarantee its absolute security.
+            </p>
+
+            <h2 className="text-2xl font-semibold mt-10 mb-4">Detailed Information on the Processing of Your Personal Data</h2>
+            <p className="mb-4">
+                The Service Providers We use may have access to Your Personal Data. These third-party vendors collect, store, use, process and transfer information about Your activity on Our Service in accordance with their Privacy Policies.
+            </p>
+
+            <h3 className="text-xl font-medium mt-8 mb-3">Usage, Performance and Miscellaneous</h3>
+            <p className="mb-4">We may use third-party Service Providers to maintain and improve our Service.</p>
+            <ul className="list-disc pl-6 mb-6 space-y-4">
+                <li>
+                    <p>
+                        <strong>Google Places</strong>
+                    </p>
+                    <p>Google Places is a service that returns information about places using HTTP requests. It is operated by Google</p>
+                    <p>Google Places service may collect information from You and from Your Device for security purposes.</p>
+                    <p>
+                        The information gathered by Google Places is held in accordance with the Privacy Policy of Google:{' '}
+                        <a href="https://www.google.com/intl/en/policies/privacy/" rel="external nofollow noopener" target="_blank" className="text-blue-600 hover:underline">
+                            https://www.google.com/intl/en/policies/privacy/
+                        </a>
+                    </p>
+                </li>
+            </ul>
+
+            <h2 className="text-2xl font-semibold mt-10 mb-4">Children's Privacy</h2>
+            <p className="mb-4">
+                Our Service does not address anyone under the age of 13. We do not knowingly collect personally identifiable information from anyone under the age of 13. If You are a parent or guardian and You are aware that Your child has provided Us with Personal Data, please contact Us. If We become aware that We have collected Personal Data from anyone under the age of 13 without verification of parental consent, We take steps to remove that information from Our servers.
+            </p>
+            <p className="mb-6">
+                If We need to rely on consent as a legal basis for processing Your information and Your country requires consent from a parent, We may require Your parent's consent before We collect and use that information.
+            </p>
+
+            <h2 className="text-2xl font-semibold mt-10 mb-4">Links to Other Websites</h2>
+            <p className="mb-4">
+                Our Service may contain links to other websites that are not operated by Us. If You click on a third party link, You will be directed to that third party's site. We strongly advise You to review the Privacy Policy of every site You visit.
+            </p>
+            <p className="mb-6">
+                We have no control over and assume no responsibility for the content, privacy policies or practices of any third party sites or services.
+            </p>
+
+            <h2 className="text-2xl font-semibold mt-10 mb-4">Changes to this Privacy Policy</h2>
+            <p className="mb-4">
+                We may update Our Privacy Policy from time to time. We will notify You of any changes by posting the new Privacy Policy on this page.
+            </p>
+            <p className="mb-4">
+                We will let You know via email and/or a prominent notice on Our Service, prior to the change becoming effective and update the &quot;Last updated&quot; date at the top of this Privacy Policy.
+            </p>
+            <p className="mb-6">
+                You are advised to review this Privacy Policy periodically for any changes. Changes to this Privacy Policy are effective when they are posted on this page.
+            </p>
+
+            <h2 className="text-2xl font-semibold mt-10 mb-4">Contact Us</h2>
+            <p className="mb-4">If you have any questions about this Privacy Policy, You can contact us:</p>
+            <ul className="list-disc pl-6 mb-6">
+                <li>By phone: +91 9471 532 682</li>
+            </ul>
         </div>
     );
-}
+};
+
+export default PrivacyPolicy;
