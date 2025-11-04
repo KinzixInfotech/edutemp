@@ -37,6 +37,9 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { useAuth } from '@/context/AuthContext';
+import FileUploadButton from '@/components/fileupload';
+import CropImageDialog from '@/app/components/CropImageDialog';
+import { uploadFiles } from '@/app/components/utils/uploadThing';
 
 const formSchema = z.object({
     name: z.string().min(3, 'Name must be at least 3 characters'),
@@ -68,7 +71,7 @@ const TEMPLATE_CONFIGS = {
         title: 'Certificate Template',
         icon: Award,
         apiEndpoint: 'certificate-templates',
-        backUrl: '/dashboard/documents/templates/certificatetemplate',
+        backUrl: '/dashboard/documents/templates/certificate',
         types: [
             { value: 'character', label: 'Character Certificate' },
             { value: 'bonafide', label: 'Bonafide Certificate' },
@@ -88,7 +91,7 @@ const TEMPLATE_CONFIGS = {
         title: 'ID Card Template',
         icon: CreditCard,
         apiEndpoint: 'idcard-templates',
-        backUrl: '/dashboard/schools/documents/templates/id-cards',
+        backUrl: '/dashboard/documents/templates/id-card',
         types: [
             { value: 'student', label: 'Student ID' },
             { value: 'teacher', label: 'Teacher ID' },
@@ -106,7 +109,7 @@ const TEMPLATE_CONFIGS = {
         title: 'Admit Card Template',
         icon: FileText,
         apiEndpoint: 'admitcard-templates',
-        backUrl: '/dashboard/schools/documents/templates/admit-cards',
+        backUrl: '/dashboard/documents/templates/admit-cards',
         types: [
             { value: 'midterm', label: 'Mid-term Exam' },
             { value: 'final', label: 'Final Exam' },
@@ -126,9 +129,18 @@ const TEMPLATE_CONFIGS = {
 export default function CreateTemplatePage() {
     const router = useRouter();
     const params = useParams();
+    const [resetKeys, setResetKeys] = useState({
+        logo: 0,
+        signature: 0,
+        stamp: 0,
+        background: 0,
+    });
+    const [uploading, setUploading] = useState(false);
+    const [rawImage, setRawImage] = useState(null);
+    const [cropDialogOpen, setCropDialogOpen] = useState(false);
+    const [currentField, setCurrentField] = useState(null);
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;
-    const [uploading, setUploading] = useState(false);
 
     // Get template type from URL param
     const templateType = params?.type;
@@ -165,7 +177,7 @@ export default function CreateTemplatePage() {
 
                         <div className="flex flex-col gap-2 sm:flex-row">
                             <Button
-                                onClick={() => router.push('/dashboard/documents/templates/certificatetemplate')}
+                                onClick={() => router.push('/dashboard/documents/templates/certificate')}
                                 variant="outline"
                                 className="flex-1"
                             >
@@ -173,7 +185,7 @@ export default function CreateTemplatePage() {
                                 Certificates
                             </Button>
                             <Button
-                                onClick={() => router.push('/dashboard/schools/documents/templates/id-cards')}
+                                onClick={() => router.push('/dashboard/documents/templates/id-card')}
                                 variant="outline"
                                 className="flex-1"
                             >
@@ -181,7 +193,7 @@ export default function CreateTemplatePage() {
                                 ID Cards
                             </Button>
                             <Button
-                                onClick={() => router.push('/dashboard/schools/documents/templates/admit-cards')}
+                                onClick={() => router.push('/dashboard/documents/templates/admit-cards')}
                                 variant="outline"
                                 className="flex-1"
                             >
@@ -280,22 +292,11 @@ export default function CreateTemplatePage() {
         },
     });
 
-    const handleFileUpload = async (field, file) => {
-        if (!file) return;
-        setUploading(true);
-        try {
-            const formData = new FormData();
-            formData.append('file', file);
-            const res = await fetch('/api/upload', { method: 'POST', body: formData });
-            if (!res.ok) throw new Error('Upload failed');
-            const { url } = await res.json();
-            setValue(field, url);
-            toast.success('File uploaded successfully');
-        } catch (error) {
-            toast.error('Upload failed');
-        } finally {
-            setUploading(false);
-        }
+    const handleImageUpload = (field, previewUrl) => {
+        if (!previewUrl || previewUrl === rawImage) return;
+        setCurrentField(field);
+        setRawImage(previewUrl);
+        setCropDialogOpen(true);
     };
 
     const onSubmit = (data) => {
@@ -312,18 +313,44 @@ export default function CreateTemplatePage() {
 
     return (
         <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-4 sm:space-y-6">
+            {cropDialogOpen && rawImage && currentField && (
+                <CropImageDialog
+                    image={rawImage}
+                    onClose={() => { if (!uploading) setCropDialogOpen(false); }}
+                    uploading={uploading}
+                    open={cropDialogOpen}
+                    onCropComplete={async (croppedBlob) => {
+                        const now = new Date();
+                        const iso = now.toISOString().replace(/[:.]/g, "-");
+                        const perf = Math.floor(performance.now() * 1000);
+                        const timestamp = `${iso}-${perf}`;
+                        const filename = `${timestamp}.jpg`;
+                        const file = new File([croppedBlob], filename, { type: "image/jpeg" });
+                        try {
+                            setUploading(true);
+                            const res = await uploadFiles("logoupload", { files: [file] });
+                            if (res && res[0]?.url) {
+                                setValue(currentField, res[0].ufsUrl);
+                                toast.success("Image uploaded successfully!");
+                            } else {
+                                toast.error("Upload failed");
+                            }
+                        } catch (err) {
+                            toast.error("Something went wrong during upload");
+                            console.error(err);
+                        } finally {
+                            setUploading(false);
+                            setCropDialogOpen(false);
+                            setCurrentField(null);
+                            setRawImage(null);
+                        }
+                    }}
+                />
+            )}
             {/* Header */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                        {/* <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => router.push(config.backUrl)}
-                            className="mr-2"
-                        >
-                            <ArrowLeft className="h-4 w-4" />
-                        </Button> */}
                         <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold flex items-center gap-2">
                             <Icon className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 flex-shrink-0" />
                             <span>Create {config.title}</span>
@@ -334,14 +361,6 @@ export default function CreateTemplatePage() {
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <Button
-                        variant="outline"
-                        onClick={() => router.push(config.backUrl)}
-                        disabled={createMutation.isPending}
-                        size="sm"
-                    >
-                        Cancel
-                    </Button>
                     <Button
                         onClick={handleSubmit(onSubmit)}
                         disabled={createMutation.isPending || uploading}
@@ -620,12 +639,10 @@ export default function CreateTemplatePage() {
                                 <CardContent className="space-y-4">
                                     <div className="space-y-2">
                                         <Label className="text-sm">School Logo</Label>
-                                        <Input
-                                            type="file"
-                                            accept="image/*"
+                                        <FileUploadButton 
+                                            onChange={(previewUrl) => handleImageUpload('logoUrl', previewUrl)} 
+                                            resetKey={resetKeys.logo}
                                             disabled={uploading}
-                                            onChange={(e) => handleFileUpload('logoUrl', e.target.files[0])}
-                                            className="text-sm"
                                         />
                                         {watchedValues.logoUrl && (
                                             <div className="mt-2">
@@ -641,12 +658,10 @@ export default function CreateTemplatePage() {
                                     {config.showSignature && (
                                         <div className="space-y-2">
                                             <Label className="text-sm">Signature</Label>
-                                            <Input
-                                                type="file"
-                                                accept="image/*"
+                                            <FileUploadButton 
+                                                onChange={(previewUrl) => handleImageUpload('signatureUrl', previewUrl)} 
+                                                resetKey={resetKeys.signature}
                                                 disabled={uploading}
-                                                onChange={(e) => handleFileUpload('signatureUrl', e.target.files[0])}
-                                                className="text-sm"
                                             />
                                             {watchedValues.signatureUrl && (
                                                 <div className="mt-2">
@@ -663,12 +678,10 @@ export default function CreateTemplatePage() {
                                     {config.showStamp && (
                                         <div className="space-y-2">
                                             <Label className="text-sm">Stamp/Seal</Label>
-                                            <Input
-                                                type="file"
-                                                accept="image/*"
+                                            <FileUploadButton 
+                                                onChange={(previewUrl) => handleImageUpload('stampUrl', previewUrl)} 
+                                                resetKey={resetKeys.stamp}
                                                 disabled={uploading}
-                                                onChange={(e) => handleFileUpload('stampUrl', e.target.files[0])}
-                                                className="text-sm"
                                             />
                                             {watchedValues.stampUrl && (
                                                 <div className="mt-2">
@@ -684,12 +697,10 @@ export default function CreateTemplatePage() {
 
                                     <div className="space-y-2">
                                         <Label className="text-sm">Background Image (Optional)</Label>
-                                        <Input
-                                            type="file"
-                                            accept="image/*"
+                                        <FileUploadButton 
+                                            onChange={(previewUrl) => handleImageUpload('backgroundImage', previewUrl)} 
+                                            resetKey={resetKeys.background}
                                             disabled={uploading}
-                                            onChange={(e) => handleFileUpload('backgroundImage', e.target.files[0])}
-                                            className="text-sm"
                                         />
                                         {watchedValues.backgroundImage && (
                                             <div className="mt-2">

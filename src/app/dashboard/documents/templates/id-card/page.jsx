@@ -214,7 +214,7 @@ export default function IdCardTemplatePage() {
                                         variant="outline"
                                         size="sm"
                                         className="flex-1 text-xs sm:text-sm"
-                                        onClick={() => router.push(`/dashboard/schools/documents/templates/id-cards/${template.id}/preview`)}
+                                        onClick={() => router.push(`/dashboard/documents/templates/idcard/${template.id}?mode=preview`)}
                                     >
                                         <Eye className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                         Preview
@@ -223,7 +223,7 @@ export default function IdCardTemplatePage() {
                                         variant="outline"
                                         size="sm"
                                         className="flex-1 text-xs sm:text-sm"
-                                        onClick={() => router.push(`/dashboard/schools/documents/templates/id-cards/${template.id}/edit`)}
+                                        onClick={() => router.push(`/dashboard/documents/templates/idcard/${template.id}?mode=edit`)}
                                     >
                                         <Edit className="mr-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                         Edit

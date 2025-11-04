@@ -34,23 +34,35 @@ export async function POST(request, { params }) {
         }
 
         // Fetch template
-        const template = await prisma.certificateTemplate.findFirst({
+        const template = await prisma.documentTemplate.findFirst({
             where: {
                 id: templateId,
                 schoolId,
-                type: certificateType,
+                subType: certificateType,
+                isActive: true,
             },
         });
+        console.log(template);
 
         if (!template) {
-            return NextResponse.json(
-                { error: 'Template not found' },
-                { status: 404 }
-            );
+            console.error('Template not found:', { templateId, schoolId, certificateType });
+            return NextResponse.json({ error: 'Template not found or inactive' }, { status: 404 });
         }
 
         // Generate unique certificate number
         const certificateNumber = `CERT-${schoolId.slice(0, 4).toUpperCase()}-${Date.now()}`;
+        // console.log(template, student, certificateNumber, customFields);
+        // Fix: Convert logoUrl to base64 before generating PDF
+        if (template?.layoutConfig?.logoUrl) {
+            try {
+                const response = await fetch(template.layoutConfig.logoUrl);
+                const buffer = await response.arrayBuffer();
+                const base64Image = Buffer.from(buffer).toString("base64");
+                template.layoutConfig.logoUrl = `data:image/png;base64,${base64Image}`;
+            } catch (error) {
+                console.error("Failed to fetch and convert logo:", error);
+            }
+        }
 
         // Generate PDF using template and data
         const pdfUrl = await generatePDF({
@@ -61,17 +73,26 @@ export async function POST(request, { params }) {
             customFields,
         });
 
+        // Generate PDF using template and data
+        // const pdfUrl = await generatePDF({
+        //     template,
+        //     student,
+        //     certificateNumber,
+        //     issueDate,
+        //     customFields,
+        // });
+
         // Save certificate record
         const certificate = await prisma.certificateGenerated.create({
             data: {
                 certificateNumber,
-                templateId,
+                templateId, // This should reference the CertificateTemplate if you have one
                 studentId,
                 schoolId,
-                issuedById,
+                issuedById: issuedById || null,
                 issueDate: new Date(issueDate),
-                customFields,
-                fileUrl: pdfUrl,
+                customFields: customFields || {},
+                fileUrl:template.layoutConfig.logoUrl,
                 status: 'issued',
             },
             include: {
