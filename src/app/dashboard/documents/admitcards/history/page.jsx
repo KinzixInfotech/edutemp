@@ -2,8 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery, useMutation } from '@tanstack/react-query';
-
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import {
@@ -14,11 +13,8 @@ import {
     Trash2,
     Search,
     Filter,
-    Calendar,
-    User,
-    MoreVertical,
-    CheckCircle,
-    XCircle
+    Plus,
+    Users
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -32,14 +28,6 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
     Select,
     SelectContent,
@@ -63,22 +51,20 @@ import {
 export default function AdmitCardHistoryPage() {
     const router = useRouter();
     const { fullUser } = useAuth();
+    const queryClient = useQueryClient();
     const schoolId = fullUser?.schoolId;
     const [searchQuery, setSearchQuery] = useState('');
     const [examFilter, setExamFilter] = useState('all');
-    const [statusFilter, setStatusFilter] = useState('all');
     const [deleteId, setDeleteId] = useState(null);
 
-    // Fetch admit cards history
+    // Fetch admit cards
     const { data: admitCards, isLoading, refetch } = useQuery({
-        queryKey: ['admitcards-history', schoolId, examFilter, statusFilter],
+        queryKey: ['admitcards-history', schoolId, examFilter],
         queryFn: async () => {
             if (!schoolId) throw new Error('No school ID');
-            const params = new URLSearchParams({
-                schoolId,
-                ...(examFilter !== 'all' && { examId: examFilter }),
-                ...(statusFilter !== 'all' && { status: statusFilter }),
-            });
+            const params = new URLSearchParams({ schoolId });
+            if (examFilter !== 'all') params.append('examId', examFilter);
+            
             const res = await fetch(`/api/documents/${schoolId}/admitcards/history?${params}`);
             if (!res.ok) throw new Error('Failed to fetch admit cards');
             return res.json();
@@ -104,11 +90,15 @@ export default function AdmitCardHistoryPage() {
             const res = await fetch(`/api/documents/${schoolId}/admitcards/${id}`, {
                 method: 'DELETE',
             });
-            if (!res.ok) throw new Error('Failed to delete admit card');
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.error || 'Failed to delete admit card');
+            }
             return res.json();
         },
         onSuccess: () => {
             toast.success('Admit card deleted successfully');
+            queryClient.invalidateQueries(['admitcards-history']);
             refetch();
             setDeleteId(null);
         },
@@ -128,7 +118,7 @@ export default function AdmitCardHistoryPage() {
         );
     });
 
-    if (!schoolId || isLoading) {
+    if (!schoolId) {
         return (
             <div className="flex items-center justify-center min-h-screen">
                 <Loader2 className="h-8 w-8 animate-spin" />
@@ -149,13 +139,23 @@ export default function AdmitCardHistoryPage() {
                         View and manage all generated admit cards
                     </p>
                 </div>
-                <Button
-                    onClick={() => router.push('/dashboard/documents/admitcards/generate')}
-                    size="sm"
-                >
-                    <FileText className="mr-2 h-4 w-4" />
-                    Generate New
-                </Button>
+                <div className="flex gap-2">
+                    <Button
+                        onClick={() => router.push('/dashboard/documents/admitcards/bulk')}
+                        variant="outline"
+                        size="sm"
+                    >
+                        <Users className="mr-2 h-4 w-4" />
+                        Bulk Generate
+                    </Button>
+                    <Button
+                        onClick={() => router.push('/dashboard/documents/admitcards/generate')}
+                        size="sm"
+                    >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Generate Single
+                    </Button>
+                </div>
             </div>
 
             {/* Filters */}
@@ -164,7 +164,7 @@ export default function AdmitCardHistoryPage() {
                     <CardTitle className="text-base sm:text-lg">Filters</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {/* Search */}
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -179,6 +179,7 @@ export default function AdmitCardHistoryPage() {
                         {/* Exam Filter */}
                         <Select value={examFilter} onValueChange={setExamFilter}>
                             <SelectTrigger>
+                                <Filter className="mr-2 h-4 w-4" />
                                 <SelectValue placeholder="Filter by exam" />
                             </SelectTrigger>
                             <SelectContent>
@@ -188,19 +189,6 @@ export default function AdmitCardHistoryPage() {
                                         {exam.title}
                                     </SelectItem>
                                 ))}
-                            </SelectContent>
-                        </Select>
-
-                        {/* Status Filter */}
-                        <Select value={statusFilter} onValueChange={setStatusFilter}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Filter by status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Status</SelectItem>
-                                <SelectItem value="issued">Issued</SelectItem>
-                                <SelectItem value="downloaded">Downloaded</SelectItem>
-                                <SelectItem value="printed">Printed</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -216,22 +204,26 @@ export default function AdmitCardHistoryPage() {
                                 Generated Admit Cards
                             </CardTitle>
                             <CardDescription className="text-xs sm:text-sm">
-                                {filteredAdmitCards?.length || 0} admit cards found
+                                {isLoading ? 'Loading...' : `${filteredAdmitCards?.length || 0} admit cards found`}
                             </CardDescription>
                         </div>
                     </div>
                 </CardHeader>
                 <CardContent>
-                    {filteredAdmitCards?.length > 0 ? (
-                        <div className="rounded-md border">
+                    {isLoading ? (
+                        <div className="flex items-center justify-center py-12">
+                            <Loader2 className="h-8 w-8 animate-spin" />
+                        </div>
+                    ) : filteredAdmitCards?.length > 0 ? (
+                        <div className="rounded-md border overflow-x-auto">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Student</TableHead>
+                                        <TableHead>Student Details</TableHead>
                                         <TableHead>Exam</TableHead>
-                                        <TableHead>Seat No</TableHead>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Status</TableHead>
+                                        <TableHead>Seat Number</TableHead>
+                                        <TableHead>Center</TableHead>
+                                        <TableHead>Issue Date</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -244,81 +236,60 @@ export default function AdmitCardHistoryPage() {
                                                     <span className="text-xs text-muted-foreground">
                                                         Roll: {card.student?.rollNumber}
                                                     </span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm">{card.exam?.title}</span>
                                                     <span className="text-xs text-muted-foreground">
-                                                        {card.center || 'N/A'}
+                                                        Class: {card.student?.class?.className}
                                                     </span>
                                                 </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline">{card.seatNumber}</Badge>
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex flex-col">
-                                                    <span className="text-sm">
-                                                        {format(new Date(card.issueDate), 'MMM dd, yyyy')}
-                                                    </span>
-                                                    {card.examTime && (
-                                                        <span className="text-xs text-muted-foreground">
-                                                            {card.examTime}
-                                                        </span>
-                                                    )}
+                                                    <span className="text-sm font-medium">{card.exam?.title}</span>
                                                 </div>
                                             </TableCell>
                                             <TableCell>
-                                                <Badge
-                                                    variant={
-                                                        card.status === 'issued'
-                                                            ? 'default'
-                                                            : card.status === 'downloaded'
-                                                                ? 'secondary'
-                                                                : 'outline'
-                                                    }
-                                                >
-                                                    {card.status}
+                                                <Badge variant="outline" className="font-mono">
+                                                    {card.seatNumber}
                                                 </Badge>
                                             </TableCell>
+                                            <TableCell>
+                                                <span className="text-sm">{card.center || 'N/A'}</span>
+                                            </TableCell>
+                                            <TableCell>
+                                                <span className="text-sm">
+                                                    {format(new Date(card.issueDate), 'MMM dd, yyyy')}
+                                                </span>
+                                            </TableCell>
                                             <TableCell className="text-right">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="sm">
-                                                            <MoreVertical className="h-4 w-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                        <DropdownMenuSeparator />
-                                                        <DropdownMenuItem
-                                                            onClick={() => window.open(card.fileUrl, '_blank')}
-                                                        >
-                                                            <Eye className="mr-2 h-4 w-4" />
-                                                            View
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem
-                                                            onClick={() => {
-                                                                const link = document.createElement('a');
-                                                                link.href = card.fileUrl;
-                                                                link.download = `admit-card-${card.seatNumber}.pdf`;
-                                                                link.click();
-                                                            }}
-                                                        >
-                                                            <Download className="mr-2 h-4 w-4" />
-                                                            Download
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuSeparator />
-                                                        <DropdownMenuItem
-                                                            onClick={() => setDeleteId(card.id)}
-                                                            className="text-destructive"
-                                                        >
-                                                            <Trash2 className="mr-2 h-4 w-4" />
-                                                            Delete
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
+                                                <div className="flex justify-end gap-2">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => router.push(`/dashboard/documents/admitcards/${card.id}`)}
+                                                    >
+                                                        <Eye className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            // Download logic - you'll need fileUrl from API
+                                                            const link = document.createElement('a');
+                                                            link.href = card.fileUrl || '#';
+                                                            link.download = `admit-card-${card.seatNumber}.pdf`;
+                                                            link.click();
+                                                        }}
+                                                    >
+                                                        <Download className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => setDeleteId(card.id)}
+                                                        className="text-destructive hover:text-destructive"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -330,14 +301,27 @@ export default function AdmitCardHistoryPage() {
                             <FileText className="h-16 w-16 text-muted-foreground mb-4" />
                             <h3 className="text-lg font-semibold mb-2">No Admit Cards Found</h3>
                             <p className="text-sm text-muted-foreground max-w-sm mb-4">
-                                {searchQuery || examFilter !== 'all' || statusFilter !== 'all'
+                                {searchQuery || examFilter !== 'all'
                                     ? 'No admit cards match your search criteria'
                                     : 'Start generating admit cards to see them here'}
                             </p>
-                            <Button onClick={() => router.push('/dashboard/documents/admitcards/generate')}>
-                                <FileText className="mr-2 h-4 w-4" />
-                                Generate Admit Card
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button
+                                    onClick={() => router.push('/dashboard/documents/admitcards/generate')}
+                                    size="sm"
+                                >
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Generate Single
+                                </Button>
+                                <Button
+                                    onClick={() => router.push('/dashboard/documents/admitcards/bulk')}
+                                    variant="outline"
+                                    size="sm"
+                                >
+                                    <Users className="mr-2 h-4 w-4" />
+                                    Bulk Generate
+                                </Button>
+                            </div>
                         </div>
                     )}
                 </CardContent>
@@ -350,7 +334,7 @@ export default function AdmitCardHistoryPage() {
                         <AlertDialogTitle>Delete Admit Card?</AlertDialogTitle>
                         <AlertDialogDescription>
                             This action cannot be undone. This will permanently delete the admit card
-                            from our servers.
+                            from the system.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -359,7 +343,11 @@ export default function AdmitCardHistoryPage() {
                             onClick={() => deleteMutation.mutate(deleteId)}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            Delete
+                            {deleteMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                'Delete'
+                            )}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

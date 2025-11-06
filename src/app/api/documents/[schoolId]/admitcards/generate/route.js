@@ -1,8 +1,6 @@
-// app/api/documents/[schoolId]/admitcards/generate/route.js
-
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { generateAdmitCardPDF } from '@/lib/admitcard-pdf-generator'; // You'll need to create this
+import { generateAdmitCardPDF } from '@/lib/pdf-generator-admitcard';
 
 export async function POST(request, { params }) {
     try {
@@ -108,9 +106,39 @@ export async function POST(request, { params }) {
             }
         }
 
-        // 6. Generate PDF
+        // 6. Convert signature to base64 if needed
+        if (layoutConfig?.signatureUrl && !layoutConfig.signatureUrl.startsWith('data:')) {
+            try {
+                const response = await fetch(layoutConfig.signatureUrl);
+                if (response.ok) {
+                    const buffer = await response.arrayBuffer();
+                    const base64 = Buffer.from(buffer).toString("base64");
+                    const mime = response.headers.get('content-type') || 'image/png';
+                    layoutConfig.signatureUrl = `data:${mime};base64,${base64}`;
+                }
+            } catch (error) {
+                console.warn('⚠️ Failed to convert signature:', error.message);
+            }
+        }
+
+        // 7. Convert student photo to base64 if needed
+        if (student.user?.profilePicture && !student.user.profilePicture.startsWith('data:')) {
+            try {
+                const response = await fetch(student.user.profilePicture);
+                if (response.ok) {
+                    const buffer = await response.arrayBuffer();
+                    const base64 = Buffer.from(buffer).toString("base64");
+                    const mime = response.headers.get('content-type') || 'image/jpeg';
+                    student.user.profilePicture = `data:${mime};base64,${base64}`;
+                }
+            } catch (error) {
+                console.warn('⚠️ Failed to convert student photo:', error.message);
+            }
+        }
+
+        // 8. Generate PDF and get URL
         console.log('📄 Generating PDF...');
-        const pdfUrl = await generateAdmitCardPDF({
+        const pdfDataUrl = await generateAdmitCardPDF({
             template: { ...template, layoutConfig },
             student,
             exam,
@@ -121,9 +149,9 @@ export async function POST(request, { params }) {
             venue,
         });
 
-        console.log('✅ PDF generated:', pdfUrl);
+        console.log('✅ PDF generated');
 
-        // 7. Save admit card record
+        // 9. Save admit card record WITH fileUrl
         const admitCard = await prisma.admitCard.create({
             data: {
                 studentId,
@@ -131,6 +159,7 @@ export async function POST(request, { params }) {
                 schoolId,
                 seatNumber,
                 center: center || null,
+                fileUrl: pdfDataUrl, // 🔥 IMPORTANT: Store the PDF URL
                 layoutConfig: {
                     ...layoutConfig,
                     examDate,
@@ -145,15 +174,22 @@ export async function POST(request, { params }) {
                         name: true,
                         email: true,
                         rollNumber: true,
+                        admissionNo: true,
                         class: {
                             select: {
                                 className: true,
+                            },
+                        },
+                        section: {
+                            select: {
+                                name: true,
                             },
                         },
                     },
                 },
                 exam: {
                     select: {
+                        id: true,
                         title: true,
                     },
                 },
@@ -163,8 +199,13 @@ export async function POST(request, { params }) {
         console.log('✅ Admit card saved:', admitCard.id);
 
         return NextResponse.json({
-            ...admitCard,
-            fileUrl: pdfUrl,
+            id: admitCard.id,
+            seatNumber: admitCard.seatNumber,
+            center: admitCard.center,
+            fileUrl: admitCard.fileUrl,
+            issueDate: admitCard.issueDate,
+            student: admitCard.student,
+            exam: admitCard.exam,
             status: 'issued',
         }, { status: 201 });
 

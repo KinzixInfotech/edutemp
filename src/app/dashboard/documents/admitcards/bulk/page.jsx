@@ -17,7 +17,8 @@ import {
     MapPin,
     Clock,
     CheckCircle2,
-    AlertCircle
+    AlertCircle,
+    ArrowLeft
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -55,8 +56,6 @@ export default function BulkGenerateAdmitCardsPage() {
     const schoolId = fullUser?.schoolId;
     const [generating, setGenerating] = useState(false);
     const [progress, setProgress] = useState(0);
-    const [generatedCount, setGeneratedCount] = useState(0);
-    const [totalCount, setTotalCount] = useState(0);
     const [results, setResults] = useState(null);
 
     const {
@@ -95,7 +94,7 @@ export default function BulkGenerateAdmitCardsPage() {
         enabled: !!schoolId,
     });
 
-    // Fetch sections based on selected class
+    // Fetch sections
     const { data: sections, isLoading: loadingSections } = useQuery({
         queryKey: ['sections', watchedValues.classId],
         queryFn: async () => {
@@ -119,7 +118,7 @@ export default function BulkGenerateAdmitCardsPage() {
         enabled: !!schoolId,
     });
 
-    // Fetch admit card templates
+    // Fetch templates
     const { data: templates, isLoading: loadingTemplates } = useQuery({
         queryKey: ['admitcard-templates', schoolId],
         queryFn: async () => {
@@ -131,7 +130,7 @@ export default function BulkGenerateAdmitCardsPage() {
         enabled: !!schoolId,
     });
 
-    // Get default template
+    // Set default template
     useEffect(() => {
         if (templates?.length > 0) {
             const defaultTemplate = templates.find(t => t.isDefault) || templates[0];
@@ -143,7 +142,6 @@ export default function BulkGenerateAdmitCardsPage() {
         mutationFn: async (data) => {
             setGenerating(true);
             setProgress(0);
-            setGeneratedCount(0);
 
             const res = await fetch(`/api/documents/${schoolId}/admitcards/bulk-generate`, {
                 method: 'POST',
@@ -190,6 +188,13 @@ export default function BulkGenerateAdmitCardsPage() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-1">
                     <div className="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => router.push('/dashboard/documents/admitcards/history')}
+                        >
+                            <ArrowLeft className="h-4 w-4" />
+                        </Button>
                         <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold flex items-center gap-2">
                             <FileText className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 flex-shrink-0 text-primary" />
                             <span>Bulk Generate Admit Cards</span>
@@ -201,18 +206,19 @@ export default function BulkGenerateAdmitCardsPage() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                {/* Form Section */}
-                <div className="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base sm:text-lg">Bulk Generation Settings</CardTitle>
-                            <CardDescription className="text-xs sm:text-sm">
-                                Configure settings for bulk admit card generation
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {/* Exam Selection */}
+            {/* Configuration Form */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-base sm:text-lg">Bulk Generation Settings</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">
+                        Configure settings for bulk admit card generation
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-6">
+                        {/* Main Settings */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {/* Exam */}
                             <div className="space-y-2">
                                 <Label htmlFor="examId" className="text-sm flex items-center gap-2">
                                     <FileText className="h-4 w-4" />
@@ -238,7 +244,7 @@ export default function BulkGenerateAdmitCardsPage() {
                                 )}
                             </div>
 
-                            {/* Class Selection */}
+                            {/* Class */}
                             <div className="space-y-2">
                                 <Label htmlFor="classId" className="text-sm flex items-center gap-2">
                                     <Users className="h-4 w-4" />
@@ -267,7 +273,7 @@ export default function BulkGenerateAdmitCardsPage() {
                                 )}
                             </div>
 
-                            {/* Section Selection (Optional) */}
+                            {/* Section */}
                             {watchedValues.classId && (
                                 <div className="space-y-2">
                                     <Label htmlFor="sectionId" className="text-sm">
@@ -292,11 +298,11 @@ export default function BulkGenerateAdmitCardsPage() {
                                 </div>
                             )}
 
-                            {/* Template Selection */}
+                            {/* Template */}
                             <div className="space-y-2">
                                 <Label htmlFor="templateId" className="text-sm flex items-center gap-2">
                                     <FileText className="h-4 w-4" />
-                                    Admit Card Template
+                                    Template
                                 </Label>
                                 <Select
                                     value={watchedValues.templateId}
@@ -373,11 +379,12 @@ export default function BulkGenerateAdmitCardsPage() {
                                     className="text-sm"
                                 />
                             </div>
+                        </div>
 
-                            {/* Seat Number Configuration */}
-                            <div className="border-t pt-4 space-y-4">
-                                <h3 className="text-sm font-semibold">Seat Number Configuration</h3>
-
+                        {/* Seat Number Configuration */}
+                        <div className="border-t pt-4">
+                            <h3 className="text-sm font-semibold mb-4">Seat Number Configuration</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="seatNumberPrefix" className="text-sm">
                                         Seat Number Prefix
@@ -402,20 +409,27 @@ export default function BulkGenerateAdmitCardsPage() {
                                         className="text-sm"
                                     />
                                 </div>
-
-                                <Alert>
-                                    <AlertCircle className="h-4 w-4" />
-                                    <AlertDescription className="text-xs">
-                                        Seat numbers will be generated as: {watchedValues.seatNumberPrefix}{watchedValues.startingSeatNumber}, {watchedValues.seatNumberPrefix}{watchedValues.startingSeatNumber + 1}, etc.
-                                    </AlertDescription>
-                                </Alert>
                             </div>
 
-                            {/* Generate Button */}
+                            <Alert className="mt-4">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription className="text-xs">
+                                    Seat numbers will be generated as: {watchedValues.seatNumberPrefix}{watchedValues.startingSeatNumber}, {watchedValues.seatNumberPrefix}{watchedValues.startingSeatNumber + 1}, etc.
+                                </AlertDescription>
+                            </Alert>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex justify-end gap-2 pt-4">
+                            <Button
+                                variant="outline"
+                                onClick={() => router.push('/dashboard/documents/admitcards/history')}
+                            >
+                                Cancel
+                            </Button>
                             <Button
                                 onClick={handleSubmit(onSubmit)}
                                 disabled={generating}
-                                className="w-full"
                             >
                                 {generating ? (
                                     <>
@@ -429,87 +443,69 @@ export default function BulkGenerateAdmitCardsPage() {
                                     </>
                                 )}
                             </Button>
-                        </CardContent>
-                    </Card>
-                </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
 
-                {/* Progress/Results Section */}
-                <div className="lg:sticky lg:top-4 lg:self-start">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base sm:text-lg">
-                                {generating ? 'Generation Progress' : results ? 'Generation Results' : 'Ready to Generate'}
-                            </CardTitle>
-                            <CardDescription className="text-xs sm:text-sm">
-                                {generating ? 'Please wait while admit cards are being generated...' :
-                                    results ? 'Bulk generation completed' :
-                                        'Fill the form and click generate to start'}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            {generating && (
-                                <div className="space-y-4">
-                                    <Progress value={progress} className="w-full" />
-                                    <div className="text-center">
-                                        <p className="text-sm text-muted-foreground">
-                                            Generated {generatedCount} of {totalCount} admit cards
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
+            {/* Progress/Results */}
+            {(generating || results) && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base sm:text-lg">
+                            {generating ? 'Generation Progress' : 'Generation Results'}
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {generating && (
+                            <div className="space-y-4">
+                                <Progress value={progress} className="w-full" />
+                                <p className="text-sm text-center text-muted-foreground">
+                                    Generating admit cards... Please wait
+                                </p>
+                            </div>
+                        )}
 
-                            {results && (
-                                <div className="space-y-4">
-                                    <Alert className="bg-green-50 border-green-200">
-                                        <CheckCircle2 className="h-4 w-4 text-green-600" />
-                                        <AlertTitle className="text-green-800">Success!</AlertTitle>
-                                        <AlertDescription className="text-green-700 text-sm">
-                                            Successfully generated {results.successCount} admit cards
+                        {results && (
+                            <div className="space-y-4">
+                                <Alert className="bg-green-50 border-green-200">
+                                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                    <AlertTitle className="text-green-800">Success!</AlertTitle>
+                                    <AlertDescription className="text-green-700 text-sm">
+                                        Successfully generated {results.successCount} out of {results.totalCount} admit cards
+                                    </AlertDescription>
+                                </Alert>
+
+                                {results.failedCount > 0 && (
+                                    <Alert variant="destructive">
+                                        <AlertCircle className="h-4 w-4" />
+                                        <AlertTitle>Partial Failure</AlertTitle>
+                                        <AlertDescription className="text-sm">
+                                            {results.failedCount} admit cards failed to generate
                                         </AlertDescription>
                                     </Alert>
+                                )}
 
-                                    {results.failedCount > 0 && (
-                                        <Alert variant="destructive">
-                                            <AlertCircle className="h-4 w-4" />
-                                            <AlertTitle>Partial Failure</AlertTitle>
-                                            <AlertDescription className="text-sm">
-                                                {results.failedCount} admit cards failed to generate
-                                            </AlertDescription>
-                                        </Alert>
-                                    )}
-
-                                    <div className="space-y-2">
-                                        <Button
-                                            onClick={() => window.open(results.zipUrl, '_blank')}
-                                            className="w-full"
-                                        >
-                                            <Download className="mr-2 h-4 w-4" />
-                                            Download All as ZIP
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            onClick={() => router.push('/dashboard/documents/admitcards/history')}
-                                            className="w-full"
-                                        >
-                                            View History
-                                        </Button>
-                                    </div>
+                                <div className="flex gap-2">
+                                    <Button
+                                        onClick={() => router.push('/dashboard/documents/admitcards/history')}
+                                        className="flex-1"
+                                    >
+                                        View History
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => window.location.reload()}
+                                        className="flex-1"
+                                    >
+                                        Generate More
+                                    </Button>
                                 </div>
-                            )}
-
-                            {!generating && !results && (
-                                <div className="flex flex-col items-center justify-center py-12 text-center">
-                                    <Users className="h-16 w-16 text-muted-foreground mb-4" />
-                                    <h3 className="text-lg font-semibold mb-2">Ready to Generate</h3>
-                                    <p className="text-sm text-muted-foreground max-w-sm">
-                                        Configure the settings and click "Generate Admit Cards" to start bulk generation
-                                    </p>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
         </div>
     );
 }

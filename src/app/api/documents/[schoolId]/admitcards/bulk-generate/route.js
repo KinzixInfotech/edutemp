@@ -1,10 +1,7 @@
-// app/api/documents/[schoolId]/admitcards/bulk-generate/route.js
-
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { generateAdmitCardPDF } from '@/lib/admitcard-pdf-generator';
-import archiver from 'archiver';
-import { Readable } from 'stream';
+import { generateAdmitCardPDF } from '@/lib/pdf-generator-admitcard';
+// import { generateAdmitCardPDF } from '@/lib/admitcard-pdf-generator';
 
 export async function POST(request, { params }) {
     try {
@@ -62,7 +59,7 @@ export async function POST(request, { params }) {
         const whereClause = {
             schoolId,
             classId: parseInt(classId),
-            ...(sectionId && { sectionId: parseInt(sectionId) }),
+            ...(sectionId && sectionId !== '' && { sectionId: parseInt(sectionId) }),
         };
 
         const students = await prisma.student.findMany({
@@ -91,8 +88,10 @@ export async function POST(request, { params }) {
 
         console.log(`✅ Found ${students.length} students`);
 
-        // 4. Convert logo to base64
+        // 4. Convert images to base64
         let layoutConfig = { ...template.layoutConfig };
+        
+        // Convert logo
         if (layoutConfig?.logoUrl && !layoutConfig.logoUrl.startsWith('data:')) {
             try {
                 const response = await fetch(layoutConfig.logoUrl);
@@ -106,6 +105,22 @@ export async function POST(request, { params }) {
                 console.warn('⚠️ Failed to convert logo:', error.message);
             }
         }
+
+        // Convert signature
+        if (layoutConfig?.signatureUrl && !layoutConfig.signatureUrl.startsWith('data:')) {
+            try {
+                const response = await fetch(layoutConfig.signatureUrl);
+                if (response.ok) {
+                    const buffer = await response.arrayBuffer();
+                    const base64 = Buffer.from(buffer).toString("base64");
+                    const mime = response.headers.get('content-type') || 'image/png';
+                    layoutConfig.signatureUrl = `data:${mime};base64,${base64}`;
+                }
+            } catch (error) {
+                console.warn('⚠️ Failed to convert signature:', error.message);
+            }
+        }
+
 
         // 5. Generate admit cards for all students
         const results = {
@@ -141,8 +156,23 @@ export async function POST(request, { params }) {
                     continue;
                 }
 
+                // Convert student photo
+                if (student.user?.profilePicture && !student.user.profilePicture.startsWith('data:')) {
+                    try {
+                        const response = await fetch(student.user.profilePicture);
+                        if (response.ok) {
+                            const buffer = await response.arrayBuffer();
+                            const base64 = Buffer.from(buffer).toString("base64");
+                            const mime = response.headers.get('content-type') || 'image/jpeg';
+                            student.user.profilePicture = `data:${mime};base64,${base64}`;
+                        }
+                    } catch (error) {
+                        console.warn(`⚠️ Failed to convert photo for ${student.name}:`, error.message);
+                    }
+                }
+
                 // Generate PDF
-                const pdfUrl = await generateAdmitCardPDF({
+                const pdfDataUrl = await generateAdmitCardPDF({
                     template: { ...template, layoutConfig },
                     student,
                     exam,
@@ -153,7 +183,7 @@ export async function POST(request, { params }) {
                     venue,
                 });
 
-                // Save admit card
+                // Save admit card WITH fileUrl
                 const admitCard = await prisma.admitCard.create({
                     data: {
                         studentId: student.userId,
@@ -161,6 +191,7 @@ export async function POST(request, { params }) {
                         schoolId,
                         seatNumber,
                         center: center || null,
+                        fileUrl: pdfDataUrl, // 🔥 IMPORTANT: Store the PDF URL
                         layoutConfig: {
                             ...layoutConfig,
                             examDate,
@@ -176,13 +207,13 @@ export async function POST(request, { params }) {
                     studentName: student.name,
                     rollNumber: student.rollNumber,
                     seatNumber,
-                    fileUrl: pdfUrl,
+                    fileUrl: pdfDataUrl,
                 });
 
                 results.successCount++;
                 currentSeatNumber++;
 
-                console.log(`✅ Generated admit card for ${student.name} (${currentSeatNumber - 1}/${students.length})`);
+                console.log(`✅ Generated admit card for ${student.name} (${results.successCount}/${students.length})`);
 
             } catch (error) {
                 console.error(`❌ Failed for ${student.name}:`, error);
@@ -198,8 +229,6 @@ export async function POST(request, { params }) {
 
         console.log(`✅ Bulk generation complete: ${results.successCount} success, ${results.failedCount} failed`);
 
-        // 6. Create ZIP file URL (you can implement actual ZIP creation or just return individual URLs)
-        // For now, returning the results
         return NextResponse.json({
             ...results,
             totalCount: students.length,
