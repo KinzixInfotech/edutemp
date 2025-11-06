@@ -367,49 +367,143 @@ model PurchaseOrderItem {
 }
 
 model Notice {
-  id           String         @id @default(uuid()) @db.Uuid
-  schoolId     String         @db.Uuid
-  title        String
-  description  String
-  fileUrl      String?
-  audience     Audience       @default(ALL)
-  priority     Priority       @default(NORMAL)
-  status       Status         @default(DRAFT)
-  publishedAt  DateTime?
-  expiryDate   DateTime?
-  createdById  String?        @db.Uuid
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @default(now()) @updatedAt
-  category     String?
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @db.Uuid
+
+  // Basic Info
+  title       String
+  description String  @db.Text // Changed to Text for long content
+  subtitle    String? // NEW: For preview text
+
+  // File Management
+  fileUrl     String?
+  attachments Json? // NEW: Array of multiple attachments
+
+  // Categorization
+  category NoticeCategory // NEW: Enum instead of String
+  audience Audience       @default(ALL)
+  priority Priority       @default(NORMAL)
+  status   Status         @default(DRAFT)
+
+  // Author Info
+  createdById String? @db.Uuid
+  issuedBy    String? // NEW: Display name
+  issuerRole  String? // NEW: "Science Department Head"
+
+  // Dates & Times
+  publishedAt DateTime?
+  expiryDate  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+
+  // Important Dates (for trips, deadlines, etc.)
+  importantDates Json? // NEW: [{label: string, value: string}]
+
+  // Read Status Tracking
+  viewCount Int @default(0) // NEW: Track views
+
+  // Relations
   Author       User?          @relation(fields: [createdById], references: [id])
   School       School         @relation(fields: [schoolId], references: [id])
   NoticeTarget NoticeTarget[]
+  NoticeReads  NoticeRead[] // NEW: Track who read it
 
   @@index([schoolId])
   @@index([status])
   @@index([priority])
+  @@index([category])
   @@index([publishedAt])
   @@index([expiryDate])
 }
 
 model NoticeTarget {
-  id        String   @id @default(uuid()) @db.Uuid
-  noticeId  String   @db.Uuid
+  id       String @id @default(uuid()) @db.Uuid
+  noticeId String @db.Uuid
+
+  // Targeting Options
   classId   Int?
   sectionId Int?
-  Class     Class?   @relation(fields: [classId], references: [id])
-  Notice    Notice   @relation(fields: [noticeId], references: [id])
-  Section   Section? @relation(fields: [sectionId], references: [id])
+  roleId    Int? // NEW: Target specific roles
+  userId    String? @db.Uuid // NEW: Target specific users
+
+  Class   Class?   @relation(fields: [classId], references: [id])
+  Notice  Notice   @relation(fields: [noticeId], references: [id])
+  Section Section? @relation(fields: [sectionId], references: [id])
+  Role    Role?    @relation(fields: [roleId], references: [id]) // NEW
+  User    User?    @relation("NoticeTargetUser", fields: [userId], references: [id]) // NEW
 
   @@index([noticeId])
   @@index([classId])
   @@index([sectionId])
+  @@index([roleId])
+  @@index([userId])
+}
+
+// NEW: Track read status for each user
+model NoticeRead {
+  id       String   @id @default(uuid()) @db.Uuid
+  noticeId String   @db.Uuid
+  userId   String   @db.Uuid
+  readAt   DateTime @default(now())
+
+  Notice Notice @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+  User   User   @relation("NoticeReads", fields: [userId], references: [id])
+
+  @@unique([noticeId, userId])
+  @@index([noticeId])
+  @@index([userId])
+  @@index([readAt])
+}
+
+// Enhanced Enums
+enum NoticeCategory {
+  GENERAL
+  ACADEMIC
+  EXAM
+  EMERGENCY
+  EVENT
+  SPORTS
+  HOLIDAY
+  FEE
+  TRANSPORT
+  LIBRARY
+  ANNOUNCEMENT
+}
+
+enum Audience {
+  ALL
+  STUDENTS
+  TEACHERS
+  PARENTS
+  STAFF // Added
+  TEACHING_STAFF // Added
+  NON_TEACHING_STAFF // Added
+  ADMINS // Added
+  CLASS
+  SECTION
+  CUSTOM // Added for specific users
+}
+
+enum Priority {
+  NORMAL
+  IMPORTANT
+  URGENT
+  CRITICAL // Added
+}
+
+enum Status {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+  SCHEDULED // Added for future publishing
+  EXPIRED // Added for auto-expiry
 }
 
 model Role {
-  id    Int    @id @default(autoincrement())
-  name  String @unique
-  users User[]
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
+  users         User[]
+  noticeTargets NoticeTarget[]
 }
 
 model User {
@@ -445,6 +539,8 @@ model User {
   CertificateTemplate   CertificateTemplate[]
   CertificateGenerated  CertificateGenerated[]
   DocumentTemplate      DocumentTemplate[]
+  NoticeReads           NoticeRead[]           @relation("NoticeReads")
+  NoticeTargets         NoticeTarget[]         @relation("NoticeTargetUser")
 
   @@index([schoolId])
   @@index([roleId])
@@ -1359,27 +1455,6 @@ enum FeeMode {
   QUARTERLY
   HALF_YEARLY
   YEARLY
-}
-
-enum Audience {
-  ALL
-  STUDENTS
-  TEACHERS
-  PARENTS
-  CLASS
-  SECTION
-}
-
-enum Priority {
-  NORMAL
-  IMPORTANT
-  URGENT
-}
-
-enum Status {
-  DRAFT
-  PUBLISHED
-  ARCHIVED
 }
 
 enum PaymentStatus {

@@ -1,932 +1,644 @@
 'use client';
-export const dynamic = 'force-dynamic';
 
-
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { format } from 'date-fns';
-import { CalendarIcon, Plus, Trash2, Edit, AlertCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+    Plus,
+    Send,
+    Save,
+    Loader2,
+    Bell,
+    Trash2,
+    Edit,
+    Eye,
+    AlertCircle,
+    Users,
+    Calendar,
+    FileText,
+    Paperclip,
+    X
+} from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-    DialogClose,
 } from '@/components/ui/dialog';
-import {
-    Select,
-    SelectTrigger,
-    SelectValue,
-    SelectContent,
-    SelectItem,
-} from '@/components/ui/select';
-import {
-    Form,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormControl,
-    FormMessage,
-} from '@/components/ui/form';
-import { Textarea } from '@/components/ui/textarea';
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/context/AuthContext';
 
-// Validation schema for create/update notice
-const noticeSchema = z.object({
-    schoolId: z.string().uuid('Invalid school ID'),
-    title: z.string().min(1, 'Title is required'),
-    description: z.string().min(1, 'Description is required'),
+const formSchema = z.object({
+    title: z.string().min(5, 'Title must be at least 5 characters'),
+    subtitle: z.string().optional(),
+    description: z.string().min(10, 'Description must be at least 10 characters'),
+    category: z.string().min(1, 'Category is required'),
+    audience: z.string().min(1, 'Audience is required'),
+    priority: z.string().default('NORMAL'),
+    status: z.string().default('DRAFT'),
+    issuedBy: z.string().optional(),
+    issuerRole: z.string().optional(),
+    publishedAt: z.string().optional(),
+    expiryDate: z.string().optional(),
     fileUrl: z.string().optional(),
-    audience: z.enum(['ALL', 'STUDENTS', 'TEACHERS', 'PARENTS', 'CLASS', 'SECTION'], {
-        errorMap: () => ({ message: 'Invalid audience' }),
-    }),
-    priority: z.enum(['NORMAL', 'IMPORTANT', 'URGENT'], {
-        errorMap: () => ({ message: 'Invalid priority' }),
-    }),
-    status: z.enum(['DRAFT', 'PUBLISHED'], {
-        errorMap: () => ({ message: 'Status must be DRAFT or PUBLISHED' }),
-    }),
-    publishedAt: z.date().optional(),
-    expiryDate: z.date().optional(),
-    createdById: z.string().uuid('Invalid creator ID').optional(),
 });
 
-const updateNoticeSchema = noticeSchema.extend({
-    status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED'], {
-        errorMap: () => ({ message: 'Invalid status' }),
-    }),
-});
+const CATEGORIES = [
+    'GENERAL',
+    'ACADEMIC',
+    'EXAM',
+    'EMERGENCY',
+    'EVENT',
+    'SPORTS',
+    'HOLIDAY',
+    'FEE',
+    'TRANSPORT',
+    'LIBRARY',
+    'ANNOUNCEMENT'
+];
 
-// Schema for filtering notices
-const filterSchema = z.object({
-    status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']).optional(),
-    audience: z.enum(['ALL', 'STUDENTS', 'TEACHERS', 'PARENTS', 'CLASS', 'SECTION']).optional(),
-    priority: z.enum(['NORMAL', 'IMPORTANT', 'URGENT']).optional(),
-    publishedAtStart: z.string().datetime().optional(),
-    publishedAtEnd: z.string().datetime().optional(),
-    sortBy: z.enum(['publishedAt', 'priority', 'createdAt']).optional().default('createdAt'),
-    limit: z.number().min(1).default(10),
-    offset: z.number().min(0).default(0),
-});
+const AUDIENCES = [
+    { value: 'ALL', label: 'All Users' },
+    { value: 'STUDENTS', label: 'Students Only' },
+    { value: 'TEACHERS', label: 'Teachers Only' },
+    { value: 'PARENTS', label: 'Parents Only' },
+    { value: 'STAFF', label: 'All Staff' },
+    { value: 'TEACHING_STAFF', label: 'Teaching Staff' },
+    { value: 'NON_TEACHING_STAFF', label: 'Non-Teaching Staff' },
+    { value: 'CLASS', label: 'Specific Class' },
+    { value: 'SECTION', label: 'Specific Section' },
+];
 
+const PRIORITIES = [
+    { value: 'NORMAL', label: 'Normal', color: 'bg-gray-500' },
+    { value: 'IMPORTANT', label: 'Important', color: 'bg-blue-500' },
+    { value: 'URGENT', label: 'Urgent', color: 'bg-orange-500' },
+    { value: 'CRITICAL', label: 'Critical', color: 'bg-red-500' },
+];
 
-
-export default function NoticesTable() {
+export default function NoticeAdminPage() {
+    const router = useRouter();
+    const queryClient = useQueryClient();
     const { fullUser } = useAuth();
-    const [notices, setNotices] = useState([]);
-    const [total, setTotal] = useState(0);
-    const [loading, setLoading] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
-    const [createOpen, setCreateOpen] = useState(false);
-    const [editOpen, setEditOpen] = useState(false);
-    const [deleteOpen, setDeleteOpen] = useState(false);
+    const schoolId = fullUser?.schoolId;
+
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [selectedNotice, setSelectedNotice] = useState(null);
-    const [filters, setFilters] = useState({
-        status: '',
-        audience: '',
-        priority: '',
-        publishedAtStart: '',
-        publishedAtEnd: '',
-        sortBy: 'createdAt',
-        limit: 10,
-        offset: 0,
-    });
+    const [importantDates, setImportantDates] = useState([]);
+    const [selectedClasses, setSelectedClasses] = useState([]);
+    const [selectedSections, setSelectedSections] = useState([]);
 
-    const form = useForm({
-        resolver: zodResolver(noticeSchema),
+    const {
+        register,
+        handleSubmit,
+        watch,
+        setValue,
+        reset,
+        formState: { errors },
+    } = useForm({
+        resolver: zodResolver(formSchema),
         defaultValues: {
-            schoolId: fullUser?.schoolId || '',
-            title: '',
-            description: '',
-            fileUrl: '',
-            audience: 'ALL',
             priority: 'NORMAL',
             status: 'DRAFT',
-            publishedAt: undefined,
-            expiryDate: undefined,
-            createdById: fullUser?.id,
+            audience: 'ALL',
+            category: 'GENERAL',
         },
     });
 
-    const editForm = useForm({
-        resolver: zodResolver(updateNoticeSchema),
-        defaultValues: {
-            schoolId: '',
-            title: '',
-            description: '',
-            fileUrl: '',
-            audience: 'ALL',
-            priority: 'NORMAL',
-            status: 'DRAFT',
-            publishedAt: undefined,
-            expiryDate: undefined,
-            createdById: '',
-        },
-    });
-    useEffect(() => {
-        console.log('Form errors:', form.formState.errors);
-    }, [form.formState.errors]);
+    const watchedValues = watch();
+    const selectedAudience = watch('audience');
 
     // Fetch notices
-    const fetchNotices = async () => {
-        if (!fullUser?.schoolId) {
-            toast.error('School ID is missing');
-            setLoading(false);
-            return;
-        }
-        setLoading(true);
-        try {
-            const query = new URLSearchParams({
-                schoolId: fullUser.schoolId,
-                ...filters,
-                status: filters.status || null,
-                audience: filters.audience || null,
-                priority: filters.priority || null,
-                publishedAtStart: filters.publishedAtStart || null,
-                publishedAtEnd: filters.publishedAtEnd || null,
-            }).toString();
-            const res = await fetch(`/api/schools/notice?${query}`);
-            if (!res.ok) {
-                const error = await res.json();
-                throw new Error(error.error || 'Failed to fetch notices');
+    const { data: noticesData, isLoading } = useQuery({
+        queryKey: ['notices', schoolId],
+        queryFn: async () => {
+            const res = await fetch(`/api/notices/${schoolId}`);
+            if (!res.ok) throw new Error('Failed to fetch notices');
+            return res.json();
+        },
+        enabled: !!schoolId,
+    });
+
+    // Fetch classes (for targeting)
+    const { data: classes } = useQuery({
+        queryKey: ['classes', schoolId],
+        queryFn: async () => {
+            const res = await fetch(`/api/classes?schoolId=${schoolId}`);
+            if (!res.ok) throw new Error('Failed to fetch classes');
+            return res.json();
+        },
+        enabled: !!schoolId && selectedAudience === 'CLASS',
+    });
+
+    // Fetch sections
+    const { data: sections } = useQuery({
+        queryKey: ['sections', schoolId, selectedClasses],
+        queryFn: async () => {
+            if (selectedClasses.length === 0) return [];
+            const res = await fetch(`/api/sections?schoolId=${schoolId}&classIds=${selectedClasses.join(',')}`);
+            if (!res.ok) throw new Error('Failed to fetch sections');
+            return res.json();
+        },
+        enabled: !!schoolId && selectedAudience === 'SECTION' && selectedClasses.length > 0,
+    });
+
+    // Create notice mutation
+    const createMutation = useMutation({
+        mutationFn: async (data) => {
+            const targets = [];
+
+            // Build targets based on audience
+            if (data.audience === 'CLASS') {
+                targets.push(...selectedClasses.map(classId => ({ classId: parseInt(classId) })));
+            } else if (data.audience === 'SECTION') {
+                targets.push(...selectedSections.map(sectionId => ({ sectionId: parseInt(sectionId) })));
             }
-            const data = await res.json();
-            setNotices(data.notices || []);
-            setTotal(data.total || 0);
-        } catch (err) {
-            console.error('Fetch error:', err);
-            toast.error(err.message || 'Failed to load notices');
-        } finally {
-            setLoading(false);
-        }
-    };
 
-    useEffect(() => {
-        fetchNotices();
-    }, [fullUser?.schoolId, filters]);
-
-    // Handle create notice
-    const handleCreate = async (values) => {
-        console.log('Creating notice with values:', values);
-        setSubmitting(true);
-        try {
             const payload = {
-                ...values,
-                publishedAt: values.publishedAt?.toISOString(),
-                expiryDate: values.expiryDate?.toISOString(),
+                ...data,
+                createdById: fullUser?.id,
+                importantDates: importantDates.length > 0 ? importantDates : null,
+                targets,
             };
-            console.log('Create payload:', payload);
-            const res = await fetch('/api/schools/notice', {
+
+            const res = await fetch(`/api/notices/${schoolId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
             });
+
             if (!res.ok) {
                 const error = await res.json();
                 throw new Error(error.error || 'Failed to create notice');
             }
-            toast.success('Notice created successfully');
-            setCreateOpen(false);
-            form.reset();
-            fetchNotices();
-        } catch (err) {
-            console.error('Create error:', err);
-            toast.error(err.message || 'Failed to create notice');
-        } finally {
-            console.log('Resetting submitting state');
-            setSubmitting(false);
-        }
-    };
+            return res.json();
+        },
+        onSuccess: () => {
+            toast.success('Notice created successfully!');
+            queryClient.invalidateQueries(['notices', schoolId]);
+            setIsCreateDialogOpen(false);
+            reset();
+            setImportantDates([]);
+            setSelectedClasses([]);
+            setSelectedSections([]);
+        },
+        onError: (error) => {
+            toast.error(error.message || 'Failed to create notice');
+        },
+    });
 
-    // Handle update notice
-    const handleUpdate = async (values) => {
-        if (!selectedNotice) {
-            toast.error('No notice selected for update');
-            return;
-        }
-        console.log('Updating notice with values:', values);
-        setSubmitting(true);
-        try {
-            const payload = {
-                ...values,
-                publishedAt: values.publishedAt?.toISOString(),
-                expiryDate: values.expiryDate?.toISOString(),
-            };
-            console.log('Update payload:', payload);
-            const res = await fetch(`/api/schools/notice?id=${selectedNotice.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
+    // Delete notice mutation
+    const deleteMutation = useMutation({
+        mutationFn: async (noticeId) => {
+            const res = await fetch(`/api/notices/${schoolId}/${noticeId}`, {
+                method: 'DELETE',
             });
-            if (!res.ok) {
-                const error = await res.json();
-                throw new Error(error.error || 'Failed to update notice');
-            }
-            toast.success('Notice updated successfully');
-            setEditOpen(false);
-            fetchNotices();
-        } catch (err) {
-            console.error('Update error:', err);
-            toast.error(err.message || 'Failed to update notice');
-        } finally {
-            setSubmitting(false);
-        }
+            if (!res.ok) throw new Error('Failed to delete notice');
+            return res.json();
+        },
+        onSuccess: () => {
+            toast.success('Notice deleted successfully');
+            queryClient.invalidateQueries(['notices', schoolId]);
+        },
+        onError: (error) => {
+            toast.error(error.message || 'Failed to delete notice');
+        },
+    });
+
+    const onSubmit = (data) => {
+        createMutation.mutate(data);
     };
 
-    // Handle delete notice
-    const handleDelete = async (hard = false) => {
-        if (!selectedNotice) {
-            toast.error('No notice selected for deletion');
-            return;
-        }
-        setSubmitting(true);
-        try {
-            const res = await fetch(
-                `/api/schools/notice?id=${selectedNotice.id}${hard ? '&hard=true' : ''}`,
-                { method: 'DELETE' }
-            );
-            if (!res.ok) {
-                const error = await res.json();
-                throw new Error(error.error || 'Failed to delete notice');
-            }
-            toast.success(`Notice ${hard ? 'permanently' : ''} deleted successfully`);
-            setDeleteOpen(false);
-            setSelectedNotice(null);
-            fetchNotices();
-        } catch (err) {
-            console.error('Delete error:', err);
-            toast.error(err.message || 'Failed to delete notice');
-        } finally {
-            setSubmitting(false);
-        }
-    };
-    useEffect(() => {
-        console.log('Submitting state:', submitting);
-    }, [submitting]);
-    // Handle mark important
-    const handleMarkImportant = async (noticeId, priority) => {
-        try {
-            const res = await fetch(`/api/schools/notice?id=${noticeId}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ priority }),
-            });
-            if (!res.ok) {
-                const error = await res.json();
-                throw new Error(error.error || 'Failed to update priority');
-            }
-            toast.success(`Notice marked as ${priority}`);
-            fetchNotices();
-        } catch (err) {
-            console.error('Mark important error:', err);
-            toast.error(err.message || 'Failed to update priority');
-        }
+    const addImportantDate = () => {
+        setImportantDates([...importantDates, { label: '', value: '' }]);
     };
 
-    // Handle file upload (simulated)
-    const handleFileChange = (e, formType) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const targetForm = formType === 'create' ? form : editForm;
-            targetForm.setValue('fileUrl', `/uploads/${file.name}`);
-        }
+    const updateImportantDate = (index, field, value) => {
+        const updated = [...importantDates];
+        updated[index][field] = value;
+        setImportantDates(updated);
     };
 
-    // when fullUser changes, update the form
-    useEffect(() => {
-        if (fullUser) {
-            form.reset({
-                ...form.getValues(), // keep current values
-                schoolId: fullUser.schoolId || '',
-                createdById: fullUser.id,
-            });
-        }
-    }, [fullUser, form]);
+    const removeImportantDate = (index) => {
+        setImportantDates(importantDates.filter((_, i) => i !== index));
+    };
+
+    if (!schoolId || isLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+        );
+    }
+
     return (
-        <div className="p-6">
-            <Card className="mb-6">
-                <CardHeader>
-                    <CardTitle>Notices</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex justify-between items-center mb-4 gap-5 lg:flex-row flex-col">
-                        <div className="flex gap-2 lg:w-fit w-full">
-                            <Select
-                                value={filters.status}
-                                onValueChange={(value) => setFilters({ ...filters, status: value || '' })}
-                            >
-                                <SelectTrigger className="lg:w-[180px] w-full">
-                                    <SelectValue placeholder="Filter by Status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="All">All Statuses</SelectItem>
-                                    <SelectItem value="DRAFT">Draft</SelectItem>
-                                    <SelectItem value="PUBLISHED">Published</SelectItem>
-                                    <SelectItem value="ARCHIVED">Archived</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Select
-                                value={filters.audience}
-                                onValueChange={(value) => setFilters({ ...filters, audience: value || '' })}
-                            >
-                                <SelectTrigger className="lg:w-[180px] w-full">
-                                    <SelectValue placeholder="Filter by Audience" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="All">All Audiences</SelectItem>
-                                    <SelectItem value="ALL">All</SelectItem>
-                                    <SelectItem value="STUDENTS">Students</SelectItem>
-                                    <SelectItem value="TEACHERS">Teachers</SelectItem>
-                                    <SelectItem value="PARENTS">Parents</SelectItem>
-                                    <SelectItem value="CLASS">Class</SelectItem>
-                                    <SelectItem value="SECTION">Section</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Select
-                                value={filters.priority}
-                                onValueChange={(value) => setFilters({ ...filters, priority: value || '' })}
-                            >
-                                <SelectTrigger className="lg:w-[180px] w-full">
-                                    <SelectValue placeholder="Filter by Priority" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="All">All Priorities</SelectItem>
-                                    <SelectItem value="NORMAL">Normal</SelectItem>
-                                    <SelectItem value="IMPORTANT">Important</SelectItem>
-                                    <SelectItem value="URGENT">Urgent</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <Dialog open={createOpen} onOpenChange={(open) => {
-                            setCreateOpen(open);
-                            if (!open) form.reset();
-                        }}>
-                            <DialogTrigger asChild>
-                                <Button className="lg:w-fit w-full">
-                                    <Plus className="h-4 w-4 mr-2" /> Create Notice
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
-                                <DialogHeader>
-                                    <DialogTitle>Create Notice</DialogTitle>
-                                </DialogHeader>
-                                <Form {...form}>
-                                    <form onSubmit={form.handleSubmit(handleCreate)} className="space-y-4">
-                                        <FormField
-                                            control={form.control}
-                                            name="title"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Title</FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="Notice title" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name="description"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Description</FormLabel>
-                                                    <FormControl>
-                                                        <Textarea placeholder="Notice description" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormItem>
-                                            <FormLabel>File Upload (Optional)</FormLabel>
-                                            <FormControl>
-                                                <Input type="file" onChange={(e) => handleFileChange(e, 'create')} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                        <FormField
-                                            control={form.control}
-                                            name="audience"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Audience</FormLabel>
-                                                    <Select onValueChange={field.onChange} value={field.value}>
-                                                        <FormControl>
-                                                            <SelectTrigger>
-                                                                <SelectValue placeholder="Select audience" />
-                                                            </SelectTrigger>
-                                                        </FormControl>
-                                                        <SelectContent>
-                                                            <SelectItem value="ALL">All</SelectItem>
-                                                            <SelectItem value="STUDENTS">Students</SelectItem>
-                                                            <SelectItem value="TEACHERS">Teachers</SelectItem>
-                                                            <SelectItem value="PARENTS">Parents</SelectItem>
-                                                            <SelectItem value="CLASS">Class</SelectItem>
-                                                            <SelectItem value="SECTION">Section</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name="priority"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Priority</FormLabel>
-                                                    <Select onValueChange={field.onChange} value={field.value}>
-                                                        <FormControl>
-                                                            <SelectTrigger>
-                                                                <SelectValue placeholder="Select priority" />
-                                                            </SelectTrigger>
-                                                        </FormControl>
-                                                        <SelectContent>
-                                                            <SelectItem value="NORMAL">Normal</SelectItem>
-                                                            <SelectItem value="IMPORTANT">Important</SelectItem>
-                                                            <SelectItem value="URGENT">Urgent</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name="status"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Status</FormLabel>
-                                                    <Select onValueChange={field.onChange} value={field.value}>
-                                                        <FormControl>
-                                                            <SelectTrigger>
-                                                                <SelectValue placeholder="Select status" />
-                                                            </SelectTrigger>
-                                                        </FormControl>
-                                                        <SelectContent>
-                                                            <SelectItem value="DRAFT">Draft</SelectItem>
-                                                            <SelectItem value="PUBLISHED">Published</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name="publishedAt"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Published At (Optional)</FormLabel>
-                                                    <Popover>
-                                                        <PopoverTrigger asChild>
-                                                            <FormControl>
-                                                                <Button
-                                                                    variant="outline"
-                                                                    className={cn(
-                                                                        'w-full justify-start text-left font-normal',
-                                                                        !field.value && 'text-muted-foreground'
-                                                                    )}
-                                                                >
-                                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                                    {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
-                                                                </Button>
-                                                            </FormControl>
-                                                        </PopoverTrigger>
-                                                        <PopoverContent className="w-auto p-0">
-                                                            <Calendar
-                                                                mode="single"
-                                                                selected={field.value}
-                                                                onSelect={field.onChange}
-                                                                initialFocus
-                                                            />
-                                                        </PopoverContent>
-                                                    </Popover>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name="expiryDate"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Expiry Date (Optional)</FormLabel>
-                                                    <Popover>
-                                                        <PopoverTrigger asChild>
-                                                            <FormControl>
-                                                                <Button
-                                                                    variant="outline"
-                                                                    className={cn(
-                                                                        'w-full justify-start text-left font-normal',
-                                                                        !field.value && 'text-muted-foreground'
-                                                                    )}
-                                                                >
-                                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                                    {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
-                                                                </Button>
-                                                            </FormControl>
-                                                        </PopoverTrigger>
-                                                        <PopoverContent className="w-auto p-0">
-                                                            <Calendar
-                                                                mode="single"
-                                                                selected={field.value}
-                                                                onSelect={field.onChange}
-                                                                initialFocus
-                                                            />
-                                                        </PopoverContent>
-                                                    </Popover>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <Button type="submit" disabled={submitting} className="w-full">
-                                            {submitting ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
+        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+            {/* Header */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-1">
+                    <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+                        <Bell className="w-8 h-8 text-primary" />
+                        Notice Board Management
+                    </h1>
+                    <p className="text-sm text-muted-foreground">
+                        Create and manage school notices and circulars
+                    </p>
+                </div>
+                <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Create Notice
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                        <DialogHeader>
+                            <DialogTitle>Create New Notice</DialogTitle>
+                            <DialogDescription>
+                                Fill in the details to create a new notice or circular
+                            </DialogDescription>
+                        </DialogHeader>
 
-                                            {submitting ? 'Creating...' : 'Create Notice'}
-                                        </Button>
-                                    </form>
-                                </Form>
-                            </DialogContent>
-                        </Dialog>
-                    </div>
-
-                    <div className="overflow-x-auto rounded-lg border">
-                        <Table className="min-w-[800px]">
-                            <TableHeader className="bg-muted sticky top-0 z-10">
-                                <TableRow>
-                                    <TableHead>#</TableHead>
-                                    <TableHead>Title</TableHead>
-                                    <TableHead>Audience</TableHead>
-                                    <TableHead>Priority</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Published At</TableHead>
-                                    <TableHead>Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {loading ? (
-                                    <TableRow>
-                                        <TableCell colSpan={7} className="text-center py-4">
-                                            <Loader2 className="animate-spin mx-auto" size={30} />
-                                        </TableCell>
-                                    </TableRow>
-                                ) : notices.length > 0 ? (
-                                    notices.map((notice, index) => (
-                                        <TableRow key={notice.id} className={index % 2 === 0 ? 'bg-muted' : 'bg-background'}>
-                                            <TableCell>{index + 1}</TableCell>
-                                            <TableCell>{notice.title}</TableCell>
-                                            <TableCell>{notice.audience}</TableCell>
-                                            <TableCell>
-                                                <Badge
-                                                    variant={
-                                                        notice.priority === 'URGENT'
-                                                            ? 'destructive'
-                                                            : notice.priority === 'IMPORTANT'
-                                                                ? 'default'
-                                                                : 'secondary'
-                                                    }
-                                                >
-                                                    {notice.priority}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge
-                                                    variant={
-                                                        notice.status === 'PUBLISHED'
-                                                            ? 'default'
-                                                            : notice.status === 'ARCHIVED'
-                                                                ? 'secondary'
-                                                                : 'outline'
-                                                    }
-                                                >
-                                                    {notice.status}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                {notice.publishedAt ? format(new Date(notice.publishedAt), 'PPP') : 'N/A'}
-                                            </TableCell>
-                                            <TableCell className="flex gap-2">
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    onClick={() => {
-                                                        setSelectedNotice(notice);
-                                                        editForm.reset({
-                                                            schoolId: notice.schoolId,
-                                                            title: notice.title,
-                                                            description: notice.description,
-                                                            fileUrl: notice.fileUrl || '',
-                                                            audience: notice.audience,
-                                                            priority: notice.priority,
-                                                            status: notice.status,
-                                                            publishedAt: notice.publishedAt ? new Date(notice.publishedAt) : undefined,
-                                                            expiryDate: notice.expiryDate ? new Date(notice.expiryDate) : undefined,
-                                                            createdById: notice.createdById || '',
-                                                        });
-                                                        setEditOpen(true);
-                                                    }}
-                                                >
-                                                    <Edit className="h-4 w-4 mr-2" /> Edit
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="destructive"
-                                                    onClick={() => {
-                                                        setSelectedNotice(notice);
-                                                        setDeleteOpen(true);
-                                                    }}
-                                                >
-                                                    <Trash2 className="h-4 w-4 mr-2" /> Delete
-                                                </Button>
-                                                {notice.priority !== 'URGENT' && (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() => handleMarkImportant(notice.id, notice.priority === 'IMPORTANT' ? 'URGENT' : 'IMPORTANT')}
-                                                    >
-                                                        <AlertCircle className="h-4 w-4 mr-2" /> Mark {notice.priority === 'IMPORTANT' ? 'Urgent' : 'Important'}
-                                                    </Button>
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                ) : (
-                                    <TableRow>
-                                        <TableCell colSpan={7} className="text-center py-4">
-                                            No notices found.
-                                        </TableCell>
-                                    </TableRow>
+                        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                            {/* Title */}
+                            <div className="space-y-2">
+                                <Label htmlFor="title">Title *</Label>
+                                <Input
+                                    id="title"
+                                    {...register('title')}
+                                    placeholder="e.g., School Holiday Announcement"
+                                />
+                                {errors.title && (
+                                    <p className="text-xs text-red-500">{errors.title.message}</p>
                                 )}
-                            </TableBody>
-                        </Table>
-                    </div>
+                            </div>
 
-                    {/* Pagination */}
-                    <div className="flex justify-between items-center mt-4">
-                        <Button
-                            disabled={filters.offset === 0 || loading}
-                            onClick={() => setFilters({ ...filters, offset: filters.offset - filters.limit })}
-                        >
-                            Previous
-                        </Button>
-                        <span>
-                            Page {Math.floor(filters.offset / filters.limit) + 1} of {Math.ceil(total / filters.limit) || 1}
-                        </span>
-                        <Button
-                            disabled={filters.offset + filters.limit >= total || loading}
-                            onClick={() => setFilters({ ...filters, offset: filters.offset + filters.limit })}
-                        >
-                            Next
-                        </Button>
-                    </div>
+                            {/* Subtitle */}
+                            <div className="space-y-2">
+                                <Label htmlFor="subtitle">Subtitle (Optional)</Label>
+                                <Input
+                                    id="subtitle"
+                                    {...register('subtitle')}
+                                    placeholder="Brief description for preview"
+                                />
+                            </div>
 
-                    {/* Edit Notice Dialog */}
-                    <Dialog open={editOpen} onOpenChange={(open) => {
-                        setEditOpen(open);
-                        if (!open) editForm.reset();
-                    }}>
-                        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
-                            <DialogHeader>
-                                <DialogTitle>Edit Notice</DialogTitle>
-                            </DialogHeader>
-                            <Form {...editForm}>
-                                <form onSubmit={editForm.handleSubmit(handleUpdate)} className="space-y-4">
-                                    <FormField
-                                        control={editForm.control}
-                                        name="title"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Title</FormLabel>
-                                                <FormControl>
-                                                    <Input placeholder="Notice title" {...field} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
+                            {/* Description */}
+                            <div className="space-y-2">
+                                <Label htmlFor="description">Description *</Label>
+                                <Textarea
+                                    id="description"
+                                    {...register('description')}
+                                    placeholder="Full notice content..."
+                                    rows={6}
+                                />
+                                {errors.description && (
+                                    <p className="text-xs text-red-500">{errors.description.message}</p>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                {/* Category */}
+                                <div className="space-y-2">
+                                    <Label>Category *</Label>
+                                    <Select
+                                        value={watchedValues.category}
+                                        onValueChange={(value) => setValue('category', value)}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {CATEGORIES.map(cat => (
+                                                <SelectItem key={cat} value={cat}>
+                                                    {cat}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {/* Priority */}
+                                <div className="space-y-2">
+                                    <Label>Priority</Label>
+                                    <Select
+                                        value={watchedValues.priority}
+                                        onValueChange={(value) => setValue('priority', value)}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {PRIORITIES.map(p => (
+                                                <SelectItem key={p.value} value={p.value}>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={`w-2 h-2 rounded-full ${p.color}`} />
+                                                        {p.label}
+                                                    </div>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            {/* Audience */}
+                            <div className="space-y-2">
+                                <Label>Target Audience *</Label>
+                                <Select
+                                    value={watchedValues.audience}
+                                    onValueChange={(value) => setValue('audience', value)}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {AUDIENCES.map(aud => (
+                                            <SelectItem key={aud.value} value={aud.value}>
+                                                {aud.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {/* Class/Section Selection */}
+                            {selectedAudience === 'CLASS' && classes && (
+                                <div className="space-y-2">
+                                    <Label>Select Classes</Label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {classes.map(cls => (
+                                            <Button
+                                                key={cls.id}
+                                                type="button"
+                                                variant={selectedClasses.includes(cls.id.toString()) ? 'default' : 'outline'}
+                                                size="sm"
+                                                onClick={() => {
+                                                    if (selectedClasses.includes(cls.id.toString())) {
+                                                        setSelectedClasses(selectedClasses.filter(id => id !== cls.id.toString()));
+                                                    } else {
+                                                        setSelectedClasses([...selectedClasses, cls.id.toString()]);
+                                                    }
+                                                }}
+                                            >
+                                                {cls.className}
+                                            </Button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedAudience === 'SECTION' && (
+                                <>
+                                    <div className="space-y-2">
+                                        <Label>First Select Classes</Label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {classes?.map(cls => (
+                                                <Button
+                                                    key={cls.id}
+                                                    type="button"
+                                                    variant={selectedClasses.includes(cls.id.toString()) ? 'default' : 'outline'}
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        if (selectedClasses.includes(cls.id.toString())) {
+                                                            setSelectedClasses(selectedClasses.filter(id => id !== cls.id.toString()));
+                                                        } else {
+                                                            setSelectedClasses([...selectedClasses, cls.id.toString()]);
+                                                        }
+                                                    }}
+                                                >
+                                                    {cls.className}
+                                                </Button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    {sections && sections.length > 0 && (
+                                        <div className="space-y-2">
+                                            <Label>Select Sections</Label>
+                                            <div className="flex flex-wrap gap-2">
+                                                {sections.map(sec => (
+                                                    <Button
+                                                        key={sec.id}
+                                                        type="button"
+                                                        variant={selectedSections.includes(sec.id.toString()) ? 'default' : 'outline'}
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            if (selectedSections.includes(sec.id.toString())) {
+                                                                setSelectedSections(selectedSections.filter(id => id !== sec.id.toString()));
+                                                            } else {
+                                                                setSelectedSections([...selectedSections, sec.id.toString()]);
+                                                            }
+                                                        }}
+                                                    >
+                                                        {sec.name}
+                                                    </Button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-4">
+                                {/* Issued By */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="issuedBy">Issued By</Label>
+                                    <Input
+                                        id="issuedBy"
+                                        {...register('issuedBy')}
+                                        placeholder="e.g., Ms. Farhana Islam"
                                     />
-                                    <FormField
-                                        control={editForm.control}
-                                        name="description"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Description</FormLabel>
-                                                <FormControl>
-                                                    <Textarea placeholder="Notice description" {...field} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
+                                </div>
+
+                                {/* Issuer Role */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="issuerRole">Issuer Role</Label>
+                                    <Input
+                                        id="issuerRole"
+                                        {...register('issuerRole')}
+                                        placeholder="e.g., Science Department Head"
                                     />
-                                    <FormItem>
-                                        <FormLabel>File Upload (Optional)</FormLabel>
-                                        <FormControl>
-                                            <Input type="file" onChange={(e) => handleFileChange(e, 'edit')} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                    <FormField
-                                        control={editForm.control}
-                                        name="audience"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Audience</FormLabel>
-                                                <Select onValueChange={field.onChange} value={field.value}>
-                                                    <FormControl>
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Select audience" />
-                                                        </SelectTrigger>
-                                                    </FormControl>
-                                                    <SelectContent>
-                                                        <SelectItem value="ALL">All</SelectItem>
-                                                        <SelectItem value="STUDENTS">Students</SelectItem>
-                                                        <SelectItem value="TEACHERS">Teachers</SelectItem>
-                                                        <SelectItem value="PARENTS">Parents</SelectItem>
-                                                        <SelectItem value="CLASS">Class</SelectItem>
-                                                        <SelectItem value="SECTION">Section</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <FormField
-                                        control={editForm.control}
-                                        name="priority"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Priority</FormLabel>
-                                                <Select onValueChange={field.onChange} value={field.value}>
-                                                    <FormControl>
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Select priority" />
-                                                        </SelectTrigger>
-                                                    </FormControl>
-                                                    <SelectContent>
-                                                        <SelectItem value="NORMAL">Normal</SelectItem>
-                                                        <SelectItem value="IMPORTANT">Important</SelectItem>
-                                                        <SelectItem value="URGENT">Urgent</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <FormField
-                                        control={editForm.control}
-                                        name="status"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Status</FormLabel>
-                                                <Select onValueChange={field.onChange} value={field.value}>
-                                                    <FormControl>
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Select status" />
-                                                        </SelectTrigger>
-                                                    </FormControl>
-                                                    <SelectContent>
-                                                        <SelectItem value="DRAFT">Draft</SelectItem>
-                                                        <SelectItem value="PUBLISHED">Published</SelectItem>
-                                                        <SelectItem value="ARCHIVED">Archived</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <FormField
-                                        control={editForm.control}
-                                        name="publishedAt"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Published At (Optional)</FormLabel>
-                                                <Popover>
-                                                    <PopoverTrigger asChild>
-                                                        <FormControl>
-                                                            <Button
-                                                                variant="outline"
-                                                                className={cn(
-                                                                    'w-full justify-start text-left font-normal',
-                                                                    !field.value && 'text-muted-foreground'
-                                                                )}
-                                                            >
-                                                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                                                {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
-                                                            </Button>
-                                                        </FormControl>
-                                                    </PopoverTrigger>
-                                                    <PopoverContent className="w-auto p-0">
-                                                        <Calendar
-                                                            mode="single"
-                                                            selected={field.value}
-                                                            onSelect={field.onChange}
-                                                            initialFocus
-                                                        />
-                                                    </PopoverContent>
-                                                </Popover>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <FormField
-                                        control={editForm.control}
-                                        name="expiryDate"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Expiry Date (Optional)</FormLabel>
-                                                <Popover>
-                                                    <PopoverTrigger asChild>
-                                                        <FormControl>
-                                                            <Button
-                                                                variant="outline"
-                                                                className={cn(
-                                                                    'w-full justify-start text-left font-normal',
-                                                                    !field.value && 'text-muted-foreground'
-                                                                )}
-                                                            >
-                                                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                                                {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
-                                                            </Button>
-                                                        </FormControl>
-                                                    </PopoverTrigger>
-                                                    <PopoverContent className="w-auto p-0">
-                                                        <Calendar
-                                                            mode="single"
-                                                            selected={field.value}
-                                                            onSelect={field.onChange}
-                                                            initialFocus
-                                                        />
-                                                    </PopoverContent>
-                                                </Popover>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <Button type="submit" disabled={submitting} className="w-full">
-                                        {submitting ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
-                                        {submitting ? 'Updating...' : 'Update Notice'}
+                                </div>
+                            </div>
+
+                            {/* Important Dates */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <Label>Important Dates</Label>
+                                    <Button type="button" variant="outline" size="sm" onClick={addImportantDate}>
+                                        <Plus className="h-4 w-4 mr-1" />
+                                        Add Date
                                     </Button>
-                                </form>
-                            </Form>
-                        </DialogContent>
-                    </Dialog>
+                                </div>
+                                {importantDates.map((date, index) => (
+                                    <div key={index} className="flex gap-2">
+                                        <Input
+                                            placeholder="Label (e.g., Deadline)"
+                                            value={date.label}
+                                            onChange={(e) => updateImportantDate(index, 'label', e.target.value)}
+                                        />
+                                        <Input
+                                            placeholder="Date"
+                                            value={date.value}
+                                            onChange={(e) => updateImportantDate(index, 'value', e.target.value)}
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => removeImportantDate(index)}
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
 
-                    {/* Delete Confirmation Dialog */}
-                    <Dialog open={deleteOpen} onOpenChange={(open) => {
-                        setDeleteOpen(open);
-                        if (!open) setSelectedNotice(null);
-                    }}>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Confirm Deletion</DialogTitle>
-                            </DialogHeader>
-                            <p>Are you sure you want to delete "{selectedNotice?.title}"?</p>
+                            <div className="grid grid-cols-2 gap-4">
+                                {/* Publish Date */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="publishedAt">Publish Date</Label>
+                                    <Input
+                                        id="publishedAt"
+                                        type="datetime-local"
+                                        {...register('publishedAt')}
+                                    />
+                                </div>
+
+                                {/* Expiry Date */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="expiryDate">Expiry Date</Label>
+                                    <Input
+                                        id="expiryDate"
+                                        type="datetime-local"
+                                        {...register('expiryDate')}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Status */}
+                            <div className="space-y-2">
+                                <Label>Status</Label>
+                                <Select
+                                    value={watchedValues.status}
+                                    onValueChange={(value) => setValue('status', value)}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="DRAFT">Save as Draft</SelectItem>
+                                        <SelectItem value="PUBLISHED">Publish Now</SelectItem>
+                                        <SelectItem value="SCHEDULED">Schedule for Later</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {/* Submit Buttons */}
                             <div className="flex gap-2 justify-end">
                                 <Button
+                                    type="button"
                                     variant="outline"
-                                    onClick={() => handleDelete(false)}
-                                    disabled={submitting}
+                                    onClick={() => setIsCreateDialogOpen(false)}
                                 >
-                                    Soft Delete (Archive)
+                                    Cancel
                                 </Button>
-                                <Button
-                                    variant="destructive"
-                                    onClick={() => handleDelete(true)}
-                                    disabled={submitting}
-                                >
-                                    Hard Delete
+                                <Button type="submit" disabled={createMutation.isPending}>
+                                    {createMutation.isPending ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Creating...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Send className="mr-2 h-4 w-4" />
+                                            {watchedValues.status === 'PUBLISHED' ? 'Publish' : 'Save'}
+                                        </>
+                                    )}
                                 </Button>
-                                <DialogClose asChild>
-                                    <Button variant="secondary">Cancel</Button>
-                                </DialogClose>
                             </div>
-                        </DialogContent>
-                    </Dialog>
+                        </form>
+                    </DialogContent>
+                </Dialog>
+            </div>
+
+            {/* Notices List */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>All Notices</CardTitle>
+                    <CardDescription>
+                        Total: {noticesData?.notices?.length || 0} notices
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        {noticesData?.notices?.map((notice) => (
+                            <div
+                                key={notice.id}
+                                className="border rounded-lg p-4 hover:bg-accent transition-colors"
+                            >
+                                <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <h3 className="font-semibold text-lg">{notice.title}</h3>
+                                            <Badge variant={notice.priority === 'URGENT' ? 'destructive' : 'secondary'}>
+                                                {notice.priority}
+                                            </Badge>
+                                            <Badge variant="outline">{notice.category}</Badge>
+                                            <Badge>{notice.status}</Badge>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground mb-2">
+                                            {notice.subtitle || notice.description.substring(0, 100)}...
+                                        </p>
+                                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                            <span>👁️ {notice._count?.NoticeReads || 0} views</span>
+                                            <span>📅 {new Date(notice.publishedAt || notice.createdAt).toLocaleDateString()}</span>
+                                            <span>👤 {notice.issuedBy || notice.Author?.name}</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button variant="ghost" size="sm">
+                                            <Eye className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="sm">
+                                            <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                                if (confirm('Delete this notice?')) {
+                                                    deleteMutation.mutate(notice.id);
+                                                }
+                                            }}
+                                        >
+                                            <Trash2 className="h-4 w-4 text-red-500" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </CardContent>
             </Card>
         </div>
