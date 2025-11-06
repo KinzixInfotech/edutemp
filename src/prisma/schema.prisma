@@ -519,6 +519,7 @@ model User {
   deletedAt             DateTime?
   status                UserStatus             @default(ACTIVE)
   Admin                 Admin?
+  fcmToken              String?
   attendance            Attendance[]
   AuditLog              AuditLog[]
   Document              Document[]

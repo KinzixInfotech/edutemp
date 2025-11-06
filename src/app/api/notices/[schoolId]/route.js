@@ -3,6 +3,8 @@
 // POST - Create new notice
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { pusher } from '@/lib/pusher';
+import { messaging } from '@/lib/firebase-admin';
 
 export async function GET(request, { params }) {
     try {
@@ -264,6 +266,26 @@ export async function POST(request, { params }) {
                 }
             }
         });
+        // If published, send real-time updates and push notifications
+        if (status === 'PUBLISHED') {
+            // 1. Get target users based on audience
+            const targetUsers = await getTargetUsers(schoolId, audience, targets);
+
+            // 2. Send real-time event via Pusher
+            await pusher.trigger(`school-${schoolId}`, 'new-notice', {
+                notice: {
+                    id: notice.id,
+                    title: notice.title,
+                    subtitle: notice.subtitle,
+                    category: notice.category,
+                    priority: notice.priority,
+                    publishedAt: notice.publishedAt,
+                }
+            });
+
+            // 3. Send FCM push notifications (background only)
+            await sendPushNotifications(targetUsers, notice);
+        }
 
         return NextResponse.json(notice, { status: 201 });
 
@@ -273,5 +295,80 @@ export async function POST(request, { params }) {
             { error: 'Failed to create notice', message: error.message },
             { status: 500 }
         );
+    }
+}
+
+// Helper: Get target users
+async function getTargetUsers(schoolId, audience, targets) {
+    const where = { schoolId };
+
+    if (audience === 'ALL') {
+        // All users in school
+    } else if (audience === 'STUDENTS') {
+        where.role = { name: 'STUDENT' };
+    } else if (audience === 'TEACHERS') {
+        where.role = { name: 'TEACHER' };
+    } else if (audience === 'CLASS') {
+        where.student = {
+            classId: { in: targets.map(t => t.classId).filter(Boolean) }
+        };
+    } else if (audience === 'SECTION') {
+        where.student = {
+            sectionId: { in: targets.map(t => t.sectionId).filter(Boolean) }
+        };
+    }
+
+    return await prisma.user.findMany({
+        where,
+        select: {
+            id: true,
+            name: true,
+            fcmToken: true, // Store FCM tokens in user table
+        }
+    });
+}
+
+// Helper: Send push notifications
+async function sendPushNotifications(users, notice) {
+    const tokens = users
+        .map(u => u.fcmToken)
+        .filter(Boolean);
+
+    if (tokens.length === 0) return;
+
+    const message = {
+        notification: {
+            title: notice.title,
+            body: notice.subtitle || notice.description.substring(0, 100),
+        },
+        data: {
+            type: 'NEW_NOTICE',
+            noticeId: notice.id,
+            category: notice.category,
+            priority: notice.priority,
+        },
+        tokens: tokens,
+    };
+
+    try {
+        const response = await messaging.sendEachForMulticast(message);
+        console.log(`Sent ${response.successCount} notifications`);
+
+        // Handle failed tokens
+        if (response.failureCount > 0) {
+            const failedTokens = [];
+            response.responses.forEach((resp, idx) => {
+                if (!resp.success) {
+                    failedTokens.push(tokens[idx]);
+                }
+            });
+            // Remove invalid tokens from database
+            await prisma.user.updateMany({
+                where: { fcmToken: { in: failedTokens } },
+                data: { fcmToken: null }
+            });
+        }
+    } catch (error) {
+        console.error('Error sending push notifications:', error);
     }
 }
