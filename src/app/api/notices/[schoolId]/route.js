@@ -3,7 +3,7 @@
 // POST - Create new notice
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { pusher } from '@/lib/pusher';
+
 import { messaging } from '@/lib/firebase-admin';
 
 export async function GET(request, { params }) {
@@ -20,6 +20,8 @@ export async function GET(request, { params }) {
         const page = parseInt(searchParams.get('page') || '1');
         const skip = (page - 1) * limit;
 
+        console.log('GET /notices DEBUG - schoolId:', schoolId, 'userId:', userId, 'limit:', limit, 'page:', page);
+
         // Build where clause
         const where = {
             schoolId,
@@ -33,6 +35,7 @@ export async function GET(request, { params }) {
         let totalCount;
 
         if (userId) {
+            console.log('GET DEBUG - Mobile user request, fetching user:', userId);
             // Mobile app request - get user-specific notices
             const user = await prisma.user.findUnique({
                 where: { id: userId },
@@ -49,8 +52,11 @@ export async function GET(request, { params }) {
             });
 
             if (!user) {
+                console.log('GET DEBUG - User not found:', userId);
                 return NextResponse.json({ error: 'User not found' }, { status: 404 });
             }
+
+            console.log('GET DEBUG - User found:', { id: user.id, role: user.role.name, hasStudent: !!user.student });
 
             // Build audience filter
             const audienceFilter = {
@@ -92,6 +98,8 @@ export async function GET(request, { params }) {
 
             where.AND = [audienceFilter];
 
+            console.log('GET DEBUG - Final where clause:', JSON.stringify(where, null, 2));
+
             // Fetch notices with read status
             notices = await prisma.notice.findMany({
                 where,
@@ -111,7 +119,7 @@ export async function GET(request, { params }) {
                     }
                 },
                 orderBy: [
-                    { priority: 'desc' },
+                    // { priority: 'desc' },
                     { publishedAt: 'desc' }
                 ],
                 take: limit,
@@ -119,6 +127,8 @@ export async function GET(request, { params }) {
             });
 
             totalCount = await prisma.notice.count({ where });
+
+            console.log(`GET DEBUG - Fetched ${notices.length} notices for user ${userId}, totalCount: ${totalCount}`);
 
             // Format for mobile
             notices = notices.map(notice => ({
@@ -142,6 +152,7 @@ export async function GET(request, { params }) {
             }));
 
         } else {
+            console.log('GET DEBUG - Web admin request, no userId');
             // Web admin request - get all notices
             notices = await prisma.notice.findMany({
                 where,
@@ -171,6 +182,7 @@ export async function GET(request, { params }) {
             });
 
             totalCount = await prisma.notice.count({ where });
+            console.log(`GET DEBUG - Fetched ${notices.length} notices (admin), totalCount: ${totalCount}`);
         }
 
         return NextResponse.json({
@@ -191,10 +203,13 @@ export async function GET(request, { params }) {
         );
     }
 }
+
 export async function POST(request, { params }) {
     try {
         const { schoolId } = params;
         const body = await request.json();
+
+        console.log('POST /notices DEBUG - Received body:', JSON.stringify(body, null, 2));
 
         const {
             title,
@@ -217,11 +232,14 @@ export async function POST(request, { params }) {
 
         // Validation
         if (!title || !description) {
+            console.log('POST DEBUG - Validation failed: title or description missing');
             return NextResponse.json(
                 { error: 'Title and description are required' },
                 { status: 400 }
             );
         }
+
+        console.log('POST DEBUG - Creating notice with status:', status, 'audience:', audience, 'targets:', targets);
 
         // Create notice with targets
         const notice = await prisma.notice.create({
@@ -266,25 +284,46 @@ export async function POST(request, { params }) {
                 }
             }
         });
+
+        console.log('POST DEBUG - Notice created:', { id: notice.id, title: notice.title, status: notice.status });
+
         // If published, send real-time updates and push notifications
         if (status === 'PUBLISHED') {
+            console.log('POST DEBUG - Notice is PUBLISHED, FCM');
+
             // 1. Get target users based on audience
             const targetUsers = await getTargetUsers(schoolId, audience, targets);
+            console.log(`POST DEBUG - Found ${targetUsers.length} target users for FCM`);
 
             // 2. Send real-time event via Pusher
-            await pusher.trigger(`school-${schoolId}`, 'new-notice', {
-                notice: {
-                    id: notice.id,
-                    title: notice.title,
-                    subtitle: notice.subtitle,
-                    category: notice.category,
-                    priority: notice.priority,
-                    publishedAt: notice.publishedAt,
-                }
-            });
+            // const pusherPayload = {
+            //     notice: {
+            //         id: notice.id,
+            //         title: notice.title,
+            //         subtitle: notice.subtitle || notice.description.substring(0, 100),
+            //         category: notice.category,
+            //         priority: notice.priority,
+            //         publishedAt: notice.publishedAt?.toISOString(),
+            //     }
+            // };
 
-            // 3. Send FCM push notifications (background only)
+            // console.log('POST DEBUG - PUSHER TRIGGERING:', {
+            //     channel: `school-${schoolId}`,
+            //     event: 'new-notice',
+            //     payload: pusherPayload
+            // });
+
+            // try {
+            //     await pusher.trigger(`school-${schoolId}`, 'new-notice', pusherPayload);
+            //     console.log('POST DEBUG - PUSHER SUCCESS');
+            // } catch (pusherError) {
+            //     console.error('POST DEBUG - PUSHER FAILED:', pusherError);
+            // }
+
+            // 2. Send FCM push notifications (background only)
             await sendPushNotifications(targetUsers, notice);
+        } else {
+            console.log('POST DEBUG - Notice is DRAFT, skipping Pusher & FCM');
         }
 
         return NextResponse.json(notice, { status: 201 });
@@ -300,32 +339,43 @@ export async function POST(request, { params }) {
 
 // Helper: Get target users
 async function getTargetUsers(schoolId, audience, targets) {
+    console.log('FCM DEBUG - getTargetUsers called with audience:', audience, 'targets:', targets);
+
     const where = { schoolId };
 
     if (audience === 'ALL') {
-        // All users in school
+        console.log('FCM DEBUG - Audience: ALL');
     } else if (audience === 'STUDENTS') {
         where.role = { name: 'STUDENT' };
+        console.log('FCM DEBUG - Audience: STUDENTS');
     } else if (audience === 'TEACHERS') {
         where.role = { name: 'TEACHER' };
+        console.log('FCM DEBUG - Audience: TEACHERS');
     } else if (audience === 'CLASS') {
-        where.student = {
-            classId: { in: targets.map(t => t.classId).filter(Boolean) }
-        };
+        const classIds = targets.map(t => t.classId).filter(Boolean);
+        where.student = { classId: { in: classIds } };
+        console.log('FCM DEBUG - Audience: CLASS, classIds:', classIds);
     } else if (audience === 'SECTION') {
-        where.student = {
-            sectionId: { in: targets.map(t => t.sectionId).filter(Boolean) }
-        };
+        const sectionIds = targets.map(t => t.sectionId).filter(Boolean);
+        where.student = { sectionId: { in: sectionIds } };
+        console.log('FCM DEBUG - Audience: SECTION, sectionIds:', sectionIds);
     }
 
-    return await prisma.user.findMany({
+    console.log('FCM DEBUG - Final where clause:', JSON.stringify(where, null, 2));
+
+    const users = await prisma.user.findMany({
         where,
         select: {
             id: true,
             name: true,
-            fcmToken: true, // Store FCM tokens in user table
+            fcmToken: true,
         }
     });
+
+    const validTokens = users.filter(u => u.fcmToken).length;
+    console.log(`FCM DEBUG - Found ${users.length} users, ${validTokens} have FCM tokens`);
+
+    return users;
 }
 
 // Helper: Send push notifications
@@ -334,7 +384,12 @@ async function sendPushNotifications(users, notice) {
         .map(u => u.fcmToken)
         .filter(Boolean);
 
-    if (tokens.length === 0) return;
+    console.log(`FCM DEBUG - Preparing to send to ${tokens.length} tokens`);
+
+    if (tokens.length === 0) {
+        console.log('FCM DEBUG - No valid FCM tokens, skipping send');
+        return;
+    }
 
     const message = {
         notification: {
@@ -343,16 +398,18 @@ async function sendPushNotifications(users, notice) {
         },
         data: {
             type: 'NEW_NOTICE',
-            noticeId: notice.id,
+           noticeId: notice.id.toString(),  // always string
             category: notice.category,
             priority: notice.priority,
         },
         tokens: tokens,
     };
 
+    console.log('FCM DEBUG - FCM message payload:', JSON.stringify(message, null, 2));
+
     try {
         const response = await messaging.sendEachForMulticast(message);
-        console.log(`Sent ${response.successCount} notifications`);
+        console.log(`FCM DEBUG - FCM SUCCESS: ${response.successCount} sent, ${response.failureCount} failed`);
 
         // Handle failed tokens
         if (response.failureCount > 0) {
@@ -360,15 +417,18 @@ async function sendPushNotifications(users, notice) {
             response.responses.forEach((resp, idx) => {
                 if (!resp.success) {
                     failedTokens.push(tokens[idx]);
+                    console.log(`FCM DEBUG - Failed token ${idx}:`, resp.error?.message);
                 }
             });
-            // Remove invalid tokens from database
+            console.log('FCM DEBUG - Cleaning up failed tokens:', failedTokens);
+
             await prisma.user.updateMany({
                 where: { fcmToken: { in: failedTokens } },
                 data: { fcmToken: null }
             });
+            console.log('FCM DEBUG - Removed failed tokens from DB');
         }
     } catch (error) {
-        console.error('Error sending push notifications:', error);
+        console.error('FCM DEBUG - FCM SEND ERROR:', error);
     }
 }
