@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { sendEmail } from '@/lib/email'; // You'll need to create this utility
 
-export async function POST(request, { params }) {
+export async function POST(request, props) {
+    const params = await props.params;
     try {
         const { schoolId, id } = params;
 

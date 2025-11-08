@@ -120,7 +120,8 @@ const superAdminSchema = baseUserSchema.extend({
     email: z.string().email().optional(),
 });
 
-export async function PATCH(req, { params }) {
+export async function PATCH(req, props) {
+    const params = await props.params;
     try {
         const userId = params.userId;
         const body = await req.json();

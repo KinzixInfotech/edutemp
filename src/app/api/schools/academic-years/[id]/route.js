@@ -2,7 +2,8 @@ import prisma from "@/lib/prisma"
 import { NextResponse } from "next/server"
 
 // 👉 Update academic year status
-export async function PATCH(req, { params }) {
+export async function PATCH(req, props) {
+    const params = await props.params;
     const { id } = params
     try {
         const body = await req.json()
@@ -44,7 +45,8 @@ export async function PATCH(req, { params }) {
 }
 
 // 👉 Delete academic year
-export async function DELETE(req, { params }) {
+export async function DELETE(req, props) {
+    const params = await props.params;
     const { id } = params
     try {
         await prisma.academicYear.delete({

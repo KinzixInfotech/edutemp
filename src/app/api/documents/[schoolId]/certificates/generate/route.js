@@ -3,7 +3,8 @@ import prisma from '@/lib/prisma';
 import { generatePDF } from '@/lib/pdf-generator';
 import { toBase64 } from '@/lib/utils';
 
-export async function POST(request, { params }) {
+export async function POST(request, props) {
+    const params = await props.params;
     try {
         const { schoolId } = params;
         const body = await request.json();

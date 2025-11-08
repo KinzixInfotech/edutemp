@@ -4,7 +4,8 @@ import { NextResponse } from 'next/server';
 import { generateCertificateNumber } from '@/lib/utils'; // Assume a utility for generating unique numbers'
 import prisma from "@/lib/prisma";
 
-export async function GET(request, { params }) {
+export async function GET(request, props) {
+  const params = await props.params;
   const { searchParams } = new URL(request.url);
   const schoolId = params.schoolId;
   const type = searchParams.get('type');
@@ -31,7 +32,8 @@ export async function GET(request, { params }) {
   }
 }
 
-export async function POST(request, { params }) {
+export async function POST(request, props) {
+  const params = await props.params;
   const schoolId = params.schoolId;
   const body = await request.json();
 

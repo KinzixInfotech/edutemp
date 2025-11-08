@@ -1,7 +1,8 @@
 import prisma from "@/lib/prisma"
 import { NextResponse } from "next/server"
 
-export async function PATCH(req, { params }) {
+export async function PATCH(req, props) {
+    const params = await props.params;
     const { classId, schoolId } = params
 
     if (!classId) {

@@ -5,7 +5,8 @@ import QRCode from 'qrcode';
 import prisma from '@/lib/prisma';
 
 
-export async function POST(request, { params }) {
+export async function POST(request, props) {
+  const params = await props.params;
   const schoolId = params.schoolId;
   const body = await request.json(); // { studentId, academicYearId? }
 

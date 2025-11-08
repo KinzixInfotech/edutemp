@@ -2,7 +2,8 @@
 import { NextResponse } from 'next/server';
 import prisma from "@/lib/prisma";
 
-export async function PUT(request, { params }) {
+export async function PUT(request, props) {
+    const params = await props.params;
     const { id } = params;
     const body = await request.json();
     try {
@@ -18,7 +19,8 @@ export async function PUT(request, { params }) {
     }
 }
 
-export async function DELETE(request, { params }) {
+export async function DELETE(request, props) {
+    const params = await props.params;
     const { id } = params;
     try {
         if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });

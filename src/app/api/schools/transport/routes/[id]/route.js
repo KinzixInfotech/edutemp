@@ -12,7 +12,8 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+    const params = await props.params;
     const { id } = params;
 
     try {
@@ -40,7 +41,8 @@ export async function GET(req, { params }) {
     }
 }
 
-export async function PUT(req, { params }) {
+export async function PUT(req, props) {
+    const params = await props.params;
     try {
         const { id } = params;
         const data = await req.json();
@@ -73,7 +75,8 @@ export async function PUT(req, { params }) {
     }
 }
 
-export async function DELETE(req, { params }) {
+export async function DELETE(req, props) {
+    const params = await props.params;
     const { id } = params;
     try {
         await prisma.route.delete({ where: { id } });

@@ -2,7 +2,8 @@
 import { NextResponse } from 'next/server';
 import prisma from "@/lib/prisma";
 
-export async function POST(request, { params }) {
+export async function POST(request, props) {
+    const params = await props.params;
     const { templateId } = params;
     const body = await request.json();
     try {

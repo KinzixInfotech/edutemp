@@ -17,7 +17,8 @@ const schema = z.object({
     isInstallment: z.boolean().optional(),
 });
 
-export async function POST(req, { params }) {
+export async function POST(req, props) {
+    const params = await props.params;
     try {
         const { studentId } = params;
         const body = await req.json();

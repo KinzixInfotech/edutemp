@@ -2,7 +2,8 @@
 import { NextResponse } from 'next/server';
 import prisma from "@/lib/prisma";
 
-export async function GET(request, { params }) {
+export async function GET(request, props) {
+    const params = await props.params;
     const { schoolId } = params;
     try {
         if (!schoolId) return NextResponse.json({ error: 'School ID required' }, { status: 400 });
@@ -16,7 +17,8 @@ export async function GET(request, { params }) {
     }
 }
 
-export async function POST(request, { params }) {
+export async function POST(request, props) {
+    const params = await props.params;
     const { schoolId } = params;
     const body = await request.json();
     try {

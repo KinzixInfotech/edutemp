@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { generateAdmitCardPDF } from '@/lib/pdf-generator-admitcard';
 
-export async function POST(request, { params }) {
+export async function POST(request, props) {
+    const params = await props.params;
     try {
         const { schoolId } = params;
         const body = await request.json();

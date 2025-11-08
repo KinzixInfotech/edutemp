@@ -3,7 +3,8 @@ import prisma from '@/lib/prisma';
 import { generateAdmitCardPDF } from '@/lib/pdf-generator-admitcard';
 // import { generateAdmitCardPDF } from '@/lib/admitcard-pdf-generator';
 
-export async function POST(request, { params }) {
+export async function POST(request, props) {
+    const params = await props.params;
     try {
         const { schoolId } = params;
         const body = await request.json();

@@ -7,7 +7,8 @@ const linkSchema = z.object({
     id: z.string().uuid(),
 });
 
-export async function POST(req, { params }) {
+export async function POST(req, props) {
+    const params = await props.params;
     const validated = linkSchema.parse({ id: params.id });
     try {
         const existing = await prisma.admissionForm.findUnique({

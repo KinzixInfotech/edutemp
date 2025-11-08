@@ -1,9 +1,13 @@
 // / File: app/api / notices / [schoolId] / [noticeId] / route.js
 // GET - Fetch single notice
 // PUT - Update notice
-// DELETE - Delete notice
+// DELETE - Delete notice'
 
-export async function GET(request, { params }) {
+import prisma from "@/lib/prisma";
+import { NextResponse } from "next/server";
+
+export async function GET(request, props) {
+    const params = await props.params;
     try {
         const { schoolId, noticeId } = params;
         const { searchParams } = new URL(request.url);
@@ -16,7 +20,7 @@ export async function GET(request, { params }) {
             },
             include: {
                 Author: {
-                    select: {
+                    select: { 
                         name: true,
                         email: true,
                     }
@@ -52,7 +56,8 @@ export async function GET(request, { params }) {
     }
 }
 
-export async function PUT(request, { params }) {
+export async function PUT(request, props) {
+    const params = await props.params;
     try {
         const { schoolId, noticeId } = params;
         const body = await request.json();
@@ -135,7 +140,8 @@ export async function PUT(request, { params }) {
     }
 }
 
-export async function DELETE(request, { params }) {
+export async function DELETE(request, props) {
+    const params = await props.params;
     try {
         const { noticeId } = params;
 
@@ -157,7 +163,8 @@ export async function DELETE(request, { params }) {
 // File: app/api/notices/[schoolId]/[noticeId]/mark-read/route.js
 // POST - Mark notice as read
 
-export async function POST(request, { params }) {
+export async function POST(request, props) {
+    const params = await props.params;
     try {
         const { noticeId } = params;
         const body = await request.json();

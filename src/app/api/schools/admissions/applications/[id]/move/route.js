@@ -65,7 +65,8 @@ const moveSchema = z.object({
   stageData: z.record(z.any()).optional(), // Stage-specific data
 });
 
-export async function POST(req, { params }) {
+export async function POST(req, props) {
+  const params = await props.params;
   try {
     const data = await req.json();
     const validated = moveSchema.parse(data);

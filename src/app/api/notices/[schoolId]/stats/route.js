@@ -1,7 +1,8 @@
 // File: app/api/notices/[schoolId]/stats/route.js
 // GET - Get notice statistics for dashboard
 
-export async function GET(request, { params }) {
+export async function GET(request, props) {
+    const params = await props.params;
     try {
         const { schoolId } = params;
         const { searchParams } = new URL(request.url);

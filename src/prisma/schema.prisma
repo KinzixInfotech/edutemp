@@ -54,6 +54,8 @@ model School {
   Signature              Signature[]
   Stamp                  Stamp[]
   DocumentTemplate       DocumentTemplate[]
+  globalFeeStructures    GlobalFeeStructure[]
+  studentFees            StudentFee[]
 
   @@index([name])
 }
@@ -542,6 +544,8 @@ model User {
   DocumentTemplate      DocumentTemplate[]
   NoticeReads           NoticeRead[]           @relation("NoticeReads")
   NoticeTargets         NoticeTarget[]         @relation("NoticeTargetUser")
+  approvedDiscounts     FeeDiscount[]          @relation("ApprovedDiscounts")
+  collectedPayments     FeePayment[]           @relation("CollectedPayments")
 
   @@index([schoolId])
   @@index([roleId])
@@ -592,19 +596,19 @@ model MasterAdmin {
 }
 
 model Student {
-  userId                 String                   @id @db.Uuid
-  classId                Int
-  parentId               String?                  @db.Uuid
-  name                   String
-  email                  String
-  dob                    String
-  gender                 String
-  admissionDate          String
-  sectionId              Int
-  bloodGroup             String
-  rollNumber             String
-  PreviousSchoolName     String?
-  FeeStatus              FeeStatus                @default(PENDING)
+  userId             String  @id @db.Uuid
+  classId            Int
+  parentId           String? @db.Uuid
+  name               String
+  email              String
+  dob                String
+  gender             String
+  admissionDate      String
+  sectionId          Int
+  bloodGroup         String
+  rollNumber         String
+  PreviousSchoolName String?
+
   DateOfLeaving          String?
   contactNumber          String
   Address                String
@@ -637,6 +641,8 @@ model Student {
   CertificateGenerated   CertificateGenerated[]
   DigitalIdCard          DigitalIdCard[]
   AdmitCard              AdmitCard[]
+  studentFees            StudentFee[]
+  feeReminders           FeeReminder[]
 
   @@index([classId])
   @@index([sectionId])
@@ -729,15 +735,15 @@ model NonTeachingStaff {
 }
 
 model Class {
-  id                  Int            @id @default(autoincrement())
-  schoolId            String         @db.Uuid
+  id                  Int                  @id @default(autoincrement())
+  schoolId            String               @db.Uuid
   className           String
   capacity            Int?
-  teachingStaffUserId String?        @db.Uuid
-  academicYearId      String?        @db.Uuid
-  AcademicYear        AcademicYear?  @relation(fields: [academicYearId], references: [id])
-  school              School         @relation(fields: [schoolId], references: [id])
-  TeachingStaff       TeachingStaff? @relation(fields: [teachingStaffUserId], references: [userId])
+  teachingStaffUserId String?              @db.Uuid
+  academicYearId      String?              @db.Uuid
+  AcademicYear        AcademicYear?        @relation(fields: [academicYearId], references: [id])
+  school              School               @relation(fields: [schoolId], references: [id])
+  TeachingStaff       TeachingStaff?       @relation(fields: [teachingStaffUserId], references: [userId])
   FeeStructure        FeeStructure[]
   homework            Homework[]
   NoticeTarget        NoticeTarget[]
@@ -746,6 +752,7 @@ model Class {
   subjects            Subject[]
   Syllabi             Syllabus[]
   Assignment          Assignment[]
+  globalFeeStructures GlobalFeeStructure[]
 
   @@unique([id, schoolId])
   @@index([schoolId])
@@ -876,22 +883,24 @@ model ExamResult {
 }
 
 model AcademicYear {
-  id               String             @id @default(uuid()) @db.Uuid
-  name             String
-  startDate        DateTime
-  endDate          DateTime
-  isActive         Boolean            @default(false)
-  createdAt        DateTime           @default(now())
-  schoolId         String             @db.Uuid
-  school           School             @relation(fields: [schoolId], references: [id])
-  classes          Class[]
-  FeePayments      FeePayment[]
-  FeeStructures    FeeStructure[]
-  NonTeachingStaff NonTeachingStaff[]
-  students         Student[]
-  Syllabus         Syllabus[]
-  TeachingStaff    TeachingStaff[]
-  DigitalIdCard    DigitalIdCard[]
+  id                  String               @id @default(uuid()) @db.Uuid
+  name                String
+  startDate           DateTime
+  endDate             DateTime
+  isActive            Boolean              @default(false)
+  createdAt           DateTime             @default(now())
+  schoolId            String               @db.Uuid
+  school              School               @relation(fields: [schoolId], references: [id])
+  classes             Class[]
+  FeePayments         FeePayment[]
+  FeeStructures       FeeStructure[]
+  NonTeachingStaff    NonTeachingStaff[]
+  students            Student[]
+  Syllabus            Syllabus[]
+  TeachingStaff       TeachingStaff[]
+  DigitalIdCard       DigitalIdCard[]
+  globalFeeStructures GlobalFeeStructure[]
+  studentFees         StudentFee[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -942,52 +951,6 @@ model StudentFeeStructure {
   feeStructure   FeeStructure           @relation(fields: [feeStructureId], references: [id])
   School         School?                @relation(fields: [schoolId], references: [id])
   Student        Student?               @relation(fields: [studentUserId], references: [userId])
-}
-
-model StudentFeeParticular {
-  id                    String                  @id @default(uuid()) @db.Uuid
-  studentFeeStructureId String                  @db.Uuid
-  globalParticularId    String                  @db.Uuid
-  amount                Float?
-  StudentFeeInstallment StudentFeeInstallment[]
-  globalParticular      FeeParticular           @relation(fields: [globalParticularId], references: [id])
-  studentFeeStructure   StudentFeeStructure     @relation(fields: [studentFeeStructureId], references: [id])
-}
-
-model FeePayment {
-  id                    String               @id @default(uuid()) @db.Uuid
-  schoolId              String               @db.Uuid
-  academicYearId        String               @db.Uuid
-  studentId             String               @db.Uuid
-  feeStructureId        String?              @db.Uuid
-  studentFeeStructureId String?              @db.Uuid
-  amount                Float
-  paymentDate           DateTime             @default(now())
-  paymentMode           String
-  academicYear          AcademicYear         @relation(fields: [academicYearId], references: [id])
-  feeStructure          FeeStructure?        @relation(fields: [feeStructureId], references: [id])
-  school                School               @relation(fields: [schoolId], references: [id])
-  studentFeeStructure   StudentFeeStructure? @relation(fields: [studentFeeStructureId], references: [id])
-  student               Student              @relation(fields: [studentId], references: [userId])
-
-  @@index([schoolId])
-  @@index([academicYearId])
-  @@index([studentId])
-  @@index([feeStructureId])
-  @@index([studentFeeStructureId])
-}
-
-model StudentFeeInstallment {
-  id                     String               @id @default(uuid()) @db.Uuid
-  studentFeeParticularId String               @db.Uuid
-  dueDate                DateTime
-  amount                 Float
-  status                 String               @default("UNPAID")
-  createdAt              DateTime             @default(now())
-  updatedAt              DateTime             @default(now()) @updatedAt
-  studentFeeParticular   StudentFeeParticular @relation(fields: [studentFeeParticularId], references: [id])
-
-  @@index([studentFeeParticularId])
 }
 
 model Attendance {
@@ -1421,13 +1384,6 @@ enum AuditAction {
   ERROR
 }
 
-enum FeeStatus {
-  PAID
-  UNPAID
-  PENDING
-  PARTIAL
-}
-
 enum UserStatus {
   ACTIVE
   INACTIVE
@@ -1451,23 +1407,353 @@ enum AttendanceStatus {
   HOLIDAY
 }
 
-enum FeeMode {
-  MONTHLY
-  QUARTERLY
-  HALF_YEARLY
-  YEARLY
-}
-
-enum PaymentStatus {
-  PENDING
-  PAID
-  FAILED
-}
-
 enum StageName {
   REVIEW
   TEST_INTERVIEW
   OFFER
   ENROLLED
   REJECTED
+}
+
+// ============================================
+// ENHANCED FEE MANAGEMENT SYSTEM SCHEMA
+// ============================================
+
+// Global Fee Structure (Template by Class)
+model GlobalFeeStructure {
+  id             String   @id @default(uuid()) @db.Uuid
+  schoolId       String   @db.Uuid
+  academicYearId String   @db.Uuid
+  classId        Int
+  name           String // e.g., "Class 10 Annual Fees 2024-25"
+  description    String?
+  mode           FeeMode  @default(YEARLY)
+  totalAmount    Float // Total calculated amount
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  school           School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear     AcademicYear          @relation(fields: [academicYearId], references: [id])
+  class            Class                 @relation(fields: [classId], references: [id])
+  particulars      GlobalFeeParticular[]
+  studentFees      StudentFee[]
+  installmentRules FeeInstallmentRule[]
+
+  @@unique([schoolId, academicYearId, classId])
+  @@index([schoolId, academicYearId])
+  @@index([classId])
+}
+
+// Fee Components (Tuition, Books, Transport, etc.)
+model GlobalFeeParticular {
+  id                   String      @id @default(uuid()) @db.Uuid
+  globalFeeStructureId String      @db.Uuid
+  name                 String // "Tuition Fee", "Transport Fee", etc.
+  amount               Float
+  isOptional           Boolean     @default(false)
+  category             FeeCategory @default(TUITION)
+  displayOrder         Int         @default(0)
+
+  globalFeeStructure GlobalFeeStructure     @relation(fields: [globalFeeStructureId], references: [id], onDelete: Cascade)
+  studentParticulars StudentFeeParticular[]
+
+  @@index([globalFeeStructureId])
+}
+
+// Installment Rules (How to break down payments)
+model FeeInstallmentRule {
+  id                   String   @id @default(uuid()) @db.Uuid
+  globalFeeStructureId String   @db.Uuid
+  installmentNumber    Int // 1, 2, 3, 4...
+  dueDate              DateTime
+  percentage           Float // Percentage of total
+  amount               Float // Fixed amount (calculated)
+  lateFeeAmount        Float    @default(0)
+  lateFeeAfterDays     Int      @default(0)
+
+  globalFeeStructure  GlobalFeeStructure      @relation(fields: [globalFeeStructureId], references: [id], onDelete: Cascade)
+  studentInstallments StudentFeeInstallment[]
+
+  @@unique([globalFeeStructureId, installmentNumber])
+  @@index([globalFeeStructureId])
+  @@index([dueDate])
+}
+
+// Student Fee Assignment (Individual Student's Fee)
+model StudentFee {
+  id                   String  @id @default(uuid()) @db.Uuid
+  studentId            String  @db.Uuid
+  schoolId             String  @db.Uuid
+  academicYearId       String  @db.Uuid
+  globalFeeStructureId String? @db.Uuid // Null for custom fees
+
+  // Amounts
+  originalAmount Float // Before any discounts
+  discountAmount Float @default(0)
+  finalAmount    Float // After discounts
+  paidAmount     Float @default(0)
+  balanceAmount  Float // Remaining
+
+  // Status
+  status   FeeStatus @default(UNPAID)
+  isCustom Boolean   @default(false) // Custom fee structure
+
+  // Dates
+  assignedDate    DateTime  @default(now())
+  lastPaymentDate DateTime?
+
+  // Relations
+  student            Student             @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  school             School              @relation(fields: [schoolId], references: [id])
+  academicYear       AcademicYear        @relation(fields: [academicYearId], references: [id])
+  globalFeeStructure GlobalFeeStructure? @relation(fields: [globalFeeStructureId], references: [id])
+
+  particulars  StudentFeeParticular[]
+  installments StudentFeeInstallment[]
+  payments     FeePayment[]
+  discounts    FeeDiscount[]
+
+  @@unique([studentId, academicYearId])
+  @@index([schoolId, academicYearId])
+  @@index([status])
+  @@index([studentId])
+}
+
+// Individual Fee Components for Each Student
+model StudentFeeParticular {
+  id                 String    @id @default(uuid()) @db.Uuid
+  studentFeeId       String    @db.Uuid
+  globalParticularId String?   @db.Uuid
+  name               String
+  amount             Float
+  paidAmount         Float     @default(0)
+  status             FeeStatus @default(UNPAID)
+
+  studentFee            StudentFee           @relation(fields: [studentFeeId], references: [id], onDelete: Cascade)
+  globalParticular      GlobalFeeParticular? @relation(fields: [globalParticularId], references: [id])
+  feeParticular         FeeParticular?       @relation(fields: [feeParticularId], references: [id])
+  feeParticularId       String?              @db.Uuid
+  studentFeeStructure   StudentFeeStructure? @relation(fields: [studentFeeStructureId], references: [id])
+  studentFeeStructureId String?              @db.Uuid
+
+  @@index([studentFeeId])
+  @@index([status])
+}
+
+// Student Installments (Payment Schedule)
+model StudentFeeInstallment {
+  id                String            @id @default(uuid()) @db.Uuid
+  studentFeeId      String            @db.Uuid
+  installmentRuleId String?           @db.Uuid
+  installmentNumber Int
+  dueDate           DateTime
+  amount            Float
+  paidAmount        Float             @default(0)
+  status            InstallmentStatus @default(PENDING)
+  lateFee           Float             @default(0)
+  isOverdue         Boolean           @default(false)
+  paidDate          DateTime?
+
+  studentFee      StudentFee              @relation(fields: [studentFeeId], references: [id], onDelete: Cascade)
+  installmentRule FeeInstallmentRule?     @relation(fields: [installmentRuleId], references: [id])
+  payments        FeePaymentInstallment[]
+
+  @@unique([studentFeeId, installmentNumber])
+  @@index([studentFeeId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([isOverdue])
+}
+
+// Discount Management
+model FeeDiscount {
+  id           String       @id @default(uuid()) @db.Uuid
+  studentFeeId String       @db.Uuid
+  reason       String
+  discountType DiscountType @default(FIXED)
+  value        Float // Percentage or Fixed Amount
+  amount       Float // Calculated discount amount
+  approvedBy   String?      @db.Uuid
+  approvedDate DateTime?
+  remarks      String?
+  createdAt    DateTime     @default(now())
+
+  studentFee StudentFee @relation(fields: [studentFeeId], references: [id], onDelete: Cascade)
+  approver   User?      @relation("ApprovedDiscounts", fields: [approvedBy], references: [id])
+
+  @@index([studentFeeId])
+}
+
+// Payment Records
+model FeePayment {
+  id             String @id @default(uuid()) @db.Uuid
+  studentFeeId   String @db.Uuid
+  studentId      String @db.Uuid
+  schoolId       String @db.Uuid
+  academicYearId String @db.Uuid
+
+  // Payment Details
+  amount          Float
+  paymentMode     PaymentMode
+  paymentMethod   PaymentMethod @default(CASH)
+  transactionId   String?       @unique
+  referenceNumber String?
+
+  // Gateway Details (for online payments)
+  gatewayName      String? // "Razorpay", "Stripe", etc.
+  gatewayOrderId   String?
+  gatewayPaymentId String?
+  gatewayResponse  Json? // Store full gateway response
+
+  // Status
+  status        PaymentStatus @default(PENDING)
+  failureReason String?
+
+  // Dates
+  paymentDate DateTime  @default(now())
+  clearedDate DateTime?
+
+  // Receipt
+  receiptNumber String  @unique
+  receiptUrl    String?
+
+  // Collection Details
+  collectedBy String? @db.Uuid
+  remarks     String?
+
+  // Relations
+  studentFee   StudentFee   @relation(fields: [studentFeeId], references: [id])
+  student      Student      @relation(fields: [studentId], references: [userId])
+  school       School       @relation(fields: [schoolId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  collector    User?        @relation("CollectedPayments", fields: [collectedBy], references: [id])
+
+  installmentPayments   FeePaymentInstallment[]
+  feeStructure          FeeStructure?           @relation(fields: [feeStructureId], references: [id])
+  feeStructureId        String?                 @db.Uuid
+  studentFeeStructure   StudentFeeStructure?    @relation(fields: [studentFeeStructureId], references: [id])
+  studentFeeStructureId String?                 @db.Uuid
+
+  @@index([studentFeeId])
+  @@index([studentId])
+  @@index([schoolId, academicYearId])
+  @@index([status])
+  @@index([paymentDate])
+  @@index([receiptNumber])
+}
+
+// Link Payments to Installments
+model FeePaymentInstallment {
+  id            String @id @default(uuid()) @db.Uuid
+  paymentId     String @db.Uuid
+  installmentId String @db.Uuid
+  amount        Float // Amount allocated to this installment
+
+  payment     FeePayment            @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  installment StudentFeeInstallment @relation(fields: [installmentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId])
+  @@index([installmentId])
+}
+
+// Payment Reminders
+model FeeReminder {
+  id            String       @id @default(uuid()) @db.Uuid
+  studentId     String       @db.Uuid
+  studentFeeId  String       @db.Uuid
+  reminderType  ReminderType @default(DUE_SOON)
+  message       String
+  sentDate      DateTime     @default(now())
+  scheduledDate DateTime
+  status        String       @default("SENT") // SENT, FAILED, PENDING
+  channel       String       @default("EMAIL") // EMAIL, SMS, APP
+
+  student Student @relation(fields: [studentId], references: [userId])
+
+  @@index([studentId])
+  @@index([scheduledDate])
+  @@index([status])
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum FeeCategory {
+  TUITION
+  ADMISSION
+  EXAMINATION
+  LIBRARY
+  LABORATORY
+  SPORTS
+  TRANSPORT
+  HOSTEL
+  MISCELLANEOUS
+  DEVELOPMENT
+  CAUTION_MONEY
+}
+
+enum FeeMode {
+  MONTHLY
+  QUARTERLY
+  HALF_YEARLY
+  YEARLY
+  ONE_TIME
+}
+
+enum FeeStatus {
+  PAID
+  UNPAID
+  PARTIAL
+  OVERDUE
+  WAIVED
+}
+
+enum InstallmentStatus {
+  PENDING
+  PAID
+  PARTIAL
+  OVERDUE
+  WAIVED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+  SCHOLARSHIP
+  SIBLING
+  STAFF_WARD
+  MERIT
+}
+
+enum PaymentMode {
+  ONLINE
+  OFFLINE
+}
+
+enum PaymentMethod {
+  CASH
+  CHEQUE
+  CARD
+  UPI
+  NET_BANKING
+  WALLET
+  DEMAND_DRAFT
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum ReminderType {
+  DUE_SOON
+  OVERDUE
+  PAYMENT_CONFIRMATION
+  INSTALLMENT_DUE
 }

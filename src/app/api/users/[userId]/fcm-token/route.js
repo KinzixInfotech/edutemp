@@ -2,7 +2,8 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
-export async function POST(request, { params }) {
+export async function POST(request, props) {
+    const params = await props.params;
     try {
         const { userId } = params;
         const body = await request.json();
@@ -74,7 +75,8 @@ export async function POST(request, { params }) {
     }
 }
 
-export async function DELETE(request, { params }) {
+export async function DELETE(request, props) {
+    const params = await props.params;
     try {
         const { userId } = params;
 

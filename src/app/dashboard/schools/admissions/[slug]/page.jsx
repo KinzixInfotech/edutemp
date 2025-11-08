@@ -1,5 +1,6 @@
 // app/admissions/[slug]/page.jsx
-'use client';
+'use client';;
+import { use } from "react";
 export const dynamic = 'force-dynamic';
 
 import { useQuery } from "@tanstack/react-query";
@@ -15,7 +16,8 @@ async function fetchFormBySlug(slug, schoolId) {
     return data.forms[0];
 }
 
-export default function FormPage({ params }) {
+export default function FormPage(props) {
+    const params = use(props.params);
     const { slug } = params;
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;

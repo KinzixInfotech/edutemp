@@ -39,7 +39,13 @@ import {
 } from "@tabler/icons-react"
 import { NavSidebarSections } from "./nav-main"
 import { Separator } from "./ui/separator"
-import { BookCopy, BookMarked, BotMessageSquare, CalendarCog, Car, Coins, DollarSign, Ellipsis, FileBadge, Flag, FlaskRound, Grip, House, IdCard, Inbox, Library, MonitorCog, Newspaper, SearchIcon, Send, Settings, Timer, User, UserPen } from "lucide-react"
+import {
+    BookCopy, BookMarked, BotMessageSquare, CalendarCog, Car, ChartNoAxesCombined, Coins, DollarSign, Ellipsis, FileBadge, Flag, FlaskRound, Grip, House, IdCard, Inbox, Library, MonitorCog, Newspaper, SearchIcon, Send, Settings, Timer, User, UserPen, LayoutDashboard,
+    FileSpreadsheet,
+    ArrowLeftRight,
+    CreditCard,
+    BarChart3,
+} from "lucide-react"
 import { useCommandMenu } from "./CommandMenuContext"
 
 export const SidebarData = [
@@ -242,26 +248,36 @@ export const SidebarData = [
     {
         title: "Fee Management",
         items: [
+            { label: "Overview", url: "/dashboard/fees/overview", icon: LayoutDashboard, roles: ["ADMIN"] },
             {
-                label: "Fee Structure",
-                icon: DollarSign,
+                label: "Manage Fee Structure",
+                icon: FileSpreadsheet,
+                url: "/dashboard/fees/manage-fee-structure",
                 roles: ["ADMIN"],
-                submenu: [
-                    { label: "Create Fee Structure", url: "/dashboard/fees/manage-fee-structure", roles: ["ADMIN"] },
-                    { label: "View Fee Structures", url: "/dashboard/fees/fee-structures", roles: ["ADMIN"] },
-                    { label: "Custom Fee Structure", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
-                ],
             },
             {
-                label: "Fee Manage",
-                icon: Coins,
+                label: "Assign Structure",
+                icon: ArrowLeftRight,
+                url: "/dashboard/fees/assign",
                 roles: ["ADMIN"],
-                submenu: [
-                    { label: "Fee Manage", url: "/dashboard/fees/manage-fees", roles: ["ADMIN"] },
-                    { label: "Payments", url: "/dashboard/fees/payments", roles: ["ADMIN"] },
-                    { label: "Collect Fee", url: "/dashboard/fees/collect-fee", roles: ["ADMIN"] },
-                    { label: "Report", url: "/dashboard/fees/report", roles: ["ADMIN"] },
-                ],
+            },
+            {
+                label: "Track Payments",
+                icon: CreditCard,
+                url: "/dashboard/fees/payments",
+                roles: ["ADMIN"],
+            },
+            {
+                label: "Reports",
+                icon: BarChart3,
+                url: "/dashboard/fees/reports",
+                roles: ["ADMIN"],
+            },
+            {
+                label: "Fee Settings",
+                icon: Settings,
+                url: "/dashboard/fees/settings",
+                roles: ["ADMIN"],
             },
         ],
     },
@@ -309,12 +325,12 @@ export const SidebarData = [
                 roles: ["ADMIN"],
                 submenu: [
                     {
-                        label: "Create Exam", url: "/dashboard/fees/manage-fee-structure", roles: ["ADMIN"]
+                        label: "Create Exam", url: "/dashboard/fees/#", roles: ["ADMIN"]
                     },
-                    { label: "Schedule Exam", url: "/dashboard/fees/fee-structures", roles: ["ADMIN"] },
-                    { label: "Input Marks", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
-                    { label: "Results & Reports", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
-                    { label: "Question Banks", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
+                    { label: "Schedule Exam", url: "/dashboard/fees/#", roles: ["ADMIN"] },
+                    { label: "Input Marks", url: "/dashboard/fees/#", roles: ["ADMIN"] },
+                    { label: "Results & Reports", url: "/dashboard/fees/#", roles: ["ADMIN"] },
+                    { label: "Question Banks", url: "/dashboard/fees/#", roles: ["ADMIN"] },
                 ],
             },
         ],

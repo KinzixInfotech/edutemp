@@ -2,7 +2,8 @@ import prisma from "@/lib/prisma"
 import { NextResponse } from "next/server"
 
 
-export async function GET(request, { params }) {
+export async function GET(request, props) {
+    const params = await props.params;
     const { schoolId } = params;
     try {
         const school = await prisma.school.findUnique({

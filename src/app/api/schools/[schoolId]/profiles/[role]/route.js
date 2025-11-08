@@ -110,8 +110,8 @@ export async function POST(req, context) {
     let createdUserId = null;
 
     try {
-        const rawRole = context.params.role;
-        const schoolId = context.params.schoolId;
+        const rawRole = (await context.params).role;
+        const schoolId = (await context.params).schoolId;
         const mappedRole = roleMap[rawRole?.toLowerCase()];
         const validRoles = ["STUDENT", "TEACHING_STAFF", "PARENT", "NON_TEACHING_STAFF"];
 
@@ -217,7 +217,7 @@ export async function POST(req, context) {
                                 bloodGroup: parsed.bloodGroup || "",
                                 contactNumber: parsed.contactNumber || "",
                                 email: parsed.email,
-                                FeeStatus: "PENDING",
+                                // FeeStatus: "PENDING",
                                 admissionDate:
                                     parsed.admissionDate?.toISOString() || new Date().toISOString(),
                                 rollNumber: parsed.rollNumber || "",

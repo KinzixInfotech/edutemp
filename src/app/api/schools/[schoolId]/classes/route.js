@@ -46,7 +46,8 @@ export async function POST(req) {
 }
 
 //Fetch classes with optional academicYearId filter and conditional AcademicYear inclusion
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+  const params = await props.params;
   try {
     const { schoolId } = params
     const { searchParams } = new URL(req.url)

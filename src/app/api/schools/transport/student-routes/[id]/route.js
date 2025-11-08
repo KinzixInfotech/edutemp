@@ -9,7 +9,8 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+    const params = await props.params;
     const { id } = params;
 
     try {
@@ -36,7 +37,8 @@ export async function GET(req, { params }) {
     }
 }
 
-export async function DELETE(req, { params }) {
+export async function DELETE(req, props) {
+    const params = await props.params;
     const { id } = params;
     try {
         await prisma.studentRouteAssignment.delete({ where: { id } });

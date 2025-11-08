@@ -2,7 +2,8 @@
 import { NextResponse } from 'next/server';
 import prisma from "@/lib/prisma";
 
-export async function PUT(request, { params }) {
+export async function PUT(request, props) {
+  const params = await props.params;
   const { schoolId, templateId } = params;
   const body = await request.json();
 
@@ -24,7 +25,8 @@ export async function PUT(request, { params }) {
   }
 }
 
-export async function DELETE(request, { params }) {
+export async function DELETE(request, props) {
+  const params = await props.params;
   const { schoolId, templateId } = params;
 
   try {

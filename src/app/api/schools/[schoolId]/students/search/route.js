@@ -3,7 +3,8 @@ import { PrismaClient } from "@prisma/client"
 
 const prisma = new PrismaClient()
 
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+    const params = await props.params;
     const { schoolId } = params
     const { searchParams } = new URL(req.url)
     const query = searchParams.get("q") || ""

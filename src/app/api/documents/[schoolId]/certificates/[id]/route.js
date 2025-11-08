@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 // GET - Fetch single certificate
-export async function GET(request, { params }) {
+export async function GET(request, props) {
+    const params = await props.params;
     try {
         const { schoolId, id } = params;
 
@@ -63,7 +64,8 @@ export async function GET(request, { params }) {
 }
 
 // DELETE - Delete certificate
-export async function DELETE(request, { params }) {
+export async function DELETE(request, props) {
+    const params = await props.params;
     try {
         const { schoolId, id } = params;
 
