@@ -179,6 +179,124 @@ async function getAuthenticatedUser(req) {
 }
 
 // ------------------ GET: Get full user data by userId ------------------
+// export async function GET(req) {
+//     try {
+//         const sessionUser = await getAuthenticatedUser(req);
+//         if (!sessionUser) {
+//             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+//         }
+
+//         const { searchParams } = new URL(req.url);
+//         const userId = searchParams.get("userId");
+
+//         if (!userId) {
+//             return NextResponse.json({ error: "Missing userId" }, { status: 400 });
+//         }
+
+//         // Only SUPER_ADMIN can fetch other users
+//         if (sessionUser.id !== userId) {
+//             const user = await prisma.user.findUnique({
+//                 where: { id: sessionUser.id },
+//                 include: { role: true },
+//             });
+//             if (user.role.name !== "SUPER_ADMIN") {
+//                 return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+//             }
+//         }
+
+//         const start = performance.now();
+
+//         // Base user info
+//         const user = await prisma.user.findUnique({
+//             where: { id: userId },
+//             select: {
+//                 id: true,
+//                 email: true,
+//                 name: true,
+//                 role: true,
+//                 profilePicture: true,
+//                 schoolId: true,
+//             },
+//         });
+
+//         if (!user) {
+//             return NextResponse.json({ error: "User not found" }, { status: 404 });
+//         }
+
+//         let schoolId = null;
+//         let school = null;
+//         let classs = null;
+//         let section = null;
+//         let studentdatafull = null;
+
+//         switch (user.role.name) {
+//             case "ADMIN":
+//                 const admin = await prisma.admin.findUnique({
+//                     where: { userId },
+//                     select: { schoolId: true, school: true },
+//                 });
+//                 schoolId = admin?.schoolId;
+//                 school = admin?.school;
+//                 break;
+
+//             case "TEACHING_STAFF":
+//                 const teacher = await prisma.teacher.findUnique({
+//                     where: { userId },
+//                     select: { schoolId: true },
+//                 });
+//                 schoolId = teacher?.schoolId;
+//                 break;
+
+//             case "NON_TEACHING_STAFF":
+//                 const staff = await prisma.staff.findUnique({
+//                     where: { userId },
+//                     select: { schoolId: true },
+//                 });
+//                 schoolId = staff?.schoolId;
+//                 break;
+
+//             case "STUDENT":
+//                 const student = await prisma.student.findUnique({
+//                     where: { userId },
+//                     include: { class: true, section: true },
+//                 });
+//                 schoolId = student?.schoolId;
+//                 studentdatafull = student;
+//                 classs = student?.class;
+//                 section = student?.section;
+//                 break;
+//             case "PARENT":
+//                 const parent = await prisma.parent.findUnique({
+//                     where: { userId },
+//                     include: {
+//                         user: true,          // fetch related User object
+//                         school: true,        // fetch related School object
+//                         studentLinks: true,  // fetch related StudentParentLink array
+//                     },
+//                 });
+
+//                 if (!parent) {
+//                     return NextResponse.json({ error: "Parent not found" }, { status: 404 });
+//                 }
+//         }
+
+//         const end = performance.now();
+//         console.log(`🕒 User query took ${end - start}ms`);
+
+//         return NextResponse.json({
+//             ...user,
+//             schoolId,
+//             school,
+//             classs,
+//             section,
+//             studentdatafull,
+//             parent,
+//         });
+//     } catch (err) {
+//         console.error("❌ Error in GET /api/auth/user:", err);
+//         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+//     }
+// }
 export async function GET(req) {
     try {
         const sessionUser = await getAuthenticatedUser(req);
@@ -188,18 +306,17 @@ export async function GET(req) {
 
         const { searchParams } = new URL(req.url);
         const userId = searchParams.get("userId");
-
         if (!userId) {
             return NextResponse.json({ error: "Missing userId" }, { status: 400 });
         }
 
         // Only SUPER_ADMIN can fetch other users
         if (sessionUser.id !== userId) {
-            const user = await prisma.user.findUnique({
+            const currentUser = await prisma.user.findUnique({
                 where: { id: sessionUser.id },
                 include: { role: true },
             });
-            if (user.role.name !== "SUPER_ADMIN") {
+            if (currentUser.role.name !== "SUPER_ADMIN") {
                 return NextResponse.json({ error: "Forbidden" }, { status: 403 });
             }
         }
@@ -209,81 +326,85 @@ export async function GET(req) {
         // Base user info
         const user = await prisma.user.findUnique({
             where: { id: userId },
-            select: {
-                id: true,
-                email: true,
-                name: true,
-                role: true,
-                profilePicture: true,
-                schoolId: true,
-            },
+            include: { role: true }, // fetch role relation
         });
 
         if (!user) {
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
-        let schoolId = null;
-        let school = null;
-        let classs = null;
-        let section = null;
-        let studentdatafull = null;
+        // Base response
+        let response = {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            profilePicture: user.profilePicture,
+            schoolId: null,
+        };
 
+        // Role-specific fetch
         switch (user.role.name) {
-            case "ADMIN":
+            case "ADMIN": {
                 const admin = await prisma.admin.findUnique({
                     where: { userId },
-                    select: { schoolId: true, school: true },
+                    include: { school: true }, // fetch related school
                 });
-                schoolId = admin?.schoolId;
-                school = admin?.school;
+                response.schoolId = admin?.schoolId;
+                response.school = admin?.school;
                 break;
-
-            case "TEACHING_STAFF":
+            }
+            case "TEACHING_STAFF": {
                 const teacher = await prisma.teacher.findUnique({
                     where: { userId },
                     select: { schoolId: true },
                 });
-                schoolId = teacher?.schoolId;
+                response.schoolId = teacher?.schoolId;
                 break;
-
-            case "NON_TEACHING_STAFF":
+            }
+            case "NON_TEACHING_STAFF": {
                 const staff = await prisma.staff.findUnique({
                     where: { userId },
                     select: { schoolId: true },
                 });
-                schoolId = staff?.schoolId;
+                response.schoolId = staff?.schoolId;
                 break;
-
-            case "STUDENT":
+            }
+            case "STUDENT": {
                 const student = await prisma.student.findUnique({
                     where: { userId },
                     include: { class: true, section: true },
                 });
-                schoolId = student?.schoolId;
-                studentdatafull = student;
-                classs = student?.class;
-                section = student?.section;
+                response.schoolId = student?.schoolId;
+                response.studentData = student;
+                response.class = student?.class;
+                response.section = student?.section;
                 break;
+            }
+            case "PARENT": {
+                const parent = await prisma.parent.findUnique({
+                    where: { userId },
+                    include: { user: true, school: true, studentLinks: true },
+                });
+                if (!parent) {
+                    return NextResponse.json({ error: "Parent not found" }, { status: 404 });
+                }
+                response.schoolId = parent?.schoolId;
+                response.parentData = parent;
+                response.school = parent?.school;
+                break;
+            }
         }
 
         const end = performance.now();
         console.log(`🕒 User query took ${end - start}ms`);
 
-        return NextResponse.json({
-            ...user,
-            schoolId,
-            school,
-            classs,
-            section,
-            studentdatafull,
-        });
+        return NextResponse.json(response);
     } catch (err) {
         console.error("❌ Error in GET /api/auth/user:", err);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
-
 // ------------------ PUT: Update user profile ------------------
 export async function PUT(req) {
     try {
