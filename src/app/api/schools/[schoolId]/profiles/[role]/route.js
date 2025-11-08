@@ -53,6 +53,7 @@ const studentSchema = baseUserSchema.extend({
     house: z.string().optional(),
     previousSchoolName: z.string().optional(),
     admissionDate: z.coerce.date().optional(),
+    linkedParentIds: z.array(z.string().uuid()).optional(),
 });
 
 const teacherSchema = baseUserSchema.extend({
@@ -103,8 +104,25 @@ const staffSchema = baseUserSchema.extend({
 
 const parentSchema = baseUserSchema.extend({
     guardianName: z.string(),
-    childId: z.string().uuid(),
+    email: z.string().email(),
+    contactNumber: z.string(),
+    alternateNumber: z.string().optional(),
+    address: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+    country: z.string().optional(),
+    postalCode: z.string().optional(),
+    occupation: z.string().optional(),
+    qualification: z.string().optional(),
+    annualIncome: z.string().optional(),
+    bloodGroup: z.string().optional(),
+    emergencyContactName: z.string().optional(),
+    emergencyContactNumber: z.string().optional(),
+    emergencyContactRelation: z.string().optional(),
+    linkedStudentIds: z.array(z.string().uuid()).optional(),
+    schoolId: z.string().uuid(),
 });
+
 
 export async function POST(req, context) {
     let createdUserId = null;
@@ -135,7 +153,7 @@ export async function POST(req, context) {
                 parsed = staffSchema.parse({ ...body, role: mappedRole, schoolId });
                 break;
             case "PARENT":
-                parsed = parentSchema.parse({ ...body, role: mappedRole });
+                parsed = parentSchema.parse({ ...body, role: mappedRole, schoolId });
                 break;
             default:
                 return NextResponse.json({ error: "Unsupported role" }, { status: 400 });
@@ -231,6 +249,17 @@ export async function POST(req, context) {
                                 GuardianRelation: parsed.guardianRelation || "",
                                 House: parsed.house || "",
                                 section: { connect: { id: Number(parsed.sectionId) } },
+                                ...(parsed.linkedParentIds && parsed.linkedParentIds.length
+                                    ? {
+                                        studentParentLinks: {
+                                            create: parsed.linkedParentIds.map(parentId => ({
+                                                parent: { connect: { id: parentId } },
+                                                relation: "GUARDIAN", // or determine from form
+                                                isPrimary: false // or determine from form
+                                            })),
+                                        },
+                                    }
+                                    : {}),
                             },
                         });
                         break;
@@ -315,10 +344,34 @@ export async function POST(req, context) {
                         profile = await tx.parent.create({
                             data: {
                                 userId: user.id,
-                                guardianName: parsed.guardianName,
-                                students: {
-                                    connect: { userId: parsed.childId },
-                                },
+                                schoolId,
+                                name: parsed.guardianName,
+                                email: parsed.email,
+                                contactNumber: parsed.contactNumber,
+                                alternateNumber: parsed.alternateNumber || null,
+                                address: parsed.address || null,
+                                city: parsed.city || null,
+                                state: parsed.state || null,
+                                country: parsed.country || null,
+                                postalCode: parsed.postalCode || null,
+                                occupation: parsed.occupation || null,
+                                qualification: parsed.qualification || null,
+                                annualIncome: parsed.annualIncome || null,
+                                bloodGroup: parsed.bloodGroup || null,
+                                emergencyContactName: parsed.emergencyContactName || null,
+                                emergencyContactNumber: parsed.emergencyContactNumber || null,
+                                emergencyContactRelation: parsed.emergencyContactRelation || null,
+                                // Only create student link if childId is provided
+                                ...(parsed.linkedStudentIds && parsed.linkedStudentIds.length
+                                    ? {
+                                        studentLinks: {
+                                            create: parsed.linkedStudentIds.map(id => ({
+                                                student: { connect: { userId: id } }
+                                            })),
+                                        },
+                                    }
+                                    : {}),
+
                             },
                         });
                         break;

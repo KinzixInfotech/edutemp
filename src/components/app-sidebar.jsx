@@ -45,6 +45,7 @@ import {
     ArrowLeftRight,
     CreditCard,
     BarChart3,
+    Baby,
 } from "lucide-react"
 import { useCommandMenu } from "./CommandMenuContext"
 
@@ -238,7 +239,8 @@ export const SidebarData = [
         title: "Manage Classes",
         items: [
             { label: "Manage Classes", url: "/dashboard/schools/create-classes", icon: BookMarked, roles: ["ADMIN"] },
-            { label: "Manage Student", url: "/dashboard/schools/manage-student", icon: User, roles: ["ADMIN"] },
+            { label: "Manage Student", url: "/dashboard/schools/manage-student", icon: Baby, roles: ["ADMIN"] },
+            { label: "Manage Parent", url: "/dashboard/schools/manage-parent", icon: User, roles: ["ADMIN"] },
             { label: "Manage Academic Year", url: "/dashboard/schools/academic-years", icon: CalendarCog, roles: ["ADMIN"] },
             { label: "Manage Attendance", url: "/dashboard/attendance/", icon: MonitorCog, roles: ["ADMIN"] },
             { label: "Notices & Circulars", url: "/dashboard/schools/manage-notice", icon: Flag, roles: ["ADMIN"] },

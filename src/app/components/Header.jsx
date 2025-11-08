@@ -7,7 +7,6 @@ import { usePathname } from "next/navigation";
 import { ChevronDown } from 'lucide-react';
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-
 // Menu Configuration - Easy to modify
 const menuConfig = {
     menus: [

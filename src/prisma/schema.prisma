@@ -56,6 +56,7 @@ model School {
   DocumentTemplate       DocumentTemplate[]
   globalFeeStructures    GlobalFeeStructure[]
   studentFees            StudentFee[]
+  parents                Parent[]
 
   @@index([name])
 }
@@ -546,6 +547,7 @@ model User {
   NoticeTargets         NoticeTarget[]         @relation("NoticeTargetUser")
   approvedDiscounts     FeeDiscount[]          @relation("ApprovedDiscounts")
   collectedPayments     FeePayment[]           @relation("CollectedPayments")
+  parent                Parent?
 
   @@index([schoolId])
   @@index([roleId])
@@ -643,10 +645,108 @@ model Student {
   AdmitCard              AdmitCard[]
   studentFees            StudentFee[]
   feeReminders           FeeReminder[]
+  studentParentLinks     StudentParentLink[]
 
   @@index([classId])
   @@index([sectionId])
   @@index([parentId])
+}
+
+// ============================================
+// PARENT-STUDENT LINKING SYSTEM
+// ============================================
+
+// Parent Model
+model Parent {
+  id       String @id @default(uuid()) @db.Uuid
+  userId   String @unique @db.Uuid
+  schoolId String @db.Uuid
+
+  // Personal Information
+  name            String
+  email           String  @unique
+  contactNumber   String  @unique
+  alternateNumber String?
+
+  // Address Information
+  address    String?
+  city       String?
+  state      String?
+  country    String?
+  postalCode String?
+
+  // Additional Details
+  occupation    String?
+  qualification String?
+  annualIncome  String?
+  bloodGroup    String?
+
+  // Emergency Contact
+  emergencyContactName     String?
+  emergencyContactNumber   String?
+  emergencyContactRelation String?
+
+  // System Fields
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  deletedAt DateTime?
+  status    UserStatus @default(ACTIVE)
+
+  // Relations
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school       School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  studentLinks StudentParentLink[]
+
+  @@index([schoolId])
+  @@index([contactNumber])
+  @@index([email])
+  @@index([userId])
+}
+
+// Bridge/Junction Model for Many-to-Many Relationship
+model StudentParentLink {
+  id        String @id @default(uuid()) @db.Uuid
+  studentId String @db.Uuid
+  parentId  String @db.Uuid
+
+  // Relation Type
+  relation ParentRelationType @default(GUARDIAN)
+
+  // Primary Contact (one parent can be marked as primary)
+  isPrimary Boolean @default(false)
+
+  // Permissions
+  canPickup      Boolean @default(true)
+  canViewReports Boolean @default(true)
+  canViewFees    Boolean @default(true)
+
+  // System Fields
+  linkedAt   DateTime  @default(now())
+  linkedBy   String?   @db.Uuid // Admin/Staff who created the link
+  verifiedAt DateTime? // When parent verified the link
+  isActive   Boolean   @default(true)
+
+  // Relations
+  student Student @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  parent  Parent  @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, parentId]) // Prevent duplicate links
+  @@index([studentId])
+  @@index([parentId])
+  @@index([relation])
+}
+
+// Enum for Parent Relation Types
+enum ParentRelationType {
+  FATHER
+  MOTHER
+  GUARDIAN
+  GRANDFATHER
+  GRANDMOTHER
+  UNCLE
+  AUNT
+  SIBLING
+  OTHER
 }
 
 model ExamSeries {
