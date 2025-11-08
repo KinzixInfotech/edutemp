@@ -4,7 +4,7 @@
 // ============================================
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-export async function POST_DISCOUNT(req) {
+export async function POST(req) {
     try {
         const body = await req.json();
         const {
