@@ -47,7 +47,12 @@ export async function PATCH(req, props) {
 export async function DELETE(req, props) {
     const params = await props.params;
     const { parentId } = params;
-    const { studentId } = await req.json();
+
+    // Extract studentId from URL query
+    const { searchParams } = new URL(req.url);
+    const studentId = searchParams.get("studentId");
+
+    console.log(studentId, "from delete");
 
     try {
         await prisma.studentParentLink.delete({

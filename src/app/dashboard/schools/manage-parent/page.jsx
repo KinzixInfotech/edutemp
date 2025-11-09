@@ -50,6 +50,8 @@ export default function ParentListPage() {
 
     const [selected, setSelected] = useState([]);
     const [dialogData, setDialogData] = useState(null);
+    console.log(dialogData);
+    
     const [search, setSearch] = useState('');
     const [studentSearchOpen, setStudentSearchOpen] = useState(false);
     const [studentSearchQuery, setStudentSearchQuery] = useState('');
@@ -168,14 +170,13 @@ export default function ParentListPage() {
     // Unlink student mutation
     const unlinkStudentMutation = useMutation({
         mutationFn: async ({ parentId, studentId }) => {
-            const res = await axios.delete(`/api/schools/${schoolId}/parents/${parentId}/link-student`, {
-                data: { studentId }
-            });
+            const res = await axios.delete(`/api/schools/${schoolId}/parents/${parentId}/link-student?studentId=${studentId}`);
             return res.data;
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['parents', schoolId]);
             toast.success('Student unlinked successfully');
+
         },
         onError: (error) => {
             toast.error(error.response?.data?.error || 'Failed to unlink student');
@@ -535,7 +536,7 @@ export default function ParentListPage() {
                 <Dialog open={!!dialogData} onOpenChange={() => {
                     setDialogData(null);
                     setSelectedStudents([]);
-                }}>
+                }} >
                     <DialogContent className="max-w-3xl w-full max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
                             <div className="flex items-start gap-4 pb-4 border-b">
@@ -699,7 +700,7 @@ export default function ParentListPage() {
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    onClick={() => handleUnlinkStudent(link.student.userId)}
+                                                    onClick={() => handleUnlinkStudent(link.studentId)}
                                                     disabled={unlinkStudentMutation.isPending}
                                                 >
                                                     <X className="h-4 w-4 text-destructive" />
