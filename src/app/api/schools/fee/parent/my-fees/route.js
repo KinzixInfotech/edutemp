@@ -1,6 +1,6 @@
 // ============================================
 // API: /api/fee/parent/my-fees/route.js
-// Parent view their children's fees
+// ENHANCED: Show complete installment breakdown for parents
 // ============================================
 
 import { NextResponse } from "next/server";
@@ -9,7 +9,7 @@ import prisma from "@/lib/prisma";
 export async function GET(req) {
     try {
         const { searchParams } = new URL(req.url);
-        const parentId = searchParams.get("parentId"); // From session/auth
+        const parentId = searchParams.get("parentId");
         const academicYearId = searchParams.get("academicYearId");
 
         if (!parentId) {
@@ -32,27 +32,19 @@ export async function GET(req) {
                     where: academicYearId ? { academicYearId } : {},
                     include: {
                         globalFeeStructure: {
-                            select: { name: true, mode: true },
+                            select: {
+                                name: true,
+                                mode: true,
+                                installmentRules: {
+                                    orderBy: { installmentNumber: 'asc' }
+                                }
+                            },
                         },
                         particulars: {
                             orderBy: { name: "asc" },
                         },
                         installments: {
                             orderBy: { installmentNumber: "asc" },
-                            include: {
-                                payments: {
-                                    include: {
-                                        payment: {
-                                            select: {
-                                                receiptNumber: true,
-                                                paymentDate: true,
-                                                amount: true,
-                                                paymentMethod: true,
-                                            },
-                                        },
-                                    },
-                                },
-                            },
                         },
                         payments: {
                             where: { status: "SUCCESS" },
@@ -82,13 +74,50 @@ export async function GET(req) {
                 };
             }
 
+            // ===================================
+            // Enrich installments with particular breakdowns
+            // ===================================
+            const enrichedInstallments = fee.installments.map(installment => {
+                const rule = fee.globalFeeStructure?.installmentRules?.find(
+                    r => r.installmentNumber === installment.installmentNumber
+                );
+
+                const percentage = rule ? rule.percentage : 100;
+
+                // Calculate what particulars are included in this installment
+                const particularBreakdowns = fee.particulars.map(particular => {
+                    const amountInInstallment = (particular.amount * percentage) / 100;
+                    return {
+                        name: particular.name,
+                        totalAmount: particular.amount,
+                        amountInThisInstallment: amountInInstallment,
+                        status: particular.status,
+                    };
+                });
+
+                return {
+                    id: installment.id,
+                    number: installment.installmentNumber,
+                    dueDate: installment.dueDate,
+                    amount: installment.amount,
+                    paidAmount: installment.paidAmount,
+                    balance: installment.amount - installment.paidAmount,
+                    status: installment.status,
+                    isOverdue: installment.isOverdue,
+                    paidDate: installment.paidDate,
+                    canPayNow: installment.status !== "PAID" && installment.paidAmount < installment.amount,
+                    particularBreakdowns, // What's included in this installment
+                    percentage: rule?.percentage || 100,
+                };
+            });
+
             // Calculate upcoming dues
             const now = new Date();
-            const upcomingInstallments = fee.installments.filter(
+            const upcomingInstallments = enrichedInstallments.filter(
                 inst => inst.status === "PENDING" && new Date(inst.dueDate) > now
             ).slice(0, 3);
 
-            const overdueInstallments = fee.installments.filter(
+            const overdueInstallments = enrichedInstallments.filter(
                 inst => inst.isOverdue && inst.status !== "PAID"
             );
 
@@ -113,18 +142,8 @@ export async function GET(req) {
                     status: fee.status,
                     lastPaymentDate: fee.lastPaymentDate,
                 },
-                particulars: fee.particulars,
-                installments: fee.installments.map(inst => ({
-                    id: inst.id,
-                    number: inst.installmentNumber,
-                    dueDate: inst.dueDate,
-                    amount: inst.amount,
-                    paidAmount: inst.paidAmount,
-                    balance: inst.amount - inst.paidAmount,
-                    status: inst.status,
-                    isOverdue: inst.isOverdue,
-                    canPayNow: inst.status !== "PAID" && inst.paidAmount < inst.amount,
-                })),
+                particulars: fee.particulars, // All fee components
+                installments: enrichedInstallments, // With breakdowns
                 upcomingDues: upcomingInstallments,
                 overdueDues: overdueInstallments,
                 recentPayments: fee.payments,
@@ -160,7 +179,3 @@ export async function GET(req) {
         );
     }
 }
-
-
-
-

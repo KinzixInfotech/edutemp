@@ -1053,6 +1053,25 @@ model StudentFeeStructure {
   Student        Student?               @relation(fields: [studentUserId], references: [userId])
 }
 
+// Link installments to specific particulars
+model InstallmentParticular {
+  id            String @id @default(uuid()) @db.Uuid
+  installmentId String @db.Uuid
+  particularId  String @db.Uuid
+
+  // How much of this particular is in this installment
+  amount     Float
+  paidAmount Float @default(0)
+
+  // Relations
+  installment StudentFeeInstallment @relation(fields: [installmentId], references: [id], onDelete: Cascade)
+  particular  StudentFeeParticular  @relation(fields: [particularId], references: [id], onDelete: Cascade)
+
+  @@unique([installmentId, particularId])
+  @@index([installmentId])
+  @@index([particularId])
+}
+
 model Attendance {
   id     Int              @id @default(autoincrement())
   userId String           @db.Uuid
@@ -1631,12 +1650,13 @@ model StudentFeeParticular {
   paidAmount         Float     @default(0)
   status             FeeStatus @default(UNPAID)
 
-  studentFee            StudentFee           @relation(fields: [studentFeeId], references: [id], onDelete: Cascade)
-  globalParticular      GlobalFeeParticular? @relation(fields: [globalParticularId], references: [id])
-  feeParticular         FeeParticular?       @relation(fields: [feeParticularId], references: [id])
-  feeParticularId       String?              @db.Uuid
-  studentFeeStructure   StudentFeeStructure? @relation(fields: [studentFeeStructureId], references: [id])
-  studentFeeStructureId String?              @db.Uuid
+  studentFee            StudentFee              @relation(fields: [studentFeeId], references: [id], onDelete: Cascade)
+  globalParticular      GlobalFeeParticular?    @relation(fields: [globalParticularId], references: [id])
+  feeParticular         FeeParticular?          @relation(fields: [feeParticularId], references: [id])
+  feeParticularId       String?                 @db.Uuid
+  studentFeeStructure   StudentFeeStructure?    @relation(fields: [studentFeeStructureId], references: [id])
+  studentFeeStructureId String?                 @db.Uuid
+  installmentBreakdowns  InstallmentParticular[]
 
   @@index([studentFeeId])
   @@index([status])
@@ -1656,9 +1676,10 @@ model StudentFeeInstallment {
   isOverdue         Boolean           @default(false)
   paidDate          DateTime?
 
-  studentFee      StudentFee              @relation(fields: [studentFeeId], references: [id], onDelete: Cascade)
-  installmentRule FeeInstallmentRule?     @relation(fields: [installmentRuleId], references: [id])
-  payments        FeePaymentInstallment[]
+  studentFee             StudentFee              @relation(fields: [studentFeeId], references: [id], onDelete: Cascade)
+  installmentRule        FeeInstallmentRule?     @relation(fields: [installmentRuleId], references: [id])
+  payments               FeePaymentInstallment[]
+  particularBreakdowns InstallmentParticular[]
 
   @@unique([studentFeeId, installmentNumber])
   @@index([studentFeeId])

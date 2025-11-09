@@ -1,6 +1,6 @@
 // ============================================
 // API: /api/fee/students/[studentId]/route.js
-// Get fee details for a specific student
+// ENHANCED: Return detailed installment breakdowns
 // ============================================
 
 import { NextResponse } from "next/server";
@@ -41,27 +41,16 @@ export async function GET(req, { params }) {
                     select: {
                         name: true,
                         mode: true,
+                        installmentRules: {
+                            orderBy: { installmentNumber: 'asc' }
+                        }
                     },
                 },
                 particulars: {
                     orderBy: { name: "asc" },
                 },
                 installments: {
-                    orderBy: { dueDate: "asc" },
-                    include: {
-                        payments: {
-                            include: {
-                                payment: {
-                                    select: {
-                                        amount: true,
-                                        paymentDate: true,
-                                        receiptNumber: true,
-                                        paymentMethod: true,
-                                    },
-                                },
-                            },
-                        },
-                    },
+                    orderBy: { installmentNumber: "asc" },
                 },
                 payments: {
                     orderBy: { paymentDate: "desc" },
@@ -79,18 +68,42 @@ export async function GET(req, { params }) {
 
         if (!studentFee) {
             return NextResponse.json(
-                { error: "No fee record found for this student" },
+                { error: "No fee record found" },
                 { status: 404 }
             );
         }
 
-        // Calculate overdue installments
+        // ===================================
+        // Calculate installment breakdowns
+        // ===================================
+        const enrichedInstallments = studentFee.installments.map(installment => {
+            const rule = studentFee.globalFeeStructure?.installmentRules?.find(
+                r => r.installmentNumber === installment.installmentNumber
+            );
+
+            const percentage = rule ? rule.percentage : 100;
+            const particularBreakdowns = studentFee.particulars.map(particular => ({
+                particularId: particular.id,
+                particularName: particular.name,
+                totalParticularAmount: particular.amount,
+                amountInThisInstallment: (particular.amount * percentage) / 100,
+                paidInThisInstallment: 0, // Will be calculated from payment allocations
+            }));
+
+            return {
+                ...installment,
+                rule: rule || null,
+                particularBreakdowns,
+                canPayNow: installment.status !== 'PAID' && installment.amount > installment.paidAmount,
+            };
+        });
+
+        // Update overdue status
         const now = new Date();
-        const overdueInstallments = studentFee.installments.filter(
+        const overdueInstallments = enrichedInstallments.filter(
             inst => inst.status !== "PAID" && new Date(inst.dueDate) < now
         );
 
-        // Update overdue status
         if (overdueInstallments.length > 0) {
             await prisma.studentFeeInstallment.updateMany({
                 where: {
@@ -102,8 +115,9 @@ export async function GET(req, { params }) {
 
         return NextResponse.json({
             ...studentFee,
+            installments: enrichedInstallments,
             overdueCount: overdueInstallments.length,
-            nextDueInstallment: studentFee.installments.find(
+            nextDueInstallment: enrichedInstallments.find(
                 inst => inst.status === "PENDING" && !inst.isOverdue
             ),
         });
