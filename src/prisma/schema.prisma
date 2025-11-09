@@ -516,6 +516,7 @@ model User {
   email                 String                 @unique
   password              String
   name                  String?
+  gender                String
   profilePicture        String                 @default("default.png")
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
@@ -658,22 +659,21 @@ model Student {
 
 // Parent Model
 model Parent {
-  id       String @id @default(uuid()) @db.Uuid
-  userId   String @unique @db.Uuid
-  schoolId String @db.Uuid
-
+  id              String  @id @default(uuid()) @db.Uuid
+  userId          String  @unique @db.Uuid
+  schoolId        String  @db.Uuid
   // Personal Information
   name            String
   email           String  @unique
   contactNumber   String  @unique
   alternateNumber String?
-
+  // gender          String
   // Address Information
-  address    String?
-  city       String?
-  state      String?
-  country    String?
-  postalCode String?
+  address         String?
+  city            String?
+  state           String?
+  country         String?
+  postalCode      String?
 
   // Additional Details
   occupation    String?
@@ -1656,7 +1656,7 @@ model StudentFeeParticular {
   feeParticularId       String?                 @db.Uuid
   studentFeeStructure   StudentFeeStructure?    @relation(fields: [studentFeeStructureId], references: [id])
   studentFeeStructureId String?                 @db.Uuid
-  installmentBreakdowns  InstallmentParticular[]
+  installmentBreakdowns InstallmentParticular[]
 
   @@index([studentFeeId])
   @@index([status])
@@ -1676,9 +1676,9 @@ model StudentFeeInstallment {
   isOverdue         Boolean           @default(false)
   paidDate          DateTime?
 
-  studentFee             StudentFee              @relation(fields: [studentFeeId], references: [id], onDelete: Cascade)
-  installmentRule        FeeInstallmentRule?     @relation(fields: [installmentRuleId], references: [id])
-  payments               FeePaymentInstallment[]
+  studentFee           StudentFee              @relation(fields: [studentFeeId], references: [id], onDelete: Cascade)
+  installmentRule      FeeInstallmentRule?     @relation(fields: [installmentRuleId], references: [id])
+  payments             FeePaymentInstallment[]
   particularBreakdowns InstallmentParticular[]
 
   @@unique([studentFeeId, installmentNumber])

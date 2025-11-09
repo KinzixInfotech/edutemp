@@ -28,7 +28,7 @@ import Link from 'next/link';
 export default function AdminFeeDashboard() {
   const { fullUser } = useAuth();
   const schoolId = fullUser?.schoolId;
-  
+
   const [dateRange, setDateRange] = useState({
     startDate: new Date(new Date().getFullYear(), 3, 1).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0]
@@ -190,7 +190,7 @@ export default function AdminFeeDashboard() {
               <DollarSign className="w-8 h-8 opacity-80" />
               <span className="text-2xl font-bold">{summary?.collectionPercentage}%</span>
             </div>
-            <h3 className="text-sm font-medium opacity-90">Total Expected</h3>
+            <h3 className="text-sm font-medium opacity-90">Total Fees Expected</h3>
             <p className="text-2xl font-bold mt-1">{formatCurrency(summary?.totalExpected)}</p>
           </CardContent>
         </Card>
@@ -201,7 +201,7 @@ export default function AdminFeeDashboard() {
               <CheckCircle className="w-8 h-8 opacity-80" />
               <TrendingUp className="w-6 h-6" />
             </div>
-            <h3 className="text-sm font-medium opacity-90">Total Collected</h3>
+            <h3 className="text-sm font-medium opacity-90">Total Fees Collected</h3>
             <p className="text-2xl font-bold mt-1">{formatCurrency(summary?.totalCollected)}</p>
           </CardContent>
         </Card>
@@ -214,7 +214,7 @@ export default function AdminFeeDashboard() {
                 {statusCounts?.overdue || 0} Students
               </span>
             </div>
-            <h3 className="text-sm font-medium opacity-90">Total Balance</h3>
+            <h3 className="text-sm font-medium opacity-90">Total Fees Due</h3>
             <p className="text-2xl font-bold mt-1">{formatCurrency(summary?.totalBalance)}</p>
           </CardContent>
         </Card>
@@ -303,14 +303,35 @@ export default function AdminFeeDashboard() {
               <div className="space-y-3">
                 {recentPayments?.map((payment, idx) => (
                   <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent">
+                    
                     <div className="flex-1">
+                      <Badge
+                          variant="secondary"
+                          className={`text-xs my-2 ${payment.status === 'SUCCESS'
+                              ? 'bg-green-100 text-green-700'
+                              : payment.status === 'failed'
+                                ? 'bg-red-100 text-red-700'
+                                : ''
+                            }`}
+                        >
+                          {payment.status}
+                        </Badge>
                       <div className="flex items-center gap-2">
-                        <span className="font-medium">{payment.student.name}</span>
+                        
+                        <span className="font-medium">{payment.student.name} • ({payment.receiptNumber})</span>
                         <Badge variant="outline" className="text-xs">{payment.student.class?.className}</Badge>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {formatDate(payment.paymentDate)} • {payment.paymentMethod}
-                      </p>
+                      <div className='inline-flex flex-row gap-3'>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {formatDate(payment.paymentDate)} • {payment.paymentMethod} • {payment.paymentMode}
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Admission Number: {payment.student.admissionNo}
+
+                        </p>
+                        
+
+                      </div>
                     </div>
                     <div className="text-right">
                       <p className="font-bold text-lg">{formatCurrency(payment.amount)}</p>
@@ -319,6 +340,7 @@ export default function AdminFeeDashboard() {
                         Receipt
                       </Button>
                     </div>
+
                   </div>
                 ))}
               </div>
@@ -387,7 +409,7 @@ export default function AdminFeeDashboard() {
                         <p className="font-semibold text-green-600">{formatCurrency(stat.collected)}</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Balance</p>
+                        <p className="text-muted-foreground">Fees Due</p>
                         <p className="font-semibold text-red-600">{formatCurrency(stat.balance)}</p>
                       </div>
                     </div>

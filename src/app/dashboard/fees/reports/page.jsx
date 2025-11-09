@@ -259,7 +259,7 @@ export default function FeeReports() {
                                 <Card>
                                     <CardContent className="pt-6">
                                         <div className="text-center">
-                                            <p className="text-sm text-muted-foreground">Total Expected</p>
+                                            <p className="text-sm text-muted-foreground">Total  Fees Expected</p>
                                             <p className="text-2xl font-bold mt-2">{formatCurrency(collectionReport?.summary?.totalExpected)}</p>
                                         </div>
                                     </CardContent>
@@ -275,7 +275,7 @@ export default function FeeReports() {
                                 <Card>
                                     <CardContent className="pt-6">
                                         <div className="text-center">
-                                            <p className="text-sm text-muted-foreground">Total Balance</p>
+                                            <p className="text-sm text-muted-foreground">Total Fees Due</p>
                                             <p className="text-2xl font-bold text-red-600 mt-2">{formatCurrency(collectionReport?.summary?.totalBalance)}</p>
                                         </div>
                                     </CardContent>
@@ -315,7 +315,7 @@ export default function FeeReports() {
                                                 <div className="text-right">
                                                     <p className="text-sm text-muted-foreground">Paid</p>
                                                     <p className="text-xl font-bold text-green-600">{formatCurrency(student.paidAmount)}</p>
-                                                    <p className="text-sm text-red-600 mt-1">Balance: {formatCurrency(student.balanceAmount)}</p>
+                                                    <p className="text-sm text-red-600 mt-1">Fees Due: {formatCurrency(student.balanceAmount)}</p>
                                                 </div>
                                             </div>
                                         ))}
@@ -401,15 +401,16 @@ export default function FeeReports() {
                                             >
                                                 <div className="flex-1">
                                                     <div className="flex items-center gap-2 mb-1">
-                                                        <span className="font-medium">{student.name}</span>
-                                                        <Badge variant="destructive">
+                                                        <span className="font-medium dark:text-gray-700">{student.name}</span>
+                                                        <Badge variant="destructive" className={'dark:text-red-700'}>
                                                             {student.overdueInstallments} Overdue
                                                         </Badge>
-                                                        <Badge variant="outline">{student.agingBucket}</Badge>
+                                                        <Badge variant="outline" className={'dark:text-black dark:border-black'}>{student.agingBucket}</Badge>
                                                     </div>
                                                     <p className="text-sm text-muted-foreground">
-                                                        {student.admissionNo} • {student.class} • {student.section}
+                                                        {student.admissionNo} • {student.class?.className} • {student.section?.name}
                                                     </p>
+
                                                     <p className="text-sm text-red-600 mt-1">
                                                         {student.daysPastDue} days overdue since {formatDate(student.oldestDueDate)}
                                                     </p>

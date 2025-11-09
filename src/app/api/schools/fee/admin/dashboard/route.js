@@ -29,7 +29,12 @@ export async function GET(req) {
       academicYearId,
       ...(classId && { student: { classId: parseInt(classId) } }),
     };
-
+    // console.log({
+    //   schoolId,
+    //   academicYearId,
+    //   startDate,
+    //   endDate
+    // });
     // Parallel queries for performance
     const [
       totalExpected,
@@ -82,12 +87,14 @@ export async function GET(req) {
           schoolId,
           academicYearId,
           status: "SUCCESS",
-          ...(startDate && endDate && {
-            paymentDate: {
-              gte: new Date(startDate),
-              lte: new Date(endDate),
-            },
-          }),
+          ...(startDate && endDate
+            ? {
+              paymentDate: {
+                gte: new Date(`${startDate}T00:00:00.000Z`),
+                lte: new Date(`${endDate}T23:59:59.999Z`),
+              },
+            }
+            : {})
         },
         include: {
           student: {
@@ -101,6 +108,8 @@ export async function GET(req) {
         orderBy: { paymentDate: "desc" },
         take: 10,
       }),
+
+
 
       // Overdue Students
       prisma.studentFee.findMany({
@@ -194,8 +203,8 @@ export async function GET(req) {
           status: "SUCCESS",
           ...(startDate && endDate && {
             paymentDate: {
-              gte: new Date(startDate),
-              lte: new Date(endDate),
+              gte: new Date(`${startDate}T00:00:00.000Z`),
+              lte: new Date(`${endDate}T23:59:59.999Z`),
             },
           }),
         },
@@ -205,52 +214,60 @@ export async function GET(req) {
 
       // Monthly collection trend (✅ FIXED)
       prisma.$queryRaw`
-        SELECT 
-          DATE_TRUNC('month', "paymentDate") as month,
-          SUM(amount) as total,
-          COUNT(*) as count
-        FROM "FeePayment"
-        WHERE "schoolId" = ${schoolId}::uuid
-          AND "academicYearId" = ${academicYearId}::uuid
-          AND status = 'SUCCESS'
-          ${startDate && endDate ? Prisma.sql`AND "paymentDate" BETWEEN ${new Date(startDate)} AND ${new Date(endDate)}` : Prisma.empty}
-        GROUP BY month
-        ORDER BY month DESC
-        LIMIT 12
-      `,
-    ]);
+  SELECT 
+    DATE_TRUNC('month', "paymentDate") AS month,
+    SUM("amount") AS total,
+    COUNT(*) AS count
+  FROM "FeePayment"
+  WHERE "schoolId" = ${schoolId}::uuid
+    AND "academicYearId" = ${academicYearId}::uuid
+    AND "status" = 'SUCCESS'
+    ${startDate && endDate
+          ? Prisma.sql`AND "paymentDate" BETWEEN ${new Date(`${startDate}T00:00:00.000Z`)} AND ${new Date(`${endDate}T23:59:59.999Z`)}`
+          : Prisma.empty}
+  GROUP BY month
+  ORDER BY month DESC
+  LIMIT 12;
+`,
 
-    return NextResponse.json({
-      summary: {
-        totalExpected: totalExpected._sum.originalAmount || 0,
-        totalCollected: totalCollected._sum.paidAmount || 0,
-        totalDiscount: totalDiscount._sum.discountAmount || 0,
-        totalBalance: totalBalance._sum.balanceAmount || 0,
-        collectionPercentage: totalExpected._sum.originalAmount
-          ? (
-            (totalCollected._sum.paidAmount /
-              totalExpected._sum.originalAmount) *
-            100
-          ).toFixed(2)
-          : 0,
-      },
-      statusCounts: {
-        paid: paidCount,
-        partial: partialCount,
-        unpaid: unpaidCount,
-        overdue: overdueCount,
-        total: paidCount + partialCount + unpaidCount + overdueCount,
-      },
-      recentPayments,
-      overdueStudents: overdueStudents.map((sf) => ({
-        ...sf.student,
-        balanceAmount: sf.balanceAmount,
-        overdueInstallments: sf.installments,
-      })),
-      classWiseStats,
-      paymentMethodStats,
-      monthlyCollection,
-    });
+    ]);
+    // console.log("recentPayments found:", recentPayments.length, recentPayments?.[0]);
+
+
+
+    return NextResponse.json(
+      safeJSON({
+        summary: {
+          totalExpected: totalExpected._sum.originalAmount || 0,
+          totalCollected: totalCollected._sum.paidAmount || 0,
+          totalDiscount: totalDiscount._sum.discountAmount || 0,
+          totalBalance: totalBalance._sum.balanceAmount || 0,
+          collectionPercentage: totalExpected._sum.originalAmount
+            ? (
+              (totalCollected._sum.paidAmount /
+                totalExpected._sum.originalAmount) *
+              100
+            ).toFixed(2)
+            : 0,
+        },
+        statusCounts: {
+          paid: paidCount,
+          partial: partialCount,
+          unpaid: unpaidCount,
+          overdue: overdueCount,
+          total: paidCount + partialCount + unpaidCount + overdueCount,
+        },
+        recentPayments,
+        overdueStudents: overdueStudents.map((sf) => ({
+          ...sf.student,
+          balanceAmount: sf.balanceAmount,
+          overdueInstallments: sf.installments,
+        })),
+        classWiseStats,
+        paymentMethodStats,
+        monthlyCollection,
+      })
+    );
   } catch (error) {
     console.error("Dashboard Stats Error:", error);
     return NextResponse.json(
@@ -259,3 +276,10 @@ export async function GET(req) {
     );
   }
 }
+// Convert BigInt safely
+const safeJSON = (obj) =>
+  JSON.parse(
+    JSON.stringify(obj, (_, value) =>
+      typeof value === 'bigint' ? Number(value) : value
+    )
+  );

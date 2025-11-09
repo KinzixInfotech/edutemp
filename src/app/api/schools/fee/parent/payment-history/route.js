@@ -5,7 +5,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
-export async function GET_PAYMENT_HISTORY(req) {
+export async function GET(req) {
     try {
         const { searchParams } = new URL(req.url);
         const parentId = searchParams.get("parentId");

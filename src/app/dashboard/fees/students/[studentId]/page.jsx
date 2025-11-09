@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { use, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -34,7 +34,10 @@ export default function StudentFeeDetails({ params }) {
     const router = useRouter();
     const queryClient = useQueryClient();
     const schoolId = fullUser?.schoolId;
-    const studentId = params?.studentId; // From URL params
+    // Unwrap params
+    const unwrappedParams = use(params);
+    const studentId = unwrappedParams.studentId;
+
 
     const [discountOpen, setDiscountOpen] = useState(false);
     const [discountType, setDiscountType] = useState('PERCENTAGE');
@@ -269,29 +272,29 @@ export default function StudentFeeDetails({ params }) {
                                     >
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-3">
-                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${inst.status === 'PAID' ? 'bg-green-500' :
+                                                <div className={`w-10 h-10  rounded-full flex items-center justify-center ${inst.status === 'PAID' ? 'bg-green-500' :
                                                     inst.isOverdue ? 'bg-red-500' : 'bg-blue-500'
                                                     } text-white font-bold`}>
                                                     {inst.installmentNumber}
                                                 </div>
                                                 <div>
-                                                    <p className="font-semibold">Installment {inst.installmentNumber}</p>
+                                                    <p className="font-semibold dark:text-gray-700">Installment {inst.installmentNumber}</p>
                                                     <p className="text-sm text-muted-foreground">
                                                         Due: {formatDate(inst.dueDate)}
                                                     </p>
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <p className="font-bold text-lg">{formatCurrency(inst.amount)}</p>
+                                                <p className="font-bold text-lg dark:text-gray-700">{formatCurrency(inst.amount)}</p>
                                                 <Badge className={getStatusColor(inst.status)}>
                                                     {inst.status}
                                                 </Badge>
                                             </div>
                                         </div>
                                         {inst.paidAmount > 0 && inst.status !== 'PAID' && (
-                                            <div className="mt-2 text-sm text-muted-foreground">
+                                            <div className="mt-2 text-sm dark:text-gray-700 text-muted-foreground">
                                                 Paid: {formatCurrency(inst.paidAmount)} •
-                                                Balance: {formatCurrency(inst.amount - inst.paidAmount)}
+                                                Due: {formatCurrency(inst.amount - inst.paidAmount)}
                                             </div>
                                         )}
                                         {inst.paidDate && (
@@ -323,7 +326,7 @@ export default function StudentFeeDetails({ params }) {
                                             <p className="font-semibold">{particular.name}</p>
                                             <p className="text-sm text-muted-foreground">
                                                 Paid: {formatCurrency(particular.paidAmount)} •
-                                                Balance: {formatCurrency(particular.amount - particular.paidAmount)}
+                                                Due: {formatCurrency(particular.amount - particular.paidAmount)}
                                             </p>
                                         </div>
                                         <div className="text-right">
