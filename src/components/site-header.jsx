@@ -27,6 +27,8 @@ export function SiteHeader() {
         { url: "/dashboard/fees/fee-structures", name: "All Fee Structures" },
         { url: "/dashboard/manage-students", name: "Manage All Students" },
         { url: "/dashboard/schools/create-classes", name: "All Classes & Sections " },
+        { url: "/dashboard/calendar", name: "Manage Calendar" },
+
     ]
     // Find the longest matching URL (deepest route)
     const currentPage = pageTitles
