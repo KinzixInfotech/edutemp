@@ -3,6 +3,11 @@
 // Location: app/api/schools/fee/payments/record/route.js (NEW FILE)
 // ============================================
 
+// ============================================
+// 3. RECORD PAYMENT API
+// Location: app/api/schools/fee/payments/record/route.js (NEW FILE)
+// ============================================
+
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { allocatePaymentToInstallments } from "@/lib/payment-allocation";
