@@ -2,7 +2,7 @@
 // FILE: app/api/schools/[schoolId]/calendar/events/route.js
 // ============================================
 
-import { NextResponse } from "next/server";
+import { google } from "googleapis";
 import prisma from "@/lib/prisma";
 
 // GET: Fetch all events (Custom + Google Calendar)
@@ -57,17 +57,21 @@ export async function GET(req, props) {
         const gmailAccount = await prisma.gmailAccount.findFirst({
             where: {
                 user: {
+                    
                     schoolId,
-                    status: 'ACTIVE',
+                    // status: 'ACTIVE',
                 },
             },
             orderBy: { lastUsedAt: 'desc' },
         });
+        console.log(gmailAccount, schoolId,'gmail');
 
         if (gmailAccount && gmailAccount.accessToken) {
             try {
                 googleEvents = await fetchGoogleCalendarEvents(
                     gmailAccount.accessToken,
+                    gmailAccount.refreshToken,
+                    gmailAccount.id,
                     startDate,
                     endDate
                 );
@@ -76,6 +80,7 @@ export async function GET(req, props) {
                 // Continue without Google events if fetch fails
             }
         }
+
 
         // Transform and combine events
         const transformedCustomEvents = customEvents.map(event => ({
@@ -125,17 +130,20 @@ export async function GET(req, props) {
         // Sort by start date
         allEvents.sort((a, b) => new Date(a.start) - new Date(b.start));
 
-        return NextResponse.json({
-            events: allEvents,
-            total: allEvents.length,
-            customCount: transformedCustomEvents.length,
-            googleCount: transformedGoogleEvents.length,
-            hasGoogleCalendar: !!gmailAccount,
-        });
+        return new Response(
+            JSON.stringify({
+                events: allEvents,
+                total: allEvents.length,
+                customCount: transformedCustomEvents.length,
+                googleCount: transformedGoogleEvents.length,
+                hasGoogleCalendar: !!gmailAccount,
+            }),
+            { status: 200 }
+        );
     } catch (error) {
         console.error('Calendar Events Error:', error);
-        return NextResponse.json(
-            { error: error.message || 'Failed to fetch events' },
+        return new Response(
+            JSON.stringify({ error: error.message || 'Failed to fetch events' }),
             { status: 500 }
         );
     }
@@ -173,8 +181,8 @@ export async function POST(req, props) {
 
         // Validate required fields
         if (!title || !startDate) {
-            return NextResponse.json(
-                { error: 'Title and start date are required' },
+            return new Response(
+                JSON.stringify({ error: 'Title and start date are required' }),
                 { status: 400 }
             );
         }
@@ -241,14 +249,17 @@ export async function POST(req, props) {
             return newEvent;
         });
 
-        return NextResponse.json({
-            message: 'Event created successfully',
-            event,
-        }, { status: 201 });
+        return new Response(
+            JSON.stringify({
+                message: 'Event created successfully',
+                event,
+            }),
+            { status: 201 }
+        );
     } catch (error) {
         console.error('Create Event Error:', error);
-        return NextResponse.json(
-            { error: error.message || 'Failed to create event' },
+        return new Response(
+            JSON.stringify({ error: error.message || 'Failed to create event' }),
             { status: 500 }
         );
     }
@@ -257,38 +268,73 @@ export async function POST(req, props) {
 
 
 // ============================================
-// HELPER: Fetch Google Calendar Events
+// HELPER: Fetch Google Calendar Events using googleapis
 // ============================================
 
-async function fetchGoogleCalendarEvents(accessToken, startDate, endDate) {
+async function fetchGoogleCalendarEvents(accessToken, refreshToken, accountId, startDate, endDate) {
     try {
+        const oauth2Client = new google.auth.OAuth2(
+            process.env.GOOGLE_CLIENT_ID,
+            process.env.GOOGLE_CLIENT_SECRET
+        );
+
+        oauth2Client.setCredentials({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+        });
+
+        const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
         const timeMin = startDate ? new Date(startDate).toISOString() : new Date().toISOString();
         const timeMax = endDate ? new Date(endDate).toISOString() : undefined;
 
-        const url = new URL('https://www.googleapis.com/calendar/v3/calendars/primary/events');
-        url.searchParams.append('timeMin', timeMin);
-        if (timeMax) {
-            url.searchParams.append('timeMax', timeMax);
-        }
-        url.searchParams.append('singleEvents', 'true');
-        url.searchParams.append('orderBy', 'startTime');
-        url.searchParams.append('maxResults', '50');
-
-        const response = await fetch(url.toString(), {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Accept': 'application/json',
-            },
+        const response = await calendar.events.list({
+           calendarId: 'en.indian#holiday@group.v.calendar.google.com',
+            timeMin,
+            timeMax,
+            singleEvents: true,
+            orderBy: 'startTime',
+            maxResults: 50,
         });
 
-        if (!response.ok) {
-            throw new Error('Failed to fetch Google Calendar events');
-        }
+        // Update last used timestamp
+        await prisma.gmailAccount.update({
+            where: { id: accountId },
+            data: { lastUsedAt: new Date() },
+        });
 
-        const data = await response.json();
-        return data.items || [];
+        return response.data.items || [];
     } catch (error) {
         console.error('Google Calendar API Error:', error);
-        return [];
+
+        // If token expired, try to refresh
+        if (error.code === 401 && refreshToken) {
+            try {
+                const oauth2Client = new google.auth.OAuth2(
+                    process.env.GOOGLE_CLIENT_ID,
+                    process.env.GOOGLE_CLIENT_SECRET
+                );
+
+                oauth2Client.setCredentials({ refresh_token: refreshToken });
+                const { credentials } = await oauth2Client.refreshAccessToken();
+
+                // Update token in database
+                await prisma.gmailAccount.update({
+                    where: { id: accountId },
+                    data: {
+                        accessToken: credentials.access_token,
+                        lastUsedAt: new Date(),
+                    },
+                });
+
+                // Retry with new token
+                return fetchGoogleCalendarEvents(credentials.access_token, refreshToken, accountId, startDate, endDate);
+            } catch (refreshError) {
+                console.error('Token refresh failed:', refreshError);
+                throw refreshError;
+            }
+        }
+
+        throw error;
     }
 }

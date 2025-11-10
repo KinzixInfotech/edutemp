@@ -3,7 +3,6 @@
 // ============================================
 
 import prisma from "@/lib/prisma";
-import { NextResponse } from "next/server";
 
 // GET: Fetch single event
 export async function GET(req, props) {
@@ -45,17 +44,17 @@ export async function GET(req, props) {
         });
 
         if (!event) {
-            return NextResponse.json(
-                { error: 'Event not found' },
+            return new Response(
+                JSON.stringify({ error: 'Event not found' }),
                 { status: 404 }
             );
         }
 
-        return NextResponse.json({ event });
+        return new Response(JSON.stringify({ event }), { status: 200 });
     } catch (error) {
         console.error('Fetch Event Error:', error);
-        return NextResponse.json(
-            { error: error.message || 'Failed to fetch event' },
+        return new Response(
+            JSON.stringify({ error: error.message || 'Failed to fetch event' }),
             { status: 500 }
         );
     }
@@ -79,14 +78,17 @@ export async function PATCH(req, props) {
             },
         });
 
-        return NextResponse.json({
-            message: 'Event updated successfully',
-            event,
-        });
+        return new Response(
+            JSON.stringify({
+                message: 'Event updated successfully',
+                event,
+            }),
+            { status: 200 }
+        );
     } catch (error) {
         console.error('Update Event Error:', error);
-        return NextResponse.json(
-            { error: error.message || 'Failed to update event' },
+        return new Response(
+            JSON.stringify({ error: error.message || 'Failed to update event' }),
             { status: 500 }
         );
     }
@@ -109,14 +111,16 @@ export async function DELETE(req, props) {
             },
         });
 
-        return NextResponse.json({
-            message: 'Event deleted successfully',
-        });
+        return new Response(
+            JSON.stringify({ message: 'Event deleted successfully' }),
+            { status: 200 }
+        );
     } catch (error) {
         console.error('Delete Event Error:', error);
-        return NextResponse.json(
-            { error: error.message || 'Failed to delete event' },
+        return new Response(
+            JSON.stringify({ error: error.message || 'Failed to delete event' }),
             { status: 500 }
         );
     }
 }
+

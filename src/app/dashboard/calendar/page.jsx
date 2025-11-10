@@ -959,20 +959,26 @@ export default function SchoolCalendar() {
                                 Manage/Create Event
                             </p>
                         </div>
-                        <Button
-                            variant="outline"
-                            onClick={() => {
-                                window.location.href = `/api/auth/google?state=${userId}`;
-                            }}
-                        >
-                            <CalendarDays className="h-4 w-4 mr-2" />
-                            Connect Google Calendar
-                        </Button>
+                        {hasGoogleCalendar ? (
+                            // <Button variant={'outline'} onClick={() => {
+                            //     window.location.href = `/api/auth/google-calendar/disconnect`;
+                            // }}>
+                            //     Disconnect Google Calendar
+                            // </Button>
+                            <></>
+                        ) : (
+                            <Button variant={'outline'} onClick={() => {
+                                window.location.href = `/api/auth/google-calendar?userId=${userId}&schoolId=${schoolId}`;
+                            }}>
+                                Connect Google Calendar
+                            </Button>
+                        )}
+
                     </div>
                     <CardContent className="p-6 flex flex-col h-full">
                         {/* Header */}
                         <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center  gap-4">
                                 <h2 className="text-2xl font-bold">{monthYear}</h2>
                                 {hasGoogleCalendar && (
                                     <Badge variant="outline" className="gap-1">

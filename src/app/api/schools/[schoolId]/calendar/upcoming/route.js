@@ -1,9 +1,9 @@
+
 // ============================================
 // FILE: app/api/schools/[schoolId]/calendar/upcoming/route.js
 // ============================================
 
 import prisma from "@/lib/prisma";
-import { NextResponse } from "next/server";
 
 export async function GET(req, props) {
     const params = await props.params;
@@ -33,16 +33,18 @@ export async function GET(req, props) {
             take: limit,
         });
 
-        return NextResponse.json({
-            events: upcomingEvents,
-            total: upcomingEvents.length,
-        });
+        return new Response(
+            JSON.stringify({
+                events: upcomingEvents,
+                total: upcomingEvents.length,
+            }),
+            { status: 200 }
+        );
     } catch (error) {
         console.error('Upcoming Events Error:', error);
-        return NextResponse.json(
-            { error: error.message || 'Failed to fetch upcoming events' },
+        return new Response(
+            JSON.stringify({ error: error.message || 'Failed to fetch upcoming events' }),
             { status: 500 }
         );
     }
 }
-
