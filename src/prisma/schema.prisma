@@ -57,6 +57,7 @@ model School {
   globalFeeStructures    GlobalFeeStructure[]
   studentFees            StudentFee[]
   parents                Parent[]
+  calendarEvents         CalendarEvent[]
 
   @@index([name])
 }
@@ -503,10 +504,11 @@ enum Status {
 }
 
 model Role {
-  id            Int            @id @default(autoincrement())
-  name          String         @unique
-  users         User[]
-  noticeTargets NoticeTarget[]
+  id                   Int                   @id @default(autoincrement())
+  name                 String                @unique
+  users                User[]
+  noticeTargets        NoticeTarget[]
+  calendarEventTargets CalendarEventTarget[]
 }
 
 model User {
@@ -516,7 +518,7 @@ model User {
   email                 String                 @unique
   password              String
   name                  String?
-  gender                String
+  gender                String                 @default("Unknown")
   profilePicture        String                 @default("default.png")
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
@@ -549,6 +551,8 @@ model User {
   approvedDiscounts     FeeDiscount[]          @relation("ApprovedDiscounts")
   collectedPayments     FeePayment[]           @relation("CollectedPayments")
   parent                Parent?
+  calendarEvents        CalendarEvent[]
+  calendarEventTargets  CalendarEventTarget[]
 
   @@index([schoolId])
   @@index([roleId])
@@ -835,41 +839,43 @@ model NonTeachingStaff {
 }
 
 model Class {
-  id                  Int                  @id @default(autoincrement())
-  schoolId            String               @db.Uuid
-  className           String
-  capacity            Int?
-  teachingStaffUserId String?              @db.Uuid
-  academicYearId      String?              @db.Uuid
-  AcademicYear        AcademicYear?        @relation(fields: [academicYearId], references: [id])
-  school              School               @relation(fields: [schoolId], references: [id])
-  TeachingStaff       TeachingStaff?       @relation(fields: [teachingStaffUserId], references: [userId])
-  FeeStructure        FeeStructure[]
-  homework            Homework[]
-  NoticeTarget        NoticeTarget[]
-  sections            Section[]
-  students            Student[]
-  subjects            Subject[]
-  Syllabi             Syllabus[]
-  Assignment          Assignment[]
-  globalFeeStructures GlobalFeeStructure[]
+  id                   Int                   @id @default(autoincrement())
+  schoolId             String                @db.Uuid
+  className            String
+  capacity             Int?
+  teachingStaffUserId  String?               @db.Uuid
+  academicYearId       String?               @db.Uuid
+  AcademicYear         AcademicYear?         @relation(fields: [academicYearId], references: [id])
+  school               School                @relation(fields: [schoolId], references: [id])
+  TeachingStaff        TeachingStaff?        @relation(fields: [teachingStaffUserId], references: [userId])
+  FeeStructure         FeeStructure[]
+  homework             Homework[]
+  NoticeTarget         NoticeTarget[]
+  sections             Section[]
+  students             Student[]
+  subjects             Subject[]
+  Syllabi              Syllabus[]
+  Assignment           Assignment[]
+  globalFeeStructures  GlobalFeeStructure[]
+  calendarEventTargets CalendarEventTarget[]
 
   @@unique([id, schoolId])
   @@index([schoolId])
 }
 
 model Section {
-  id                  Int                     @id @default(autoincrement())
-  name                String
-  classId             Int
-  schoolId            String                  @db.Uuid
-  teachingStaffUserId String?                 @db.Uuid
-  NoticeTarget        NoticeTarget[]
-  class               Class                   @relation(fields: [classId], references: [id])
-  supervisor          TeachingStaff?          @relation(fields: [teachingStaffUserId], references: [userId])
-  subjectTeachers     SectionSubjectTeacher[]
-  students            Student[]
-  timetables          Timetable[]
+  id                   Int                     @id @default(autoincrement())
+  name                 String
+  classId              Int
+  schoolId             String                  @db.Uuid
+  teachingStaffUserId  String?                 @db.Uuid
+  NoticeTarget         NoticeTarget[]
+  class                Class                   @relation(fields: [classId], references: [id])
+  supervisor           TeachingStaff?          @relation(fields: [teachingStaffUserId], references: [userId])
+  subjectTeachers      SectionSubjectTeacher[]
+  students             Student[]
+  timetables           Timetable[]
+  calendarEventTargets CalendarEventTarget[]
 
   @@unique([classId, name])
   @@index([classId])
@@ -1796,6 +1802,148 @@ model FeeReminder {
   @@index([studentId])
   @@index([scheduledDate])
   @@index([status])
+}
+
+// ============================================
+// CALENDAR & EVENTS SYSTEM
+// ============================================
+
+model CalendarEvent {
+  id          String  @id @default(uuid()) @db.Uuid
+  schoolId    String  @db.Uuid
+  title       String
+  description String? @db.Text
+
+  // Event Type & Category
+  eventType EventType     @default(CUSTOM)
+  category  EventCategory @default(OTHER)
+
+  // Date & Time
+  startDate DateTime
+  endDate   DateTime
+  startTime String? // "09:00 AM"
+  endTime   String? // "05:00 PM"
+  isAllDay  Boolean  @default(false)
+
+  // Location & Details
+  location String?
+  venue    String?
+
+  // Visibility & Access
+  isPublic       Boolean  @default(true)
+  targetAudience Audience @default(ALL)
+
+  // Color & Display
+  color    String   @default("#3B82F6") // Hex color
+  priority Priority @default(NORMAL)
+
+  // Recurrence
+  isRecurring    Boolean @default(false)
+  recurrenceRule Json? // RRULE format
+
+  // Creator Info
+  createdById String? @db.Uuid
+  createdBy   User?   @relation(fields: [createdById], references: [id])
+
+  // Status
+  status EventStatus @default(SCHEDULED)
+
+  // System Fields
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Relations
+  school    School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  targets   CalendarEventTarget[]
+  reminders EventReminder[]
+
+  @@index([schoolId])
+  @@index([startDate])
+  @@index([endDate])
+  @@index([eventType])
+  @@index([category])
+  @@index([status])
+}
+
+model CalendarEventTarget {
+  id      String @id @default(uuid()) @db.Uuid
+  eventId String @db.Uuid
+
+  // Targeting Options
+  classId   Int?
+  sectionId Int?
+  roleId    Int?
+  userId    String? @db.Uuid
+
+  // Relations
+  event   CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  class   Class?        @relation(fields: [classId], references: [id])
+  section Section?      @relation(fields: [sectionId], references: [id])
+  role    Role?         @relation(fields: [roleId], references: [id])
+  user    User?         @relation(fields: [userId], references: [id])
+
+  @@index([eventId])
+  @@index([classId])
+  @@index([sectionId])
+  @@index([userId])
+}
+
+model EventReminder {
+  id           String        @id @default(uuid()) @db.Uuid
+  eventId      String        @db.Uuid
+  reminderType ReminderType?
+
+  // Timing
+  reminderTime Int // Minutes before event (e.g., 30, 60, 1440)
+  scheduledAt  DateTime
+
+  // Status
+  isSent Boolean   @default(false)
+  sentAt DateTime?
+
+  // Relations
+  event CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([scheduledAt])
+  @@index([isSent])
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum EventType {
+  CUSTOM // User created events
+  HOLIDAY // School holidays
+  VACATION // Vacation periods
+  EXAM // Examination events
+  SPORTS // Sports events
+  MEETING // Staff/Parent meetings
+  ADMISSION // Admission related
+  FEE_DUE // Fee payment deadlines
+  BIRTHDAY // Birthday celebrations
+}
+
+enum EventCategory {
+  ACADEMIC
+  ADMINISTRATIVE
+  SPORTS
+  CULTURAL
+  HOLIDAY
+  EXAM
+  MEETING
+  CELEBRATION
+  OTHER
+}
+
+enum EventStatus {
+  SCHEDULED
+  ONGOING
+  COMPLETED
+  CANCELLED
+  POSTPONED
 }
 
 // ============================================

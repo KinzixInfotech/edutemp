@@ -46,6 +46,7 @@ import {
     CreditCard,
     BarChart3,
     Baby,
+    Calendar,
 } from "lucide-react"
 import { useCommandMenu } from "./CommandMenuContext"
 
@@ -57,6 +58,7 @@ export const SidebarData = [
             { label: "Self Attendance", url: "/dashboard/markattendance", icon: Newspaper, roles: ["SUPER_ADMIN", "STUDENT", "ADMIN", "MASTER_ADMIN", "TEACHER", "STAFF"] },
             { label: "Inbox", url: "/dashboard/schools/mail/inbox", icon: Inbox, roles: ["ADMIN"] },
             { label: "Noticeboard", url: "/dashboard/schools/noticeboard", icon: Flag, roles: ["ADMIN"] },
+            { label: "Calendar", url: "/dashboard/calendar", icon: Calendar, roles: ["ADMIN"] },
 
         ],
     },

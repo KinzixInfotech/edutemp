@@ -2,7 +2,8 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+    const params = await props.params;
     const { schoolId, parentId } = params;
     console.log(schoolId, parentId);
 

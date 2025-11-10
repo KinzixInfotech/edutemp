@@ -11,7 +11,12 @@ export async function GET(req) {
         const parentId = searchParams.get("parentId");
         const studentId = searchParams.get("studentId");
         const academicYearId = searchParams.get("academicYearId");
-
+        console.log(`
+🧩 Query Params:
+- Parent ID: ${parentId}
+- Student ID: ${studentId}
+- Academic Year ID: ${academicYearId}
+`);
         if (!parentId) {
             return NextResponse.json(
                 { error: "parentId required" },
@@ -22,9 +27,18 @@ export async function GET(req) {
         // Verify parent owns this student
         const student = studentId
             ? await prisma.student.findFirst({
-                where: { userId: studentId, parentId },
+                where: {
+                    userId: studentId,
+                    studentParentLinks: {
+                        some: {
+                            parentId: parentId,
+                        },
+                    },
+                },
             })
             : null;
+
+        // console.log(student, studentId)
 
         if (studentId && !student) {
             return NextResponse.json(
@@ -34,7 +48,13 @@ export async function GET(req) {
         }
 
         const where = {
-            student: { parentId },
+            student: {
+                studentParentLinks: {
+                    some: {
+                        parentId: parentId,
+                    },
+                },
+            },
             ...(studentId && { studentId }),
             ...(academicYearId && { academicYearId }),
             status: "SUCCESS",
@@ -63,6 +83,7 @@ export async function GET(req) {
             },
             orderBy: { paymentDate: "desc" },
         });
+        console.log(payments);
 
         return NextResponse.json(payments);
     } catch (error) {
