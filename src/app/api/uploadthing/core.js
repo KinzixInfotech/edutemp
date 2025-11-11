@@ -34,6 +34,24 @@ export const ourFileRouter = {
 
             return { url: file.ufsUrl };
         }),
+    feeReceiptUploader: f({ pdf: { maxFileSize: "2MB" } })
+        .input(z.object({
+            paymentId: z.string(),
+            schoolId: z.string(),
+        }))
+        .onUploadComplete(async ({ metadata, file }) => {
+            console.log("Fee receipt uploaded:", file.ufsUrl);
+
+            // Save receipt URL to feePayment
+            await prisma.feePayment.update({
+                where: { id: metadata.paymentId },
+                data: {
+                    receiptUrl: file.ufsUrl,
+                },
+            });
+
+            return { url: file.ufsUrl };
+        }),
     logoupload: f({ image: { maxFileSize: "4MB" } })
         // .input(
         //     z.object({

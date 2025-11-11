@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
 
-export async function GET_RECEIPT(req, { params }) {
+export async function GET(req, { params }) {
     try {
         const { receiptNumber } = params;
 
