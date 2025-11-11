@@ -57,14 +57,14 @@ export async function GET(req, props) {
         const gmailAccount = await prisma.gmailAccount.findFirst({
             where: {
                 user: {
-                    
+
                     schoolId,
                     // status: 'ACTIVE',
                 },
             },
             orderBy: { lastUsedAt: 'desc' },
         });
-        console.log(gmailAccount, schoolId,'gmail');
+        console.log(gmailAccount, schoolId, 'gmail');
 
         if (gmailAccount && gmailAccount.accessToken) {
             try {
@@ -177,6 +177,7 @@ export async function POST(req, props) {
             targets,
             reminders,
             createdById,
+            sendPushNotification,
         } = body;
 
         // Validate required fields
@@ -246,6 +247,7 @@ export async function POST(req, props) {
                 });
             }
 
+
             return newEvent;
         });
 
@@ -289,7 +291,7 @@ async function fetchGoogleCalendarEvents(accessToken, refreshToken, accountId, s
         const timeMax = endDate ? new Date(endDate).toISOString() : undefined;
 
         const response = await calendar.events.list({
-           calendarId: 'en.indian#holiday@group.v.calendar.google.com',
+            calendarId: 'en.indian#holiday@group.v.calendar.google.com',
             timeMin,
             timeMax,
             singleEvents: true,
