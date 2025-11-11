@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -231,6 +231,7 @@ export default function SchoolCalendar() {
 
         return days;
     }, [currentDate]);
+
 
     const getEventsForDate = useCallback((date) => {
         return filteredEvents.filter(event => {
@@ -502,14 +503,20 @@ export default function SchoolCalendar() {
                                                         </div>
                                                         <div className="space-y-1 overflow-y-auto flex-1 scrollbar-thin">
                                                             {dayEvents.slice(0, 2).map((event, i) => (
-                                                                <div
-                                                                    key={i}
-                                                                    className="text-[10px] md:text-xs px-2 py-1 rounded-md truncate text-white font-medium shadow-sm"
-                                                                    style={{ backgroundColor: event.color }}
-                                                                    title={event.title}
-                                                                >
-                                                                    {event.title}
-                                                                </div>
+                                                                // <div
+                                                                //     key={i}
+                                                                //     className="relative overflow-hidden text-[10px] md:text-xs px-2 py-1 rounded-md text-white font-medium shadow-sm"
+                                                                //     style={{ backgroundColor: event.color }}
+                                                                //     title={event.title}
+                                                                // >
+                                                                //     <div className="marquee-wrapper">
+                                                                //         <div className="marquee">
+                                                                //             <span>{event.title}</span>
+                                                                //             <span>{event.title}</span>
+                                                                //         </div>
+                                                                //     </div>
+                                                                // </div>
+                                                                <EventTitle title={event.title} color={event.color} key={i} />
                                                             ))}
                                                             {dayEvents.length > 2 && (
                                                                 <div className="text-[10px] md:text-xs text-primary font-semibold bg-primary/10 rounded-md px-2 py-1">
@@ -525,6 +532,7 @@ export default function SchoolCalendar() {
                                 </div>
                             </div>
                         </CardContent>
+
                     </Card>
                 </div>
 
@@ -1092,7 +1100,60 @@ export default function SchoolCalendar() {
                 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
                     background: hsl(var(--muted-foreground) / 0.5);
                 }
+
+.marquee-wrapper {
+  overflow: hidden;
+  display: block;
+}
+
+.marquee {
+  display: inline-flex;
+  width: max-content;
+  animation: marquee 10s linear infinite;
+}
+
+.marquee span {
+  padding-right: 2rem; /* space between repeats */
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+
             `}</style>
+        </div>
+    );
+}
+function EventTitle({ title, color }) {
+    const containerRef = useRef(null);
+    const textRef = useRef(null);
+    const [shouldScroll, setShouldScroll] = useState(false);
+
+    useEffect(() => {
+        if (containerRef.current && textRef.current) {
+            setShouldScroll(textRef.current.scrollWidth > containerRef.current.offsetWidth);
+        }
+    }, [title]);
+
+    return (
+        <div
+            ref={containerRef}
+            className="relative overflow-hidden text-[10px] md:text-xs px-2 py-1 rounded-md text-white font-medium shadow-sm"
+            style={{ backgroundColor: color }}
+            title={title}
+        >
+            {shouldScroll ? (
+                <div className="marquee-wrapper">
+                    <div className="marquee">
+                        <span ref={textRef}>{title}</span>
+                        <span>{title}</span> {/* duplicate for smooth loop */}
+                    </div>
+                </div>
+            ) : (
+                <span ref={textRef} className="truncate block">{title}</span>
+            )}
         </div>
     );
 }
