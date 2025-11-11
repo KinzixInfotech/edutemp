@@ -59,6 +59,15 @@ model School {
   parents                Parent[]
   calendarEvents         CalendarEvent[]
 
+  attendance              Attendance[]
+  attendanceConfig        AttendanceConfig?
+  schoolCalendar          SchoolCalendar[]
+  leaveRequests           LeaveRequest[]
+  leaveBalances           LeaveBalance[]
+  attendanceStats         AttendanceStats[]
+  bulkAttendance          BulkAttendance[]
+  attendanceNotifications AttendanceNotification[]
+
   @@index([name])
 }
 
@@ -512,21 +521,21 @@ model Role {
 }
 
 model User {
-  id                    String                 @id @db.Uuid
-  schoolId              String?                @db.Uuid
-  roleId                Int
-  email                 String                 @unique
-  password              String
-  name                  String?
-  gender                String                 @default("Unknown")
-  profilePicture        String                 @default("default.png")
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  deletedAt             DateTime?
-  status                UserStatus             @default(ACTIVE)
-  Admin                 Admin?
-  fcmToken              String?
-  attendance            Attendance[]
+  id             String     @id @db.Uuid
+  schoolId       String?    @db.Uuid
+  roleId         Int
+  email          String     @unique
+  password       String
+  name           String?
+  gender         String     @default("Unknown")
+  profilePicture String     @default("default.png")
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  deletedAt      DateTime?
+  status         UserStatus @default(ACTIVE)
+  Admin          Admin?
+  fcmToken       String?
+
   AuditLog              AuditLog[]
   Document              Document[]
   issuedBooks           LibraryBook[]          @relation("IssuedBooks")
@@ -553,6 +562,16 @@ model User {
   parent                Parent?
   calendarEvents        CalendarEvent[]
   calendarEventTargets  CalendarEventTarget[]
+
+  attendance              Attendance[]
+  markedAttendance        Attendance[]             @relation("MarkedBy")
+  approvedAttendance      Attendance[]             @relation("ApprovedBy")
+  leaveRequests           LeaveRequest[]
+  reviewedLeaves          LeaveRequest[]           @relation("LeaveReviewer")
+  leaveBalances           LeaveBalance[]
+  attendanceStats         AttendanceStats[]
+  bulkAttendanceRecords   BulkAttendance[]
+  attendanceNotifications AttendanceNotification[] @relation("AttendanceNotifications")
 
   @@index([schoolId])
   @@index([roleId])
@@ -858,6 +877,7 @@ model Class {
   Assignment           Assignment[]
   globalFeeStructures  GlobalFeeStructure[]
   calendarEventTargets CalendarEventTarget[]
+  bulkAttendance       BulkAttendance[]
 
   @@unique([id, schoolId])
   @@index([schoolId])
@@ -876,6 +896,7 @@ model Section {
   students             Student[]
   timetables           Timetable[]
   calendarEventTargets CalendarEventTarget[]
+  bulkAttendance       BulkAttendance[]
 
   @@unique([classId, name])
   @@index([classId])
@@ -1007,6 +1028,8 @@ model AcademicYear {
   DigitalIdCard       DigitalIdCard[]
   globalFeeStructures GlobalFeeStructure[]
   studentFees         StudentFee[]
+  leaveBalances       LeaveBalance[]
+  attendanceStats     AttendanceStats[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -1078,14 +1101,373 @@ model InstallmentParticular {
   @@index([particularId])
 }
 
+// Attendance Record - Main attendance tracking
 model Attendance {
-  id     Int              @id @default(autoincrement())
-  userId String           @db.Uuid
-  date   DateTime
-  status AttendanceStatus
-  user   User             @relation(fields: [userId], references: [id])
+  id       String   @id @default(uuid()) @db.Uuid
+  userId   String   @db.Uuid
+  schoolId String   @db.Uuid
+  date     DateTime @db.Date
 
-  @@unique([userId, date])
+  // Status & Timing
+  status       AttendanceStatus
+  checkInTime  DateTime?
+  checkOutTime DateTime?
+  workingHours Float?           @default(0) // Calculated hours
+
+  // Location & Device Info
+  checkInLocation  Json? // {latitude, longitude, address}
+  checkOutLocation Json?
+  deviceInfo       Json? // {deviceId, platform, appVersion}
+
+  // Metadata
+  markedBy      String?  @db.Uuid // Who marked (for students)
+  markedAt      DateTime @default(now())
+  isLateCheckIn Boolean  @default(false)
+  lateByMinutes Int?
+  remarks       String?
+
+  // Approval System
+  requiresApproval Boolean        @default(false)
+  approvalStatus   ApprovalStatus @default(PENDING)
+  approvedBy       String?        @db.Uuid
+  approvedAt       DateTime?
+  approvalRemarks  String?
+
+  // Relations
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school         School               @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  marker         User?                @relation("MarkedBy", fields: [markedBy], references: [id])
+  approver       User?                @relation("ApprovedBy", fields: [approvedBy], references: [id])
+  leaveRequest   LeaveRequest?        @relation("AttendanceLeave", fields: [leaveRequestId], references: [id])
+  documents      AttendanceDocument[]
+  leaveRequestId String?              @db.Uuid
+
+  @@unique([userId, schoolId, date])
+  @@index([userId, date])
+  @@index([schoolId, date])
+  @@index([status])
+  @@index([approvalStatus])
+  @@index([markedBy])
+}
+
+// School Calendar - Define working days, holidays
+model SchoolCalendar {
+  id       String   @id @default(uuid()) @db.Uuid
+  schoolId String   @db.Uuid
+  date     DateTime @db.Date
+
+  // Day Configuration
+  dayType     DayType @default(WORKING_DAY)
+  isHoliday   Boolean @default(false)
+  holidayName String?
+
+  // Working Hours
+  startTime String? // "09:00"
+  endTime   String? // "17:00"
+
+  // Metadata
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, date])
+  @@index([schoolId, date])
+  @@index([dayType])
+}
+
+// Attendance Configuration - School-specific settings
+model AttendanceConfig {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @unique @db.Uuid
+
+  // Working Hours
+  defaultStartTime   String @default("09:00")
+  defaultEndTime     String @default("17:00")
+  gracePeriodMinutes Int    @default(15) // Late after this
+  halfDayHours       Float  @default(4)
+  fullDayHours       Float  @default(8)
+
+  // Geo-fencing
+  enableGeoFencing    Boolean @default(false)
+  schoolLatitude      Float?
+  schoolLongitude     Float?
+  allowedRadiusMeters Int?    @default(500)
+
+  // Auto-marking Rules
+  autoMarkAbsent Boolean @default(true)
+  autoMarkTime   String  @default("10:00") // Mark absent if not checked in by this time
+
+  // Approval Rules
+  requireApprovalDays Int     @default(3) // Past attendance needs approval after X days
+  autoApproveLeaves   Boolean @default(false)
+
+  // Notifications
+  sendDailyReminders Boolean @default(true)
+  reminderTime       String  @default("08:30")
+  notifyParents      Boolean @default(true)
+
+  // Stats Calculation
+  calculateOnWeekends  Boolean @default(false)
+  minAttendancePercent Float   @default(75)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+}
+
+// Leave Management
+model LeaveRequest {
+  id       String @id @default(uuid()) @db.Uuid
+  userId   String @db.Uuid
+  schoolId String @db.Uuid
+
+  // Leave Details
+  leaveType LeaveType
+  startDate DateTime  @db.Date
+  endDate   DateTime  @db.Date
+  totalDays Int
+  reason    String    @db.Text
+
+  // Status
+  status        LeaveStatus @default(PENDING)
+  submittedAt   DateTime    @default(now())
+  reviewedBy    String?     @db.Uuid
+  reviewedAt    DateTime?
+  reviewRemarks String?
+
+  // Emergency Contact
+  emergencyContact      String?
+  emergencyContactPhone String?
+
+  // Relations
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school     School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  reviewer   User?           @relation("LeaveReviewer", fields: [reviewedBy], references: [id])
+  attendance Attendance[]    @relation("AttendanceLeave")
+  documents  LeaveDocument[]
+
+  @@index([userId, status])
+  @@index([schoolId, status])
+  @@index([startDate, endDate])
+}
+
+// Leave Balance Tracking
+model LeaveBalance {
+  id             String @id @default(uuid()) @db.Uuid
+  userId         String @db.Uuid
+  schoolId       String @db.Uuid
+  academicYearId String @db.Uuid
+
+  // Balance by Type
+  casualLeaveTotal   Int @default(12)
+  casualLeaveUsed    Int @default(0)
+  casualLeaveBalance Int @default(12)
+
+  sickLeaveTotal   Int @default(10)
+  sickLeaveUsed    Int @default(0)
+  sickLeaveBalance Int @default(10)
+
+  earnedLeaveTotal   Int @default(15)
+  earnedLeaveUsed    Int @default(0)
+  earnedLeaveBalance Int @default(15)
+
+  maternityLeaveTotal   Int @default(180)
+  maternityLeaveUsed    Int @default(0)
+  maternityLeaveBalance Int @default(180)
+
+  // Metadata
+  lastResetDate DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school       School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  @@unique([userId, academicYearId])
+  @@index([userId, schoolId])
+}
+
+// Attendance Stats - Pre-calculated for performance
+model AttendanceStats {
+  id             String @id @default(uuid()) @db.Uuid
+  userId         String @db.Uuid
+  schoolId       String @db.Uuid
+  academicYearId String @db.Uuid
+  month          Int // 1-12
+  year           Int
+
+  // Stats
+  totalWorkingDays Int @default(0)
+  totalPresent     Int @default(0)
+  totalAbsent      Int @default(0)
+  totalHalfDay     Int @default(0)
+  totalLate        Int @default(0)
+  totalLeaves      Int @default(0)
+  totalHolidays    Int @default(0)
+
+  attendancePercentage Float @default(0)
+  avgWorkingHours      Float @default(0)
+
+  // Calculated
+  lastCalculated DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school       School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  @@unique([userId, academicYearId, month, year])
+  @@index([userId, schoolId])
+  @@index([academicYearId, month, year])
+  @@index([attendancePercentage])
+}
+
+// Bulk Attendance - For efficient batch marking
+model BulkAttendance {
+  id        String   @id @default(uuid()) @db.Uuid
+  schoolId  String   @db.Uuid
+  classId   Int?
+  sectionId Int?
+  date      DateTime @db.Date
+  markedBy  String   @db.Uuid
+  markedAt  DateTime @default(now())
+
+  // Summary
+  totalStudents Int
+  presentCount  Int
+  absentCount   Int
+  lateCount     Int
+  halfDayCount  Int
+
+  // Metadata
+  remarks String?
+
+  school  School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class   Class?   @relation(fields: [classId], references: [id])
+  section Section? @relation(fields: [sectionId], references: [id])
+  marker  User     @relation(fields: [markedBy], references: [id])
+
+  @@index([schoolId, date])
+  @@index([classId, date])
+  @@index([markedBy])
+}
+
+// Attendance Documents (Medical certificates, etc.)
+model AttendanceDocument {
+  id           String   @id @default(uuid()) @db.Uuid
+  attendanceId String   @db.Uuid
+  documentType String // "MEDICAL_CERTIFICATE", "LEAVE_LETTER", etc.
+  fileUrl      String
+  fileName     String
+  uploadedAt   DateTime @default(now())
+
+  attendance Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+
+  @@index([attendanceId])
+}
+
+// Leave Documents
+model LeaveDocument {
+  id             String   @id @default(uuid()) @db.Uuid
+  leaveRequestId String   @db.Uuid
+  documentType   String
+  fileUrl        String
+  fileName       String
+  uploadedAt     DateTime @default(now())
+
+  leaveRequest LeaveRequest @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+
+  @@index([leaveRequestId])
+}
+
+// Attendance Notifications Queue
+model AttendanceNotification {
+  id               String           @id @default(uuid()) @db.Uuid
+  schoolId         String           @db.Uuid
+  userId           String           @db.Uuid
+  notificationType NotificationType
+
+  // Notification Details
+  title        String
+  message      String             @db.Text
+  scheduledFor DateTime
+  sentAt       DateTime?
+  status       NotificationStatus @default(PENDING)
+
+  // Metadata
+  metadata  Json? // Additional data
+  createdAt DateTime @default(now())
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user   User   @relation("AttendanceNotifications", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, scheduledFor])
+  @@index([userId, status])
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  HALF_DAY
+  LATE
+  ON_LEAVE
+  HOLIDAY
+  WEEKEND
+}
+
+enum DayType {
+  WORKING_DAY
+  WEEKEND
+  HOLIDAY
+  EXAM_DAY
+  VACATION
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  NOT_REQUIRED
+}
+
+enum LeaveType {
+  CASUAL
+  SICK
+  EARNED
+  MATERNITY
+  PATERNITY
+  EMERGENCY
+  UNPAID
+  COMPENSATORY
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum NotificationType {
+  DAILY_REMINDER
+  ABSENT_ALERT
+  LEAVE_APPROVED
+  LEAVE_REJECTED
+  LOW_ATTENDANCE
+  APPROVAL_REQUIRED
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
 }
 
 model Notification {
@@ -1523,13 +1905,6 @@ enum DocumentType {
   CERTIFICATE
   REPORT
   OTHER
-}
-
-enum AttendanceStatus {
-  PRESENT
-  ABSENT
-  LATE
-  HOLIDAY
 }
 
 enum StageName {
