@@ -28,14 +28,24 @@ export async function PATCH(req, props) {
         }
 
         // Update only if section belongs to the given school
-        const updated = await prisma.section.updateMany({
+        // const updated = await prisma.section.updateMany({
+        //     where: {
+        //         id: parseInt(classId, 10),
+        //         schoolId: schoolId,
+        //     },
+        //     data: { teachingStaffUserId:teacherId },
+        // })
+        const updated = await prisma.section.update({
             where: {
+                schoolId,
                 id: parseInt(classId, 10),
-                schoolId: schoolId,
             },
-            data: { teachingStaffUserId:teacherId },
-        })
-
+            data: {
+                teachingStaff: {
+                    connect: { userId: teacherId }, // connect teacher to section
+                },
+            },
+        });
         if (updated.count === 0) {
             return NextResponse.json(
                 { error: "Section not found for this school" },

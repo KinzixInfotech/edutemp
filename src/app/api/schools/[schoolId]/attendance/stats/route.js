@@ -3,6 +3,7 @@
 
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { ISTDate } from '../bulk/route';
 
 // GET - Fetch attendance statistics
 export async function GET(req, { params }) {
@@ -61,8 +62,8 @@ export async function GET(req, { params }) {
                         userId,
                         schoolId,
                         date: {
-                            gte: new Date(currentYear, currentMonth - 1, 1),
-                            lte: new Date(currentYear, currentMonth, 0)
+                            gte: ISTDate(new Date(currentYear, currentMonth - 1, 1)),
+                            lte: ISTDate(new Date(currentYear, currentMonth, 0))
                         }
                     },
                     orderBy: { date: 'desc' }
@@ -77,13 +78,12 @@ export async function GET(req, { params }) {
                 where: {
                     schoolId,
                     date: {
-                        gte: new Date(currentYear, currentMonth - 1, 1),
-                        lte: new Date(currentYear, currentMonth, 0)
+                        gte: ISTDate(new Date(currentYear, currentMonth - 1, 1)),
+                        lte: ISTDate(new Date(currentYear, currentMonth, 0))
                     },
                     dayType: 'WORKING_DAY'
                 }
             });
-
             return NextResponse.json({
                 userId,
                 monthlyStats: monthlyStats || {
@@ -270,8 +270,8 @@ async function recalculateStats(schoolId, academicYearId, userId, month, year) {
             where: {
                 schoolId,
                 date: {
-                    gte: new Date(year, month - 1, 1),
-                    lte: new Date(year, month, 0)
+                    gte: ISTDate(new Date(year, month - 1, 1)),
+                    lte: ISTDate(new Date(year, month, 0))
                 }
             }
         });
@@ -283,8 +283,8 @@ async function recalculateStats(schoolId, academicYearId, userId, month, year) {
                 userId: user.userId,
                 schoolId,
                 date: {
-                    gte: new Date(year, month - 1, 1),
-                    lte: new Date(year, month, 0)
+                    gte: ISTDate(new Date(year, month - 1, 1)),
+                    lte: ISTDate(new Date(year, month, 0))
                 }
             },
             _count: { id: true },
@@ -295,8 +295,8 @@ async function recalculateStats(schoolId, academicYearId, userId, month, year) {
             where: {
                 schoolId,
                 date: {
-                    gte: new Date(year, month - 1, 1),
-                    lte: new Date(year, month, 0)
+                    gte: ISTDate(new Date(year, month - 1, 1)),
+                    lte: ISTDate(new Date(year, month, 0))
                 },
                 dayType: 'WORKING_DAY'
             }

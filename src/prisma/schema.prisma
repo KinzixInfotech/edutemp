@@ -802,6 +802,7 @@ model TeachingStaff {
   name                  String
   designation           String
   gender                String
+  sectionsAssigned      Section[]               @relation("Section_Teacher")
   age                   String
   bloodGroup            String
   contactNumber         String
@@ -818,7 +819,6 @@ model TeachingStaff {
   academicYearId        String                  @db.Uuid
   Class                 Class[]
   homework              Homework[]
-  Section               Section[]
   SectionSubjectTeacher SectionSubjectTeacher[]
   AcademicYear          AcademicYear            @relation(fields: [academicYearId], references: [id])
   department            Department?             @relation(fields: [departmentId], references: [id])
@@ -883,15 +883,35 @@ model Class {
   @@index([schoolId])
 }
 
+// model Section {
+//   id                   Int                     @id @default(autoincrement())
+//   name                 String
+//   classId              Int
+//   schoolId             String                  @db.Uuid
+//   teachingStaffUserId  String?                 @db.Uuid
+//   NoticeTarget         NoticeTarget[]
+//   class                Class                   @relation(fields: [classId], references: [id])
+//   supervisor           TeachingStaff?          @relation(fields: [teachingStaffUserId], references: [userId])
+//   subjectTeachers      SectionSubjectTeacher[]
+//   students             Student[]
+//   timetables           Timetable[]
+//   calendarEventTargets CalendarEventTarget[]
+//   bulkAttendance       BulkAttendance[]
+
+//   @@unique([classId, name])
+//   @@index([classId])
+// }
 model Section {
-  id                   Int                     @id @default(autoincrement())
-  name                 String
-  classId              Int
-  schoolId             String                  @db.Uuid
-  teachingStaffUserId  String?                 @db.Uuid
-  NoticeTarget         NoticeTarget[]
+  id                  Int     @id @default(autoincrement())
+  name                String
+  classId             Int
+  schoolId            String  @db.Uuid
+  teachingStaffUserId String? @db.Uuid
+
+  // Relations
   class                Class                   @relation(fields: [classId], references: [id])
-  supervisor           TeachingStaff?          @relation(fields: [teachingStaffUserId], references: [userId])
+  teachingStaff        TeachingStaff?          @relation("Section_Teacher", fields: [teachingStaffUserId], references: [userId])
+  NoticeTarget         NoticeTarget[]
   subjectTeachers      SectionSubjectTeacher[]
   students             Student[]
   timetables           Timetable[]

@@ -171,7 +171,7 @@ export async function POST(req) {
                 where: { id: studentFeeId },
                 data: {
                     paidAmount: newPaidAmount,
-                    balanceAmount: newBalanceAmount,
+                    balanceAmount: newBalanceAmount, 
                     status: newStatus,
                     lastPaymentDate: new Date(),
                 },

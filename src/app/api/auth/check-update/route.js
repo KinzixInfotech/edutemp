@@ -1,4 +1,4 @@
-// File: app/api/auth/check-update/route.js
+ // File: app/api/auth/check-update/route.js
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 

@@ -4,6 +4,32 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
+// ===== CONFIG =====
+// Set DEBUG = true to enable detailed, highlighted debug logs
+export const DEBUG = true;
+
+function debugLog(...args) {
+    if (!DEBUG) return;
+    // Prefix and visually separate debug logs so they stand out in server logs
+    console.log('🚨[ATTENDANCE DEBUG]----------------------------------------------------------------');
+    console.log(...args);
+    console.log('🚨[ATTENDANCE DEBUG]----------------------------------------------------------------');
+}
+export const ISTDate = (input) => {
+    if (!input) return new Date(new Date().toDateString());
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+        const [y, m, d] = input.split('-').map(Number);
+        return new Date(y, m - 1, d); // local date, not UTC conversion
+    }
+
+    return new Date(input);
+}
+
+
+// Helper: safe parsing to integer
+const toInt = (v) => (typeof v === 'number' ? v : parseInt(v, 10));
+
 // GET - Fetch students for bulk marking
 export async function GET(req, { params }) {
     const { schoolId } = params;
@@ -11,18 +37,22 @@ export async function GET(req, { params }) {
 
     const classId = searchParams.get('classId');
     const sectionId = searchParams.get('sectionId');
-    const date = searchParams.get('date') ? new Date(searchParams.get('date')) : new Date();
+    const dateParam = searchParams.get('date');
+    const date = dateParam ? ISTDate(dateParam) : ISTDate();
 
     if (!classId) {
         return NextResponse.json({ error: 'classId is required' }, { status: 400 });
     }
+
     try {
+        debugLog('GET /attendance/bulk called', { schoolId, classId, sectionId, date: date.toISOString() });
+
         // Get students in class/section
         const students = await prisma.student.findMany({
             where: {
                 schoolId,
-                classId: parseInt(classId),
-                ...(sectionId && { sectionId: parseInt(sectionId) }),
+                classId: toInt(classId),
+                ...(sectionId && { sectionId: toInt(sectionId) }),
                 user: {
                     deletedAt: null,
                     status: 'ACTIVE'
@@ -33,17 +63,12 @@ export async function GET(req, { params }) {
                 name: true,
                 admissionNo: true,
                 rollNumber: true,
-                profilePicture: true,
-                class: {
-                    select: { className: true }
-                },
-                section: {
-                    select: { name: true }
-                },
+                class: { select: { className: true } },
+                section: { select: { name: true } },
                 user: {
                     select: {
                         attendance: {
-                            where: { date: new Date(date.toDateString()) },
+                            where: { date: date },
                             select: {
                                 id: true,
                                 status: true,
@@ -65,15 +90,11 @@ export async function GET(req, { params }) {
         const existingBulk = await prisma.bulkAttendance.findFirst({
             where: {
                 schoolId,
-                classId: parseInt(classId),
-                ...(sectionId && { sectionId: parseInt(sectionId) }),
-                date: new Date(date.toDateString())
+                classId: toInt(classId),
+                ...(sectionId && { sectionId: toInt(sectionId) }),
+                date: date
             },
-            include: {
-                marker: {
-                    select: { name: true }
-                }
-            }
+            include: { marker: { select: { name: true } } }
         });
 
         // Format response
@@ -127,51 +148,45 @@ export async function POST(req, { params }) {
     }
 
     try {
-        const attendanceDate = new Date(date);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        attendanceDate.setHours(0, 0, 0, 0);
+        console.log('🕒 Raw:', date, '| ISTDate:', ISTDate(date).toISOString(), '| Local:', ISTDate(date).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }));
+        const attendanceDate = ISTDate(date);
+        debugLog('POST /attendance/bulk called', { schoolId, classId, sectionId, rawDate: date, attendanceDate: attendanceDate.toISOString(), markedBy, markAllPresent });
 
+        const today = ISTDate(); // normalized today
         // Check if marking past attendance (requires approval)
         const requiresApproval = attendanceDate < today;
 
-        // Get attendance config
-        const config = await prisma.attendanceConfig.findUnique({
-            where: { schoolId }
-        });
+        // Get attendance config (could be null)
+        const config = await prisma.attendanceConfig.findUnique({ where: { schoolId } });
+        debugLog('attendanceConfig', config);
 
-        const results = {
-            success: [],
-            failed: [],
-            skipped: [],
-        };
+        const results = { success: [], failed: [], skipped: [] };
+
+        // Ensure attendance array exists
+        let providedAttendance = Array.isArray(attendance) ? attendance : [];
 
         // Process in transaction
+        // We will commit attendance & bulkAttendance atomically, then run stats update after commit using root client.
+        let attendanceData = providedAttendance;
+
         await prisma.$transaction(async (tx) => {
             // If markAllPresent, get all students
-            let attendanceData = attendance;
-
             if (markAllPresent) {
                 const students = await tx.student.findMany({
                     where: {
                         schoolId,
-                        classId: parseInt(classId),
-                        ...(sectionId && { sectionId: parseInt(sectionId) }),
-                        user: {
-                            deletedAt: null,
-                            status: 'ACTIVE'
-                        }
+                        classId: toInt(classId),
+                        ...(sectionId && { sectionId: toInt(sectionId) }),
+                        user: { deletedAt: null, status: 'ACTIVE' }
                     },
                     select: { userId: true }
                 });
 
-                attendanceData = students.map(s => ({
-                    userId: s.userId,
-                    status: 'PRESENT',
-                }));
+                attendanceData = students.map(s => ({ userId: s.userId, status: 'PRESENT' }));
+                debugLog('markAllPresent -> created attendanceData', { count: attendanceData.length });
             }
 
-            // Bulk upsert attendance records
+            // Bulk upsert attendance records inside transaction
             for (const record of attendanceData) {
                 try {
                     const existingAttendance = await tx.attendance.findUnique({
@@ -185,10 +200,7 @@ export async function POST(req, { params }) {
                     });
 
                     if (existingAttendance && !record.forceUpdate) {
-                        results.skipped.push({
-                            userId: record.userId,
-                            reason: 'Already marked'
-                        });
+                        results.skipped.push({ userId: record.userId, reason: 'Already marked' });
                         continue;
                     }
 
@@ -229,12 +241,8 @@ export async function POST(req, { params }) {
                     });
 
                     results.success.push(attendanceRecord.id);
-
                 } catch (error) {
-                    results.failed.push({
-                        userId: record.userId,
-                        error: error.message
-                    });
+                    results.failed.push({ userId: record.userId, error: error.message });
                 }
             }
 
@@ -247,8 +255,8 @@ export async function POST(req, { params }) {
             await tx.bulkAttendance.create({
                 data: {
                     schoolId,
-                    classId: parseInt(classId),
-                    sectionId: sectionId ? parseInt(sectionId) : null,
+                    classId: toInt(classId),
+                    sectionId: sectionId ? toInt(sectionId) : null,
                     date: attendanceDate,
                     markedBy,
                     totalStudents: attendanceData.length,
@@ -260,15 +268,25 @@ export async function POST(req, { params }) {
                 }
             });
 
-            // Update attendance stats (async, don't wait)
-            updateAttendanceStats(tx, schoolId, attendanceDate).catch(console.error);
-        });
+            // IMPORTANT: Do NOT call updateAttendanceStats(tx, ...) here without awaiting —
+            // but also avoid doing heavy stat calculation inside transaction for performance.
+            // We'll run stats after the transaction commits using the root prisma client.
+            debugLog('Transaction: attendance upsert & bulk created', { successCount: results.success.length, skippedCount: results.skipped.length, failedCount: results.failed.length });
+        }); // end transaction
+
+        // Now update attendance stats using the root prisma client (outside transaction)
+        try {
+            updateAttendanceStats(prisma, schoolId, attendanceDate);
+        } catch (err) {
+            // Don't fail the API if stats fail — just log
+            console.error('Attendance stats update error (post-transaction):', err);
+        }
 
         return NextResponse.json({
             success: true,
             results,
             summary: {
-                total: attendance?.length || 0,
+                total: attendanceData.length,
                 successful: results.success.length,
                 failed: results.failed.length,
                 skipped: results.skipped.length,
@@ -286,87 +304,101 @@ export async function POST(req, { params }) {
 }
 
 // Helper function to update stats
-async function updateAttendanceStats(tx, schoolId, date) {
-    const month = date.getMonth() + 1;
-    const year = date.getFullYear();
+// Accepts either a prisma client or a transaction client
+async function updateAttendanceStats(client, schoolId, date) {
+    try {
+        debugLog('updateAttendanceStats called', { schoolId, date: date.toISOString() });
 
-    const academicYear = await tx.academicYear.findFirst({
-        where: { schoolId, isActive: true },
-        select: { id: true }
-    });
+        const month = date.getMonth() + 1;
+        const year = date.getFullYear();
 
-    if (!academicYear) return;
+        const academicYear = await client.academicYear.findFirst({
+            where: { schoolId, isActive: true },
+            select: { id: true }
+        });
 
-    // Get all users with attendance in this month
-    const users = await tx.attendance.groupBy({
-        by: ['userId'],
-        where: {
-            schoolId,
-            date: {
-                gte: new Date(year, month - 1, 1),
-                lte: new Date(year, month, 0)
-            }
-        },
-        _count: { id: true }
-    });
+        if (!academicYear) {
+            debugLog('No active academic year found for school', { schoolId });
+            return;
+        }
 
-    for (const user of users) {
-        const stats = await tx.attendance.groupBy({
-            by: ['status'],
+        // Get all users with attendance in this month
+        const monthStart = ISTDate(new Date(year, month - 1, 1));
+        const monthEnd = ISTDate(new Date(year, month, 0));
+
+        const users = await client.attendance.groupBy({
+            by: ['userId'],
             where: {
-                userId: user.userId,
                 schoolId,
-                date: {
-                    gte: new Date(year, month - 1, 1),
-                    lte: new Date(year, month, 0)
-                }
+                date: { gte: monthStart, lte: monthEnd }
             },
             _count: { id: true }
         });
 
-        const totalPresent = stats.find(s => s.status === 'PRESENT')?._count.id || 0;
-        const totalAbsent = stats.find(s => s.status === 'ABSENT')?._count.id || 0;
-        const totalHalfDay = stats.find(s => s.status === 'HALF_DAY')?._count.id || 0;
-        const totalLate = stats.find(s => s.status === 'LATE')?._count.id || 0;
-        const totalLeaves = stats.find(s => s.status === 'ON_LEAVE')?._count.id || 0;
+        debugLog('Users with attendance in month', { monthStart: monthStart.toISOString(), monthEnd: monthEnd.toISOString(), userCount: users.length });
 
-        const totalDays = totalPresent + totalAbsent + totalHalfDay + totalLate + totalLeaves;
-        const attendancePercentage = totalDays > 0
-            ? ((totalPresent + totalLate + (totalHalfDay * 0.5)) / totalDays) * 100
-            : 0;
-
-        await tx.attendanceStats.upsert({
-            where: {
-                userId_academicYearId_month_year: {
+        for (const user of users) {
+            const stats = await client.attendance.groupBy({
+                by: ['status'],
+                where: {
                     userId: user.userId,
+                    schoolId,
+                    date: { gte: monthStart, lte: monthEnd }
+                },
+                _count: { id: true }
+            });
+
+            const totalPresent = stats.find(s => s.status === 'PRESENT')?._count.id || 0;
+            const totalAbsent = stats.find(s => s.status === 'ABSENT')?._count.id || 0;
+            const totalHalfDay = stats.find(s => s.status === 'HALF_DAY')?._count.id || 0;
+            const totalLate = stats.find(s => s.status === 'LATE')?._count.id || 0;
+            const totalLeaves = stats.find(s => s.status === 'ON_LEAVE')?._count.id || 0;
+
+            const totalDays = totalPresent + totalAbsent + totalHalfDay + totalLate + totalLeaves;
+            const attendancePercentage = totalDays > 0
+                ? ((totalPresent + totalLate + (totalHalfDay * 0.5)) / totalDays) * 100
+                : 0;
+
+            await client.attendanceStats.upsert({
+                where: {
+                    userId_academicYearId_month_year: {
+                        userId: user.userId,
+                        academicYearId: academicYear.id,
+                        month,
+                        year
+                    }
+                },
+                update: {
+                    totalPresent,
+                    totalAbsent,
+                    totalHalfDay,
+                    totalLate,
+                    totalLeaves,
+                    attendancePercentage,
+                    lastCalculated: new Date(),
+                },
+                create: {
+                    userId: user.userId,
+                    schoolId,
                     academicYearId: academicYear.id,
                     month,
-                    year
+                    year,
+                    totalPresent,
+                    totalAbsent,
+                    totalHalfDay,
+                    totalLate,
+                    totalLeaves,
+                    attendancePercentage,
                 }
-            },
-            update: {
-                totalPresent,
-                totalAbsent,
-                totalHalfDay,
-                totalLate,
-                totalLeaves,
-                attendancePercentage,
-                lastCalculated: new Date(),
-            },
-            create: {
-                userId: user.userId,
-                schoolId,
-                academicYearId: academicYear.id,
-                month,
-                year,
-                totalPresent,
-                totalAbsent,
-                totalHalfDay,
-                totalLate,
-                totalLeaves,
-                attendancePercentage,
-            }
-        });
+            });
+
+            debugLog('Upserted attendanceStats for user', { userId: user.userId, totalPresent, totalAbsent, totalHalfDay, totalLate, totalLeaves, attendancePercentage });
+        }
+
+    } catch (error) {
+        console.error('updateAttendanceStats error:', error);
+        // bubble up or swallow depending on caller — caller currently logs and continues
+        throw error;
     }
 }
 
@@ -377,16 +409,11 @@ export async function PUT(req, { params }) {
     const { bulkId, updates, markedBy } = body;
 
     if (!bulkId || !updates) {
-        return NextResponse.json({
-            error: 'bulkId and updates are required'
-        }, { status: 400 });
+        return NextResponse.json({ error: 'bulkId and updates are required' }, { status: 400 });
     }
 
     try {
-        const results = {
-            updated: [],
-            failed: []
-        };
+        const results = { updated: [], failed: [] };
 
         await prisma.$transaction(async (tx) => {
             for (const update of updates) {
@@ -396,7 +423,7 @@ export async function PUT(req, { params }) {
                             userId_schoolId_date: {
                                 userId: update.userId,
                                 schoolId,
-                                date: new Date(update.date)
+                                date: ISTDate(update.date)
                             }
                         },
                         data: {
@@ -409,23 +436,18 @@ export async function PUT(req, { params }) {
 
                     results.updated.push(update.userId);
                 } catch (error) {
-                    results.failed.push({
-                        userId: update.userId,
-                        error: error.message
-                    });
+                    results.failed.push({ userId: update.userId, error: error.message });
                 }
             }
         });
 
-        return NextResponse.json({
-            success: true,
-            results
-        });
+        // Optionally update stats after bulk update (uncomment if desired)
+        updateAttendanceStats(prisma, schoolId, ISTDate(updates[0].date)).catch(console.error);
+
+        return NextResponse.json({ success: true, results });
 
     } catch (error) {
         console.error('Update bulk attendance error:', error);
-        return NextResponse.json({
-            error: 'Failed to update attendance'
-        }, { status: 500 });
+        return NextResponse.json({ error: 'Failed to update attendance' }, { status: 500 });
     }
 }
