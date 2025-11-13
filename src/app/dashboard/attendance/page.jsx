@@ -36,13 +36,12 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 
+// ===== DATE UTILITY FUNCTIONS (OUTSIDE COMPONENT) =====
 
-// Helper to convert date to IST and format for API
-const formatDateForAPI = (dateInput = new Date()) => {
+const getISTDateString = (dateInput = new Date()) => {
     let date;
 
     if (typeof dateInput === 'string') {
-        // If it's already YYYY-MM-DD, return as-is
         if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
             return dateInput;
         }
@@ -58,14 +57,61 @@ const formatDateForAPI = (dateInput = new Date()) => {
     return istDate.toISOString().split('T')[0];
 };
 
+const formatDateForAPI = (dateInput) => getISTDateString(dateInput);
+
+const formatIST = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+    });
+};
+
+
+// ✅ CRITICAL: Match attendance data (handles +1 day offset for IST)
+const getAttendanceForDate = (date, monthlyTrend) => {
+    if (!monthlyTrend) return null;
+
+    // Calendar date: "2025-11-12"
+    const dateStr = getISTDateString(date);
+
+    // Find matching attendance
+    return monthlyTrend.find(d => {
+        const serverDate = d.date; // API: "2025-11-11T00:00:00.000Z"
+        if (!serverDate) return false;
+
+        // Handle ISO timestamp format
+        if (typeof serverDate === 'string' && serverDate.includes('T')) {
+            // Extract date part: "2025-11-11"
+            const apiDateOnly = serverDate.split('T')[0];
+            // Add 1 day for IST display: "2025-11-11" -> "2025-11-12"
+            const apiDate = new Date(apiDateOnly + 'T00:00:00.000Z');
+            const nextDay = new Date(apiDate.getTime() + 24 * 60 * 60 * 1000);
+            const displayDate = nextDay.toISOString().split('T')[0];
+
+            return displayDate === dateStr;
+        }
+
+        // Fallback: direct comparison
+        return serverDate === dateStr;
+    }) || null;
+};
+
+// ===== MAIN COMPONENT =====
+
 export default function AdminAttendanceDashboard() {
     const { fullUser } = useAuth();
-
     const schoolId = fullUser?.schoolId;
     const queryClient = useQueryClient();
 
     // State Management
-    const [currentDate, setCurrentDate] = useState(new Date());
+    const [currentDate, setCurrentDate] = useState(() => {
+        const now = new Date();
+        const offset = 5.5 * 60 * 60 * 1000;
+        const ist = new Date(now.getTime() + offset);
+        return new Date(ist.getFullYear(), ist.getMonth(), 1);
+    });
     const [selectedDate, setSelectedDate] = useState(null);
     const [selectedRole, setSelectedRole] = useState('all');
     const [selectedClass, setSelectedClass] = useState('all');
@@ -87,14 +133,12 @@ export default function AdminAttendanceDashboard() {
         remarks: ''
     });
 
-
-
     // Fetch Dashboard Data
     const { data: dashboardData, isLoading: dashboardLoading, refetch: refetchDashboard } = useQuery({
-        queryKey: ['attendance-dashboard', schoolId, formatDateForAPI(currentDate), selectedRole, selectedClass],
+        queryKey: ['attendance-dashboard', schoolId, getISTDateString(currentDate), selectedRole, selectedClass],
         queryFn: async () => {
             const params = new URLSearchParams({
-                date: formatDateForAPI(currentDate),
+                date: getISTDateString(currentDate),
                 ...(selectedRole !== 'all' && { roleId: selectedRole }),
                 ...(selectedClass !== 'all' && { classId: selectedClass })
             });
@@ -104,7 +148,7 @@ export default function AdminAttendanceDashboard() {
         },
         enabled: !!schoolId,
         staleTime: 1000 * 60 * 2,
-        keepPreviousData: true, // Keep old data while fetching new
+        keepPreviousData: true,
     });
 
     // Fetch Pending Approvals
@@ -230,6 +274,7 @@ export default function AdminAttendanceDashboard() {
         }
     };
 
+    // Generate Calendar Days
     const getDaysInMonth = useCallback(() => {
         const year = currentDate.getFullYear();
         const month = currentDate.getMonth();
@@ -237,10 +282,10 @@ export default function AdminAttendanceDashboard() {
         const lastDay = new Date(year, month + 1, 0);
         const daysInMonth = lastDay.getDate();
         const startingDayOfWeek = firstDay.getDay();
-
         const days = [];
         const prevMonthLastDay = new Date(year, month, 0).getDate();
 
+        // Previous month padding
         for (let i = startingDayOfWeek - 1; i >= 0; i--) {
             days.push({
                 date: prevMonthLastDay - i,
@@ -249,14 +294,17 @@ export default function AdminAttendanceDashboard() {
             });
         }
 
+        // Current month days
         for (let i = 1; i <= daysInMonth; i++) {
+            const fullDate = new Date(year, month, i);
             days.push({
                 date: i,
                 isCurrentMonth: true,
-                fullDate: new Date(year, month, i),
+                fullDate: fullDate,
             });
         }
 
+        // Next month padding
         const remainingDays = 42 - days.length;
         for (let i = 1; i <= remainingDays; i++) {
             days.push({
@@ -269,24 +317,7 @@ export default function AdminAttendanceDashboard() {
         return days;
     }, [currentDate]);
 
-    const getAttendanceForDate = (date) => {
-        if (!dashboardData?.monthlyTrend) return null;
-
-        const dateStr = formatDateForAPI(date);
-        const dayData = dashboardData.monthlyTrend.find(d => {
-            const trendDate = new Date(d.date);
-            return formatDateForAPI(trendDate) === dateStr;
-        });
-        return dayData || null;
-    };
-
-    const formatDate = (date) => {
-        return new Date(date).toLocaleDateString('en-IN', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric'
-        });
-    };
+    const formatDate = (dateInput) => formatIST(dateInput);
 
     const getStatusColor = (status) => {
         const colors = {
@@ -557,8 +588,8 @@ export default function AdminAttendanceDashboard() {
                             {/* Calendar Grid */}
                             <div className="grid grid-cols-7 gap-2">
                                 {days.map((day, idx) => {
-                                    const attendanceData = getAttendanceForDate(day.fullDate);
-                                    const isToday = day.fullDate.toDateString() === new Date().toDateString();
+                                    const attendanceData = getAttendanceForDate(day.fullDate, dashboardData?.monthlyTrend);
+                                    const isToday = getISTDateString(day.fullDate) === getISTDateString(new Date());
                                     const isWeekend = day.fullDate.getDay() === 0 || day.fullDate.getDay() === 6;
 
                                     return (
