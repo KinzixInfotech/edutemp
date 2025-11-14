@@ -24,6 +24,7 @@ import {
     AlertTriangle,
     Settings,
     ExternalLink,
+    Check,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -76,9 +77,23 @@ export default function CalendarSetup() {
             const res = await fetch(`/api/schools/${schoolId}/calendar/populate`);
             const data = await res.json();
             setStatus(data);
+            
+            // Load current config from backend if calendar is populated
+            if (data.isPopulated && data.currentConfig) {
+                setConfig(prev => ({
+                    ...prev,
+                    // Only update if workingDays is not empty, otherwise keep default
+                    workingDays: data.currentConfig.workingDays && data.currentConfig.workingDays.length > 0 
+                        ? data.currentConfig.workingDays 
+                        : prev.workingDays,
+                    startTime: data.currentConfig.startTime || prev.startTime,
+                    endTime: data.currentConfig.endTime || prev.endTime,
+                    fetchGoogleHolidays: data.currentConfig.fetchGoogleHolidays ?? prev.fetchGoogleHolidays,
+                }));
+            }
         } catch (error) {
             console.error('Failed to fetch status:', error);
-            toast.error('Something Went Wrong While Fetching')
+            toast.error('Something Went Wrong While Fetching');
         } finally {
             setIsLoading(false);
             setIsFetching(false);
@@ -90,7 +105,6 @@ export default function CalendarSetup() {
             if (!confirm('⚠️ Calendar already populated\n\nDo you want to regenerate it? This will delete existing entries and create new ones.\n\nClick OK to proceed, or enable "Force Refresh" checkbox below.')) {
                 return;
             }
-            // User confirmed via dialog, enable force refresh
             setConfig(prev => ({ ...prev, forceRefresh: true }));
         }
 
@@ -101,26 +115,25 @@ export default function CalendarSetup() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     ...config,
-                    forceRefresh: status?.isPopulated ? true : config.forceRefresh, // Always force refresh if already populated
+                    forceRefresh: status?.isPopulated ? true : config.forceRefresh,
                 }),
             });
 
             const data = await res.json();
 
             if (!res.ok) {
-                // alert('❌ Error: ' + (data.error || 'Failed to populate calendar'));
-                toast.error(`Error:${data.error || 'Failed To Populate Calendar'}`)
+                toast.error(`Error: ${data.error || 'Failed To Populate Calendar'}`);
                 return;
             }
 
-            // alert(`✅ Calendar populated successfully!\n\nTotal Days: ${data.stats.totalDays}\nWorking Days: ${data.stats.workingDays}\nWeekends: ${data.stats.weekends}\nHolidays: ${data.stats.holidays}\n\nGoogle Holidays: ${data.stats.holidaysFromGoogle}`);
-            toast.success(`Calendar populated successfully!\n\nTotal Days: ${data.stats.totalDays}\nWorking Days: ${data.stats.workingDays}\nWeekends: ${data.stats.weekends}\nHolidays: ${data.stats.holidays}\n\nGoogle Holidays: ${data.stats.holidaysFromGoogle}`);
+            toast.success(
+                `Calendar populated successfully!\n\nTotal Days: ${data.stats.totalDays}\nWorking Days: ${data.stats.workingDays}\nWeekends: ${data.stats.weekends}\nHolidays: ${data.stats.holidays}\n\nGoogle Holidays: ${data.stats.holidaysFromGoogle}`
+            );
             
             fetchStatus();
             checkGoogleCalendar();
         } catch (error) {
-            // alert('❌ Error: ' + error.message);
-            toast.error(`Error ${error.message}`)
+            toast.error(`Error: ${error.message}`);
         } finally {
             setPopulating(false);
         }
@@ -140,15 +153,14 @@ export default function CalendarSetup() {
             const data = await res.json();
 
             if (!res.ok) {
-                // alert('❌ Error: ' + (data.error || 'Failed to clear calendar'));
-                toast.error('❌ Error: ' + (data.error || 'Failed to clear calendar'));
+                toast.error('Error: ' + (data.error || 'Failed to clear calendar'));
                 return;
             }
 
-            toast.success(`✅ Calendar cleared successfully!\n\nDeleted ${data.deletedCount} entries`);
+            toast.success(`Calendar cleared successfully!\n\nDeleted ${data.deletedCount} entries`);
             fetchStatus();
         } catch (error) {
-            toast.error('❌ Error: ' + error.message);
+            toast.error('Error: ' + error.message);
         } finally {
             setClearing(false);
         }
@@ -164,13 +176,13 @@ export default function CalendarSetup() {
     };
 
     const days = [
-        { value: 0, label: 'Sun', short: 'S' },
-        { value: 1, label: 'Mon', short: 'M' },
-        { value: 2, label: 'Tue', short: 'T' },
-        { value: 3, label: 'Wed', short: 'W' },
-        { value: 4, label: 'Thu', short: 'T' },
-        { value: 5, label: 'Fri', short: 'F' },
-        { value: 6, label: 'Sat', short: 'S' },
+        { value: 0, label: 'Sunday', short: 'Sun', abbr: 'S' },
+        { value: 1, label: 'Monday', short: 'Mon', abbr: 'M' },
+        { value: 2, label: 'Tuesday', short: 'Tue', abbr: 'T' },
+        { value: 3, label: 'Wednesday', short: 'Wed', abbr: 'W' },
+        { value: 4, label: 'Thursday', short: 'Thu', abbr: 'T' },
+        { value: 5, label: 'Friday', short: 'Fri', abbr: 'F' },
+        { value: 6, label: 'Saturday', short: 'Sat', abbr: 'S' },
     ];
 
     if (!schoolId) {
@@ -218,7 +230,7 @@ export default function CalendarSetup() {
                         disabled={isFetching}
                         className="bg-muted"
                     >
-                        <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
+                        <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
                     </Button>
                 </div>
             </div>
@@ -248,11 +260,13 @@ export default function CalendarSetup() {
                                                 {new Date(status.academicYear.startDate).toLocaleDateString('en-IN', {
                                                     day: 'numeric',
                                                     month: 'short',
-                                                    year: 'numeric'
-                                                })} - {new Date(status.academicYear.endDate).toLocaleDateString('en-IN', {
+                                                    year: 'numeric',
+                                                })}{' '}
+                                                -{' '}
+                                                {new Date(status.academicYear.endDate).toLocaleDateString('en-IN', {
                                                     day: 'numeric',
                                                     month: 'short',
-                                                    year: 'numeric'
+                                                    year: 'numeric',
                                                 })}
                                             </p>
                                         </div>
@@ -261,10 +275,10 @@ export default function CalendarSetup() {
                                 <Badge
                                     variant="outline"
                                     className={cn(
-                                        "text-xs",
+                                        'text-xs font-medium px-3 py-1.5',
                                         status.isPopulated
-                                            ? "bg-green-100 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400"
-                                            : "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-400"
+                                            ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400'
+                                            : 'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-400'
                                     )}
                                 >
                                     {status.isPopulated ? (
@@ -334,80 +348,141 @@ export default function CalendarSetup() {
             <Card>
                 <CardContent className="pt-4 sm:pt-6">
                     <div className="space-y-6">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
-                                <Settings className="h-5 w-5" />
-                                Configuration
-                            </h2>
-                            <Badge variant="outline" className="text-xs">
-                                <Info className="mr-1.5 h-3 w-3" />
-                                Customize Settings
-                            </Badge>
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
+                                    <Settings className="h-5 w-5" />
+                                    Configuration
+                                </h2>
+                                <Badge variant="outline" className="text-xs">
+                                    <Info className="mr-1.5 h-3 w-3" />
+                                    {status?.isPopulated ? 'Current Settings' : 'Customize Settings'}
+                                </Badge>
+                            </div>
+                            
+                            {/* Show current saved config */}
+                            {status?.isPopulated && status?.currentConfig && (
+                                <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                                    <p className="text-xs font-medium text-blue-900 dark:text-blue-100 mb-1">
+                                        📋 Saved Configuration
+                                    </p>
+                                    <div className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                                        <p>Working Days: {status.currentConfig.workingDays?.length > 0 
+                                            ? status.currentConfig.workingDays.map(d => days[d]?.short).join(', ')
+                                            : 'None (All weekends)'
+                                        }</p>
+                                        <p>Hours: {status.currentConfig.startTime} - {status.currentConfig.endTime}</p>
+                                        <p>Google Holidays: {status.currentConfig.fetchGoogleHolidays ? '✅ Enabled' : '❌ Disabled'}</p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
-                        {/* Working Days */}
+                        {/* Working Days - Modern Card Style */}
                         <div className="space-y-3">
-                            <label className="text-sm  font-semibold">
-                                Select Working Days
-                            </label>
-                            <div className="grid mt-2.5 grid-cols-7 gap-2">
-                                {days.map(day => (
-                                    <Button
-                                        key={day.value}
-                                        type="button"
-                                        variant={config.workingDays.includes(day.value) ? "default" : "outline"}
-                                        onClick={() => toggleWorkingDay(day.value)}
-                                        className={cn(
-                                            "h-12 sm:h-14 font-medium transition-all",
-                                            !config.workingDays.includes(day.value) && "bg-muted"
-                                        )}
-                                    >
-                                        <span className="hidden sm:block">{day.label}</span>
-                                        <span className="sm:hidden">{day.short}</span>
-                                    </Button>
-                                ))}
+                            <label className="text-sm font-semibold">Select Working Days</label>
+                            
+                            {config.workingDays.length === 0 && (
+                                <div className="p-3 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded-lg flex items-start gap-2">
+                                    <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
+                                    <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                                        <strong>Warning:</strong> No working days selected! All days will be marked as weekends.
+                                    </p>
+                                </div>
+                            )}
+                            
+                            <div className="grid grid-cols-7 gap-2 sm:gap-3">
+                                {days.map((day) => {
+                                    const isSelected = config.workingDays.includes(day.value);
+                                    return (
+                                        <button
+                                            key={day.value}
+                                            type="button"
+                                            onClick={() => toggleWorkingDay(day.value)}
+                                            className={cn(
+                                                'relative rounded-xl p-3 sm:p-4 transition-all duration-200 group',
+                                                'border-2 hover:scale-105 active:scale-95',
+                                                isSelected
+                                                    ? 'bg-primary border-primary text-primary-foreground shadow-md'
+                                                    : 'bg-muted/50 border-muted hover:border-muted-foreground/30 hover:bg-muted'
+                                            )}
+                                        >
+                                            {/* Checkmark indicator */}
+                                            {isSelected && (
+                                                <div className="absolute -top-1 -right-1 bg-primary-foreground text-primary rounded-full p-0.5">
+                                                    <Check className="h-3 w-3 dark:text-white" />
+                                                </div>
+                                            )}
+                                            
+                                            {/* Day labels */}
+                                            <div className="flex flex-col items-center gap-1">
+                                                <span className="hidden dark:text-white lg:block text-xs sm:text-sm font-semibold">
+                                                    {day.short}
+                                                </span>
+                                                <span className="hidden dark:text-white sm:block lg:hidden text-xs font-semibold">
+                                                    {day.abbr}
+                                                </span>
+                                                <span className="sm:hidden dark:text-white text-xs font-semibold">
+                                                    {day.abbr}
+                                                </span>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
                             </div>
                             <p className="text-xs text-muted-foreground">
                                 Click to select/deselect working days for your school
                             </p>
                         </div>
 
-                        {/* Working Hours */}
+                        {/* Working Hours - Modern Style */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <label className="text-sm font-semibold flex items-center gap-2">
                                     <Clock className="h-4 w-4 text-muted-foreground" />
                                     Start Time
                                 </label>
-                                <Input
-                                    type="time"
-                                    value={config.startTime}
-                                    onChange={(e) => setConfig(prev => ({ ...prev, startTime: e.target.value }))}
-                                    className="bg-muted"
-                                />
+                                <div className="relative">
+                                    <Input
+                                        type="time"
+                                        value={config.startTime}
+                                        onChange={(e) => setConfig((prev) => ({ ...prev, startTime: e.target.value }))}
+                                        className="bg-muted/50 border-2 hover:border-muted-foreground/30 focus:border-primary transition-colors pl-4"
+                                    />
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-semibold flex items-center gap-2">
                                     <Clock className="h-4 w-4 text-muted-foreground" />
                                     End Time
                                 </label>
-                                <Input
-                                    type="time"
-                                    value={config.endTime}
-                                    onChange={(e) => setConfig(prev => ({ ...prev, endTime: e.target.value }))}
-                                    className="bg-muted"
-                                />
+                                <div className="relative">
+                                    <Input
+                                        type="time"
+                                        value={config.endTime}
+                                        onChange={(e) => setConfig((prev) => ({ ...prev, endTime: e.target.value }))}
+                                        className="bg-muted/50 border-2 hover:border-muted-foreground/30 focus:border-primary transition-colors pl-4"
+                                    />
+                                </div>
                             </div>
                         </div>
 
-                        {/* Options */}
+                        {/* Options - Modern Card Style */}
                         <div className="space-y-3">
-                            <label className="flex items-start gap-3 p-4 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors border">
+                            <label
+                                className={cn(
+                                    'flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200',
+                                    'border-2 hover:shadow-md',
+                                    config.fetchGoogleHolidays
+                                        ? 'bg-primary/5 border-primary/20 hover:border-primary/30'
+                                        : 'bg-muted/30 border-muted hover:border-muted-foreground/30'
+                                )}
+                            >
                                 <Checkbox
                                     id="googleHolidays"
                                     checked={config.fetchGoogleHolidays}
-                                    onCheckedChange={(checked) => 
-                                        setConfig(prev => ({ ...prev, fetchGoogleHolidays: checked }))
+                                    onCheckedChange={(checked) =>
+                                        setConfig((prev) => ({ ...prev, fetchGoogleHolidays: checked }))
                                     }
                                     className="mt-1"
                                 />
@@ -423,12 +498,20 @@ export default function CalendarSetup() {
                             </label>
 
                             {status?.isPopulated && (
-                                <label className="flex items-start gap-3 p-4 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors border-2 border-yellow-500/20 bg-yellow-500/5">
+                                <label
+                                    className={cn(
+                                        'flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200',
+                                        'border-2 hover:shadow-md',
+                                        config.forceRefresh
+                                            ? 'bg-yellow-500/10 border-yellow-500/30 hover:border-yellow-500/40'
+                                            : 'bg-muted/30 border-muted hover:border-muted-foreground/30'
+                                    )}
+                                >
                                     <Checkbox
                                         id="forceRefresh"
                                         checked={config.forceRefresh}
-                                        onCheckedChange={(checked) => 
-                                            setConfig(prev => ({ ...prev, forceRefresh: checked }))
+                                        onCheckedChange={(checked) =>
+                                            setConfig((prev) => ({ ...prev, forceRefresh: checked }))
                                         }
                                         className="mt-1"
                                     />
@@ -453,7 +536,7 @@ export default function CalendarSetup() {
                 <Button
                     onClick={handlePopulate}
                     disabled={populating || (status?.isPopulated && !config.forceRefresh)}
-                    className="flex-1 h-12 text-base font-semibold"
+                    className="flex-1 h-12 text-base font-semibold shadow-lg hover:shadow-xl transition-all"
                     size="lg"
                 >
                     {populating ? (
@@ -474,7 +557,7 @@ export default function CalendarSetup() {
                         variant="destructive"
                         onClick={handleClear}
                         disabled={clearing}
-                        className="h-12 text-base font-semibold"
+                        className="h-12 text-base font-semibold shadow-lg hover:shadow-xl transition-all"
                         size="lg"
                     >
                         {clearing ? (
@@ -503,7 +586,8 @@ export default function CalendarSetup() {
                             <div className="space-y-1">
                                 <h3 className="text-sm font-semibold">Automatic Population</h3>
                                 <p className="text-xs text-muted-foreground">
-                                    The attendance cron job will automatically populate the calendar if it's empty when marking attendance.
+                                    The attendance cron job will automatically populate the calendar if it's empty when marking
+                                    attendance.
                                 </p>
                             </div>
                         </div>
@@ -519,7 +603,8 @@ export default function CalendarSetup() {
                             <div className="space-y-1">
                                 <h3 className="text-sm font-semibold">Google Calendar Integration</h3>
                                 <p className="text-xs text-muted-foreground">
-                                    Holidays are fetched from Indian national calendar. Additional holidays can be added manually later.
+                                    Holidays are fetched from Indian national calendar. Additional holidays can be added manually
+                                    later.
                                 </p>
                             </div>
                         </div>
