@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
+import { AttendanceTrendChart } from '@/components/chart_dynamic';
 
 // ===== DATE UTILITY FUNCTIONS (OUTSIDE COMPONENT) =====
 
@@ -496,6 +497,7 @@ export default function AdminAttendanceDashboard() {
                     </CardContent>
                 </Card>
             </div>
+<AttendanceTrendChart monthlyTrend={dashboardData?.monthlyTrend} />
 
             {/* Status Breakdown */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
