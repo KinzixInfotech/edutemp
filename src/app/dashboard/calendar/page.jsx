@@ -299,76 +299,28 @@ export default function SchoolCalendar() {
     return (
         <div className="h-full flex flex-col gap-6 p-4 md:p-6 bg-gradient-to-br from-background via-background to-muted/20">
             {/* Enhanced Header with Stats */}
-            <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div className="space-y-1">
-                        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold flex items-center gap-3 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                            <Calendar className="w-7 h-7 sm:w-8 sm:h-8 lg:w-10 lg:h-10 text-primary" />
-                            <span>Calendar</span>
-                        </h1>
-                        <p className="text-sm sm:text-base text-muted-foreground">
-                            Manage school events and schedules
-                        </p>
-                    </div>
-                    {!hasGoogleCalendar && (
-                        <Button
-                            variant="outline"
-                            onClick={handleGoogleCalendarConnect}
-                            className="gap-2 hover:border-primary hover:text-primary transition-all"
-                        >
-                            <ExternalLink className="h-4 w-4" />
-                            Connect Google Calendar
-                        </Button>
-                    )}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="space-y-1">
+                    <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold flex items-center gap-3 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                        <Calendar className="w-7 h-7 sm:w-8 sm:h-8 lg:w-10 lg:h-10 text-primary" />
+                        <span>Calendar</span>
+                    </h1>
+                    <p className="text-sm sm:text-base text-muted-foreground">
+                        Manage school events and schedules
+                    </p>
                 </div>
-
-                {/* Stats Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20 hover:shadow-lg transition-all">
-                        <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs text-muted-foreground font-medium">Total Events</p>
-                                    <p className="text-2xl font-bold text-blue-600">{eventStats.total}</p>
-                                </div>
-                                <Calendar className="h-8 w-8 text-blue-500/40" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/20 hover:shadow-lg transition-all">
-                        <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs text-muted-foreground font-medium">Holidays</p>
-                                    <p className="text-2xl font-bold text-red-600">{eventStats.holidays}</p>
-                                </div>
-                                <Sparkles className="h-8 w-8 text-red-500/40" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20 hover:shadow-lg transition-all">
-                        <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs text-muted-foreground font-medium">Exams</p>
-                                    <p className="text-2xl font-bold text-purple-600">{eventStats.exams}</p>
-                                </div>
-                                <Clock className="h-8 w-8 text-purple-500/40" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="bg-gradient-to-br from-indigo-500/10 to-indigo-500/5 border-indigo-500/20 hover:shadow-lg transition-all">
-                        <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs text-muted-foreground font-medium">Meetings</p>
-                                    <p className="text-2xl font-bold text-indigo-600">{eventStats.meetings}</p>
-                                </div>
-                                <MapPin className="h-8 w-8 text-indigo-500/40" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                {/* Show sync status badge only */}
+                {hasGoogleCalendar ? (
+                    <Badge variant="outline" className="gap-1.5 px-3 py-1.5">
+                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                        <span className="text-xs">Google Synced</span>
+                    </Badge>
+                ) : (
+                    <Badge variant="outline" className="gap-1.5 px-3 py-1.5 bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800">
+                        <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                        <span className="text-xs text-yellow-700 dark:text-yellow-400">Not Synced</span>
+                    </Badge>
+                )}
             </div>
 
             <div className="flex flex-col lg:flex-row gap-6 flex-1">
@@ -380,12 +332,12 @@ export default function SchoolCalendar() {
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                                 <div className="flex items-center gap-3">
                                     <h2 className="text-xl md:text-2xl font-bold">{monthYear}</h2>
-                                    {hasGoogleCalendar && (
+                                    {/* {hasGoogleCalendar && (
                                         <Badge variant="outline" className="gap-1.5 px-2.5 py-1">
                                             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                                             <span className="text-xs">Google Synced</span>
                                         </Badge>
-                                    )}
+                                    )} */}
                                 </div>
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <Button variant="outline" size="sm" onClick={handleToday} className="gap-1.5">

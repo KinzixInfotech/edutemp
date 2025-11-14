@@ -59,7 +59,17 @@ export const SidebarData = [
             { label: "Inbox", url: "/dashboard/schools/mail/inbox", icon: Inbox, roles: ["ADMIN"] },
             { label: "Noticeboard", url: "/dashboard/schools/noticeboard", icon: Flag, roles: ["ADMIN"] },
             { label: "Calendar", url: "/dashboard/calendar", icon: Calendar, roles: ["ADMIN"] },
-
+{
+                label: "School Calendar",
+                icon: Calendar,
+                roles: ["ADMIN"],
+                submenu: [
+                    { label: "Manage Calendar", url: "/dashboard/calendar/setup-calendar", roles: ["ADMIN"] },
+                    {
+                        label: "Calendar", url: "/dashboard/calendar", roles: ["ADMIN"]
+                    },
+                ],
+            },
         ],
     },
     {
