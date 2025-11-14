@@ -498,7 +498,6 @@ export default function AdminAttendanceDashboard() {
                 </Card>
             </div>
             <AttendanceTrendChart monthlyTrend={dashboardData?.monthlyTrend} />
-
             {/* Status Breakdown */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 {[
