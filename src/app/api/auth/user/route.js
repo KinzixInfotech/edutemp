@@ -355,7 +355,7 @@ export async function GET(req) {
                 break;
             }
             case "TEACHING_STAFF": {
-                const teacher = await prisma.teacher.findUnique({
+                const teacher = await prisma.TeachingStaff.findUnique({
                     where: { userId },
                     select: { schoolId: true },
                 });

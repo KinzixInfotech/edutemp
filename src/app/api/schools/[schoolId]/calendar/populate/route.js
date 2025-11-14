@@ -10,245 +10,171 @@ import { google } from 'googleapis';
 // Helper: Get/Set calendar configuration metadata
 const CONFIG_KEY = '__CALENDAR_CONFIG__';
 
+// async function getCalendarConfig(schoolId) {
+//     try {
+//         const configEntry = await prisma.schoolCalendar.findFirst({
+//             where: {
+//                 schoolId,
+//                 description: { startsWith: CONFIG_KEY },
+//             },
+//         });
+
+//         if (configEntry && configEntry.description) {
+//             const configJson = configEntry.description.replace(CONFIG_KEY, '');
+//             return JSON.parse(configJson);
+//         }
+//     } catch (error) {
+//         console.error('[CONFIG] Failed to parse stored config:', error);
+//     }
+//     return null;
+// }
+
+// async function saveCalendarConfig(schoolId, config) {
+//     try {
+//         const configData = {
+//             workingDays: config.workingDays,
+//             startTime: config.startTime,
+//             endTime: config.endTime,
+//             fetchGoogleHolidays: config.fetchGoogleHolidays,
+//             lastPopulated: new Date().toISOString(),
+//         };
+
+//         // Use a far future date that won't conflict with actual calendar
+//         const configDate = new Date('2099-12-31');
+
+//         await prisma.schoolCalendar.upsert({
+//             where: {
+//                 schoolId_date: {
+//                     schoolId,
+//                     date: configDate,
+//                 },
+//             },
+//             update: {
+//                 description: CONFIG_KEY + JSON.stringify(configData),
+//                 updatedAt: new Date(),
+//             },
+//             create: {
+//                 schoolId,
+//                 date: configDate,
+//                 dayType: 'WEEKEND', // Hidden entry
+//                 isHoliday: false,
+//                 description: CONFIG_KEY + JSON.stringify(configData),
+//             },
+//         });
+//     } catch (error) {
+//         console.error('[CONFIG] Failed to save config:', error);
+//     }
+// }
+
+
+// ============================================
+// FILE: app/api/schools/[schoolId]/calendar/populate/route.js
+// Populate School Calendar + AttendanceConfig
+// ============================================
+
+// import { NextResponse } from 'next/server';
+// import prisma from '@/lib/prisma';
+// import { google } from 'googleapis';
+
+// -------------------------------------------------------------------
+// CONFIG STORAGE (hidden entry)
+// -------------------------------------------------------------------
+
+
 async function getCalendarConfig(schoolId) {
     try {
-        const configEntry = await prisma.schoolCalendar.findFirst({
-            where: {
-                schoolId,
-                description: { startsWith: CONFIG_KEY },
-            },
+        const entry = await prisma.schoolCalendar.findFirst({
+            where: { schoolId, description: { startsWith: CONFIG_KEY } },
         });
-
-        if (configEntry && configEntry.description) {
-            const configJson = configEntry.description.replace(CONFIG_KEY, '');
-            return JSON.parse(configJson);
+        if (entry?.description) {
+            return JSON.parse(entry.description.replace(CONFIG_KEY, ''));
         }
-    } catch (error) {
-        console.error('[CONFIG] Failed to parse stored config:', error);
+    } catch (e) {
+        console.error('[CONFIG] parse error', e);
     }
     return null;
 }
 
 async function saveCalendarConfig(schoolId, config) {
-    try {
-        const configData = {
-            workingDays: config.workingDays,
-            startTime: config.startTime,
-            endTime: config.endTime,
-            fetchGoogleHolidays: config.fetchGoogleHolidays,
-            lastPopulated: new Date().toISOString(),
-        };
+    const payload = {
+        workingDays: config.workingDays,
+        startTime: config.startTime,
+        endTime: config.endTime,
+        fetchGoogleHolidays: config.fetchGoogleHolidays,
+        lastPopulated: new Date().toISOString(),
+    };
+    const farFuture = new Date('2099-12-31');
 
-        // Use a far future date that won't conflict with actual calendar
-        const configDate = new Date('2099-12-31');
-
-        await prisma.schoolCalendar.upsert({
-            where: {
-                schoolId_date: {
-                    schoolId,
-                    date: configDate,
-                },
-            },
-            update: {
-                description: CONFIG_KEY + JSON.stringify(configData),
-                updatedAt: new Date(),
-            },
-            create: {
-                schoolId,
-                date: configDate,
-                dayType: 'WEEKEND', // Hidden entry
-                isHoliday: false,
-                description: CONFIG_KEY + JSON.stringify(configData),
-            },
-        });
-    } catch (error) {
-        console.error('[CONFIG] Failed to save config:', error);
-    }
+    await prisma.schoolCalendar.upsert({
+        where: { schoolId_date: { schoolId, date: farFuture } },
+        update: { description: CONFIG_KEY + JSON.stringify(payload) },
+        create: {
+            schoolId,
+            date: farFuture,
+            dayType: 'WEEKEND',
+            description: CONFIG_KEY + JSON.stringify(payload),
+        },
+    });
 }
 
-// GET - Check calendar status with configuration details
+// -------------------------------------------------------------------
+// GET – calendar status + attendance-config flag
+// -------------------------------------------------------------------
 export async function GET(req, { params }) {
     try {
         const { schoolId } = await params;
-        
-        // Get academic year
+
         const academicYear = await prisma.academicYear.findFirst({
             where: { schoolId, isActive: true },
         });
-        
         if (!academicYear) {
-            return NextResponse.json({ 
-                error: 'No active academic year found' 
-            }, { status: 404 });
+            return NextResponse.json({ error: 'No active academic year' }, { status: 404 });
         }
-        
-        // Count existing calendar entries (exclude config entry)
-        const calendarCount = await prisma.schoolCalendar.count({
-            where: {
-                schoolId,
-                date: {
-                    gte: academicYear.startDate,
-                    lte: academicYear.endDate,
-                },
-                OR: [
-                    { description: null },
-                    { description: { not: { startsWith: CONFIG_KEY } } },
-                ],
-            },
-        });
-        
-        // Get breakdown by type
+
+        // ---- calendar entries (exclude hidden config) ----
+        const where = {
+            schoolId,
+            date: { gte: academicYear.startDate, lte: academicYear.endDate },
+            OR: [
+                { description: null },
+                { description: { not: { startsWith: CONFIG_KEY } } },
+            ],
+        };
+        const calendarCount = await prisma.schoolCalendar.count({ where });
+
         const breakdown = await prisma.schoolCalendar.groupBy({
             by: ['dayType'],
-            where: {
-                schoolId,
-                date: {
-                    gte: academicYear.startDate,
-                    lte: academicYear.endDate,
-                },
-                OR: [
-                    { description: null },
-                    { description: { not: { startsWith: CONFIG_KEY } } },
-                ],
-            },
+            where,
             _count: true,
         });
-        
-        // Get sample entries with all fields
-        const sampleEntries = await prisma.schoolCalendar.findMany({
-            where: {
-                schoolId,
-                date: {
-                    gte: academicYear.startDate,
-                    lte: academicYear.endDate,
-                },
-                OR: [
-                    { description: null },
-                    { description: { not: { startsWith: CONFIG_KEY } } },
-                ],
-            },
-            select: {
-                id: true,
-                date: true,
-                dayType: true,
-                isHoliday: true,
-                holidayName: true,
-                startTime: true,
-                endTime: true,
-                description: true,
-                createdAt: true,
-                updatedAt: true,
-            },
-            orderBy: {
-                date: 'asc',
-            },
-            take: 10,
+
+        // ---- attendance config ----
+        const attendanceConfig = await prisma.attendanceConfig.findUnique({
+            where: { schoolId },
         });
 
-        // Fetch stored configuration
+        // ---- stored calendar config (fallback logic unchanged) ----
         const storedConfig = await getCalendarConfig(schoolId);
+        let currentConfig = storedConfig;
 
-        // Use stored config or extract from entries as fallback
-        let currentConfig;
-        
-        if (storedConfig) {
-            currentConfig = storedConfig;
-        } else if (calendarCount > 0) {
-            // Fallback: Extract from existing entries
-                            const workingDaysData = await prisma.schoolCalendar.findMany({
-                where: {
-                    schoolId,
-                    date: {
-                        gte: academicYear.startDate,
-                        lte: academicYear.endDate,
-                    },
-                    dayType: 'WORKING_DAY',
-                    OR: [
-                        { description: null },
-                        { description: { not: { startsWith: CONFIG_KEY } } },
-                    ],
-                },
-                select: {
-                    date: true,
-                    startTime: true,
-                    endTime: true,
-                },
+        if (!currentConfig && calendarCount > 0) {
+            // fallback – infer from existing entries
+            const sample = await prisma.schoolCalendar.findMany({
+                where: { ...where, dayType: 'WORKING_DAY' },
+                select: { date: true, startTime: true, endTime: true },
                 take: 100,
             });
-
-            const uniqueDays = new Set();
-            workingDaysData.forEach(entry => {
-                const dayOfWeek = new Date(entry.date).getDay();
-                uniqueDays.add(dayOfWeek);
-            });
-
-            const holidayCount = await prisma.schoolCalendar.count({
-                where: {
-                    schoolId,
-                    date: {
-                        gte: academicYear.startDate,
-                        lte: academicYear.endDate,
-                    },
-                    dayType: 'HOLIDAY',
-                    OR: [
-                        { description: null },
-                        { description: { not: { startsWith: CONFIG_KEY } } },
-                    ],
-                },
-            });
-
+            const days = new Set(sample.map(e => new Date(e.date).getDay()));
             currentConfig = {
-                workingDays: Array.from(uniqueDays).sort((a, b) => a - b),
-                startTime: workingDaysData[0]?.startTime || '09:00',
-                endTime: workingDaysData[0]?.endTime || '17:00',
-                fetchGoogleHolidays: holidayCount > 0,
-            };
-        } else {
-            // Default config
-            currentConfig = {
-                workingDays: [1, 2, 3, 4, 5, 6],
-                startTime: '09:00',
-                endTime: '17:00',
+                workingDays: Array.from(days).sort((a, b) => a - b),
+                startTime: sample[0]?.startTime ?? '09:00',
+                endTime: sample[0]?.endTime ?? '17:00',
                 fetchGoogleHolidays: true,
             };
+        } else if (!currentConfig) {
+            currentConfig = { workingDays: [1, 2, 3, 4, 5, 6], startTime: '09:00', endTime: '17:00', fetchGoogleHolidays: true };
         }
-        
-        // Get all entries if requested
-        const { searchParams } = new URL(req.url);
-        const includeAll = searchParams.get('includeAll') === 'true';
-        
-        let allEntries = null;
-        if (includeAll && calendarCount > 0) {
-            allEntries = await prisma.schoolCalendar.findMany({
-                where: {
-                    schoolId,
-                    date: {
-                        gte: academicYear.startDate,
-                        lte: academicYear.endDate,
-                    },
-                    OR: [
-                        { description: null },
-                        { description: { not: { startsWith: CONFIG_KEY } } },
-                    ],
-                },
-                select: {
-                    id: true,
-                    date: true,
-                    dayType: true,
-                    isHoliday: true,
-                    holidayName: true,
-                    startTime: true,
-                    endTime: true,
-                    description: true,
-                    createdAt: true,
-                    updatedAt: true,
-                },
-                orderBy: {
-                    date: 'asc',
-                },
-            });
-        }
-        
+
         return NextResponse.json({
             academicYear: {
                 id: academicYear.id,
@@ -258,107 +184,84 @@ export async function GET(req, { params }) {
             },
             calendarStats: {
                 total: calendarCount,
-                breakdown: breakdown.reduce((acc, item) => {
-                    acc[item.dayType] = item._count;
-                    return acc;
-                }, {}),
+                breakdown: breakdown.reduce((a, c) => ({ ...a, [c.dayType]: c._count }), {}),
             },
             isPopulated: calendarCount > 0,
             currentConfig,
-            sampleEntries,
-            ...(allEntries && { allEntries }),
+            attendanceConfigCreated: !!attendanceConfig,
+            attendanceConfig,               // optional – UI can read times
         });
-        
-    } catch (error) {
-        console.error('[CALENDAR STATUS ERROR]', error);
-        return NextResponse.json({ 
-            error: error.message 
-        }, { status: 500 });
+    } catch (e) {
+        console.error('[GET] error', e);
+        return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }
 
-// POST - Populate calendar
+// -------------------------------------------------------------------
+// POST – populate calendar + upsert AttendanceConfig
+// -------------------------------------------------------------------
 export async function POST(req, { params }) {
     try {
         const { schoolId } = await params;
-        const body = await req.json();
-        
         const {
             forceRefresh = false,
             fetchGoogleHolidays = true,
-            workingDays = [1, 2, 3, 4, 5, 6], // Mon-Sat by default
+            workingDays = [1, 2, 3, 4, 5, 6],
             startTime = '09:00',
             endTime = '17:00',
-        } = body;
-        
-        console.log('[CALENDAR POPULATE] Starting for school:', schoolId);
-        
-        // Get active academic year
+        } = await req.json();
+
+        // ---- academic year -------------------------------------------------
         const academicYear = await prisma.academicYear.findFirst({
             where: { schoolId, isActive: true },
         });
-        
         if (!academicYear) {
-            return NextResponse.json({ 
-                error: 'No active academic year found' 
-            }, { status: 404 });
+            return NextResponse.json({ error: 'No active academic year' }, { status: 404 });
         }
-        
-        const startDate = new Date(academicYear.startDate);
-        const endDate = new Date(academicYear.endDate);
-        
-        console.log(`[CALENDAR] Academic Year: ${academicYear.name}`);
-        console.log(`[CALENDAR] Date Range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
-        
-        // Check if already populated
+
+        const start = new Date(academicYear.startDate);
+        const end = new Date(academicYear.endDate);
+
+        // ---- conflict check -------------------------------------------------
         if (!forceRefresh) {
-            const existingCount = await prisma.schoolCalendar.count({
+            const existing = await prisma.schoolCalendar.count({
                 where: {
                     schoolId,
-                    date: { gte: startDate, lte: endDate },
+                    date: { gte: start, lte: end },
                     OR: [
                         { description: null },
                         { description: { not: { startsWith: CONFIG_KEY } } },
                     ],
                 },
             });
-            
-            if (existingCount > 0) {
-                return NextResponse.json({
-                    message: 'Calendar already populated. Use forceRefresh=true to regenerate.',
-                    existingCount,
-                }, { status: 409 });
+            if (existing > 0) {
+                return NextResponse.json(
+                    { message: 'Already populated – use forceRefresh=true' },
+                    { status: 409 }
+                );
             }
         }
-        
-        // Fetch holidays from Google Calendar
+
+        // ---- Google holidays ------------------------------------------------
         let holidays = [];
         if (fetchGoogleHolidays) {
             try {
-                holidays = await fetchIndianHolidays(startDate, endDate, schoolId);
-                console.log(`[CALENDAR] Fetched ${holidays.length} holidays from Google Calendar`);
-            } catch (error) {
-                console.error('[CALENDAR] Failed to fetch Google holidays:', error.message);
-                // Continue without holidays
+                holidays = await fetchIndianHolidays(start, end, schoolId);
+            } catch (e) {
+                console.warn('[HOLIDAYS] fallback', e);
             }
         }
-        
-        // Create holiday map for quick lookup
-        const holidayMap = new Map(
-            holidays.map(h => [h.date, h.name])
-        );
-        
-        // Generate calendar entries
+        const holidayMap = new Map(holidays.map(h => [h.date, h.name]));
+
+        // ---- generate entries ------------------------------------------------
         const entries = [];
-        let current = new Date(startDate);
-        
-        while (current <= endDate) {
-            const dateStr = current.toISOString().split('T')[0];
-            const dayOfWeek = current.getDay(); // 0 = Sunday, 6 = Saturday
-            
-            let entry = {
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            const iso = d.toISOString().split('T')[0];
+            const dow = d.getDay();
+
+            const entry = {
                 schoolId,
-                date: new Date(current),
+                date: new Date(d),
                 isHoliday: false,
                 startTime: null,
                 endTime: null,
@@ -366,77 +269,91 @@ export async function POST(req, { params }) {
                 createdAt: new Date(),
                 updatedAt: new Date(),
             };
-            
-            // Check if it's a holiday from Google Calendar
-            if (holidayMap.has(dateStr)) {
+
+            if (holidayMap.has(iso)) {
                 entry.dayType = 'HOLIDAY';
                 entry.isHoliday = true;
-                entry.holidayName = holidayMap.get(dateStr);
-                entry.description = `Public Holiday: ${holidayMap.get(dateStr)}`;
-            }
-            // Check if it's a weekend
-            else if (!workingDays.includes(dayOfWeek)) {
+                entry.holidayName = holidayMap.get(iso);
+                entry.description = `Public Holiday: ${holidayMap.get(iso)}`;
+            } else if (!workingDays.includes(dow)) {
                 entry.dayType = 'WEEKEND';
-                entry.description = dayOfWeek === 0 ? 'Sunday' : 'Saturday';
-            }
-            // Working day
-            else {
+                entry.description = dow === 0 ? 'Sunday' : 'Saturday';
+            } else {
                 entry.dayType = 'WORKING_DAY';
                 entry.startTime = startTime;
                 entry.endTime = endTime;
             }
-            
+
             entries.push(entry);
-            current.setDate(current.getDate() + 1);
         }
-        
-        console.log(`[CALENDAR] Generated ${entries.length} calendar entries`);
-        
-        // Clear existing entries if force refresh (exclude config entry)
+
+        // ---- delete old (forceRefresh) ---------------------------------------
         if (forceRefresh) {
-            const deleted = await prisma.schoolCalendar.deleteMany({
+            await prisma.schoolCalendar.deleteMany({
                 where: {
                     schoolId,
-                    date: { gte: startDate, lte: endDate },
+                    date: { gte: start, lte: end },
                     OR: [
                         { description: null },
                         { description: { not: { startsWith: CONFIG_KEY } } },
                     ],
                 },
             });
-            console.log(`[CALENDAR] Deleted ${deleted.count} existing entries`);
         }
-        
-        // Insert entries in batches
-        const batchSize = 100;
+
+        // ---- batch insert ----------------------------------------------------
+        const batch = 100;
         let inserted = 0;
-        
-        for (let i = 0; i < entries.length; i += batchSize) {
-            const batch = entries.slice(i, i + batchSize);
-            const result = await prisma.schoolCalendar.createMany({
-                data: batch,
+        for (let i = 0; i < entries.length; i += batch) {
+            const { count } = await prisma.schoolCalendar.createMany({
+                data: entries.slice(i, i + batch),
                 skipDuplicates: true,
             });
-            inserted += result.count;
-            console.log(`[CALENDAR] Inserted batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(entries.length / batchSize)}`);
+            inserted += count;
         }
-        
-        // Save configuration
+
+        // ---- save calendar config --------------------------------------------
         await saveCalendarConfig(schoolId, {
             workingDays,
             startTime,
             endTime,
             fetchGoogleHolidays,
         });
-        
-        console.log('[CALENDAR] Configuration saved:', { workingDays, startTime, endTime, fetchGoogleHolidays });
-        
-        // Get summary
+
+        // ---- UPSERT AttendanceConfig (THIS IS THE FIX) -----------------------
+        await prisma.attendanceConfig.upsert({
+            where: { schoolId },
+            update: {
+                defaultStartTime: startTime,
+                defaultEndTime: endTime,
+                gracePeriodMinutes: 15,
+                halfDayHours: 4,
+                fullDayHours: 8,
+                enableGeoFencing: false,
+                allowedRadiusMeters: 500,
+                autoMarkAbsent: true,
+                autoMarkTime: '10:00',
+            },
+            create: {
+                schoolId,
+                defaultStartTime: startTime,
+                defaultEndTime: endTime,
+                gracePeriodMinutes: 15,
+                halfDayHours: 4,
+                fullDayHours: 8,
+                enableGeoFencing: false,
+                allowedRadiusMeters: 500,
+                autoMarkAbsent: true,
+                autoMarkTime: '10:00',
+            },
+        });
+
+        // ---- final stats ------------------------------------------------------
         const summary = await prisma.schoolCalendar.groupBy({
             by: ['dayType'],
             where: {
                 schoolId,
-                date: { gte: startDate, lte: endDate },
+                date: { gte: start, lte: end },
                 OR: [
                     { description: null },
                     { description: { not: { startsWith: CONFIG_KEY } } },
@@ -444,23 +361,11 @@ export async function POST(req, { params }) {
             },
             _count: true,
         });
-        
-        const stats = summary.reduce((acc, item) => {
-            acc[item.dayType] = item._count;
-            return acc;
-        }, {});
-        
-        console.log('[CALENDAR] Population completed successfully');
-        
+        const stats = summary.reduce((a, c) => ({ ...a, [c.dayType]: c._count }), {});
+
         return NextResponse.json({
             success: true,
-            message: 'School calendar populated successfully',
-            academicYear: {
-                id: academicYear.id,
-                name: academicYear.name,
-                startDate: academicYear.startDate,
-                endDate: academicYear.endDate,
-            },
+            message: 'Calendar populated',
             stats: {
                 totalDays: entries.length,
                 inserted,
@@ -469,65 +374,537 @@ export async function POST(req, { params }) {
                 holidays: stats.HOLIDAY || 0,
                 holidaysFromGoogle: holidays.length,
             },
-            workingDaysConfig: workingDays,
             workingHours: { startTime, endTime },
+            attendanceConfigCreated: true,
         });
-        
-    } catch (error) {
-        console.error('[CALENDAR POPULATE ERROR]', error);
-        return NextResponse.json({ 
-            error: error.message,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
-        }, { status: 500 });
+    } catch (e) {
+        console.error('[POST] error', e);
+        return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }
 
-// DELETE - Clear calendar
+// -------------------------------------------------------------------
+// DELETE – clear calendar (including hidden config)
+// -------------------------------------------------------------------
 export async function DELETE(req, { params }) {
     try {
         const { schoolId } = await params;
-        
         const academicYear = await prisma.academicYear.findFirst({
             where: { schoolId, isActive: true },
         });
-        
         if (!academicYear) {
-            return NextResponse.json({ 
-                error: 'No active academic year found' 
-            }, { status: 404 });
+            return NextResponse.json({ error: 'No active academic year' }, { status: 404 });
         }
-        
-        // Delete all entries including config
-        const result = await prisma.schoolCalendar.deleteMany({
+
+        const { count } = await prisma.schoolCalendar.deleteMany({
             where: {
                 schoolId,
                 OR: [
-                    {
-                        date: {
-                            gte: academicYear.startDate,
-                            lte: academicYear.endDate,
-                        },
-                    },
-                    {
-                        description: { startsWith: CONFIG_KEY },
-                    },
+                    { date: { gte: academicYear.startDate, lte: academicYear.endDate } },
+                    { description: { startsWith: CONFIG_KEY } },
                 ],
             },
         });
-        
-        return NextResponse.json({
-            success: true,
-            message: 'School calendar cleared',
-            deletedCount: result.count,
-        });
-        
-    } catch (error) {
-        console.error('[CALENDAR DELETE ERROR]', error);
-        return NextResponse.json({ 
-            error: error.message 
-        }, { status: 500 });
+
+        return NextResponse.json({ success: true, deletedCount: count });
+    } catch (e) {
+        console.error('[DELETE] error', e);
+        return NextResponse.json({ error: e.message }, { status: 500 });
     }
 }
+
+
+// GET - Check calendar status with configuration details
+// export async function GET(req, { params }) {
+//     try {
+//         const { schoolId } = await params;
+
+//         // Get academic year
+//         const academicYear = await prisma.academicYear.findFirst({
+//             where: { schoolId, isActive: true },
+//         });
+
+//         if (!academicYear) {
+//             return NextResponse.json({
+//                 error: 'No active academic year found'
+//             }, { status: 404 });
+//         }
+
+//         // Count existing calendar entries (exclude config entry)
+//         const calendarCount = await prisma.schoolCalendar.count({
+//             where: {
+//                 schoolId,
+//                 date: {
+//                     gte: academicYear.startDate,
+//                     lte: academicYear.endDate,
+//                 },
+//                 OR: [
+//                     { description: null },
+//                     { description: { not: { startsWith: CONFIG_KEY } } },
+//                 ],
+//             },
+//         });
+
+//         // Get breakdown by type
+//         const breakdown = await prisma.schoolCalendar.groupBy({
+//             by: ['dayType'],
+//             where: {
+//                 schoolId,
+//                 date: {
+//                     gte: academicYear.startDate,
+//                     lte: academicYear.endDate,
+//                 },
+//                 OR: [
+//                     { description: null },
+//                     { description: { not: { startsWith: CONFIG_KEY } } },
+//                 ],
+//             },
+//             _count: true,
+//         });
+
+//         // Get sample entries with all fields
+//         const sampleEntries = await prisma.schoolCalendar.findMany({
+//             where: {
+//                 schoolId,
+//                 date: {
+//                     gte: academicYear.startDate,
+//                     lte: academicYear.endDate,
+//                 },
+//                 OR: [
+//                     { description: null },
+//                     { description: { not: { startsWith: CONFIG_KEY } } },
+//                 ],
+//             },
+//             select: {
+//                 id: true,
+//                 date: true,
+//                 dayType: true,
+//                 isHoliday: true,
+//                 holidayName: true,
+//                 startTime: true,
+//                 endTime: true,
+//                 description: true,
+//                 createdAt: true,
+//                 updatedAt: true,
+//             },
+//             orderBy: {
+//                 date: 'asc',
+//             },
+//             take: 10,
+//         });
+
+//         // Fetch stored configuration
+//         const storedConfig = await getCalendarConfig(schoolId);
+
+//         // Use stored config or extract from entries as fallback
+//         let currentConfig;
+
+//         if (storedConfig) {
+//             currentConfig = storedConfig;
+//         } else if (calendarCount > 0) {
+//             // Fallback: Extract from existing entries
+//             const workingDaysData = await prisma.schoolCalendar.findMany({
+//                 where: {
+//                     schoolId,
+//                     date: {
+//                         gte: academicYear.startDate,
+//                         lte: academicYear.endDate,
+//                     },
+//                     dayType: 'WORKING_DAY',
+//                     OR: [
+//                         { description: null },
+//                         { description: { not: { startsWith: CONFIG_KEY } } },
+//                     ],
+//                 },
+//                 select: {
+//                     date: true,
+//                     startTime: true,
+//                     endTime: true,
+//                 },
+//                 take: 100,
+//             });
+
+//             const uniqueDays = new Set();
+//             workingDaysData.forEach(entry => {
+//                 const dayOfWeek = new Date(entry.date).getDay();
+//                 uniqueDays.add(dayOfWeek);
+//             });
+
+//             const holidayCount = await prisma.schoolCalendar.count({
+//                 where: {
+//                     schoolId,
+//                     date: {
+//                         gte: academicYear.startDate,
+//                         lte: academicYear.endDate,
+//                     },
+//                     dayType: 'HOLIDAY',
+//                     OR: [
+//                         { description: null },
+//                         { description: { not: { startsWith: CONFIG_KEY } } },
+//                     ],
+//                 },
+//             });
+
+//             currentConfig = {
+//                 workingDays: Array.from(uniqueDays).sort((a, b) => a - b),
+//                 startTime: workingDaysData[0]?.startTime || '09:00',
+//                 endTime: workingDaysData[0]?.endTime || '17:00',
+//                 fetchGoogleHolidays: holidayCount > 0,
+//             };
+//         } else {
+//             // Default config
+//             currentConfig = {
+//                 workingDays: [1, 2, 3, 4, 5, 6],
+//                 startTime: '09:00',
+//                 endTime: '17:00',
+//                 fetchGoogleHolidays: true,
+//             };
+//         }
+
+//         // Get all entries if requested
+//         const { searchParams } = new URL(req.url);
+//         const includeAll = searchParams.get('includeAll') === 'true';
+
+//         let allEntries = null;
+//         if (includeAll && calendarCount > 0) {
+//             allEntries = await prisma.schoolCalendar.findMany({
+//                 where: {
+//                     schoolId,
+//                     date: {
+//                         gte: academicYear.startDate,
+//                         lte: academicYear.endDate,
+//                     },
+//                     OR: [
+//                         { description: null },
+//                         { description: { not: { startsWith: CONFIG_KEY } } },
+//                     ],
+//                 },
+//                 select: {
+//                     id: true,
+//                     date: true,
+//                     dayType: true,
+//                     isHoliday: true,
+//                     holidayName: true,
+//                     startTime: true,
+//                     endTime: true,
+//                     description: true,
+//                     createdAt: true,
+//                     updatedAt: true,
+//                 },
+//                 orderBy: {
+//                     date: 'asc',
+//                 },
+//             });
+//         }
+
+//         return NextResponse.json({
+//             academicYear: {
+//                 id: academicYear.id,
+//                 name: academicYear.name,
+//                 startDate: academicYear.startDate,
+//                 endDate: academicYear.endDate,
+//             },
+//             calendarStats: {
+//                 total: calendarCount,
+//                 breakdown: breakdown.reduce((acc, item) => {
+//                     acc[item.dayType] = item._count;
+//                     return acc;
+//                 }, {}),
+//             },
+//             isPopulated: calendarCount > 0,
+//             currentConfig,
+//             sampleEntries,
+//             ...(allEntries && { allEntries }),
+//         });
+
+//     } catch (error) {
+//         console.error('[CALENDAR STATUS ERROR]', error);
+//         return NextResponse.json({
+//             error: error.message
+//         }, { status: 500 });
+//     }
+// }
+
+// // POST - Populate calendar
+// export async function POST(req, { params }) {
+//     try {
+//         const { schoolId } = await params;
+//         const body = await req.json();
+
+//         const {
+//             forceRefresh = false,
+//             fetchGoogleHolidays = true,
+//             workingDays = [1, 2, 3, 4, 5, 6], // Mon-Sat by default
+//             startTime = '09:00',
+//             endTime = '17:00',
+//         } = body;
+
+//         console.log('[CALENDAR POPULATE] Starting for school:', schoolId);
+
+//         // Get active academic year
+//         const academicYear = await prisma.academicYear.findFirst({
+//             where: { schoolId, isActive: true },
+//         });
+
+//         if (!academicYear) {
+//             return NextResponse.json({
+//                 error: 'No active academic year found'
+//             }, { status: 404 });
+//         }
+
+//         const startDate = new Date(academicYear.startDate);
+//         const endDate = new Date(academicYear.endDate);
+
+//         console.log(`[CALENDAR] Academic Year: ${academicYear.name}`);
+//         console.log(`[CALENDAR] Date Range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+
+//         // Check if already populated
+//         if (!forceRefresh) {
+//             const existingCount = await prisma.schoolCalendar.count({
+//                 where: {
+//                     schoolId,
+//                     date: { gte: startDate, lte: endDate },
+//                     OR: [
+//                         { description: null },
+//                         { description: { not: { startsWith: CONFIG_KEY } } },
+//                     ],
+//                 },
+//             });
+
+//             if (existingCount > 0) {
+//                 return NextResponse.json({
+//                     message: 'Calendar already populated. Use forceRefresh=true to regenerate.',
+//                     existingCount,
+//                 }, { status: 409 });
+//             }
+//         }
+
+//         // Fetch holidays from Google Calendar
+//         let holidays = [];
+//         if (fetchGoogleHolidays) {
+//             try {
+//                 holidays = await fetchIndianHolidays(startDate, endDate, schoolId);
+//                 console.log(`[CALENDAR] Fetched ${holidays.length} holidays from Google Calendar`);
+//             } catch (error) {
+//                 console.error('[CALENDAR] Failed to fetch Google holidays:', error.message);
+//                 // Continue without holidays
+//             }
+//         }
+
+//         // Create holiday map for quick lookup
+//         const holidayMap = new Map(
+//             holidays.map(h => [h.date, h.name])
+//         );
+
+//         // Generate calendar entries
+//         const entries = [];
+//         let current = new Date(startDate);
+
+//         while (current <= endDate) {
+//             const dateStr = current.toISOString().split('T')[0];
+//             const dayOfWeek = current.getDay(); // 0 = Sunday, 6 = Saturday
+
+//             let entry = {
+//                 schoolId,
+//                 date: new Date(current),
+//                 isHoliday: false,
+//                 startTime: null,
+//                 endTime: null,
+//                 description: null,
+//                 createdAt: new Date(),
+//                 updatedAt: new Date(),
+//             };
+
+//             // Check if it's a holiday from Google Calendar
+//             if (holidayMap.has(dateStr)) {
+//                 entry.dayType = 'HOLIDAY';
+//                 entry.isHoliday = true;
+//                 entry.holidayName = holidayMap.get(dateStr);
+//                 entry.description = `Public Holiday: ${holidayMap.get(dateStr)}`;
+//             }
+//             // Check if it's a weekend
+//             else if (!workingDays.includes(dayOfWeek)) {
+//                 entry.dayType = 'WEEKEND';
+//                 entry.description = dayOfWeek === 0 ? 'Sunday' : 'Saturday';
+//             }
+//             // Working day
+//             else {
+//                 entry.dayType = 'WORKING_DAY';
+//                 entry.startTime = startTime;
+//                 entry.endTime = endTime;
+//             }
+
+//             entries.push(entry);
+//             current.setDate(current.getDate() + 1);
+//         }
+
+//         console.log(`[CALENDAR] Generated ${entries.length} calendar entries`);
+
+//         // Clear existing entries if force refresh (exclude config entry)
+//         if (forceRefresh) {
+//             const deleted = await prisma.schoolCalendar.deleteMany({
+//                 where: {
+//                     schoolId,
+//                     date: { gte: startDate, lte: endDate },
+//                     OR: [
+//                         { description: null },
+//                         { description: { not: { startsWith: CONFIG_KEY } } },
+//                     ],
+//                 },
+//             });
+//             console.log(`[CALENDAR] Deleted ${deleted.count} existing entries`);
+//         }
+
+//         // Insert entries in batches
+//         const batchSize = 100;
+//         let inserted = 0;
+
+//         for (let i = 0; i < entries.length; i += batchSize) {
+//             const batch = entries.slice(i, i + batchSize);
+//             const result = await prisma.schoolCalendar.createMany({
+//                 data: batch,
+//                 skipDuplicates: true,
+//             });
+//             inserted += result.count;
+//             console.log(`[CALENDAR] Inserted batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(entries.length / batchSize)}`);
+//         }
+
+//         // Save configuration
+//         await saveCalendarConfig(schoolId, {
+//             workingDays,
+//             startTime,
+//             endTime,
+//             fetchGoogleHolidays,
+//         });
+//         // After: await saveCalendarConfig(schoolId, { ... });
+
+//         // ADD THIS: Create or update AttendanceConfig
+//         await prisma.attendanceConfig.upsert({
+//             where: { schoolId },
+//             update: {
+//                 defaultStartTime: startTime,
+//                 defaultEndTime: endTime,
+//                 gracePeriodMinutes: 15,
+//                 halfDayHours: 4,
+//                 fullDayHours: 8,
+//                 enableGeoFencing: false,
+//                 allowedRadiusMeters: 500,
+//                 autoMarkAbsent: true,
+//                 autoMarkTime: "10:00",
+//             },
+//             create: {
+//                 schoolId,
+//                 defaultStartTime: startTime,
+//                 defaultEndTime: endTime,
+//                 gracePeriodMinutes: 15,
+//                 halfDayHours: 4,
+//                 fullDayHours: 8,
+//                 enableGeoFencing: false,
+//                 allowedRadiusMeters: 500,
+//                 autoMarkAbsent: true,
+//                 autoMarkTime: "10:00",
+//             },
+//         });
+
+//         console.log('[CALENDAR] Configuration saved:', { workingDays, startTime, endTime, fetchGoogleHolidays });
+
+//         // Get summary
+//         const summary = await prisma.schoolCalendar.groupBy({
+//             by: ['dayType'],
+//             where: {
+//                 schoolId,
+//                 date: { gte: startDate, lte: endDate },
+//                 OR: [
+//                     { description: null },
+//                     { description: { not: { startsWith: CONFIG_KEY } } },
+//                 ],
+//             },
+//             _count: true,
+//         });
+
+//         const stats = summary.reduce((acc, item) => {
+//             acc[item.dayType] = item._count;
+//             return acc;
+//         }, {});
+
+//         console.log('[CALENDAR] Population completed successfully');
+
+//         return NextResponse.json({
+//             success: true,
+//             message: 'School calendar populated successfully',
+//             academicYear: {
+//                 id: academicYear.id,
+//                 name: academicYear.name,
+//                 startDate: academicYear.startDate,
+//                 endDate: academicYear.endDate,
+//             },
+//             stats: {
+//                 totalDays: entries.length,
+//                 inserted,
+//                 workingDays: stats.WORKING_DAY || 0,
+//                 weekends: stats.WEEKEND || 0,
+//                 holidays: stats.HOLIDAY || 0,
+//                 holidaysFromGoogle: holidays.length,
+//             },
+//             workingDaysConfig: workingDays,
+//             workingHours: { startTime, endTime },
+//         });
+
+//     } catch (error) {
+//         console.error('[CALENDAR POPULATE ERROR]', error);
+//         return NextResponse.json({
+//             error: error.message,
+//             stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+//         }, { status: 500 });
+//     }
+// }
+
+// DELETE - Clear calendar
+// export async function DELETE(req, { params }) {
+//     try {
+//         const { schoolId } = await params;
+
+//         const academicYear = await prisma.academicYear.findFirst({
+//             where: { schoolId, isActive: true },
+//         });
+
+//         if (!academicYear) {
+//             return NextResponse.json({
+//                 error: 'No active academic year found'
+//             }, { status: 404 });
+//         }
+
+//         // Delete all entries including config
+//         const result = await prisma.schoolCalendar.deleteMany({
+//             where: {
+//                 schoolId,
+//                 OR: [
+//                     {
+//                         date: {
+//                             gte: academicYear.startDate,
+//                             lte: academicYear.endDate,
+//                         },
+//                     },
+//                     {
+//                         description: { startsWith: CONFIG_KEY },
+//                     },
+//                 ],
+//             },
+//         });
+
+//         return NextResponse.json({
+//             success: true,
+//             message: 'School calendar cleared',
+//             deletedCount: result.count,
+//         });
+
+//     } catch (error) {
+//         console.error('[CALENDAR DELETE ERROR]', error);
+//         return NextResponse.json({
+//             error: error.message
+//         }, { status: 500 });
+//     }
+// }
 
 // ============================================
 // HELPER: Fetch Indian Holidays from Google Calendar
@@ -547,7 +924,7 @@ async function fetchIndianHolidays(startDate, endDate, schoolId) {
 
         if (gmailAccount && gmailAccount.accessToken) {
             console.log('[GOOGLE CALENDAR] Using authenticated user account');
-            
+
             const oauth2Client = new google.auth.OAuth2(
                 process.env.GOOGLE_CLIENT_ID,
                 process.env.GOOGLE_CLIENT_SECRET
@@ -583,23 +960,23 @@ async function fetchIndianHolidays(startDate, endDate, schoolId) {
                     description: event.description,
                 };
             });
-            
+
             console.log(`[GOOGLE CALENDAR] Successfully fetched ${holidays.length} holidays`);
             return holidays;
         } else {
             console.log('[GOOGLE CALENDAR] No authenticated account found, using default holidays');
             return getDefaultIndianHolidays(startDate.getFullYear());
         }
-        
+
     } catch (error) {
         console.error('[GOOGLE CALENDAR ERROR]', error.message);
         console.log('[GOOGLE CALENDAR] Falling back to default holidays');
-        
+
         // If token expired, try to refresh
         if (error.code === 401) {
             console.log('[GOOGLE CALENDAR] Token expired, user needs to reconnect');
         }
-        
+
         return getDefaultIndianHolidays(startDate.getFullYear());
     }
 }
@@ -614,7 +991,7 @@ function getDefaultIndianHolidays(year) {
         { date: `${year}-01-26`, name: 'Republic Day' },
         { date: `${year}-08-15`, name: 'Independence Day' },
         { date: `${year}-10-02`, name: 'Gandhi Jayanti' },
-        
+
         // Religious Holidays (approximate dates - vary by lunar calendar)
         { date: `${year}-03-08`, name: 'Maha Shivaratri' },
         { date: `${year}-03-25`, name: 'Holi' },
@@ -627,10 +1004,10 @@ function getDefaultIndianHolidays(year) {
         { date: `${year}-10-31`, name: 'Diwali' },
         { date: `${year}-11-15`, name: 'Guru Nanak Jayanti' },
         { date: `${year}-12-25`, name: 'Christmas' },
-        
+
         // Islamic Holidays (approximate - vary by lunar calendar)
         { date: `${year}-03-31`, name: 'Eid ul-Fitr' },
         { date: `${year}-06-17`, name: 'Eid ul-Adha' },
         { date: `${year}-09-16`, name: 'Muharram' },
     ];
-}
+} 
