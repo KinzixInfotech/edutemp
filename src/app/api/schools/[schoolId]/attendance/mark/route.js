@@ -2,36 +2,46 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
-// === CONFIG ===
-const CHECK_IN_WINDOW_HOURS = 3; // Max 3 hours after school start
-const CHECK_OUT_WINDOW_HOURS = 3; // Max 3 hours after check-in
+// ──────────────────────────────────────────────────────────────────────
+// DEFAULT CONFIG (auto-created if missing)
+// ──────────────────────────────────────────────────────────────────────
+const DEFAULT_CONFIG = {
+    defaultStartTime: '09:00',
+    defaultEndTime: '22:00',
+    gracePeriodMinutes: 15,
+    enableGeoFencing: false,
+    allowedRadiusMeters: 500,
+    halfDayHours: 4,
+    fullDayHours: 8,
+};
 
-// POST - Mark self attendance
+// ──────────────────────────────────────────────────────────────────────
+// CHECK-OUT GRACE: 3 hours after school end
+// ──────────────────────────────────────────────────────────────────────
+const CHECK_OUT_GRACE_HOURS = 3;
+
+// ──────────────────────────────────────────────────────────────────────
+// POST – Mark Check-in / Check-out
+// ──────────────────────────────────────────────────────────────────────
 export async function POST(req, { params }) {
     const { schoolId } = params;
     const body = await req.json();
-    const {
-        userId,
-        type, // 'CHECK_IN' or 'CHECK_OUT'
-        location,
-        deviceInfo,
-        remarks
-    } = body;
+    const { userId, type, location, deviceInfo, remarks } = body;
 
-    if (!userId || !type) {
-        return NextResponse.json({ error: 'userId and type are required' }, { status: 400 });
+    if (!userId || !type || !['CHECK_IN', 'CHECK_OUT'].includes(type)) {
+        return NextResponse.json({ error: 'userId and valid type required' }, { status: 400 });
     }
 
     try {
         const now = new Date();
         const today = new Date(now.toDateString());
 
-        // === 1. Get config & calendar ===
+        // ───── 1. Fetch config + calendar ─────
         const [config, calendar] = await Promise.all([
             prisma.attendanceConfig.findUnique({ where: { schoolId } }),
             prisma.schoolCalendar.findUnique({
-                where: { schoolId_date: { schoolId, date: today } }
-            })
+                where: { schoolId_date: { schoolId, date: today } },
+            }),
         ]);
 
         if (!config) {
@@ -39,13 +49,13 @@ export async function POST(req, { params }) {
         }
 
         if (calendar?.dayType !== 'WORKING_DAY') {
-            return NextResponse.json({
-                error: `Today is ${calendar?.dayType || 'HOLIDAY'}`,
-                dayType: calendar?.dayType
-            }, { status: 400 });
+            return NextResponse.json(
+                { error: `Today is ${calendar?.dayType || 'HOLIDAY'}`, dayType: calendar?.dayType },
+                { status: 400 }
+            );
         }
 
-        // === 2. Geofencing ===
+        // ───── 2. Geofencing ─────
         if (config.enableGeoFencing && location) {
             const distance = calculateDistance(
                 location.latitude,
@@ -54,232 +64,238 @@ export async function POST(req, { params }) {
                 config.schoolLongitude
             );
             if (distance > config.allowedRadiusMeters) {
-                return NextResponse.json({
-                    error: `Too far: ${Math.round(distance)}m. Must be within ${config.allowedRadiusMeters}m.`,
-                    distance,
-                    allowedRadius: config.allowedRadiusMeters
-                }, { status: 400 });
+                return NextResponse.json(
+                    {
+                        error: `Too far: ${Math.round(distance)}m. Must be within ${config.allowedRadiusMeters}m.`,
+                        distance,
+                        allowedRadius: config.allowedRadiusMeters,
+                    },
+                    { status: 400 }
+                );
             }
         }
 
-        // === 3. Parse school start time ===
-        const [startHour, startMinute] = config.defaultStartTime.split(':').map(Number);
+        // ───── 3. Parse school times ─────
+        const [startH, startM] = config.defaultStartTime.split(':').map(Number);
+        const [endH, endM] = config.defaultEndTime.split(':').map(Number);
+
         const schoolStart = new Date(today);
-        schoolStart.setHours(startHour, startMinute, 0, 0);
+        schoolStart.setHours(startH, startM, 0, 0);
 
-        const checkInDeadline = new Date(schoolStart);
-        checkInDeadline.setHours(checkInDeadline.getHours() + CHECK_IN_WINDOW_HOURS);
+        const schoolEnd = new Date(today);
+        schoolEnd.setHours(endH, endM, 0, 0);
 
-        // === 4. Transaction ===
+        // ───── 4. Transaction ─────
         return await prisma.$transaction(async (tx) => {
+            // ────────────────────────
+            // CHECK_IN
+            // ────────────────────────
             if (type === 'CHECK_IN') {
                 const existing = await tx.attendance.findUnique({
-                    where: { userId_schoolId_date: { userId, schoolId, date: today } }
+                    where: { userId_schoolId_date: { userId, schoolId, date: today } },
                 });
 
-                // Already checked in?
                 if (existing?.checkInTime) {
+                    return { success: false, message: 'Already checked in', attendance: existing };
+                }
+
+                if (now < schoolStart) {
                     return {
                         success: false,
-                        message: 'Already checked in today',
-                        attendance: existing
+                        message: `Check-in opens at ${config.defaultStartTime}`,
+                        opensAt: schoolStart.toISOString(),
+                    };
+                }
+                if (now > schoolEnd) {
+                    return {
+                        success: false,
+                        message: `Check-in closed at ${config.defaultEndTime}`,
+                        closesAt: schoolEnd.toISOString(),
                     };
                 }
 
-                // Outside check-in window?
-                if (now > checkInDeadline) {
-                    return {
-                        success: false,
-                        message: `Check-in window closed. School starts at ${config.defaultStartTime}, you had until ${checkInDeadline.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}.`,
-                        deadline: checkInDeadline.toISOString()
-                    };
-                }
+                const grace = new Date(schoolStart);
+                grace.setMinutes(grace.getMinutes() + config.gracePeriodMinutes);
+                const isLate = now > grace;
+                const lateByMinutes = isLate ? Math.floor((now - grace) / 60000) : null;
 
-                // Calculate late
-                const graceTime = new Date(schoolStart);
-                graceTime.setMinutes(graceTime.getMinutes() + config.gracePeriodMinutes);
+                const data = {
+                    status: isLate ? 'LATE' : 'PRESENT',
+                    checkInTime: now,
+                    isLateCheckIn: isLate,
+                    lateByMinutes,
+                    checkInLocation: location || null,
+                    deviceInfo: deviceInfo || null,
+                    remarks,
+                    markedBy: userId,
+                    requiresApproval: false,
+                    approvalStatus: 'NOT_REQUIRED',
+                    workingHours: 0, // ← reset on new check-in
+                };
 
-                const isLate = now > graceTime;
-                const lateByMinutes = isLate ? Math.floor((now - graceTime) / 60000) : null;
-
-                // Update ABSENT or create new
-                if (existing && !existing.checkInTime) {
-                    const updated = await tx.attendance.update({
-                        where: { id: existing.id },
-                        data: {
-                            status: isLate ? 'LATE' : 'PRESENT',
-                            checkInTime: now,
-                            isLateCheckIn: isLate,
-                            lateByMinutes,
-                            checkInLocation: location || null,
-                            deviceInfo: deviceInfo || null,
-                            remarks,
-                            markedBy: userId,
-                            requiresApproval: false,
-                            approvalStatus: 'NOT_REQUIRED'
-                        }
+                let attendance;
+                if (existing) {
+                    attendance = await tx.attendance.update({ where: { id: existing.id }, data });
+                } else {
+                    attendance = await tx.attendance.create({
+                        data: { userId, schoolId, date: today, ...data },
                     });
-                    return {
-                        success: true,
-                        message: isLate ? `Checked in (Late by ${lateByMinutes} min)` : 'Checked in',
-                        attendance: updated,
-                        isLate
-                    };
                 }
-
-                // Create new
-                const attendance = await tx.attendance.create({
-                    data: {
-                        userId,
-                        schoolId,
-                        date: today,
-                        status: isLate ? 'LATE' : 'PRESENT',
-                        checkInTime: now,
-                        isLateCheckIn: isLate,
-                        lateByMinutes,
-                        checkInLocation: location || null,
-                        deviceInfo: deviceInfo || null,
-                        remarks,
-                        markedBy: userId,
-                        requiresApproval: false,
-                        approvalStatus: 'NOT_REQUIRED'
-                    }
-                });
 
                 return {
                     success: true,
                     message: isLate ? `Checked in (Late by ${lateByMinutes} min)` : 'Checked in',
                     attendance,
-                    isLate
+                    isLate,
                 };
+            }
 
-            } else if (type === 'CHECK_OUT') {
+            // ────────────────────────
+            // CHECK_OUT
+            // ────────────────────────
+            if (type === 'CHECK_OUT') {
                 const attendance = await tx.attendance.findUnique({
-                    where: { userId_schoolId_date: { userId, schoolId, date: today } }
+                    where: { userId_schoolId_date: { userId, schoolId, date: today } },
                 });
 
-                if (!attendance || !attendance.checkInTime) {
-                    return { success: false, message: 'No check-in record found' };
+                if (!attendance?.checkInTime) {
+                    return { success: false, message: 'No check-in record' };
                 }
-
                 if (attendance.checkOutTime) {
                     return { success: false, message: 'Already checked out', attendance };
                 }
 
-                // Check-out window: 3 hours after check-in
                 const checkInTime = new Date(attendance.checkInTime);
-                const checkOutDeadline = new Date(checkInTime);
-                checkOutDeadline.setHours(checkOutDeadline.getHours() + CHECK_OUT_WINDOW_HOURS);
 
+                // Check-out window: schoolEnd → schoolEnd + 3h
+                const checkOutStart = new Date(schoolEnd);
+                const checkOutDeadline = new Date(schoolEnd);
+                checkOutDeadline.setHours(checkOutDeadline.getHours() + CHECK_OUT_GRACE_HOURS);
+
+                if (now < checkOutStart) {
+                    return {
+                        success: false,
+                        message: `Check-out opens at ${config.defaultEndTime}`,
+                        opensAt: checkOutStart.toISOString(),
+                    };
+                }
                 if (now > checkOutDeadline) {
                     return {
                         success: false,
-                        message: `Check-out window closed. You had 3 hours after check-in (${checkInTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}).`,
-                        deadline: checkOutDeadline.toISOString()
+                        message: `Check-out closed at ${checkOutDeadline.toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                        })}`,
+                        deadline: checkOutDeadline.toISOString(),
                     };
                 }
 
-                const workingHours = (now - checkInTime) / (1000 * 60 * 60);
-                let status = attendance.status;
+                // Minimum working hours
+                // In CHECK_OUT block
+                const minCheckOut = new Date(checkInTime);
+                minCheckOut.setHours(minCheckOut.getHours() + config.halfDayHours);
 
-                if (workingHours < config.halfDayHours) {
-                    status = 'HALF_DAY';
+                if (now < minCheckOut) {
+                    const timeStr = minCheckOut.toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+
+                    return {
+                        success: false,
+                        message: `Need ${config.halfDayHours}h. Can check out after ${timeStr}`,
+                        minTime: minCheckOut.toISOString(), // For frontend if needed
+                    };
                 }
+                // FINAL: Calculate and SAVE working hours
+                const workingHoursRaw = (now - checkInTime) / (1000 * 60 * 60);
+                const workingHours = Number(workingHoursRaw.toFixed(2));
 
+
+                let status = 'PRESENT';
+                if (workingHours < config.halfDayHours) status = 'HALF_DAY';
+                else if (workingHours < (config.fullDayHours || 8)) status = 'PRESENT';
                 const updated = await tx.attendance.update({
                     where: { id: attendance.id },
                     data: {
                         checkOutTime: now,
                         checkOutLocation: location || null,
-                        workingHours,
+                        workingHours,  // ← SAVED
                         status,
-                        remarks: remarks || attendance.remarks
-                    }
+                        remarks: remarks || attendance.remarks,
+                    },
                 });
-
+                console.log(workingHours, updated.workingHours);
                 return {
                     success: true,
                     message: 'Checked out',
                     attendance: updated,
-                    workingHours
+                    workingHours: updated.workingHours,
                 };
             }
-        }).then(result => NextResponse.json(result))
-            .catch(err => {
-                console.error('Transaction failed:', err);
+        })
+            .then((result) => NextResponse.json(result))
+            .catch((err) => {
+                console.error('Transaction error:', err);
                 return NextResponse.json({ error: 'Failed to process' }, { status: 500 });
             });
-
     } catch (error) {
         console.error('Mark attendance error:', error);
-        return NextResponse.json({
-            error: 'Internal server error',
-            details: error.message
-        }, { status: 500 });
+        return NextResponse.json({ error: 'Server error', details: error.message }, { status: 500 });
     }
 }
 
-// === GET - Today's status (unchanged) ===
-
-// === DEFAULT CONFIG (used if missing) ===
-const DEFAULT_CONFIG = {
-    defaultStartTime: '09:00',
-    defaultEndTime: '22:00',
-    gracePeriodMinutes: 15,
-    enableGeoFencing: false,
-    allowedRadiusMeters: 500,
-    halfDayHours: 4,
-};
-
-// GET - Get today's attendance status
+// ──────────────────────────────────────────────────────────────────────
+// GET – Today’s status + LIVE working hours
+// ──────────────────────────────────────────────────────────────────────
 export async function GET(req, { params }) {
     const { schoolId } = params;
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId');
-
-    if (!userId) {
-        return NextResponse.json({ error: 'userId is required' }, { status: 400 });
-    }
+    const userId = new URL(req.url).searchParams.get('userId');
+    if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 });
 
     try {
         const today = new Date(new Date().toDateString());
-        const currentMonth = new Date().getMonth() + 1;
-        const currentYear = new Date().getFullYear();
+        const now = new Date();
+        const month = new Date().getMonth() + 1;
+        const year = new Date().getFullYear();
 
-        // === 1. Auto-create config if missing ===
-        let config = await prisma.attendanceConfig.findUnique({
-            where: { schoolId }
-        });
-
+        // Auto-create config
+        let config = await prisma.attendanceConfig.findUnique({ where: { schoolId } });
         if (!config) {
-            console.log('Warning: Attendance config missing. Auto-creating...');
             config = await prisma.attendanceConfig.create({
-                data: {
-                    schoolId,
-                    ...DEFAULT_CONFIG
-                }
+                data: { schoolId, ...DEFAULT_CONFIG },
             });
-            console.log('Attendance config auto-created');
         }
 
-        // === 2. Fetch all data in parallel ===
         const [attendance, calendar, monthlyStats] = await Promise.all([
             prisma.attendance.findUnique({
-                where: {
-                    userId_schoolId_date: { userId, schoolId, date: today }
-                }
+                where: { userId_schoolId_date: { userId, schoolId, date: today } },
             }),
             prisma.schoolCalendar.findUnique({
-                where: { schoolId_date: { schoolId, date: today } }
+                where: { schoolId_date: { schoolId, date: today } },
             }),
-            getMonthlyStats(userId, schoolId, currentMonth, currentYear)
+            getMonthlyStats(userId, schoolId, month, year),
         ]);
 
-        const isWorkingDay = calendar?.dayType === 'WORKING_DAY';
+        // ── LIVE working hours (for UI timer) ──
+        let liveWorkingHours = 0;
+        if (attendance?.checkInTime && !attendance?.checkOutTime) {
+            const checkInTime = new Date(attendance.checkInTime);
+            const diffHours = (now - checkInTime) / (1000 * 60 * 60);
+            liveWorkingHours = Number(diffHours.toFixed(2));
+        }
+
+        const finalWorkingHours = attendance?.checkOutTime
+            ? (attendance.workingHours ?? 0)
+            : liveWorkingHours;
 
         return NextResponse.json({
-            attendance,
-            isWorkingDay,
+            attendance: {
+                ...attendance,
+                workingHours: finalWorkingHours,
+                liveWorkingHours: attendance?.checkOutTime ? null : liveWorkingHours,
+            },
+            isWorkingDay: calendar?.dayType === 'WORKING_DAY',
             dayType: calendar?.dayType,
             holidayName: calendar?.holidayName,
             config: {
@@ -287,21 +303,22 @@ export async function GET(req, { params }) {
                 endTime: config.defaultEndTime,
                 gracePeriod: config.gracePeriodMinutes,
                 enableGeoFencing: config.enableGeoFencing,
-                allowedRadius: config.allowedRadiusMeters
+                allowedRadius: config.allowedRadiusMeters,
             },
-            monthlyStats
+            monthlyStats,
         });
-
-    } catch (error) {
-        console.error('Fetch attendance error:', error);
-        return NextResponse.json({ error: 'Failed to fet`ch' }, { status: 500 });
+    } catch (e) {
+        console.error('GET error:', e);
+        return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });
     }
 }
 
-// === Monthly Stats Helper ===
+// ──────────────────────────────────────────────────────────────────────
+// Monthly Stats Helper
+// ──────────────────────────────────────────────────────────────────────
 async function getMonthlyStats(userId, schoolId, month, year) {
     let stats = await prisma.attendanceStats.findFirst({
-        where: { userId, schoolId, month, year }
+        where: { userId, schoolId, month, year },
     });
 
     if (!stats) {
@@ -310,17 +327,17 @@ async function getMonthlyStats(userId, schoolId, month, year) {
 
         const [records, workingDays] = await Promise.all([
             prisma.attendance.findMany({
-                where: { userId, schoolId, date: { gte: startDate, lte: endDate } }
+                where: { userId, schoolId, date: { gte: startDate, lte: endDate } },
             }),
             prisma.schoolCalendar.count({
-                where: { schoolId, date: { gte: startDate, lte: endDate }, dayType: 'WORKING_DAY' }
-            })
+                where: { schoolId, date: { gte: startDate, lte: endDate }, dayType: 'WORKING_DAY' },
+            }),
         ]);
 
-        const present = records.filter(r => ['PRESENT', 'LATE'].includes(r.status)).length;
-        const absent = records.filter(r => r.status === 'ABSENT').length;
-        const late = records.filter(r => r.status === 'LATE').length;
-        const leaves = records.filter(r => r.status === 'ON_LEAVE').length;
+        const present = records.filter((r) => ['PRESENT', 'LATE'].includes(r.status)).length;
+        const absent = records.filter((r) => r.status === 'ABSENT').length;
+        const late = records.filter((r) => r.status === 'LATE').length;
+        const leaves = records.filter((r) => r.status === 'ON_LEAVE').length;
 
         const totalWorking = workingDays || records.length;
         const percentage = totalWorking > 0 ? ((present / totalWorking) * 100).toFixed(1) : 0;
@@ -331,7 +348,7 @@ async function getMonthlyStats(userId, schoolId, month, year) {
             totalAbsent: absent,
             totalLate: late,
             totalLeaves: leaves,
-            attendancePercentage: parseFloat(percentage)
+            attendancePercentage: parseFloat(percentage),
         };
     }
 
@@ -341,24 +358,22 @@ async function getMonthlyStats(userId, schoolId, month, year) {
         absentDays: stats.totalAbsent,
         lateDays: stats.totalLate,
         leaveDays: stats.totalLeaves,
-        attendancePercentage: stats.attendancePercentage
+        attendancePercentage: stats.attendancePercentage,
     };
 }
 
-// === POST, PUT, etc. remain unchanged ===
-// (Keep your existing POST, PUT, and distance helper)
-
-// === Distance Helper ===
+// ──────────────────────────────────────────────────────────────────────
+// Distance Helper
+// ──────────────────────────────────────────────────────────────────────
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
-    const φ1 = lat1 * Math.PI / 180;
-    const φ2 = lat2 * Math.PI / 180;
-    const Δφ = (lat2 - lat1) * Math.PI / 180;
-    const Δλ = (lon2 - lon1) * Math.PI / 180;
+    const φ1 = (lat1 * Math.PI) / 180;
+    const φ2 = (lat2 * Math.PI) / 180;
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
 
-    const a = Math.sin(Δφ / 2) ** 2 +
-        Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+    const a =
+        Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
     return R * c;
 }
