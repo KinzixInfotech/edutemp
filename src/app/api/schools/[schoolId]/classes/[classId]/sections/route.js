@@ -21,3 +21,23 @@ export async function POST(req, props) {
         return NextResponse.json({ error: "Failed to create section" }, { status: 500 });
     }
 }
+export async function GET(req, props) {
+    try {
+        const params = await props.params;
+        const { classId } = params;
+
+        const sections = await prisma.section.findMany({
+            where: {
+                classId: parseInt(classId, 10),
+            },
+            orderBy: {
+                name: "asc",
+            },
+        });
+
+        return NextResponse.json(sections, { status: 200 });
+    } catch (error) {
+        console.error("Error fetching sections:", error);
+        return NextResponse.json({ error: "Failed to fetch sections" }, { status: 500 });
+    }
+}

@@ -1,40 +1,50 @@
-// app/api/schools/[schoolId]/attendance/mark/route.js
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
 // ──────────────────────────────────────────────────────────────────────
-// DEFAULT CONFIG (auto-created if missing)
+// CONFIGURATION CONSTANTS (Fallback defaults)
 // ──────────────────────────────────────────────────────────────────────
-const DEFAULT_CONFIG = {
-    defaultStartTime: '09:00',
-    defaultEndTime: '22:00',
-    gracePeriodMinutes: 15,
-    enableGeoFencing: false,
-    allowedRadiusMeters: 500,
-    halfDayHours: 4,
-    fullDayHours: 8,
-};
+const DEFAULT_CHECK_IN_WINDOW_HOURS = 2;
+const DEFAULT_CHECK_OUT_GRACE_HOURS = 4;
+const DEFAULT_MIN_WORKING_HOURS = 4;
+
+// India Standard Time offset (UTC+5:30)
+const IST_OFFSET = 5.5 * 60 * 60 * 1000;
 
 // ──────────────────────────────────────────────────────────────────────
-// CHECK-OUT GRACE: 3 hours after school end
+// HELPER: Get IST date (handles timezone properly)
 // ──────────────────────────────────────────────────────────────────────
-const CHECK_OUT_GRACE_HOURS = 3;
+function getISTDate() {
+    const now = new Date();
+    const istTime = new Date(now.getTime() + IST_OFFSET);
+    const year = istTime.getUTCFullYear();
+    const month = istTime.getUTCMonth();
+    const date = istTime.getUTCDate();
+    return new Date(Date.UTC(year, month, date, 0, 0, 0, 0));
+}
+
+function getISTNow() {
+    const now = new Date();
+    return new Date(now.getTime() + IST_OFFSET);
+}
 
 // ──────────────────────────────────────────────────────────────────────
 // POST – Mark Check-in / Check-out
 // ──────────────────────────────────────────────────────────────────────
 export async function POST(req, { params }) {
-    const { schoolId } = params;
+    const { schoolId } = await params;
     const body = await req.json();
     const { userId, type, location, deviceInfo, remarks } = body;
 
     if (!userId || !type || !['CHECK_IN', 'CHECK_OUT'].includes(type)) {
-        return NextResponse.json({ error: 'userId and valid type required' }, { status: 400 });
+        return NextResponse.json({
+            error: 'userId and valid type (CHECK_IN/CHECK_OUT) required'
+        }, { status: 400 });
     }
 
     try {
         const now = new Date();
-        const today = new Date(now.toDateString());
+        const today = getISTDate();
 
         // ───── 1. Fetch config + calendar ─────
         const [config, calendar] = await Promise.all([
@@ -45,37 +55,50 @@ export async function POST(req, { params }) {
         ]);
 
         if (!config) {
-            return NextResponse.json({ error: 'Attendance config not found' }, { status: 404 });
+            return NextResponse.json({
+                error: 'Attendance config not found. Please set up calendar first.'
+            }, { status: 404 });
         }
 
+        // Get dynamic values from config or use defaults
+        const CHECK_IN_WINDOW_HOURS = config.checkInWindowHours ?? DEFAULT_CHECK_IN_WINDOW_HOURS;
+        const CHECK_OUT_GRACE_HOURS = config.checkOutGraceHours ?? DEFAULT_CHECK_OUT_GRACE_HOURS;
+        const MIN_WORKING_HOURS = config.minWorkingHours ?? DEFAULT_MIN_WORKING_HOURS;
+
+        // Check if working day
         if (calendar?.dayType !== 'WORKING_DAY') {
-            return NextResponse.json(
-                { error: `Today is ${calendar?.dayType || 'HOLIDAY'}`, dayType: calendar?.dayType },
-                { status: 400 }
-            );
+            return NextResponse.json({
+                error: `Today is ${calendar?.dayType || 'HOLIDAY'}. No attendance required.`,
+                dayType: calendar?.dayType,
+                holidayName: calendar?.holidayName
+            }, { status: 400 });
         }
 
-        // ───── 2. Geofencing ─────
+        // ───── 2. Geofencing (if enabled) ─────
         if (config.enableGeoFencing && location) {
+            if (!config.schoolLatitude || !config.schoolLongitude) {
+                return NextResponse.json({
+                    error: 'School location not configured'
+                }, { status: 400 });
+            }
+
             const distance = calculateDistance(
                 location.latitude,
                 location.longitude,
                 config.schoolLatitude,
                 config.schoolLongitude
             );
+
             if (distance > config.allowedRadiusMeters) {
-                return NextResponse.json(
-                    {
-                        error: `Too far: ${Math.round(distance)}m. Must be within ${config.allowedRadiusMeters}m.`,
-                        distance,
-                        allowedRadius: config.allowedRadiusMeters,
-                    },
-                    { status: 400 }
-                );
+                return NextResponse.json({
+                    error: `You are ${Math.round(distance)}m away. Must be within ${config.allowedRadiusMeters}m of school.`,
+                    distance,
+                    allowedRadius: config.allowedRadiusMeters,
+                }, { status: 400 });
             }
         }
 
-        // ───── 3. Parse school times ─────
+        // ───── 3. Parse school times from config ─────
         const [startH, startM] = config.defaultStartTime.split(':').map(Number);
         const [endH, endM] = config.defaultEndTime.split(':').map(Number);
 
@@ -84,6 +107,15 @@ export async function POST(req, { params }) {
 
         const schoolEnd = new Date(today);
         schoolEnd.setHours(endH, endM, 0, 0);
+
+        // Check-in window: schoolStart to schoolStart + CHECK_IN_WINDOW_HOURS
+        const checkInDeadline = new Date(schoolStart);
+        checkInDeadline.setHours(checkInDeadline.getHours() + CHECK_IN_WINDOW_HOURS);
+
+        // Check-out window: schoolEnd to schoolEnd + CHECK_OUT_GRACE_HOURS
+        const checkOutStart = new Date(schoolEnd);
+        const checkOutDeadline = new Date(schoolEnd);
+        checkOutDeadline.setHours(checkOutDeadline.getHours() + CHECK_OUT_GRACE_HOURS);
 
         // ───── 4. Transaction ─────
         return await prisma.$transaction(async (tx) => {
@@ -96,28 +128,38 @@ export async function POST(req, { params }) {
                 });
 
                 if (existing?.checkInTime) {
-                    return { success: false, message: 'Already checked in', attendance: existing };
+                    return NextResponse.json({
+                        success: false,
+                        message: 'Already checked in today',
+                        attendance: existing
+                    });
                 }
 
+                // Check if within check-in window
                 if (now < schoolStart) {
-                    return {
+                    return NextResponse.json({
                         success: false,
                         message: `Check-in opens at ${config.defaultStartTime}`,
                         opensAt: schoolStart.toISOString(),
-                    };
-                }
-                if (now > schoolEnd) {
-                    return {
-                        success: false,
-                        message: `Check-in closed at ${config.defaultEndTime}`,
-                        closesAt: schoolEnd.toISOString(),
-                    };
+                    });
                 }
 
-                const grace = new Date(schoolStart);
-                grace.setMinutes(grace.getMinutes() + config.gracePeriodMinutes);
-                const isLate = now > grace;
-                const lateByMinutes = isLate ? Math.floor((now - grace) / 60000) : null;
+                if (now > checkInDeadline) {
+                    return NextResponse.json({
+                        success: false,
+                        message: `Check-in window closed at ${checkInDeadline.toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                        })}`,
+                        closedAt: checkInDeadline.toISOString(),
+                    });
+                }
+
+                // Calculate if late using grace period from config
+                const gracePeriod = new Date(schoolStart);
+                gracePeriod.setMinutes(gracePeriod.getMinutes() + config.gracePeriodMinutes);
+                const isLate = now > gracePeriod;
+                const lateByMinutes = isLate ? Math.floor((now - gracePeriod) / 60000) : null;
 
                 const data = {
                     status: isLate ? 'LATE' : 'PRESENT',
@@ -130,24 +172,33 @@ export async function POST(req, { params }) {
                     markedBy: userId,
                     requiresApproval: false,
                     approvalStatus: 'NOT_REQUIRED',
-                    workingHours: 0, // ← reset on new check-in
+                    workingHours: 0,
                 };
 
                 let attendance;
                 if (existing) {
-                    attendance = await tx.attendance.update({ where: { id: existing.id }, data });
+                    attendance = await tx.attendance.update({
+                        where: { id: existing.id },
+                        data
+                    });
                 } else {
                     attendance = await tx.attendance.create({
                         data: { userId, schoolId, date: today, ...data },
                     });
                 }
 
-                return {
+                return NextResponse.json({
                     success: true,
-                    message: isLate ? `Checked in (Late by ${lateByMinutes} min)` : 'Checked in',
+                    message: isLate
+                        ? `Checked in (Late by ${lateByMinutes} min)`
+                        : 'Checked in successfully',
                     attendance,
                     isLate,
-                };
+                    checkOutWindow: {
+                        start: checkOutStart.toISOString(),
+                        end: checkOutDeadline.toISOString(),
+                    }
+                });
             }
 
             // ────────────────────────
@@ -159,41 +210,45 @@ export async function POST(req, { params }) {
                 });
 
                 if (!attendance?.checkInTime) {
-                    return { success: false, message: 'No check-in record' };
+                    return NextResponse.json({
+                        success: false,
+                        message: 'No check-in record found for today'
+                    });
                 }
+
                 if (attendance.checkOutTime) {
-                    return { success: false, message: 'Already checked out', attendance };
+                    return NextResponse.json({
+                        success: false,
+                        message: 'Already checked out today',
+                        attendance
+                    });
                 }
 
                 const checkInTime = new Date(attendance.checkInTime);
 
-                // Check-out window: schoolEnd → schoolEnd + 3h
-                const checkOutStart = new Date(schoolEnd);
-                const checkOutDeadline = new Date(schoolEnd);
-                checkOutDeadline.setHours(checkOutDeadline.getHours() + CHECK_OUT_GRACE_HOURS);
-
+                // Check if within check-out window
                 if (now < checkOutStart) {
-                    return {
+                    return NextResponse.json({
                         success: false,
                         message: `Check-out opens at ${config.defaultEndTime}`,
                         opensAt: checkOutStart.toISOString(),
-                    };
-                }
-                if (now > checkOutDeadline) {
-                    return {
-                        success: false,
-                        message: `Check-out closed at ${checkOutDeadline.toLocaleTimeString('en-US', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                        })}`,
-                        deadline: checkOutDeadline.toISOString(),
-                    };
+                    });
                 }
 
-                // Minimum working hours
-                // In CHECK_OUT block
+                if (now > checkOutDeadline) {
+                    return NextResponse.json({
+                        success: false,
+                        message: `Check-out window closed at ${checkOutDeadline.toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                        })}. Contact admin for manual check-out.`,
+                        deadline: checkOutDeadline.toISOString(),
+                    });
+                }
+
+                // Check minimum working hours (from config)
                 const minCheckOut = new Date(checkInTime);
-                minCheckOut.setHours(minCheckOut.getHours() + config.halfDayHours);
+                minCheckOut.setHours(minCheckOut.getHours() + MIN_WORKING_HOURS);
 
                 if (now < minCheckOut) {
                     const timeStr = minCheckOut.toLocaleTimeString('en-US', {
@@ -201,71 +256,84 @@ export async function POST(req, { params }) {
                         minute: '2-digit'
                     });
 
-                    return {
+                    return NextResponse.json({
                         success: false,
-                        message: `Need ${config.halfDayHours}h. Can check out after ${timeStr}`,
-                        minTime: minCheckOut.toISOString(), // For frontend if needed
-                    };
+                        message: `Minimum ${MIN_WORKING_HOURS} hours required. Can check out after ${timeStr}`,
+                        minTime: minCheckOut.toISOString(),
+                    });
                 }
-                // FINAL: Calculate and SAVE working hours
+
+                // Calculate working hours
                 const workingHoursRaw = (now - checkInTime) / (1000 * 60 * 60);
                 const workingHours = Number(workingHoursRaw.toFixed(2));
 
-
+                // Determine status based on hours worked (from config)
                 let status = 'PRESENT';
-                if (workingHours < config.halfDayHours) status = 'HALF_DAY';
-                else if (workingHours < (config.fullDayHours || 8)) status = 'PRESENT';
+                if (workingHours < config.halfDayHours) {
+                    status = 'HALF_DAY';
+                } else if (workingHours >= config.fullDayHours) {
+                    status = 'PRESENT';
+                }
+
                 const updated = await tx.attendance.update({
                     where: { id: attendance.id },
                     data: {
                         checkOutTime: now,
                         checkOutLocation: location || null,
-                        workingHours,  // ← SAVED
+                        workingHours,
                         status,
                         remarks: remarks || attendance.remarks,
                     },
                 });
-                console.log(workingHours, updated.workingHours);
-                return {
+
+                return NextResponse.json({
                     success: true,
-                    message: 'Checked out',
+                    message: `Checked out successfully. Worked ${workingHours.toFixed(2)} hours`,
                     attendance: updated,
                     workingHours: updated.workingHours,
-                };
+                });
             }
-        })
-            .then((result) => NextResponse.json(result))
-            .catch((err) => {
-                console.error('Transaction error:', err);
-                return NextResponse.json({ error: 'Failed to process' }, { status: 500 });
-            });
+        });
     } catch (error) {
         console.error('Mark attendance error:', error);
-        return NextResponse.json({ error: 'Server error', details: error.message }, { status: 500 });
+        return NextResponse.json({
+            error: 'Server error',
+            details: error.message
+        }, { status: 500 });
     }
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// GET – Today’s status + LIVE working hours
+// GET – Today's status + LIVE working hours
 // ──────────────────────────────────────────────────────────────────────
 export async function GET(req, { params }) {
-    const { schoolId } = params;
+    const { schoolId } = await params;
     const userId = new URL(req.url).searchParams.get('userId');
-    if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 });
+
+    if (!userId) {
+        return NextResponse.json({ error: 'userId required' }, { status: 400 });
+    }
 
     try {
-        const today = new Date(new Date().toDateString());
+        const today = getISTDate();
         const now = new Date();
-        const month = new Date().getMonth() + 1;
-        const year = new Date().getFullYear();
+        const istNow = getISTNow();
+        const month = istNow.getUTCMonth() + 1;
+        const year = istNow.getUTCFullYear();
 
-        // Auto-create config
+        // Fetch config
         let config = await prisma.attendanceConfig.findUnique({ where: { schoolId } });
         if (!config) {
-            config = await prisma.attendanceConfig.create({
-                data: { schoolId, ...DEFAULT_CONFIG },
-            });
+            return NextResponse.json({
+                error: 'Attendance config not found. Please set up calendar first.',
+                needsSetup: true
+            }, { status: 404 });
         }
+
+        // Get dynamic values from config or use defaults
+        const CHECK_IN_WINDOW_HOURS = config.checkInWindowHours ?? DEFAULT_CHECK_IN_WINDOW_HOURS;
+        const CHECK_OUT_GRACE_HOURS = config.checkOutGraceHours ?? DEFAULT_CHECK_OUT_GRACE_HOURS;
+        const MIN_WORKING_HOURS = config.minWorkingHours ?? DEFAULT_MIN_WORKING_HOURS;
 
         const [attendance, calendar, monthlyStats] = await Promise.all([
             prisma.attendance.findUnique({
@@ -277,7 +345,24 @@ export async function GET(req, { params }) {
             getMonthlyStats(userId, schoolId, month, year),
         ]);
 
-        // ── LIVE working hours (for UI timer) ──
+        // Calculate time windows using config times
+        const [startH, startM] = config.defaultStartTime.split(':').map(Number);
+        const [endH, endM] = config.defaultEndTime.split(':').map(Number);
+
+        const schoolStart = new Date(today);
+        schoolStart.setHours(startH, startM, 0, 0);
+
+        const schoolEnd = new Date(today);
+        schoolEnd.setHours(endH, endM, 0, 0);
+
+        const checkInDeadline = new Date(schoolStart);
+        checkInDeadline.setHours(checkInDeadline.getHours() + CHECK_IN_WINDOW_HOURS);
+
+        const checkOutStart = new Date(schoolEnd);
+        const checkOutDeadline = new Date(schoolEnd);
+        checkOutDeadline.setHours(checkOutDeadline.getHours() + CHECK_OUT_GRACE_HOURS);
+
+        // Calculate live working hours
         let liveWorkingHours = 0;
         if (attendance?.checkInTime && !attendance?.checkOutTime) {
             const checkInTime = new Date(attendance.checkInTime);
@@ -288,6 +373,14 @@ export async function GET(req, { params }) {
         const finalWorkingHours = attendance?.checkOutTime
             ? (attendance.workingHours ?? 0)
             : liveWorkingHours;
+
+        // Calculate minimum check-out time using config
+        let minCheckOutTime = null;
+        if (attendance?.checkInTime && !attendance?.checkOutTime) {
+            const checkIn = new Date(attendance.checkInTime);
+            minCheckOutTime = new Date(checkIn);
+            minCheckOutTime.setHours(minCheckOutTime.getHours() + MIN_WORKING_HOURS);
+        }
 
         return NextResponse.json({
             attendance: {
@@ -304,12 +397,41 @@ export async function GET(req, { params }) {
                 gracePeriod: config.gracePeriodMinutes,
                 enableGeoFencing: config.enableGeoFencing,
                 allowedRadius: config.allowedRadiusMeters,
+                halfDayHours: config.halfDayHours,
+                fullDayHours: config.fullDayHours,
+                minWorkingHours: MIN_WORKING_HOURS,
+                checkInWindowHours: CHECK_IN_WINDOW_HOURS,
+                checkOutGraceHours: CHECK_OUT_GRACE_HOURS,
+                // Additional config fields
+                autoMarkAbsent: config.autoMarkAbsent,
+                autoMarkTime: config.autoMarkTime,
+                requireApprovalDays: config.requireApprovalDays,
+                sendDailyReminders: config.sendDailyReminders,
+                reminderTime: config.reminderTime,
+                notifyParents: config.notifyParents,
+                minAttendancePercent: config.minAttendancePercent,
+            },
+            windows: {
+                checkIn: {
+                    start: schoolStart.toISOString(),
+                    end: checkInDeadline.toISOString(),
+                    isOpen: now >= schoolStart && now <= checkInDeadline,
+                },
+                checkOut: {
+                    start: checkOutStart.toISOString(),
+                    end: checkOutDeadline.toISOString(),
+                    isOpen: now >= checkOutStart && now <= checkOutDeadline,
+                    minTime: minCheckOutTime?.toISOString(),
+                },
             },
             monthlyStats,
         });
     } catch (e) {
         console.error('GET error:', e);
-        return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });
+        return NextResponse.json({
+            error: 'Failed to fetch',
+            details: e.message
+        }, { status: 500 });
     }
 }
 
@@ -330,7 +452,11 @@ async function getMonthlyStats(userId, schoolId, month, year) {
                 where: { userId, schoolId, date: { gte: startDate, lte: endDate } },
             }),
             prisma.schoolCalendar.count({
-                where: { schoolId, date: { gte: startDate, lte: endDate }, dayType: 'WORKING_DAY' },
+                where: {
+                    schoolId,
+                    date: { gte: startDate, lte: endDate },
+                    dayType: 'WORKING_DAY'
+                },
             }),
         ]);
 
@@ -363,17 +489,19 @@ async function getMonthlyStats(userId, schoolId, month, year) {
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// Distance Helper
+// Distance Helper (Haversine Formula)
 // ──────────────────────────────────────────────────────────────────────
 function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371e3;
+    const R = 6371e3; // Earth's radius in meters
     const φ1 = (lat1 * Math.PI) / 180;
     const φ2 = (lat2 * Math.PI) / 180;
     const Δφ = ((lat2 - lat1) * Math.PI) / 180;
     const Δλ = ((lon2 - lon1) * Math.PI) / 180;
 
     const a =
-        Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+        Math.sin(Δφ / 2) ** 2 +
+        Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
     return R * c;
 }

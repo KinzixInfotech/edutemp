@@ -30,7 +30,7 @@ const ISTDate = (input) => {
 
 export async function GET(request) {
     const startTime = Date.now();
-    
+
     try {
         // Verify cron secret
         const authHeader = request.headers.get('authorization');
@@ -44,14 +44,14 @@ export async function GET(request) {
 
         const now = new Date();
         const today = ISTDate(now);
-        
+
         // Calculate date range to check (yesterday and before)
         const endDate = new Date(today);
         endDate.setDate(endDate.getDate() - 1); // Yesterday
-        
+
         // Start date depends on mode
         let startDate;
-        
+
         if (CONFIG.CHECK_MODE === 'ACADEMIC_YEAR') {
             // Will be determined per school - use a fallback for now
             startDate = new Date(endDate);
@@ -62,7 +62,7 @@ export async function GET(request) {
             startDate.setDate(startDate.getDate() - (CONFIG.DAYS_TO_CHECK - 1));
             console.log(`[CRON] Mode: DAYS - Checking last ${CONFIG.DAYS_TO_CHECK} days`);
         }
-        
+
         // Safety limit
         const maxStartDate = new Date(endDate);
         maxStartDate.setDate(maxStartDate.getDate() - CONFIG.MAX_DAYS_BACK);
@@ -115,7 +115,7 @@ export async function GET(request) {
 
         // Filter schools with auto-mark enabled
         const enabledSchools = schools.filter(
-            (school) => school.attendanceConfig?.autoMarkAbsent !== false
+            (school) => school.attendanceConfig?.autoMarkAbsent === true
         );
 
         console.log(`[CRON] ${enabledSchools.length} schools have auto-mark enabled`);
@@ -127,16 +127,16 @@ export async function GET(request) {
         // Process schools in parallel batches
         for (let i = 0; i < enabledSchools.length; i += CONFIG.PARALLEL_SCHOOLS) {
             const schoolBatch = enabledSchools.slice(i, i + CONFIG.PARALLEL_SCHOOLS);
-            
+
             const batchPromises = schoolBatch.map(async (school) => {
                 const schoolStartTime = Date.now();
-                
+
                 console.log(`[SCHOOL ${school.id}] Processing ${school.name}`);
-                
+
                 try {
                     // Determine start date for this school
                     let schoolStartDate = startDate;
-                    
+
                     if (CONFIG.CHECK_MODE === 'ACADEMIC_YEAR' && school.AcademicYear && school.AcademicYear.length > 0) {
                         const academicYearStart = ISTDate(school.AcademicYear[0].startDate);
                         schoolStartDate = academicYearStart > maxStartDate ? academicYearStart : maxStartDate;
@@ -145,12 +145,12 @@ export async function GET(request) {
                         schoolStartDate = maxStartDate;
                         console.log(`[SCHOOL ${school.id}] Using max lookback: ${schoolStartDate.toISOString()}`);
                     }
-                    
+
                     const result = await processSchool(school, schoolStartDate, endDate);
-                    
+
                     totalMarked += result.markedCount;
                     totalErrors += result.errorCount;
-                    
+
                     return {
                         schoolId: school.id,
                         schoolName: school.name,
@@ -167,7 +167,7 @@ export async function GET(request) {
                 } catch (error) {
                     console.error(`[SCHOOL ${school.id}] Error:`, error.message);
                     totalErrors++;
-                    
+
                     return {
                         schoolId: school.id,
                         schoolName: school.name,
@@ -178,7 +178,7 @@ export async function GET(request) {
             });
 
             const batchResults = await Promise.allSettled(batchPromises);
-            
+
             batchResults.forEach((result) => {
                 if (result.status === 'fulfilled') {
                     schoolResults.push(result.value);
@@ -226,7 +226,7 @@ export async function GET(request) {
 // Process a single school
 async function processSchool(school, startDate, endDate) {
     const schoolStartTime = Date.now();
-    
+
     // Get active academic year
     const academicYear = await prisma.academicYear.findFirst({
         where: {
@@ -251,7 +251,7 @@ async function processSchool(school, startDate, endDate) {
             endDate: endDate.toISOString(),
         };
     }
-    
+
     console.log(`[SCHOOL ${school.id}] Checking from ${startDate.toISOString()} to ${endDate.toISOString()}`);
 
     // Check if SchoolCalendar is populated
@@ -270,11 +270,11 @@ async function processSchool(school, startDate, endDate) {
     // If no calendar entries at all, auto-populate
     if (calendarCount === 0) {
         console.log(`[SCHOOL ${school.id}] ⚠️ No SchoolCalendar entries found! Auto-populating...`);
-        
+
         try {
             const populated = await autoPopulateSchoolCalendar(
-                school.id, 
-                academicYear.startDate, 
+                school.id,
+                academicYear.startDate,
                 academicYear.endDate
             );
             console.log(`[SCHOOL ${school.id}] ✅ Auto-populated ${populated} calendar days`);
@@ -304,13 +304,13 @@ async function processSchool(school, startDate, endDate) {
     // If no SchoolCalendar entries, generate working days (Monday-Saturday)
     if (workingDays.length === 0) {
         console.log(`[SCHOOL ${school.id}] No SchoolCalendar found, generating working days (Mon-Sat)`);
-        
+
         workingDays = [];
         const current = new Date(startDate);
-        
+
         while (current <= endDate) {
             const dayOfWeek = current.getDay();
-            
+
             // Include Monday (1) to Saturday (6), exclude Sunday (0)
             if (dayOfWeek !== 0) {
                 workingDays.push({
@@ -319,10 +319,10 @@ async function processSchool(school, startDate, endDate) {
                     dayType: 'WORKING_DAY',
                 });
             }
-            
+
             current.setDate(current.getDate() + 1);
         }
-        
+
         console.log(`[SCHOOL ${school.id}] Generated ${workingDays.length} working days`);
     }
 
@@ -345,10 +345,10 @@ async function processSchool(school, startDate, endDate) {
     for (const workingDay of workingDays) {
         try {
             const result = await processDay(school.id, workingDay.date, academicYear.id);
-            
+
             totalMarked += result.markedCount;
             totalErrors += result.errorCount;
-            
+
             if (result.markedCount > 0 || result.errorCount > 0) {
                 dayDetails.push({
                     date: workingDay.date.toISOString(),
@@ -359,7 +359,7 @@ async function processSchool(school, startDate, endDate) {
         } catch (error) {
             console.error(`[SCHOOL ${school.id}] Error processing day ${workingDay.date}:`, error.message);
             totalErrors++;
-            
+
             dayDetails.push({
                 date: workingDay.date.toISOString(),
                 error: error.message,
@@ -381,7 +381,7 @@ async function processSchool(school, startDate, endDate) {
 // Process a single day
 async function processDay(schoolId, date, academicYearId) {
     const normalizedDate = ISTDate(date);
-    
+
     // Get all active users who should have attendance
     const activeUsers = await prisma.user.findMany({
         where: {
@@ -454,7 +454,7 @@ async function processDay(schoolId, date, academicYearId) {
                 batch,
                 academicYearId
             );
-            
+
             markedCount += result.successCount;
             errorCount += result.errorCount;
         } catch (error) {
@@ -504,7 +504,7 @@ async function markBatchAbsentWithRetry(schoolId, date, users, academicYearId, a
         };
     } catch (error) {
         console.error(`[BATCH] Attempt ${attempt} failed:`, error.message);
-        
+
         // Retry with exponential backoff
         if (attempt < CONFIG.MAX_RETRIES) {
             const delay = CONFIG.RETRY_DELAY * Math.pow(2, attempt - 1);
@@ -629,13 +629,13 @@ async function updateDayStats(schoolId, date, academicYearId) {
 async function autoPopulateSchoolCalendar(schoolId, startDate, endDate) {
     const entries = [];
     const workingDays = [1, 2, 3, 4, 5, 6]; // Mon-Sat
-    
+
     let current = new Date(startDate);
     const end = new Date(endDate);
-    
+
     while (current <= end) {
         const dayOfWeek = current.getDay();
-        
+
         const entry = {
             schoolId,
             date: new Date(current),
@@ -645,7 +645,7 @@ async function autoPopulateSchoolCalendar(schoolId, startDate, endDate) {
             createdAt: new Date(),
             updatedAt: new Date(),
         };
-        
+
         if (!workingDays.includes(dayOfWeek)) {
             // Weekend
             entry.dayType = 'WEEKEND';
@@ -655,11 +655,11 @@ async function autoPopulateSchoolCalendar(schoolId, startDate, endDate) {
             entry.startTime = '09:00';
             entry.endTime = '17:00';
         }
-        
+
         entries.push(entry);
         current.setDate(current.getDate() + 1);
     }
-    
+
     // Insert in batches
     const batchSize = 100;
     for (let i = 0; i < entries.length; i += batchSize) {
@@ -669,6 +669,6 @@ async function autoPopulateSchoolCalendar(schoolId, startDate, endDate) {
             skipDuplicates: true,
         });
     }
-    
+
     return entries.length;
 }

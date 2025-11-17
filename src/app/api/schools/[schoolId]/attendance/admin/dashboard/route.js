@@ -1,6 +1,4 @@
 // app/api/schools/[schoolId]/attendance/admin/dashboard/route.js
-// Admin Dashboard - Comprehensive attendance overview with stats and filters
-
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
@@ -14,19 +12,16 @@ export async function GET(req, { params }) {
   const roleId = searchParams.get('roleId');
   const classId = searchParams.get('classId');
   const status = searchParams.get('status');
-  const page = parseInt(searchParams.get('page') || '1');
-  const limit = parseInt(searchParams.get('limit') || '50');
-    console.log(schoolId);
 
   try {
-    // ✅ Check if schoolId exists
+    // Check if schoolId exists
     if (!schoolId) {
       return NextResponse.json(
         { message: 'Missing schoolId in request parameters' },
         { status: 400 }
       );
     }
-    
+
     // Get active academic year
     const academicYear = await prisma.academicYear.findFirst({
       where: { schoolId, isActive: true },
@@ -37,28 +32,36 @@ export async function GET(req, { params }) {
       return NextResponse.json({ error: 'No active academic year' }, { status: 404 });
     }
 
+    // Check if today is a working day
+    const today = new Date(date.toDateString());
+    const calendar = await prisma.schoolCalendar.findUnique({
+      where: { schoolId_date: { schoolId, date: today } }
+    });
+
+    const isWorkingDay = calendar?.dayType === 'WORKING_DAY';
+    const dayInfo = {
+      date: today.toISOString(),
+      isWorkingDay,
+      dayType: calendar?.dayType || 'UNKNOWN',
+      holidayName: calendar?.holidayName
+    };
+
     // Build filter conditions
     const attendanceWhere = {
       schoolId,
-      ...(startDate && endDate ? { date: { gte: startDate, lte: endDate } } : { date }),
+      ...(startDate && endDate ? { date: { gte: startDate, lte: endDate } } : { date: today }),
       ...(status && { status }),
-    };
-
-    const userWhere = {
-      schoolId,
-      deletedAt: null,
-      ...(roleId && { roleId: parseInt(roleId) }),
     };
 
     // 1. TODAY'S OVERVIEW
     const todayStats = await prisma.attendance.groupBy({
       by: ['status'],
-      where: { schoolId, date: new Date(date.toDateString()) },
+      where: { schoolId, date: today },
       _count: { id: true },
     });
 
     const todayOverview = {
-      date: date.toISOString(),
+      date: today.toISOString(),
       total: todayStats.reduce((sum, s) => sum + s._count.id, 0),
       present: todayStats.find(s => s.status === 'PRESENT')?._count.id || 0,
       absent: todayStats.find(s => s.status === 'ABSENT')?._count.id || 0,
@@ -67,11 +70,14 @@ export async function GET(req, { params }) {
       onLeave: todayStats.find(s => s.status === 'ON_LEAVE')?._count.id || 0,
     };
 
+    // Count users who haven't marked attendance
     todayOverview.notMarked = await prisma.user.count({
       where: {
-        ...userWhere,
+        schoolId,
+        deletedAt: null,
+        status: 'ACTIVE',
         attendance: {
-          none: { date: new Date(date.toDateString()) }
+          none: { date: today }
         }
       }
     });
@@ -89,7 +95,7 @@ export async function GET(req, { params }) {
         COUNT(CASE WHEN a.status = 'ON_LEAVE' THEN 1 END) as "onLeave"
       FROM "Role" r
       LEFT JOIN "User" u ON u."roleId" = r.id AND u."schoolId" = ${schoolId}::uuid AND u."deletedAt" IS NULL
-      LEFT JOIN "Attendance" a ON a."userId" = u.id AND a.date = ${date.toISOString().split('T')[0]}::date
+      LEFT JOIN "Attendance" a ON a."userId" = u.id AND a.date = ${today.toISOString().split('T')[0]}::date
       WHERE r.name IN ('Student', 'TeachingStaff', 'NonTeachingStaff', 'Admin')
       GROUP BY r.id, r.name
       ORDER BY r.name
@@ -110,13 +116,70 @@ export async function GET(req, { params }) {
         ) as "attendancePercentage"
       FROM "Class" c
       LEFT JOIN "Student" s ON s."classId" = c.id AND s."schoolId" = ${schoolId}::uuid
-      LEFT JOIN "Attendance" a ON a."userId" = s."userId" AND a.date = ${date.toISOString().split('T')[0]}::date
+      LEFT JOIN "Attendance" a ON a."userId" = s."userId" AND a.date = ${today.toISOString().split('T')[0]}::date
       WHERE c."schoolId" = ${schoolId}::uuid
       GROUP BY c.id, c."className"
       ORDER BY c."className"
     `;
 
-    // 4. MONTHLY TRENDS
+    // 4. TEACHER ACTIVITY WITH DEVICE & LOCATION
+    const teacherActivity = await prisma.attendance.findMany({
+      where: {
+        schoolId,
+        date: today,
+        user: {
+          role: { name: 'TeachingStaff' }
+        }
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            profilePicture: true,
+            teacher: {
+              select: {
+                employeeId: true,
+                designation: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { checkInTime: 'desc' }
+    });
+
+    // Calculate streaks for teachers
+    const teacherActivityWithStreaks = await Promise.all(
+      teacherActivity.map(async (att) => {
+        // Calculate consecutive attendance days
+        const streak = await calculateUserStreak(att.userId, schoolId);
+
+        return {
+          userId: att.user.id,
+          name: att.user.name,
+          employeeId: att.user.teacher?.employeeId,
+          designation: att.user.teacher?.designation,
+          profilePicture: att.user.profilePicture,
+          checkInTime: att.checkInTime,
+          checkOutTime: att.checkOutTime,
+          workingHours: att.workingHours || 0,
+          status: att.status,
+          isLateCheckIn: att.isLateCheckIn,
+          lateByMinutes: att.lateByMinutes,
+          location: {
+            checkIn: att.checkInLocation,
+            checkOut: att.checkOutLocation
+          },
+          deviceInfo: att.deviceInfo,
+          streak: streak,
+          remarks: att.remarks
+        };
+      })
+    );
+
+    // 5. MONTHLY TRENDS
     const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
     const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
 
@@ -137,7 +200,7 @@ export async function GET(req, { params }) {
       LIMIT 30
     `;
 
-    // 5. PENDING APPROVALS
+    // 6. PENDING APPROVALS
     const pendingApprovals = await prisma.attendance.count({
       where: {
         schoolId,
@@ -150,7 +213,7 @@ export async function GET(req, { params }) {
       where: { schoolId, status: 'PENDING' }
     });
 
-    // 6. LOW ATTENDANCE ALERTS
+    // 7. LOW ATTENDANCE ALERTS
     const lowAttendanceUsers = await prisma.attendanceStats.findMany({
       where: {
         schoolId,
@@ -180,9 +243,9 @@ export async function GET(req, { params }) {
       take: 20,
     });
 
-    // 7. RECENT ACTIVITY
+    // 8. RECENT ACTIVITY
     const recentActivity = await prisma.attendance.findMany({
-      where: { schoolId, date: new Date(date.toDateString()) },
+      where: { schoolId, date: today },
       include: {
         user: {
           select: {
@@ -204,62 +267,8 @@ export async function GET(req, { params }) {
       take: 50,
     });
 
-    // 8. DETAILED LIST WITH PAGINATION
-    const skip = (page - 1) * limit;
-
-    const [attendanceRecords, totalRecords] = await Promise.all([
-      prisma.attendance.findMany({
-        where: attendanceWhere,
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              profilePicture: true,
-              role: { select: { name: true } },
-              student: {
-                select: {
-                  class: { select: { className: true } },
-                  section: { select: { name: true } },
-                  admissionNo: true,
-                }
-              },
-              teacher: {
-                select: {
-                  employeeId: true,
-                  designation: true,
-                }
-              }
-            }
-          },
-          marker: { select: { name: true } },
-          approver: { select: { name: true } }
-        },
-        orderBy: [
-          { date: 'desc' },
-          { markedAt: 'desc' }
-        ],
-        skip,
-        take: limit,
-      }),
-      prisma.attendance.count({ where: attendanceWhere })
-    ]);
-
-    // 9. SUMMARY STATS FOR DATE RANGE
-    let rangeStats = null;
-    if (startDate && endDate) {
-      rangeStats = await prisma.attendance.groupBy({
-        by: ['status'],
-        where: {
-          schoolId,
-          date: { gte: startDate, lte: endDate }
-        },
-        _count: { id: true }
-      });
-    }
-
     return NextResponse.json({
+      dayInfo,
       todayOverview,
       roleWiseStats: roleWiseStats.map(stat => ({
         ...stat,
@@ -278,6 +287,7 @@ export async function GET(req, { params }) {
         late: Number(stat.late),
         attendancePercentage: Number(stat.attendancePercentage || 0),
       })),
+      teacherActivity: teacherActivityWithStreaks,
       monthlyTrend: monthlyTrend.map(day => ({
         ...day,
         present: Number(day.present),
@@ -293,17 +303,6 @@ export async function GET(req, { params }) {
       },
       lowAttendanceUsers,
       recentActivity,
-      attendanceRecords,
-      pagination: {
-        page,
-        limit,
-        total: totalRecords,
-        totalPages: Math.ceil(totalRecords / limit),
-      },
-      rangeStats: rangeStats ? rangeStats.reduce((acc, stat) => {
-        acc[stat.status.toLowerCase()] = stat._count.id;
-        return acc;
-      }, {}) : null,
     }, {
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -319,57 +318,42 @@ export async function GET(req, { params }) {
   }
 }
 
-// Export report
-export async function POST(req, { params }) {
-  const { schoolId } = params;
-  const body = await req.json();
-  const { startDate, endDate, format, roleId, classId } = body;
-
+// Helper function to calculate consecutive attendance streak
+async function calculateUserStreak(userId, schoolId) {
   try {
-    // Generate comprehensive report
-    const reportData = await prisma.attendance.findMany({
+    const attendanceRecords = await prisma.attendance.findMany({
       where: {
+        userId,
         schoolId,
-        date: {
-          gte: new Date(startDate),
-          lte: new Date(endDate)
-        },
-        ...(roleId && { user: { roleId: parseInt(roleId) } }),
+        status: { in: ['PRESENT', 'LATE'] }
       },
-      include: {
-        user: {
-          select: {
-            name: true,
-            email: true,
-            role: { select: { name: true } },
-            student: {
-              select: {
-                admissionNo: true,
-                class: { select: { className: true } },
-                section: { select: { name: true } }
-              }
-            }
-          }
-        }
-      },
-      orderBy: [
-        { date: 'asc' },
-        { user: { name: 'asc' } }
-      ]
+      orderBy: { date: 'desc' },
+      take: 100,
+      select: { date: true }
     });
 
-    // Format based on request (CSV, PDF, Excel)
-    // Implementation depends on format
+    if (attendanceRecords.length === 0) return 0;
 
-    return NextResponse.json({
-      success: true,
-      reportData,
-      format,
-      generatedAt: new Date(),
-    });
+    let streak = 0;
+    let currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0);
 
+    for (const record of attendanceRecords) {
+      const recordDate = new Date(record.date);
+      recordDate.setHours(0, 0, 0, 0);
+
+      const diffDays = Math.floor((currentDate - recordDate) / (1000 * 60 * 60 * 24));
+
+      if (diffDays === streak) {
+        streak++;
+      } else if (diffDays > streak) {
+        break;
+      }
+    }
+
+    return streak;
   } catch (error) {
-    console.error('Report generation error:', error);
-    return NextResponse.json({ error: 'Failed to generate report' }, { status: 500 });
+    console.error('Streak calculation error:', error);
+    return 0;
   }
 }
