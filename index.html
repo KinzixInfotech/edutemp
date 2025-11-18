@@ -1,0 +1,1611 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aam Innovations - Premier Tech Staffing Solutions</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-blue: #1e40af;
+            --secondary-blue: #3b82f6;
+            --accent-cyan: #06b6d4;
+            --dark-blue: #1e3a8a;
+            --light-bg: #f8fafc;
+            --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --gradient-2: linear-gradient(135deg, #667eea 0%, #06b6d4 100%);
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+            --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.12);
+            --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            line-height: 1.6;
+            color: #1e293b;
+            background: #fff;
+        }
+
+        /* Header & Navigation */
+        header {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #06b6d4 100%);
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 4px 20px rgba(30, 64, 175, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .top-bar {
+            background: rgba(0, 0, 0, 0.15);
+            padding: 10px 0;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.95);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .top-bar .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 40px;
+        }
+
+        .contact-info span {
+            margin-right: 30px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .social-links {
+            display: flex;
+            gap: 15px;
+        }
+
+        .social-links a {
+            color: #fff;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .social-links a:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+        }
+
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 40px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .logo {
+            font-size: 26px;
+            font-weight: 800;
+            color: #fff;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            letter-spacing: -0.5px;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .logo span {
+            background: linear-gradient(135deg, #fbbf24, #10b981);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .nav-links>li {
+            position: relative;
+        }
+
+        .nav-links>li>a {
+            color: #fff;
+            text-decoration: none;
+            padding: 10px 18px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.3s ease;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .nav-links>li>a:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .dropdown {
+            position: absolute;
+            top: calc(100% + 10px);
+            left: 0;
+            background: #fff;
+            min-width: 280px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-15px);
+            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .nav-links>li:hover .dropdown {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .dropdown li {
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .dropdown li:last-child {
+            border-bottom: none;
+        }
+
+        .dropdown a {
+            padding: 16px 24px;
+            display: block;
+            color: #334155;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            font-weight: 500;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .dropdown a::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 4px;
+            background: var(--gradient-2);
+            transform: translateX(-4px);
+            transition: transform 0.3s ease;
+        }
+
+        .dropdown a:hover {
+            background: linear-gradient(90deg, #f0f9ff 0%, #fff 100%);
+            color: #1e40af;
+            padding-left: 30px;
+        }
+
+        .dropdown a:hover::before {
+            transform: translateX(0);
+        }
+
+        .mobile-menu-btn {
+            display: none;
+            background: rgba(255, 255, 255, 0.15);
+            border: none;
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 10px 15px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .mobile-menu-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        .cta-btn {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            color: #1e293b;
+            padding: 12px 28px;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 700;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
+            font-size: 14px;
+        }
+
+        .cta-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 24px rgba(251, 191, 36, 0.4);
+        }
+
+        /* Hero Section */
+        .hero {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 40%, #06b6d4 100%);
+            padding: 200px 40px 120px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(6, 182, 212, 0.2) 0%, transparent 50%);
+        }
+
+        .hero::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 100px;
+            background: linear-gradient(to top, #fff, transparent);
+        }
+
+        .hero-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            color: #fff;
+        }
+
+        .hero h1 {
+            font-size: 64px;
+            font-weight: 800;
+            margin-bottom: 24px;
+            line-height: 1.1;
+            animation: fadeInUp 0.8s ease;
+            letter-spacing: -1px;
+        }
+
+        .hero h1 span {
+            background: linear-gradient(135deg, #fbbf24, #10b981);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero p {
+            font-size: 22px;
+            margin-bottom: 40px;
+            opacity: 0.95;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            animation: fadeInUp 0.8s ease 0.2s both;
+            line-height: 1.6;
+            font-weight: 400;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            animation: fadeInUp 0.8s ease 0.4s both;
+        }
+
+        .hero-btn {
+            padding: 18px 42px;
+            text-decoration: none;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            color: #1e293b;
+            box-shadow: 0 8px 24px rgba(251, 191, 36, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 36px rgba(251, 191, 36, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-4px);
+        }
+
+        /* Page Content */
+        .page-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 100px 40px;
+        }
+
+        .page-header {
+            text-align: center;
+            margin-bottom: 80px;
+        }
+
+        .page-header h1 {
+            font-size: 56px;
+            background: linear-gradient(135deg, #1e40af 0%, #06b6d4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 20px;
+            font-weight: 800;
+            letter-spacing: -1px;
+        }
+
+        .page-header p {
+            font-size: 22px;
+            color: #64748b;
+            font-weight: 400;
+        }
+
+        /* Modern Card Grid */
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 32px;
+            margin-top: 60px;
+        }
+
+        .service-card {
+            background: #fff;
+            padding: 44px;
+            border-radius: 24px;
+            box-shadow: var(--shadow-md);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 1px solid #f1f5f9;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .service-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 6px;
+            background: var(--gradient-2);
+            transform: scaleX(0);
+            transition: transform 0.4s ease;
+            transform-origin: left;
+        }
+
+        .service-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .service-card:hover {
+            transform: translateY(-12px);
+            box-shadow: var(--shadow-xl);
+            border-color: #e0f2fe;
+        }
+
+        .service-icon {
+            font-size: 56px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 90px;
+            height: 90px;
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border-radius: 20px;
+            transition: all 0.4s ease;
+        }
+
+        .service-card:hover .service-icon {
+            transform: scale(1.1) rotate(5deg);
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+        }
+
+        .service-card h3 {
+            color: #1e293b;
+            font-size: 26px;
+            margin-bottom: 16px;
+            font-weight: 700;
+            line-height: 1.3;
+        }
+
+        .service-card p {
+            color: #64748b;
+            font-size: 16px;
+            line-height: 1.7;
+            margin-bottom: 24px;
+        }
+
+        .learn-more {
+            color: #3b82f6;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: gap 0.3s ease;
+        }
+
+        .learn-more:hover {
+            gap: 12px;
+        }
+
+        /* Stats Section */
+        .stats-section {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #06b6d4 100%);
+            padding: 100px 40px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stats-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                radial-gradient(circle at 30% 50%, rgba(255, 255, 255, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 70% 80%, rgba(6, 182, 212, 0.15) 0%, transparent 50%);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 50px;
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .stat-item:hover {
+            transform: translateY(-8px);
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        .stat-item h3 {
+            font-size: 56px;
+            background: linear-gradient(135deg, #fbbf24, #10b981);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 12px;
+            font-weight: 800;
+        }
+
+        .stat-item p {
+            color: rgba(255, 255, 255, 0.95);
+            font-size: 18px;
+            font-weight: 500;
+        }
+
+        /* Content Sections */
+        .content-section {
+            padding: 40px 0;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .content-section h2 {
+            background: linear-gradient(135deg, #1e40af 0%, #06b6d4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 42px;
+            margin-bottom: 24px;
+            font-weight: 800;
+        }
+
+        .content-section h3 {
+            color: #1e40af;
+            font-size: 28px;
+            margin: 40px 0 20px;
+            font-weight: 700;
+        }
+
+        .content-section p {
+            font-size: 17px;
+            line-height: 1.8;
+            color: #475569;
+            margin-bottom: 20px;
+        }
+
+        .content-section ul {
+            margin-left: 24px;
+            margin-bottom: 24px;
+        }
+
+        .content-section li {
+            margin-bottom: 14px;
+            color: #475569;
+            font-size: 16px;
+            line-height: 1.7;
+        }
+
+        .content-section li strong {
+            color: #1e40af;
+        }
+
+        /* Footer */
+        footer {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #cbd5e1;
+            padding: 80px 40px 30px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        footer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+        }
+
+        .footer-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 50px;
+            margin-bottom: 50px;
+        }
+
+        .footer-section h3 {
+            background: linear-gradient(135deg, #fbbf24, #10b981);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 24px;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .footer-section ul {
+            list-style: none;
+        }
+
+        .footer-section ul li {
+            margin-bottom: 12px;
+        }
+
+        .footer-section a {
+            color: #cbd5e1;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+
+        .footer-section a:hover {
+            color: #fbbf24;
+            transform: translateX(5px);
+        }
+
+        .footer-section p {
+            line-height: 1.8;
+            color: #94a3b8;
+        }
+
+        .footer-bottom {
+            text-align: center;
+            padding-top: 30px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            color: #94a3b8;
+            font-size: 14px;
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Hidden Pages */
+        .page-content {
+            display: none;
+        }
+
+        .page-content.active {
+            display: block;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .mobile-menu-btn {
+                display: block;
+            }
+
+            .nav-links {
+                display: none;
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+                flex-direction: column;
+                padding: 20px;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            }
+
+            .nav-links.active {
+                display: flex;
+            }
+
+            .nav-links>li {
+                width: 100%;
+            }
+
+            .dropdown {
+                position: static;
+                opacity: 1;
+                visibility: visible;
+                transform: none;
+                box-shadow: none;
+                background: rgba(255, 255, 255, 0.1);
+                margin-top: 10px;
+                display: none;
+            }
+
+            .nav-links>li:hover .dropdown {
+                display: block;
+            }
+
+            .hero {
+                padding: 160px 20px 80px;
+            }
+
+            .hero h1 {
+                font-size: 40px;
+            }
+
+            .hero p {
+                font-size: 18px;
+            }
+
+            .page-header h1 {
+                font-size: 36px;
+            }
+
+            .page-content {
+                padding: 60px 20px;
+            }
+
+            .top-bar .container {
+                flex-direction: column;
+                text-align: center;
+                gap: 10px;
+                padding: 0 20px;
+            }
+
+            .contact-info span {
+                display: block;
+                margin: 5px 0;
+            }
+
+            .services-grid {
+                grid-template-columns: 1fr;
+            }
+
+            nav {
+                padding: 18px 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="top-bar">
+            <div class="container">
+                <div class="contact-info">
+                    <span>✉️ Support@aaminnovations.com</span>
+                </div>
+                <!-- <div class="social-links">
+                    <a href="#" title="LinkedIn">in</a>
+                    <a href="#" title="Twitter">𝕏</a>
+                    <a href="#" title="Facebook">f</a>
+                </div> -->
+            </div>
+        </div>
+        <nav>
+            <a href="#" class="logo" onclick="showPage('home')">
+                <!-- <div class="logo-icon">🚀</div> -->
+                <div><span>AAM</span> Innovations</div>
+            </a>
+            <button class="mobile-menu-btn" onclick="toggleMenu()">☰</button>
+            <ul class="nav-links" id="navLinks">
+                <li><a href="#" onclick="showPage('home'); return false;">Home</a></li>
+                <li>
+                    <a href="#" onclick="return false;">Services ▾</a>
+                    <ul class="dropdown">
+                        <li><a href="#" onclick="showPage('it-staffing'); return false;">IT Staffing Solutions</a></li>
+                        <li><a href="#" onclick="showPage('permanent-placement'); return false;">Permanent Placement</a>
+                        </li>
+                        <li><a href="#" onclick="showPage('contract-staffing'); return false;">Contract Staffing</a>
+                        </li>
+                        <li><a href="#" onclick="showPage('managed-services'); return false;">Managed Services</a></li>
+                        <li><a href="#" onclick="showPage('recruitment-process'); return false;">RPO Services</a></li>
+                    </ul>
+                </li>
+                <li>
+                    <a href="#" onclick="return false;">Industries ▾</a>
+                    <ul class="dropdown">
+                        <li><a href="#" onclick="showPage('fintech'); return false;">FinTech</a></li>
+                        <li><a href="#" onclick="showPage('healthcare'); return false;">Healthcare Tech</a></li>
+                        <li><a href="#" onclick="showPage('saas'); return false;">SaaS</a></li>
+                        <li><a href="#" onclick="showPage('ecommerce'); return false;">E-Commerce</a></li>
+                        <li><a href="#" onclick="showPage('ai-ml'); return false;">AI & Machine Learning</a></li>
+                    </ul>
+                </li>
+                <li>
+                    <a href="#" onclick="return false;">Solutions ▾</a>
+                    <ul class="dropdown">
+                        <li><a href="#" onclick="showPage('enterprise'); return false;">Enterprise Solutions</a></li>
+                        <li><a href="#" onclick="showPage('startups'); return false;">Startup Staffing</a></li>
+                        <li><a href="#" onclick="showPage('project-based'); return false;">Project-Based Hiring</a></li>
+                        <li><a href="#" onclick="showPage('team-augmentation'); return false;">Team Augmentation</a>
+                        </li>
+                    </ul>
+                </li>
+                <li><a href="#" onclick="showPage('about'); return false;">About Us</a></li>
+                <li><a href="#" onclick="showPage('careers'); return false;">Careers</a></li>
+                <li><a href="#" onclick="showPage('contact'); return false;">Contact</a></li>
+                <li><a href="#" onclick="showPage('contact'); return false;" class="cta-btn">Get Started</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <h1>Transform Your Tech Team with <span>Elite Talent</span></h1>
+            <p>Connect with world-class technology professionals who drive innovation and accelerate your digital
+                transformation journey.</p>
+            <div class="hero-buttons">
+                <a href="#" onclick="showPage('contact')" class="hero-btn btn-primary">Hire Top Talent →</a>
+                <a href="#" onclick="showPage('it-staffing')" class="hero-btn btn-secondary">Explore Services</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Content Area -->
+    <div id="main-content">
+        <!-- Home Page -->
+        <div class="page-content active" id="home">
+            <div class="page-header">
+                <h1>Your Strategic Partner in Tech Talent</h1>
+                <p>Empowering blue-chip companies with exceptional technology professionals since 2015</p>
+            </div>
+
+            <div class="services-grid">
+                <div class="service-card">
+                    <div class="service-icon">💼</div>
+                    <h3>Permanent Placement</h3>
+                    <p>Build lasting teams with top-tier technology professionals who align with your company culture
+                        and long-term vision.</p>
+                    <a href="#" onclick="showPage('permanent-placement'); return false;" class="learn-more">Learn More
+                        →</a>
+                </div>
+                <div class="service-card">
+                    <div class="service-icon">⚡</div>
+                    <h3>Contract Staffing</h3>
+                    <p>Scale rapidly with flexible contract professionals for project-based needs and seasonal demands.
+                    </p>
+                    <a href="#" onclick="showPage('contract-staffing'); return false;" class="learn-more">Learn More
+                        →</a>
+                </div>
+                <div class="service-card">
+                    <div class="service-icon">🎯</div>
+                    <h3>Executive Search</h3>
+                    <p>Identify and attract transformational tech leaders who drive organizational success and
+                        innovation.</p>
+                    <a href="#" onclick="showPage('enterprise'); return false;" class="learn-more">Learn More →</a>
+                </div>
+                <div class="service-card">
+                    <div class="service-icon">🔧</div>
+                    <h3>Managed Services</h3>
+                    <p>Outsource your entire recruitment process with our comprehensive managed staffing solutions.</p>
+                    <a href="#" onclick="showPage('managed-services'); return false;" class="learn-more">Learn More
+                        →</a>
+                </div>
+                <div class="service-card">
+                    <div class="service-icon">🚀</div>
+                    <h3>Team Augmentation</h3>
+                    <p>Enhance your existing teams with specialized skills and expertise for critical projects.</p>
+                    <a href="#" onclick="showPage('team-augmentation'); return false;" class="learn-more">Learn More
+                        →</a>
+                </div>
+                <div class="service-card">
+                    <div class="service-icon">🤖</div>
+                    <h3>AI/ML Specialists</h3>
+                    <p>Access cutting-edge talent in artificial intelligence, machine learning, and data science.</p>
+                    <a href="#" onclick="showPage('ai-ml'); return false;" class="learn-more">Learn More →</a>
+                </div>
+            </div>
+
+            <div style="margin-top: 80px;">
+                <div class="page-header">
+                    <h2
+                        style="font-size: 42px; background: linear-gradient(135deg, #1e40af 0%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                        Why Choose Aam Innovations</h2>
+                </div>
+
+                <div class="services-grid">
+                    <div class="service-card">
+                        <div class="service-icon">🏆</div>
+                        <h3>Proven Excellence</h3>
+                        <p>Over 2,500 successful placements with Fortune 500 companies and innovative startups. Our
+                            track record speaks for itself with 95% client satisfaction rate.</p>
+                    </div>
+                    <div class="service-card">
+                        <div class="service-icon">⚡</div>
+                        <h3>Speed to Market</h3>
+                        <p>Average 15-day time-to-hire without compromising quality. Our streamlined process and
+                            extensive network ensure rapid talent delivery.</p>
+                    </div>
+                    <div class="service-card">
+                        <div class="service-icon">🎓</div>
+                        <h3>Technical Expertise</h3>
+                        <p>Our recruiters are former technologists who understand your technical requirements and can
+                            evaluate candidates effectively.</p>
+                    </div>
+                    <div class="service-card">
+                        <div class="service-icon">🌍</div>
+                        <h3>Global Reach</h3>
+                        <p>Access to a network of 50,000+ pre-vetted professionals across North America, Europe, and
+                            Asia-Pacific regions.</p>
+                    </div>
+                    <div class="service-card">
+                        <div class="service-icon">🔒</div>
+                        <h3>Quality Guarantee</h3>
+                        <p>90-day replacement guarantee on all permanent placements. We stand behind every candidate we
+                            place.</p>
+                    </div>
+                    <div class="service-card">
+                        <div class="service-icon">🤝</div>
+                        <h3>Partnership Approach</h3>
+                        <p>We don't just fill positions—we become your strategic talent partner, understanding your
+                            business and culture deeply.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div
+                style="margin-top: 80px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding: 60px 40px; border-radius: 24px;">
+                <div class="page-header">
+                    <h2
+                        style="font-size: 42px; background: linear-gradient(135deg, #1e40af 0%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                        Industries We Serve</h2>
+                    <p>Specialized expertise across high-growth technology sectors</p>
+                </div>
+
+                <div class="services-grid">
+                    <div class="service-card">
+                        <div class="service-icon">💳</div>
+                        <h3>Financial Technology</h3>
+                        <p>Digital banking, payments, blockchain, cryptocurrency, trading platforms, and regulatory
+                            technology solutions.</p>
+                        <a href="#" onclick="showPage('fintech'); return false;" class="learn-more">Explore FinTech
+                            →</a>
+                    </div>
+                    <div class="service-card">
+                        <div class="service-icon">🏥</div>
+                        <h3>Healthcare Tech</h3>
+                        <p>EHR systems, telemedicine, medical devices, health analytics, and digital health platforms.
+                        </p>
+                        <a href="#" onclick="showPage('healthcare'); return false;" class="learn-more">Explore
+                            Healthcare →</a>
+                    </div>
+                    <div class="service-card">
+                        <div class="service-icon">☁️</div>
+                        <h3>SaaS Platforms</h3>
+                        <p>Cloud-based software, enterprise applications, B2B platforms, and subscription services.</p>
+                        <a href="#" onclick="showPage('saas'); return false;" class="learn-more">Explore SaaS →</a>
+                    </div>
+                    <div class="service-card">
+                        <div class="service-icon">🛒</div>
+                        <h3>E-Commerce</h3>
+                        <p>Online marketplaces, retail technology, payment systems, and digital commerce platforms.</p>
+                        <a href="#" onclick="showPage('ecommerce'); return false;" class="learn-more">Explore E-Commerce
+                            →</a>
+                    </div>
+                    <div class="service-card">
+                        <div class="service-icon">🤖</div>
+                        <h3>AI & ML</h3>
+                        <p>Artificial intelligence, machine learning, data science, computer vision, and NLP
+                            applications.</p>
+                        <a href="#" onclick="showPage('ai-ml'); return false;" class="learn-more">Explore AI/ML →</a>
+                    </div>
+                    <div class="service-card">
+                        <div class="service-icon">🎮</div>
+                        <h3>Gaming & Entertainment</h3>
+                        <p>Game development, streaming platforms, AR/VR, and digital entertainment technologies.</p>
+                        <a href="#" onclick="showPage('home'); return false;" class="learn-more">Learn More →</a>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 80px; text-align: center;">
+                <h2
+                    style="font-size: 42px; background: linear-gradient(135deg, #1e40af 0%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 30px;">
+                    Ready to Transform Your Team?</h2>
+                <p
+                    style="font-size: 20px; color: #64748b; margin-bottom: 40px; max-width: 700px; margin-left: auto; margin-right: auto;">
+                    Let's discuss how Aam Innovations can help you build exceptional technology teams that drive
+                    business success.</p>
+                <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
+                    <a href="#" onclick="showPage('contact'); return false;" class="hero-btn btn-primary">Contact Us
+                        Today</a>
+                    <a href="#" onclick="showPage('about'); return false;" class="hero-btn btn-secondary"
+                        style="color: #1e40af; border-color: #1e40af;">Learn About Us</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Section -->
+        <div class="stats-section">
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <h3>2500+</h3>
+                    <p>Successful Placements</p>
+                </div>
+                <div class="stat-item">
+                    <h3>200+</h3>
+                    <p>Enterprise Clients</p>
+                </div>
+                <div class="stat-item">
+                    <h3>95%</h3>
+                    <p>Client Satisfaction</p>
+                </div>
+                <div class="stat-item">
+                    <h3>15</h3>
+                    <p>Days Avg. Time to Hire</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- IT Staffing Page -->
+        <div class="page-content" id="it-staffing">
+            <div class="page-header">
+                <h1>IT Staffing Solutions</h1>
+                <p>Comprehensive technology staffing services for modern enterprises</p>
+            </div>
+            <div class="content-section">
+                <h2>End-to-End IT Staffing Excellence</h2>
+                <p>Aam Innovations specializes in connecting blue-chip companies with exceptional IT professionals
+                    across all technology domains. Our comprehensive staffing solutions ensure you have the right talent
+                    at the right time to drive your digital initiatives forward.</p>
+
+                <h3>Our IT Staffing Specializations</h3>
+                <ul>
+                    <li><strong>Software Development:</strong> Full-stack developers, frontend specialists, backend
+                        engineers, mobile app developers (iOS/Android), and DevOps engineers</li>
+                    <li><strong>Cloud & Infrastructure:</strong> AWS, Azure, and GCP architects, cloud engineers, SREs,
+                        and infrastructure specialists</li>
+                    <li><strong>Data & Analytics:</strong> Data scientists, data engineers, business intelligence
+                        analysts, and ML engineers</li>
+                    <li><strong>Cybersecurity:</strong> Security architects, penetration testers, SOC analysts, and
+                        compliance specialists</li>
+                    <li><strong>Enterprise Systems:</strong> SAP consultants, Salesforce developers, Oracle specialists,
+                        and ERP implementation experts</li>
+                    <li><strong>Quality Assurance:</strong> QA engineers, test automation specialists, and performance
+                        testing experts</li>
+                </ul>
+
+                <h3>Why Choose Our IT Staffing Services</h3>
+                <p>We understand that technology is the backbone of modern business. Our rigorous vetting process
+                    ensures every candidate possesses not only technical excellence but also cultural fit and business
+                    acumen.</p>
+                <ul>
+                    <li>Access to pre-vetted talent pool of 50,000+ tech professionals</li>
+                    <li>Technical assessment and skill validation by industry experts</li>
+                    <li>Average placement time of 15 days for critical roles</li>
+                    <li>Dedicated account managers for personalized service</li>
+                    <li>90-day replacement guarantee for permanent placements</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Permanent Placement Page -->
+        <div class="page-content" id="permanent-placement">
+            <div class="page-header">
+                <h1>Permanent Placement Services</h1>
+                <p>Build your dream team with long-term technology professionals</p>
+            </div>
+            <div class="content-section">
+                <h2>Strategic Permanent Hiring Solutions</h2>
+                <p>Building a successful technology team requires more than just filling positions—it requires finding
+                    professionals who will grow with your organization, contribute to your culture, and drive long-term
+                    success.</p>
+
+                <h3>Our Permanent Placement Process</h3>
+                <ul>
+                    <li><strong>Discovery & Consultation:</strong> We begin by deeply understanding your organization,
+                        technical requirements, team dynamics, and cultural values</li>
+                    <li><strong>Strategic Sourcing:</strong> Leveraging our extensive network and advanced AI-powered
+                        matching technology to identify ideal candidates</li>
+                    <li><strong>Comprehensive Screening:</strong> Multi-stage technical assessments, behavioral
+                        interviews, and cultural fit evaluations</li>
+                    <li><strong>Candidate Presentation:</strong> Detailed profiles with technical evaluations, salary
+                        expectations, and availability</li>
+                    <li><strong>Interview Coordination:</strong> Seamless scheduling and feedback management throughout
+                        the process</li>
+                    <li><strong>Offer Management:</strong> Negotiation support and candidate relationship management
+                    </li>
+                </ul>
+
+                <h3>Roles We Fill Permanently</h3>
+                <ul>
+                    <li>Software Engineers & Architects (all levels)</li>
+                    <li>Engineering Managers & Directors</li>
+                    <li>VP/CTO/CIO level positions</li>
+                    <li>Product Managers & Product Owners</li>
+                    <li>Data Scientists & ML Engineers</li>
+                    <li>DevOps & Infrastructure Teams</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Contract Staffing Page -->
+        <div class="page-content" id="contract-staffing">
+            <div class="page-header">
+                <h1>Contract Staffing Solutions</h1>
+                <p>Flexible talent solutions for dynamic business needs</p>
+            </div>
+            <div class="content-section">
+                <h2>Agile Contract Staffing for Modern Businesses</h2>
+                <p>In today's fast-paced technology landscape, flexibility is key. Our contract staffing solutions
+                    provide you with highly skilled professionals exactly when you need them.</p>
+
+                <h3>Contract Staffing Models</h3>
+                <ul>
+                    <li><strong>Short-term Contracts:</strong> 1-3 months for urgent projects or immediate needs</li>
+                    <li><strong>Long-term Contracts:</strong> 6-12+ months for extended projects and initiatives</li>
+                    <li><strong>Contract-to-Hire:</strong> Evaluate candidates in real-world scenarios before permanent
+                        commitment</li>
+                    <li><strong>Project-based Staffing:</strong> Complete teams for specific deliverables with defined
+                        timelines</li>
+                </ul>
+
+                <h3>Benefits of Contract Staffing</h3>
+                <ul>
+                    <li>Rapid deployment—candidates can start within days</li>
+                    <li>Cost-effective solution for project-based work</li>
+                    <li>Access specialized skills without long-term commitment</li>
+                    <li>Scalability for seasonal demands or market fluctuations</li>
+                    <li>Try before you buy with contract-to-hire options</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Managed Services Page -->
+        <div class="page-content" id="managed-services">
+            <div class="page-header">
+                <h1>Managed Staffing Services</h1>
+                <p>Comprehensive recruitment outsourcing for enterprise organizations</p>
+            </div>
+            <div class="content-section">
+                <h2>Full-Service Recruitment Management</h2>
+                <p>Our Managed Services Program (MSP) provides complete recruitment process outsourcing, allowing your
+                    organization to focus on core business while we handle all aspects of talent acquisition.</p>
+
+                <h3>What's Included in Managed Services</h3>
+                <ul>
+                    <li><strong>Strategic Workforce Planning:</strong> Collaborate on hiring forecasts and talent
+                        strategies aligned with business objectives</li>
+                    <li><strong>Vendor Management:</strong> Coordinate and manage multiple staffing suppliers for
+                        optimal results</li>
+                    <li><strong>Recruitment Marketing:</strong> Employer branding, job postings, and candidate
+                        attraction campaigns</li>
+                    <li><strong>End-to-End Recruitment:</strong> Full-cycle hiring from sourcing to onboarding</li>
+                    <li><strong>Analytics & Reporting:</strong> Comprehensive dashboards with time-to-fill,
+                        cost-per-hire, and quality metrics</li>
+                </ul>
+
+                <h3>Managed Services Benefits</h3>
+                <ul>
+                    <li>30-40% reduction in recruitment costs</li>
+                    <li>50% faster time-to-fill rates</li>
+                    <li>Improved quality of hire through specialized expertise</li>
+                    <li>Scalable model that grows with your business</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- About Us Page -->
+        <div class="page-content" id="about">
+            <div class="page-header">
+                <h1>About Aam Innovations</h1>
+                <p>Your trusted partner in technology talent acquisition since 2015</p>
+            </div>
+            <div class="content-section">
+                <h2>Who We Are</h2>
+                <p>Aam Innovations is a premier technology staffing firm specializing in connecting blue-chip
+                    companies with exceptional IT professionals. Founded in 2015, we've grown from a boutique staffing
+                    agency to a trusted partner for Fortune 500 companies and innovative startups alike.</p>
+
+                <h3>Our Mission</h3>
+                <p>To empower organizations with exceptional technology talent that drives innovation, accelerates
+                    digital transformation, and creates sustainable competitive advantages.</p>
+
+                <h3>Our Values</h3>
+                <ul>
+                    <li><strong>Excellence:</strong> We maintain the highest standards in everything we do, from
+                        candidate vetting to client service</li>
+                    <li><strong>Integrity:</strong> Transparency and honesty guide every interaction with candidates and
+                        clients</li>
+                    <li><strong>Innovation:</strong> We leverage cutting-edge technology and methodologies to stay ahead
+                        of industry trends</li>
+                    <li><strong>Partnership:</strong> We view every client relationship as a long-term strategic
+                        partnership</li>
+                    <li><strong>Diversity & Inclusion:</strong> We champion diverse teams and inclusive hiring practices
+                    </li>
+                </ul>
+
+                <h3>Why Choose Aam Innovations</h3>
+                <ul>
+                    <li><strong>Deep Technical Expertise:</strong> Our recruiters are former technologists who speak
+                        your language</li>
+                    <li><strong>Extensive Network:</strong> Access to 50,000+ pre-vetted technology professionals</li>
+                    <li><strong>Proven Track Record:</strong> 2,500+ successful placements with 95% client satisfaction
+                    </li>
+                    <li><strong>Speed & Quality:</strong> Average 15-day time-to-hire without compromising on quality
+                    </li>
+                    <li><strong>Global Reach:</strong> Capabilities across North America, Europe, and Asia-Pacific</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Careers Page -->
+        <div class="page-content" id="careers">
+            <div class="page-header">
+                <h1>Join Our Team</h1>
+                <p>Build your career with a leader in technology staffing</p>
+            </div>
+            <div class="content-section">
+                <h2>Career Opportunities at Aam Innovations</h2>
+                <p>Join a dynamic, fast-paced environment where your contributions directly impact the success of
+                    leading technology companies worldwide.</p>
+
+                <h3>Why Work With Us</h3>
+                <ul>
+                    <li><strong>Competitive Compensation:</strong> Industry-leading base salaries plus performance-based
+                        bonuses</li>
+                    <li><strong>Unlimited Growth:</strong> Clear career progression paths from recruiter to senior
+                        leadership</li>
+                    <li><strong>Continuous Learning:</strong> Regular training on latest technologies and recruitment
+                        techniques</li>
+                    <li><strong>Work-Life Balance:</strong> Flexible schedules and hybrid work options</li>
+                    <li><strong>Comprehensive Benefits:</strong> Health, dental, vision, 401(k) matching, and generous
+                        PTO</li>
+                </ul>
+
+                <h3>Open Positions</h3>
+                <ul>
+                    <li><strong>Technical Recruiters:</strong> 2+ years of technical recruiting experience required</li>
+                    <li><strong>Senior Account Managers:</strong> 5+ years staffing industry experience preferred</li>
+                    <li><strong>Recruitment Marketing Specialist:</strong> Digital marketing and social media expertise
+                    </li>
+                    <li><strong>Data Analyst:</strong> HR analytics and business intelligence experience</li>
+                </ul>
+
+                <h3>Apply Now</h3>
+                <p>Ready to take your career to the next level? Send your resume to careers@aaminnovations.com or apply
+                    through our LinkedIn page.</p>
+            </div>
+        </div>
+
+        <!-- FinTech Page -->
+        <div class="page-content" id="fintech">
+            <div class="page-header">
+                <h1>FinTech Staffing Solutions</h1>
+                <p>Specialized talent for the future of financial services</p>
+            </div>
+            <div class="content-section">
+                <h2>Technology Talent for Financial Innovation</h2>
+                <p>The financial technology sector demands professionals who understand both cutting-edge technology and
+                    complex financial systems.</p>
+
+                <h3>FinTech Roles We Staff</h3>
+                <ul>
+                    <li><strong>Blockchain & Cryptocurrency:</strong> Smart contract developers, blockchain architects,
+                        crypto security specialists</li>
+                    <li><strong>Payment Processing:</strong> Payment gateway engineers, PCI compliance specialists,
+                        fraud detection experts</li>
+                    <li><strong>Trading Platforms:</strong> Algorithmic traders, quantitative developers, high-frequency
+                        trading engineers</li>
+                    <li><strong>RegTech:</strong> Compliance automation specialists, AML/KYC developers</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Healthcare Page -->
+        <div class="page-content" id="healthcare">
+            <div class="page-header">
+                <h1>Healthcare Technology Staffing</h1>
+                <p>Building the future of healthcare with exceptional tech talent</p>
+            </div>
+            <div class="content-section">
+                <h2>HealthTech Talent Solutions</h2>
+                <p>Healthcare technology is transforming patient care and medical operations. We connect healthcare
+                    organizations with technology professionals who understand both healthcare workflows and
+                    cutting-edge digital solutions.</p>
+
+                <h3>Specialized Healthcare IT Roles</h3>
+                <ul>
+                    <li>Electronic Health Record (EHR) Specialists - Epic, Cerner, Allscripts</li>
+                    <li>Healthcare Data Analysts and HIPAA Compliance Experts</li>
+                    <li>Telemedicine Platform Developers</li>
+                    <li>Medical Device Software Engineers</li>
+                    <li>Healthcare AI/ML Engineers for Diagnostics</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- SaaS Page -->
+        <div class="page-content" id="saas">
+            <div class="page-header">
+                <h1>SaaS Staffing Solutions</h1>
+                <p>Powering cloud-first companies with elite engineering talent</p>
+            </div>
+            <div class="content-section">
+                <h2>SaaS Technology Recruitment</h2>
+                <p>Software-as-a-Service companies need agile teams that can innovate rapidly while maintaining
+                    reliability and scalability.</p>
+
+                <h3>Key SaaS Talent Areas</h3>
+                <ul>
+                    <li>Full-Stack SaaS Engineers (React, Node.js, Python, Ruby)</li>
+                    <li>Cloud Infrastructure Engineers (AWS, Azure, GCP)</li>
+                    <li>SaaS Product Managers and Product Designers</li>
+                    <li>DevOps and Site Reliability Engineers</li>
+                    <li>API and Integration Specialists</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- E-Commerce Page -->
+        <div class="page-content" id="ecommerce">
+            <div class="page-header">
+                <h1>E-Commerce Staffing</h1>
+                <p>Digital commerce talent for the modern marketplace</p>
+            </div>
+            <div class="content-section">
+                <h2>E-Commerce Technology Experts</h2>
+                <p>The e-commerce landscape demands specialized technical talent who can build scalable,
+                    high-performance platforms.</p>
+
+                <h3>E-Commerce Specializations</h3>
+                <ul>
+                    <li>Shopify & Magento Developers</li>
+                    <li>E-Commerce Platform Architects</li>
+                    <li>Payment Gateway Integration Specialists</li>
+                    <li>Marketplace Platform Engineers</li>
+                    <li>Conversion Rate Optimization Experts</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- AI/ML Page -->
+        <div class="page-content" id="ai-ml">
+            <div class="page-header">
+                <h1>AI & Machine Learning Staffing</h1>
+                <p>Next-generation talent for artificial intelligence initiatives</p>
+            </div>
+            <div class="content-section">
+                <h2>AI/ML Talent Acquisition</h2>
+                <p>Artificial Intelligence and Machine Learning are reshaping industries. We connect you with experts
+                    who can turn data into competitive advantage.</p>
+
+                <h3>AI/ML Roles We Fill</h3>
+                <ul>
+                    <li>Machine Learning Engineers & Data Scientists</li>
+                    <li>Natural Language Processing (NLP) Specialists</li>
+                    <li>Computer Vision Engineers</li>
+                    <li>MLOps Engineers & AI Infrastructure Specialists</li>
+                    <li>Deep Learning Researchers</li>
+                    <li>AI Product Managers</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Enterprise Solutions Page -->
+        <div class="page-content" id="enterprise">
+            <div class="page-header">
+                <h1>Enterprise Staffing Solutions</h1>
+                <p>Comprehensive talent strategies for large-scale organizations</p>
+            </div>
+            <div class="content-section">
+                <h2>Enterprise-Grade Staffing Excellence</h2>
+                <p>Large enterprises face unique challenges in technology staffing. Our enterprise solutions provide the
+                    scale, expertise, and technology needed to meet complex staffing requirements.</p>
+
+                <h3>Enterprise Staffing Capabilities</h3>
+                <ul>
+                    <li><strong>High-Volume Recruitment:</strong> Capacity to handle 100+ simultaneous requisitions</li>
+                    <li><strong>Multi-Location Staffing:</strong> Coordinate hiring across global offices</li>
+                    <li><strong>Executive Search:</strong> C-level and VP-level technology leadership placement</li>
+                    <li><strong>Diversity Hiring:</strong> Specialized programs to build diverse technology teams</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Startups Page -->
+        <div class="page-content" id="startups">
+            <div class="page-header">
+                <h1>Startup Staffing Solutions</h1>
+                <p>Rapid talent acquisition for high-growth startups</p>
+            </div>
+            <div class="content-section">
+                <h2>Startup-Focused Recruitment</h2>
+                <p>Startups need to move fast and hire smart. We help early-stage companies build founding teams and
+                    scale rapidly with the right technical talent.</p>
+
+                <h3>Startup Hiring Solutions</h3>
+                <ul>
+                    <li>Founding Engineer & CTO Placement</li>
+                    <li>Full-Stack Generalist Developers</li>
+                    <li>Growth Engineering Teams</li>
+                    <li>Flexible Contract-to-Permanent Options</li>
+                    <li>Equity-Based Compensation Consulting</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Project-Based Page -->
+        <div class="page-content" id="project-based">
+            <div class="page-header">
+                <h1>Project-Based Hiring</h1>
+                <p>Complete teams for specific initiatives and deliverables</p>
+            </div>
+            <div class="content-section">
+                <h2>Project-Specific Talent Solutions</h2>
+                <p>Some initiatives require dedicated teams with specific skills for defined periods. Our project-based
+                    hiring delivers complete, cohesive teams ready to execute.</p>
+
+                <h3>Project Staffing Models</h3>
+                <ul>
+                    <li>Digital Transformation Projects</li>
+                    <li>Cloud Migration Teams</li>
+                    <li>Product Development Squads</li>
+                    <li>System Integration Projects</li>
+                    <li>Agile Development Teams</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Team Augmentation Page -->
+        <div class="page-content" id="team-augmentation">
+            <div class="page-header">
+                <h1>Team Augmentation</h1>
+                <p>Enhance your existing teams with specialized expertise</p>
+            </div>
+            <div class="content-section">
+                <h2>Strategic Team Enhancement</h2>
+                <p>Sometimes you need specific skills without building entire teams. Our team augmentation services
+                    provide targeted expertise to complement your existing workforce.</p>
+
+                <h3>Augmentation Benefits</h3>
+                <ul>
+                    <li>Fill skill gaps quickly without long-term commitment</li>
+                    <li>Scale teams up or down based on project demands</li>
+                    <li>Access niche expertise for specialized initiatives</li>
+                    <li>Maintain team cohesion while adding capacity</li>
+                    <li>Flexible engagement models from weeks to years</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- RPO Page -->
+        <div class="page-content" id="recruitment-process">
+            <div class="page-header">
+                <h1>Recruitment Process Outsourcing</h1>
+                <p>Complete recruitment solutions tailored to your business</p>
+            </div>
+            <div class="content-section">
+                <h2>Full-Service RPO Solutions</h2>
+                <p>Our Recruitment Process Outsourcing services provide end-to-end recruitment management, allowing you
+                    to focus on core business.</p>
+
+                <h3>RPO Service Models</h3>
+                <ul>
+                    <li><strong>Full RPO:</strong> Complete recruitment function management</li>
+                    <li><strong>Selective RPO:</strong> Targeted support for specific roles or departments</li>
+                    <li><strong>Project RPO:</strong> Time-bound recruitment for specific initiatives</li>
+                    <li><strong>Recruiter On Demand:</strong> Flexible capacity when you need it</li>
+                </ul>
+
+                <h3>RPO Benefits</h3>
+                <ul>
+                    <li>40% cost reduction compared to traditional recruiting</li>
+                    <li>Access to advanced recruitment technology</li>
+                    <li>Scalable model that adapts to business needs</li>
+                    <li>Improved candidate quality and experience</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Contact Page -->
+        <div class="page-content" id="contact">
+            <div class="page-header">
+                <h1>Contact Us</h1>
+                <p>Let's discuss how we can support your staffing needs</p>
+            </div>
+            <div class="content-section">
+                <h2>Get In Touch</h2>
+                <p>Whether you're looking to hire exceptional technology talent or seeking your next career opportunity,
+                    we're here to help.</p>
+
+                <h3>Contact Information</h3>
+                <p>
+                    <strong>General Inquiries:</strong> Support@aaminnovations.com<br />
+                </p>
+
+                <h3>Address</h3>
+                <!-- <p><br> -->
+                    B-2/629,
+                    Gali no 26,
+                    Kansal Marg,
+                    Harsh Vihar
+                    Delhi
+                    110093<br>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3>Aam Innovations</h3>
+                <p>Your strategic partner in technology talent acquisition. Connecting blue-chip companies with
+                    exceptional IT professionals since 2015.</p>
+            </div>
+            <div class="footer-section">
+                <h3>Services</h3>
+                <ul>
+                    <li><a href="#" onclick="showPage('it-staffing')">IT Staffing</a></li>
+                    <li><a href="#" onclick="showPage('permanent-placement')">Permanent Placement</a></li>
+                    <li><a href="#" onclick="showPage('contract-staffing')">Contract Staffing</a></li>
+                    <li><a href="#" onclick="showPage('managed-services')">Managed Services</a></li>
+                    <li><a href="#" onclick="showPage('recruitment-process')">RPO Services</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h3>Industries</h3>
+                <ul>
+                    <li><a href="#" onclick="showPage('fintech')">FinTech</a></li>
+                    <li><a href="#" onclick="showPage('healthcare')">Healthcare Tech</a></li>
+                    <li><a href="#" onclick="showPage('saas')">SaaS</a></li>
+                    <li><a href="#" onclick="showPage('ecommerce')">E-Commerce</a></li>
+                    <li><a href="#" onclick="showPage('ai-ml')">AI & Machine Learning</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h3>Company</h3>
+                <ul>
+                    <li><a href="#" onclick="showPage('about')">About Us</a></li>
+                    <li><a href="#" onclick="showPage('careers')">Careers</a></li>
+                    <li><a href="#" onclick="showPage('contact')">Contact</a></li>
+                    <li><a href="#">Privacy Policy</a></li>
+                    <li><a href="#">Terms of Service</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2025 Aam Innovations. All rights reserved. | Empowering Technology. Connecting Talent.</p>
+        </div>
+    </footer>
+
+    <script>
+        function toggleMenu() {
+            const navLinks = document.getElementById('navLinks');
+            navLinks.classList.toggle('active');
+        }
+
+        function showPage(pageId) {
+            // Hide all pages
+            const allPages = document.querySelectorAll('.page-content');
+            allPages.forEach(page => {
+                page.classList.remove('active');
+            });
+
+            // Show selected page
+            const selectedPage = document.getElementById(pageId);
+            if (selectedPage) {
+                selectedPage.classList.add('active');
+            }
+
+            // Close mobile menu if open
+            document.getElementById('navLinks').classList.remove('active');
+
+            // Prevent default link behavior
+            return false;
+        }
+
+        // Handle all navigation clicks
+        document.addEventListener('click', function (e) {
+            if (e.target.tagName === 'A' && e.target.getAttribute('onclick')) {
+                e.preventDefault();
+            }
+        });
+    </script>
+</body>
+
+</html>

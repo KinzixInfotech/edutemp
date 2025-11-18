@@ -1,14 +1,22 @@
 // app/api/schools/[schoolId]/attendance/admin/dashboard/route.js
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-
+import dayjs from "dayjs";
 export async function GET(req, { params }) {
   const { schoolId } = params;
   const { searchParams } = new URL(req.url);
+  const date = searchParams.get('date')
+    ? dayjs(searchParams.get('date')).toDate()
+    : new Date();
 
-  const date = searchParams.get('date') ? new Date(searchParams.get('date')) : new Date();
-  const startDate = searchParams.get('startDate') ? new Date(searchParams.get('startDate')) : null;
-  const endDate = searchParams.get('endDate') ? new Date(searchParams.get('endDate')) : null;
+  const startDate = searchParams.get('startDate')
+    ? dayjs(searchParams.get('startDate')).toDate()
+    : null;
+
+  const endDate = searchParams.get('endDate')
+    ? dayjs(searchParams.get('endDate')).toDate()
+    : null;
+
   const roleId = searchParams.get('roleId');
   const classId = searchParams.get('classId');
   const status = searchParams.get('status');
@@ -96,7 +104,7 @@ export async function GET(req, { params }) {
       FROM "Role" r
       LEFT JOIN "User" u ON u."roleId" = r.id AND u."schoolId" = ${schoolId}::uuid AND u."deletedAt" IS NULL
       LEFT JOIN "Attendance" a ON a."userId" = u.id AND a.date = ${today.toISOString().split('T')[0]}::date
-      WHERE r.name IN ('Student', 'TeachingStaff', 'NonTeachingStaff', 'Admin')
+      WHERE r.name IN ('Student', 'TEACHING_STAFF', 'NonTeachingStaff', 'Admin')
       GROUP BY r.id, r.name
       ORDER BY r.name
     `;
@@ -128,7 +136,7 @@ export async function GET(req, { params }) {
         schoolId,
         date: today,
         user: {
-          role: { name: 'TeachingStaff' }
+          role: { name: 'TEACHING_STAFF' }
         }
       },
       include: {

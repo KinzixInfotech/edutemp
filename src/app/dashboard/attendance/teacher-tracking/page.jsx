@@ -24,6 +24,8 @@ export default function TeacherTracking() {
     const { data, isLoading, refetch } = useQuery({
         queryKey: ['teacher-tracking', schoolId, date],
         queryFn: async () => {
+            // src/app/api/schools/[schoolId]/attendance/admin/ teacher-tracking/route.js
+
             const res = await fetch(`/api/schools/${schoolId}/attendance/admin/teacher-tracking?date=${date}`);
             if (!res.ok) throw new Error('Failed');
             return res.json();

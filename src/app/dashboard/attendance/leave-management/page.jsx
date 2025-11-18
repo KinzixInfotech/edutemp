@@ -354,7 +354,7 @@ export default function LeaveManagement() {
                                                 </div>
 
                                                 {/* Reason */}
-                                                <div className="bg-gray-50 rounded-lg p-3 mb-3">
+                                                <div className="bg-gray-50 dark:bg-muted border rounded-lg p-3 mb-3">
                                                     <p className="text-sm font-medium mb-1">Reason:</p>
                                                     <p className="text-sm text-muted-foreground">{leave.reason}</p>
                                                 </div>

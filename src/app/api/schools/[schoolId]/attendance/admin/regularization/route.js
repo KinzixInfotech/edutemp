@@ -4,10 +4,10 @@ import { NextResponse } from 'next/server';
 
 // GET - Fetch regularization requests
 export async function GET(req, { params }) {
-    const { schoolId } = params;
+    const { schoolId } = await params; // Fix: await params
     const { searchParams } = new URL(req.url);
 
-    const status = searchParams.get('status') || 'PENDING';
+    const statusParam = searchParams.get('status');
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
     const userId = searchParams.get('userId');
@@ -17,9 +17,22 @@ export async function GET(req, { params }) {
     try {
         const skip = (page - 1) * limit;
 
+        // Smart status handling
+        let approvalStatusCondition;
+        if (statusParam) {
+            const statuses = statusParam.includes(',')
+                ? statusParam.split(',').map(s => s.trim())
+                : [statusParam];
+            approvalStatusCondition = statuses.length === 1
+                ? { approvalStatus: statuses[0] }
+                : { approvalStatus: { in: statuses } };
+        } else {
+            approvalStatusCondition = { approvalStatus: 'PENDING' };
+        }
+
         const where = {
             schoolId,
-            approvalStatus: status,
+            ...approvalStatusCondition, // Use smart condition
             requiresApproval: true,
             ...(userId && { userId }),
             ...(startDate && endDate && {
@@ -384,3 +397,5 @@ async function updateAttendanceStats(tx, schoolId, userId, date) {
         }
     });
 }
+
+ 

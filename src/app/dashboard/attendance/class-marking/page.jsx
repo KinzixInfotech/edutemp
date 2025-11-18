@@ -57,11 +57,11 @@ export default function ClassAttendanceMarking() {
                 classId,
                 date
             });
-            
+
             if (sectionId && sectionId !== 'all') {
                 params.append('sectionId', sectionId);
             }
-            
+
             const res = await fetch(`/api/schools/${schoolId}/attendance/bulk?${params}`);
             if (!res.ok) throw new Error('Failed');
             return res.json();
@@ -74,7 +74,7 @@ export default function ClassAttendanceMarking() {
         if (studentsData?.students) {
             const existing = {};
             const remarks = {};
-            
+
             studentsData.students.forEach(student => {
                 if (student.attendance) {
                     existing[student.userId] = student.attendance.status;
@@ -83,7 +83,7 @@ export default function ClassAttendanceMarking() {
                     }
                 }
             });
-            
+
             setAttendanceData(existing);
             setRemarksData(remarks);
         }
@@ -122,7 +122,7 @@ export default function ClassAttendanceMarking() {
             toast.success(`✅ Attendance marked successfully!`, {
                 description: `${data.summary?.successful || 0} students marked, ${data.summary?.skipped || 0} skipped`
             });
-            
+
             // Invalidate and refetch
             queryClient.invalidateQueries(['class-students', schoolId, classId, sectionId, date]);
             refetch();
@@ -144,7 +144,7 @@ export default function ClassAttendanceMarking() {
     const handleStatusToggle = (userId) => {
         const statuses = ['PRESENT', 'ABSENT', 'LATE', 'ON_LEAVE'];
         const current = attendanceData[userId] || '';
-        
+
         if (!current) {
             // If no status, set to PRESENT
             setAttendanceData(prev => ({
@@ -155,7 +155,7 @@ export default function ClassAttendanceMarking() {
             // Cycle through statuses
             const currentIndex = statuses.indexOf(current);
             const nextStatus = statuses[(currentIndex + 1) % statuses.length];
-            
+
             setAttendanceData(prev => ({
                 ...prev,
                 [userId]: nextStatus
@@ -275,8 +275,8 @@ export default function ClassAttendanceMarking() {
                         </div>
 
                         <div className="flex items-end">
-                            <Button 
-                                onClick={() => refetch()} 
+                            <Button
+                                onClick={() => refetch()}
                                 className="w-full"
                                 disabled={!classId}
                             >
@@ -305,24 +305,24 @@ export default function ClassAttendanceMarking() {
                                 </div>
                             </div>
                             <div className="flex gap-2 flex-wrap">
-                                <Button 
-                                    variant="outline" 
+                                <Button
+                                    variant="outline"
                                     onClick={() => handleMarkAll('PRESENT')}
                                     size="sm"
                                 >
                                     <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
                                     All Present
                                 </Button>
-                                <Button 
-                                    variant="outline" 
+                                <Button
+                                    variant="outline"
                                     onClick={() => handleMarkAll('ABSENT')}
                                     size="sm"
                                 >
                                     <XCircle className="w-4 h-4 mr-2 text-red-600" />
                                     All Absent
                                 </Button>
-                                <Button 
-                                    variant="outline" 
+                                <Button
+                                    variant="outline"
                                     onClick={handleClear}
                                     size="sm"
                                 >
@@ -399,14 +399,12 @@ export default function ClassAttendanceMarking() {
                         return (
                             <Card
                                 key={student.userId}
-                                className={`cursor-pointer transition-all hover:shadow-lg ${
-                                    status ? 'ring-2 ring-offset-2' : ''
-                                } ${
-                                    status === 'PRESENT' ? 'ring-green-500' :
-                                    status === 'ABSENT' ? 'ring-red-500' :
-                                    status === 'LATE' ? 'ring-yellow-500' :
-                                    status === 'ON_LEAVE' ? 'ring-blue-500' : ''
-                                }`}
+                                className={`cursor-pointer transition-all hover:shadow-lg ${status ? 'ring-2 ring-offset-2' : ''
+                                    } ${status === 'PRESENT' ? 'ring-green-500' :
+                                        status === 'ABSENT' ? 'ring-red-500' :
+                                            status === 'LATE' ? 'ring-yellow-500' :
+                                                status === 'ON_LEAVE' ? 'ring-blue-500' : ''
+                                    }`}
                                 onClick={() => handleStatusToggle(student.userId)}
                             >
                                 <CardContent className="pt-6 text-center">

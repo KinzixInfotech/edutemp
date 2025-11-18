@@ -14,6 +14,15 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
+import {
+    exportSummaryToExcel,
+    exportMonthlyToExcel,
+    exportClassWiseToExcel,
+    exportStudentWiseToExcel,
+    exportTeacherToExcel,
+    exportDefaultersToExcel,
+    exportLeaveAnalysisToExcel
+} from '@/lib/exportUtils';
 
 export default function AttendanceReports() {
     const { fullUser } = useAuth();
@@ -27,7 +36,7 @@ export default function AttendanceReports() {
     const [classFilter, setClassFilter] = useState('');
     const [sectionFilter, setSectionFilter] = useState('');
 
-    const { data, isLoading, refetch } = useQuery({
+    const { data, isLoading, isFetching, refetch } = useQuery({
         queryKey: ['attendance-report', schoolId, reportType, dateRange, classFilter, sectionFilter],
         queryFn: async () => {
             const params = new URLSearchParams({
@@ -42,7 +51,12 @@ export default function AttendanceReports() {
             if (!res.ok) throw new Error('Failed');
             return res.json();
         },
-        enabled: !!schoolId && !!dateRange.start && !!dateRange.end
+        enabled: !!schoolId && !!dateRange.start && !!dateRange.end,
+        staleTime: 5 * 60 * 1000, // Data stays fresh for 5 minutes
+        cacheTime: 10 * 60 * 1000, // Keep cached data for 10 minutes
+        refetchOnWindowFocus: false, // Don't refetch when window regains focus
+        refetchOnMount: false, // Don't refetch on component mount if data exists
+        refetchOnReconnect: false, // Don't refetch on internet reconnect
     });
 
     // Fetch classes for filter
@@ -55,35 +69,63 @@ export default function AttendanceReports() {
         enabled: !!schoolId
     });
 
-    const handleExport = async (format) => {
+    const handleExport = (format) => {
+        console.log('Export called with format:', format, 'Report type:', reportType);
+        console.log('Data available:', !!data);
+        
+        if (!data) {
+            toast.error('No data to export');
+            return;
+        }
+
         try {
-            const params = new URLSearchParams({
-                reportType,
-                startDate: dateRange.start,
-                endDate: dateRange.end,
-                format,
-                ...(classFilter && { classId: classFilter })
-            });
-
-            const res = await fetch(`/api/schools/${schoolId}/attendance/admin/reports?${params}`);
-            const data = await res.json();
-
-            if (format === 'PDF') {
-                toast.success('PDF download started');
-                console.log('PDF Data:', data);
-            } else if (format === 'EXCEL') {
-                toast.success('Excel download started');
-                console.log('Excel Data:', data);
+            if (format === 'EXCEL') {
+                console.log('Starting Excel export for:', reportType);
+                
+                switch (reportType) {
+                    case 'SUMMARY':
+                        exportSummaryToExcel(data, dateRange);
+                        break;
+                    case 'MONTHLY':
+                        exportMonthlyToExcel(data, dateRange);
+                        break;
+                    case 'CLASS_WISE':
+                        exportClassWiseToExcel(data, dateRange);
+                        break;
+                    case 'STUDENT_WISE':
+                        exportStudentWiseToExcel(data, dateRange);
+                        break;
+                    case 'TEACHER_PERFORMANCE':
+                        exportTeacherToExcel(data, dateRange);
+                        break;
+                    case 'DEFAULTERS':
+                        console.log('Exporting defaulters:', data.defaulters?.length, 'records');
+                        exportDefaultersToExcel(data, dateRange);
+                        break;
+                    case 'LEAVE_ANALYSIS':
+                        exportLeaveAnalysisToExcel(data, dateRange);
+                        break;
+                    default:
+                        toast.error('Invalid report type');
+                        return;
+                }
+                
+                console.log('Export function completed');
+                toast.success('Excel file downloaded successfully!');
+            } else if (format === 'PDF') {
+                toast.info('PDF export coming soon!');
             }
         } catch (error) {
-            toast.error('Failed to export report');
+            console.error('Export error:', error);
+            toast.error(`Failed to export report: ${error.message}`);
         }
     };
 
-    if (isLoading) {
+    if (isLoading || isFetching) {
         return (
-            <div className="flex items-center justify-center h-screen">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <div className="flex flex-col items-center justify-center h-screen">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                <p className="text-muted-foreground">Loading report data...</p>
             </div>
         );
     }
@@ -121,7 +163,13 @@ export default function AttendanceReports() {
                 </CardHeader>
                 <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                        <Select value={reportType} onValueChange={setReportType}>
+                        <Select 
+                            value={reportType} 
+                            onValueChange={(value) => {
+                                setReportType(value);
+                                toast.info(`Switched to ${value.replace(/_/g, ' ')} report`);
+                            }}
+                        >
                             <SelectTrigger>
                                 <SelectValue placeholder="Report Type" />
                             </SelectTrigger>
@@ -166,7 +214,23 @@ export default function AttendanceReports() {
                             </Select>
                         )}
 
-                        <Button onClick={() => refetch()}>Generate Report</Button>
+                        <Button 
+                            onClick={() => {
+                                toast.loading('Generating report...');
+                                refetch().then(() => {
+                                    toast.dismiss();
+                                    toast.success('Report generated successfully!', {
+                                        description: `${reportType.replace(/_/g, ' ')} report is ready. Click Export Excel or PDF button above to download.`,
+                                        duration: 5000,
+                                    });
+                                }).catch(() => {
+                                    toast.dismiss();
+                                    toast.error('Failed to generate report');
+                                });
+                            }}
+                        >
+                            Generate Report
+                        </Button>
                     </div>
                 </CardContent>
             </Card>
@@ -484,39 +548,79 @@ export default function AttendanceReports() {
                 <TabsContent value="DEFAULTERS">
                     <Card>
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <AlertCircle className="w-5 h-5 text-red-600" />
-                                Defaulters Report (Below 75%)
-                            </CardTitle>
-                            <CardDescription>{data?.count || 0} students found</CardDescription>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <AlertCircle className="w-5 h-5 text-red-600" />
+                                        Defaulters Report (Below 75%)
+                                    </CardTitle>
+                                    <CardDescription>{data?.count || 0} defaulters found</CardDescription>
+                                </div>
+                                {data?.defaulters && data.defaulters.length > 0 && (
+                                    <div className="flex gap-2">
+                                        <Button 
+                                            size="sm" 
+                                            variant="outline"
+                                            onClick={() => handleExport('EXCEL')}
+                                        >
+                                            <Download className="w-4 h-4 mr-2" />
+                                            Export Excel
+                                        </Button>
+                                        <Button 
+                                            size="sm" 
+                                            variant="outline"
+                                            onClick={() => handleExport('PDF')}
+                                        >
+                                            <Download className="w-4 h-4 mr-2" />
+                                            Export PDF
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
                         </CardHeader>
                         <CardContent>
-                            {data?.students && data.students.length > 0 ? (
+                            {data?.defaulters && data.defaulters.length > 0 ? (
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
                                         <thead>
                                             <tr className="border-b">
-                                                <th className="text-left p-3">Admission No</th>
+                                                <th className="text-left p-3">Type</th>
+                                                <th className="text-left p-3">Admission/Employee No</th>
                                                 <th className="text-left p-3">Name</th>
-                                                <th className="text-left p-3">Class</th>
+                                                <th className="text-left p-3">Class/Designation</th>
                                                 <th className="text-left p-3">Contact</th>
                                                 <th className="text-center p-3">Present</th>
                                                 <th className="text-center p-3">Absent</th>
+                                                <th className="text-center p-3">Late</th>
                                                 <th className="text-center p-3">Percentage</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {data.students.map((student) => (
-                                                <tr key={student.userId} className="border-b hover:bg-accent">
-                                                    <td className="p-3">{student.admissionNo}</td>
-                                                    <td className="p-3 font-medium">{student.name}</td>
-                                                    <td className="p-3">{student.className}</td>
-                                                    <td className="p-3">{student.contactNumber || 'N/A'}</td>
-                                                    <td className="text-center p-3 text-green-600">{student.totalPresent || 0}</td>
-                                                    <td className="text-center p-3 text-red-600">{student.totalAbsent || 0}</td>
+                                            {data.defaulters.map((person) => (
+                                                <tr key={person.userId} className="border-b hover:bg-accent">
+                                                    <td className="p-3">
+                                                        <Badge variant={person.userType === 'Student' ? 'default' : 'secondary'}>
+                                                            {person.userType}
+                                                        </Badge>
+                                                    </td>
+                                                    <td className="p-3">
+                                                        {person.userType === 'Student'
+                                                            ? person.admissionNo
+                                                            : person.employeeId}
+                                                    </td>
+                                                    <td className="p-3 font-medium">{person.name}</td>
+                                                    <td className="p-3">
+                                                        {person.userType === 'Student'
+                                                            ? `${person.className} ${person.sectionName || ''}`
+                                                            : person.designation}
+                                                    </td>
+                                                    <td className="p-3">{person.contactNumber || person.email || 'N/A'}</td>
+                                                    <td className="text-center p-3 text-green-600">{person.totalPresent || 0}</td>
+                                                    <td className="text-center p-3 text-red-600">{person.totalAbsent || 0}</td>
+                                                    <td className="text-center p-3 text-yellow-600">{person.totalLate || 0}</td>
                                                     <td className="text-center p-3">
                                                         <Badge variant="destructive">
-                                                            {student.attendancePercentage ? student.attendancePercentage.toFixed(1) : '0.0'}%
+                                                            {person.attendancePercentage}%
                                                         </Badge>
                                                     </td>
                                                 </tr>
@@ -525,10 +629,10 @@ export default function AttendanceReports() {
                                     </table>
                                 </div>
                             ) : (
-                                <div className="text-center py-8 text-muted-foreground">
-                                    <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-500 opacity-50" />
-                                    <p className="text-lg font-medium">Great! No defaulters found</p>
-                                    <p className="text-sm mt-2">All students have attendance above 75%</p>
+                                <div className="text-center py-8">
+                                    <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-500" />
+                                    <p className="text-lg font-medium text-gray-900">Great! No defaulters found</p>
+                                    <p className="text-sm mt-2 text-muted-foreground">All students have attendance above 75%</p>
                                 </div>
                             )}
                         </CardContent>

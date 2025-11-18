@@ -5,10 +5,10 @@ import { NextResponse } from 'next/server';
 
 // GET - Fetch leave requests
 export async function GET(req, { params }) {
-    const { schoolId } = params;
+    const { schoolId } = await params; // Fix: await params
     const { searchParams } = new URL(req.url);
 
-    const status = searchParams.get('status') || 'PENDING';
+    const statusParam = searchParams.get('status');
     const userId = searchParams.get('userId');
     const leaveType = searchParams.get('leaveType');
     const page = parseInt(searchParams.get('page') || '1');
@@ -19,9 +19,22 @@ export async function GET(req, { params }) {
     try {
         const skip = (page - 1) * limit;
 
+        // Smart status handling - works for both single and multiple
+        let statusCondition;
+        if (statusParam) {
+            const statuses = statusParam.includes(',')
+                ? statusParam.split(',').map(s => s.trim())
+                : [statusParam];
+            statusCondition = statuses.length === 1
+                ? { status: statuses[0] }
+                : { status: { in: statuses } };
+        } else {
+            statusCondition = { status: 'PENDING' };
+        }
+
         const where = {
             schoolId,
-            ...(status && { status }),
+            ...statusCondition, // Use smart condition
             ...(userId && { userId }),
             ...(leaveType && { leaveType }),
             ...(startDate && endDate && {
@@ -29,6 +42,7 @@ export async function GET(req, { params }) {
                 endDate: { lte: new Date(endDate) }
             })
         };
+
 
         const [leaves, total] = await Promise.all([
             prisma.leaveRequest.findMany({

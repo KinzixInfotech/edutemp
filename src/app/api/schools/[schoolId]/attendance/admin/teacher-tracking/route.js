@@ -221,7 +221,7 @@ export async function GET(req, { params }) {
         const month = istTime.getUTCMonth();
         const day = istTime.getUTCDate();
         today = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
-    }
+    }   
 
     const teacherId = searchParams.get('teacherId');
 

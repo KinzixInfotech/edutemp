@@ -6,7 +6,6 @@ export async function GET(req, props) {
     const { schoolId } = params;
     const searchParams = Object.fromEntries(req.nextUrl.searchParams);
     console.log(schoolId);
-
     let {
         classId,
         sectionId,

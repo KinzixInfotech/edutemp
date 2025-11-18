@@ -14,10 +14,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { useAuth } from '@/context/AuthContext';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function AttendanceRegularization() {
-    const schoolId = 'your-school-id';
-    const adminId = 'admin-user-id';
+    const { fullUser } = useAuth();
+    const schoolId = fullUser?.schoolId;
+    const adminId = fullUser?.id;
     const queryClient = useQueryClient();
 
     const [statusFilter, setStatusFilter] = useState('PENDING');
@@ -256,11 +259,16 @@ export default function AttendanceRegularization() {
                                             {/* Checkbox */}
                                             {statusFilter === 'PENDING' && (
                                                 <div className="mt-1">
-                                                    <input
+                                                    {/* <input
                                                         type="checkbox"
                                                         checked={selectedRequests.includes(request.id)}
                                                         onChange={() => toggleSelection(request.id)}
                                                         className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                    /> */}
+                                                    <Checkbox
+                                                        checked={selectedRequests.includes(request.id)}
+                                                        onCheckedChange={() => toggleSelection(request.id)}
+                                                        className="w-5 h-5"
                                                     />
                                                 </div>
                                             )}
@@ -288,7 +296,7 @@ export default function AttendanceRegularization() {
                                                         <p className="font-medium">{formatDate(request.date)}</p>
                                                     </div>
                                                     <div>
-                                                        <p className="text-muted-foreground">Requested Status</p>
+                                                        <p className="text-muted-foreground mb-1">Requested Status</p>
                                                         <Badge variant={request.status === 'PRESENT' ? 'default' : 'destructive'}>
                                                             {request.status}
                                                         </Badge>
@@ -301,7 +309,7 @@ export default function AttendanceRegularization() {
 
                                                 {/* Reason */}
                                                 {request.remarks && (
-                                                    <div className="bg-gray-50 rounded-lg p-3 mb-3">
+                                                    <div className="bg-gray-50  dark:bg-muted dark:border rounded-lg p-3 mb-3">
                                                         <p className="text-sm font-medium mb-1">Reason:</p>
                                                         <p className="text-sm text-muted-foreground">{request.remarks}</p>
                                                     </div>

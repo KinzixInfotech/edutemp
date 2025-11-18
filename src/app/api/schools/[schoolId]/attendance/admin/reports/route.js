@@ -2,14 +2,26 @@
 
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 export async function GET(req, { params }) {
     const { schoolId } = params;
     const { searchParams } = new URL(req.url);
 
     const reportType = searchParams.get('reportType') || 'MONTHLY';
-    const startDate = new Date(searchParams.get('startDate'));
-    const endDate = new Date(searchParams.get('endDate'));
+    
+    // Parse dates in IST timezone
+    const startDateParam = searchParams.get('startDate');
+    const endDateParam = searchParams.get('endDate');
+    
+    const startDate = dayjs(startDateParam).tz('Asia/Kolkata').toDate();
+    const endDate = dayjs(endDateParam).tz('Asia/Kolkata').toDate();
+    
     const classId = searchParams.get('classId');
     const sectionId = searchParams.get('sectionId');
     const format = searchParams.get('format') || 'JSON';
@@ -35,7 +47,15 @@ export async function GET(req, { params }) {
                 break;
 
             case 'DEFAULTERS':
+                console.log('Defaulters query params:', { 
+                    schoolId, 
+                    startDate, 
+                    endDate,
+                    startDateParam,
+                    endDateParam
+                });
                 reportData = await generateDefaultersReport(schoolId, startDate, endDate);
+                console.log('Defaulters found:', reportData.count);
                 break;
 
             case 'LEAVE_ANALYSIS':
@@ -282,7 +302,7 @@ async function generateTeacherReport(schoolId, startDate, endDate) {
         where: {
             schoolId,
             date: { gte: startDate, lte: endDate },
-            user: { role: { name: 'TeachingStaff' } }
+            user: { role: { name: 'TEACHING_STAFF' } }
         },
         _count: { id: true },
         _sum: { workingHours: true },
@@ -351,7 +371,7 @@ async function generateTeacherReport(schoolId, startDate, endDate) {
     };
 }
 
-// 5. Defaulters Report
+// 5. Defaulters Report - FIXED VERSION
 async function generateDefaultersReport(schoolId, startDate, endDate) {
     const academicYear = await prisma.academicYear.findFirst({
         where: { schoolId, isActive: true }
@@ -361,17 +381,57 @@ async function generateDefaultersReport(schoolId, startDate, endDate) {
         throw new Error('No active academic year found');
     }
 
-    const month = startDate.getMonth() + 1;
-    const year = startDate.getFullYear();
+    // Parse dates in IST timezone
+    const startDateIST = dayjs(startDate).tz('Asia/Kolkata');
+    const endDateIST = dayjs(endDate).tz('Asia/Kolkata');
+    
+    const startMonth = startDateIST.month() + 1; // dayjs months are 0-indexed
+    const startYear = startDateIST.year();
+    const endMonth = endDateIST.month() + 1;
+    const endYear = endDateIST.year();
+
+    // Build the where clause to handle date ranges spanning multiple months
+    const whereClause = {
+        schoolId,
+        academicYearId: academicYear.id,
+        attendancePercentage: { lt: 75 }
+    };
+
+    // Handle date range filtering
+    if (startMonth === endMonth && startYear === endYear) {
+        // Same month and year
+        whereClause.month = startMonth;
+        whereClause.year = startYear;
+    } else if (startYear === endYear) {
+        // Same year, different months
+        whereClause.year = startYear;
+        whereClause.month = {
+            gte: startMonth,
+            lte: endMonth
+        };
+    } else {
+        // Different years - use OR condition
+        whereClause.OR = [
+            {
+                year: startYear,
+                month: { gte: startMonth }
+            },
+            {
+                year: endYear,
+                month: { lte: endMonth }
+            },
+            {
+                year: { gt: startYear, lt: endYear }
+            }
+        ];
+        delete whereClause.month;
+        delete whereClause.year;
+    }
+
+    console.log('Defaulters where clause:', JSON.stringify(whereClause, null, 2));
 
     const defaulters = await prisma.attendanceStats.findMany({
-        where: {
-            schoolId,
-            academicYearId: academicYear.id,
-            month,
-            year,
-            attendancePercentage: { lt: 75 }
-        },
+        where: whereClause,
         include: {
             user: {
                 select: {
@@ -400,25 +460,35 @@ async function generateDefaultersReport(schoolId, startDate, endDate) {
         orderBy: { attendancePercentage: 'asc' }
     });
 
+    console.log(`Found ${defaulters.length} defaulters with attendance < 75%`);
+
     return {
         type: 'DEFAULTERS',
         threshold: 75,
         period: { start: startDate, end: endDate },
         count: defaulters.length,
-        students: defaulters.map(d => ({
+        defaulters: defaulters.map(d => ({
             userId: d.userId,
             name: d.user.name,
             email: d.user.email,
+            userType: d.user.student ? 'Student' : 'Teacher',
+            // Student details
             admissionNo: d.user.student?.admissionNo,
             rollNumber: d.user.student?.rollNumber,
             className: d.user.student?.class?.className,
             sectionName: d.user.student?.section?.name,
             contactNumber: d.user.student?.contactNumber,
             parentName: d.user.student?.FatherName || d.user.student?.MotherName,
-            attendancePercentage: d.attendancePercentage,
+            // Teacher details
+            employeeId: d.user.teacher?.employeeId,
+            designation: d.user.teacher?.designation,
+            // Attendance stats
+            attendancePercentage: Number(d.attendancePercentage).toFixed(2),
             totalPresent: d.totalPresent,
             totalAbsent: d.totalAbsent,
-            totalLate: d.totalLate
+            totalLate: d.totalLate,
+            month: d.month,
+            year: d.year
         }))
     };
 }
