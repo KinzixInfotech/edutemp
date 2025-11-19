@@ -271,10 +271,13 @@ export const SidebarData = [
                         label: "Attendance Mark", url: "/dashboard/attendance/class-marking/", roles: ["ADMIN"]
                     },
                     {
-                        label: "Student History", url: "/dashboard/attendance/student-history/", roles: ["ADMIN"]
+                        label: "Student Data", url: "/dashboard/attendance/student-history/", roles: ["ADMIN"]
                     },
                     {
                         label: "Teacher Tracking", url: "/dashboard/attendance/teacher-tracking/", roles: ["ADMIN"]
+                    },
+                      {
+                        label: "Attendance Delegations", url: "/dashboard/attendance/delegation/", roles: ["ADMIN"]
                     },
                     {
                         label: "Leave Management", url: "/dashboard/attendance/leave-management/", roles: ["ADMIN"]
@@ -288,6 +291,7 @@ export const SidebarData = [
                     {
                         label: "Settings", url: "/dashboard/attendance/settings/", roles: ["ADMIN"]
                     },
+                  
                 ],
             },
         ],

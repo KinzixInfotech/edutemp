@@ -23,6 +23,7 @@ model School {
   AcademicYear           AcademicYear[]
   admins                 Admin[]
   classes                Class[]
+  attendanceDelegations  AttendanceDelegation[]
   exams                  Exam[]
   FeePayment             FeePayment[]
   FeeStructure           FeeStructure[]
@@ -562,6 +563,7 @@ model User {
   parent                Parent?
   calendarEvents        CalendarEvent[]
   calendarEventTargets  CalendarEventTarget[]
+  createdDelegations    AttendanceDelegation[] @relation("DelegationCreator")
 
   attendance              Attendance[]
   markedAttendance        Attendance[]             @relation("MarkedBy")
@@ -796,15 +798,16 @@ model HomeworkSubmission {
 }
 
 model TeachingStaff {
-  userId                String                  @id @db.Uuid
-  departmentId          Int?
-  employeeId            String
-  name                  String
-  designation           String
-  gender                String
-  sectionsAssigned      Section[]               @relation("Section_Teacher")
-  age                   String
-  bloodGroup            String
+  userId           String    @id @db.Uuid
+  departmentId     Int?
+  employeeId       String
+  name             String
+  designation      String
+  gender           String
+  sectionsAssigned Section[] @relation("Section_Teacher")
+  age              String
+  bloodGroup       String
+
   contactNumber         String
   dob                   String
   email                 String
@@ -823,6 +826,8 @@ model TeachingStaff {
   AcademicYear          AcademicYear            @relation(fields: [academicYearId], references: [id])
   department            Department?             @relation(fields: [departmentId], references: [id])
   school                School                  @relation(fields: [schoolId], references: [id])
+  originalDelegations   AttendanceDelegation[]  @relation("OriginalTeacher")
+  substituteDelegations AttendanceDelegation[]  @relation("SubstituteTeacher")
   user                  User                    @relation(fields: [userId], references: [id])
   subjects              Subject[]               @relation("SubjectToTeachingStaff")
 
@@ -858,26 +863,27 @@ model NonTeachingStaff {
 }
 
 model Class {
-  id                   Int                   @id @default(autoincrement())
-  schoolId             String                @db.Uuid
-  className            String
-  capacity             Int?
-  teachingStaffUserId  String?               @db.Uuid
-  academicYearId       String?               @db.Uuid
-  AcademicYear         AcademicYear?         @relation(fields: [academicYearId], references: [id])
-  school               School                @relation(fields: [schoolId], references: [id])
-  TeachingStaff        TeachingStaff?        @relation(fields: [teachingStaffUserId], references: [userId])
-  FeeStructure         FeeStructure[]
-  homework             Homework[]
-  NoticeTarget         NoticeTarget[]
-  sections             Section[]
-  students             Student[]
-  subjects             Subject[]
-  Syllabi              Syllabus[]
-  Assignment           Assignment[]
-  globalFeeStructures  GlobalFeeStructure[]
-  calendarEventTargets CalendarEventTarget[]
-  bulkAttendance       BulkAttendance[]
+  id                    Int                    @id @default(autoincrement())
+  schoolId              String                 @db.Uuid
+  className             String
+  capacity              Int?
+  teachingStaffUserId   String?                @db.Uuid
+  academicYearId        String?                @db.Uuid
+  AcademicYear          AcademicYear?          @relation(fields: [academicYearId], references: [id])
+  school                School                 @relation(fields: [schoolId], references: [id])
+  TeachingStaff         TeachingStaff?         @relation(fields: [teachingStaffUserId], references: [userId])
+  FeeStructure          FeeStructure[]
+  homework              Homework[]
+  NoticeTarget          NoticeTarget[]
+  sections              Section[]
+  attendanceDelegations AttendanceDelegation[]
+  students              Student[]
+  subjects              Subject[]
+  Syllabi               Syllabus[]
+  Assignment            Assignment[]
+  globalFeeStructures   GlobalFeeStructure[]
+  calendarEventTargets  CalendarEventTarget[]
+  bulkAttendance        BulkAttendance[]
 
   @@unique([id, schoolId])
   @@index([schoolId])
@@ -909,14 +915,15 @@ model Section {
   teachingStaffUserId String? @db.Uuid
 
   // Relations
-  class                Class                   @relation(fields: [classId], references: [id])
-  teachingStaff        TeachingStaff?          @relation("Section_Teacher", fields: [teachingStaffUserId], references: [userId])
-  NoticeTarget         NoticeTarget[]
-  subjectTeachers      SectionSubjectTeacher[]
-  students             Student[]
-  timetables           Timetable[]
-  calendarEventTargets CalendarEventTarget[]
-  bulkAttendance       BulkAttendance[]
+  class                 Class                   @relation(fields: [classId], references: [id])
+  teachingStaff         TeachingStaff?          @relation("Section_Teacher", fields: [teachingStaffUserId], references: [userId])
+  NoticeTarget          NoticeTarget[]
+  subjectTeachers       SectionSubjectTeacher[]
+  students              Student[]
+  timetables            Timetable[]
+  calendarEventTargets  CalendarEventTarget[]
+  bulkAttendance        BulkAttendance[]
+  attendanceDelegations AttendanceDelegation[]
 
   @@unique([classId, name])
   @@index([classId])
@@ -1123,10 +1130,11 @@ model InstallmentParticular {
 
 // Attendance Record - Main attendance tracking
 model Attendance {
-  id       String   @id @default(uuid()) @db.Uuid
-  userId   String   @db.Uuid
-  schoolId String   @db.Uuid
-  date     DateTime @db.Date
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  schoolId     String   @db.Uuid
+  date         DateTime @db.Date
+  delegationId String?  @db.Uuid // Track if marked via delegation
 
   // Status & Timing
   status       AttendanceStatus
@@ -1168,6 +1176,83 @@ model Attendance {
   @@index([status])
   @@index([approvalStatus])
   @@index([markedBy])
+}
+
+// model AttendanceDelegation {
+//   id                  String @id @default(uuid()) @db.Uuid
+//   schoolId            String @db.Uuid
+//   originalTeacherId   String @db.Uuid
+//   substituteTeacherId String @db.Uuid
+//   classId             Int
+//   sectionId           Int?
+
+//   // Delegation Period
+//   startDate DateTime @db.Date
+//   endDate   DateTime @db.Date
+
+//   // Status & Metadata
+//   status      DelegationStatus @default(ACTIVE)
+//   reason      String?          @db.Text
+//   createdById String           @db.Uuid
+//   createdAt   DateTime         @default(now())
+//   updatedAt   DateTime         @updatedAt
+
+//   // Relations
+//   school            School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+//   originalTeacher   TeachingStaff @relation("OriginalTeacher", fields: [originalTeacherId], references: [userId])
+//   substituteTeacher TeachingStaff @relation("SubstituteTeacher", fields: [substituteTeacherId], references: [userId])
+//   class             Class         @relation(fields: [classId], references: [id])
+//   section           Section?      @relation(fields: [sectionId], references: [id])
+//   createdBy         User          @relation("DelegationCreator", fields: [createdById], references: [id])
+
+//   @@unique([schoolId, classId, sectionId, startDate, endDate, substituteTeacherId])
+//   @@index([schoolId, startDate, endDate])
+//   @@index([substituteTeacherId, startDate, endDate])
+//   @@index([originalTeacherId, startDate, endDate])
+//   @@index([status])
+// }
+model AttendanceDelegation {
+  id                  String @id @default(uuid()) @db.Uuid
+  schoolId            String @db.Uuid
+  originalTeacherId   String @db.Uuid
+  substituteTeacherId String @db.Uuid
+  classId             Int
+  sectionId           Int?
+
+  // Delegation Period
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+
+  // Status & Metadata
+  status      DelegationStatus @default(ACTIVE)
+  reason      String?          @db.Text
+  createdById String           @db.Uuid
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  // Relations
+  school            School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  originalTeacher   TeachingStaff @relation("OriginalTeacher", fields: [originalTeacherId], references: [userId])
+  substituteTeacher TeachingStaff @relation("SubstituteTeacher", fields: [substituteTeacherId], references: [userId])
+  class             Class         @relation(fields: [classId], references: [id])
+  section           Section?      @relation(fields: [sectionId], references: [id])
+  createdBy         User          @relation("DelegationCreator", fields: [createdById], references: [id])
+
+  // ✅ New Rules
+  @@unique([schoolId, originalTeacherId, startDate, endDate])
+  @@unique([schoolId, classId, sectionId, startDate, endDate])
+
+  // Existing helpful indexes
+  @@index([schoolId, startDate, endDate])
+  @@index([substituteTeacherId, startDate, endDate])
+  @@index([originalTeacherId, startDate, endDate])
+  @@index([status])
+}
+
+enum DelegationStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
 }
 
 // School Calendar - Define working days, holidays
