@@ -556,6 +556,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/context/AuthContext';
 import LoaderPage from '@/components/loader-page';
+import { calculateStreak } from '@/app/api/schools/[schoolId]/attendance/admin/reports/route';
 
 export default function StudentAttendanceHistory() {
   const { fullUser } = useAuth();
@@ -563,6 +564,7 @@ export default function StudentAttendanceHistory() {
   if (!schoolId) return <LoaderPage />
 
   const [studentId, setStudentId] = useState('');
+  const [streak, setStreak] = useState(null);
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
   const [searchTerm, setSearchTerm] = useState('');
@@ -689,7 +691,6 @@ export default function StudentAttendanceHistory() {
   });
 
   const cn = (...classes) => classes.filter(Boolean).join(' ');
-
   if (!studentId) {
     return (
       <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -960,6 +961,7 @@ export default function StudentAttendanceHistory() {
             <CardHeader>
               <CardTitle>Monthly Calendar</CardTitle>
               <CardDescription>Color-coded attendance calendar</CardDescription>
+             <Badge>Streak {streak ?? "..."}</Badge>
             </CardHeader>
             <CardContent>
               {/* Calendar Grid */}

@@ -1,6 +1,7 @@
 // app/api/schools/[schoolId]/attendance/admin/student-history/route.js
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { calculateStreak } from '../reports/route';
 
 export async function GET(req, { params }) {
     const { schoolId } = params;
@@ -88,12 +89,14 @@ export async function GET(req, { params }) {
             }
         });
 
+       const streak =  await calculateStreak(studentId,schoolId);
         // Calculate stats if not found
         let stats;
         if (monthlyStats) {
             stats = {
                 totalWorkingDays: monthlyStats.totalWorkingDays,
                 totalPresent: monthlyStats.totalPresent,
+                streak,
                 totalAbsent: monthlyStats.totalAbsent,
                 totalLate: monthlyStats.totalLate,
                 totalHalfDay: monthlyStats.totalHalfDay,
@@ -118,6 +121,7 @@ export async function GET(req, { params }) {
                 totalWorkingDays: totalDays,
                 totalPresent: present,
                 totalAbsent: absent,
+                streak,
                 totalLate: late,
                 totalHalfDay: halfDay,
                 totalLeaves: leaves,

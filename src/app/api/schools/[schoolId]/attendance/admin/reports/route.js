@@ -14,14 +14,15 @@ export async function GET(req, { params }) {
     const { searchParams } = new URL(req.url);
 
     const reportType = searchParams.get('reportType') || 'MONTHLY';
-    
-    // Parse dates in IST timezone
+
+    // Parse dates as UTC (avoid implicit local/IST shifts)
     const startDateParam = searchParams.get('startDate');
     const endDateParam = searchParams.get('endDate');
-    
-    const startDate = dayjs(startDateParam).tz('Asia/Kolkata').toDate();
-    const endDate = dayjs(endDateParam).tz('Asia/Kolkata').toDate();
-    
+
+    // Interpret input dates as UTC-midnight boundaries
+    const startDate = dayjs.utc(startDateParam).startOf('day').toDate();
+    const endDate = dayjs.utc(endDateParam).endOf('day').toDate();
+
     const classId = searchParams.get('classId');
     const sectionId = searchParams.get('sectionId');
     const format = searchParams.get('format') || 'JSON';
@@ -47,9 +48,9 @@ export async function GET(req, { params }) {
                 break;
 
             case 'DEFAULTERS':
-                console.log('Defaulters query params:', { 
-                    schoolId, 
-                    startDate, 
+                console.log('Defaulters query params:', {
+                    schoolId,
+                    startDate,
                     endDate,
                     startDateParam,
                     endDateParam
@@ -259,6 +260,7 @@ async function generateStudentWiseReport(schoolId, startDate, endDate, classId, 
             { rollNumber: 'asc' }
         ]
     });
+    const streak = await calculateStreak(students.userId, schoolId);
 
     const studentStats = students.map(student => {
         const attendance = student.user.attendance;
@@ -268,13 +270,14 @@ async function generateStudentWiseReport(schoolId, startDate, endDate, classId, 
         const leaves = attendance.filter(a => a.status === 'ON_LEAVE').length;
         const total = attendance.length;
         const percentage = total > 0 ? ((present + late) / total * 100).toFixed(2) : 0;
-
+        const streakStudent = streak;
         return {
             userId: student.userId,
             name: student.name,
             admissionNo: student.admissionNo,
             rollNumber: student.rollNumber,
             className: student.class.className,
+            streak: streakStudent,
             sectionName: student.section?.name,
             attendance: {
                 total,
@@ -381,14 +384,14 @@ async function generateDefaultersReport(schoolId, startDate, endDate) {
         throw new Error('No active academic year found');
     }
 
-    // Parse dates in IST timezone
-    const startDateIST = dayjs(startDate).tz('Asia/Kolkata');
-    const endDateIST = dayjs(endDate).tz('Asia/Kolkata');
-    
-    const startMonth = startDateIST.month() + 1; // dayjs months are 0-indexed
-    const startYear = startDateIST.year();
-    const endMonth = endDateIST.month() + 1;
-    const endYear = endDateIST.year();
+    // Use UTC-based dayjs to extract month/year (no local shift)
+    const startDateUTC = dayjs.utc(startDate);
+    const endDateUTC = dayjs.utc(endDate);
+
+    const startMonth = startDateUTC.month() + 1; // dayjs months are 0-indexed
+    const startYear = startDateUTC.year();
+    const endMonth = endDateUTC.month() + 1;
+    const endYear = endDateUTC.year();
 
     // Build the where clause to handle date ranges spanning multiple months
     const whereClause = {
@@ -499,18 +502,24 @@ async function generateLeaveAnalysis(schoolId, startDate, endDate) {
         by: ['leaveType', 'status'],
         where: {
             schoolId,
-            startDate: { gte: startDate },
-            endDate: { lte: endDate }
+            AND: [
+                { startDate: { lte: endDate } }, // leave begins before filter ends
+                { endDate: { gte: startDate } }  // leave ends after filter starts
+            ]
         },
         _count: { id: true },
         _sum: { totalDays: true }
     });
 
+    console.log(startDate, endDate);
+
     const leavesByUser = await prisma.leaveRequest.findMany({
         where: {
             schoolId,
-            startDate: { gte: startDate },
-            endDate: { lte: endDate }
+            AND: [
+                { startDate: { lte: endDate } }, // leave begins before filter ends
+                { endDate: { gte: startDate } }  // leave ends after filter starts
+            ]
         },
         include: {
             user: {
@@ -580,7 +589,7 @@ async function generateSummaryReport(schoolId, startDate, endDate) {
 }
 
 // Helper: Calculate streak
-async function calculateStreak(userId, schoolId) {
+export async function calculateStreak(userId, schoolId) {
     const records = await prisma.attendance.findMany({
         where: {
             userId,

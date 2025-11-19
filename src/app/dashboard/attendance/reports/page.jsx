@@ -460,6 +460,7 @@ export default function AttendanceReports() {
                                                 <th className="text-center p-3">Present</th>
                                                 <th className="text-center p-3">Absent</th>
                                                 <th className="text-center p-3">Late</th>
+                                                <th className="text-center p-3">Streak</th>
                                                 <th className="text-center p-3">Percentage</th>
                                             </tr>
                                         </thead>
@@ -472,6 +473,11 @@ export default function AttendanceReports() {
                                                     <td className="text-center p-3 text-green-600">{student.attendance?.present || 0}</td>
                                                     <td className="text-center p-3 text-red-600">{student.attendance?.absent || 0}</td>
                                                     <td className="text-center p-3 text-yellow-600">{student.attendance?.late || 0}</td>
+                                                    <td className="text-center p-3">
+                                                        <Badge className={'bg-yellow-600'}>
+                                                            {student.streak}%
+                                                        </Badge>
+                                                    </td>
                                                     <td className="text-center p-3">
                                                         <Badge variant={(student.attendance?.percentage || 0) >= 75 ? 'default' : 'destructive'}>
                                                             {student.attendance?.percentage || 0}%
