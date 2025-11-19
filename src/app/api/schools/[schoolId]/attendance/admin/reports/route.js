@@ -2,26 +2,42 @@
 
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
-import timezone from 'dayjs/plugin/timezone';
 
-dayjs.extend(utc);
-dayjs.extend(timezone);
+// SIMPLE: Use the same ISTDate function from bulk attendance
+export const ISTDate = (input) => {
+    if (!input) {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return new Date(`${year}-${month}-${day}T00:00:00.000Z`);
+    }
+    
+    // If input is YYYY-MM-DD, just append time
+    if (typeof input === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input)) {
+        return new Date(`${input}T00:00:00.000Z`);
+    }
+    
+    // Otherwise parse normally
+    const d = new Date(input);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return new Date(`${year}-${month}-${day}T00:00:00.000Z`);
+}
 
 export async function GET(req, { params }) {
-    const { schoolId } = params;
+    const { schoolId } = await params; // FIX: Await params
     const { searchParams } = new URL(req.url);
 
     const reportType = searchParams.get('reportType') || 'MONTHLY';
 
-    // Parse dates as UTC (avoid implicit local/IST shifts)
+    // Parse dates using ISTDate
     const startDateParam = searchParams.get('startDate');
     const endDateParam = searchParams.get('endDate');
 
-    // Interpret input dates as UTC-midnight boundaries
-    const startDate = dayjs.utc(startDateParam).startOf('day').toDate();
-    const endDate = dayjs.utc(endDateParam).endOf('day').toDate();
+    const startDate = ISTDate(startDateParam);
+    const endDate = ISTDate(endDateParam);
 
     const classId = searchParams.get('classId');
     const sectionId = searchParams.get('sectionId');
@@ -220,7 +236,7 @@ async function generateClassWiseReport(schoolId, startDate, endDate, classId) {
     };
 }
 
-// 3. Student-wise Report
+// 3. Student-wise Report - FIXED
 async function generateStudentWiseReport(schoolId, startDate, endDate, classId, sectionId) {
     const where = {
         schoolId,
@@ -260,36 +276,41 @@ async function generateStudentWiseReport(schoolId, startDate, endDate, classId, 
             { rollNumber: 'asc' }
         ]
     });
-    const streak = await calculateStreak(students.userId, schoolId);
 
-    const studentStats = students.map(student => {
-        const attendance = student.user.attendance;
-        const present = attendance.filter(a => a.status === 'PRESENT').length;
-        const absent = attendance.filter(a => a.status === 'ABSENT').length;
-        const late = attendance.filter(a => a.status === 'LATE').length;
-        const leaves = attendance.filter(a => a.status === 'ON_LEAVE').length;
-        const total = attendance.length;
-        const percentage = total > 0 ? ((present + late) / total * 100).toFixed(2) : 0;
-        const streakStudent = streak;
-        return {
-            userId: student.userId,
-            name: student.name,
-            admissionNo: student.admissionNo,
-            rollNumber: student.rollNumber,
-            className: student.class.className,
-            streak: streakStudent,
-            sectionName: student.section?.name,
-            attendance: {
-                total,
-                present,
-                absent,
-                late,
-                leaves,
-                percentage: Number(percentage)
-            },
-            records: attendance
-        };
-    });
+    // ✅ FIX: Calculate streak for EACH student individually
+    const studentStats = await Promise.all(
+        students.map(async (student) => {
+            const attendance = student.user.attendance;
+            const present = attendance.filter(a => a.status === 'PRESENT').length;
+            const absent = attendance.filter(a => a.status === 'ABSENT').length;
+            const late = attendance.filter(a => a.status === 'LATE').length;
+            const leaves = attendance.filter(a => a.status === 'ON_LEAVE').length;
+            const total = attendance.length;
+            const percentage = total > 0 ? ((present + late) / total * 100).toFixed(2) : 0;
+            
+            // ✅ FIX: Calculate streak for THIS student
+            const streak = await calculateStreak(student.userId, schoolId);
+            
+            return {
+                userId: student.userId,
+                name: student.name,
+                admissionNo: student.admissionNo,
+                rollNumber: student.rollNumber,
+                className: student.class.className,
+                streak: streak,
+                sectionName: student.section?.name,
+                attendance: {
+                    total,
+                    present,
+                    absent,
+                    late,
+                    leaves,
+                    percentage: Number(percentage)
+                },
+                records: attendance
+            };
+        })
+    );
 
     return {
         type: 'STUDENT_WISE',
@@ -374,7 +395,7 @@ async function generateTeacherReport(schoolId, startDate, endDate) {
     };
 }
 
-// 5. Defaulters Report - FIXED VERSION
+// 5. Defaulters Report
 async function generateDefaultersReport(schoolId, startDate, endDate) {
     const academicYear = await prisma.academicYear.findFirst({
         where: { schoolId, isActive: true }
@@ -384,36 +405,27 @@ async function generateDefaultersReport(schoolId, startDate, endDate) {
         throw new Error('No active academic year found');
     }
 
-    // Use UTC-based dayjs to extract month/year (no local shift)
-    const startDateUTC = dayjs.utc(startDate);
-    const endDateUTC = dayjs.utc(endDate);
+    const startMonth = startDate.getMonth() + 1;
+    const startYear = startDate.getFullYear();
+    const endMonth = endDate.getMonth() + 1;
+    const endYear = endDate.getFullYear();
 
-    const startMonth = startDateUTC.month() + 1; // dayjs months are 0-indexed
-    const startYear = startDateUTC.year();
-    const endMonth = endDateUTC.month() + 1;
-    const endYear = endDateUTC.year();
-
-    // Build the where clause to handle date ranges spanning multiple months
     const whereClause = {
         schoolId,
         academicYearId: academicYear.id,
         attendancePercentage: { lt: 75 }
     };
 
-    // Handle date range filtering
     if (startMonth === endMonth && startYear === endYear) {
-        // Same month and year
         whereClause.month = startMonth;
         whereClause.year = startYear;
     } else if (startYear === endYear) {
-        // Same year, different months
         whereClause.year = startYear;
         whereClause.month = {
             gte: startMonth,
             lte: endMonth
         };
     } else {
-        // Different years - use OR condition
         whereClause.OR = [
             {
                 year: startYear,
@@ -475,17 +487,14 @@ async function generateDefaultersReport(schoolId, startDate, endDate) {
             name: d.user.name,
             email: d.user.email,
             userType: d.user.student ? 'Student' : 'Teacher',
-            // Student details
             admissionNo: d.user.student?.admissionNo,
             rollNumber: d.user.student?.rollNumber,
             className: d.user.student?.class?.className,
             sectionName: d.user.student?.section?.name,
             contactNumber: d.user.student?.contactNumber,
             parentName: d.user.student?.FatherName || d.user.student?.MotherName,
-            // Teacher details
             employeeId: d.user.teacher?.employeeId,
             designation: d.user.teacher?.designation,
-            // Attendance stats
             attendancePercentage: Number(d.attendancePercentage).toFixed(2),
             totalPresent: d.totalPresent,
             totalAbsent: d.totalAbsent,
@@ -503,22 +512,20 @@ async function generateLeaveAnalysis(schoolId, startDate, endDate) {
         where: {
             schoolId,
             AND: [
-                { startDate: { lte: endDate } }, // leave begins before filter ends
-                { endDate: { gte: startDate } }  // leave ends after filter starts
+                { startDate: { lte: endDate } },
+                { endDate: { gte: startDate } }
             ]
         },
         _count: { id: true },
         _sum: { totalDays: true }
     });
 
-    console.log(startDate, endDate);
-
     const leavesByUser = await prisma.leaveRequest.findMany({
         where: {
             schoolId,
             AND: [
-                { startDate: { lte: endDate } }, // leave begins before filter ends
-                { endDate: { gte: startDate } }  // leave ends after filter starts
+                { startDate: { lte: endDate } },
+                { endDate: { gte: startDate } }
             ]
         },
         include: {
@@ -588,7 +595,7 @@ async function generateSummaryReport(schoolId, startDate, endDate) {
     };
 }
 
-// Helper: Calculate streak
+// Helper: Calculate streak - FIXED
 export async function calculateStreak(userId, schoolId) {
     const records = await prisma.attendance.findMany({
         where: {
@@ -603,13 +610,15 @@ export async function calculateStreak(userId, schoolId) {
 
     if (records.length === 0) return 0;
 
+    console.log(records.length, records, ISTDate());
+
     let streak = 0;
-    let expectedDate = new Date();
-    expectedDate.setHours(0, 0, 0, 0);
+    let expectedDate = ISTDate(); // Use ISTDate for today at midnight UTC
 
     for (const record of records) {
-        const recordDate = new Date(record.date);
-        recordDate.setHours(0, 0, 0, 0);
+        const recordDate = ISTDate(record.date); // Convert record date to midnight UTC
+
+        console.log('Comparing:', recordDate.toISOString(), 'vs', expectedDate.toISOString());
 
         if (recordDate.getTime() === expectedDate.getTime()) {
             streak++;
