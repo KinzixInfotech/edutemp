@@ -1,25 +1,233 @@
+// // app/api/schools/syllabus/route.js
+// import prisma from "@/lib/prisma";
+// import { NextResponse } from "next/server";
+
+// export async function GET(req) {
+//     const { searchParams } = new URL(req.url);
+//     const schoolId = searchParams.get("schoolId");
+//     const classId = searchParams.get("classId");
+//     const academicYearId = searchParams.get("academicYearId");
+
+//     if (!schoolId) {
+//         return NextResponse.json({ error: "schoolId is required" }, { status: 400 });
+//     }
+
+//     try {
+//         const where = { schoolId };
+//         if (classId) where.classId = parseInt(classId);
+//         if (academicYearId) where.academicYearId = academicYearId;
+
+//         const syllabi = await prisma.syllabus.findMany({
+//             where,
+//             include: {
+//                 // fileName:true,
+//                 // filename:true,
+//                 // filename:true,
+//                 Class: {
+//                     include: {
+//                         sections: {
+//                             select: {
+//                                 id: true,
+//                                 name: true,
+//                             }
+//                         }
+//                     }
+//                 },
+//                 AcademicYear: {
+//                     select: {
+//                         id: true,
+//                         name: true,
+//                         isActive: true,
+//                     }
+//                 },
+//             },
+//             orderBy: {
+//                 uploadedAt: 'desc'
+//             }
+//         });
+
+//         return NextResponse.json({
+//             success: true,
+//             syllabi,
+//             total: syllabi.length
+//         });
+//     } catch (error) {
+//         console.error("Fetch syllabi error:", error);
+//         return NextResponse.json({ error: "Failed to fetch syllabi" }, { status: 500 });
+//     }
+// }
+
+// export async function POST(req) {
+//     try {
+//         const body = await req.json();
+//         const { fileUrl, schoolId, classId, academicYearId, fileName } = body;
+
+//         if (!fileUrl || !schoolId || !classId) {
+//             return NextResponse.json(
+//                 { error: "fileUrl, schoolId, and classId are required" },
+//                 { status: 400 }
+//             );
+//         }
+
+//         // Get active academic year if not provided
+//         let finalAcademicYearId = academicYearId;
+
+//         if (!finalAcademicYearId) {
+//             const activeYear = await prisma.academicYear.findFirst({
+//                 where: { schoolId, isActive: true },
+//             });
+//             if (activeYear) finalAcademicYearId = activeYear.id;
+//         }
+
+//         // Check if syllabus already exists for this class
+//         const existing = await prisma.syllabus.findFirst({
+//             where: {
+//                 schoolId,
+//                 classId: parseInt(classId),
+//                 academicYearId: finalAcademicYearId,
+//             }
+//         });
+
+//         let syllabus;
+
+//         if (existing) {
+//             // Update existing syllabus
+//             syllabus = await prisma.syllabus.update({
+//                 where: { id: existing.id },
+//                 data: {
+//                     fileUrl,
+//                     filename:fileName,
+//                     uploadedAt: new Date(),
+//                 },
+//                 include: {
+//                     Class: {
+//                         include: {
+//                             sections: true
+//                         }
+//                     },
+//                     AcademicYear: true,
+//                     School: {
+//                         select: {
+//                             id: true,
+//                             name: true,
+//                         }
+//                     },
+//                 },
+//             });
+//         } else {
+//             // Create new syllabus
+//             syllabus = await prisma.syllabus.create({
+//                 data: {
+//                     filename:fileName,
+//                     fileUrl,
+//                     schoolId,
+//                     classId: parseInt(classId),
+//                     academicYearId: finalAcademicYearId,
+//                 },
+//                 include: {
+//                     Class: {
+//                         include: {
+//                             sections: true
+//                         }
+//                     },
+//                     AcademicYear: true,
+//                     School: {
+//                         select: {
+//                             id: true,
+//                             name: true,
+//                         }
+//                     },
+//                 },
+//             });
+//         }
+
+//         return NextResponse.json({
+//             success: true,
+//             syllabus,
+//             message: existing ? "Syllabus updated successfully" : "Syllabus uploaded successfully"
+//         }, { status: 201 });
+//     } catch (error) {
+//         console.error("Create syllabus error:", error);
+//         return NextResponse.json(
+//             { error: "Failed to create syllabus" },
+//             { status: 500 }
+//         );
+//     }
+// }
+
+// export async function DELETE(req) {
+//     const body = await req.json();
+//     const { id } = body;
+
+//     if (!id) {
+//         return NextResponse.json({ error: "id is required" }, { status: 400 });
+//     }
+
+//     try {
+//         await prisma.syllabus.delete({ where: { id } });
+//         return NextResponse.json({
+//             success: true,
+//             message: "Syllabus deleted successfully"
+//         });
+//     } catch (error) {
+//         console.error("Delete syllabus error:", error);
+//         return NextResponse.json({ error: "Failed to delete syllabus" }, { status: 500 });
+//     }
+// }
+
 // app/api/schools/syllabus/route.js
 import prisma from "@/lib/prisma";
-import { School } from "lucide-react";
 import { NextResponse } from "next/server";
+import { notifySyllabusToClass, notifySyllabusToTeachers, notifySyllabusUploaded } from "@/lib/notifications/notificationHelper";
 
 export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const schoolId = searchParams.get("schoolId");
+    const classId = searchParams.get("classId");
+    const academicYearId = searchParams.get("academicYearId");
+
     if (!schoolId) {
         return NextResponse.json({ error: "schoolId is required" }, { status: 400 });
     }
+
     try {
+        const where = { schoolId };
+        if (classId) where.classId = parseInt(classId);
+        if (academicYearId) where.academicYearId = academicYearId;
+
         const syllabi = await prisma.syllabus.findMany({
-            where: { schoolId },
+            where,
             include: {
-                Class: true,
-                AcademicYear: true,
+                Class: {
+                    include: {
+                        sections: {
+                            select: {
+                                id: true,
+                                name: true,
+                            }
+                        }
+                    }
+                },
+                AcademicYear: {
+                    select: {
+                        id: true,
+                        name: true,
+                        isActive: true,
+                    }
+                },
             },
+            orderBy: {
+                uploadedAt: 'desc'
+            }
         });
-        return NextResponse.json(syllabi);
+
+        return NextResponse.json({
+            success: true,
+            syllabi,
+            total: syllabi.length
+        });
     } catch (error) {
-        console.error(error);
+        console.error("Fetch syllabi error:", error);
         return NextResponse.json({ error: "Failed to fetch syllabi" }, { status: 500 });
     }
 }
@@ -27,41 +235,125 @@ export async function GET(req) {
 export async function POST(req) {
     try {
         const body = await req.json();
-        const { fileUrl, schoolId, classId } = body;
+        const { fileUrl, schoolId, classId, academicYearId, fileName, senderId } = body;
 
-        if (!fileUrl || !schoolId) {
+        if (!fileUrl || !schoolId || !classId) {
             return NextResponse.json(
-                { error: "fileUrl and schoolId are required" },
+                { error: "fileUrl, schoolId, and classId are required" },
                 { status: 400 }
             );
         }
 
-        // Fetch active academic year 
-        let finalAcademicYearId;
+        // Get active academic year if not provided
+        let finalAcademicYearId = academicYearId;
 
-        const activeYear = await prisma.academicYear.findFirst({
-            where: { schoolId, isActive: true },
-        });
-        if (activeYear) finalAcademicYearId = activeYear.id;
+        if (!finalAcademicYearId) {
+            const activeYear = await prisma.academicYear.findFirst({
+                where: { schoolId, isActive: true },
+            });
+            if (activeYear) finalAcademicYearId = activeYear.id;
+        }
 
-        const syllabus = await prisma.syllabus.create({
-            data: {
-                fileUrl,
-                School: { connect: { id: schoolId } },
-                Class: { connect: { id: parseInt(classId) } },
-                AcademicYear: { connect: { id: finalAcademicYearId } },
-            },
-            include: {
-                Class: true,
-                AcademicYear: true,
-                School: true,
-            },
+        // Check if syllabus already exists for this class
+        const existing = await prisma.syllabus.findFirst({
+            where: {
+                schoolId,
+                classId: parseInt(classId),
+                academicYearId: finalAcademicYearId,
+            }
         });
 
+        let syllabus;
+        let isUpdate = false;
 
-        return NextResponse.json(syllabus, { status: 201 });
+        if (existing) {
+            // Update existing syllabus
+            syllabus = await prisma.syllabus.update({
+                where: { id: existing.id },
+                data: {
+                    fileUrl,
+                    filename: fileName,
+                    uploadedAt: new Date(),
+                },
+                include: {
+                    Class: {
+                        include: {
+                            sections: true
+                        }
+                    },
+                    AcademicYear: true,
+                    School: {
+                        select: {
+                            id: true,
+                            name: true,
+                        }
+                    },
+                },
+            });
+            isUpdate = true;
+        } else {
+            // Create new syllabus
+            syllabus = await prisma.syllabus.create({
+                data: {
+                    filename: fileName,
+                    fileUrl,
+                    schoolId,
+                    classId: parseInt(classId),
+                    academicYearId: finalAcademicYearId,
+                },
+                include: {
+                    Class: {
+                        include: {
+                            sections: true
+                        }
+                    },
+                    AcademicYear: true,
+                    School: {
+                        select: {
+                            id: true,
+                            name: true,
+                        }
+                    },
+                },
+            });
+        }
+
+        // Send notification to all students and parents in the class
+        try {
+            // await  notifySyllabusToTeachers({
+            //     schoolId: schoolId,
+            //     classId: parseInt(classId),
+            //     className: syllabus.Class.className,
+            //     senderId: senderId || null,
+            //     fileName: fileName || 'New syllabus document'
+            // });
+            // await notifySyllabusUploaded({
+            //     schoolId,
+            // classId: parseInt(classId),
+            //     className: syllabus.Class.className,
+            // senderId: senderId || null,
+            // fileName: fileName || 'New syllabus document'
+            // });
+            await notifySyllabusToClass({
+                schoolId,
+                classId: parseInt(classId),
+                className: syllabus.Class.className,
+                senderId: senderId || null,
+                fileName: fileName || 'New syllabus document'
+            });
+
+        } catch (notifError) {
+            console.error('Notification error:', notifError);
+            // Don't fail the request if notification fails
+        }
+
+        return NextResponse.json({
+            success: true,
+            syllabus,
+            message: isUpdate ? "Syllabus updated successfully" : "Syllabus uploaded successfully"
+        }, { status: 201 });
     } catch (error) {
-        console.error(error);
+        console.error("Create syllabus error:", error);
         return NextResponse.json(
             { error: "Failed to create syllabus" },
             { status: 500 }
@@ -72,14 +364,19 @@ export async function POST(req) {
 export async function DELETE(req) {
     const body = await req.json();
     const { id } = body;
+
     if (!id) {
         return NextResponse.json({ error: "id is required" }, { status: 400 });
     }
+
     try {
         await prisma.syllabus.delete({ where: { id } });
-        return NextResponse.json({ success: true });
+        return NextResponse.json({
+            success: true,
+            message: "Syllabus deleted successfully"
+        });
     } catch (error) {
-        console.error(error);
+        console.error("Delete syllabus error:", error);
         return NextResponse.json({ error: "Failed to delete syllabus" }, { status: 500 });
     }
 }

@@ -47,6 +47,8 @@ import {
     BarChart3,
     Baby,
     Calendar,
+    ScrollText,
+    Blocks,
 } from "lucide-react"
 import { useCommandMenu } from "./CommandMenuContext"
 
@@ -224,11 +226,11 @@ export const SidebarData = [
     },
     {
         items: [
-            { label: "Inventory", url: "/dashboard/schools/inventory", icon: House, roles: ["SUPER_ADMIN", "STUDENT", "ADMIN", "MASTER_ADMIN", "TEACHER", "STAFF"] },
-            { label: "Syllabus Management", url: "/dashboard/schools/syllabus-managment/", icon: House, roles: ["ADMIN"] },
+            { label: "Inventory", url: "/dashboard/schools/inventory", icon: Blocks, roles: ["SUPER_ADMIN", "STUDENT", "ADMIN", "MASTER_ADMIN", "TEACHER", "STAFF"] },
+            { label: "Syllabus Management", url: "/dashboard/schools/syllabus-managment/", icon: ScrollText, roles: ["ADMIN"] },
             { label: "Create Super Admin", url: "/dashboard/edubreezy/add-user", icon: IconListDetails, roles: ["SUPER_ADMIN"] },
             { label: "Audit Log", url: "/dashboard/auditlog", icon: IconChartBar, roles: ["SUPER_ADMIN"] },
-            { label: "Edu AI", url: "/dashboard/schools/eduai", icon: BotMessageSquare, roles: ["ADMIN"] },
+            // { label: "Edu AI", url: "/dashboard/schools/eduai", icon: BotMessageSquare, roles: ["ADMIN"] },
         ]
     },
     {

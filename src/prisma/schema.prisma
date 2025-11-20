@@ -333,6 +333,7 @@ model InventoryItem {
 model Syllabus {
   id             String        @id @default(uuid())
   academicYearId String?       @db.Uuid
+  filename       String
   fileUrl        String
   uploadedAt     DateTime      @default(now())
   schoolId       String        @db.Uuid
@@ -544,8 +545,8 @@ model User {
   MasterAdmin           MasterAdmin?
   nonTeachingStaff      NonTeachingStaff?
   Notice                Notice[]
-  receivedNotifications Notification[]         @relation("Receiver")
-  sentNotifications     Notification[]         @relation("Sender")
+  receivedNotifications Notification[]         @relation("NotificationReceiver")
+  sentNotifications     Notification[]         @relation("NotificationSender")
   student               Student?
   teacher               TeachingStaff?
   role                  Role                   @relation(fields: [roleId], references: [id])
@@ -574,6 +575,7 @@ model User {
   attendanceStats         AttendanceStats[]
   bulkAttendanceRecords   BulkAttendance[]
   attendanceNotifications AttendanceNotification[] @relation("AttendanceNotifications")
+
 
   @@index([schoolId])
   @@index([roleId])
@@ -1224,13 +1226,13 @@ model AttendanceDelegation {
   endDate   DateTime @db.Date
 
   // Status & Metadata
-  status      DelegationStatus @default(ACTIVE)
-  reason      String?          @db.Text
-  
-  acknowledgedAt        DateTime?       // Tracks when substitute teacher acknowledged the delegation
-  createdById String           @db.Uuid
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  status DelegationStatus @default(ACTIVE)
+  reason String?          @db.Text
+
+  acknowledgedAt DateTime? // Tracks when substitute teacher acknowledged the delegation
+  createdById    String    @db.Uuid
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   // Relations
   school            School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
@@ -1243,7 +1245,6 @@ model AttendanceDelegation {
   // ✅ New Rules
   @@unique([schoolId, originalTeacherId, startDate, endDate])
   @@unique([schoolId, classId, sectionId, startDate, endDate])
-
   // Existing helpful indexes
   @@index([schoolId, startDate, endDate])
   @@index([substituteTeacherId, startDate, endDate])
@@ -1562,6 +1563,7 @@ enum LeaveStatus {
   CANCELLED
 }
 
+// Notification Enums
 enum NotificationType {
   DAILY_REMINDER
   ABSENT_ALERT
@@ -1569,6 +1571,29 @@ enum NotificationType {
   LEAVE_REJECTED
   LOW_ATTENDANCE
   APPROVAL_REQUIRED
+  GENERAL
+  SYLLABUS
+  ASSIGNMENT
+  FEE
+  EXAM
+  ATTENDANCE
+  NOTICE
+  LEAVE
+  TRANSPORT
+  LIBRARY
+  ADMISSION
+  EVENT
+  RESULT
+  TIMETABLE
+  BIRTHDAY
+  ANNIVERSARY
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
 }
 
 enum NotificationStatus {
@@ -1578,16 +1603,40 @@ enum NotificationStatus {
 }
 
 model Notification {
-  id         Int      @id @default(autoincrement())
-  senderId   String   @db.Uuid
-  receiverId String   @db.Uuid
-  message    String
-  createdAt  DateTime @default(now())
-  receiver   User     @relation("Receiver", fields: [receiverId], references: [id])
-  sender     User     @relation("Sender", fields: [senderId], references: [id])
+  id         String  @id @default(uuid()) @db.Uuid
+  senderId   String? @db.Uuid
+  receiverId String  @db.Uuid
+  schoolId   String  @db.Uuid
 
-  @@index([receiverId])
-  @@index([senderId])
+  // Content
+  title    String
+  message  String               @db.Text
+  type     NotificationType     @default(GENERAL)
+  priority NotificationPriority @default(NORMAL)
+  icon     String               @default("📢")
+
+  // Status
+  isRead Boolean   @default(false)
+  readAt DateTime?
+
+  // Action & Metadata
+  actionUrl String? // Deep link or action URL
+  metadata  Json? // Additional data
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  expiresAt DateTime? // Optional expiry date
+
+  // Relations
+  receiver User  @relation("NotificationReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender   User? @relation("NotificationSender", fields: [senderId], references: [id])
+
+  @@index([receiverId, isRead])
+  @@index([receiverId, createdAt])
+  @@index([schoolId])
+  @@index([type])
+  @@index([priority])
+  @@index([createdAt])
 }
 
 model LibraryBook {

@@ -1,0 +1,386 @@
+// ============================================
+// NOTIFICATION SYSTEM - USAGE EXAMPLES
+// ============================================
+
+import { 
+    sendNotification,
+    notifyTeachers,
+    notifySyllabusToTeachers,
+    notifySyllabusUploaded,
+    notifySyllabusToStudentsAndParents,
+    notifyAssignmentCreated,
+    notifyFeeReminder,
+    notifyExamSchedule,
+    notifyAttendanceMarked,
+    notifyNoticePublished,
+    notifyLeaveApproved 
+} from "@/lib/notifications/notificationHelper";
+
+// ============================================
+// 1. SEND TO ONLY TEACHERS
+// ============================================
+
+// Example 1: Send general notification to all teachers
+await notifyTeachers({
+    schoolId: "school-123",
+    title: "Staff Meeting Reminder",
+    message: "Staff meeting scheduled for tomorrow at 10 AM in the conference room",
+    senderId: "admin-user-id",
+    actionUrl: "/meetings"
+});
+
+// Example 2: Send syllabus notification to teachers of specific class
+await notifySyllabusToTeachers({
+    schoolId: "school-123",
+    classId: 10,
+    className: "Class 10",
+    senderId: "admin-user-id",
+    fileName: "Class 10 - Annual Syllabus 2024.pdf"
+});
+
+// Example 3: Send to teachers using role name
+await sendNotification({
+    schoolId: "school-123",
+    title: "New Policy Update",
+    message: "Please review the updated attendance policy",
+    type: 'GENERAL',
+    priority: 'HIGH',
+    icon: '📋',
+    targetOptions: { 
+        roleNames: ['Teacher'] // Use role name from your Role table
+    },
+    senderId: "admin-user-id",
+    actionUrl: "/policies"
+});
+
+// Example 4: Send to specific teachers by user IDs
+const teacherUserIds = ["teacher-1-id", "teacher-2-id", "teacher-3-id"];
+await sendNotification({
+    schoolId: "school-123",
+    title: "Department Meeting",
+    message: "Science department meeting at 3 PM",
+    type: 'GENERAL',
+    targetOptions: { 
+        userIds: teacherUserIds 
+    },
+    senderId: "admin-user-id"
+});
+
+// ============================================
+// 2. SEND TO ONLY STUDENTS
+// ============================================
+
+// Example 1: Send to students of a specific class
+await notifySyllabusUploaded({
+    schoolId: "school-123",
+    classId: 10,
+    className: "Class 10",
+    senderId: "teacher-user-id",
+    fileName: "Mathematics Syllabus.pdf"
+});
+
+// Example 2: Send to students of specific section
+await sendNotification({
+    schoolId: "school-123",
+    title: "Extra Class Tomorrow",
+    message: "Extra mathematics class will be held tomorrow at 2 PM",
+    type: 'GENERAL',
+    icon: '📚',
+    targetOptions: { 
+        sectionIds: [1, 2] // Section IDs
+    },
+    senderId: "teacher-user-id"
+});
+
+// Example 3: Send to all students in school
+await sendNotification({
+    schoolId: "school-123",
+    title: "School Closed Tomorrow",
+    message: "School will remain closed tomorrow due to public holiday",
+    type: 'GENERAL',
+    priority: 'URGENT',
+    icon: '🏫',
+    targetOptions: { 
+        userTypes: ['STUDENT']
+    },
+    senderId: "admin-user-id"
+});
+
+// ============================================
+// 3. SEND TO STUDENTS AND PARENTS
+// ============================================
+
+// Example 1: Send syllabus notification to students and their parents
+await notifySyllabusToStudentsAndParents({
+    schoolId: "school-123",
+    classId: 10,
+    className: "Class 10",
+    senderId: "admin-user-id",
+    fileName: "Annual Syllabus 2024.pdf"
+});
+
+// Example 2: Send fee reminder to students and parents
+await sendNotification({
+    schoolId: "school-123",
+    title: "Fee Payment Reminder",
+    message: "Please pay your quarterly fees by the end of this month",
+    type: 'FEE',
+    priority: 'HIGH',
+    icon: '💰',
+    targetOptions: { 
+        classIds: [10, 11, 12],
+        userTypes: ['STUDENT'],
+        includeParents: true
+    },
+    senderId: "admin-user-id",
+    actionUrl: '/fees'
+});
+
+// Example 3: Send exam notification to students and parents
+await notifyExamSchedule({
+    schoolId: "school-123",
+    classIds: [10],
+    examName: "Mid-term Examination",
+    examDate: new Date("2024-12-15"),
+    senderId: "admin-user-id"
+});
+
+// ============================================
+// 4. SEND TO ONLY PARENTS
+// ============================================
+
+// Example 1: Send parent-teacher meeting notification
+await sendNotification({
+    schoolId: "school-123",
+    title: "Parent-Teacher Meeting",
+    message: "PTM scheduled for next Saturday. Please attend with your ward",
+    type: 'EVENT',
+    priority: 'HIGH',
+    icon: '👨‍👩‍👧',
+    targetOptions: { 
+        userTypes: ['PARENT']
+    },
+    senderId: "admin-user-id",
+    actionUrl: '/events/ptm'
+});
+
+// Example 2: Send to parents of specific class
+await sendNotification({
+    schoolId: "school-123",
+    title: "Class Picnic Announcement",
+    message: "Class 10 is organizing a picnic next month. Please submit consent forms",
+    type: 'EVENT',
+    icon: '🎒',
+    targetOptions: { 
+        classIds: [10],
+        userTypes: ['STUDENT'],
+        includeParents: true
+    },
+    senderId: "teacher-user-id",
+    metadata: { classId: 10 }
+});
+
+// ============================================
+// 5. SEND TO ADMINS AND STAFF
+// ============================================
+
+// Example 1: Send to all admins
+await sendNotification({
+    schoolId: "school-123",
+    title: "Emergency Alert",
+    message: "Immediate attention required in the main building",
+    type: 'GENERAL',
+    priority: 'URGENT',
+    icon: '🚨',
+    targetOptions: { 
+        userTypes: ['ADMIN']
+    },
+    senderId: "system"
+});
+
+// Example 2: Send to teaching and non-teaching staff
+await sendNotification({
+    schoolId: "school-123",
+    title: "Salary Credited",
+    message: "Your salary for this month has been credited to your account",
+    type: 'GENERAL',
+    icon: '💵',
+    targetOptions: { 
+        userTypes: ['TEACHER', 'NON_TEACHING_STAFF']
+    },
+    senderId: "admin-user-id",
+    actionUrl: '/salary'
+});
+
+// ============================================
+// 6. SEND TO MULTIPLE USER TYPES
+// ============================================
+
+// Example 1: Send to teachers and admins
+await sendNotification({
+    schoolId: "school-123",
+    title: "Policy Update",
+    message: "New attendance policy has been implemented",
+    type: 'GENERAL',
+    priority: 'HIGH',
+    icon: '📜',
+    targetOptions: { 
+        userTypes: ['TEACHER', 'ADMIN']
+    },
+    senderId: "principal-user-id",
+    actionUrl: '/policies/attendance'
+});
+
+// Example 2: Send to everyone in school
+await sendNotification({
+    schoolId: "school-123",
+    title: "Annual Day Celebration",
+    message: "Annual day celebration on December 20th. All are invited!",
+    type: 'EVENT',
+    priority: 'NORMAL',
+    icon: '🎉',
+    targetOptions: { 
+        allUsers: true
+    },
+    senderId: "admin-user-id",
+    actionUrl: '/events/annual-day'
+});
+
+// ============================================
+// 7. CONDITIONAL NOTIFICATIONS IN APIS
+// ============================================
+
+// In your syllabus upload API
+export async function POST(req) {
+    try {
+        const body = await req.json();
+        const { fileUrl, schoolId, classId, fileName, senderId, notifyUsers } = body;
+
+        // ... syllabus creation logic ...
+
+        // Conditional notification based on user preference
+        if (notifyUsers) {
+            if (notifyUsers === 'TEACHERS') {
+                await notifySyllabusToTeachers({
+                    schoolId, classId, className, senderId, fileName
+                });
+            } else if (notifyUsers === 'STUDENTS') {
+                await notifySyllabusUploaded({
+                    schoolId, classId, className, senderId, fileName
+                });
+            } else if (notifyUsers === 'ALL') {
+                await notifySyllabusToStudentsAndParents({
+                    schoolId, classId, className, senderId, fileName
+                });
+            }
+        }
+
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        console.error('Error:', error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+}
+
+// ============================================
+// 8. ADVANCED TARGETING EXAMPLES
+// ============================================
+
+// Example 1: Send to teachers of specific subject
+const mathTeachers = await prisma.teachingStaff.findMany({
+    where: { schoolId: "school-123", subjectId: 1 },
+    select: { userId: true }
+});
+await sendNotification({
+    schoolId: "school-123",
+    title: "Mathematics Workshop",
+    message: "Workshop on new teaching methods this weekend",
+    type: 'GENERAL',
+    targetOptions: { 
+        userIds: mathTeachers.map(t => t.userId)
+    },
+    senderId: "admin-user-id"
+});
+
+// Example 2: Send to class teachers only
+const classTeachers = await prisma.class.findMany({
+    where: { schoolId: "school-123" },
+    select: { teachingStaffUserId: true }
+});
+await sendNotification({
+    schoolId: "school-123",
+    title: "Class Teacher Meeting",
+    message: "All class teachers are requested to attend the meeting",
+    type: 'GENERAL',
+    targetOptions: { 
+        userIds: classTeachers.map(c => c.teachingStaffUserId).filter(Boolean)
+    },
+    senderId: "admin-user-id"
+});
+
+// ============================================
+// 9. NOTIFICATION WITH EXPIRY
+// ============================================
+
+await sendNotification({
+    schoolId: "school-123",
+    title: "Limited Time Offer",
+    message: "Early bird discount on annual fees. Valid till Dec 31",
+    type: 'FEE',
+    icon: '🎁',
+    targetOptions: { userTypes: ['STUDENT'], includeParents: true },
+    senderId: "admin-user-id",
+    metadata: { 
+        expiresAt: new Date("2024-12-31"),
+        discountPercent: 10 
+    }
+});
+
+// ============================================
+// 10. CUSTOM NOTIFICATION WITH ALL OPTIONS
+// ============================================
+
+await sendNotification({
+    schoolId: "school-123",
+    title: "Custom Notification",
+    message: "This is a fully customized notification",
+    type: 'GENERAL',
+    priority: 'HIGH',
+    icon: '🔔',
+    targetOptions: {
+        classIds: [10, 11],
+        sectionIds: [1, 2],
+        roleNames: ['Teacher'],
+        userTypes: ['STUDENT', 'PARENT'],
+        includeParents: true
+    },
+    senderId: "admin-user-id",
+    metadata: {
+        customField1: "value1",
+        customField2: "value2",
+        category: "important"
+    },
+    actionUrl: "/custom-action",
+    sendPush: true // Enable push notifications
+});
+
+// ============================================
+// SUMMARY OF TARGET OPTIONS
+// ============================================
+
+/*
+targetOptions can include:
+- userIds: string[] - Specific user IDs
+- classIds: number[] - Target students/teachers of these classes
+- sectionIds: number[] - Target students/teachers of these sections
+- roleIds: number[] - Target users with these role IDs
+- roleNames: string[] - Target users with these role names (e.g., ['Teacher', 'Admin'])
+- userTypes: string[] - Target by type: ['TEACHER', 'STUDENT', 'PARENT', 'ADMIN', 'NON_TEACHING_STAFF']
+- includeParents: boolean - Also send to parents of targeted students
+- allUsers: boolean - Send to all users in the school
+
+Priority:
+- If userIds provided, only those users get notification
+- If allUsers is true, everyone gets notification
+- Otherwise, combination of other options is used
+*/
