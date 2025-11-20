@@ -1226,6 +1226,8 @@ model AttendanceDelegation {
   // Status & Metadata
   status      DelegationStatus @default(ACTIVE)
   reason      String?          @db.Text
+  
+  acknowledgedAt        DateTime?       // Tracks when substitute teacher acknowledged the delegation
   createdById String           @db.Uuid
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
