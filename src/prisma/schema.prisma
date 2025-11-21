@@ -69,8 +69,394 @@ model School {
   bulkAttendance          BulkAttendance[]
   attendanceNotifications AttendanceNotification[]
   homework                Homework[]
+  partnerSchools          PartnerSchool[]
 
   @@index([name])
+}
+
+// ============================================
+// CHANNEL PARTNER PROGRAM SYSTEM
+// ============================================
+
+// Partner Roles
+enum PartnerRole {
+  AFFILIATE
+  RESELLER
+  ENTERPRISE
+}
+
+// Partner Levels
+enum PartnerLevel {
+  SILVER
+  GOLD
+  PLATINUM
+}
+
+// Partner Status
+enum PartnerStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REJECTED
+}
+
+// Lead Status
+enum LeadStatus {
+  NEW
+  IN_PROGRESS
+  DEMO_SCHEDULED
+  CONVERTED
+  REJECTED
+}
+
+// Payout Status
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// Commission Type
+enum CommissionType {
+  ONBOARDING
+  RENEWAL
+  UPGRADE
+  BONUS
+}
+
+// Main Partner Model
+model Partner {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @unique @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Partner Details
+  role   PartnerRole   @default(AFFILIATE)
+  level  PartnerLevel  @default(SILVER)
+  status PartnerStatus @default(PENDING)
+
+  // Business Information
+  companyName  String?
+  businessType String?
+  gstin        String? @unique
+  panNumber    String? @unique
+
+  // Contact Information
+  contactPerson  String
+  contactEmail   String  @unique
+  contactPhone   String
+  alternatePhone String?
+  address        String
+  city           String
+  state          String
+  country        String  @default("India")
+  postalCode     String
+
+  // Commission Configuration
+  commissionRate Float @default(10) // Percentage
+  renewalRate    Float @default(5) // Percentage
+
+  // Referral Information
+  referralCode String  @unique
+  referralLink String
+  qrCodeUrl    String?
+
+  // Account Manager
+  accountManagerId String? @db.Uuid
+  accountManager   User?   @relation("PartnerAccountManager", fields: [accountManagerId], references: [id])
+
+  // KYC & Banking
+  kycStatus     String  @default("PENDING") // PENDING, VERIFIED, REJECTED
+  kycDocuments  Json? // Array of document URLs
+  bankName      String?
+  accountNumber String?
+  ifscCode      String?
+  accountHolder String?
+  upiId         String?
+
+  // Statistics
+  totalLeads      Int   @default(0)
+  convertedLeads  Int   @default(0)
+  totalRevenue    Float @default(0)
+  totalCommission Float @default(0)
+
+  // Approval Details
+  approvedBy     String?   @db.Uuid
+  approvedAt     DateTime?
+  rejectedReason String?
+
+  // System Fields
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Relations
+  leads       PartnerLead[]
+  schools     PartnerSchool[]
+  commissions PartnerCommission[]
+  payouts     PartnerPayout[]
+  activities  PartnerActivity[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([level])
+  @@index([referralCode])
+  @@index([contactEmail])
+}
+
+// Partner Leads Management
+model PartnerLead {
+  id        String  @id @default(uuid()) @db.Uuid
+  partnerId String  @db.Uuid
+  partner   Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  // Lead Information
+  schoolName     String
+  contactPerson  String
+  contactPhone   String
+  contactEmail   String
+  alternatePhone String?
+  address        String?
+  city           String?
+  state          String?
+  postalCode     String?
+
+  // Lead Details
+  estimatedStudents Int?
+  currentSystem     String?
+  notes             String? @db.Text
+
+  // Status & Assignment
+  status       LeadStatus @default(NEW)
+  assignedToId String?    @db.Uuid
+  assignedTo   User?      @relation("LeadAssignedTo", fields: [assignedToId], references: [id])
+  assignedAt   DateTime?
+
+  // Conversion Details
+  convertedAt       DateTime?
+  convertedSchoolId String?   @db.Uuid
+  rejectedReason    String?
+
+  // Follow-up
+  lastFollowUp    DateTime?
+  nextFollowUp    DateTime?
+  demoScheduledAt DateTime?
+
+  // System Fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  activities LeadActivity[]
+
+  @@index([partnerId])
+  @@index([status])
+  @@index([contactEmail])
+  @@index([assignedToId])
+}
+
+// Lead Activity Log
+model LeadActivity {
+  id     String      @id @default(uuid()) @db.Uuid
+  leadId String      @db.Uuid
+  lead   PartnerLead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  activityType String // STATUS_CHANGE, FOLLOW_UP, DEMO, NOTES
+  description  String  @db.Text
+  oldStatus    String?
+  newStatus    String?
+  performedBy  String? @db.Uuid
+
+  createdAt DateTime @default(now())
+
+  @@index([leadId])
+  @@index([createdAt])
+}
+
+// Partner-School Relationship
+model PartnerSchool {
+  id        String  @id @default(uuid()) @db.Uuid
+  partnerId String  @db.Uuid
+  partner   Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  schoolId  String  @db.Uuid
+  school    School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  // Onboarding Details
+  onboardedAt      DateTime @default(now())
+  subscriptionPlan String
+  planStartDate    DateTime
+  planEndDate      DateTime
+  renewalDate      DateTime
+
+  // Revenue & Commission
+  subscriptionAmount Float
+  commissionRate     Float
+  commissionAmount   Float
+
+  // Status
+  isActive     Boolean @default(true)
+  renewalCount Int     @default(0)
+
+  // System Fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([partnerId, schoolId])
+  @@index([partnerId])
+  @@index([schoolId])
+  @@index([renewalDate])
+}
+
+// Commission Management
+model PartnerCommission {
+  id        String  @id @default(uuid()) @db.Uuid
+  partnerId String  @db.Uuid
+  partner   Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  // Commission Details
+  type       CommissionType @default(ONBOARDING)
+  schoolId   String?        @db.Uuid
+  schoolName String
+
+  // Amounts
+  revenueAmount    Float
+  commissionRate   Float
+  commissionAmount Float
+
+  // Status
+  isPaid   Boolean        @default(false)
+  paidAt   DateTime?
+  payoutId String?        @db.Uuid
+  payout   PartnerPayout? @relation(fields: [payoutId], references: [id])
+
+  // Period
+  periodMonth Int
+  periodYear  Int
+
+  // System Fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([partnerId])
+  @@index([isPaid])
+  @@index([periodMonth, periodYear])
+}
+
+// Payout Management
+model PartnerPayout {
+  id        String  @id @default(uuid()) @db.Uuid
+  partnerId String  @db.Uuid
+  partner   Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  // Payout Details
+  amount        Float
+  commissionIds String[] // Array of commission IDs
+
+  // Payment Information
+  paymentMethod   String // BANK_TRANSFER, UPI, CHEQUE
+  transactionId   String?
+  referenceNumber String?
+  utrNumber       String?
+
+  // Status
+  status       PayoutStatus @default(PENDING)
+  requestedAt  DateTime     @default(now())
+  processedAt  DateTime?
+  completedAt  DateTime?
+  failedReason String?
+
+  // Processed By
+  processedBy String? @db.Uuid
+
+  // System Fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  commissions PartnerCommission[]
+
+  @@index([partnerId])
+  @@index([status])
+  @@index([requestedAt])
+}
+
+// Marketing Assets
+model MarketingAsset {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Asset Details
+  title       String
+  description String? @db.Text
+  type        String // PITCH_DECK, BROCHURE, PRICING, VIDEO, IMAGE
+  category    String? // SALES, MARKETING, TRAINING
+
+  // File Information
+  fileUrl      String
+  fileName     String
+  fileSize     Int?
+  mimeType     String?
+  thumbnailUrl String?
+
+  // Access Control
+  isActive      Boolean  @default(true)
+  partnerLevels String[] // ["SILVER", "GOLD", "PLATINUM"]
+
+  // Metadata
+  downloadCount Int     @default(0)
+  version       String? @default("1.0")
+
+  // System Fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
+  @@index([isActive])
+}
+
+// Partner Activity Log
+model PartnerActivity {
+  id        String  @id @default(uuid()) @db.Uuid
+  partnerId String  @db.Uuid
+  partner   Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  activityType String // LOGIN, LEAD_ADDED, PAYOUT_REQUEST, PROFILE_UPDATE
+  description  String  @db.Text
+  metadata     Json?
+  ipAddress    String?
+
+  createdAt DateTime @default(now())
+
+  @@index([partnerId])
+  @@index([createdAt])
+}
+
+// Commission Slabs Configuration
+model CommissionSlab {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Slab Details
+  name       String
+  level      PartnerLevel
+  minRevenue Float        @default(0)
+  maxRevenue Float?
+
+  // Rates
+  onboardingRate Float // Percentage
+  renewalRate    Float // Percentage
+  upgradeRate    Float // Percentage
+
+  // Conditions
+  minSchools Int     @default(0)
+  isActive   Boolean @default(true)
+
+  // System Fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([level])
+  @@index([isActive])
 }
 
 // admission module
@@ -576,6 +962,9 @@ model User {
   attendanceStats         AttendanceStats[]
   bulkAttendanceRecords   BulkAttendance[]
   attendanceNotifications AttendanceNotification[] @relation("AttendanceNotifications")
+  partner                 Partner?
+  managedPartners         Partner[]                @relation("PartnerAccountManager")
+  assignedLeads           PartnerLead[]            @relation("LeadAssignedTo")
 
   @@index([schoolId])
   @@index([roleId])
