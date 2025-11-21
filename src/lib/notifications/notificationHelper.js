@@ -727,6 +727,169 @@ export async function notifyLeaveApproved({ schoolId, userId, leaveType, startDa
     });
 }
 
+// Add to lib/notifications/notificationHelper.js
+
+/**
+ * Notify homework assignment to students and parents
+ */
+export async function notifyHomeworkAssigned({
+    schoolId,
+    classId,
+    sectionId,
+    className,
+    sectionName,
+    title,
+    subjectName,
+    dueDate,
+    senderId,
+    teacherName
+}) {
+    const classIdNum = parseInt(classId);
+    const sectionIdNum = sectionId ? parseInt(sectionId) : null;
+
+    // Format due date
+    const dueDateFormatted = new Date(dueDate).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+    });
+
+    // Create message
+    const targetText = sectionName
+        ? `${className} - ${sectionName}`
+        : className;
+
+    const subjectText = subjectName ? ` (${subjectName})` : '';
+
+    const message = `New homework assigned for ${targetText}${subjectText}. Due: ${dueDateFormatted}`;
+
+    // Build target options
+    const targetOptions = {
+        classIds: [classIdNum],
+        userTypes: ['STUDENT'],
+        includeParents: true
+    };
+
+    if (sectionIdNum) {
+        targetOptions.sectionIds = [sectionIdNum];
+    }
+
+    // Send notification
+    await sendNotification({
+        schoolId,
+        title: `New Homework: ${title}`,
+        message,
+        type: 'ASSIGNMENT',
+        priority: 'HIGH',
+        icon: '📝',
+        targetOptions,
+        senderId,
+        metadata: {
+            classId,
+            sectionId,
+            title,
+            subjectName,
+            dueDate,
+            teacherName
+        },
+        actionUrl: '/homework'
+    });
+}
+
+/**
+ * Notify homework due reminder
+ */
+export async function notifyHomeworkDueReminder({
+    schoolId,
+    homeworkId,
+    studentIds,
+    title,
+    dueDate
+}) {
+    const dueDateFormatted = new Date(dueDate).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
+    });
+
+    const daysLeft = Math.ceil((new Date(dueDate) - new Date()) / (1000 * 60 * 60 * 24));
+
+    let message = `Reminder: "${title}" is due on ${dueDateFormatted}`;
+    if (daysLeft === 0) {
+        message = `⚠️ "${title}" is due today!`;
+    } else if (daysLeft === 1) {
+        message = `⚠️ "${title}" is due tomorrow!`;
+    } else if (daysLeft < 0) {
+        message = `⚠️ "${title}" is overdue!`;
+    }
+
+    await sendNotification({
+        schoolId,
+        title: 'Homework Due Reminder',
+        message,
+        type: 'ASSIGNMENT',
+        priority: daysLeft <= 1 ? 'URGENT' : 'HIGH',
+        icon: '⏰',
+        targetOptions: {
+            userIds: studentIds,
+            includeParents: true
+        },
+        metadata: { homeworkId, dueDate, daysLeft },
+        actionUrl: `/homework/${homeworkId}`
+    });
+}
+
+/**
+ * Notify homework submission received
+ */
+export async function notifyHomeworkSubmitted({
+    schoolId,
+    teacherId,
+    studentName,
+    homeworkTitle,
+    className
+}) {
+    await sendNotification({
+        schoolId,
+        title: 'Homework Submitted',
+        message: `${studentName} from ${className} has submitted "${homeworkTitle}"`,
+        type: 'ASSIGNMENT',
+        priority: 'NORMAL',
+        icon: '✅',
+        targetOptions: { userIds: [teacherId] },
+        metadata: { studentName, homeworkTitle, className },
+        actionUrl: '/homework/submissions'
+    });
+}
+
+/**
+ * Notify homework evaluated
+ */
+export async function notifyHomeworkEvaluated({
+    schoolId,
+    studentId,
+    homeworkTitle,
+    grade,
+    feedback
+}) {
+    const message = grade
+        ? `Your homework "${homeworkTitle}" has been graded: ${grade}`
+        : `Your homework "${homeworkTitle}" has been evaluated`;
+
+    await sendNotification({
+        schoolId,
+        title: 'Homework Evaluated',
+        message,
+        type: 'ASSIGNMENT',
+        priority: 'NORMAL',
+        icon: '📊',
+        targetOptions: {
+            userIds: [studentId],
+            includeParents: true
+        },
+        metadata: { homeworkTitle, grade, feedback },
+        actionUrl: '/homework'
+    });
+}
 // Export all notification types as enum
 export const NOTIFICATION_TYPES = {
     GENERAL: 'GENERAL',

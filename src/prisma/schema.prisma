@@ -68,6 +68,7 @@ model School {
   attendanceStats         AttendanceStats[]
   bulkAttendance          BulkAttendance[]
   attendanceNotifications AttendanceNotification[]
+  homework                Homework[]
 
   @@index([name])
 }
@@ -576,7 +577,6 @@ model User {
   bulkAttendanceRecords   BulkAttendance[]
   attendanceNotifications AttendanceNotification[] @relation("AttendanceNotifications")
 
-
   @@index([schoolId])
   @@index([roleId])
 }
@@ -791,12 +791,43 @@ model ExamIssue {
 }
 
 model HomeworkSubmission {
-  id             Int      @id @default(autoincrement())
-  homeworkId     Int
-  studentId      String   @db.Uuid
-  submissionDate DateTime
-  homework       Homework @relation(fields: [homeworkId], references: [id])
-  student        Student  @relation(fields: [studentId], references: [userId])
+  id         String @id @default(uuid()) @db.Uuid
+  homeworkId String @db.Uuid
+  studentId  String @db.Uuid
+
+  // Submission Details
+  submittedAt DateTime?
+  fileUrl     String?
+  fileName    String?
+  remarks     String?   @db.Text
+
+  // Status
+  status   SubmissionStatus @default(PENDING)
+  grade    String?
+  feedback String?          @db.Text
+
+  // Evaluation
+  evaluatedBy String?   @db.Uuid
+  evaluatedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  homework Homework @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  student  Student  @relation(fields: [studentId], references: [userId])
+
+  @@unique([homeworkId, studentId])
+  @@index([homeworkId])
+  @@index([studentId])
+  @@index([status])
+}
+
+enum SubmissionStatus {
+  PENDING
+  SUBMITTED
+  LATE
+  EVALUATED
+  MISSING
 }
 
 model TeachingStaff {
@@ -926,6 +957,7 @@ model Section {
   calendarEventTargets  CalendarEventTarget[]
   bulkAttendance        BulkAttendance[]
   attendanceDelegations AttendanceDelegation[]
+  homework              Homework[]
 
   @@unique([classId, name])
   @@index([classId])
@@ -995,19 +1027,47 @@ model Department {
   teachers         TeachingStaff[]
 }
 
+// Enhanced Homework Model
 model Homework {
-  id                 Int                  @id @default(autoincrement())
-  classId            Int
-  subjectId          Int
-  teacherId          String               @db.Uuid
-  class              Class                @relation(fields: [classId], references: [id])
-  subject            Subject              @relation(fields: [subjectId], references: [id])
-  teacher            TeachingStaff        @relation(fields: [teacherId], references: [userId])
-  HomeworkSubmission HomeworkSubmission[]
+  id        String @id @default(uuid()) @db.Uuid
+  schoolId  String @db.Uuid
+  classId   Int
+  sectionId Int?
+  subjectId Int?
+  teacherId String @db.Uuid
 
+  // Homework Details
+  title       String
+  description String  @db.Text
+  fileUrl     String? // Optional PDF/document
+  fileName    String?
+
+  // Dates
+  assignedDate DateTime @default(now())
+  dueDate      DateTime
+
+  // Status
+  isActive Boolean @default(true)
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  school  School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class   Class         @relation(fields: [classId], references: [id])
+  section Section?      @relation(fields: [sectionId], references: [id])
+  subject Subject?      @relation(fields: [subjectId], references: [id])
+  teacher TeachingStaff @relation(fields: [teacherId], references: [userId])
+
+  submissions HomeworkSubmission[]
+
+  @@index([schoolId])
   @@index([classId])
-  @@index([subjectId])
+  @@index([sectionId])
   @@index([teacherId])
+  @@index([dueDate])
+  @@index([isActive])
 }
 
 model Exam {

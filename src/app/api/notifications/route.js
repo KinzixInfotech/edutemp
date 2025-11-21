@@ -81,6 +81,41 @@ export async function GET(req) {
         );
     }
 }
+/**
+ * GET unread count only - Lightweight endpoint for badge
+ * Route: /api/notifications/unread-count?userId=xxx&schoolId=xxx
+ */
+export async function HEAD(req) {
+    const { searchParams } = new URL(req.url);
+    const userId = searchParams.get("userId");
+    const schoolId = searchParams.get("schoolId");
+
+    if (!userId) {
+        return NextResponse.json({ error: "userId is required" }, { status: 400 });
+    }
+
+    try {
+        const unreadCount = await prisma.notification.count({
+            where: {
+                receiverId: userId,
+                isRead: false,
+                ...(schoolId && { schoolId })
+            }
+        });
+
+        return NextResponse.json({
+            success: true,
+            unreadCount
+        });
+    } catch (error) {
+        console.error("Fetch unread count error:", error);
+        return NextResponse.json(
+            { error: "Failed to fetch unread count" },
+            { status: 500 }
+        );
+    }
+}
+
 
 /**
  * PUT - Mark notifications as read
