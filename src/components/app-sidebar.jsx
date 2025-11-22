@@ -50,6 +50,7 @@ import {
     ScrollText,
     Blocks,
     BookA,
+    School,
 } from "lucide-react"
 import { useCommandMenu } from "./CommandMenuContext"
 
@@ -74,6 +75,17 @@ export const SidebarData = [
             },
         ],
     },
+    //for partners
+    {
+        items: [
+            { label: "Home", url: "/dashboard/partnerprogram/dashboard", icon: House, roles: ["PARTNER"] },
+            { label: "Leads", url: "/dashboard/partnerprogram/leads", icon: User, roles: ["PARTNER"] },
+            { label: "Schools", url: "/dashboard/partnerprogram/schools", icon: School, roles: ["PARTNER"] },
+            { label: "Resources", url: "/dashboard/partnerprogram/resources", icon: BookCopy, roles: ["PARTNER"] },
+            { label: "Profile", url: "/dashboard/partnerprogram/profile", icon: UserPen, roles: ["PARTNER"] },
+
+        ],
+    },
     {
         title: "Admission  Management",
         items: [
@@ -90,6 +102,22 @@ export const SidebarData = [
                     { label: "All Applications", url: "/dashboard/schools/admissions/applications", roles: ["ADMIN"] },
                     { label: "Enrolled Students", url: "/dashboard/schools/admissions/enrolled", roles: ["ADMIN"] },
                     { label: "Waitlist/Rejected", url: "/dashboard/schools/admissions/waitlist-rejected", roles: ["ADMIN"] },
+                ],
+            },
+        ],
+    },
+
+    {
+        title: "Marketing",
+        items: [
+            {
+                label: "Partner Program",
+                icon: BotMessageSquare,
+                roles: ["SUPER_ADMIN"],
+                submenu: [
+                    {
+                        label: "Partner Management", url: "/dashboard/partnerprogram/admin/partners", roles: ["SUPER_ADMIN"]
+                    },
                 ],
             },
         ],
@@ -280,7 +308,7 @@ export const SidebarData = [
                     {
                         label: "Teacher Tracking", url: "/dashboard/attendance/teacher-tracking/", roles: ["ADMIN"]
                     },
-                      {
+                    {
                         label: "Attendance Delegations", url: "/dashboard/attendance/delegation/", roles: ["ADMIN"]
                     },
                     {
@@ -295,7 +323,7 @@ export const SidebarData = [
                     {
                         label: "Settings", url: "/dashboard/attendance/settings/", roles: ["ADMIN"]
                     },
-                  
+
                 ],
             },
         ],

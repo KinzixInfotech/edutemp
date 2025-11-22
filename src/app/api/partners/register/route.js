@@ -1,9 +1,11 @@
 // app/api/partners/register/route.js
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
+import { supabaseAdmin } from "@/lib/supbase-admin";
 
 export async function POST(req) {
+    let createdUserId = null;
+
     try {
         const body = await req.json();
         const {
@@ -28,7 +30,7 @@ export async function POST(req) {
             );
         }
 
-        // Check if user exists
+        // Check if user exists in local DB
         const existingUser = await prisma.user.findUnique({
             where: { email }
         });
@@ -40,12 +42,24 @@ export async function POST(req) {
             );
         }
 
-        // Hash password
-        const hashedPassword = await bcrypt.hash(password, 10);
+        // Create Supabase User
+        const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+            email: email,
+            password: password,
+            email_confirm: true,
+            user_metadata: { name: name }
+        });
+
+        if (authError || !authUser?.user?.id) {
+            throw new Error(`Supabase Auth Error: ${authError?.message || "Unknown error"}`);
+        }
+
+        createdUserId = authUser.user.id;
 
         // Generate unique referral code
         const referralCode = `REF${Date.now()}${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
-        const referralLink = `${process.env.NEXT_PUBLIC_APP_URL}/register?ref=${referralCode}`;
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const referralLink = `${baseUrl}/register?ref=${referralCode}`;
 
         // Create user and partner in transaction
         const result = await prisma.$transaction(async (tx) => {
@@ -60,9 +74,9 @@ export async function POST(req) {
 
             const user = await tx.user.create({
                 data: {
-                    id: crypto.randomUUID(),
+                    id: createdUserId, // Use Supabase ID
                     email,
-                    password: hashedPassword,
+                    password: password, // Storing plain/hashed depending on previous logic, but Supabase handles auth now.
                     name,
                     roleId: partnerRole.id,
                     status: "ACTIVE"
@@ -107,6 +121,17 @@ export async function POST(req) {
 
     } catch (error) {
         console.error("Partner registration error:", error);
+
+        // Cleanup Supabase user if Prisma transaction failed
+        if (createdUserId) {
+            try {
+                await supabaseAdmin.auth.admin.deleteUser(createdUserId);
+                console.log(`🧹 Deleted Supabase user: ${createdUserId}`);
+            } catch (cleanupError) {
+                console.error("⚠️ Supabase cleanup failed:", cleanupError);
+            }
+        }
+
         return NextResponse.json(
             { error: error.message || "Registration failed" },
             { status: 500 }

@@ -394,6 +394,14 @@ export async function GET(req) {
                 response.school = parent?.school;
                 break;
             }
+            case "PARTNER": {
+                const partner = await prisma.partner.findUnique({
+                    where: { userId },
+                    include: { user: true },
+                });
+                response.partner = partner;
+                break;
+            }
         }
 
         const end = performance.now();

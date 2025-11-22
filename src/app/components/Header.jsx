@@ -87,9 +87,15 @@ const menuConfig = {
             ]
         },
         {
-            name: "Resources",
+            name: "Partner",
             type: "submenu",
             submenus: [
+                {
+                    category: "Become A EduBreezy Partner",
+                    items: [
+                        { name: "Register", link: "/partners/register", target: "_self", description: "Earn With Edubreezy" },
+                    ]
+                },
                 {
                     category: "Learn",
                     items: [
@@ -99,15 +105,6 @@ const menuConfig = {
                         { name: "FAQ", link: "/faq", target: "_self", description: "Frequently asked questions" }
                     ]
                 },
-                {
-                    category: "Support",
-                    items: [
-                        { name: "Help Center", link: "/help", target: "_self", description: "Get instant answers" },
-                        { name: "Contact Support", link: "/support", target: "_self", description: "Reach our support team" },
-                        { name: "Community Forum", link: "/community", target: "_self", description: "Connect with other users" },
-                        { name: "System Status", link: "/status", target: "_blank", description: "Check system health" }
-                    ]
-                }
             ]
         }
     ]
@@ -152,7 +149,7 @@ export default function Header() {
                         <Link href="/" className="text-primary hover:text-primary/90">
                             <Image src='/edu.png' width={200} height={200} alt="EduBreezy" priority />
                         </Link>
-                       
+
                     </div>
 
                     {/* Desktop Navigation - Middle */}
@@ -246,7 +243,7 @@ export default function Header() {
                                 </Link>
                             )
                         )}
-                        
+
                     </div>
                 </div>
             </nav>
