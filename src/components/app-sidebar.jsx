@@ -82,6 +82,7 @@ export const SidebarData = [
             { label: "Leads", url: "/dashboard/partnerprogram/leads", icon: User, roles: ["PARTNER"] },
             { label: "Schools", url: "/dashboard/partnerprogram/schools", icon: School, roles: ["PARTNER"] },
             { label: "Resources", url: "/dashboard/partnerprogram/resources", icon: BookCopy, roles: ["PARTNER"] },
+            { label: "Earnings", url: "/dashboard/partnerprogram/earnings", icon: DollarSign, roles: ["PARTNER"] },
             { label: "Profile", url: "/dashboard/partnerprogram/profile", icon: UserPen, roles: ["PARTNER"] },
 
         ],

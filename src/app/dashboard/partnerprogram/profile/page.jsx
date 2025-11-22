@@ -23,8 +23,10 @@ const PdfUploadButton = dynamic(() => import('@/components/upload'), { ssr: fals
 
 export default function PartnerProfile() {
     const { fullUser } = useAuth();
+    console.log(fullUser);
+
     const queryClient = useQueryClient();
-    const [partnerId] = useState(fullUser?.partner?.id);
+    const [partnerId] = useState(fullUser?.id);
 
     const [personalData, setPersonalData] = useState({
         companyName: '',
