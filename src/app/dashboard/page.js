@@ -19,7 +19,7 @@ import { ChartAreaInteractive } from '@/components/chart-area-interactive';
 import { SectionCards } from '@/components/section-cards';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import LoaderPage from '@/components/loader-page';
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, Plus, LayoutDashboard } from "lucide-react";
 import { ChartPieLabel } from '@/components/chart-pie';
 import { ChartBarHorizontal, } from '@/components/bar-chart';
 import { ChartLineLabel } from '@/components/line-chart';
@@ -27,55 +27,20 @@ import BigCalendar from '@/components/big-calendar';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useGlobalLoading } from '@/lib/utils';
+import PartnerDashboard from './partnerprogram/dashboard/page';
+import { WIDGETS, DEFAULT_WIDGETS } from '@/components/dashboard/widgets/registry';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
-// const LatestNotice = () => {
-//   // Dummy data
-//   const latestNotice = {
-//     title: "Holiday Announcement",
-//     description: "School will remain closed on 15th September due to festival celebrations.",
-//     priority: "URGENT", // Can be NORMAL, IMPORTANT, URGENT
-//     date: "September 5, 2025",
-//   };
-
-//   // Color based on priority
-//   const priorityColor = {
-//     NORMAL: "bg-blue-100 text-blue-800",
-//     IMPORTANT: "bg-yellow-100 text-yellow-800",
-//     URGENT: "bg-red-100 text-red-800",
-//   };
-
-//   return (
-//     <div className="w-full  bg-muted dark:bg-[#18181b]  rounded-xl p-4 ">
-//       <div className={`px-2 py-1 w-fit rounded-full text-xs font-medium ${priorityColor[latestNotice.priority]}`}>
-//         {latestNotice.priority}
-//       </div>
-//       <div className="flex px-1 py-2 items-start gap-4">
-
-//         <div>
-//           <h3 className="text-lg font-semibold text-foreground border-b w-fit">{latestNotice.title}</h3>
-//           <p className="text-sm text-muted-foreground mt-1">{latestNotice.description}</p>
-//           <p className="text-xs text-muted-foreground mt-2 mb-2">{latestNotice.date}</p>
-//           <Link href="/dashboard/schools/noticeboard">
-//             <span className='border-b py-1 text-sm  cursor-pointer '>
-//               View Notice
-//             </span>
-//           </Link>
-//           <
-// Link href="/dashboard/schools/noticeboard" className='ml-1.5'>
-//             <span className='border-b py-1 text-sm  cursor-pointer '>
-//               Dismiss
-//             </span>
-//           </Link>
-//         </div>
-
-//       </div>
-
-//     </div>
-//   );
-// };
-// import { useEffect, useState } from 'react';
-// import Link from 'next/link';
-
+// ... (LatestNotice component remains unchanged) ...
 const LatestNotice = ({ fullUser, queryClient }) => {
   if (!fullUser) return
   const [dismissedNoticeId, setDismissedNoticeId] = useState(null);
@@ -118,32 +83,6 @@ const LatestNotice = ({ fullUser, queryClient }) => {
     enabled: !!fullUser, // ensure fullUser exists before fetching
     staleTime: 1000 * 60 * 5 // cache for 5 minutes
   });
-  // Fetch latest notice from API
-  // useEffect(() => {
-  //   const fetchLatestNotice = async () => {
-  //     const params = new URLSearchParams({
-  //       userId: fullUser.id,
-  //       schoolId: fullUser.schoolId,
-
-  //       limit: "1",
-  //       offset: "0",
-  //     });
-
-  //     try {
-  //       const res = await fetch(`/api/schools/notice/get?${params}`);
-  //       const data = await res.json();
-  //       if (data.notices && data.notices.length > 0) {
-  //         setLatestNotice(data.notices[0]);
-  //       }
-  //     } catch (error) {
-  //       console.error("Error fetching latest notice:", error);
-  //     }
-  //   };
-
-  //   fetchLatestNotice();
-  //   console.log(fullUser, 'from notice');
-
-  // }, [fullUser?.schoolId]);
 
   const handleDismiss = () => {
     if (latestNotice) {
@@ -235,6 +174,37 @@ export default function Dashboard() {
   const [date, setDate] = useState(new Date());
   const { fullUser, loading } = useAuth();
 
+  // Widget State
+  const [activeWidgets, setActiveWidgets] = useState(DEFAULT_WIDGETS);
+  const [isWidgetDialogOpen, setIsWidgetDialogOpen] = useState(false);
+
+  // Load saved widgets from local storage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('adminDashboardWidgets');
+    if (saved) {
+      try {
+        setActiveWidgets(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to parse saved widgets", e);
+      }
+    }
+  }, []);
+
+  // Save widgets to local storage whenever they change
+  useEffect(() => {
+    localStorage.setItem('adminDashboardWidgets', JSON.stringify(activeWidgets));
+  }, [activeWidgets]);
+
+  const toggleWidget = (widgetId) => {
+    setActiveWidgets(prev => {
+      if (prev.includes(widgetId)) {
+        return prev.filter(id => id !== widgetId);
+      } else {
+        return [...prev, widgetId];
+      }
+    });
+  };
+
   // Super Admin Queries
   const schoolTrendQuery = useQuery({
     queryKey: ['schoolTrend'],
@@ -292,18 +262,7 @@ export default function Dashboard() {
     adminTeacherStatsQuery,
     adminNonTeacherStatsQuery,
   ]);
-  // Prefetch if needed (optional, you can remove this block if not required)
-  // useEffect(() => {
-  //   if (!fullUser) return;
 
-  //   if (fullUser.role.name === 'SUPER_ADMIN') {
-  //     queryClient.prefetchQuery(['schoolTrend'], fetchSchoolTrend);
-  //     queryClient.prefetchQuery(['activeAccounts'], fetchActiveAccounts);
-  //   } else if (fullUser.role.name === 'ADMIN') {
-  //     queryClient.prefetchQuery(['adminTeacherStats', fullUser.schoolId], () => fetchAdminStatsTeacher(fullUser.schoolId));
-  //     queryClient.prefetchQuery(['adminNonTeacherStats', fullUser.schoolId], () => fetchAdminStatsNonTeacher(fullUser.schoolId));
-  //   }
-  // }, [fullUser, queryClient]);
   useEffect(() => {
     if (!fullUser) return;
 
@@ -359,10 +318,70 @@ export default function Dashboard() {
       case "ADMIN":
         return (
           <>
+            <div className='px-4 flex items-center justify-between'>
+              <h1 className="text-2xl font-bold tracking-tight">Admin Dashboard</h1>
+              <Dialog open={isWidgetDialogOpen} onOpenChange={setIsWidgetDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <LayoutDashboard className="h-4 w-4" />
+                    Customize Widgets
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Customize Dashboard</DialogTitle>
+                    <DialogDescription>
+                      Select the widgets you want to display on your dashboard.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    {Object.values(WIDGETS).map((widget) => (
+                      <div key={widget.id} className="flex items-start space-x-3 space-y-0 rounded-md border p-4">
+                        <Checkbox
+                          id={widget.id}
+                          checked={activeWidgets.includes(widget.id)}
+                          onCheckedChange={() => toggleWidget(widget.id)}
+                        />
+                        <div className="space-y-1 leading-none">
+                          <Label htmlFor={widget.id} className="font-medium flex items-center gap-2">
+                            <widget.icon className="h-4 w-4 text-muted-foreground" />
+                            {widget.title}
+                          </Label>
+                          <p className="text-sm text-muted-foreground">
+                            {widget.description}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+
             <div className='px-4'>
               <LatestNotice fullUser={fullUser} queryClient={queryClient} />
             </div>
+
+            {/* Basic Stats Cards */}
             <SectionCards data={cards} isloading={isLoading} />
+
+            {/* Dynamic Widgets Grid */}
+            <div className="px-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              {activeWidgets.map(widgetId => {
+                const widgetConfig = WIDGETS[widgetId];
+                if (!widgetConfig) return null;
+                const WidgetComponent = widgetConfig.component;
+                return (
+                  <div key={widgetId} className={widgetConfig.defaultSize}>
+                    <WidgetComponent
+                      fullUser={fullUser}
+                      onRemove={() => toggleWidget(widgetId)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
             <div className="flex flex-col gap-3.5 px-4">
               {/* <ChartAreaInteractive chartData={chartDataSuper} /> */}
 
@@ -407,6 +426,8 @@ export default function Dashboard() {
         return (
           <p className="text-sm px-4 text-muted-foreground">Welcome student! No charts for you today 😅</p>
         );
+      case "PARTNER":
+        return <PartnerDashboard />;
       default:
         return (
           <p className="text-sm px-4 text-gray-500">No dashboard available for your role.</p>

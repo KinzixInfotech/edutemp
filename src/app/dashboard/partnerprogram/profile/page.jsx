@@ -130,7 +130,6 @@ export default function PartnerProfile() {
                     Manage your account information and settings
                 </p>
             </motion.div>
-
             {/* Profile Status */}
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -170,7 +169,6 @@ export default function PartnerProfile() {
                     </CardContent>
                 </Card>
             </motion.div>
-
             {/* Personal Information */}
             <motion.div
                 initial={{ opacity: 0, y: 20 }}

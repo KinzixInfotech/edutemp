@@ -27,7 +27,7 @@ export default function LoginPhoto({ className, ...props }) {
     const [loading, setLoading] = useState(false)
     const [loadingl, setLoadingl] = useState(true)
     const [alreadyLoggedIn, setAlreadyLoggedIn] = useState(false)
-    
+
     // schoolcode
     const searchParams = useSearchParams()
     const schoolCode = searchParams.get("schoolCode")
@@ -126,16 +126,16 @@ export default function LoginPhoto({ className, ...props }) {
             {/* Animated Background Elements */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 {/* Gradient Orbs */}
-                <div className="absolute top-20 left-10 w-72 h-72 rounded-full blur-3xl opacity-20 animate-pulse" 
-                    style={{ backgroundColor: '#0c65f1' }} 
+                <div className="absolute top-20 left-10 w-72 h-72 rounded-full blur-3xl opacity-20 animate-pulse"
+                    style={{ backgroundColor: '#0c65f1' }}
                 />
-                <div className="absolute bottom-20 right-10 w-96 h-96 rounded-full blur-3xl opacity-15 animate-pulse" 
-                    style={{ backgroundColor: '#0c65f1', animationDelay: '1s' }} 
+                <div className="absolute bottom-20 right-10 w-96 h-96 rounded-full blur-3xl opacity-15 animate-pulse"
+                    style={{ backgroundColor: '#0c65f1', animationDelay: '1s' }}
                 />
-                <div className="absolute top-1/2 left-1/3 w-64 h-64 rounded-full blur-3xl opacity-10 animate-pulse" 
-                    style={{ backgroundColor: '#0c65f1', animationDelay: '2s' }} 
+                <div className="absolute top-1/2 left-1/3 w-64 h-64 rounded-full blur-3xl opacity-10 animate-pulse"
+                    style={{ backgroundColor: '#0c65f1', animationDelay: '2s' }}
                 />
-                
+
                 {/* Floating Particles */}
                 {[...Array(20)].map((_, i) => (
                     <div
@@ -169,8 +169,8 @@ export default function LoginPhoto({ className, ...props }) {
                         // Error State
                         <div className="text-center space-y-6 animate-fade-in-up">
                             <div className="relative inline-block">
-                                <div className="absolute inset-0 rounded-full blur-2xl opacity-30 animate-pulse" 
-                                    style={{ backgroundColor: '#0c65f1' }} 
+                                <div className="absolute inset-0 rounded-full blur-2xl opacity-30 animate-pulse"
+                                    style={{ backgroundColor: '#0c65f1' }}
                                 />
                                 <div className="relative bg-white/90 backdrop-blur-md rounded-3xl p-8 shadow-2xl">
                                     <Lottie
@@ -185,8 +185,8 @@ export default function LoginPhoto({ className, ...props }) {
                                         Please Make Sure The School Code is Correct
                                     </p>
                                     <Link href="/">
-                                        <Button 
-                                            size="lg" 
+                                        <Button
+                                            size="lg"
                                             className="text-white font-bold shadow-lg hover:shadow-xl transition-all"
                                             style={{ background: 'linear-gradient(135deg, #0c65f1 0%, #0a52c6 100%)' }}
                                         >
@@ -208,24 +208,24 @@ export default function LoginPhoto({ className, ...props }) {
                                             <div className="mb-8 text-center lg:text-left">
                                                 <div className="inline-flex items-center gap-3 mb-6">
                                                     <div className="relative">
-                                                        <div className="absolute inset-0 rounded-xl" 
-                                                            style={{ backgroundColor: '#0c65f1' }} 
+                                                        <div className="absolute inset-0 rounded-xl"
+                                                            style={{ backgroundColor: '#0c65f1' }}
                                                         />
                                                         <div className="relative bg-muted rounded-xl p-3 shadow-none">
-                                                            <Image 
-                                                                src='/edu.png' 
-                                                                width={140} 
-                                                                height={50} 
-                                                                alt="EduBreezy" 
-                                                                priority 
+                                                            <Image
+                                                                src='/edu.png'
+                                                                width={140}
+                                                                height={50}
+                                                                alt="EduBreezy"
+                                                                priority
                                                                 className="object-contain"
                                                             />
                                                         </div>
                                                     </div>
                                                 </div>
-                                                
-                                                <h1 className="text-3xl sm:text-4xl font-bold mb-3" 
-                                                    style={{ 
+
+                                                <h1 className="text-3xl sm:text-4xl font-bold mb-3"
+                                                    style={{
                                                         background: 'linear-gradient(135deg, #0c65f1 0%, #0a52c6 100%)',
                                                         WebkitBackgroundClip: 'text',
                                                         WebkitTextFillColor: 'transparent',
@@ -309,8 +309,8 @@ export default function LoginPhoto({ className, ...props }) {
                                                     disabled={loading || alreadyLoggedIn}
                                                     className="w-full h-12 text-white font-bold text-base rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] group"
                                                     style={{
-                                                        background: loading || alreadyLoggedIn 
-                                                            ? '#cbd5e1' 
+                                                        background: loading || alreadyLoggedIn
+                                                            ? '#cbd5e1'
                                                             : 'linear-gradient(135deg, #0c65f1 0%, #0a52c6 100%)'
                                                     }}
                                                 >
@@ -357,12 +357,12 @@ export default function LoginPhoto({ className, ...props }) {
                                                         className="absolute inset-0 h-full w-full object-cover"
                                                     />
                                                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20" />
-                                                    
+
                                                     {/* School Logo and Info Overlay */}
                                                     <div className="relative h-full flex flex-col items-center justify-center p-12 text-white z-10">
                                                         {/* School Logo */}
                                                         <div className="relative mb-8">
-                                                            <div className="absolute inset-0 rounded-3xl blur-2xl opacity-60 animate-pulse bg-white" />
+                                                            <div className="absolute inset-0 rounded-3xl blur-2xl opacity-60 bg-white animate-pulse bg-white" />
                                                             <div className="relative bg-white/95 backdrop-blur-sm rounded-3xl p-6 shadow-2xl">
                                                                 <img
                                                                     src={school.logo || school.profilePicture}
@@ -371,18 +371,18 @@ export default function LoginPhoto({ className, ...props }) {
                                                                 />
                                                             </div>
                                                         </div>
-                                                        
+
                                                         {/* School Name */}
                                                         <h2 className="text-3xl font-bold mb-3 text-center drop-shadow-lg">
                                                             {school.name}
                                                         </h2>
-                                                        
+
                                                         {school.address && (
                                                             <p className="text-base text-white/90 mb-8 text-center max-w-md drop-shadow">
                                                                 {school.address}
                                                             </p>
                                                         )}
-                                                        
+
                                                         {/* Feature highlights for school */}
                                                         {/* <div className="space-y-3 w-full max-w-sm">
                                                             {[
@@ -410,14 +410,14 @@ export default function LoginPhoto({ className, ...props }) {
                                                         className="absolute  inset-0 h-full w-full object-cover"
                                                     /> */}
                                                     <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-indigo-600" />
-                                                    
+
                                                     {/* Pattern Overlay */}
                                                     {/* <div className="absolute inset-0 opacity-10"
                                                         style={{
                                                             backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
                                                         }}
                                                     /> */}
-                                                    
+
                                                     <div className="relative h-full flex flex-col items-center justify-center p-12 text-white">
                                                         {/* Animated Icon */}
                                                         <div className="relative inline-block mb-8">
@@ -426,7 +426,7 @@ export default function LoginPhoto({ className, ...props }) {
                                                                 <Sparkles className="w-20 h-20" />
                                                             </div>
                                                         </div>
-                                                        
+
                                                         <div className="space-y-4 mb-12">
                                                             <h2 className="text-4xl font-bold">
                                                                 Manage Everything<br />In One Place
@@ -444,7 +444,7 @@ export default function LoginPhoto({ className, ...props }) {
                                                                 "Parent-teacher communication",
                                                                 "Secure data encryption"
                                                             ].map((feature, idx) => (
-                                                                <div 
+                                                                <div
                                                                     key={idx}
                                                                     className="flex items-center gap-3 text-left bg-white/10 backdrop-blur-sm rounded-xl p-3 transform hover:scale-105 transition-transform"
                                                                 >

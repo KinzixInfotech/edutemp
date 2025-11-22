@@ -78,7 +78,7 @@ export const SidebarData = [
     //for partners
     {
         items: [
-            { label: "Home", url: "/dashboard/partnerprogram/dashboard", icon: House, roles: ["PARTNER"] },
+            { label: "Home", url: "/dashboard", icon: House, roles: ["PARTNER"] },
             { label: "Leads", url: "/dashboard/partnerprogram/leads", icon: User, roles: ["PARTNER"] },
             { label: "Schools", url: "/dashboard/partnerprogram/schools", icon: School, roles: ["PARTNER"] },
             { label: "Resources", url: "/dashboard/partnerprogram/resources", icon: BookCopy, roles: ["PARTNER"] },
