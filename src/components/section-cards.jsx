@@ -16,7 +16,7 @@ export function SectionCards({ data, isloading }) {
                 Array(3).fill(0).map((_, index) => (
                     <div
                         key={index}
-                        className="relative rounded-sm p-4 min-h-[120px] flex flex-col justify-between text-sm border border-border bg-gradient-to-t from-[color-mix(in_oklab,var(--primary)_5%,transparent)] to-white dark:bg-[#18181b] dark:from-transparent dark:to-transparent dark:border-muted/40 dark:shadow-lg"
+                        className="relative rounded-xl p-5 min-h-[120px] flex flex-col justify-between text-sm border border-border/60 bg-muted/40"
                     >
                         {/* Top Left Date Skeleton */}
                         <Skeleton className="absolute top-3 left-3 h-5 w-16 rounded-full" />
@@ -42,7 +42,7 @@ export function SectionCards({ data, isloading }) {
                     return (
                         <div
                             key={index}
-                            className="relative rounded-sm p-4 min-h-[120px] flex flex-col justify-between text-sm border border-border text-gray-800 dark:text-white bg-gradient-to-t from-[color-mix(in_oklab,var(--primary)_5%,transparent)] to-white dark:bg-[#18181b] dark:from-transparent dark:to-transparent dark:border-muted/40 dark:shadow-lg"
+                            className="relative rounded-xl p-5 min-h-[120px] flex flex-col justify-between text-sm border border-border/60 bg-muted/40 backdrop-blur-sm hover:shadow-md transition-all duration-300 group"
                         >
                             {/* Top Left Date */}
                             {metric.date && (

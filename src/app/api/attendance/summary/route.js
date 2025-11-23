@@ -8,32 +8,50 @@ export async function GET(req) {
     const schoolId = searchParams.get("schoolId");
     const classId = searchParams.get("classId");
 
-    if (!dateParam || !schoolId || !classId)
-        return NextResponse.json({ error: "Date, schoolId and classId required" }, { status: 400 });
+    if (!dateParam || !schoolId)
+        return NextResponse.json({ error: "Date and schoolId required" }, { status: 400 });
 
     const date = new Date(dateParam);
-
-    const roles = ["STUDENT", "TEACHER", "STAFF"];
+    const roles = ["STUDENT", "TEACHER", "STAFF"]; // These should match Role names in DB
 
     const summary = await Promise.all(
-         roles.map(async (role) => {
-            // Total users for this role in the school/class
+        roles.map(async (roleName) => {
+            // Construct base where clause for User
+            const userWhere = {
+                schoolId,
+                role: { name: roleName }
+            };
+
+            // Apply class filter only if classId is provided, not 'all', and role is STUDENT
+            if (classId && classId !== 'all' && roleName === 'STUDENT') {
+                userWhere.student = {
+                    classId: parseInt(classId)
+                };
+            }
+
+            // Total users for this role
             const total = await prisma.user.count({
-                where: { role, schoolId, classId },
+                where: userWhere,
             });
 
             // Attendance counts for this date
+            // Attendance has a 'user' relation. We filter attendance by date, status, and user criteria.
+            const attendanceWhere = {
+                date,
+                user: userWhere
+            };
+
             const present = await prisma.attendance.count({
-                where: { date, status: "PRESENT", user: { role, schoolId, classId } },
+                where: { ...attendanceWhere, status: "PRESENT" },
             });
             const absent = await prisma.attendance.count({
-                where: { date, status: "ABSENT", user: { role, schoolId, classId } },
+                where: { ...attendanceWhere, status: "ABSENT" },
             });
             const late = await prisma.attendance.count({
-                where: { date, status: "LATE", user: { role, schoolId, classId } },
+                where: { ...attendanceWhere, status: "LATE" },
             });
 
-            return { role, total, present, absent, late };
+            return { role: roleName, total, present, absent, late };
         })
     );
 

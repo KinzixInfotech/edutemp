@@ -117,9 +117,9 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                     >
                                                         <SidebarMenuButton
                                                             className={`w-full  justify-center py-4 hover:!bg-white rounded-md hover:!text-black transition-all hover:cursor-pointer ${isActive || isParentActive
-                                                                    ? "bg-white dark:text-white dark:bg-[#171717] shadow-xs font-semibold text-bl border"
-                                                                    : ""
+                                                                ? "shadow-xs font-semibold border dark:bg-[#1a3a5a] dark:text-black dark:border-primary/50" : ""
                                                                 }`}
+                                                            style={isActive || isParentActive ? { backgroundColor: '#e6effc' } : {}}
                                                         >
                                                             {item.icon && <item.icon className="w-4 h-4" />}
                                                         </SidebarMenuButton>
@@ -158,9 +158,9 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                 <CollapsibleTrigger asChild>
                                                     <SidebarMenuButton
                                                         className={`group  w-full justify-between py-4 hover:!bg-white rounded-md hover:!text-black transition-all hover:cursor-pointer ${isActive || isParentActive
-                                                                ? "bg-white dark:text-white dark:bg-[#171717] shadow-xs font-semibold text-bl border"
-                                                                : ""
+                                                            ? "shadow-xs font-semibold border dark:bg-[#1a3a5a] dark:text-black dark:border-primary/50" : ""
                                                             }`}
+                                                        style={isActive || isParentActive ? { backgroundColor: '#e6effc' } : {}}
                                                     >
                                                         <div className="flex items-center gap-2">
                                                             {item.icon && <item.icon className="w-4 h-4" />}
@@ -187,9 +187,10 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                                 <SidebarMenuSubButton
                                                                     asChild
                                                                     className={`transition-all ${isSubActive
-                                                                            ? "bg-white shadow-md dark:text-black font-semibold text-bl border dark:hover:!text-white"
-                                                                            : ""
+                                                                        ? "shadow-md font-semibold border dark:bg-[#1a3a5a] dark:text-black dark:border-primary/50"
+                                                                        : ""
                                                                         }`}
+                                                                    style={isSubActive ? { backgroundColor: '#e6effc' } : {}}
                                                                 >
                                                                     <Link href={sub.url} onClick={handleClick}>
                                                                         {sub.icon && <sub.icon className="w-4 h-4" />}
@@ -216,9 +217,9 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                     <SidebarMenuButton
                                                         asChild
                                                         className={`w-full justify-center py-4 hover:!bg-white hover:!text-black transition-all rounded-md hover:cursor-pointer ${isActive
-                                                                ? "bg-[#f6f6f6] dark:text-white dark:bg-[#171717] font-semibold text-bl"
-                                                                : ""
+                                                            ? "font-semibold border dark:bg-[#1a3a5a] dark:text-black dark:border-primary/50" : ""
                                                             }`}
+                                                        style={isActive ? { backgroundColor: '#e6effc' } : {}}
                                                     >
                                                         <Link href={item.url} onClick={handleClick}>
                                                             {item.icon && <item.icon className="w-4 h-4" />}
@@ -241,9 +242,9 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                         <SidebarMenuButton
                                             asChild
                                             className={`w-full py-4 hover:!bg-white hover:!text-black transition-all rounded-md hover:cursor-pointer ${isActive
-                                                    ? "bg-[#f6f6f6] dark:text-white dark:bg-[#171717] font-semibold text-bl"
-                                                    : ""
+                                                ? "font-semibold border dark:bg-[#1a3a5a] dark:text-black dark:border-primary/50" : ""
                                                 }`}
+                                            style={isActive ? { backgroundColor: '#e6effc' } : {}}
                                         >
                                             <Link href={item.url} onClick={handleClick}>
                                                 {item.icon && <item.icon className="w-4 h-4" />}

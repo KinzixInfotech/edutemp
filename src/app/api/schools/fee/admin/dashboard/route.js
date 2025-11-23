@@ -27,7 +27,7 @@ export async function GET(req) {
     const where = {
       schoolId,
       academicYearId,
-      ...(classId && { student: { classId: parseInt(classId) } }),
+      ...(classId && classId !== 'all' && { student: { classId: parseInt(classId) } }),
     };
     // console.log({
     //   schoolId,

@@ -29,6 +29,7 @@ import Link from 'next/link';
 import { useGlobalLoading } from '@/lib/utils';
 import PartnerDashboard from './partnerprogram/dashboard/page';
 import { WIDGETS, DEFAULT_WIDGETS } from '@/components/dashboard/widgets/registry';
+import WelcomeBanner from '@/components/dashboard/WelcomeBanner';
 import {
   Dialog,
   DialogContent,
@@ -282,7 +283,7 @@ export default function Dashboard() {
     { title: "Sprint Planning", time: "05:00 PM – 06:00 PM", description: "Define next sprint tasks and goals." },
   ];
 
-  const cards = [,
+  const cards = [
     { label: "Total Teaching Staff", value: adminTeacherCount, direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
     { label: "Total Staffs", value: adminNonTeacherCount, direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
     { label: "Total Students", value: totalStudentCount, direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
@@ -318,8 +319,13 @@ export default function Dashboard() {
       case "ADMIN":
         return (
           <>
+            {/* Welcome Banner */}
+            <div className='px-4'>
+              <WelcomeBanner fullUser={fullUser} />
+            </div>
+
             <div className='px-4 flex items-center justify-between'>
-              <h1 className="text-2xl font-bold tracking-tight">Admin Dashboard</h1>
+              <h2 className="text-xl font-semibold tracking-tight">Dashboard Overview</h2>
               <Dialog open={isWidgetDialogOpen} onOpenChange={setIsWidgetDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-2">
@@ -358,15 +364,8 @@ export default function Dashboard() {
               </Dialog>
             </div>
 
-            <div className='px-4'>
-              <LatestNotice fullUser={fullUser} queryClient={queryClient} />
-            </div>
-
-            {/* Basic Stats Cards */}
-            <SectionCards data={cards} isloading={isLoading} />
-
             {/* Dynamic Widgets Grid */}
-            <div className="px-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="px-4 grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               {activeWidgets.map(widgetId => {
                 const widgetConfig = WIDGETS[widgetId];
                 if (!widgetConfig) return null;
@@ -380,19 +379,6 @@ export default function Dashboard() {
                   </div>
                 );
               })}
-            </div>
-
-            <div className="flex flex-col gap-3.5 px-4">
-              {/* <ChartAreaInteractive chartData={chartDataSuper} /> */}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full">
-
-                <ChartPieLabel chartData={chartData} title="Students" date="January - June 2024" isLoading={isLoading} />
-                {/* <ChartBarMultiple chartData={barchartData} title="Attendance" date="Today" />
-                 */}
-                <ChartBarHorizontal isLoading={isLoading} />
-              </div>
-              {/* <ChartLineLabel chartData={linechartData} title="Finance" date="Today" /> */}
             </div>
           </>
         );
@@ -446,43 +432,36 @@ export default function Dashboard() {
           md:pr-0
           ">
             {renderRoleContent()}
-            <div className="flex  px-4">
-              {/* Calendar + Events */}
-              <div className="w-full border-none px-2.5 py-2.5 rounded-sm  dark:bg-card">
-                <div className="w-full py-2">
-                  <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-sm font-semibold dark:text-white text-gray-800">Events</h2>
-                    <button className="text-xs dark:text-white text-gray-500 hover:text-gray-800">View</button>
-                  </div>
-                  <div className="space-y-2">
-                    {events.map((event, idx) => (
-                      <div
-                        key={idx}
-                        className="flex shadow-sm items-start gap-2 rounded-md bg-white px-3 py-2 dark:bg-[#222225] border-t-primary border-[0.5] border-t-2 transition-all"
-                      >
-                        <div className="flex flex-col flex-1 col-span-2 gap-1.5">
-                          <h3 className="font-medium text-sm dark:text-white text-gray-800">{event.title}</h3>
-                          <p className="text-xs text-gray-500 dark:text-[#b5b5b5]">{event.description}</p>
-                          <div className="flex flex-row items-center dark:text-white text-gray-400 text-[11px] pt-1 gap-2">
-                            <CalendarClock className="h-4 w-4 mb-1" />
-                            {event.time}
+            {fullUser?.role?.name !== 'ADMIN' && (
+              <div className="flex  px-4">
+                {/* Calendar + Events */}
+                <div className="w-full border-none px-2.5 py-2.5 rounded-sm  dark:bg-card">
+                  <div className="w-full py-2">
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="text-sm font-semibold dark:text-white text-gray-800">Events</h2>
+                      <button className="text-xs dark:text-white text-gray-500 hover:text-gray-800">View</button>
+                    </div>
+                    <div className="space-y-2">
+                      {events.map((event, idx) => (
+                        <div
+                          key={idx}
+                          className="flex shadow-sm items-start gap-2 rounded-md bg-white px-3 py-2 dark:bg-[#222225] border-t-primary border-[0.5] border-t-2 transition-all"
+                        >
+                          <div className="flex flex-col flex-1 col-span-2 gap-1.5">
+                            <h3 className="font-medium text-sm dark:text-white text-gray-800">{event.title}</h3>
+                            <p className="text-xs text-gray-500 dark:text-[#b5b5b5]">{event.description}</p>
+                            <div className="flex flex-row items-center dark:text-white text-gray-400 text-[11px] pt-1 gap-2">
+                              <CalendarClock className="h-4 w-4 mb-1" />
+                              {event.time}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
-              {/* Announcement Panel */}
-              {/* <div className="lg:col-span-1 w-full border-none px-2.5 py-2.5 rounded-sm dark:bg-card">    <div className="w-full py-2">
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-sm font-semibold dark:text-white text-gray-800">Announcement</h2>
-                  <button className="text-xs dark:text-white text-gray-500 hover:text-gray-800">View</button>
-                </div>
-                <EventList events={events} />
-              </div>
-              </div> */}
-            </div>
+            )}
           </div>
         </div>
       </div>

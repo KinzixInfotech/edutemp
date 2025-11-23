@@ -6,14 +6,11 @@ import { cn } from "@/lib/utils";
 export default function WidgetContainer({ title, children, onRemove, className }) {
     return (
         <div className={cn(
-            "relative group rounded-xl border border-border/50 bg-background/50 backdrop-blur-xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden",
+            "relative group rounded-xl bg-muted p-0 overflow-hidden flex flex-col",
             className
         )}>
-            {/* Gradient Border Effect */}
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-
-            <div className="flex items-center justify-between p-4 border-b border-border/50 bg-muted/20">
-                <h3 className="font-semibold text-sm tracking-tight text-foreground/90">{title}</h3>
+            <div className="flex items-center justify-between p-4 border-b border-border/50 shrink-0">
+                <h3 className="font-semibold text-sm tracking-tight text-foreground">{title}</h3>
                 {onRemove && (
                     <Button
                         variant="ghost"
@@ -26,7 +23,7 @@ export default function WidgetContainer({ title, children, onRemove, className }
                 )}
             </div>
 
-            <div className="p-4">
+            <div className="p-4 flex-1 flex flex-col">
                 {children}
             </div>
         </div>

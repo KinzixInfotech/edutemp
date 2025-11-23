@@ -14,13 +14,28 @@ const fetchFeeStats = async ({ schoolId, academicYearId }) => {
 };
 
 export default function FeeStatsWidget({ fullUser, onRemove }) {
+    // 1. Fetch active academic year first (like the detailed page does)
+    const { data: academicYears } = useQuery({
+        queryKey: ['academic-years', fullUser?.schoolId],
+        queryFn: async () => {
+            if (!fullUser?.schoolId) return [];
+            const res = await fetch(`/api/schools/academic-years?schoolId=${fullUser.schoolId}`);
+            if (!res.ok) throw new Error('Failed to fetch academic years');
+            return res.json();
+        },
+        enabled: !!fullUser?.schoolId,
+    });
+
+    const activeAcademicYearId = academicYears?.find(y => y.isActive)?.id;
+
+    // 2. Fetch stats using the active academic year
     const { data, isLoading } = useQuery({
-        queryKey: ['feeStats', fullUser?.schoolId, fullUser?.academicYearId],
+        queryKey: ['feeStats', fullUser?.schoolId, activeAcademicYearId],
         queryFn: () => fetchFeeStats({
             schoolId: fullUser?.schoolId,
-            academicYearId: fullUser?.academicYear?.id
+            academicYearId: activeAcademicYearId
         }),
-        enabled: !!fullUser?.schoolId && !!fullUser?.academicYear?.id,
+        enabled: !!fullUser?.schoolId && !!activeAcademicYearId,
     });
 
     if (isLoading) {
@@ -42,8 +57,8 @@ export default function FeeStatsWidget({ fullUser, onRemove }) {
     const percentage = parseFloat(stats.collectionPercentage) || 0;
 
     return (
-        <WidgetContainer title="Fee Collection" onRemove={onRemove}>
-            <div className="space-y-6">
+        <WidgetContainer title="Fee Collection" onRemove={onRemove} className="h-full">
+            <div className="space-y-6 h-full flex flex-col justify-between">
                 {/* Main Stat */}
                 <div className="flex items-end justify-between">
                     <div>

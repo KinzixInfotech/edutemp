@@ -104,7 +104,7 @@ export async function GET(req, { params }) {
       FROM "Role" r
       LEFT JOIN "User" u ON u."roleId" = r.id AND u."schoolId" = ${schoolId}::uuid AND u."deletedAt" IS NULL
       LEFT JOIN "Attendance" a ON a."userId" = u.id AND a.date = ${today.toISOString().split('T')[0]}::date
-      WHERE r.name IN ('Student', 'TEACHING_STAFF', 'NonTeachingStaff', 'Admin')
+      WHERE r.name IN ('STUDENT', 'TEACHING_STAFF', 'NON_TEACHING_STAFF', 'ADMIN')
       GROUP BY r.id, r.name
       ORDER BY r.name
     `;
