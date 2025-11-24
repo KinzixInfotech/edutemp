@@ -180,8 +180,12 @@ export async function PATCH(req) {
             );
         }
 
+        // Fetch lead with partner details for commission calculation
         const currentLead = await prisma.partnerLead.findUnique({
-            where: { id }
+            where: { id },
+            include: {
+                partner: true
+            }
         });
 
         if (!currentLead) {
@@ -201,6 +205,83 @@ export async function PATCH(req) {
         }
 
         const lead = await prisma.$transaction(async (tx) => {
+            // Handle Conversion Logic
+            if (status === 'CONVERTED' && currentLead.status !== 'CONVERTED') {
+                // 1. Create School
+                const schoolCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+                const domain = `${currentLead.schoolName.toLowerCase().replace(/[^a-z0-9]/g, '')}-${schoolCode.toLowerCase()}.edutemp.com`;
+
+                const newSchool = await tx.school.create({
+                    data: {
+                        name: currentLead.schoolName,
+                        domain: domain,
+                        schoolCode: schoolCode,
+                        profilePicture: "https://placehold.co/400",
+                        location: `${currentLead.city || ''}, ${currentLead.state || ''}`.replace(/^, /, ''),
+                        contactNumber: currentLead.contactPhone,
+                        SubscriptionType: "PREMIUM",
+                        Language: "English"
+                    }
+                });
+
+                // 2. Calculate Financials
+                const estimatedStudents = currentLead.estimatedStudents || 100; // Default to 100 if not set
+                const PRICE_PER_STUDENT = 500;
+                const subscriptionAmount = estimatedStudents * PRICE_PER_STUDENT;
+                const commissionRate = currentLead.partner.commissionRate || 10;
+                const commissionAmount = subscriptionAmount * (commissionRate / 100);
+
+                // 3. Create PartnerSchool
+                const startDate = new Date();
+                const endDate = new Date();
+                endDate.setFullYear(endDate.getFullYear() + 1);
+
+                await tx.partnerSchool.create({
+                    data: {
+                        partnerId: currentLead.partnerId,
+                        schoolId: newSchool.id,
+                        subscriptionPlan: "Annual Premium",
+                        planStartDate: startDate,
+                        planEndDate: endDate,
+                        renewalDate: endDate,
+                        subscriptionAmount: subscriptionAmount,
+                        commissionRate: commissionRate,
+                        commissionAmount: commissionAmount,
+                        isActive: true
+                    }
+                });
+
+                // 4. Create PartnerCommission
+                await tx.partnerCommission.create({
+                    data: {
+                        partnerId: currentLead.partnerId,
+                        type: "ONBOARDING",
+                        schoolId: newSchool.id,
+                        schoolName: currentLead.schoolName,
+                        revenueAmount: subscriptionAmount,
+                        commissionRate: commissionRate,
+                        commissionAmount: commissionAmount,
+                        periodMonth: startDate.getMonth() + 1,
+                        periodYear: startDate.getFullYear(),
+                        isPaid: false
+                    }
+                });
+
+                // 5. Update Partner Stats
+                await tx.partner.update({
+                    where: { id: currentLead.partnerId },
+                    data: {
+                        convertedLeads: { increment: 1 },
+                        totalRevenue: { increment: subscriptionAmount },
+                        totalCommission: { increment: commissionAmount }
+                    }
+                });
+
+                // Update lead conversion details
+                updateData.convertedAt = new Date();
+                updateData.convertedSchoolId = newSchool.id;
+            }
+
             const updated = await tx.partnerLead.update({
                 where: { id },
                 data: {
