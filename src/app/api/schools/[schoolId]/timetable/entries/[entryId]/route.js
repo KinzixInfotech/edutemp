@@ -1,0 +1,91 @@
+import { NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
+
+// GET /api/schools/[schoolId]/timetable/entries/[entryId]
+export async function GET(req, { params }) {
+    try {
+        const { entryId } = await params;
+
+        const entry = await prisma.timetableEntry.findUnique({
+            where: { id: entryId },
+            include: {
+                class: true,
+                section: true,
+                subject: true,
+                teacher: true,
+                timeSlot: true,
+            },
+        });
+
+        if (!entry) {
+            return NextResponse.json(
+                { error: 'Timetable entry not found' },
+                { status: 404 }
+            );
+        }
+
+        return NextResponse.json(entry);
+    } catch (error) {
+        console.error('Error fetching timetable entry:', error);
+        return NextResponse.json(
+            { error: 'Failed to fetch timetable entry' },
+            { status: 500 }
+        );
+    }
+}
+
+// PUT /api/schools/[schoolId]/timetable/entries/[entryId]
+export async function PUT(req, { params }) {
+    try {
+        const { entryId } = await params;
+        const body = await req.json();
+        const { subjectId, teacherId, timeSlotId, dayOfWeek, roomNumber, notes, isActive } = body;
+
+        const entry = await prisma.timetableEntry.update({
+            where: { id: entryId },
+            data: {
+                subjectId: subjectId ? parseInt(subjectId) : undefined,
+                teacherId: teacherId || undefined,
+                timeSlotId: timeSlotId || undefined,
+                dayOfWeek: dayOfWeek != null ? parseInt(dayOfWeek) : undefined,
+                roomNumber: roomNumber !== undefined ? roomNumber : undefined,
+                notes: notes !== undefined ? notes : undefined,
+                isActive: isActive !== undefined ? isActive : undefined,
+            },
+            include: {
+                class: { select: { className: true } },
+                section: { select: { name: true } },
+                subject: { select: { subjectName: true } },
+                teacher: { select: { name: true } },
+                timeSlot: { select: { label: true } },
+            },
+        });
+
+        return NextResponse.json(entry);
+    } catch (error) {
+        console.error('Error updating timetable entry:', error);
+        return NextResponse.json(
+            { error: 'Failed to update timetable entry' },
+            { status: 500 }
+        );
+    }
+}
+
+// DELETE /api/schools/[schoolId]/timetable/entries/[entryId]
+export async function DELETE(req, { params }) {
+    try {
+        const { entryId } = await params;
+
+        await prisma.timetableEntry.delete({
+            where: { id: entryId },
+        });
+
+        return NextResponse.json({ message: 'Timetable entry deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting timetable entry:', error);
+        return NextResponse.json(
+            { error: 'Failed to delete timetable entry' },
+            { status: 500 }
+        );
+    }
+}

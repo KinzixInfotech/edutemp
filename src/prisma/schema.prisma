@@ -25,6 +25,7 @@ model School {
   classes                Class[]
   attendanceDelegations  AttendanceDelegation[]
   exams                  Exam[]
+  examHalls              ExamHall[]
   FeePayment             FeePayment[]
   FeeStructure           FeeStructure[]
   galleries              Gallery[]
@@ -70,6 +71,9 @@ model School {
   attendanceNotifications AttendanceNotification[]
   homework                Homework[]
   partnerSchools          PartnerSchool[]
+  timeSlots               TimeSlot[]
+  timetableEntries        TimetableEntry[]
+  timetableTemplates      TimetableTemplate[]
 
   @@index([name])
 }
@@ -1063,6 +1067,7 @@ model Student {
   studentFees            StudentFee[]
   feeReminders           FeeReminder[]
   studentParentLinks     StudentParentLink[]
+  seatAllocations        SeatAllocation[]
 
   @@index([classId])
   @@index([sectionId])
@@ -1252,6 +1257,7 @@ model TeachingStaff {
   substituteDelegations AttendanceDelegation[]  @relation("SubstituteTeacher")
   user                  User                    @relation(fields: [userId], references: [id])
   subjects              Subject[]               @relation("SubjectToTeachingStaff")
+  timetableEntries      TimetableEntry[]
 
   @@index([departmentId])
 }
@@ -1306,6 +1312,9 @@ model Class {
   globalFeeStructures   GlobalFeeStructure[]
   calendarEventTargets  CalendarEventTarget[]
   bulkAttendance        BulkAttendance[]
+  exam                  Exam?                  @relation(fields: [examId], references: [id])
+  examId                Int?
+  timetableEntries      TimetableEntry[]
 
   @@unique([id, schoolId])
   @@index([schoolId])
@@ -1347,6 +1356,7 @@ model Section {
   bulkAttendance        BulkAttendance[]
   attendanceDelegations AttendanceDelegation[]
   homework              Homework[]
+  timetableEntries      TimetableEntry[]
 
   @@unique([classId, name])
   @@index([classId])
@@ -1364,6 +1374,80 @@ model SectionSubjectTeacher {
   @@unique([sectionId, subjectId])
 }
 
+// Time Slot Configuration (e.g., Period 1: 09:00-09:40)
+model TimeSlot {
+  id        String   @id @default(uuid()) @db.Uuid
+  schoolId  String   @db.Uuid
+  label     String // "Period 1", "Period 2", "Lunch Break"
+  startTime String // "09:00"
+  endTime   String // "09:40"
+  isBreak   Boolean  @default(false)
+  sequence  Int // Order: 1, 2, 3...
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school  School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  entries TimetableEntry[]
+
+  @@index([schoolId])
+  @@index([schoolId, sequence])
+}
+
+// Individual Timetable Entry (Class X, Period 1, Monday = Math with Mr. Sharma)
+model TimetableEntry {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @db.Uuid
+
+  // Linking
+  classId    Int
+  sectionId  Int?
+  subjectId  Int
+  teacherId  String @db.Uuid
+  timeSlotId String @db.Uuid
+
+  // Schedule
+  dayOfWeek  Int // 1=Monday, 2=Tuesday, ..., 6=Saturday
+  roomNumber String?
+
+  // Metadata
+  isActive  Boolean  @default(true)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  school   School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class    Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
+  section  Section?      @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject  Subject       @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher  TeachingStaff @relation(fields: [teacherId], references: [userId], onDelete: Cascade)
+  timeSlot TimeSlot      @relation(fields: [timeSlotId], references: [id], onDelete: Cascade)
+
+  @@unique([classId, sectionId, timeSlotId, dayOfWeek])
+  @@index([schoolId])
+  @@index([teacherId, dayOfWeek])
+  @@index([classId, sectionId, dayOfWeek])
+  @@index([timeSlotId, dayOfWeek])
+}
+
+// Template for reusing timetable configurations
+model TimetableTemplate {
+  id             String   @id @default(uuid()) @db.Uuid
+  schoolId       String   @db.Uuid
+  name           String // "Standard Week", "Exam Week"
+  academicYearId String   @db.Uuid
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  school       School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([academicYearId])
+}
+
+// Legacy model - kept for backward compatibility, will be deprecated
 model Timetable {
   id        String   @id @default(uuid()) @db.Uuid
   sectionId Int
@@ -1403,6 +1487,8 @@ model Subject {
   class                 Class                   @relation(fields: [classId], references: [id])
   department            Department              @relation(fields: [departmentId], references: [id])
   Teacher               TeachingStaff[]         @relation("SubjectToTeachingStaff")
+  examSubjects          ExamSubject[]
+  timetableEntries      TimetableEntry[]
 
   @@index([classId])
   @@index([departmentId])
@@ -1460,31 +1546,114 @@ model Homework {
 }
 
 model Exam {
-  id         Int          @id @default(autoincrement())
-  schoolId   String       @db.Uuid
-  title      String
-  createdAt  DateTime     @default(now())
-  school     School       @relation(fields: [schoolId], references: [id])
-  results    ExamResult[]
-  examSeries ExamSeries[]
-  AdmitCard  AdmitCard[]
+  id             Int        @id @default(autoincrement())
+  schoolId       String     @db.Uuid
+  title          String
+  type           ExamType   @default(OFFLINE)
+  startDate      DateTime?
+  endDate        DateTime?
+  status         ExamStatus @default(DRAFT)
+  academicYearId String?    @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  school       School        @relation(fields: [schoolId], references: [id])
+  academicYear AcademicYear? @relation(fields: [academicYearId], references: [id])
+
+  classes Class[]
+
+  results         ExamResult[]
+  examSeries      ExamSeries[]
+  AdmitCard       AdmitCard[]
+  subjects        ExamSubject[]
+  seatAllocations SeatAllocation[]
 
   @@index([schoolId])
 }
 
+model ExamSubject {
+  id           String    @id @default(uuid()) @db.Uuid
+  examId       Int
+  subjectId    Int
+  date         DateTime?
+  startTime    String?
+  endTime      String?
+  duration     Int?
+  maxMarks     Float     @default(100)
+  passingMarks Float     @default(33)
+
+  exam    Exam    @relation(fields: [examId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id])
+
+  @@unique([examId, subjectId])
+  @@index([examId])
+  @@index([subjectId])
+}
+
 model ExamResult {
-  id        Int     @id @default(autoincrement())
+  id        Int    @id @default(autoincrement())
   examId    Int
-  studentId String  @db.Uuid
+  studentId String @db.Uuid
   subjectId Int
-  exam      Exam    @relation(fields: [examId], references: [id])
-  student   Student @relation(fields: [studentId], references: [userId])
-  subject   Subject @relation(fields: [subjectId], references: [id])
+
+  marksObtained Float?
+  grade         String?
+  remarks       String?
+  isAbsent      Boolean @default(false)
+
+  exam    Exam    @relation(fields: [examId], references: [id])
+  student Student @relation(fields: [studentId], references: [userId])
+  subject Subject @relation(fields: [subjectId], references: [id])
 
   @@unique([examId, studentId, subjectId])
   @@index([examId])
   @@index([studentId])
   @@index([subjectId])
+}
+
+model ExamHall {
+  id         String  @id @default(uuid()) @db.Uuid
+  schoolId   String  @db.Uuid
+  name       String
+  roomNumber String?
+  capacity   Int
+
+  allocations SeatAllocation[]
+  school      School           @relation(fields: [schoolId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([schoolId])
+}
+
+model SeatAllocation {
+  id         String @id @default(uuid()) @db.Uuid
+  examId     Int
+  studentId  String @db.Uuid
+  examHallId String @db.Uuid
+  seatNumber String
+
+  exam    Exam     @relation(fields: [examId], references: [id])
+  student Student  @relation(fields: [studentId], references: [userId])
+  hall    ExamHall @relation(fields: [examHallId], references: [id])
+
+  @@unique([examId, studentId])
+  @@index([examId])
+  @@index([examHallId])
+}
+
+enum ExamType {
+  OFFLINE
+  ONLINE
+}
+
+enum ExamStatus {
+  DRAFT
+  SCHEDULED
+  COMPLETED
+  PUBLISHED
 }
 
 model AcademicYear {
@@ -1508,6 +1677,8 @@ model AcademicYear {
   studentFees         StudentFee[]
   leaveBalances       LeaveBalance[]
   attendanceStats     AttendanceStats[]
+  exams               Exam[]
+  timetableTemplates  TimetableTemplate[]
 
   @@unique([schoolId, name])
   @@index([schoolId])

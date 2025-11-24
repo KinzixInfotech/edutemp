@@ -1,4 +1,4 @@
-// lib/prisma.js
+// lib/prisma.js - Force reload
 import { PrismaClient } from '@prisma/client'
 
 const globalForPrisma = global

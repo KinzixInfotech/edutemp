@@ -50,6 +50,8 @@ import {
     ScrollText,
     Blocks,
     BookA,
+    RouteOff,
+    BookOpen,
     School,
 } from "lucide-react"
 import { useCommandMenu } from "./CommandMenuContext"
@@ -75,6 +77,7 @@ export const SidebarData = [
             },
         ],
     },
+
     //for partners
     {
         items: [
@@ -290,6 +293,41 @@ export const SidebarData = [
         ]
     },
     {
+        title: "Subjects",
+        items: [
+            {
+                label: "Manage Subjects",
+                icon: BookOpen,
+                roles: ["ADMIN"],
+                submenu: [
+                    {
+                        label: "Subject List", url: "/dashboard/subjects/manage", roles: ["ADMIN"]
+                    },
+                    {
+                        label: "Create Subject", url: "/dashboard/subjects/create", roles: ["ADMIN"]
+                    },
+                    { label: "Statistics", url: "/dashboard/subjects/stats", roles: ["ADMIN"] },
+                ],
+            },
+        ],
+    },
+    {
+        title: "Timetable",
+        items: [
+            {
+                label: "Manage Timetable",
+                icon: Calendar,
+                roles: ["ADMIN"],
+                submenu: [
+                    { label: "Overview", url: "/dashboard/timetable/manage", roles: ["ADMIN"] },
+                    { label: "Create Timetable", url: "/dashboard/timetable/create", roles: ["ADMIN"] },
+                    { label: "Time Slots", url: "/dashboard/timetable/slots", roles: ["ADMIN"] },
+                    { label: "Statistics", url: "/dashboard/timetable/stats", roles: ["ADMIN"] },
+                ],
+            },
+        ],
+    },
+    {
         // title: "Management Attendance",
         items: [
             {
@@ -409,16 +447,18 @@ export const SidebarData = [
                 roles: ["ADMIN"],
                 submenu: [
                     {
-                        label: "Create Exam", url: "/dashboard/fees/#", roles: ["ADMIN"]
+                        label: "Exam List", url: "/dashboard/examination/manage", roles: ["ADMIN"]
                     },
-                    { label: "Schedule Exam", url: "/dashboard/fees/#", roles: ["ADMIN"] },
-                    { label: "Input Marks", url: "/dashboard/fees/#", roles: ["ADMIN"] },
-                    { label: "Results & Reports", url: "/dashboard/fees/#", roles: ["ADMIN"] },
-                    { label: "Question Banks", url: "/dashboard/fees/#", roles: ["ADMIN"] },
+                    {
+                        label: "Create Exam", url: "/dashboard/examination/create", roles: ["ADMIN"]
+                    },
+                    { label: "Marks Entry", url: "/dashboard/examination/marks", roles: ["ADMIN"] },
+                    { label: "Hall Management", url: "/dashboard/examination/halls", roles: ["ADMIN"] },
                 ],
             },
         ],
     },
+
     {
         title: "Edu Employees",
         items: [
@@ -432,21 +472,6 @@ export const SidebarData = [
         items: [
             { label: "Alumni Management", url: "/dashboard/schools/alumni/", icon: Timer, roles: ["SUPER_ADMIN", "STUDENT", "ADMIN", "MASTER_ADMIN", "TEACHER", "STAFF"] },
         ],
-    },
-    {
-        title: "Other Management",
-        items: [
-            {
-                label: "Additional Management",
-                icon: Grip,
-                roles: ["ADMIN"],
-                submenu: [
-                    { label: "Manage Time Table ", url: "/dashboard/schools/manage-time-table", roles: ["ADMIN"] },
-                    { label: "Manage Gallery", url: "/dashboard/schools/manage-gallery", roles: ["ADMIN"] },
-                ]
-            },
-
-        ]
     },
 ]
 
@@ -475,6 +500,7 @@ export function AppSidebar({ ...props }) {
     const logo = resolvedTheme === "dark" ? logoWhite : logoBlack
     const logoCl = resolvedTheme === "dark" ? logocldark : logocllight
     const isCollapsed = state === "collapsed"
+    // console.log(fullUser);
 
     return (
         <Sidebar collapsible="icon" {...props}>
