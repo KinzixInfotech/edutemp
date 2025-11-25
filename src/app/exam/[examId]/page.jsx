@@ -284,16 +284,11 @@ export default function PublicExamPage() {
 
     if (viewState === "LOGIN") {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-white p-4 sm:p-6 md:p-8 relative overflow-hidden">
-                {/* Educational Pattern Background */}
-                <div className="absolute inset-0 opacity-5 hidden sm:block">
-                    <div className="absolute top-10 left-10 text-6xl">🎓</div>
-                    <div className="absolute top-32 right-20 text-5xl">📚</div>
-                    <div className="absolute bottom-20 left-32 text-6xl">✏️</div>
-                    <div className="absolute bottom-40 right-40 text-5xl">🎓</div>
-                    <div className="absolute top-1/2 left-1/4 text-4xl">📖</div>
-                    <div className="absolute top-1/3 right-1/3 text-5xl">🎓</div>
-                    <div className="absolute bottom-1/3 left-1/2 text-4xl">📝</div>
+            <div className="relative min-h-screen bg-gradient-to-br from-blue-50 via-sky-50 to-indigo-50 overflow-hidden flex items-center justify-center p-4">
+                {/* Animated Background Elements */}
+                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                    <div className="absolute top-20 left-10 w-72 h-72 rounded-full blur-3xl opacity-20 animate-pulse" style={{ backgroundColor: '#0c65f1' }} />
+                    <div className="absolute bottom-20 right-10 w-96 h-96 rounded-full blur-3xl opacity-15 animate-pulse" style={{ backgroundColor: '#0c65f1', animationDelay: '1s' }} />
                 </div>
 
                 <motion.div
@@ -301,73 +296,92 @@ export default function PublicExamPage() {
                     animate={{ opacity: 1, y: 0 }}
                     className="w-full max-w-md relative z-10"
                 >
-                    <Card className="border border-gray-200 shadow-sm">
-                        <CardContent className="p-6 sm:p-10 md:p-12">
-                            {/* Logo/Icon */}
-                            <div className="flex justify-center mb-6">
-                                <div className="bg-primary/10 p-4 rounded-full">
-                                    <School className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
+                    <Card className="overflow-hidden border-none shadow-2xl bg-white/95 backdrop-blur-md">
+                        <CardContent className="p-8 sm:p-12">
+                            {/* Logo Section */}
+                            <div className="text-center mb-8">
+                                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-50 mb-6">
+                                    <School className="h-8 w-8 text-[#0c65f1]" />
                                 </div>
+                                <h1 className="text-3xl font-bold mb-2" style={{ color: '#0c65f1' }}>
+                                    Student Exam Portal
+                                </h1>
+                                <p className="text-gray-600">
+                                    Sign in to access your examination
+                                </p>
                             </div>
 
-                            {/* Title */}
-                            <h1 className="text-xl sm:text-2xl font-normal text-center text-gray-800 mb-2">
-                                Sign in
-                            </h1>
-                            <p className="text-sm text-center text-gray-600 mb-6 sm:mb-8">
-                                to continue to Exam
-                            </p>
-
                             {/* Form */}
-                            <form onSubmit={handleLogin} className="space-y-4 sm:space-y-5">
-                                <div>
-                                    <Input
-                                        type="email"
-                                        placeholder="Email"
-                                        value={credentials.email}
-                                        onChange={(e) => setCredentials({ ...credentials, email: e.target.value })}
-                                        required
-                                        className="h-12 sm:h-14 text-base border-gray-300 focus:border-primary px-4"
-                                    />
+                            <form onSubmit={handleLogin} className="space-y-6">
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-semibold text-gray-700">Email Address</Label>
+                                    <div className="relative group">
+                                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-[#0c65f1] transition-colors" />
+                                        <Input
+                                            type="email"
+                                            placeholder="student@school.com"
+                                            value={credentials.email}
+                                            onChange={(e) => setCredentials({ ...credentials, email: e.target.value })}
+                                            required
+                                            className="pl-12 h-12 bg-gray-50 border-2 border-gray-200 focus:border-[#0c65f1] focus:bg-white transition-all rounded-xl font-medium"
+                                        />
+                                    </div>
                                 </div>
-                                <div>
-                                    <Input
-                                        type="password"
-                                        placeholder="Enter your password"
-                                        value={credentials.password}
-                                        onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
-                                        required
-                                        className="h-12 sm:h-14 text-base border-gray-300 focus:border-primary px-4"
-                                    />
+
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-semibold text-gray-700">Password</Label>
+                                    <div className="relative group">
+                                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-[#0c65f1] transition-colors" />
+                                        <Input
+                                            type="password"
+                                            placeholder="Enter your password"
+                                            value={credentials.password}
+                                            onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
+                                            required
+                                            className="pl-12 h-12 bg-gray-50 border-2 border-gray-200 focus:border-[#0c65f1] focus:bg-white transition-all rounded-xl font-medium"
+                                        />
+                                    </div>
                                 </div>
 
                                 {errorMsg && (
-                                    <div className="text-sm text-red-600 bg-red-50 p-3 rounded flex items-start gap-2 border border-red-100">
-                                        <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                                        <span>{errorMsg}</span>
+                                    <div className="p-4 rounded-xl bg-red-50 border border-red-100 flex items-start gap-3">
+                                        <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+                                        <p className="text-sm text-red-600 font-medium">{errorMsg}</p>
                                     </div>
                                 )}
 
-                                <div className="flex items-center justify-end pt-2 sm:pt-4">
-                                    <Button
-                                        type="submit"
-                                        disabled={loading}
-                                        className="px-6 sm:px-8 h-10 sm:h-11"
-                                    >
-                                        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        Next
-                                    </Button>
-                                </div>
+                                <Button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="w-full h-12 text-white font-bold text-base rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98]"
+                                    style={{
+                                        background: 'linear-gradient(135deg, #0c65f1 0%, #0a52c6 100%)'
+                                    }}
+                                >
+                                    {loading ? (
+                                        <div className="flex items-center gap-2">
+                                            <Loader2 className="w-5 h-5 animate-spin" />
+                                            <span>Verifying...</span>
+                                        </div>
+                                    ) : (
+                                        "Start Exam Session"
+                                    )}
+                                </Button>
                             </form>
+
+                            {/* Footer */}
+                            <div className="mt-8 text-center">
+                                <p className="text-xs text-gray-500 flex items-center justify-center gap-2">
+                                    <Lock className="h-3 w-3" />
+                                    Secure Examination Environment
+                                </p>
+                            </div>
                         </CardContent>
                     </Card>
 
-                    {/* Footer */}
-                    <div className="mt-4 sm:mt-6 text-center">
-                        <p className="text-xs text-gray-500">
-                            Powered by <span className="font-semibold text-primary">EduBreezy</span>
-                        </p>
-                    </div>
+                    <p className="text-center text-gray-500 text-sm mt-8">
+                        Powered by <span className="font-semibold text-[#0c65f1]">EduBreezy</span>
+                    </p>
                 </motion.div>
             </div>
         );

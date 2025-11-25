@@ -133,9 +133,15 @@ export async function PUT(req, { params }) {
                     if (question) {
                         // Simple auto-grading for MCQ/Checkbox
                         if (question.type === 'MCQ' || question.type === 'CHECKBOX') {
-                            // Compare ans.answer with question.correctAnswer
-                            // This is a simplified comparison
-                            if (JSON.stringify(ans.answer) === JSON.stringify(question.correctAnswer)) {
+                            // Normalize both to arrays for comparison
+                            const studentAns = Array.isArray(ans.answer) ? ans.answer : [ans.answer];
+                            const correctAns = Array.isArray(question.correctAnswer) ? question.correctAnswer : [question.correctAnswer];
+
+                            // Sort and compare strings
+                            const sortedStudent = studentAns.map(String).sort();
+                            const sortedCorrect = correctAns.map(String).sort();
+
+                            if (JSON.stringify(sortedStudent) === JSON.stringify(sortedCorrect)) {
                                 isCorrect = true;
                                 marksObtained = question.marks;
                             }

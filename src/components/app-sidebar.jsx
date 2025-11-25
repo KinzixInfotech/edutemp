@@ -456,6 +456,7 @@ export const SidebarData = [
                         label: "Create Exam", url: "/dashboard/examination/create", roles: ["ADMIN"]
                     },
                     { label: "Marks Entry", url: "/dashboard/examination/marks", roles: ["ADMIN"] },
+                    { label: "Online Results", url: "/dashboard/examination/online-results", roles: ["ADMIN"] },
                     { label: "Hall Management", url: "/dashboard/examination/halls", roles: ["ADMIN"] },
                     { label: "Statistics", url: "/dashboard/examination/stats", roles: ["ADMIN"] },
                 ],
