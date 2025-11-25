@@ -48,7 +48,7 @@ export async function POST(request, props) {
 
         // 2. Fetch exam details
         const exam = await prisma.exam.findUnique({
-            where: { id: parseInt(examId) },
+            where: { id: examId },
             include: {
                 school: true,
             },
@@ -79,7 +79,7 @@ export async function POST(request, props) {
         const existingAdmitCard = await prisma.admitCard.findFirst({
             where: {
                 studentId,
-                examId: parseInt(examId),
+                examId: examId,
                 schoolId,
             },
         });
@@ -156,7 +156,7 @@ export async function POST(request, props) {
         const admitCard = await prisma.admitCard.create({
             data: {
                 studentId,
-                examId: parseInt(examId),
+                examId: examId,
                 schoolId,
                 seatNumber,
                 center: center || null,

@@ -7,7 +7,7 @@ export async function GET(req, { params }) {
         const { examId } = await params;
 
         const exam = await prisma.exam.findUnique({
-            where: { id: parseInt(examId) },
+            where: { id: examId },
             include: {
                 academicYear: true,
                 classes: true,
@@ -45,7 +45,7 @@ export async function PUT(req, { params }) {
         const { title, type, startDate, endDate, status, classIds } = body;
 
         const exam = await prisma.exam.update({
-            where: { id: parseInt(examId) },
+            where: { id: examId },
             data: {
                 title,
                 type,
@@ -75,7 +75,7 @@ export async function PUT(req, { params }) {
 export async function DELETE(req, { params }) {
     try {
         const { examId } = await params;
-        const id = parseInt(examId);
+        const id = examId;
 
         // Delete all related records in proper order to avoid foreign key constraints
         await prisma.$transaction(async (tx) => {

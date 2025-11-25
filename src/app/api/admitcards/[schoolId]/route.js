@@ -18,7 +18,7 @@ export async function GET(request, props) {
     }
 
     const where = { schoolId };
-    if (examId) where.examId = parseInt(examId);
+    if (examId) where.examId = examId;
 
     const admitCards = await prisma.admitCard.findMany({
       where,

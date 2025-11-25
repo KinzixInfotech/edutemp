@@ -7,7 +7,7 @@ export async function GET(req, { params }) {
         const { examId } = await params;
 
         const allocations = await prisma.seatAllocation.findMany({
-            where: { examId: parseInt(examId) },
+            where: { examId: examId },
             include: {
                 student: {
                     select: {
@@ -48,7 +48,7 @@ export async function POST(req, { params }) {
 
         // 1. Fetch Exam and its Classes
         const exam = await prisma.exam.findUnique({
-            where: { id: parseInt(examId) },
+            where: { id: examId },
             include: { classes: true },
         });
 
@@ -85,7 +85,7 @@ export async function POST(req, { params }) {
 
         // 4. Clear existing allocations for this exam
         await prisma.seatAllocation.deleteMany({
-            where: { examId: parseInt(examId) },
+            where: { examId: examId },
         });
 
         // 5. Allocation Logic
@@ -99,7 +99,7 @@ export async function POST(req, { params }) {
                 const student = students[currentStudentIndex];
 
                 allocations.push({
-                    examId: parseInt(examId),
+                    examId: examId,
                     studentId: student.userId,
                     examHallId: hall.id,
                     seatNumber: `${hall.roomNumber || hall.name}-${seatsFilled + 1}`, // Simple seat numbering

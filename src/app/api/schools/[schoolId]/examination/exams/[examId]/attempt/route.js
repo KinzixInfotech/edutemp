@@ -14,7 +14,7 @@ export async function POST(req, { params }) {
 
         // Check if exam exists and is active
         const exam = await prisma.exam.findUnique({
-            where: { id: parseInt(examId) },
+            where: { id: examId },
             include: { questions: true }
         });
 
@@ -37,7 +37,7 @@ export async function POST(req, { params }) {
         // Check existing attempt
         const existingAttempt = await prisma.studentExamAttempt.findFirst({
             where: {
-                examId: parseInt(examId),
+                examId: examId,
                 studentId: studentId
             }
         });
@@ -59,14 +59,19 @@ export async function POST(req, { params }) {
                     // Exclude correctAnswer
                 })),
                 startTime: existingAttempt.startTime,
-                securitySettings: exam.securitySettings
+                securitySettings: exam.securitySettings,
+                exam: {
+                    enableTimer: exam.enableTimer,
+                    duration: exam.duration,
+                    securitySettings: exam.securitySettings
+                }
             });
         }
 
         // Create new attempt
         const attempt = await prisma.studentExamAttempt.create({
             data: {
-                examId: parseInt(examId),
+                examId: examId,
                 studentId: studentId,
                 status: 'IN_PROGRESS',
                 startTime: new Date(),
@@ -84,7 +89,12 @@ export async function POST(req, { params }) {
                 order: q.order
             })),
             startTime: attempt.startTime,
-            securitySettings: exam.securitySettings
+            securitySettings: exam.securitySettings,
+            exam: {
+                enableTimer: exam.enableTimer,
+                duration: exam.duration,
+                securitySettings: exam.securitySettings
+            }
         });
 
     } catch (error) {

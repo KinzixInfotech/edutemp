@@ -9,7 +9,7 @@ export async function GET(req, { params }) {
         // Get all students allocated to this hall for this exam
         const allocations = await prisma.seatAllocation.findMany({
             where: {
-                examId: parseInt(examId),
+                examId: examId,
                 examHallId: hallId
             },
             include: {
@@ -26,7 +26,7 @@ export async function GET(req, { params }) {
         // Get existing attendance records
         const attendance = await prisma.hallAttendance.findMany({
             where: {
-                examId: parseInt(examId),
+                examId: examId,
                 hallId: hallId
             }
         });
@@ -67,7 +67,7 @@ export async function POST(req, { params }) {
             prisma.hallAttendance.upsert({
                 where: {
                     examId_studentId: {
-                        examId: parseInt(examId),
+                        examId: examId,
                         studentId: s.studentId
                     }
                 },
@@ -78,7 +78,7 @@ export async function POST(req, { params }) {
                     hallId: hallId
                 },
                 create: {
-                    examId: parseInt(examId),
+                    examId: examId,
                     hallId: hallId,
                     studentId: s.studentId,
                     status: s.status,

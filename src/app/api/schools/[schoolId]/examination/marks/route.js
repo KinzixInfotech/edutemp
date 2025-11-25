@@ -38,7 +38,7 @@ export async function GET(req, { params }) {
         // Fetch existing marks
         const marks = await prisma.examResult.findMany({
             where: {
-                examId: parseInt(examId),
+                examId: examId,
                 subjectId: parseInt(subjectId),
                 studentId: {
                     in: students.map((s) => s.userId),
@@ -89,7 +89,7 @@ export async function POST(req, { params }) {
                 prisma.examResult.upsert({
                     where: {
                         examId_studentId_subjectId: {
-                            examId: parseInt(examId),
+                            examId: examId,
                             studentId: mark.studentId,
                             subjectId: parseInt(subjectId),
                         },
@@ -101,7 +101,7 @@ export async function POST(req, { params }) {
                         isAbsent: mark.isAbsent,
                     },
                     create: {
-                        examId: parseInt(examId),
+                        examId: examId,
                         studentId: mark.studentId,
                         subjectId: parseInt(subjectId),
                         marksObtained: mark.marksObtained !== '' ? parseFloat(mark.marksObtained) : null,

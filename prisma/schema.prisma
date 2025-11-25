@@ -1173,10 +1173,10 @@ enum ParentRelationType {
 }
 
 model ExamSeries {
-  id     Int   @id @default(autoincrement())
-  examId Int
+  id     Int    @id @default(autoincrement())
+  examId String @db.Uuid
   score  Float
-  exam   Exam  @relation(fields: [examId], references: [id])
+  exam   Exam   @relation(fields: [examId], references: [id])
 }
 
 model ExamIssue {
@@ -1316,7 +1316,7 @@ model Class {
   calendarEventTargets  CalendarEventTarget[]
   bulkAttendance        BulkAttendance[]
   exam                  Exam?                  @relation(fields: [examId], references: [id])
-  examId                Int?
+  examId                String?                @db.Uuid
   timetableEntries      TimetableEntry[]
 
   @@unique([id, schoolId])
@@ -1549,7 +1549,7 @@ model Homework {
 }
 
 model Exam {
-  id             Int        @id @default(autoincrement())
+  id             String     @id @default(uuid()) @db.Uuid
   schoolId       String     @db.Uuid
   title          String
   type           ExamType   @default(OFFLINE)
@@ -1585,7 +1585,7 @@ model Exam {
 
 model ExamSubject {
   id           String    @id @default(uuid()) @db.Uuid
-  examId       Int
+  examId       String    @db.Uuid
   subjectId    Int
   date         DateTime?
   startTime    String?
@@ -1604,7 +1604,7 @@ model ExamSubject {
 
 model ExamResult {
   id        Int    @id @default(autoincrement())
-  examId    Int
+  examId    String @db.Uuid
   studentId String @db.Uuid
   subjectId Int
 
@@ -1643,7 +1643,7 @@ model ExamHall {
 
 model SeatAllocation {
   id         String @id @default(uuid()) @db.Uuid
-  examId     Int
+  examId     String @db.Uuid
   studentId  String @db.Uuid
   examHallId String @db.Uuid
   seatNumber String
@@ -2646,7 +2646,7 @@ model AdmitCard {
   id           String   @id @default(uuid()) @db.Uuid
   studentId    String   @db.Uuid
   student      Student  @relation(fields: [studentId], references: [userId], onDelete: Cascade)
-  examId       Int
+  examId       String   @db.Uuid
   exam         Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
   schoolId     String   @db.Uuid
   school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
@@ -3197,7 +3197,7 @@ enum ReminderType {
 
 model OnlineExamQuestion {
   id            String @id @default(uuid()) @db.Uuid
-  examId        Int
+  examId        String @db.Uuid
   question      String
   type          String // MCQ, SUBJECTIVE, CHECKBOX
   options       Json? // Array of options for MCQ/Checkbox
@@ -3213,7 +3213,7 @@ model OnlineExamQuestion {
 
 model StudentExamAttempt {
   id        String @id @default(uuid()) @db.Uuid
-  examId    Int
+  examId    String @db.Uuid
   studentId String @db.Uuid
 
   startTime DateTime  @default(now())
@@ -3249,7 +3249,7 @@ model StudentExamAnswer {
 
 model ExamHallInvigilator {
   id        String @id @default(uuid()) @db.Uuid
-  examId    Int
+  examId    String @db.Uuid
   hallId    String @db.Uuid
   teacherId String @db.Uuid
 
@@ -3264,7 +3264,7 @@ model ExamHallInvigilator {
 
 model HallAttendance {
   id        String @id @default(uuid()) @db.Uuid
-  examId    Int
+  examId    String @db.Uuid
   hallId    String @db.Uuid
   studentId String @db.Uuid
 

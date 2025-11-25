@@ -7,7 +7,7 @@ export async function GET(req, { params }) {
         const { examId } = await params;
 
         const questions = await prisma.onlineExamQuestion.findMany({
-            where: { examId: parseInt(examId) },
+            where: { examId: examId },
             orderBy: { order: 'asc' },
         });
 
@@ -45,7 +45,7 @@ export async function PUT(req, { params }) {
             // Check if exam has attempts.
 
             const attemptsCount = await tx.studentExamAttempt.count({
-                where: { examId: parseInt(examId) }
+                where: { examId: examId }
             });
 
             if (attemptsCount > 0) {
@@ -54,14 +54,14 @@ export async function PUT(req, { params }) {
 
             // Delete all existing questions
             await tx.onlineExamQuestion.deleteMany({
-                where: { examId: parseInt(examId) }
+                where: { examId: examId }
             });
 
             // Create new questions
             if (questions.length > 0) {
                 await tx.onlineExamQuestion.createMany({
                     data: questions.map((q, index) => ({
-                        examId: parseInt(examId),
+                        examId: examId,
                         question: q.question,
                         type: q.type,
                         options: q.options || [],
@@ -74,7 +74,7 @@ export async function PUT(req, { params }) {
         });
 
         const updatedQuestions = await prisma.onlineExamQuestion.findMany({
-            where: { examId: parseInt(examId) },
+            where: { examId: examId },
             orderBy: { order: 'asc' },
         });
 

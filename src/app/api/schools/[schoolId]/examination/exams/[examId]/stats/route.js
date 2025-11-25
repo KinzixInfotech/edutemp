@@ -6,7 +6,7 @@ export async function GET(req, { params }) {
         const { examId } = await params;
 
         const exam = await prisma.exam.findUnique({
-            where: { id: parseInt(examId) },
+            where: { id: examId },
             include: {
                 classes: {
                     include: {
@@ -126,7 +126,7 @@ export async function GET(req, { params }) {
 
         // Attendance Stats
         const attendanceRecords = await prisma.hallAttendance.findMany({
-            where: { examId: parseInt(examId) }
+            where: { examId: examId }
         });
 
         stats.attendance = {

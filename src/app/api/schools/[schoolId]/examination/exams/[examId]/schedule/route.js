@@ -19,7 +19,7 @@ export async function POST(req, { params }) {
         const existingSchedule = await prisma.examSubject.findUnique({
             where: {
                 examId_subjectId: {
-                    examId: parseInt(examId),
+                    examId: examId,
                     subjectId: parseInt(subjectId),
                 },
             },
@@ -45,7 +45,7 @@ export async function POST(req, { params }) {
             // Create new
             schedule = await prisma.examSubject.create({
                 data: {
-                    examId: parseInt(examId),
+                    examId: examId,
                     subjectId: parseInt(subjectId),
                     date: date ? new Date(date) : null,
                     startTime,
@@ -84,7 +84,7 @@ export async function DELETE(req, { params }) {
         await prisma.examSubject.delete({
             where: {
                 examId_subjectId: {
-                    examId: parseInt(examId),
+                    examId: examId,
                     subjectId: parseInt(subjectId),
                 },
             },

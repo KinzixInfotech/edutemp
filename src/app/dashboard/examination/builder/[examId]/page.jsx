@@ -209,7 +209,7 @@ export default function ExamBuilderPage() {
                                             value={q.question}
                                             onChange={(e) => updateQuestion(index, 'question', e.target.value)}
                                             placeholder="Question Text"
-                                            className="font-medium text-lg border-none shadow-none focus-visible:ring-0 px-0"
+                                            className="font-medium pl-2! text-lg border-none shadow-none focus-visible:ring-0 px-0"
                                         />
                                         <Select value={q.type} onValueChange={(val) => updateQuestion(index, 'type', val)}>
                                             <SelectTrigger className="w-[150px]">

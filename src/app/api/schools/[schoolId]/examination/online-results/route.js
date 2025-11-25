@@ -20,7 +20,7 @@ export async function GET(req, { params }) {
         }
 
         if (examId && examId !== 'all') {
-            whereClause.examId = parseInt(examId);
+            whereClause.examId = examId;
         }
 
         if (classId && classId !== 'all') {

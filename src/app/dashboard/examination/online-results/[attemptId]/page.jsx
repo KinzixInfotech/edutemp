@@ -100,6 +100,50 @@ export default function ExamResultDetailPage() {
                 </div>
             </div>
 
+            {/* Security Violations Alert */}
+            {attempt.status === 'TERMINATED' && attempt.securityViolations && (
+                <Card className="border-destructive bg-destructive/5">
+                    <CardHeader>
+                        <CardTitle className="text-destructive flex items-center gap-2">
+                            <AlertTriangle className="h-5 w-5" />
+                            Exam Terminated - Security Violations Detected
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground mb-1">Violation Count</p>
+                                <p className="text-2xl font-bold text-destructive">
+                                    {typeof attempt.securityViolations === 'object'
+                                        ? (attempt.securityViolations.count || attempt.securityViolations.tabSwitches || 'Multiple')
+                                        : 'Multiple'}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground mb-1">Reason</p>
+                                <p className="text-base font-medium text-destructive">
+                                    {typeof attempt.securityViolations === 'object' && attempt.securityViolations.reason
+                                        ? attempt.securityViolations.reason
+                                        : "Multiple security violations detected"}
+                                </p>
+                            </div>
+                            {attempt.endTime && (
+                                <div>
+                                    <p className="text-sm font-medium text-muted-foreground mb-1">Terminated At</p>
+                                    <p className="text-base">{format(new Date(attempt.endTime), "PPpp")}</p>
+                                </div>
+                            )}
+                            {typeof attempt.securityViolations === 'object' && attempt.securityViolations.tabSwitches && (
+                                <div>
+                                    <p className="text-sm font-medium text-muted-foreground mb-1">Tab Switches</p>
+                                    <p className="text-2xl font-bold text-orange-600">{attempt.securityViolations.tabSwitches}</p>
+                                </div>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Statistics Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card>

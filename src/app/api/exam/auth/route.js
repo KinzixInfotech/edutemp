@@ -47,7 +47,7 @@ export async function POST(req) {
 
         // 3. Check Exam Eligibility
         const exam = await prisma.exam.findUnique({
-            where: { id: parseInt(examId) },
+            where: { id: examId },
             include: {
                 classes: true,
                 seatAllocations: {

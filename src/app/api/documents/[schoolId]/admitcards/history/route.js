@@ -9,7 +9,7 @@
 
 //         const whereClause = {
 //             schoolId,
-//             ...(examId && examId !== 'all' && { examId: parseInt(examId) }),
+//             ...(examId && examId !== 'all' && { examId: examId }),
 //         };
 
 //         const admitCards = await prisma.admitCard.findMany({
@@ -66,7 +66,7 @@ export async function GET(request, props) {
 
         const whereClause = {
             schoolId,
-            ...(examId && examId !== 'all' && { examId: parseInt(examId) }),
+            ...(examId && examId !== 'all' && { examId: examId }),
         };
 
         const admitCards = await prisma.admitCard.findMany({
