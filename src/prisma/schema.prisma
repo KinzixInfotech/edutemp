@@ -1068,6 +1068,8 @@ model Student {
   feeReminders           FeeReminder[]
   studentParentLinks     StudentParentLink[]
   seatAllocations        SeatAllocation[]
+  studentExamAttempts    StudentExamAttempt[]
+  hallAttendances        HallAttendance[]
 
   @@index([classId])
   @@index([sectionId])
@@ -1258,6 +1260,7 @@ model TeachingStaff {
   user                  User                    @relation(fields: [userId], references: [id])
   subjects              Subject[]               @relation("SubjectToTeachingStaff")
   timetableEntries      TimetableEntry[]
+  examHallInvigilators  ExamHallInvigilator[]
 
   @@index([departmentId])
 }
@@ -1569,6 +1572,14 @@ model Exam {
   subjects        ExamSubject[]
   seatAllocations SeatAllocation[]
 
+  securitySettings Json? // Security settings for online exams (lockScreen, tabMonitoring)
+  duration         Int? // Exam duration in minutes
+  enableTimer      Boolean               @default(false) // Whether to enable timer for this exam[]
+  questions        OnlineExamQuestion[]
+  attempts         StudentExamAttempt[]
+  invigilators     ExamHallInvigilator[]
+  attendance       HallAttendance[]
+
   @@index([schoolId])
 }
 
@@ -1622,8 +1633,10 @@ model ExamHall {
   allocations SeatAllocation[]
   school      School           @relation(fields: [schoolId], references: [id])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  examHallInvigilators ExamHallInvigilator[]
+  hallAttendances      HallAttendance[]
 
   @@index([schoolId])
 }
@@ -3176,4 +3189,94 @@ enum ReminderType {
   OVERDUE
   PAYMENT_CONFIRMATION
   INSTALLMENT_DUE
+}
+
+// ============================================
+// ONLINE EXAM & HALL ATTENDANCE SYSTEM
+// ============================================
+
+model OnlineExamQuestion {
+  id            String @id @default(uuid()) @db.Uuid
+  examId        Int
+  question      String
+  type          String // MCQ, SUBJECTIVE, CHECKBOX
+  options       Json? // Array of options for MCQ/Checkbox
+  correctAnswer Json? // Correct answer(s)
+  marks         Float
+  order         Int
+
+  exam    Exam                @relation(fields: [examId], references: [id], onDelete: Cascade)
+  answers StudentExamAnswer[]
+
+  @@index([examId])
+}
+
+model StudentExamAttempt {
+  id        String @id @default(uuid()) @db.Uuid
+  examId    Int
+  studentId String @db.Uuid
+
+  startTime DateTime  @default(now())
+  endTime   DateTime?
+  status    String // IN_PROGRESS, COMPLETED, TERMINATED
+  score     Float?
+
+  securityViolations Json? // Log of tab switches, etc.
+
+  exam    Exam                @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student Student             @relation(fields: [studentId], references: [userId])
+  answers StudentExamAnswer[]
+
+  @@index([examId])
+  @@index([studentId])
+}
+
+model StudentExamAnswer {
+  id         String @id @default(uuid()) @db.Uuid
+  attemptId  String @db.Uuid
+  questionId String @db.Uuid
+
+  answer        Json // Student's answer
+  isCorrect     Boolean?
+  marksObtained Float?
+
+  attempt  StudentExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question OnlineExamQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([attemptId])
+  @@index([questionId])
+}
+
+model ExamHallInvigilator {
+  id        String @id @default(uuid()) @db.Uuid
+  examId    Int
+  hallId    String @db.Uuid
+  teacherId String @db.Uuid
+
+  assignedAt DateTime @default(now())
+
+  exam    Exam          @relation(fields: [examId], references: [id], onDelete: Cascade)
+  hall    ExamHall      @relation(fields: [hallId], references: [id], onDelete: Cascade)
+  teacher TeachingStaff @relation(fields: [teacherId], references: [userId])
+
+  @@unique([examId, hallId, teacherId])
+}
+
+model HallAttendance {
+  id        String @id @default(uuid()) @db.Uuid
+  examId    Int
+  hallId    String @db.Uuid
+  studentId String @db.Uuid
+
+  status   String // PRESENT, ABSENT
+  markedBy String   @db.Uuid // Teacher/Admin ID
+  markedAt DateTime @default(now())
+
+  exam    Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  hall    ExamHall @relation(fields: [hallId], references: [id], onDelete: Cascade)
+  student Student  @relation(fields: [studentId], references: [userId])
+
+  @@unique([examId, studentId])
+  @@index([examId])
+  @@index([hallId])
 }

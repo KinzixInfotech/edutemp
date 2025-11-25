@@ -19,6 +19,7 @@ export async function GET(req, { params }) {
                         date: 'asc',
                     },
                 },
+                school: true,
             },
         });
 
@@ -56,6 +57,7 @@ export async function PUT(req, { params }) {
                         set: classIds.map((id) => ({ id: parseInt(id) })),
                     }
                     : undefined,
+                securitySettings: body.securitySettings !== undefined ? body.securitySettings : undefined,
             },
         });
 
@@ -73,16 +75,56 @@ export async function PUT(req, { params }) {
 export async function DELETE(req, { params }) {
     try {
         const { examId } = await params;
+        const id = parseInt(examId);
 
-        await prisma.exam.delete({
-            where: { id: parseInt(examId) },
+        // Delete all related records in proper order to avoid foreign key constraints
+        await prisma.$transaction(async (tx) => {
+            // Delete hall attendance records
+            await tx.hallAttendance.deleteMany({
+                where: { examId: id }
+            });
+
+            // Delete student exam attempts
+            await tx.studentExamAttempt.deleteMany({
+                where: { examId: id }
+            });
+
+            // Delete online exam questions
+            await tx.onlineExamQuestion.deleteMany({
+                where: { examId: id }
+            });
+
+            // Delete seat allocations
+            await tx.seatAllocation.deleteMany({
+                where: { examId: id }
+            });
+
+            // Delete exam results
+            await tx.examResult.deleteMany({
+                where: { examId: id }
+            });
+
+            // Delete exam subjects
+            await tx.examSubject.deleteMany({
+                where: { examId: id }
+            });
+
+            // Delete hall invigilators
+            await tx.examHallInvigilator.deleteMany({
+                where: { examId: id }
+            });
+
+            // Finally, delete the exam
+            await tx.exam.delete({
+                where: { id }
+            });
         });
 
         return NextResponse.json({ message: 'Exam deleted successfully' });
     } catch (error) {
         console.error('Error deleting exam:', error);
         return NextResponse.json(
-            { error: 'Failed to delete exam' },
+            { error: 'Failed to delete exam. Please try again.' },
             { status: 500 }
         );
     }

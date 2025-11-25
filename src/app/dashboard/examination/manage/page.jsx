@@ -13,16 +13,29 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, Calendar, FileText, Trash2, Edit } from "lucide-react";
+import { Loader2, Plus, Calendar, FileText, Trash2, Edit, Copy, Link2, Check } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import axios from "axios";
 import { format } from "date-fns";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function ExamListPage() {
   const { fullUser } = useAuth();
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [copiedId, setCopiedId] = useState(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [examToDelete, setExamToDelete] = useState(null);
 
   useEffect(() => {
     if (fullUser?.schoolId) {
@@ -57,6 +70,36 @@ export default function ExamListPage() {
       console.error("Error deleting exam:", error);
       toast.error("Failed to delete exam");
     }
+  };
+
+  const openDeleteDialog = (exam) => {
+    setExamToDelete(exam);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!examToDelete) return;
+
+    try {
+      await axios.delete(
+        `/api/schools/${fullUser.schoolId}/examination/exams/${examToDelete.id}`
+      );
+      toast.success("Exam deleted successfully");
+      fetchExams();
+      setDeleteDialogOpen(false);
+      setExamToDelete(null);
+    } catch (error) {
+      console.error("Error deleting exam:", error);
+      toast.error("Failed to delete exam");
+    }
+  };
+
+  const copyExamUrl = (examId) => {
+    const url = `${window.location.origin}/exam/${examId}`;
+    navigator.clipboard.writeText(url);
+    setCopiedId(examId);
+    toast.success("Exam URL copied to clipboard!");
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
   if (loading) {
@@ -114,6 +157,14 @@ export default function ExamListPage() {
                         <span className="text-xs text-muted-foreground">
                           {exam._count?.subjects || 0} Subjects
                         </span>
+                        {exam.type === 'ONLINE' && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <Link2 className="h-3 w-3 text-primary" />
+                            <span className="text-xs text-primary font-mono">
+                              /exam/{exam.id}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -154,6 +205,33 @@ export default function ExamListPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
+                        {exam.type === 'ONLINE' && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => copyExamUrl(exam.id)}
+                            >
+                              {copiedId === exam.id ? (
+                                <>
+                                  <Check className="mr-2 h-4 w-4" />
+                                  Copied!
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="mr-2 h-4 w-4" />
+                                  Copy URL
+                                </>
+                              )}
+                            </Button>
+                            <Link href={`/dashboard/examination/builder/${exam.id}`}>
+                              <Button variant="outline" size="sm">
+                                <FileText className="mr-2 h-4 w-4" />
+                                Builder
+                              </Button>
+                            </Link>
+                          </>
+                        )}
                         <Link href={`/dashboard/examination/${exam.id}`}>
                           <Button variant="ghost" size="icon">
                             <Edit className="h-4 w-4" />
@@ -162,10 +240,9 @@ export default function ExamListPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => deleteExam(exam.id)}
+                          onClick={() => openDeleteDialog(exam)}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
                     </TableCell>
@@ -176,6 +253,29 @@ export default function ExamListPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Exam?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{examToDelete?.title}</strong>?
+              <br />
+              This action cannot be undone and will permanently remove the exam and all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

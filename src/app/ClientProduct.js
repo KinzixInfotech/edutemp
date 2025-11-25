@@ -7,8 +7,8 @@ import CalBtn from "./components/cal";
 
 export default function ClientProduct({ children }) {
     const pathname = usePathname();
-    const hideheader = pathname.startsWith("/dashboard") || pathname === "/login";
-    const hidefooter = pathname.startsWith("/dashboard") || pathname === "/login";
+    const hideheader = pathname.startsWith("/dashboard") || pathname === "/login" || pathname.startsWith("/exam");
+    const hidefooter = pathname.startsWith("/dashboard") || pathname === "/login" || pathname.startsWith("/exam");
 
 
     return (

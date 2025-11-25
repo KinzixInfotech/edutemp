@@ -86,12 +86,17 @@ export default function CreateExamPage() {
 
     setLoading(true);
     try {
-      await axios.post(
+      const res = await axios.post(
         `/api/schools/${fullUser.schoolId}/examination/exams`,
         formData
       );
       toast.success("Exam created successfully");
-      router.push("/dashboard/examination/manage");
+
+      if (formData.type === 'ONLINE') {
+        router.push(`/dashboard/examination/builder/${res.data.id}`);
+      } else {
+        router.push("/dashboard/examination/manage");
+      }
     } catch (error) {
       console.error("Error creating exam:", error);
       toast.error("Failed to create exam");

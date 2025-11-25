@@ -75,6 +75,7 @@ export async function POST(req, { params }) {
                 classes: {
                     connect: classIds?.map((id) => ({ id: parseInt(id) })) || [],
                 },
+                securitySettings: body.securitySettings || undefined,
             },
         });
 

@@ -447,6 +447,9 @@ export const SidebarData = [
                 roles: ["ADMIN"],
                 submenu: [
                     {
+                        label: "Overview", url: "/dashboard/examination/overview", roles: ["ADMIN"]
+                    },
+                    {
                         label: "Exam List", url: "/dashboard/examination/manage", roles: ["ADMIN"]
                     },
                     {
@@ -454,6 +457,7 @@ export const SidebarData = [
                     },
                     { label: "Marks Entry", url: "/dashboard/examination/marks", roles: ["ADMIN"] },
                     { label: "Hall Management", url: "/dashboard/examination/halls", roles: ["ADMIN"] },
+                    { label: "Statistics", url: "/dashboard/examination/stats", roles: ["ADMIN"] },
                 ],
             },
         ],
