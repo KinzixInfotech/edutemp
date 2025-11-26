@@ -1,6 +1,6 @@
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = env("DIRECT_URL")
 }
 
 generator client {
@@ -43,7 +43,7 @@ model School {
   Vehicle                Vehicle[]
   Route                  Route[]
   Assignment             Assignment[]
-  AdmissionForm          AdmissionForm[]
+  Form                   Form[]
   Application            Application[]
   Stage                  Stage[]
   Upload                 Upload[]
@@ -463,80 +463,75 @@ model CommissionSlab {
   @@index([isActive])
 }
 
-// admission module
-model AdmissionForm {
-  id           String        @id @default(uuid()) @db.Uuid
-  schoolId     String        @db.Uuid
-  name         String
-  description  String?
-  slug         String?       @unique
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+// Global Form Builder
+enum FormCategory {
+  ADMISSION
+  SURVEY
+  FEEDBACK
+  GENERAL
+}
+
+enum FormStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Form {
+  id          String       @id @default(uuid()) @db.Uuid
+  schoolId    String       @db.Uuid
+  title       String
+  description String?
+  slug        String?      @unique
+  category    FormCategory @default(GENERAL)
+  status      FormStatus   @default(DRAFT)
+  settings    Json? // { isPublic: boolean, allowMultiple: boolean, notifications: [] }
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
   school       School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   fields       FormField[]
-  applications Application[]
+  applications Application[] // Submissions
 
   @@index([schoolId])
   @@index([slug])
+  @@index([category])
 }
 
 model FormField {
-  id              String        @id @default(uuid()) @db.Uuid
-  admissionFormId String        @db.Uuid
-  name            String
-  type            String // e.g., "text", "email", "file", "select"
-  required        Boolean       @default(false)
-  options         Json? // for select fields
-  order           Int
-  admissionForm   AdmissionForm @relation(fields: [admissionFormId], references: [id], onDelete: Cascade)
+  id       String  @id @default(uuid()) @db.Uuid
+  formId   String  @db.Uuid
+  name     String
+  type     String // e.g., "text", "email", "file", "select"
+  required Boolean @default(false)
+  options  Json? // for select fields
+  order    Int
 
-  @@index([admissionFormId])
+  form Form @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  @@index([formId])
 }
 
-// model Application {
-//   id              String                @id @default(uuid()) @db.Uuid
-//   schoolId        String                @db.Uuid
-//   admissionFormId String                @db.Uuid
-//   applicantName   String
-//   applicantEmail  String
-//   data            Json // submitted form data
-//   submittedAt     DateTime              @default(now())
-//   currentStageId  String                @db.Uuid
-//   createdById     String?               @db.Uuid // optional user who submitted
-//   school          School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-//   admissionForm   AdmissionForm         @relation(fields: [admissionFormId], references: [id], onDelete: Cascade)
-//   currentStage    Stage                 @relation("CurrentStage", fields: [currentStageId], references: [id])
-//   createdBy       User?                 @relation(fields: [createdById], references: [id])
-//   documents       ApplicationDocument[]
-//   stageHistory    StageHistory[]
-//   payments        Payment[]
-
-//   @@index([schoolId])
-//   @@index([admissionFormId])
-//   @@index([currentStageId])
-//   @@index([submittedAt])
-//   @@index([applicantEmail])
-// }
 model Application {
-  id              String   @id @default(uuid()) @db.Uuid
-  schoolId        String   @db.Uuid
-  admissionFormId String   @db.Uuid
-  applicantName   String
-  applicantEmail  String
-  data            Json
-  submittedAt     DateTime @default(now())
-  currentStageId  String   @db.Uuid
-  createdById     String?  @db.Uuid
+  id             String   @id @default(uuid()) @db.Uuid
+  schoolId       String   @db.Uuid
+  formId         String   @db.Uuid
+  applicantName  String
+  applicantEmail String
+  data           Json
+  submittedAt    DateTime @default(now())
+  currentStageId String?  @db.Uuid // Optional for non-admission forms
+  createdById    String?  @db.Uuid
 
-  school        School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  admissionForm AdmissionForm         @relation(fields: [admissionFormId], references: [id], onDelete: Cascade)
-  currentStage  Stage                 @relation("CurrentStage", fields: [currentStageId], references: [id])
-  createdBy     User?                 @relation(fields: [createdById], references: [id])
-  documents     ApplicationDocument[]
-  stageHistory  StageHistory[]
-  payments      Payment[]
+  school       School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  form         Form                  @relation(fields: [formId], references: [id], onDelete: Cascade)
+  currentStage Stage?                @relation("CurrentStage", fields: [currentStageId], references: [id])
+  createdBy    User?                 @relation(fields: [createdById], references: [id])
+  documents    ApplicationDocument[]
+  stageHistory StageHistory[]
+  payments     Payment[]
 
-  @@unique([schoolId, admissionFormId, applicantEmail])
+  @@unique([schoolId, formId, applicantEmail])
 }
 
 model ApplicationDocument {
@@ -553,32 +548,24 @@ model ApplicationDocument {
 }
 
 model Stage {
-  id                  String         @id @default(uuid()) @db.Uuid
-  name                StageName      @unique
-  order               Int            @unique
-  requiresTest        Boolean        @default(false)
-  requiresInterview   Boolean        @default(false)
-  feeRequired         Boolean        @default(false)
+  id                String  @id @default(uuid()) @db.Uuid
+  schoolId          String  @db.Uuid // Made required
+  name              String // Changed from Enum to String
+  type              String  @default("CUSTOM") // SYSTEM or CUSTOM
+  order             Int
+  requiresTest      Boolean @default(false)
+  requiresInterview Boolean @default(false)
+  feeRequired       Boolean @default(false)
+
   currentApplications Application[]  @relation("CurrentStage")
   stageHistory        StageHistory[]
-  School              School?        @relation(fields: [schoolId], references: [id])
-  schoolId            String?        @db.Uuid
+  School              School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, name])
+  @@unique([schoolId, order])
+  @@index([schoolId])
 }
 
-// model StageHistory {
-//   id            String      @id @default(uuid()) @db.Uuid
-//   applicationId String      @db.Uuid
-//   stageId       String      @db.Uuid
-//   movedById     String?     @db.Uuid // Made optional for system/public actions
-//   movedAt       DateTime    @default(now())
-//   notes         String?
-//   application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-//   stage         Stage       @relation(fields: [stageId], references: [id])
-//   movedBy       User?       @relation(fields: [movedById], references: [id])
-
-//   @@index([applicationId])
-//   @@index([movedAt])
-// }
 model StageHistory {
   id            String   @id @default(uuid()) @db.Uuid
   applicationId String   @db.Uuid
@@ -2694,14 +2681,6 @@ enum DocumentType {
   CERTIFICATE
   REPORT
   OTHER
-}
-
-enum StageName {
-  REVIEW
-  TEST_INTERVIEW
-  OFFER
-  ENROLLED
-  REJECTED
 }
 
 // ============================================

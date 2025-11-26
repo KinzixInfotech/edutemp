@@ -1,91 +1,57 @@
-// import { NextResponse } from "next/server";
-// import { z } from "zod";
-// import prisma from "@/lib/prisma";
-
-// const idSchema = z.object({
-//     id: z.string().uuid(),
-// });
-
-// export async function GET(req, context) {
-// const params = await context.params;
-// console.log("params resolved:", params);
-// console.log("params:", params);
-
-// console.log("type of params:", typeof params, params);
-
-// const validated = idSchema.parse(params);
-
-//     try {
-//         const application = await prisma.application.findUnique({
-//             where: { id: validated.id },
-//             select: {
-//                 id: true,
-//                 applicantName: true,
-//                 applicantEmail: true,
-//                 data: true,
-//                 submittedAt: true,
-//                 currentStage: { select: { name: true } },
-//                 documents: true,
-//                 stageHistory: {
-//                     select: {
-//                         stage: { select: { name: true } },
-//                         movedAt: true,
-//                         notes: true,
-//                         movedBy: { select: { name: true } },
-//                     },
-//                     orderBy: { movedAt: "asc" },
-//                 },
-//             },
-//         });
-
-//         if (!application) {
-//             return NextResponse.json({ error: "Application not found" }, { status: 404 });
-//         }
-
-//         return NextResponse.json({ success: true, application });
-//     } catch (err) {
-//         console.error(err);
-//         return NextResponse.json({ error: err.message }, { status: 500 });
-//     }
-// }
-
-// app/api/schools/admissions/applications/[id]/route.js
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import prisma from "@/lib/prisma";
 
-const idSchema = z.object({
-    id: z.string().uuid(),
-});
-
-export async function GET(req, context) {
+// GET: Fetch single application by ID
+export async function GET(req, { params }) {
+    const { id } = await params;
+    const { searchParams } = new URL(req.url);
+    const schoolId = searchParams.get("schoolId");
 
     try {
-        const params = await context.params;
-        console.log("params resolved:", params);
-        console.log("params:", params);
-
-        console.log("type of params:", typeof params, params);
-
-        const validated = idSchema.parse(params);
         const application = await prisma.application.findUnique({
-            where: { id: validated.id },
-            select: {
-                id: true,
-                applicantName: true,
-                applicantEmail: true,
-                submittedAt: true,
-                currentStage: { select: { id: true, name: true } },
-                data: true,
-                documents: true,
+            where: { id },
+            include: {
+                form: {
+                    select: {
+                        title: true,
+                        category: true,
+                    },
+                },
+                currentStage: {
+                    select: {
+                        id: true,
+                        name: true,
+                        order: true,
+                    },
+                },
+                stageHistory: {
+                    include: {
+                        stage: {
+                            select: {
+                                name: true,
+                            },
+                        },
+                    },
+                    orderBy: {
+                        movedAt: "desc",
+                    },
+                },
             },
         });
+
         if (!application) {
-            return NextResponse.json({ error: "Application not found" }, { status: 404 });
+            return NextResponse.json(
+                { error: "Application not found" },
+                { status: 404 }
+            );
         }
-        return NextResponse.json({ success: true, application });
-    } catch (err) {
-        console.error(err);
-        return NextResponse.json({ error: err.message }, { status: 500 });
+
+        return NextResponse.json({ application });
+    } catch (error) {
+        console.error("Error fetching application:", error);
+        return NextResponse.json(
+            { error: "Failed to fetch application" },
+            { status: 500 }
+        );
     }
 }

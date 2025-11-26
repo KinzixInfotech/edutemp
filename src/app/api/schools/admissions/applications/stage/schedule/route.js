@@ -1,147 +1,141 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { z } from "zod";
 
-const scheduleSchema = z.object({
-    applicationId: z.string().uuid(),
-    stageId: z.string().uuid(),
-    movedById: z.string().uuid().optional(),
-    testDate: z.string().optional(), // date in YYYY-MM-DD
-    testStartTime: z.string().optional(), // HH:mm
-    testEndTime: z.string().optional(),
-    testVenue: z.string().optional(),
-    customMessage: z.string().optional(),
-});
-
-export async function POST(req) {
-    try {
-        const body = await req.json();
-        const data = scheduleSchema.parse(body);
-
-        // Convert date/time strings into JS Date objects
-        const testDate = data.testDate ? new Date(data.testDate) : null;
-        const startTime = data.testStartTime
-            ? new Date(`${data.testDate}T${data.testStartTime}`)
-            : null;
-        const endTime = data.testEndTime
-            ? new Date(`${data.testDate}T${data.testEndTime}`)
-            : null;
-
-        // Create new StageHistory entry for scheduling
-        const schedule = await prisma.stageHistory.create({
-            data: {
-                applicationId: data.applicationId,
-                stageId: data.stageId,
-                movedById: data.movedById || null,
-                notes: data.customMessage || "Test scheduled",
-                testDate,
-                testStartTime: startTime,
-                testEndTime: endTime,
-                testVenue: data.testVenue || null,
-            },
-        });
-
-        return NextResponse.json({ success: true, schedule });
-    } catch (err) {
-        console.error(err);
-        if (err.name === "ZodError") {
-            return NextResponse.json({ error: err.errors }, { status: 400 });
-        }
-        return NextResponse.json({ error: err.message }, { status: 500 });
-    }
-}
-
+// GET: Fetch test schedule for an application
 export async function GET(req) {
+    const { searchParams } = new URL(req.url);
+    const applicationId = searchParams.get("applicationId");
+
+    if (!applicationId) {
+        return NextResponse.json(
+            { error: "applicationId is required" },
+            { status: 400 }
+        );
+    }
+
     try {
-        const { searchParams } = new URL(req.url);
-        const applicationId = searchParams.get("applicationId");
-
-        if (!applicationId) {
-            return NextResponse.json({ error: "applicationId is required" }, { status: 400 });
-        }
-
-        // Fetch the most recent test schedule for the application
+        // Find the most recent stage history entry with test details
         const schedule = await prisma.stageHistory.findFirst({
             where: {
                 applicationId,
-                testDate: { not: null }, // ensures we only get test records
+                OR: [
+                    { testDate: { not: null } },
+                    { testVenue: { not: null } },
+                ],
             },
-            orderBy: {
-                movedAt: "desc", // get the latest scheduled test
-            },
+            orderBy: { movedAt: "desc" },
             select: {
-                id: true,
                 testDate: true,
                 testStartTime: true,
                 testEndTime: true,
                 testVenue: true,
+                testScore: true,
+                testPassed: true,
                 notes: true,
-                stage: { select: { name: true, id: true } },
-                movedBy: { select: { name: true, id: true, email: true } },
             },
         });
 
-        if (!schedule) {
-            return NextResponse.json(
-                { success: false, message: "No test scheduled for this application." },
-                { status: 404 }
-            );
-        }
-
-        return NextResponse.json({ success: true, schedule });
-    } catch (err) {
-        console.error(err);
-        return NextResponse.json({ error: err.message }, { status: 500 });
+        return NextResponse.json({ schedule: schedule || null });
+    } catch (error) {
+        console.error("Error fetching test schedule:", error);
+        return NextResponse.json(
+            { error: "Failed to fetch test schedule" },
+            { status: 500 }
+        );
     }
 }
 
-// New schema for test result update
-const testResultSchema = z.object({
-    testResult: z.enum(["pass", "fail"]).optional(),
-    testScore: z.number().optional(),
-    notes: z.string().optional(),
-});
+// POST: Schedule a test for an application
+export async function POST(req) {
+    try {
+        const body = await req.json();
+        const {
+            applicationId,
+            stageId,
+            movedById,
+            testDate,
+            testStartTime,
+            testEndTime,
+            testVenue,
+            customMessage,
+        } = body;
 
+        if (!applicationId || !stageId) {
+            return NextResponse.json(
+                { error: "applicationId and stageId are required" },
+                { status: 400 }
+            );
+        }
+
+        // Create or update stage history with test details
+        const schedule = await prisma.stageHistory.create({
+            data: {
+                applicationId,
+                stageId,
+                movedById,
+                testDate: testDate ? new Date(testDate) : null,
+                testStartTime,
+                testEndTime,
+                testVenue,
+                notes: customMessage || null,
+            },
+        });
+
+        return NextResponse.json({ schedule });
+    } catch (error) {
+        console.error("Error scheduling test:", error);
+        return NextResponse.json(
+            { error: "Failed to schedule test" },
+            { status: 500 }
+        );
+    }
+}
+
+// PUT: Update test result
 export async function PUT(req) {
     try {
         const body = await req.json();
-        const data = testResultSchema.parse(body);
+        const { applicationId, stageId, testResult, testScore, notes } = body;
 
-        // Find the latest StageHistory for this application and stage
-        const latestStageHistory = await prisma.stageHistory.findFirst({
-            where: { applicationId: data.applicationId, stageId: data.stageId },
+        if (!applicationId || !stageId) {
+            return NextResponse.json(
+                { error: "applicationId and stageId are required" },
+                { status: 400 }
+            );
+        }
+
+        // Find the stage history entry to update
+        const existing = await prisma.stageHistory.findFirst({
+            where: {
+                applicationId,
+                stageId,
+            },
             orderBy: { movedAt: "desc" },
         });
 
-        if (!latestStageHistory) {
+        if (!existing) {
             return NextResponse.json(
-                { error: "No scheduled test found for this application and stage" },
+                { error: "Stage history not found" },
                 { status: 404 }
             );
         }
 
-        // Update the latest StageHistory
+        // Update the test result
         const updated = await prisma.stageHistory.update({
-            where: { id: latestStageHistory.id }, // use .id here
+            where: { id: existing.id },
             data: {
-                testPassed:
-                    data.testResult === "pass"
-                        ? true
-                        : data.testResult === "fail"
-                            ? false
-                            : null,
-                testScore: data.testScore || null,
-                notes: data.notes || null,
+                testScore: testScore ? Number(testScore) : null,
+                testPassed: testResult === "pass" ? true : testResult === "fail" ? false : null,
+                notes: notes || existing.notes,
             },
         });
 
-        return NextResponse.json({ success: true, updated });
-    } catch (err) {
-        console.error(err);
-        if (err.name === "ZodError") {
-            return NextResponse.json({ error: err.errors }, { status: 400 });
-        }
-        return NextResponse.json({ error: err.message }, { status: 500 });
+        return NextResponse.json({ updated });
+    } catch (error) {
+        console.error("Error updating test result:", error);
+        return NextResponse.json(
+            { error: "Failed to update test result" },
+            { status: 500 }
+        );
     }
-
 }

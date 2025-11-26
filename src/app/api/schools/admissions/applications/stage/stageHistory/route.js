@@ -1,49 +1,43 @@
-import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import prisma from "@/lib/prisma";
 
-// Validate query parameters
-const getTestSchema = z.object({
-    applicationId: z.string().uuid(),
-    stageId: z.string().uuid(),
-});
-
+// GET: Fetch stage history for test score
 export async function GET(req) {
+    const { searchParams } = new URL(req.url);
+    const applicationId = searchParams.get("applicationId");
+    const stageId = searchParams.get("stageId");
+
+    if (!applicationId || !stageId) {
+        return NextResponse.json(
+            { error: "applicationId and stageId are required" },
+            { status: 400 }
+        );
+    }
+
     try {
-        console.log("🔥 Hit stageHistory route");
-
-        const { searchParams } = new URL(req.url);
-
-        const params = getTestSchema.parse({
-            applicationId: searchParams.get("applicationId"),
-            stageId: searchParams.get("stageId"),
-        });
-
-        // fetch the latest StageHistory entry for this application + stage
-        const latestTest = await prisma.stageHistory.findFirst({
-            where: { applicationId: params.applicationId, stageId: params.stageId },
+        const test = await prisma.stageHistory.findFirst({
+            where: {
+                applicationId,
+                stageId,
+            },
             orderBy: { movedAt: "desc" },
             select: {
-                id: true,
-                // testDate: true,
-                // testStartTime: true,
-                // testEndTime: true,
-                // testVenue: true,
-                testPassed: true,
                 testScore: true,
+                testPassed: true,
                 notes: true,
-                stage: { select: { id: true, name: true } },
-                movedBy: { select: { id: true, name: true, email: true } },
+                testDate: true,
+                testStartTime: true,
+                testEndTime: true,
+                testVenue: true,
             },
         });
-console.log("latestTest:", latestTest);
 
-        return NextResponse.json({ success: true, test: latestTest || null });
-    } catch (err) {
-        console.error(err);
-        if (err.name === "ZodError") {
-            return NextResponse.json({ error: err.errors }, { status: 400 });
-        }
-        return NextResponse.json({ error: err.message }, { status: 500 });
+        return NextResponse.json({ test: test || null });
+    } catch (error) {
+        console.error("Error fetching stage history:", error);
+        return NextResponse.json(
+            { error: "Failed to fetch stage history" },
+            { status: 500 }
+        );
     }
 }

@@ -1,523 +1,337 @@
-    // app/admissions/forms-settings.jsx
-    'use client';
-export const dynamic = 'force-dynamic';
+"use client";
 
-    import { useState } from "react";
-    import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-    import { Button } from "@/components/ui/button";
-    import { Input } from "@/components/ui/input";
-    import { Label } from "@/components/ui/label";
-    import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-    import { Switch } from "@/components/ui/switch";
-    import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-    import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
-    import { Skeleton } from "@/components/ui/skeleton";
-    import { toast } from "sonner";
-    import { Loader2, Plus } from "lucide-react";
-    import { useAuth } from "@/context/AuthContext";
+import React, { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
+import { Loader2, Plus, ExternalLink, Edit, Trash2 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import axios from "axios";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-    async function fetchForms(schoolId) {
-        const response = await fetch(`/api/schools/admissions/forms?schoolId=${schoolId}`);
-        if (!response.ok) throw new Error("Failed to fetch forms");
-        return response.json();
-    }
+export default function FormsSettings() {
+    const { fullUser } = useAuth();
+    const schoolId = fullUser?.schoolId;
+    const router = useRouter();
+    const queryClient = useQueryClient();
 
-    async function fetchStages(schoolId) {
-        const response = await fetch(`/api/schools/admissions/settings?schoolId=${schoolId}`);
-        if (!response.ok) throw new Error("Failed to fetch stages");
-        return response.json();
-    }
+    const [drawerMode, setDrawerMode] = useState(null);
+    const [stageData, setStageData] = useState({ name: "", order: 0, requiresTest: false, requiresInterview: false, feeRequired: false });
+    const [stageError, setStageError] = useState("");
+    const [saving, setSaving] = useState(false);
+    const [creatingForm, setCreatingForm] = useState(false);
 
-    async function createForm(data) {
-        const response = await fetch("/api/schools/admissions/forms", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data),
-        });
-        if (!response.ok) throw new Error("Failed to create form");
-        return response.json();
-    }
+    // Fetch Admission Forms
+    const { data: forms = [], isLoading: formsLoading } = useQuery({
+        queryKey: ["admission-forms", schoolId],
+        queryFn: async () => {
+            const res = await axios.get(`/api/schools/${schoolId}/forms?category=ADMISSION`);
+            return res.data;
+        },
+        enabled: !!schoolId,
+    });
 
-    async function updateForm({ id, ...data }) {
-        const response = await fetch(`/api/schools/admissions/forms?id=${id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data), // only the rest of the data
-        });
-        if (!response.ok) throw new Error("Failed to update form");
-        return response.json();
-    }
+    // Fetch Stages
+    const { data: stages = [], isLoading: stagesLoading } = useQuery({
+        queryKey: ["stages", schoolId],
+        queryFn: async () => {
+            const res = await axios.get(`/api/schools/${schoolId}/admissions/stages`);
+            return res.data;
+        },
+        enabled: !!schoolId,
+    });
 
-    async function deleteForm(id) {
-        const response = await fetch(`/api/schools/admissions/forms?id=${id}`, {
-            method: "DELETE",
-        });
-        if (!response.ok) throw new Error("Failed to delete form");
-        return true;
-    }
+    // Create New Form (Redirects to Builder)
+    const createForm = async () => {
+        setCreatingForm(true);
+        try {
+            const res = await axios.post(`/api/schools/${schoolId}/forms`, {
+                title: "New Admission Form",
+                category: "ADMISSION",
+                description: "Admission form for new academic year"
+            });
+            toast.success("Form created! Redirecting to builder...");
+            router.push(`/dashboard/forms/builder/${res.data.id}`);
+        } catch (error) {
+            console.error("Error creating form:", error);
+            toast.error("Failed to create form");
+            setCreatingForm(false);
+        }
+    };
 
-    async function generateLink(id) {
-        const response = await fetch(`/api/schools/admissions/forms/${id}/link`, {
-            method: "POST",
-        });
-        if (!response.ok) throw new Error("Failed to generate link");
-        return response.json();
-    }
+    // Delete Form
+    const deleteFormMutation = useMutation({
+        mutationFn: async (id) => {
+            await axios.delete(`/api/schools/${schoolId}/forms/${id}`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(["admission-forms"]);
+            toast.success("Form deleted");
+        },
+        onError: () => toast.error("Failed to delete form")
+    });
 
-    async function createStage(data) {
-        const response = await fetch("/api/schools/admissions/settings/stages", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data),
-        });
-        if (!response.ok) throw new Error("Failed to create stage");
-        return response.json();
-    }
+    // Stage Mutations
+    const createStageMutation = useMutation({
+        mutationFn: async (data) => {
+            await axios.post(`/api/schools/${schoolId}/admissions/stages`, data);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(["stages"]);
+            setDrawerMode(null);
+            toast.success("Stage created");
+        },
+        onError: () => toast.error("Failed to create stage")
+    });
 
-    async function updateStage({ id, ...data }) {
-        const response = await fetch(`/api/schools/admissions/settings/stages?id=${id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data),
-        });
-        if (!response.ok) throw new Error("Failed to update stage");
-        return response.json();
-    }
+    const updateStageMutation = useMutation({
+        mutationFn: async ({ id, ...data }) => {
+            await axios.put(`/api/schools/${schoolId}/admissions/stages?id=${id}`, data);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(["stages"]);
+            setDrawerMode(null);
+            toast.success("Stage updated");
+        },
+        onError: () => toast.error("Failed to update stage")
+    });
 
-    async function deleteStage(id) {
-        const response = await fetch(`/api/schools/admissions/settings/stages?id=${id}`, {
-            method: "DELETE",
-        });
-        if (!response.ok) throw new Error("Failed to delete stage");
-        return true;
-    }
+    const deleteStageMutation = useMutation({
+        mutationFn: async (id) => {
+            await axios.delete(`/api/schools/${schoolId}/admissions/stages?id=${id}`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(["stages"]);
+            toast.success("Stage deleted");
+        },
+        onError: () => toast.error("Failed to delete stage")
+    });
 
-    export default function FormsSettings() {
-        const { fullUser } = useAuth();
-        const schoolId = fullUser?.schoolId;
-        const [drawerMode, setDrawerMode] = useState(null);
-        const [formData, setFormData] = useState({ fields: [] });
-        const [stageData, setStageData] = useState({ name: "", order: 0, requiresTest: false });
-        const [formError, setFormError] = useState("");
-        const [stageError, setStageError] = useState("");
-        const [saving, setSaving] = useState(false);
+    const handleStageSubmit = () => {
+        if (!stageData.name) {
+            setStageError("Stage name required");
+            return;
+        }
+        if (drawerMode === "add-stage") {
+            createStageMutation.mutate(stageData);
+        } else if (drawerMode === "edit-stage") {
+            updateStageMutation.mutate(stageData);
+        }
+    };
 
-        const queryClient = useQueryClient();
+    const handleAddStage = () => {
+        setStageData({ name: "", order: stages.length + 1, requiresTest: false, requiresInterview: false, feeRequired: false });
+        setStageError("");
+        setDrawerMode("add-stage");
+    };
 
-        const { data: { forms = [] } = {}, isLoading: formsLoading } = useQuery({
-            queryKey: ["forms", schoolId],
-            queryFn: () => fetchForms(schoolId),
-            enabled: !!schoolId,
-        });
+    const handleEditStage = (stage) => {
+        setStageData(stage);
+        setStageError("");
+        setDrawerMode("edit-stage");
+    };
 
-        const { data: { stages = [] } = {}, isLoading: stagesLoading } = useQuery({
-            queryKey: ["stages", schoolId],
-            queryFn: () => fetchStages(schoolId),
-            enabled: !!schoolId,
-        });
+    return (
+        <div className="p-6 space-y-8">
+            <div>
+                <h1 className="text-3xl font-bold tracking-tight">Admission Settings</h1>
+                <p className="text-muted-foreground">Manage admission forms and application stages.</p>
+            </div>
 
-        const createFormMutation = useMutation({
-            mutationFn: createForm,
-            onMutate: () => setSaving(true),
-            onSuccess: () => {
-                queryClient.invalidateQueries(["forms"]);
-                setDrawerMode(null);
-                toast.success("Form created");
-                setSaving(false);
-            },
-            onError: () => {
-                setSaving(false);
-                toast.error("Failed to create form")
-            }
-        });
-
-        const updateFormMutation = useMutation({
-            mutationFn: updateForm,
-            onMutate: () => setSaving(true),
-            onSuccess: () => {
-                queryClient.invalidateQueries(["forms"]);
-                setDrawerMode(null);
-                toast.success("Form updated");
-                setSaving(false);
-            },
-            onError: () => {
-                setSaving(false);
-                toast.error("Failed to update form")
-            }
-        });
-
-        const deleteFormMutation = useMutation({
-            mutationFn: deleteForm,
-            onSuccess: () => {
-                queryClient.invalidateQueries(["forms"]);
-                toast.success("Form deleted");
-            },
-            onError: () => {
-                setSaving(false);
-                toast.error("Failed to delete form")
-            }
-        });
-
-        const generateLinkMutation = useMutation({
-            mutationFn: generateLink,
-            onSuccess: (res) => toast.success(`Link generated: /admissions/${res.slug}`),
-            onError: () => toast.error("Failed to generate link"),
-        });
-
-        const createStageMutation = useMutation({
-            mutationFn: createStage,
-            onMutate: () => setSaving(true),
-            onSuccess: () => {
-                queryClient.invalidateQueries(["stages"]);
-                setDrawerMode(null);
-                toast.success("Stage created");
-                setSaving(false);
-            },
-            onError: () => {
-                setSaving(false);
-                toast.error("Failed to create stage")
-            }
-        });
-
-        const updateStageMutation = useMutation({
-            mutationFn: updateStage,
-            onMutate: () => setSaving(true),
-            onSuccess: () => {
-                queryClient.invalidateQueries(["stages"]);
-                setDrawerMode(null);
-                toast.success("Stage updated");
-                setSaving(false);
-            },
-            onError: () => {
-                setSaving(false);
-                toast.error("Failed to update stage")
-            }
-        });
-
-        const deleteStageMutation = useMutation({
-            mutationFn: deleteStage,
-            onSuccess: () => {
-                queryClient.invalidateQueries(["stages"]);
-                toast.success("Stage deleted");
-            },
-            onError: () => {
-                setSaving(false);
-                toast.error("Failed to delete stage")
-            }
-        });
-
-        const handleFormChange = (e) => {
-            setFormData({ ...formData, [e.target.name]: e.target.value });
-        };
-
-        const handleFieldChange = (index, field, value) => {
-            const newFields = [...formData.fields];
-            newFields[index] = { ...newFields[index], [field]: value };
-            setFormData({ ...formData, fields: newFields });
-        };
-
-        const addField = () => {
-            setFormData({ ...formData, fields: [...formData.fields, { name: "", type: "", required: false, options: [], order: formData.fields.length + 1 }] });
-        };
-
-        const removeField = (index) => {
-            setFormData({ ...formData, fields: formData.fields.filter((_, i) => i !== index) });
-        };
-
-        const handleStageChange = (e) => {
-            const { name, value } = e.target;
-            setStageData({ ...stageData, [name]: name === "order" ? parseInt(value) : value });
-        };
-
-        const handleStageSwitch = (checked) => {
-            setStageData({ ...stageData, requiresTest: checked });
-        };
-
-        const handleFormSubmit = () => {
-            if (!formData.name) {
-                setFormError("Form name required");
-                return;
-            }
-            const data = { ...formData, schoolId };
-            if (drawerMode === "add-form") {
-                createFormMutation.mutate(data);
-            } else if (drawerMode === "edit-form") {
-                updateFormMutation.mutate({ id: formData.id, ...data });
-            }
-        };
-
-        const handleStageSubmit = () => {
-            if (!stageData.name) {
-                setStageError("Stage name required");
-                return;
-            }
-            const data = { ...stageData, schoolId };
-            if (drawerMode === "add-stage") {
-                createStageMutation.mutate(data);
-            } else if (drawerMode === "edit-stage") {
-                updateStageMutation.mutate({ id: stageData.id, ...data });
-            }
-        };
-
-        const handleAddForm = () => {
-            setFormData({ fields: [] });
-            setFormError("");
-            setDrawerMode("add-form");
-        };
-
-        const handleEditForm = (form) => {
-            setFormData(form);
-            setFormError("");
-            setDrawerMode("edit-form");
-        };
-
-        const handleDeleteForm = (id) => {
-            deleteFormMutation.mutate(id);
-        };
-
-        const handleGenerateLink = (id) => {
-            generateLinkMutation.mutate(id);
-        };
-
-        const handleAddStage = () => {
-            setStageData({ name: "", order: stages.length + 1, requiresTest: false });
-            setStageError("");
-            setDrawerMode("add-stage");
-        };
-
-        const handleEditStage = (stage) => {
-            setStageData(stage);
-            setStageError("");
-            setDrawerMode("edit-stage");
-        };
-
-        const handleDeleteStage = (id) => {
-            deleteStageMutation.mutate(id);
-        };
-
-        return (
-            <div className="p-6">
-                <h2 className="text-2xl font-bold mb-4">Forms & Settings</h2>
-                <div className="space-y-8">
-                    {/* Forms Section */}
-                    <div>
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-semibold">Admission Forms</h3>
-                            <Button onClick={handleAddForm}>Create Form <Plus strokeWidth={2} /> </Button>
-                        </div>
-                        <div className="overflow-x-auto rounded-lg border">
-                            <Table className="min-w-[800px]">
-                                <TableHeader>
-                                    <TableRow className="bg-muted sticky top-0 z-10">
-                                        <TableHead>#</TableHead>
-                                        <TableHead>Name</TableHead>
-                                        <TableHead>Description</TableHead>
-                                        <TableHead>Fields</TableHead>
-                                        <TableHead>Link</TableHead>
-                                        <TableHead>Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {formsLoading ? (
-                                        Array(6).fill(0).map((_, index) => (
-                                            <TableRow key={index}>
-                                                <TableCell><Skeleton className="h-6 w-6" /></TableCell>
-                                                <TableCell><Skeleton className="h-6 w-32" /></TableCell>
-                                                <TableCell><Skeleton className="h-6 w-32" /></TableCell>
-                                                <TableCell><Skeleton className="h-6 w-24" /></TableCell>
-                                                <TableCell><Skeleton className="h-6 w-32" /></TableCell>
-                                                <TableCell><Skeleton className="h-6 w-20" /></TableCell>
-                                            </TableRow>
-                                        ))
-                                    ) : forms.length > 0 ? (
-                                        forms.map((form, index) => (
-                                            <TableRow key={form.id} className={index % 2 === 0 ? "bg-muted" : "bg-background"}>
-                                                <TableCell>{index + 1}</TableCell>
-                                                <TableCell>{form.name}</TableCell>
-                                                <TableCell>{form.description}</TableCell>
-                                                <TableCell>{form.fields.length}</TableCell>
-
-                                                <TableCell>
-                                                    <a target="_blank" className="underline text-blue-700 hover:text-blue-500" href={`/dashboard/schools${form.slug ? `/admissions/${form.slug}` : "#"}`}>{form.slug ? `/admissions/${form.slug}` : "Not generated"}
-                                                    </a>
-                                                </TableCell>
-
-                                                <TableCell className="flex gap-2">
-                                                    <Button size="sm" variant="outline" onClick={() => handleEditForm(form)}>Edit</Button>
-                                                    <Button size="sm" variant="destructive" onClick={() => handleDeleteForm(form.id)}>Delete</Button>
-                                                    <Button size="sm" variant="outline" onClick={() => handleGenerateLink(form.id)}>Generate Link</Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    ) : (
-                                        <TableRow>
-                                            <TableCell colSpan={6} className="text-center py-4">No forms found.</TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </div>
-
-                    {/* Stages Section */}
-                    <div>
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-semibold">Admission Stages</h3>
-                            {/* <Button onClick={handleAddStage}>Create Stage</Button> */}
-                        </div>
-                        <div className="overflow-x-auto rounded-lg border">
-                            <Table className="min-w-[800px]">
-                                <TableHeader>
-                                    <TableRow className="bg-muted sticky top-0 z-10">
-                                        <TableHead>#</TableHead>
-                                        <TableHead>Name</TableHead>
-                                        <TableHead>Order</TableHead>
-                                        {/* <TableHead>Requires Test</TableHead> */}
-                                        {/* <TableHead>Actions</TableHead> */}
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {stagesLoading ? (
-                                        Array(6).fill(0).map((_, index) => (
-                                            <TableRow key={index}>
-                                                <TableCell><Skeleton className="h-6 w-6" /></TableCell>
-                                                <TableCell><Skeleton className="h-6 w-32" /></TableCell>
-                                                <TableCell><Skeleton className="h-6 w-24" /></TableCell>
-                                                {/* <TableCell><Skeleton className="h-6 w-24" /></TableCell> */}
-                                                {/* <TableCell><Skeleton className="h-6 w-20" /></TableCell> */}
-                                            </TableRow>
-                                        ))
-                                    ) : stages.length > 0 ? (
-                                        stages.map((stage, index) => (
-                                            <TableRow key={stage.id} className={index % 2 === 0 ? "bg-muted" : "bg-background"}>
-                                                <TableCell>{index + 1}</TableCell>
-                                                <TableCell>{stage.name}</TableCell>
-                                                <TableCell>{stage.order}</TableCell>
-                                                {/* <TableCell>{stage.requiresTest ? "Yes" : "No"}</TableCell> */}
-                                                {/* <TableCell className="flex gap-2">
-                                                    <Button size="sm" variant="outline" onClick={() => handleEditStage(stage)}>Edit</Button>
-                                                    <Button size="sm" variant="destructive" onClick={() => handleDeleteStage(stage.id)}>Delete</Button>
-                                                </TableCell> */}
-                                            </TableRow>
-                                        ))
-                                    ) : (
-                                        <TableRow>
-                                            <TableCell colSpan={5} className="text-center py-4">No stages found.</TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </div>
+            {/* Forms Section */}
+            <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                    <h2 className="text-xl font-semibold">Admission Forms</h2>
+                    <Button onClick={createForm} disabled={creatingForm}>
+                        {creatingForm ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                        Create New Form
+                    </Button>
                 </div>
-
-                {/* Drawer for Form and Stage Management */}
-                <Drawer open={!!drawerMode} onOpenChange={() => setDrawerMode(null)} direction="right">
-                    <DrawerContent className="w-[400px] flex flex-col h-full">
-                        <DrawerHeader>
-                            <DrawerTitle>
-                                {drawerMode === "add-form" ? "Create Form" :
-                                    drawerMode === "edit-form" ? "Edit Form" :
-                                        drawerMode === "add-stage" ? "Create Stage" :
-                                            "Edit Stage"}
-                            </DrawerTitle>
-                        </DrawerHeader>
-                        <div className="p-4 flex-1 overflow-y-auto">
-                            {drawerMode?.includes("form") ? (
-                                <>
-                                    {formError && <p className="text-red-500 mb-4">{formError}</p>}
-                                    <div className="space-y-4">
-                                        <div>
-                                            <Label htmlFor="name" className="mb-2 text-muted-foreground">Name*</Label>
-                                            <Input id="name" name="name" value={formData.name || ""} onChange={handleFormChange} />
-                                        </div>
-                                        <div>
-                                            <Label htmlFor="description" className="mb-2 text-muted-foreground">Description</Label>
-                                            <Input id="description" name="description" value={formData.description || ""} onChange={handleFormChange} />
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Label htmlFor="requiresTest" className="text-muted-foreground">Requires Payment</Label>
-                                            <Switch
-                                                id="requiresTest"
-                                                checked={stageData.requiresTest}
-                                                onCheckedChange={handleStageSwitch}
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label className="mb-2 text-muted-foreground">Fields</Label>
-
-                                            {formData.fields?.map((field, index) => (
-                                                <div key={index} className="flex gap-2 mb-2">
-                                                    <Input placeholder="Field Name" value={field.name} onChange={(e) => handleFieldChange(index, "name", e.target.value)} />
-                                                    <Select value={field.type} onValueChange={(val) => handleFieldChange(index, "type", val)}>
-                                                        <SelectTrigger className="w-[120px]">
-                                                            <SelectValue placeholder="Type" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="text">Text</SelectItem>
-                                                            <SelectItem value="email">Email</SelectItem>
-                                                            <SelectItem value="file">File</SelectItem>
-                                                            <SelectItem value="select">Select</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                    <Button variant="destructive" size="sm" onClick={() => removeField(index)}>Remove</Button>
-                                                </div>
-                                            ))}
-                                            <Button variant="outline" size="sm" onClick={addField}>Add Field</Button>
-                                        </div>
-
-                                    </div>
-                                    <Button
-                                        onClick={handleFormSubmit}
-                                        disabled={saving}
-                                        className={`mt-6 w-full ${saving ? "opacity-50 cursor-not-allowed" : ""}`}
-                                    >
-                                        {saving ? (
-                                            <div className="flex items-center gap-2 justify-center">
-                                                <Loader2 className="animate-spin" size={20} />
-                                                <span>Saving</span>
-                                            </div>
-                                        ) : "Save Form"}
-                                    </Button>
-                                </>
+                <div className="rounded-md border">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Title</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Submissions</TableHead>
+                                <TableHead>Public Link</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {formsLoading ? (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center py-4"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell>
+                                </TableRow>
+                            ) : forms.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">No admission forms found.</TableCell>
+                                </TableRow>
                             ) : (
-                                <>
-                                    {stageError && <p className="text-red-500 mb-4">{stageError}</p>}
-                                    <div className="space-y-4">
-                                        <div>
-                                            <Label htmlFor="name" className="mb-2 text-muted-foreground">Stage Name*</Label>
-                                            <Input id="name" name="name" value={stageData.name || ""} onChange={handleStageChange} />
-                                        </div>
-                                        <div>
-                                            <Label htmlFor="order" className="mb-2 text-muted-foreground">Order*</Label>
-                                            <Input id="order" name="order" type="number" value={stageData.order || 0} onChange={handleStageChange} />
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Label htmlFor="requiresTest" className="text-muted-foreground">Requires Test</Label>
-                                            <Switch
-                                                id="requiresTest"
-                                                checked={stageData.requiresTest}
-                                                onCheckedChange={handleStageSwitch}
-                                            />
-                                        </div>
-                                    </div>
-                                    <Button
-                                        onClick={handleStageSubmit}
-                                        disabled={saving}
-                                        className={`mt-6 w-full ${saving ? "opacity-50 cursor-not-allowed" : ""}`}
-                                    >
-                                        {saving ? (
-                                            <div className="flex items-center gap-2 justify-center">
-                                                <Loader2 className="animate-spin" size={20} />
-                                                <span>Saving</span>
+                                forms.map((form) => (
+                                    <TableRow key={form.id}>
+                                        <TableCell className="font-medium">{form.title}</TableCell>
+                                        <TableCell>{form.status}</TableCell>
+                                        <TableCell>{form._count?.applications || 0}</TableCell>
+                                        <TableCell>
+                                            <a
+                                                href={`/forms/${form.id}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center text-blue-600 hover:underline"
+                                            >
+                                                View Form <ExternalLink className="ml-1 h-3 w-3" />
+                                            </a>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex justify-end gap-2">
+                                                <Link href={`/dashboard/forms/builder/${form.id}`}>
+                                                    <Button variant="ghost" size="icon">
+                                                        <Edit className="h-4 w-4" />
+                                                    </Button>
+                                                </Link>
+                                                <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteFormMutation.mutate(form.id)}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
                                             </div>
-                                        ) : "Save Stage"}
-                                    </Button>
-                                </>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
                             )}
+                        </TableBody>
+                    </Table>
+                </div>
+            </div>
+
+            {/* Stages Section */}
+            <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                    <h2 className="text-xl font-semibold">Application Stages</h2>
+                    <Button onClick={handleAddStage} variant="outline">
+                        <Plus className="mr-2 h-4 w-4" /> Add Stage
+                    </Button>
+                </div>
+                <div className="rounded-md border">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Order</TableHead>
+                                <TableHead>Stage Name</TableHead>
+                                <TableHead>Requirements</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {stagesLoading ? (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="text-center py-4"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell>
+                                </TableRow>
+                            ) : stages.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="text-center py-4 text-muted-foreground">No stages defined.</TableCell>
+                                </TableRow>
+                            ) : (
+                                stages.map((stage) => (
+                                    <TableRow key={stage.id}>
+                                        <TableCell>{stage.order}</TableCell>
+                                        <TableCell className="font-medium">{stage.name}</TableCell>
+                                        <TableCell>
+                                            <div className="flex gap-2">
+                                                {stage.requiresTest && <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">Test</span>}
+                                                {stage.requiresInterview && <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">Interview</span>}
+                                                {stage.feeRequired && <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Fee</span>}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex justify-end gap-2">
+                                                <Button variant="ghost" size="icon" onClick={() => handleEditStage(stage)}>
+                                                    <Edit className="h-4 w-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="text-destructive" onClick={() => deleteStageMutation.mutate(stage.id)}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                </div>
+            </div>
+
+            {/* Stage Drawer */}
+            <Drawer open={!!drawerMode} onOpenChange={() => setDrawerMode(null)} direction="right">
+                <DrawerContent className="w-[400px] flex flex-col h-full">
+                    <DrawerHeader>
+                        <DrawerTitle>
+                            {drawerMode === "add-stage" ? "Add New Stage" : "Edit Stage"}
+                        </DrawerTitle>
+                    </DrawerHeader>
+                    <div className="p-4 space-y-6">
+                        {stageError && <p className="text-destructive text-sm">{stageError}</p>}
+
+                        <div className="space-y-2">
+                            <Label htmlFor="name">Stage Name</Label>
+                            <Input
+                                id="name"
+                                value={stageData.name}
+                                onChange={(e) => setStageData({ ...stageData, name: e.target.value })}
+                                placeholder="e.g., Interview"
+                            />
                         </div>
-                    </DrawerContent>
-                </Drawer>
-            </div >
-        );
-    }
+
+                        <div className="space-y-2">
+                            <Label htmlFor="order">Order</Label>
+                            <Input
+                                id="order"
+                                type="number"
+                                value={stageData.order}
+                                onChange={(e) => setStageData({ ...stageData, order: parseInt(e.target.value) })}
+                            />
+                            <p className="text-xs text-muted-foreground">Lower numbers appear first in the pipeline.</p>
+                        </div>
+
+                        <div className="space-y-4 pt-4 border-t">
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="requiresTest">Requires Test/Exam</Label>
+                                <Switch
+                                    id="requiresTest"
+                                    checked={stageData.requiresTest}
+                                    onCheckedChange={(c) => setStageData({ ...stageData, requiresTest: c })}
+                                />
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="requiresInterview">Requires Interview</Label>
+                                <Switch
+                                    id="requiresInterview"
+                                    checked={stageData.requiresInterview}
+                                    onCheckedChange={(c) => setStageData({ ...stageData, requiresInterview: c })}
+                                />
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="feeRequired">Requires Fee Payment</Label>
+                                <Switch
+                                    id="feeRequired"
+                                    checked={stageData.feeRequired}
+                                    onCheckedChange={(c) => setStageData({ ...stageData, feeRequired: c })}
+                                />
+                            </div>
+                        </div>
+
+                        <Button className="w-full mt-6" onClick={handleStageSubmit}>
+                            {drawerMode === "add-stage" ? "Create Stage" : "Update Stage"}
+                        </Button>
+                    </div>
+                </DrawerContent>
+            </Drawer>
+        </div>
+    );
+}

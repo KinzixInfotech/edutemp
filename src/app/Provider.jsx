@@ -6,7 +6,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { useState } from 'react'
 import { AuthProvider } from "@/context/AuthContext";
-import { ThemeProvider } from "@/components/theme-provider";
 
 const Provider = ({ children }) => {
     const [queryClient] = useState(() => new QueryClient({
@@ -22,16 +21,9 @@ const Provider = ({ children }) => {
 
     return (
         <QueryClientProvider client={queryClient}>
-            <ThemeProvider
-                attribute="class"
-                defaultTheme="system"
-                enableSystem
-                disableTransitionOnChange
-            >
-                <AuthProvider>
-                    {children}
-                </AuthProvider>
-            </ThemeProvider>
+            <AuthProvider>
+                {children}
+            </AuthProvider>
             <ReactQueryDevtools initialIsOpen={false} />
         </QueryClientProvider>
     )

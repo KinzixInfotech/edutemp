@@ -103,8 +103,8 @@ const Hero = () => {
                 {/* Icon */}
                 <div className="relative">
                     <div className="absolute inset-0 rounded-full blur-2xl opacity-30 animate-pulse" style={{ backgroundColor: '#0c65f1' }} />
-                    <div className="relative p-4 bg-muted border rounded-2xl" >
-                        <Image src='/edu.png' width={200} height={200} alt="EduBreezy" priority /> 
+                    <div className="relative p-4 bg-muted border bg-white! rounded-2xl" >
+                        <Image src='/edu.png' width={200} height={200} alt="EduBreezy" priority />
                         {/* <GraduationCap className="w-12 h-12 sm:w-16 sm:h-16 text-white" /> */}
                     </div>
                 </div>
@@ -117,7 +117,7 @@ const Hero = () => {
                         WebkitTextFillColor: 'transparent',
                         backgroundClip: 'text',
                     }}>
-                        All-in-One <span className=" !italic border-b-2 ">Cloud Platform</span> 
+                        All-in-One <span className=" !italic border-b-2 ">Cloud Platform</span>
 
                         <br className="hidden sm:block" />
                         for Modern Schools
@@ -146,7 +146,7 @@ const Hero = () => {
                                 onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
                             >
                                 <div className="text-white px-2 sm:px-3 py-1 rounded-lg font-bold text-xs sm:text-sm flex-shrink-0" style={{ background: 'linear-gradient(135deg, #0c65f1 0%, #0a52c6 100%)' }}>
-                                    EB - 
+                                    EB -
                                 </div>
                                 <input
                                     type="text"

@@ -62,7 +62,7 @@ export const SidebarData = [
         items: [
             { label: "Home", url: "/dashboard/", icon: House, roles: ["SUPER_ADMIN", "STUDENT", "ADMIN", "MASTER_ADMIN", "TEACHER", "STAFF"] },
             { label: "Self Attendance", url: "/dashboard/markattendance", icon: Newspaper, roles: ["SUPER_ADMIN", "STUDENT", "ADMIN", "MASTER_ADMIN", "TEACHER", "STAFF"] },
-            { label: "Inbox", url: "/dashboard/schools/mail/inbox", icon: Inbox, roles: ["ADMIN"] },
+            // { label: "Inbox", url: "/dashboard/schools/mail/inbox", icon: Inbox, roles: ["ADMIN"] },
             { label: "Noticeboard", url: "/dashboard/schools/noticeboard", icon: Flag, roles: ["ADMIN"] },
             {
                 label: "School Calendar",
@@ -78,7 +78,6 @@ export const SidebarData = [
         ],
     },
 
-    //for partners
     {
         items: [
             { label: "Home", url: "/dashboard", icon: House, roles: ["PARTNER"] },
@@ -91,6 +90,12 @@ export const SidebarData = [
         ],
     },
     {
+        title: "Data Collection",
+        items: [
+            { label: "Form Builder", url: "/dashboard/forms", icon: FileSpreadsheet, roles: ["ADMIN"] },
+        ]
+    },
+    {
         title: "Admission  Management",
         items: [
             {
@@ -101,7 +106,7 @@ export const SidebarData = [
                     {
                         label: "OverView", url: "/dashboard/schools/admissions/overview", roles: ["ADMIN"]
                     },
-                    { label: "Form Builder/Settings", url: "/dashboard/schools/admissions/form-settings", roles: ["ADMIN"] },
+                    { label: "Settings", url: "/dashboard/schools/admissions/form-settings", roles: ["ADMIN"] },
                     { label: "Registration Fee", url: "/dashboard/schools/admissions/fees-verification", roles: ["ADMIN"] },
                     { label: "All Applications", url: "/dashboard/schools/admissions/applications", roles: ["ADMIN"] },
                     { label: "Enrolled Students", url: "/dashboard/schools/admissions/enrolled", roles: ["ADMIN"] },

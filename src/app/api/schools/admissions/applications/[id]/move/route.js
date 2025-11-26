@@ -1,121 +1,51 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import prisma from "@/lib/prisma";
 
-// const moveSchema = z.object({
-//     id: z.string().uuid(),
-//     stageId: z.string(),
-//     notes: z.string().optional(),
-//     movedById: z.string().uuid(),
-// });
+// POST: Move application to a different stage
+export async function POST(req, { params }) {
+    const { id } = await params;
 
-// export async function POST(req, ctx) {
-//     const {params} = await ctx
-//     const data = await req.json();
-//     console.log(data,'move');
-    
-//     const validated = moveSchema.parse({ ...data, id: params.id });
-//     try {
-//         const application = await prisma.application.findUnique({
-//             where: { id: validated.id },
-//             select: { currentStageId: true, schoolId: true },
-//         });
-//         if (!application) {
-//             return NextResponse.json({ error: "Application not found" }, { status: 404 });
-//         }
-//         const stage = await prisma.stage.findUnique({
-//             where: { id: validated.stageId },
-//             select: { schoolId: true },
-//         });
-//         if (!stage || stage.schoolId !== application.schoolId) {
-//             return NextResponse.json({ error: "Invalid stage" }, { status: 400 });
-//         }
-//         // Verify movedById
-//         const user = await prisma.user.findFirst({
-//             where: { id: validated.movedById, schoolId: application.schoolId },
-//         });
-//         if (!user) {
-//             return NextResponse.json({ error: "User not authorized" }, { status: 403 });
-//         }
-//         await prisma.$transaction([
-//             prisma.application.update({
-//                 where: { id: validated.id },
-//                 data: { currentStageId: validated.stageId },
-//             }),
-//             prisma.stageHistory.create({
-//                 data: {
-//                     applicationId: validated.id,
-//                     stageId: validated.stageId,
-//                     movedById: validated.movedById,
-//                     notes: validated.notes,
-//                 },
-//             }),
-//         ]);
-//         return NextResponse.json({ success: true });
-//     } catch (err) {
-//         console.error(err);
-//         return NextResponse.json({ error: err.message }, { status: 500 });
-//     }
-// }
+    try {
+        const body = await req.json();
+        const { stageId, movedById, stageData } = body;
 
-// app/api/schools/admissions/applications/[id]/move/route.js
-const moveSchema = z.object({
-  stageId: z.string().uuid(),
-  movedById: z.string().uuid().optional(),
-  stageData: z.record(z.any()).optional(), // Stage-specific data
-});
+        if (!stageId) {
+            return NextResponse.json(
+                { error: "stageId is required" },
+                { status: 400 }
+            );
+        }
 
-export async function POST(req, props) {
-  const params = await props.params;
-  try {
-    const data = await req.json();
-    const validated = moveSchema.parse(data);
+        // Update application's current stage
+        const application = await prisma.application.update({
+            where: { id },
+            data: {
+                currentStageId: stageId,
+            },
+        });
 
-    
-    const applicationId = z.string().uuid().parse(params.id);
+        // Create stage history entry
+        await prisma.stageHistory.create({
+            data: {
+                applicationId: id,
+                stageId,
+                movedById,
+                notes: stageData?.notes || stageData?.rejectionReason || null,
+                testDate: stageData?.testDate ? new Date(stageData.testDate) : null,
+                testStartTime: stageData?.testStartTime || null,
+                testEndTime: stageData?.testEndTime || null,
+                testVenue: stageData?.testVenue || null,
+                testScore: stageData?.testScore ? Number(stageData.testScore) : null,
+                testPassed: stageData?.testResult === "pass" ? true : stageData?.testResult === "fail" ? false : null,
+            },
+        });
 
-    const application = await prisma.application.findUnique({
-      where: { id: applicationId },
-      select: { currentStageId: true, data: true },
-    });
-
-    if (!application) {
-      return NextResponse.json({ error: "Application not found" }, { status: 404 });
+        return NextResponse.json({ application });
+    } catch (error) {
+        console.error("Error moving application:", error);
+        return NextResponse.json(
+            { error: "Failed to move application" },
+            { status: 500 }
+        );
     }
-
-    const updatedApplication = await prisma.$transaction([
-      // Update the application with new stage and merged data
-      prisma.application.update({
-        where: { id: applicationId },
-        data: {
-          currentStageId: validated.stageId,
-          data: {
-            ...application.data,
-            [validated.stageId]: validated.stageData || {}, // Store stage-specific data
-          },
-        },
-        select: {
-          id: true,
-          currentStageId: true,
-        },
-      }),
-      // Log the stage transition in StageHistory
-      prisma.stageHistory.create({
-        data: {
-          applicationId,
-          stageId: validated.stageId,
-          movedById: validated.movedById,
-          notes: validated.stageData?.notes || null,
-        },
-      }),
-    ]);
-
-    return NextResponse.json({ success: true, application: updatedApplication[0] });
-  } catch (err) {
-    console.error(err);
-    if (err.name === "ZodError") {
-      return NextResponse.json({ error: err.message }, { status: 400 });
-    }
-    return NextResponse.json({ error: err.message }, { status: 500 });
-  }
 }

@@ -428,12 +428,14 @@ export default function ApplicationDetails() {
     }
 
     // const currentStageIndex = stages.findIndex(stage => stage.id === application.currentStage.id);
-    const rejectedStage = stages.findIndex(stage => stage?.name === "Rejected");
+    const rejectedStage = stages.find(stage => stage?.name?.toUpperCase() === "REJECTED");
 
-    const excludedStageIds = ["36bf836d-c63e-474b-9da5-e16909612ebf", "49ee66f1-06c3-4589-b5a8-8e3768350868"];
-
+    // Filter out only Rejected stage from the stepper (keep Enrolled as final step)
     const filteredStages = stages.filter(
-        (stage) => !excludedStageIds.includes(stage.id)
+        (stage) => {
+            const stageName = stage.name?.toUpperCase();
+            return stageName !== "REJECTED";
+        }
     );
     const formatDate = (dateString) => {
         return new Date(dateString).toLocaleDateString("en-US", {
@@ -496,8 +498,12 @@ export default function ApplicationDetails() {
             setStageData(prev => ({ ...prev, [field]: value }));
         }, []);
 
-        switch (stageName) {
+        // Normalize stage name for comparison (case-insensitive)
+        const normalizedStageName = stageName?.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+
+        switch (normalizedStageName) {
             case "REVIEW":
+            case "SUBMITTED":
                 return (
                     <div className="space-y-4">
                         <div>
@@ -584,7 +590,7 @@ export default function ApplicationDetails() {
                                             if (rejectedStage) {
                                                 moveMutation.mutate({
                                                     id: applicationId,
-                                                    stageId: '49ee66f1-06c3-4589-b5a8-8e3768350868',
+                                                    stageId: rejectedStage.id,
                                                     movedById,
                                                     stageData,
                                                 });
@@ -606,7 +612,7 @@ export default function ApplicationDetails() {
                         </Dialog >
                     </div >
                 );
-            case "Shortlisted":
+            case "SHORTLISTED":
                 return (
                     <div className="space-y-4">
                         <div>
@@ -628,6 +634,9 @@ export default function ApplicationDetails() {
                     </div>
                 );
             case "TEST_INTERVIEW":
+            case "TEST":
+            case "INTERVIEW":
+            case "TESTINTERVIEW":
 
                 return (
                     <div className="space-y-4">
@@ -821,6 +830,7 @@ export default function ApplicationDetails() {
                     </div>
                 );
             case "OFFER":
+            case "OFFERED":
                 return (
                     <div className="space-y-4">
                         <div>
@@ -849,7 +859,9 @@ export default function ApplicationDetails() {
                         </div>
                     </div>
                 );
-            case "Fees & Verification":
+            case "FEES_VERIFICATION":
+            case "FEES__VERIFICATION":
+            case "FEESVERIFICATION":
                 return (
                     <div className="space-y-4">
                         <div>
@@ -872,6 +884,7 @@ export default function ApplicationDetails() {
                     </div>
                 );
             case "ENROLLED":
+            case "ENROLLMENT":
                 return (
                     // <div className="space-y-4">
                     //     <div>
@@ -951,7 +964,7 @@ export default function ApplicationDetails() {
                         </div>
                     </div>
                 );
-            case "Waitlisted":
+            case "WAITLISTED":
                 return (
                     <div className="space-y-4">
                         <div>
@@ -973,7 +986,7 @@ export default function ApplicationDetails() {
                         <Button>Move to Offer</Button>
                     </div>
                 );
-            case "Rejected":
+            case "REJECTED":
                 return (
                     <div className="space-y-4">
                         <div>
@@ -1105,11 +1118,11 @@ export default function ApplicationDetails() {
 
                         // update state whenever current step changes
                         useEffect(() => {
-                            if (methods.current.id !== activeStep) {
+                            if (methods?.current?.id && methods.current.id !== activeStep) {
                                 console.log("Active step changed:", methods.current.id);
                                 setActiveStep(methods.current.id);
                             }
-                        }, [methods.current.id, activeStep]);
+                        }, [methods?.current?.id, activeStep]);
 
                         return (
                             <>

@@ -1,34 +1,30 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import prisma from "@/lib/prisma";
 
-const getSchema = z.object({
-    schoolId: z.string().uuid(),
-});
-
+// GET: Fetch admission settings (stages)
 export async function GET(req) {
+    const { searchParams } = new URL(req.url);
+    const schoolId = searchParams.get("schoolId");
+
+    if (!schoolId) {
+        return NextResponse.json(
+            { error: "schoolId is required" },
+            { status: 400 }
+        );
+    }
+
     try {
-        const { searchParams } = new URL(req.url);
-        const params = { schoolId: searchParams.get("schoolId") };
-        const validated = getSchema.parse(params);
         const stages = await prisma.stage.findMany({
-          
-            select: {
-                id: true,
-                name: true,
-                order: true,
-                requiresTest: true,
-                // createdAt: true,
-                // updatedAt: true,
-            },
+            where: { schoolId },
             orderBy: { order: "asc" },
         });
-        return NextResponse.json({ success: true, stages });
-    } catch (err) {
-        console.error(err);
-        if (err.name === "ZodError") {
-            return NextResponse.json({ error: err.message }, { status: 400 });
-        }
-        return NextResponse.json({ error: err.message }, { status: 500 });
+
+        return NextResponse.json({ stages });
+    } catch (error) {
+        console.error("Error fetching stages:", error);
+        return NextResponse.json(
+            { error: "Failed to fetch stages" },
+            { status: 500 }
+        );
     }
 }
