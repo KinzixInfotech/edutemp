@@ -15,7 +15,7 @@ export async function GET(req, { params }) {
                 },
                 // For Online Exams
                 attempts: {
-                    where: { isFinished: true },
+                    where: { status: 'COMPLETED' },
                     include: { student: true }
                 },
                 questions: true, // To calculate max marks for online

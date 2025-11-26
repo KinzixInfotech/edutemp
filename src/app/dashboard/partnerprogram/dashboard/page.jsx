@@ -72,7 +72,6 @@ export default function PartnerDashboard() {
                     </Badge>
                 </div>
             </motion.div>
-
             <motion.div
                 variants={container}
                 initial="hidden"

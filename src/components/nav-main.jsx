@@ -117,9 +117,9 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                     >
                                                         <SidebarMenuButton
                                                             className={`w-full  justify-center py-4 hover:!bg-white rounded-md hover:!text-black transition-all hover:cursor-pointer ${isActive || isParentActive
-                                                                ? "shadow-xs font-semibold border dark:bg-[#1a3a5a] dark:text-black dark:border-primary/50" : ""
+                                                                ? "shadow-xs font-semibold border dark:bg-white dark:text-black" : ""
                                                                 }`}
-                                                            style={isActive || isParentActive ? { backgroundColor: '#e6effc' } : {}}
+                                                            style={isActive || isParentActive ? { backgroundColor: 'white' } : {}}
                                                         >
                                                             {item.icon && <item.icon className="w-4 h-4" />}
                                                         </SidebarMenuButton>
@@ -158,9 +158,9 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                 <CollapsibleTrigger asChild>
                                                     <SidebarMenuButton
                                                         className={`group  w-full justify-between py-4 hover:!bg-white rounded-md hover:!text-black transition-all hover:cursor-pointer ${isActive || isParentActive
-                                                            ? "shadow-xs font-semibold border dark:bg-[#1a3a5a] dark:text-black dark:border-primary/50" : ""
+                                                            ? "shadow-xs font-semibold border dark:bg-white dark:text-black " : ""
                                                             }`}
-                                                        style={isActive || isParentActive ? { backgroundColor: '#e6effc' } : {}}
+                                                        style={isActive || isParentActive ? { backgroundColor: 'white' } : {}}
                                                     >
                                                         <div className="flex items-center gap-2">
                                                             {item.icon && <item.icon className="w-4 h-4" />}
@@ -187,10 +187,10 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                                 <SidebarMenuSubButton
                                                                     asChild
                                                                     className={`transition-all ${isSubActive
-                                                                        ? "shadow-md font-semibold border dark:bg-[#1a3a5a] dark:text-black dark:border-primary/50"
+                                                                        ? "shadow-md font-semibold  dark:bg-white dark:text-black"
                                                                         : ""
                                                                         }`}
-                                                                    style={isSubActive ? { backgroundColor: '#e6effc' } : {}}
+                                                                    style={isSubActive ? { backgroundColor: 'white' } : {}}
                                                                 >
                                                                     <Link href={sub.url} onClick={handleClick}>
                                                                         {sub.icon && <sub.icon className="w-4 h-4" />}
@@ -219,7 +219,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                         className={`w-full justify-center py-4 hover:!bg-white hover:!text-black transition-all rounded-md hover:cursor-pointer ${isActive
                                                             ? "font-semibold border dark:bg-[#1a3a5a] dark:text-black dark:border-primary/50" : ""
                                                             }`}
-                                                        style={isActive ? { backgroundColor: '#e6effc' } : {}}
+                                                        style={isActive ? { backgroundColor: 'white' } : {}}
                                                     >
                                                         <Link href={item.url} onClick={handleClick}>
                                                             {item.icon && <item.icon className="w-4 h-4" />}
@@ -242,9 +242,9 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                         <SidebarMenuButton
                                             asChild
                                             className={`w-full py-4 hover:!bg-white hover:!text-black transition-all rounded-md hover:cursor-pointer ${isActive
-                                                ? "font-semibold border dark:bg-[#1a3a5a] dark:text-black dark:border-primary/50" : ""
+                                                ? "font-semibold border dark:bg-white dark:text-black dark:border-primary/50" : ""
                                                 }`}
-                                            style={isActive ? { backgroundColor: '#e6effc' } : {}}
+                                            style={isActive ? { backgroundColor: 'white' } : {}}
                                         >
                                             <Link href={item.url} onClick={handleClick}>
                                                 {item.icon && <item.icon className="w-4 h-4" />}
