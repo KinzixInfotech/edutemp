@@ -1,6 +1,7 @@
 datasource db {
   provider = "postgresql"
-  url      = env("DIRECT_URL")
+  url      = env("DATABASE_URL")
+  // url      = env("DIRECT_URL")
 }
 
 generator client {
@@ -74,6 +75,7 @@ model School {
   timeSlots               TimeSlot[]
   timetableEntries        TimetableEntry[]
   timetableTemplates      TimetableTemplate[]
+  mediaLibraries          MediaLibrary[]
 
   @@index([name])
 }
@@ -956,6 +958,7 @@ model User {
   partner                 Partner?
   managedPartners         Partner[]                @relation("PartnerAccountManager")
   assignedLeads           PartnerLead[]            @relation("LeadAssignedTo")
+  uploadedMedia           MediaLibrary[]
 
   @@index([schoolId])
   @@index([roleId])
@@ -1033,7 +1036,7 @@ model Student {
   GuardianName           String?
   GuardianRelation       String?
   House                  String?
-  admissionNo            String
+  admissionNo            String                   @unique
   schoolId               String                   @db.Uuid
   academicYearId         String?                  @db.Uuid
   ExamIssue              ExamIssue[]
@@ -3258,4 +3261,31 @@ model HallAttendance {
   @@unique([examId, studentId])
   @@index([examId])
   @@index([hallId])
+}
+
+// ============================================
+// MEDIA LIBRARY SYSTEM
+// ============================================
+
+model MediaLibrary {
+  id           String   @id @default(uuid()) @db.Uuid
+  schoolId     String   @db.Uuid
+  url          String // Image URL from UploadThing
+  fileName     String
+  fileSize     Int // Size in bytes
+  mimeType     String // image/png, image/jpeg, etc.
+  width        Int? // Image width (optional)
+  height       Int? // Image height (optional)
+  uploadedById String   @db.Uuid
+  uploadedAt   DateTime @default(now())
+  tags         Json? // Array for categorization
+  altText      String? // Alternative text for accessibility
+
+  // Relations
+  school     School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  uploadedBy User   @relation(fields: [uploadedById], references: [id])
+
+  @@index([schoolId])
+  @@index([uploadedById])
+  @@index([uploadedAt])
 }

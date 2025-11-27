@@ -90,22 +90,49 @@ export const ourFileRouter = {
             return { url: file.ufsUrl }
         }),
 
-    //  Image upload for each school (library)
-    // schoolImageUpload: f({ image: { maxFileSize: "4MB" } })
-    //     .input(z.object({ schoolId: z.string() }))
-    //     .onUploadComplete(async ({ metadata, file }) => {
-    //         console.log("Image uploaded for school:", metadata.schoolId)
-    //         console.log("File URL:", file.ufsUrl)
-    // await prisma.upload.create({
-    //     data: {
-    //         schoolId: metadata.schoolId,
-    //         fileUrl: file.ufsUrl,
-    //         fileName: file.name,
-    //         mimeType: file.type,
-    //         size: file.size,
-    //     },
-    // })
 
-    //         return { url: file.ufsUrl }
-    //     }),
+    // Image upload for school media library
+    schoolImageUpload: f({ image: { maxFileSize: "5MB", maxFileCount: 10 } })
+        .input(z.object({ schoolId: z.string(), uploadedById: z.string() }))
+        .middleware(async ({ input }) => {
+            // Pass input to metadata so it's available in onUploadComplete
+            console.log("Middleware - School ID:", input.schoolId);
+            console.log("Middleware - Uploaded By:", input.uploadedById);
+            return {
+                schoolId: input.schoolId,
+                uploadedById: input.uploadedById,
+            };
+        })
+        .onUploadComplete(async ({ metadata, file }) => {
+            try {
+                console.log("=== Upload Complete Callback ===");
+                console.log("Full metadata:", JSON.stringify(metadata));
+                console.log("School ID from metadata:", metadata.schoolId);
+                console.log("File URL:", file.ufsUrl);
+                console.log("File name:", file.name);
+
+                // Use ufsUrl instead of deprecated url
+                const fileUrl = file.ufsUrl;
+
+                // Save to MediaLibrary
+                const savedMedia = await prisma.mediaLibrary.create({
+                    data: {
+                        schoolId: metadata.schoolId,
+                        url: fileUrl,
+                        fileName: file.name,
+                        fileSize: file.size,
+                        mimeType: file.type,
+                        uploadedById: metadata.uploadedById,
+                    },
+                });
+
+                console.log("Successfully saved to MediaLibrary:", savedMedia.id);
+                return { url: fileUrl, success: true };
+            } catch (error) {
+                console.error("ERROR in onUploadComplete:", error);
+                console.error("Error details:", error.message);
+                console.error("Metadata received:", metadata);
+                throw error; // Re-throw to let UploadThing handle it
+            }
+        }),
 }

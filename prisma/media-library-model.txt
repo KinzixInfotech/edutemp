@@ -1,0 +1,27 @@
+
+// ============================================
+// MEDIA LIBRARY SYSTEM
+// ============================================
+
+model MediaLibrary {
+  id            String   @id @default(uuid()) @db.Uuid
+  schoolId      String   @db.Uuid
+  url           String   // Image URL from UploadThing
+  fileName      String
+  fileSize      Int      // Size in bytes
+  mimeType      String   // image/png, image/jpeg, etc.
+  width         Int?     // Image width (optional)
+  height        Int?     // Image height (optional)
+  uploadedById  String   @db.Uuid
+  uploadedAt    DateTime @default(now())
+  tags          Json?    // Array for categorization
+  altText       String?  // Alternative text for accessibility
+  
+  // Relations
+  school       School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  uploadedBy   User   @relation(fields: [uploadedById], references: [id])
+  
+  @@index([schoolId])
+  @@index([uploadedById])
+  @@index([uploadedAt])
+}

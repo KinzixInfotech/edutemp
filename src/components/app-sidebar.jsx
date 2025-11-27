@@ -93,6 +93,7 @@ export const SidebarData = [
         title: "Data Collection",
         items: [
             { label: "Form Builder", url: "/dashboard/forms", icon: FileSpreadsheet, roles: ["ADMIN"] },
+            { label: "Media Library", url: "/dashboard/media-library", icon: Library, roles: ["ADMIN"] },
         ]
     },
     {

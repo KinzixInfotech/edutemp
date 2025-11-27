@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertCircleIcon, CalendarCheck, CheckCircle2Icon, Copy, Loader2, Mail, Phone } from "lucide-react";
+import { AlertCircleIcon, CalendarCheck, CheckCircle2Icon, Copy, Loader2, Mail, Phone, RefreshCw } from "lucide-react";
 import { useParams } from "next/navigation";
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { defineStepper } from "@/components/stepper";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -163,6 +164,11 @@ export default function ApplicationDetails() {
     const applicationId = params.id;
     const local = localStorage.getItem('user');
     const fullUser = JSON.parse(local);
+
+    const [assignedRollNumbers, setAssignedRollNumbers] = useState([]);
+    const [rollNumberWarning, setRollNumberWarning] = useState("");
+
+
 
     const [scopen, setScopen] = useState(false);
 
@@ -379,6 +385,26 @@ export default function ApplicationDetails() {
 
     const [stageData, setStageData] = useState({}); // Store stage-specific data
     console.log(stageData);
+
+    useEffect(() => {
+        if (stageData.sectionId && schoolId) {
+            fetch(`/api/schools/${schoolId}/sections/${stageData.sectionId}/roll-numbers`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.assignedRollNumbers) {
+                        setAssignedRollNumbers(data.assignedRollNumbers);
+                    }
+                    if (data.nextRollNumber && !stageData.rollNumber) {
+                        setStageData(prev => ({ ...prev, rollNumber: data.nextRollNumber }));
+                    }
+                })
+                .catch(err => console.error("Failed to fetch roll numbers", err));
+        } else {
+            setAssignedRollNumbers([]);
+        }
+    }, [stageData.sectionId, schoolId]);
+
+
     const { data: { stages = [] } = {}, isLoading: stagesLoading } = useQuery({
         queryKey: ["stages", schoolId],
         queryFn: () => fetchStages(schoolId),
@@ -418,7 +444,7 @@ export default function ApplicationDetails() {
             case "REJECTED":
                 return "bg-red-100 text-red-700 border-red-200";
             default:
-                return "bg-gray-100 text-gray-700 border-gray-200";
+                return "bg-gray-100  border-gray-200";
         }
     };
 
@@ -497,6 +523,27 @@ export default function ApplicationDetails() {
         const handleStageDataChange = useCallback((field, value) => {
             setStageData(prev => ({ ...prev, [field]: value }));
         }, []);
+
+        const handleRollNumberChange = (value) => {
+            handleStageDataChange("rollNumber", value);
+            if (assignedRollNumbers.includes(value) || assignedRollNumbers.includes(parseInt(value))) {
+                // Find next available
+                let nextVal = 1;
+                const sorted = [...assignedRollNumbers].filter(n => typeof n === 'number').sort((a, b) => a - b);
+                for (const num of sorted) {
+                    if (num === nextVal) nextVal++;
+                    else if (num > nextVal) break;
+                }
+                // Also check against string values just in case
+                while (assignedRollNumbers.includes(String(nextVal))) {
+                    nextVal++;
+                }
+
+                setRollNumberWarning(`Roll number ${value} is already assigned. Next available: ${nextVal}`);
+            } else {
+                setRollNumberWarning("");
+            }
+        };
 
         // Normalize stage name for comparison (case-insensitive)
         const normalizedStageName = stageName?.toUpperCase().replace(/[^A-Z0-9]/g, '_');
@@ -913,50 +960,257 @@ export default function ApplicationDetails() {
                     //     </div>
                     // </div>
                     <div className="space-y-4 p-4">
-                        <div>
-                            <Label className="text-gray-700 font-semibold mb-2 block">Class Assigned</Label>
-                            {loadingClasses ? (
-                                <div className="flex items-center gap-2 text-gray-500">
-                                    <Loader2 className="animate-spin w-5 h-5" />
-                                    <span>Loading classes...</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <Label className="font-semibold mb-2 block">Admission Number</Label>
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="Admission Number"
+                                        value={stageData.admissionNo || ""}
+                                        onChange={(e) => handleStageDataChange("admissionNo", e.target.value)}
+                                    />
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={() => {
+                                            fetch(`/api/schools/${schoolId}/students/next-admission-no`)
+                                                .then(res => res.json())
+                                                .then(data => {
+                                                    if (data.nextAdmissionNo) {
+                                                        handleStageDataChange("admissionNo", data.nextAdmissionNo);
+                                                        toast.success("Admission number generated");
+                                                    }
+                                                })
+                                                .catch(() => toast.error("Failed to generate admission number"));
+                                        }}
+                                        title="Generate Admission Number"
+                                    >
+                                        <RefreshCw className="h-4 w-4" />
+                                    </Button>
                                 </div>
-                            ) : (
+                            </div>
+                            <div>
+                                <Label className=" font-semibold mb-2 block">Admission Date</Label>
+                                <Input
+                                    type="date"
+                                    value={stageData.admissionDate || new Date().toISOString().split('T')[0]}
+                                    onChange={(e) => handleStageDataChange("admissionDate", e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <Label className=" font-semibold mb-2 block">Student Name</Label>
+                                <Input
+                                    placeholder="Student Name"
+                                    value={stageData.studentName || application.applicantName || ""}
+                                    onChange={(e) => handleStageDataChange("studentName", e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <Label className=" font-semibold mb-2 block">Date of Birth</Label>
+                                <Input
+                                    type="date"
+                                    value={stageData.dob || ""}
+                                    onChange={(e) => handleStageDataChange("dob", e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <Label className=" font-semibold mb-2 block">Gender</Label>
                                 <Select
-                                    value={stageData.classAssigned || ""}
-                                    onValueChange={(value) => handleStageDataChange("classAssigned", value)}
+                                    value={stageData.gender || ""}
+                                    onValueChange={(value) => handleStageDataChange("gender", value)}
                                 >
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Select Class" />
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select Gender" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {classes.length === 0 ? (
-                                            <SelectItem value="" disabled>
-                                                No classes available
-                                            </SelectItem>
-                                        ) : (
-                                            classes.map((cls) => (
-                                                <SelectItem key={cls.id} value={cls.className}>
-                                                    {displayClassName(cls.className)}
-                                                </SelectItem>
-                                            ))
-                                        )}
+                                        <SelectItem value="MALE">Male</SelectItem>
+                                        <SelectItem value="FEMALE">Female</SelectItem>
+                                        <SelectItem value="OTHER">Other</SelectItem>
                                     </SelectContent>
                                 </Select>
+                            </div>
+                            <div>
+                                <Label className=" font-semibold mb-2 block">Class Assigned</Label>
+                                {loadingClasses ? (
+                                    <div className="flex items-center gap-2 text-gray-500">
+                                        <Loader2 className="animate-spin w-5 h-5" />
+                                        <span>Loading classes...</span>
+                                    </div>
+                                ) : (
+                                    <Select
+                                        value={stageData.classId || ""}
+                                        onValueChange={(value) => {
+                                            handleStageDataChange("classId", value);
+                                            handleStageDataChange("sectionId", ""); // Reset section when class changes
+                                        }}
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Select Class" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {classes.length === 0 ? (
+                                                <SelectItem value="null" disabled>
+                                                    No classes available
+                                                </SelectItem>
+                                            ) : (
+                                                classes.map((cls) => (
+                                                    <SelectItem key={cls.id} value={cls.id.toString()}>
+                                                        {displayClassName(cls.className)}
+                                                    </SelectItem>
+                                                ))
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                )}
+                            </div>
+                            <div>
+                                <Label className=" font-semibold  mb-2 block">Section Assigned</Label>
+                                <Select
+                                    value={stageData.sectionId || ""}
+                                    onValueChange={(value) => handleStageDataChange("sectionId", value)}
+                                    disabled={!stageData.classId}
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Select Section" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {classes.find(c => c.id.toString() === stageData.classId)?.sections?.map((sec) => (
+                                            <SelectItem key={sec.id} value={sec.id.toString()}>
+                                                {sec.name}
+                                            </SelectItem>
+                                        )) || <SelectItem value="select" disabled>Select Class First</SelectItem>}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div>
+                                <Label className=" font-semibold mb-2 block">Roll Number</Label>
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="Enter roll number"
+                                        value={stageData.rollNumber || ""}
+                                        onChange={(e) => handleRollNumberChange(e.target.value)}
+                                    />
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={() => {
+                                            if (stageData.sectionId && schoolId) {
+                                                fetch(`/api/schools/${schoolId}/sections/${stageData.sectionId}/roll-numbers`)
+                                                    .then(res => res.json())
+                                                    .then(data => {
+                                                        if (data.nextRollNumber) {
+                                                            setStageData(prev => ({ ...prev, rollNumber: data.nextRollNumber }));
+                                                            setRollNumberWarning("");
+                                                            toast.success("Roll number assigned");
+                                                        }
+                                                    })
+                                                    .catch(() => toast.error("Failed to generate roll number"));
+                                            } else {
+                                                toast.error("Please select a section first");
+                                            }
+                                        }}
+                                        title="Generate Roll Number"
+                                        disabled={!stageData.sectionId}
+                                    >
+                                        <RefreshCw className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                                {rollNumberWarning && (
+                                    <p className="text-sm text-red-500 mt-1">{rollNumberWarning}</p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="border-t pt-4 mt-4">
+                            <h4 className="font-semibold mb-4">Parent/Guardian Details</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <Label className=" font-semibold mb-2 block">Guardian Type</Label>
+                                    <RadioGroup
+                                        value={stageData.guardianType || "PARENTS"}
+                                        onValueChange={(value) => handleStageDataChange("guardianType", value)}
+                                        className="flex gap-4"
+                                    >
+                                        <div className="flex items-center space-x-2">
+                                            <RadioGroupItem value="PARENTS" id="r1" />
+                                            <Label htmlFor="r1">Parents</Label>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <RadioGroupItem value="GUARDIAN" id="r2" />
+                                            <Label htmlFor="r2">Guardian</Label>
+                                        </div>
+                                    </RadioGroup>
+                                </div>
+                            </div>
+
+                            {stageData.guardianType === "GUARDIAN" ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                    <div>
+                                        <Label className=" font-semibold mb-2 block">Guardian Name</Label>
+                                        <Input
+                                            placeholder="Guardian Name"
+                                            value={stageData.guardianName || ""}
+                                            onChange={(e) => handleStageDataChange("guardianName", e.target.value)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label className=" font-semibold mb-2 block">Guardian Mobile</Label>
+                                        <Input
+                                            placeholder="Guardian Mobile"
+                                            value={stageData.guardianMobileNo || ""}
+                                            onChange={(e) => handleStageDataChange("guardianMobileNo", e.target.value)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label className=" font-semibold mb-2 block">Relation</Label>
+                                        <Input
+                                            placeholder="Relation"
+                                            value={stageData.guardianRelation || ""}
+                                            onChange={(e) => handleStageDataChange("guardianRelation", e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                    <div>
+                                        <Label className=" font-semibold mb-2 block">Father Name</Label>
+                                        <Input
+                                            placeholder="Father Name"
+                                            value={stageData.fatherName || ""}
+                                            onChange={(e) => handleStageDataChange("fatherName", e.target.value)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label className=" font-semibold mb-2 block">Father Mobile</Label>
+                                        <Input
+                                            placeholder="Father Mobile"
+                                            value={stageData.fatherMobileNumber || ""}
+                                            onChange={(e) => handleStageDataChange("fatherMobileNumber", e.target.value)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label className=" font-semibold mb-2 block">Mother Name</Label>
+                                        <Input
+                                            placeholder="Mother Name"
+                                            value={stageData.motherName || ""}
+                                            onChange={(e) => handleStageDataChange("motherName", e.target.value)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label className=" font-semibold mb-2 block">Mother Mobile</Label>
+                                        <Input
+                                            placeholder="Mother Mobile"
+                                            value={stageData.motherMobileNumber || ""}
+                                            onChange={(e) => handleStageDataChange("motherMobileNumber", e.target.value)}
+                                        />
+                                    </div>
+                                </div>
                             )}
                         </div>
+
                         <div>
-                            <Label className="text-gray-700 font-semibold mb-2 block">Roll Number</Label>
+                            <Label className=" font-semibold mb-2 block">Comments</Label>
                             <Input
-                                // className="w-full bg-white border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                placeholder="Enter roll number"
-                                value={stageData.rollNumber || ""}
-                                onChange={(e) => handleStageDataChange("rollNumber", e.target.value)}
-                            />
-                        </div>
-                        <div>
-                            <Label className="text-gray-700 font-semibold mb-2 block">Comments</Label>
-                            <Input
-                                // className="w-full bg-white border-gray-300 focus:ring-2 focus:ring-blue-500"
                                 placeholder="Add comments"
                                 value={stageData.notes || ""}
                                 onChange={(e) => handleStageDataChange("notes", e.target.value)}
@@ -1192,7 +1446,7 @@ export default function ApplicationDetails() {
                                         </Stepper.Navigation>
 
                                         <div className="mt-4 p-4 bg-white shadow-md dark:bg-muted border rounded-md">
-                                            {renderFieldsForStage(methods.current.title, methods)}
+                                            {methods.current ? renderFieldsForStage(methods.current.title, methods) : <div>Loading stage...</div>}
                                         </div>
 
                                         <Stepper.Controls className="mt-4 w-full flex justify-between ">
@@ -1206,10 +1460,10 @@ export default function ApplicationDetails() {
                                                 </Button>
                                             </div>
                                             <Button
-                                                onClick={() => moveMutation.mutate({ id: applicationId, stageId: methods.current.id, movedById, stageData })}
-                                                disabled={application.currentStage.id === methods.current.id}
+                                                onClick={() => moveMutation.mutate({ id: applicationId, stageId: methods.current?.id, movedById, stageData })}
+                                                disabled={!methods.current || application.currentStage.id === methods.current.id}
                                             >
-                                                {application.currentStage.id === methods.current.id
+                                                {methods.current && application.currentStage.id === methods.current.id
                                                     ? 'Marked'
                                                     : `Mark`}
                                             </Button>

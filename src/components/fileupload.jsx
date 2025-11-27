@@ -1,14 +1,18 @@
 "use client"
 
-import { useEffect, useRef } from "react"
-import { AlertCircleIcon, ImageIcon, UploadIcon, XIcon } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { AlertCircleIcon, ImageIcon, UploadIcon, XIcon, Library } from "lucide-react"
 
 import { useFileUpload } from '@/lib/useFileupload'
 import { Button } from '@/components/ui/button'
+import { MediaLibraryDialog } from './media-library-dialog'
+import { useAuth } from "@/context/AuthContext"
 
-export default function FileUploadButton({ field, onChange, resetKey }) {
+export default function FileUploadButton({ field, onChange, resetKey, saveToLibrary = true }) {
     const maxSizeMB = 2
     const maxSize = maxSizeMB * 1024 * 1024 // 2MB
+    const { fullUser: user } = useAuth()
+    const [showLibrary, setShowLibrary] = useState(false)
 
     const [
         { files, isDragging, errors },
@@ -20,7 +24,7 @@ export default function FileUploadButton({ field, onChange, resetKey }) {
             openFileDialog,
             removeFile,
             getInputProps,
-            clearFiles, // ✅ this is already exposed
+            clearFiles,
         },
     ] = useFileUpload({
         accept: "image/,image/png,image/jpeg,image/jpg,image/gif",
@@ -36,6 +40,11 @@ export default function FileUploadButton({ field, onChange, resetKey }) {
         if (onChange && previewUrl && previewUrl !== previousUrlRef.current) {
             previousUrlRef.current = previewUrl
             onChange(previewUrl)
+
+            // Save to media library if enabled and user is available
+            if (saveToLibrary && user?.schoolId && user?.id && files[0]?.file) {
+                saveImageToLibrary(previewUrl, files[0].file)
+            }
         }
     }, [previewUrl, onChange])
 
@@ -43,10 +52,35 @@ export default function FileUploadButton({ field, onChange, resetKey }) {
     useEffect(() => {
         if (clearFiles) {
             clearFiles()
-            previousUrlRef.current = null // ensures onChange works again with same file
+            previousUrlRef.current = null
         }
     }, [resetKey])
+
     const fileName = files[0]?.file.name || null
+
+    const saveImageToLibrary = async (url, file) => {
+        try {
+            await fetch(`/api/schools/${user.schoolId}/media`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    url,
+                    fileName: file.name,
+                    fileSize: file.size,
+                    mimeType: file.type,
+                    uploadedById: user.id,
+                }),
+            })
+        } catch (error) {
+            console.error("Failed to save image to library:", error)
+        }
+    }
+
+    const handleLibrarySelect = (url) => {
+        if (onChange) {
+            onChange(url)
+        }
+    }
 
     return (
         <div className="flex flex-col gap-2">
@@ -84,17 +118,30 @@ export default function FileUploadButton({ field, onChange, resetKey }) {
                             <p className="text-muted-foreground text-xs">
                                 PNG, JPG or GIF (max. {maxSizeMB}MB)
                             </p>
-                            <Button
-                                variant="outline"
-                                className="mt-4"
-                                onClick={openFileDialog}
-                            >
-                                <UploadIcon
-                                    className="-ms-1 size-4 opacity-60"
-                                    aria-hidden="true"
-                                />
-                                Select image
-                            </Button>
+                            <div className="flex gap-2 mt-4">
+                                <Button
+                                    variant="outline"
+                                    onClick={openFileDialog}
+                                >
+                                    <UploadIcon
+                                        className="-ms-1 size-4 opacity-60"
+                                        aria-hidden="true"
+                                    />
+                                    Upload New
+                                </Button>
+                                {user?.schoolId && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setShowLibrary(true)}
+                                    >
+                                        <Library
+                                            className="-ms-1 size-4 opacity-60"
+                                            aria-hidden="true"
+                                        />
+                                        Choose from Library
+                                    </Button>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>
@@ -117,6 +164,15 @@ export default function FileUploadButton({ field, onChange, resetKey }) {
                     <AlertCircleIcon className="size-3 shrink-0" />
                     <span>{errors[0]}</span>
                 </div>
+            )}
+
+            {user?.schoolId && (
+                <MediaLibraryDialog
+                    open={showLibrary}
+                    onOpenChange={setShowLibrary}
+                    schoolId={user.schoolId}
+                    onSelect={handleLibrarySelect}
+                />
             )}
         </div>
     )
