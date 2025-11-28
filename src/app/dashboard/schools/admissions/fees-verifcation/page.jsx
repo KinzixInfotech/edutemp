@@ -12,7 +12,7 @@ import { Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 async function fetchFeeApplications(schoolId) {
-    const response = await fetch(`/api/schools/admissions/applications?schoolId=${schoolId}&stageId=fees-verification-id`); // Assume stage id
+    const response = await fetch(`/api/schools/${schoolId}/admissions/applications?stageId=Fee Verification`);
     if (!response.ok) throw new Error("Failed to fetch fee applications");
     return response.json();
 }
@@ -50,7 +50,7 @@ export default function FeesVerification() {
     });
 
     const handleConfirm = (id) => {
-        confirmMutation.mutate({ id, stageId: "enrolled-id", movedById, notes: "Fee verified" });
+        confirmMutation.mutate({ id, stageId: "Enrolled", movedById, notes: "Fee verified" });
     };
 
     return (

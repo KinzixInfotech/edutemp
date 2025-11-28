@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import { Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -36,6 +37,8 @@ export default function CreateExamPage() {
     startDate: "",
     endDate: "",
     classIds: [],
+    isFinalExam: false,
+    description: "",
   });
 
   useEffect(() => {
@@ -211,6 +214,40 @@ export default function CreateExamPage() {
                   }
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="isFinalExam"
+                  checked={formData.isFinalExam}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, isFinalExam: checked })
+                  }
+                />
+                <Label
+                  htmlFor="isFinalExam"
+                  className="text-sm font-medium cursor-pointer"
+                >
+                  Mark as Final Exam
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Final exams are used for student promotion decisions.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                placeholder="Optional: Add exam description or instructions..."
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
+                rows={3}
+              />
             </div>
 
             <div className="space-y-3">

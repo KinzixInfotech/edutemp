@@ -102,8 +102,8 @@ export function MediaLibraryDialog({ open, onOpenChange, schoolId, onSelect }) {
                                     <div
                                         key={item.id}
                                         className={`relative group cursor-pointer rounded-lg border-2 overflow-hidden transition-all ${selectedImage?.id === item.id
-                                                ? "border-primary ring-2 ring-primary/20"
-                                                : "border-transparent hover:border-muted-foreground/20"
+                                            ? "border-primary ring-2 ring-primary/20"
+                                            : "border-transparent hover:border-muted-foreground/20"
                                             }`}
                                         onClick={() => setSelectedImage(item)}
                                     >

@@ -190,7 +190,7 @@ export default function NewProfilePage() {
             parentId: form.parentId || null,
             userId: form.userId || undefined,
             schoolId: schoolId,
-            linkedStudentIds: selectedStudents.map(s => s.userId || s.id), 
+            linkedStudentIds: selectedStudents.map(s => s.userId || s.id),
             linkedParentIds: selectedParents.map(p => p.id),
         }
 

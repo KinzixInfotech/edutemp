@@ -1,7 +1,7 @@
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
-  // url      = env("DIRECT_URL")
+  // url      = env("DATABASE_URL")
+  url      = env("DIRECT_URL")
 }
 
 generator client {
@@ -948,6 +948,7 @@ model User {
 
   attendance              Attendance[]
   markedAttendance        Attendance[]             @relation("MarkedBy")
+  promotionsInitiated     PromotionHistory[]
   approvedAttendance      Attendance[]             @relation("ApprovedBy")
   leaveRequests           LeaveRequest[]
   reviewedLeaves          LeaveRequest[]           @relation("LeaveReviewer")
@@ -1060,6 +1061,7 @@ model Student {
   seatAllocations        SeatAllocation[]
   studentExamAttempts    StudentExamAttempt[]
   hallAttendances        HallAttendance[]
+  promotionHistories     PromotionHistory[]
 
   @@index([classId])
   @@index([sectionId])
@@ -1284,30 +1286,32 @@ model NonTeachingStaff {
 }
 
 model Class {
-  id                    Int                    @id @default(autoincrement())
-  schoolId              String                 @db.Uuid
-  className             String
-  capacity              Int?
-  teachingStaffUserId   String?                @db.Uuid
-  academicYearId        String?                @db.Uuid
-  AcademicYear          AcademicYear?          @relation(fields: [academicYearId], references: [id])
-  school                School                 @relation(fields: [schoolId], references: [id])
-  TeachingStaff         TeachingStaff?         @relation(fields: [teachingStaffUserId], references: [userId])
-  FeeStructure          FeeStructure[]
-  homework              Homework[]
-  NoticeTarget          NoticeTarget[]
-  sections              Section[]
-  attendanceDelegations AttendanceDelegation[]
-  students              Student[]
-  subjects              Subject[]
-  Syllabi               Syllabus[]
-  Assignment            Assignment[]
-  globalFeeStructures   GlobalFeeStructure[]
-  calendarEventTargets  CalendarEventTarget[]
-  bulkAttendance        BulkAttendance[]
-  exam                  Exam?                  @relation(fields: [examId], references: [id])
-  examId                String?                @db.Uuid
-  timetableEntries      TimetableEntry[]
+  id                     Int                    @id @default(autoincrement())
+  schoolId               String                 @db.Uuid
+  className              String
+  capacity               Int?
+  teachingStaffUserId    String?                @db.Uuid
+  academicYearId         String?                @db.Uuid
+  AcademicYear           AcademicYear?          @relation(fields: [academicYearId], references: [id])
+  school                 School                 @relation(fields: [schoolId], references: [id])
+  TeachingStaff          TeachingStaff?         @relation(fields: [teachingStaffUserId], references: [userId])
+  FeeStructure           FeeStructure[]
+  homework               Homework[]
+  NoticeTarget           NoticeTarget[]
+  sections               Section[]
+  attendanceDelegations  AttendanceDelegation[]
+  students               Student[]
+  subjects               Subject[]
+  Syllabi                Syllabus[]
+  Assignment             Assignment[]
+  globalFeeStructures    GlobalFeeStructure[]
+  calendarEventTargets   CalendarEventTarget[]
+  bulkAttendance         BulkAttendance[]
+  exam                   Exam?                  @relation(fields: [examId], references: [id])
+  examId                 String?                @db.Uuid
+  timetableEntries       TimetableEntry[]
+  promotionHistoriesFrom PromotionHistory[]     @relation("PromotionFromClass")
+  promotionHistoriesTo   PromotionHistory[]     @relation("PromotionToClass")
 
   @@unique([id, schoolId])
   @@index([schoolId])
@@ -1547,6 +1551,8 @@ model Exam {
   endDate        DateTime?
   status         ExamStatus @default(DRAFT)
   academicYearId String?    @db.Uuid
+  isFinalExam    Boolean    @default(false)
+  description    String?    @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
@@ -1660,28 +1666,30 @@ enum ExamStatus {
 }
 
 model AcademicYear {
-  id                  String               @id @default(uuid()) @db.Uuid
-  name                String
-  startDate           DateTime
-  endDate             DateTime
-  isActive            Boolean              @default(false)
-  createdAt           DateTime             @default(now())
-  schoolId            String               @db.Uuid
-  school              School               @relation(fields: [schoolId], references: [id])
-  classes             Class[]
-  FeePayments         FeePayment[]
-  FeeStructures       FeeStructure[]
-  NonTeachingStaff    NonTeachingStaff[]
-  students            Student[]
-  Syllabus            Syllabus[]
-  TeachingStaff       TeachingStaff[]
-  DigitalIdCard       DigitalIdCard[]
-  globalFeeStructures GlobalFeeStructure[]
-  studentFees         StudentFee[]
-  leaveBalances       LeaveBalance[]
-  attendanceStats     AttendanceStats[]
-  exams               Exam[]
-  timetableTemplates  TimetableTemplate[]
+  id                     String               @id @default(uuid()) @db.Uuid
+  name                   String
+  startDate              DateTime
+  endDate                DateTime
+  isActive               Boolean              @default(false)
+  createdAt              DateTime             @default(now())
+  schoolId               String               @db.Uuid
+  school                 School               @relation(fields: [schoolId], references: [id])
+  classes                Class[]
+  FeePayments            FeePayment[]
+  FeeStructures          FeeStructure[]
+  NonTeachingStaff       NonTeachingStaff[]
+  students               Student[]
+  Syllabus               Syllabus[]
+  TeachingStaff          TeachingStaff[]
+  DigitalIdCard          DigitalIdCard[]
+  globalFeeStructures    GlobalFeeStructure[]
+  studentFees            StudentFee[]
+  leaveBalances          LeaveBalance[]
+  attendanceStats        AttendanceStats[]
+  exams                  Exam[]
+  timetableTemplates     TimetableTemplate[]
+  promotionHistoriesFrom PromotionHistory[]   @relation("PromotionFromYear")
+  promotionHistoriesTo   PromotionHistory[]   @relation("PromotionToYear")
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -3261,6 +3269,35 @@ model HallAttendance {
   @@unique([examId, studentId])
   @@index([examId])
   @@index([hallId])
+}
+
+model PromotionHistory {
+  id        String @id @default(uuid()) @db.Uuid
+  studentId String @db.Uuid
+
+  fromClassId Int
+  toClassId   Int
+
+  fromYearId String @db.Uuid
+  toYearId   String @db.Uuid
+
+  status  String // PROMOTED, DETAINED, CONDITIONAL
+  remarks String?
+
+  promotedAt DateTime @default(now())
+  promotedBy String   @db.Uuid // User ID of Admin
+
+  student   Student      @relation(fields: [studentId], references: [userId])
+  fromClass Class        @relation("PromotionFromClass", fields: [fromClassId], references: [id])
+  toClass   Class        @relation("PromotionToClass", fields: [toClassId], references: [id])
+  fromYear  AcademicYear @relation("PromotionFromYear", fields: [fromYearId], references: [id])
+  toYear    AcademicYear @relation("PromotionToYear", fields: [toYearId], references: [id])
+  promoter  User         @relation(fields: [promotedBy], references: [id])
+
+  @@index([studentId])
+  @@index([fromClassId])
+  @@index([toClassId])
+  @@index([fromYearId])
 }
 
 // ============================================
