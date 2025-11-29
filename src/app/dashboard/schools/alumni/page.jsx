@@ -37,13 +37,11 @@ export default function AlumniManagementPage() {
     const [leavingReasonFilter, setLeavingReasonFilter] = useState("");
     const [selectedAlumni, setSelectedAlumni] = useState(null);
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-
     useEffect(() => {
         if (schoolId) {
             fetchAlumni();
         }
     }, [schoolId, graduationYearFilter, leavingReasonFilter]);
-
     const fetchAlumni = async () => {
         setLoading(true);
         try {
@@ -65,7 +63,6 @@ export default function AlumniManagementPage() {
             setLoading(false);
         }
     };
-
     const handleSearch = () => {
         fetchAlumni();
     };
@@ -101,9 +98,7 @@ export default function AlumniManagementPage() {
                 </div>
                 <AlumniConversionDialog onSuccess={fetchAlumni} />
             </div>
-
             <Separator />
-
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card>
@@ -115,9 +110,6 @@ export default function AlumniManagementPage() {
                         <div className="text-2xl font-bold">{alumni.length}</div>
                     </CardContent>
                 </Card>
-
-
-
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-medium">Latest Batch (Session)</CardTitle>
@@ -130,7 +122,6 @@ export default function AlumniManagementPage() {
                     </CardContent>
                 </Card>
             </div>
-
             {/* Filters */}
             <Card>
                 <CardHeader>
@@ -152,7 +143,6 @@ export default function AlumniManagementPage() {
                                 </Button>
                             </div>
                         </div>
-
                         <div>
                             <Label>Session Passed Out</Label>
                             <Select value={graduationYearFilter} onValueChange={setGraduationYearFilter}>
@@ -186,7 +176,6 @@ export default function AlumniManagementPage() {
                     </div>
                 </CardContent>
             </Card>
-
             {/* Alumni List */}
             <Card>
                 <CardHeader>
