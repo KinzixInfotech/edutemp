@@ -76,6 +76,8 @@ model School {
   timetableEntries        TimetableEntry[]
   timetableTemplates      TimetableTemplate[]
   mediaLibraries          MediaLibrary[]
+  teacherShifts           TeacherShift[]
+  alumni                  Alumni[]
 
   @@index([name])
 }
@@ -1023,23 +1025,28 @@ model Student {
   rollNumber         String
   PreviousSchoolName String?
 
-  DateOfLeaving          String?
-  contactNumber          String
-  Address                String
-  city                   String
-  state                  String
-  country                String
-  postalCode             String
-  FatherName             String
-  MotherName             String
-  FatherNumber           String?
-  MotherNumber           String?
-  GuardianName           String?
-  GuardianRelation       String?
-  House                  String?
-  admissionNo            String                   @unique
-  schoolId               String                   @db.Uuid
-  academicYearId         String?                  @db.Uuid
+  DateOfLeaving    String?
+  contactNumber    String
+  Address          String
+  city             String
+  state            String
+  country          String
+  postalCode       String
+  FatherName       String
+  MotherName       String
+  FatherNumber     String?
+  MotherNumber     String?
+  GuardianName     String?
+  GuardianRelation String?
+  House            String?
+  admissionNo      String  @unique
+  schoolId         String  @db.Uuid
+  academicYearId   String? @db.Uuid
+
+  // Alumni Tracking
+  isAlumni          Boolean   @default(false)
+  alumniConvertedAt DateTime?
+
   ExamIssue              ExamIssue[]
   examResults            ExamResult[]
   FeePayment             FeePayment[]
@@ -1253,6 +1260,7 @@ model TeachingStaff {
   subjects              Subject[]               @relation("SubjectToTeachingStaff")
   timetableEntries      TimetableEntry[]
   examHallInvigilators  ExamHallInvigilator[]
+  teacherShifts         TeacherShift[]
 
   @@index([departmentId])
 }
@@ -1312,6 +1320,8 @@ model Class {
   timetableEntries       TimetableEntry[]
   promotionHistoriesFrom PromotionHistory[]     @relation("PromotionFromClass")
   promotionHistoriesTo   PromotionHistory[]     @relation("PromotionToClass")
+  teacherShifts          TeacherShift[]
+  alumni                 Alumni[]
 
   @@unique([id, schoolId])
   @@index([schoolId])
@@ -1354,6 +1364,8 @@ model Section {
   attendanceDelegations AttendanceDelegation[]
   homework              Homework[]
   timetableEntries      TimetableEntry[]
+  teacherShifts         TeacherShift[]
+  alumni                Alumni[]
 
   @@unique([classId, name])
   @@index([classId])
@@ -1383,8 +1395,9 @@ model TimeSlot {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  school  School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  entries TimetableEntry[]
+  school        School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  entries       TimetableEntry[]
+  teacherShifts TeacherShift[]
 
   @@index([schoolId])
   @@index([schoolId, sequence])
@@ -1425,6 +1438,43 @@ model TimetableEntry {
   @@index([teacherId, dayOfWeek])
   @@index([classId, sectionId, dayOfWeek])
   @@index([timeSlotId, dayOfWeek])
+}
+
+// Date-specific Teacher Shift (Timetable)
+model TeacherShift {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @db.Uuid
+
+  // Linking
+  classId    Int
+  sectionId  Int
+  subjectId  Int
+  teacherId  String @db.Uuid
+  timeSlotId String @db.Uuid
+
+  // Schedule
+  date       DateTime @db.Date // Specific date for this shift
+  roomNumber String?
+
+  // Metadata
+  status    String   @default("ASSIGNED") // ASSIGNED, CANCELLED, COMPLETED
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  school   School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class    Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
+  section  Section       @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject  Subject       @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher  TeachingStaff @relation(fields: [teacherId], references: [userId], onDelete: Cascade)
+  timeSlot TimeSlot      @relation(fields: [timeSlotId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, date, timeSlotId]) // One teacher can't be in two places at same time
+  @@index([schoolId])
+  @@index([teacherId, date])
+  @@index([classId, sectionId, date])
+  @@index([date])
 }
 
 // Template for reusing timetable configurations
@@ -1486,6 +1536,7 @@ model Subject {
   Teacher               TeachingStaff[]         @relation("SubjectToTeachingStaff")
   examSubjects          ExamSubject[]
   timetableEntries      TimetableEntry[]
+  teacherShifts         TeacherShift[]
 
   @@index([classId])
   @@index([departmentId])
@@ -3325,4 +3376,62 @@ model MediaLibrary {
   @@index([schoolId])
   @@index([uploadedById])
   @@index([uploadedAt])
+}
+
+// ============================================
+// ALUMNI MANAGEMENT
+// ============================================
+
+model Alumni {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @db.Uuid
+
+  // Original Student Information (preserved)
+  originalStudentId String @unique @db.Uuid
+  admissionNo       String
+  name              String
+  email             String
+  contactNumber     String
+
+  // Academic Information
+  lastClassId      Int
+  lastSectionId    Int
+  lastAcademicYear String? @db.Uuid
+
+  // Alumni Specific
+  graduationYear Int
+  leavingDate    DateTime @db.Date
+  leavingReason  String // GRADUATED, TRANSFERRED, WITHDRAWN, OTHER
+
+  // Contact Information
+  currentAddress String?
+  currentCity    String?
+  currentState   String?
+  currentCountry String?
+  currentEmail   String?
+  currentPhone   String?
+
+  // Professional Information
+  currentOccupation String?
+  currentCompany    String?
+  higherEducation   String? // University/College name
+  achievements      String? // Text field for notable achievements
+
+  // Engagement
+  willingToMentor Boolean @default(false)
+  canContact      Boolean @default(true)
+
+  // System Fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  school      School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  lastClass   Class   @relation(fields: [lastClassId], references: [id])
+  lastSection Section @relation(fields: [lastSectionId], references: [id])
+
+  @@index([schoolId])
+  @@index([graduationYear])
+  @@index([leavingReason])
+  @@index([email])
 }

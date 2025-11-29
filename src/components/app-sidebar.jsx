@@ -330,6 +330,7 @@ export const SidebarData = [
                     { label: "Overview", url: "/dashboard/timetable/manage", roles: ["ADMIN"] },
                     { label: "Create Timetable", url: "/dashboard/timetable/create", roles: ["ADMIN"] },
                     { label: "Time Slots", url: "/dashboard/timetable/slots", roles: ["ADMIN"] },
+                    { label: "Teacher Shifts", url: "/dashboard/teachers/shifts", roles: ["ADMIN"] },
                     { label: "Statistics", url: "/dashboard/timetable/stats", roles: ["ADMIN"] },
                 ],
             },
@@ -481,9 +482,9 @@ export const SidebarData = [
         ],
     },
     {
-        title: "Almuni",
+        title: "Alumni",
         items: [
-            { label: "Alumni Management", url: "/dashboard/schools/alumni/", icon: Timer, roles: ["SUPER_ADMIN", "STUDENT", "ADMIN", "MASTER_ADMIN", "TEACHER", "STAFF"] },
+            { label: "Alumni Management", url: "/dashboard/schools/alumni/", icon: TrendingUp, roles: ["ADMIN"] },
         ],
     },
 ]
