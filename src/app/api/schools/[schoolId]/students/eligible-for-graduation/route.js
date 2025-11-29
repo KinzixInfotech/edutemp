@@ -8,13 +8,20 @@ export async function GET(req, { params }) {
 
     const classId = searchParams.get('classId');
     const sectionId = searchParams.get('sectionId');
+    const search = searchParams.get('search');
 
     try {
         const where = {
             schoolId,
             isAlumni: false, // Only active students
             ...(classId && { classId: parseInt(classId) }),
-            ...(sectionId && { sectionId: parseInt(sectionId) })
+            ...(sectionId && { sectionId: parseInt(sectionId) }),
+            ...(search && {
+                OR: [
+                    { name: { contains: search, mode: 'insensitive' } },
+                    { admissionNo: { contains: search, mode: 'insensitive' } }
+                ]
+            })
         };
 
         const students = await prisma.student.findMany({

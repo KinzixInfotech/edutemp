@@ -24,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Loader2, Search, UserPlus, Users, GraduationCap, Building2, Mail, Phone } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import AlumniConversionDialog from "@/components/schools/AlumniConversionDialog";
 
 export default function AlumniManagementPage() {
     const { fullUser } = useAuth();
@@ -91,11 +92,14 @@ export default function AlumniManagementPage() {
     return (
         <div className="p-6 space-y-6">
             {/* Header */}
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">Alumni Management</h1>
-                <p className="text-muted-foreground mt-2">
-                    Manage and connect with your school's alumni network
-                </p>
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Alumni Management</h1>
+                    <p className="text-muted-foreground mt-2">
+                        Manage and connect with your school's alumni network
+                    </p>
+                </div>
+                <AlumniConversionDialog onSuccess={fetchAlumni} />
             </div>
 
             <Separator />
@@ -112,21 +116,11 @@ export default function AlumniManagementPage() {
                     </CardContent>
                 </Card>
 
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium">Willing to Mentor</CardTitle>
-                        <GraduationCap className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">
-                            {alumni.filter(a => a.willingToMentor).length}
-                        </div>
-                    </CardContent>
-                </Card>
+
 
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium">Latest Batch</CardTitle>
+                        <CardTitle className="text-sm font-medium">Latest Batch (Session)</CardTitle>
                         <UserPlus className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -160,13 +154,13 @@ export default function AlumniManagementPage() {
                         </div>
 
                         <div>
-                            <Label>Graduation Year</Label>
+                            <Label>Session Passed Out</Label>
                             <Select value={graduationYearFilter} onValueChange={setGraduationYearFilter}>
                                 <SelectTrigger>
-                                    <SelectValue placeholder="All Years" />
+                                    <SelectValue placeholder="All Sessions" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All Years</SelectItem>
+                                    <SelectItem value="all">All Sessions</SelectItem>
                                     {[...new Set(alumni.map(a => a.graduationYear))].sort((a, b) => b - a).map(year => (
                                         <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
                                     ))}
@@ -182,7 +176,7 @@ export default function AlumniManagementPage() {
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">All Reasons</SelectItem>
-                                    <SelectItem value="GRADUATED">Graduated</SelectItem>
+                                    <SelectItem value="GRADUATED">Passed Out</SelectItem>
                                     <SelectItem value="TRANSFERRED">Transferred</SelectItem>
                                     <SelectItem value="WITHDRAWN">Withdrawn</SelectItem>
                                     <SelectItem value="OTHER">Other</SelectItem>
@@ -219,7 +213,7 @@ export default function AlumniManagementPage() {
                                         <div className="flex items-center gap-2">
                                             <h3 className="font-semibold">{alumnus.name}</h3>
                                             <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                                                Class of {alumnus.graduationYear}
+                                                Batch of {alumnus.graduationYear}
                                             </span>
                                         </div>
                                         <div className="text-sm text-muted-foreground mt-1">
@@ -234,11 +228,7 @@ export default function AlumniManagementPage() {
                                         )}
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        {alumnus.willingToMentor && (
-                                            <span className="text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100 px-2 py-1 rounded">
-                                                Mentor
-                                            </span>
-                                        )}
+
                                         <Button variant="outline" size="sm">
                                             View Details
                                         </Button>
@@ -268,7 +258,7 @@ export default function AlumniManagementPage() {
                                     <p className="font-medium">{selectedAlumni.admissionNo}</p>
                                 </div>
                                 <div>
-                                    <Label className="text-muted-foreground">Graduation Year</Label>
+                                    <Label className="text-muted-foreground">Session Passed Out</Label>
                                     <p className="font-medium">{selectedAlumni.graduationYear}</p>
                                 </div>
                                 <div>
