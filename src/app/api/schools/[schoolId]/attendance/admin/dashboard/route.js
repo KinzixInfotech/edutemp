@@ -5,8 +5,9 @@ import dayjs from "dayjs";
 export async function GET(req, { params }) {
   const { schoolId } = params;
   const { searchParams } = new URL(req.url);
-  const date = searchParams.get('date')
-    ? dayjs(searchParams.get('date')).toDate()
+  const dateString = searchParams.get('date');
+  const date = dateString
+    ? new Date(dateString + "T00:00:00.000Z")
     : new Date();
 
   const startDate = searchParams.get('startDate')
@@ -41,7 +42,11 @@ export async function GET(req, { params }) {
     }
 
     // Check if today is a working day
-    const today = new Date(date.toDateString());
+    const today = new Date(Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate()
+    ));
     const calendar = await prisma.schoolCalendar.findUnique({
       where: { schoolId_date: { schoolId, date: today } }
     });
