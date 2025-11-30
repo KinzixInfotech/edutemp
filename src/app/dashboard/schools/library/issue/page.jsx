@@ -1,289 +1,380 @@
-// app/library/admin-issue/page.js
-// Admin Global Issue Page
-
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import axios from "axios";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
+import {
+    Loader2,
+    BookPlus,
+    BookMinus,
+    AlertCircle,
+    Calendar,
+} from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 
-async function fetchAvailableBooks(schoolId) {
-    const params = new URLSearchParams({ schoolId });
-    const response = await fetch(`/api/schools/library/books?${params}`);
-    if (!response.ok) {
-        throw new Error((await response.json()).error || "Failed to fetch books");
-    }
-    return response.json();
-}
-
-async function fetchUsers() {
-    const response = await fetch("/api/schools/library/users");
-    if (!response.ok) {
-        throw new Error((await response.json()).error || "Failed to fetch users");
-    }
-    return (await response.json()).users;
-}
-
-async function issueBook(data) {
-    const response = await fetch("/api/schools/library/issue", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-    });
-    if (!response.ok) {
-        throw new Error((await response.json()).error || "Failed to issue book");
-    }
-    return (await response.json()).book;
-}
-
-export default function AdminIssueBookPage() {
+export default function LibraryTransactionsPage() {
     const { fullUser } = useAuth();
-    const router = useRouter();
-    const queryClient = useQueryClient();
-    const [openDialog, setOpenDialog] = useState(false);
-    const [selectedBook, setSelectedBook] = useState(null);
-    const [selectedUserId, setSelectedUserId] = useState("");
-    const [issueDate, setIssueDate] = useState(new Date().toISOString().split("T")[0]);
-    const [dueDate, setDueDate] = useState(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]);
-    const [charges, setCharges] = useState(0); // For any initial charges or fines
-
-    // if (authLoading) {
-    //     return <p>Loading...</p>;
-    // }
-
-    // if (!fullUser || fullUser.role !== "Admin") {
-    //     toast({ title: "Access denied", variant: "destructive" });
-    //     router.push("/library");
-    //     return null;
-    // }
-
     const schoolId = fullUser?.schoolId;
 
-    const { data: books, isLoading: booksLoading } = useQuery({
-        queryKey: ["availableBooks", schoolId],
-        queryFn: () => fetchAvailableBooks(schoolId),
-        enabled: !!schoolId,
-        staleTime: 5 * 60 * 1000,
+    const [books, setBooks] = useState([]);
+    const [settings, setSettings] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [selectedCopy, setSelectedCopy] = useState(null);
+    const [copies, setCopies] = useState([]);
+
+    const [issueForm, setIssueForm] = useState({
+        copyId: "",
+        userId: "",
+        userType: "STUDENT",
+        dueDate: "",
     });
 
-    const { data: users, isLoading: usersLoading } = useQuery({
-        queryKey: ["users"],
-        queryFn: fetchUsers,
-        staleTime: 5 * 60 * 1000,
-    });
-    console.log(users);
-
-
-    const mutation = useMutation({
-        mutationFn: issueBook,
-        onSuccess: () => {
-            queryClient.invalidateQueries(["availableBooks"]);
-            queryClient.invalidateQueries(["history"]);
-            // toast({ title: "Book issued successfully" });
-            toast.success('Book Issued Successfully');
-            setOpenDialog(false);
-            setSelectedBook(null);
-            setSelectedUserId("");
-        },
-        onError: (error) => {
-            toast.error(`Failed To Issue Book  ${error.message}`);
-
-        },
+    const [returnForm, setReturnForm] = useState({
+        transactionId: "",
+        remarks: "",
     });
 
-    const handleOpenIssue = (book) => {
-        setSelectedBook(book);
-        setOpenDialog(true);
-        setIssueDate(new Date().toISOString().split("T")[0]);
-        setDueDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]);
-        setCharges(0);
-    };
-
-    const handleIssue = () => {
-        if (!selectedBook?.id || !selectedUserId) {
-            // toast({ title: "Please select a user", variant: "destructive" });
-            toast.error('Please Select A User');
-            return;
+    useEffect(() => {
+        if (schoolId) {
+            fetchData();
         }
+    }, [schoolId]);
 
-        const issuedAt = new Date(issueDate).toISOString();
-        const dueAt = new Date(dueDate).toISOString();
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const [booksRes, settingsRes] = await Promise.all([
+                axios.get(`/api/schools/${schoolId}/library/books`),
+                axios.get(`/api/schools/${schoolId}/library/settings`),
+            ]);
 
-        mutation.mutate({ bookId: selectedBook.id, issuedToId: selectedUserId, issuedAt, dueAt, fineAmount: charges, role: fullUser?.role.name });
+            setBooks(booksRes.data.data);
+            setSettings(settingsRes.data);
+        } catch (error) {
+            console.error("Failed to fetch data", error);
+            toast.error("Failed to load data");
+        } finally {
+            setLoading(false);
+        }
     };
-    const selectedUser = users?.find(user => user.id === selectedUserId);
-    return (
-        <div className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Admin Issue Book</h2>
 
-            <div className="overflow-x-auto rounded-lg border">
-                <Table className="min-w-full">
-                    <TableHeader>
-                        <TableRow className="bg-muted sticky top-0 z-10">
-                            <TableHead>#</TableHead>
-                            <TableHead>Title</TableHead>
-                            <TableHead>Author</TableHead>
-                            <TableHead>Category</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {booksLoading ? (
-                            Array(6).fill(0).map((_, index) => (
-                                <TableRow key={index}>
-                                    <TableCell><Skeleton className="h-6 w-6" /></TableCell>
-                                    <TableCell><Skeleton className="h-6 w-32" /></TableCell>
-                                    <TableCell><Skeleton className="h-6 w-32" /></TableCell>
-                                    <TableCell><Skeleton className="h-6 w-24" /></TableCell>
-                                    <TableCell><Skeleton className="h-6 w-32" /></TableCell>
-                                    <TableCell><Skeleton className="h-6 w-20" /></TableCell>
-                                </TableRow>
-                            ))
-                        ) : books?.length > 0 ? (
-                            books.map((book, index) => (
-                                <TableRow key={book.id} className={index % 2 === 0 ? "bg-muted" : "bg-background"}>
-                                    <TableCell >{index + 1}</TableCell>
-                                    <TableCell >{book.title}</TableCell>
-                                    <TableCell >{book.author}</TableCell>
-                                    <TableCell >{book.category}</TableCell>
-                                    <TableCell >
-                                        <span
-                                            className={`px-2 py-1 rounded-sm capitalize text-sm font-medium ${book.status === "available" ? "bg-green-100 text-green-800" :
-                                                book.status === "issued" ? "bg-yellow-100 text-yellow-800" :
-                                                    book.status === "reserved" ? "bg-blue-100 text-blue-800" :
-                                                        "bg-red-100 text-red-800"
-                                                }`}
-                                        >
-                                            {book.status}
-                                        </span>
-                                    </TableCell>
-                                    <TableCell >
-                                        {book.status === "available" && (
-                                            <Button size="sm" onClick={() => handleOpenIssue(book)}>
-                                                Issue
-                                            </Button>
-                                        )}
-                                    </TableCell>
-                                </TableRow>
-                            ))
-                        ) : (
-                            <TableRow>
-                                <TableCell colSpan={6} className="text-center py-4">No available books found.</TableCell>
-                            </TableRow>
-                        )}
-                    </TableBody>
-                </Table>
+    const fetchCopies = async (bookId) => {
+        try {
+            const res = await axios.get(
+                `/api/schools/${schoolId}/library/books/${bookId}/copies`
+            );
+            setCopies(res.data);
+        } catch (error) {
+            toast.error("Failed to fetch copies");
+        }
+    };
+
+    const handleIssueBook = async () => {
+        try {
+            await axios.post(`/api/schools/${schoolId}/library/transactions/issue`, issueForm);
+            toast.success("Book issued successfully");
+            fetchData();
+            setIssueForm({
+                copyId: "",
+                userId: "",
+                userType: "STUDENT",
+                dueDate: "",
+            });
+        } catch (error) {
+            toast.error(error.response?.data?.error || "Failed to issue book");
+        }
+    };
+
+    const handleReturnBook = async () => {
+        try {
+            const res = await axios.post(
+                `/api/schools/${schoolId}/library/transactions/return`,
+                returnForm
+            );
+
+            if (res.data.fineAmount > 0) {
+                toast.warning(`Book returned. Fine: ₹${res.data.fineAmount}`);
+            } else {
+                toast.success("Book returned successfully");
+            }
+
+            fetchData();
+            setReturnForm({ transactionId: "", remarks: "" });
+        } catch (error) {
+            toast.error(error.response?.data?.error || "Failed to return book");
+        }
+    };
+
+    const calculateDueDate = (userType) => {
+        if (!settings) return "";
+
+        const days =
+            userType === "STUDENT"
+                ? settings.issueDaysStudent
+                : settings.issueDaysTeacher;
+
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + days);
+        return dueDate.toISOString().split("T")[0];
+    };
+
+    useEffect(() => {
+        if (issueForm.userType && settings) {
+            setIssueForm({
+                ...issueForm,
+                dueDate: calculateDueDate(issueForm.userType),
+            });
+        }
+    }, [issueForm.userType, settings]);
+
+    if (!schoolId) {
+        return (
+            <div className="flex justify-center items-center h-96">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+        );
+    }
+
+    return (
+        <div className="p-6 space-y-6">
+            {/* Header */}
+            <div>
+                <h1 className="text-3xl font-bold tracking-tight">Issue & Return Books</h1>
+                <p className="text-muted-foreground mt-2">
+                    Manage book issues and returns with automatic fine calculation
+                </p>
             </div>
 
-            <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-                <DialogContent className="max-h-[80vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Issue Book: {selectedBook?.title}</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-2 flex flex-col">
-                        {/* Book details */}
-                        <div className="inline-flex gap-1 ">
-                            <Label>Author:</Label>
-                            <p className='border-b'>{selectedBook?.author}</p>
-                        </div>
-                        <div className="inline-flex gap-1 ">
-                            <Label>Category:</Label>
-                            <p className='border-b'>{selectedBook?.category}</p>
-                        </div>
-                        {/* User select */}
-                        <div>
-                            <Label htmlFor="user-select">Select User</Label>
-                            <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                                <SelectTrigger id="user-select" className='mt-2 w-full'>
-                                    <SelectValue placeholder="Choose a user" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {users?.length > 0 && users.map((user) => (
-                                        <SelectItem key={user.id} value={user.id}>
-                                            {user.name || user.email} ({user.role.name})
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            {usersLoading && <p>Loading users...</p>}
-                            {selectedUser && (
-                                <div className="space-y-2 mt-2 p-4 border rounded-md bg-muted/50">
-                                    <h3 className="font-semibold">User Profile</h3>
-                                    {/* <img src={selectedUser.profilePicture} className="w-32 h-32"/> */}
-                                    <div className="flex items-center justify-center">
-                                        <Avatar className='w-36 h-36'>
-                                            <AvatarImage src={selectedUser.profilePicture} />
-                                            <AvatarFallback>{selectedUser.name?.[0]}</AvatarFallback>
-                                        </Avatar>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2.5">
-                                        <div >
-                                            <p><strong>Name:</strong> {selectedUser.name || "Name Not Added"}</p>
-                                            <p><strong>Email:</strong> {selectedUser.email}</p>
+            <Separator />
 
-                                        </div>
+            {/* Settings Info */}
+            {settings && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg">Library Settings</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div>
+                                <p className="text-muted-foreground">Student Limit</p>
+                                <p className="font-semibold">{settings.maxBooksStudent} books</p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground">Teacher Limit</p>
+                                <p className="font-semibold">{settings.maxBooksTeacher} books</p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground">Student Duration</p>
+                                <p className="font-semibold">{settings.issueDaysStudent} days</p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground">Fine Per Day</p>
+                                <p className="font-semibold">₹{settings.finePerDay}</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
-                                        <div className="border-l pl-2.5">
-                                            <p><strong>Role:</strong> {selectedUser.role.name}</p>
-                                            {/* <p><strong>Adm No:</strong> {selectedUser.role.name}</p> */}
+            {/* Tabs */}
+            <Tabs defaultValue="issue" className="space-y-4">
+                <TabsList>
+                    <TabsTrigger value="issue">
+                        <BookPlus className="h-4 w-4 mr-2" />
+                        Issue Book
+                    </TabsTrigger>
+                    <TabsTrigger value="return">
+                        <BookMinus className="h-4 w-4 mr-2" />
+                        Return Book
+                    </TabsTrigger>
+                </TabsList>
+
+                {/* Issue Tab */}
+                <TabsContent value="issue" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Issue a Book</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <Label>Select Book</Label>
+                                    <Select
+                                        onValueChange={(value) => {
+                                            fetchCopies(value);
+                                            setIssueForm({ ...issueForm, copyId: "" });
+                                        }}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Choose a book" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {books
+                                                .filter((b) => b.availableCopies > 0)
+                                                .map((book) => (
+                                                    <SelectItem key={book.id} value={book.id}>
+                                                        {book.title} ({book.availableCopies} available)
+                                                    </SelectItem>
+                                                ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div>
+                                    <Label>Select Copy</Label>
+                                    <Select
+                                        value={issueForm.copyId}
+                                        onValueChange={(value) =>
+                                            setIssueForm({ ...issueForm, copyId: value })
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Choose a copy" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {copies
+                                                .filter((c) => c.status === "AVAILABLE")
+                                                .map((copy) => (
+                                                    <SelectItem key={copy.id} value={copy.id}>
+                                                        {copy.accessionNumber} - {copy.condition}
+                                                    </SelectItem>
+                                                ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div>
+                                    <Label>User Type</Label>
+                                    <Select
+                                        value={issueForm.userType}
+                                        onValueChange={(value) =>
+                                            setIssueForm({ ...issueForm, userType: value })
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="STUDENT">Student</SelectItem>
+                                            <SelectItem value="TEACHER">Teacher</SelectItem>
+                                            <SelectItem value="STAFF">Staff</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div>
+                                    <Label>User ID</Label>
+                                    <Input
+                                        value={issueForm.userId}
+                                        onChange={(e) =>
+                                            setIssueForm({ ...issueForm, userId: e.target.value })
+                                        }
+                                        placeholder="Enter user ID"
+                                    />
+                                </div>
+
+                                <div>
+                                    <Label>Due Date</Label>
+                                    <Input
+                                        type="date"
+                                        value={issueForm.dueDate}
+                                        onChange={(e) =>
+                                            setIssueForm({ ...issueForm, dueDate: e.target.value })
+                                        }
+                                    />
+                                </div>
+                            </div>
+
+                            <Button onClick={handleIssueBook} className="mt-6 w-full">
+                                <BookPlus className="h-4 w-4 mr-2" />
+                                Issue Book
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* Return Tab */}
+                <TabsContent value="return" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Return a Book</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                <div>
+                                    <Label>Transaction ID</Label>
+                                    <Input
+                                        value={returnForm.transactionId}
+                                        onChange={(e) =>
+                                            setReturnForm({ ...returnForm, transactionId: e.target.value })
+                                        }
+                                        placeholder="Enter transaction ID"
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        The transaction ID is provided when a book is issued
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <Label>Remarks (Optional)</Label>
+                                    <Input
+                                        value={returnForm.remarks}
+                                        onChange={(e) =>
+                                            setReturnForm({ ...returnForm, remarks: e.target.value })
+                                        }
+                                        placeholder="Any notes about the return"
+                                    />
+                                </div>
+
+                                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                    <div className="flex items-start gap-2">
+                                        <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                                        <div className="text-sm">
+                                            <p className="font-medium text-yellow-900">Automatic Fine Calculation</p>
+                                            <p className="text-yellow-700 mt-1">
+                                                If the book is returned after the due date, a fine of ₹
+                                                {settings?.finePerDay || 5} per day will be automatically calculated.
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
-                            )}
-                        </div>
-                        {/* Issue date */}
-                        <div>
-                            <Label htmlFor="issue-date">Issue Date</Label>
-                            <Input
-                                id="issue-date"
-                                type="date"
-                                value={issueDate}
-                                className='mt-2'
-                                onChange={(e) => setIssueDate(e.target.value)}
-                            />
-                        </div>
-                        {/* Due date */}
-                        <div>
-                            <Label htmlFor="due-date">Return Date</Label>
-                            <Input
-                                id="due-date"
-                                type="date"
-                                value={dueDate}
-                                className='mt-2'
-                                onChange={(e) => setDueDate(e.target.value)}
-                            />
-                        </div>
-                        {/* Charges */}
-                        <div>
-                            <Label htmlFor="charges">Initial Charges/Fines ₹</Label>
-                            <Input
-                                id="charges"
-                                type="number"
-                                step="0.01"
-                                value={charges} className='mt-2'
-                                onChange={(e) => setCharges(parseFloat(e.target.value))}
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button onClick={handleIssue} className={'w-full'} disabled={mutation.isPending}>
-                            {mutation.isPending ? "Issuing..." : "Issue Book"}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
 
+                                <Button onClick={handleReturnBook} className="w-full">
+                                    <BookMinus className="h-4 w-4 mr-2" />
+                                    Return Book
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }

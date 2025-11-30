@@ -1,433 +1,570 @@
-'use client';
-export const dynamic = 'force-dynamic';
+"use client";
 
-
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import axios from "axios";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
+import {
+    Loader2,
+    Package,
+    TrendingUp,
+    AlertTriangle,
+    ShoppingCart,
+    Plus,
+    Search,
+    DollarSign,
+} from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 
-export default function InventoryItemsTable() {
+export default function InventoryManagementPage() {
     const { fullUser } = useAuth();
-    const queryClient = useQueryClient();
+    const schoolId = fullUser?.schoolId;
 
-    const [selectedItem, setSelectedItem] = useState(null);
-    const [drawerMode, setDrawerMode] = useState(null);
-    const [formData, setFormData] = useState({});
-    const [formError, setFormError] = useState('');
-    const [transactions, setTransactions] = useState([]);
-    const [txLoading, setTxLoading] = useState(false);
+    const [stats, setStats] = useState(null);
+    const [items, setItems] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [sales, setSales] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [selectedCategory, setSelectedCategory] = useState("");
+    const [isAddItemOpen, setIsAddItemOpen] = useState(false);
+    const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
+    const [isSaleDialogOpen, setIsSaleDialogOpen] = useState(false);
 
-    // Fetch Inventory Items
-    const { data: items = [], isLoading: loading } = useQuery({
-        queryKey: ['inventory-items', fullUser?.schoolId],
-        queryFn: async () => {
-            const res = await axios.get(`/api/schools/inventory/inventory-items?schoolId=${fullUser.schoolId}`);
-            return res.data;
-        },
-        enabled: !!fullUser?.schoolId,
-        staleTime: 0, // notices are often dynamic, no caching
-        refetchOnWindowFocus: false,
+    const [itemForm, setItemForm] = useState({
+        name: "",
+        categoryId: "",
+        quantity: 0,
+        unit: "",
+        purchaseDate: new Date().toISOString().split("T")[0],
+        costPerUnit: 0,
+        sellingPrice: 0,
+        isSellable: false,
+        vendorName: "",
+        vendorContact: "",
+        location: "",
+        status: "IN_STOCK",
     });
 
-    // Fetch Transactions for selected item
-    const fetchTransactions = async (itemId) => {
-        setTxLoading(true);
+    const [categoryForm, setCategoryForm] = useState({
+        name: "",
+        description: "",
+    });
+
+    const [saleForm, setSaleForm] = useState({
+        buyerName: "",
+        buyerType: "STUDENT",
+        items: [],
+        paymentMethod: "CASH",
+    });
+
+    useEffect(() => {
+        if (schoolId) {
+            fetchData();
+        }
+    }, [schoolId]);
+
+    const fetchData = async () => {
+        setLoading(true);
         try {
-            const res = await axios.get(`/api/schools/inventory/transactions?itemId=${itemId}`);
-            setTransactions(res.data);
-        } catch (err) {
-            console.error(err);
+            const [statsRes, itemsRes, categoriesRes, salesRes] = await Promise.all([
+                axios.get(`/api/schools/${schoolId}/inventory/stats`),
+                axios.get(`/api/schools/${schoolId}/inventory/items`),
+                axios.get(`/api/schools/${schoolId}/inventory/categories`),
+                axios.get(`/api/schools/${schoolId}/inventory/sales`),
+            ]);
+
+            setStats(statsRes.data);
+            setItems(itemsRes.data);
+            setCategories(categoriesRes.data);
+            setSales(salesRes.data);
+        } catch (error) {
+            console.error("Failed to fetch inventory data", error);
+            toast.error("Failed to load inventory data");
         } finally {
-            setTxLoading(false);
+            setLoading(false);
         }
     };
 
-    const handleAdd = () => {
-        setDrawerMode('add');
-        setSelectedItem(null);
-        setFormData({
-            name: '',
-            category: '',
-            description: '',
+    const handleAddItem = async () => {
+        try {
+            await axios.post(`/api/schools/${schoolId}/inventory/items`, itemForm);
+            toast.success("Item added successfully");
+            setIsAddItemOpen(false);
+            fetchData();
+            resetItemForm();
+        } catch (error) {
+            toast.error("Failed to add item");
+        }
+    };
+
+    const handleAddCategory = async () => {
+        try {
+            await axios.post(`/api/schools/${schoolId}/inventory/categories`, categoryForm);
+            toast.success("Category added successfully");
+            setIsAddCategoryOpen(false);
+            fetchData();
+            setCategoryForm({ name: "", description: "" });
+        } catch (error) {
+            toast.error("Failed to add category");
+        }
+    };
+
+    const handleCreateSale = async () => {
+        try {
+            await axios.post(`/api/schools/${schoolId}/inventory/sales`, saleForm);
+            toast.success("Sale recorded successfully");
+            setIsSaleDialogOpen(false);
+            fetchData();
+            setSaleForm({ buyerName: "", buyerType: "STUDENT", items: [], paymentMethod: "CASH" });
+        } catch (error) {
+            toast.error(error.response?.data?.error || "Failed to record sale");
+        }
+    };
+
+    const resetItemForm = () => {
+        setItemForm({
+            name: "",
+            categoryId: "",
             quantity: 0,
-            minimumQuantity: 0,
-            maximumQuantity: 0,
-            unit: '',
+            unit: "",
+            purchaseDate: new Date().toISOString().split("T")[0],
             costPerUnit: 0,
-            vendorName: '',
-            vendorContact: '',
-            warrantyPeriod: '',
-            location: '',
-            status: 'ACTIVE',
-            barcode: '',
-            notes: '',
+            sellingPrice: 0,
+            isSellable: false,
+            vendorName: "",
+            vendorContact: "",
+            location: "",
+            status: "IN_STOCK",
         });
     };
 
-    const handleEdit = (item) => {
-        setDrawerMode('edit');
-        setSelectedItem(item);
-        setFormData({ ...item });
-        fetchTransactions(item.id);
-    };
-
-    // Mutation for add/edit
-    const saveItemMutation = useMutation({
-        mutationFn: async (data) => {
-            if (drawerMode === 'add') {
-                return axios.post('/api/schools/inventory/inventory-items', { ...data, schoolId: fullUser.schoolId }).then(res => res.data);
-            } else {
-                return axios.put('/api/schools/inventory/inventory-items', { id: selectedItem.id, ...data }).then(res => res.data);
-            }
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries(['inventory-items', fullUser?.schoolId]);
-            setDrawerMode(null);
-        },
-        onError: (err) => {
-            setFormError('An error occurred while saving the item.');
-            console.error(err);
-        }
+    const filteredItems = items.filter((item) => {
+        const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCategory = !selectedCategory || item.categoryId === selectedCategory;
+        return matchesSearch && matchesCategory;
     });
 
-    const handleSubmit = () => {
-        if (!formData.name || !formData.category || !formData.unit || !formData.vendorName || !formData.vendorContact || !formData.location || !formData.status) {
-            setFormError('Please fill in all required fields.');
-            return;
-        }
-        setFormError('');
-        const data = {
-            ...formData,
-            quantity: parseInt(formData.quantity),
-            minimumQuantity: parseInt(formData.minimumQuantity),
-            maximumQuantity: parseInt(formData.maximumQuantity),
-            costPerUnit: parseFloat(formData.costPerUnit),
-        };
-        saveItemMutation.mutate(data);
-    };
-
-    // Mutation for delete
-    const deleteItemMutation = useMutation({
-        mutationFn: async (id) => axios.delete('/api/schools/inventory/inventory-items', { data: { id } }),
-        onSuccess: () => queryClient.invalidateQueries(['inventory-items', fullUser?.schoolId]),
-    });
-
-    const handleDelete = (id) => {
-        if (!confirm('Are you sure you want to delete this item?')) return;
-        deleteItemMutation.mutate(id);
-    };
-
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData({ ...formData, [name]: value });
-    };
-
-    const handleSelectChange = (name, value) => {
-        setFormData({ ...formData, [name]: value });
-    };
-
+    if (!schoolId) {
+        return (
+            <div className="flex justify-center items-center h-96">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+        );
+    }
 
     return (
-        <div className="p-6">
-            {/* <h2 className="text-lg font-semibold mb-4">Inventory Items Overview</h2> */}
-            <Button onClick={handleAdd} className="mb-4">Add Item</Button>
-            <div className="overflow-x-auto rounded-lg border">
-                <Table className="min-w-[800px]">
-                    <TableHeader>
-                        <TableRow className="bg-muted sticky top-0 z-10">
-                            <TableHead>#</TableHead>
-                            <TableHead>Name</TableHead>
-                            <TableHead>Category</TableHead>
-                            <TableHead>Quantity</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {loading ? (
-                            Array(6).fill(0).map((_, index) => (
-                                <TableRow key={index}>
-                                    <TableCell><Skeleton className="h-6 w-6" /></TableCell>
-                                    <TableCell><Skeleton className="h-6 w-32" /></TableCell>
-                                    <TableCell><Skeleton className="h-6 w-32" /></TableCell>
-                                    <TableCell><Skeleton className="h-6 w-24" /></TableCell>
-                                    <TableCell><Skeleton className="h-6 w-32" /></TableCell>
-                                    <TableCell><Skeleton className="h-6 w-20" /></TableCell>
-                                </TableRow>
-                            ))
-                        ) : items.length > 0 ? (
-                            items.map((item, index) => (
-                                <TableRow key={item.id} className={index % 2 === 0 ? "bg-muted" : "bg-background"}>
-                                    <TableCell>{index + 1}</TableCell>
-                                    <TableCell>{item.name}</TableCell>
-                                    <TableCell>{item.category}</TableCell>
-                                    <TableCell>{item.quantity}</TableCell>
-                                    <TableCell>
-                                        <span
-                                            className={`px-2 py-1 rounded-sm text-sm font-medium ${item.status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
-                                                item.status === 'UNDER_REPAIR' ? 'bg-yellow-100 text-yellow-800' :
-                                                    'bg-red-100 text-red-800'
-                                                }`}
-                                        >
-                                            {item.status}
-                                        </span>
-                                    </TableCell>
-                                    <TableCell className='flex flex-row gap-2 '>
-                                        <Dialog>
-                                            <DialogTrigger asChild>
-                                                <Button size="sm" variant="outline" onClick={() => setSelectedItem(item)}>
-                                                    View Transactions
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent className="max-w-3xl">
-                                                <DialogHeader>
-                                                    <DialogTitle>Transactions - {selectedItem?.name}</DialogTitle>
-                                                </DialogHeader>
-                                                {txLoading ? (
-                                                    <p className="text-center py-4">Loading transactions...</p>
-                                                ) : transactions.length > 0 ? (
-                                                    <div className="overflow-x-auto rounded-lg border">
-                                                        <Table>
-                                                            <TableHeader>
-                                                                <TableRow className="bg-muted">
-                                                                    <TableHead>Type</TableHead>
-                                                                    <TableHead>Quantity</TableHead>
-                                                                    <TableHead>Date</TableHead>
-                                                                    <TableHead>Issued To</TableHead>
-                                                                    <TableHead>Handled By</TableHead>
-                                                                    <TableHead>Remarks</TableHead>
-                                                                    <TableHead>Status</TableHead>
-                                                                </TableRow>
-                                                            </TableHeader>
-                                                            <TableBody>
-                                                                {transactions.map((tx, idx) => (
-                                                                    <TableRow key={tx.id} className={idx % 2 === 0 ? "bg-muted" : "bg-background"}>
-                                                                        <TableCell>{tx.transactionType}</TableCell>
-                                                                        <TableCell>{tx.quantity}</TableCell>
-                                                                        <TableCell>{new Date(tx.date).toLocaleDateString()}</TableCell>
-                                                                        <TableCell>{tx.issuedToName || 'N/A'}</TableCell>
-                                                                        <TableCell>{tx.handledByName}</TableCell>
-                                                                        <TableCell>{tx.remarks || 'N/A'}</TableCell>
-                                                                        <TableCell>
-                                                                            <span
-                                                                                className={`px-2 py-1 rounded-sm text-sm font-medium ${tx.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                                                                                    tx.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                                                                                        'bg-red-100 text-red-800'
-                                                                                    }`}
-                                                                            >
-                                                                                {tx.status}
-                                                                            </span>
-                                                                        </TableCell>
-                                                                    </TableRow>
-                                                                ))}
-                                                            </TableBody>
-                                                        </Table>
-                                                    </div>
-                                                ) : (
-                                                    <p className="text-center py-4">No transactions found.</p>
-                                                )}
-                                            </DialogContent>
-                                        </Dialog>
-                                        <Button size="sm" variant="outline" onClick={() => handleEdit(item)}>
-                                            Edit
-                                        </Button>
-                                        <Button size="sm" variant="destructive" onClick={() => handleDelete(item.id)}>
-                                            Delete
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))
-                        ) : (
-                            <TableRow>
-                                <TableCell colSpan={6} className="text-center py-4">No items found.</TableCell>
-                            </TableRow>
-                        )}
-                    </TableBody>
-                </Table>
+        <div className="p-6 space-y-6">
+            {/* Header */}
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Inventory Management</h1>
+                    <p className="text-muted-foreground mt-2">
+                        Manage inventory items, track sales, and monitor stock levels
+                    </p>
+                </div>
+                <div className="flex gap-2">
+                    <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant="outline">
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Category
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Add New Category</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label>Category Name</Label>
+                                    <Input
+                                        value={categoryForm.name}
+                                        onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
+                                        placeholder="e.g., Uniforms, Stationery"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Description</Label>
+                                    <Input
+                                        value={categoryForm.description}
+                                        onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
+                                        placeholder="Optional description"
+                                    />
+                                </div>
+                                <Button onClick={handleAddCategory} className="w-full">
+                                    Add Category
+                                </Button>
+                            </div>
+                        </DialogContent>
+                    </Dialog>
+                    <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
+                        <DialogTrigger asChild>
+                            <Button>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Item
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                            <DialogHeader>
+                                <DialogTitle>Add New Inventory Item</DialogTitle>
+                            </DialogHeader>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label>Item Name *</Label>
+                                    <Input
+                                        value={itemForm.name}
+                                        onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Category</Label>
+                                    <Select
+                                        value={itemForm.categoryId}
+                                        onValueChange={(value) => setItemForm({ ...itemForm, categoryId: value })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select category (optional)" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {categories.length === 0 ? (
+                                                <div className="p-2 text-sm text-muted-foreground">
+                                                    No categories yet. Add one using "Add Category" button.
+                                                </div>
+                                            ) : (
+                                                categories.map((cat) => (
+                                                    <SelectItem key={cat.id} value={cat.id}>
+                                                        {cat.name}
+                                                    </SelectItem>
+                                                ))
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                    {categories.length === 0 && (
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            Tip: Create categories first for better organization
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Quantity *</Label>
+                                    <Input
+                                        type="number"
+                                        value={itemForm.quantity}
+                                        onChange={(e) => setItemForm({ ...itemForm, quantity: parseInt(e.target.value) })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Unit *</Label>
+                                    <Input
+                                        value={itemForm.unit}
+                                        onChange={(e) => setItemForm({ ...itemForm, unit: e.target.value })}
+                                        placeholder="e.g., pcs, kg, liters"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Purchase Date</Label>
+                                    <Input
+                                        type="date"
+                                        value={itemForm.purchaseDate}
+                                        onChange={(e) => setItemForm({ ...itemForm, purchaseDate: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Cost Per Unit *</Label>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        value={itemForm.costPerUnit}
+                                        onChange={(e) => setItemForm({ ...itemForm, costPerUnit: parseFloat(e.target.value) })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Selling Price</Label>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        value={itemForm.sellingPrice}
+                                        onChange={(e) => setItemForm({ ...itemForm, sellingPrice: parseFloat(e.target.value) })}
+                                    />
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        type="checkbox"
+                                        checked={itemForm.isSellable}
+                                        onChange={(e) => setItemForm({ ...itemForm, isSellable: e.target.checked })}
+                                        className="h-4 w-4"
+                                    />
+                                    <Label>Is Sellable</Label>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Vendor Name *</Label>
+                                    <Input
+                                        value={itemForm.vendorName}
+                                        onChange={(e) => setItemForm({ ...itemForm, vendorName: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Vendor Contact *</Label>
+                                    <Input
+                                        value={itemForm.vendorContact}
+                                        onChange={(e) => setItemForm({ ...itemForm, vendorContact: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Location *</Label>
+                                    <Input
+                                        value={itemForm.location}
+                                        onChange={(e) => setItemForm({ ...itemForm, location: e.target.value })}
+                                        placeholder="Storage location"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Status</Label>
+                                    <Select
+                                        value={itemForm.status}
+                                        onValueChange={(value) => setItemForm({ ...itemForm, status: value })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="IN_STOCK">In Stock</SelectItem>
+                                            <SelectItem value="LOW_STOCK">Low Stock</SelectItem>
+                                            <SelectItem value="OUT_OF_STOCK">Out of Stock</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                            <Button onClick={handleAddItem} className="w-full mt-4">
+                                Add Item
+                            </Button>
+                        </DialogContent>
+                    </Dialog>
+                </div>
             </div>
 
-            <Drawer open={!!drawerMode} onOpenChange={() => setDrawerMode(null)} direction="right">
-                <DrawerContent className="w-[400px] flex flex-col h-full">
-                    <DrawerHeader>
-                        <DrawerTitle>{drawerMode === 'add' ? 'Add Item' : 'Edit Item'}</DrawerTitle>
-                    </DrawerHeader>
-                    <div className="p-4 flex-1 overflow-y-auto">
-                        {formError && <p className="text-red-500 mb-4">{formError}</p>}
-                        <div className="space-y-4">
-                            <div>
-                                <Label htmlFor="name" className='mb-2 text-muted-foreground' >Name*</Label>
-                                <Input
-                                    id="name"
-                                    name="name"
-                                    value={formData.name || ''}
-                                    onChange={handleChange}
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="category" className='mb-2 text-muted-foreground' >Category*</Label>
-                                <Input
-                                    id="category"
-                                    name="category"
-                                    value={formData.category || ''}
-                                    onChange={handleChange}
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="description" className='mb-2 text-muted-foreground' >Description</Label>
-                                <Input
-                                    id="description"
-                                    name="description"
-                                    value={formData.description || ''}
-                                    onChange={handleChange}
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="quantity" className='mb-2 text-muted-foreground' >Quantity*</Label>
-                                <Input
-                                    type="number"
-                                    id="quantity"
-                                    name="quantity"
-                                    value={formData.quantity || 0}
-                                    onChange={handleChange}
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="minimumQuantity" className='mb-2 text-muted-foreground' >Min Quantity*</Label>
-                                <Input
-                                    type="number"
-                                    id="minimumQuantity"
-                                    name="minimumQuantity"
-                                    value={formData.minimumQuantity || 0}
-                                    onChange={handleChange}
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="maximumQuantity" className='mb-2 text-muted-foreground' >Max Quantity*</Label>
-                                <Input
-                                    type="number"
-                                    id="maximumQuantity"
-                                    name="maximumQuantity"
-                                    value={formData.maximumQuantity || 0}
-                                    onChange={handleChange}
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="unit" className='mb-2 text-muted-foreground' >Unit*</Label>
-                                <Input
-                                    id="unit"
-                                    name="unit"
-                                    value={formData.unit || ''}
-                                    onChange={handleChange}
-                                />
-                            </div>
-                            <div>
-                                {/* <Label htmlFor="purchaseDate" className='mb-2 text-muted-foreground' >Purchase Date*</Label>
-                                <Input
-                                    type="date"
-                                    id="purchaseDate"
-                                    name="purchaseDate"
-                                    value={formData.purchaseDate || ''}
-                                    onChange={handleChange}
-                                /> */}
-                            </div>
-                            <div>
-                                <Label htmlFor="costPerUnit" className='mb-2 text-muted-foreground' >Cost Per Unit*</Label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    id="costPerUnit"
-                                    name="costPerUnit"
-                                    value={formData.costPerUnit || 0.0}
-                                    onChange={handleChange}
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="vendorName" className='mb-2 text-muted-foreground' >Vendor Name*</Label>
-                                <Input
-                                    id="vendorName"
-                                    name="vendorName"
-                                    value={formData.vendorName || ''}
-                                    onChange={handleChange}
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="vendorContact" className='mb-2 text-muted-foreground' >Vendor Contact*</Label>
-                                <Input
-                                    id="vendorContact"
-                                    name="vendorContact"
-                                    value={formData.vendorContact || ''}
-                                    onChange={handleChange}
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="warrantyPeriod" className='mb-2 text-muted-foreground' >Warranty Period</Label>
-                                <Input
-                                    id="warrantyPeriod"
-                                    name="warrantyPeriod"
-                                    value={formData.warrantyPeriod || ''}
-                                    onChange={handleChange}
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="location" className='mb-2 text-muted-foreground' >Location*</Label>
-                                <Input
-                                    id="location"
-                                    name="location"
-                                    value={formData.location || ''}
-                                    onChange={handleChange}
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="status" className='mb-2 text-muted-foreground' >Status*</Label>
-                                <Select
-                                    value={formData.status || 'ACTIVE'}
-                                    onValueChange={(val) => handleSelectChange('status', val)}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
+            <Separator />
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium">Total Items</CardTitle>
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{stats?.totalItems || 0}</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium">Low Stock Alerts</CardTitle>
+                        <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-yellow-600">{stats?.lowStockItems || 0}</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+                        <DollarSign className="h-4 w-4 text-green-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">₹{stats?.totalRevenue?.toFixed(2) || 0}</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium">Total Profit</CardTitle>
+                        <TrendingUp className="h-4 w-4 text-blue-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-blue-600">₹{stats?.totalProfit?.toFixed(2) || 0}</div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Tabs */}
+            <Tabs defaultValue="items" className="space-y-4">
+                <TabsList>
+                    <TabsTrigger value="items">Items</TabsTrigger>
+                    <TabsTrigger value="sales">Sales</TabsTrigger>
+                    <TabsTrigger value="categories">Categories</TabsTrigger>
+                </TabsList>
+
+                {/* Items Tab */}
+                <TabsContent value="items" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Inventory Items</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex gap-4 mb-4">
+                                <div className="flex-1">
+                                    <Input
+                                        placeholder="Search items..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                    />
+                                </div>
+                                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                                    <SelectTrigger className="w-[200px]">
+                                        <SelectValue placeholder="All Categories" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="ACTIVE">Active</SelectItem>
-                                        <SelectItem value="UNDER_REPAIR">Under Repair</SelectItem>
-                                        <SelectItem value="DISPOSED">Disposed</SelectItem>
+                                        <SelectItem value="all">All Categories</SelectItem>
+                                        {categories.map((cat) => (
+                                            <SelectItem key={cat.id} value={cat.id}>
+                                                {cat.name}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div>
-                                <Label htmlFor="barcode" className='mb-2 text-muted-foreground' >Barcode</Label>
-                                <Input
-                                    id="barcode"
-                                    name="barcode"
-                                    value={formData.barcode || ''}
-                                    onChange={handleChange}
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="notes" className='mb-2 text-muted-foreground' >Notes</Label>
-                                <Input
-                                    id="notes"
-                                    name="notes"
-                                    value={formData.notes || ''}
-                                    onChange={handleChange}
-                                />
-                            </div>
-                        </div>
-                        <Button onClick={handleSubmit} className="mt-6 w-full">
-                            Save
-                        </Button>
-                    </div>
-                </DrawerContent>
-            </Drawer>
 
+                            {loading ? (
+                                <div className="flex justify-center p-8">
+                                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                                </div>
+                            ) : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Name</TableHead>
+                                            <TableHead>Category</TableHead>
+                                            <TableHead>Quantity</TableHead>
+                                            <TableHead>Cost</TableHead>
+                                            <TableHead>Selling Price</TableHead>
+                                            <TableHead>Status</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {filteredItems.map((item) => (
+                                            <TableRow key={item.id}>
+                                                <TableCell className="font-medium">{item.name}</TableCell>
+                                                <TableCell>
+                                                    {categories.find((c) => c.id === item.categoryId)?.name || item.category}
+                                                </TableCell>
+                                                <TableCell>{item.quantity} {item.unit}</TableCell>
+                                                <TableCell>₹{item.costPerUnit}</TableCell>
+                                                <TableCell>₹{item.sellingPrice || "-"}</TableCell>
+                                                <TableCell>
+                                                    <span
+                                                        className={`px-2 py-1 rounded-full text-xs ${item.quantity <= 5
+                                                            ? "bg-red-100 text-red-800"
+                                                            : "bg-green-100 text-green-800"
+                                                            }`}
+                                                    >
+                                                        {item.quantity <= 5 ? "Low Stock" : "In Stock"}
+                                                    </span>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* Sales Tab */}
+                <TabsContent value="sales" className="space-y-4">
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <CardTitle>Sales History</CardTitle>
+                            <Button onClick={() => setIsSaleDialogOpen(true)}>
+                                <ShoppingCart className="h-4 w-4 mr-2" />
+                                New Sale
+                            </Button>
+                        </CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Buyer</TableHead>
+                                        <TableHead>Type</TableHead>
+                                        <TableHead>Amount</TableHead>
+                                        <TableHead>Payment</TableHead>
+                                        <TableHead>Status</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {sales.map((sale) => (
+                                        <TableRow key={sale.id}>
+                                            <TableCell>{new Date(sale.saleDate).toLocaleDateString()}</TableCell>
+                                            <TableCell>{sale.buyerName}</TableCell>
+                                            <TableCell>{sale.buyerType}</TableCell>
+                                            <TableCell>₹{sale.totalAmount.toFixed(2)}</TableCell>
+                                            <TableCell>{sale.paymentMethod}</TableCell>
+                                            <TableCell>
+                                                <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                                                    {sale.status}
+                                                </span>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* Categories Tab */}
+                <TabsContent value="categories" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Inventory Categories</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {categories.map((category) => (
+                                    <Card key={category.id}>
+                                        <CardHeader>
+                                            <CardTitle className="text-lg">{category.name}</CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <p className="text-sm text-muted-foreground">{category.description}</p>
+                                            <p className="text-sm font-medium mt-2">
+                                                {category._count?.items || 0} items
+                                            </p>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }

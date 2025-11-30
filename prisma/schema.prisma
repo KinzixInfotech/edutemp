@@ -32,6 +32,7 @@ model School {
   galleries              Gallery[]
   InventoryItem          InventoryItem[]
   libraryBooks           LibraryBook[]
+
   MasterAdmin            MasterAdmin?
   NonTeachingStaff       NonTeachingStaff[]
   Notice                 Notice[]
@@ -78,6 +79,8 @@ model School {
   mediaLibraries          MediaLibrary[]
   teacherShifts           TeacherShift[]
   alumni                  Alumni[]
+  inventoryCategories     InventoryCategory[]
+  inventorySales          InventorySale[]
 
   @@index([name])
 }
@@ -689,10 +692,11 @@ model Assignment {
 }
 
 model InventoryItem {
-  id              String                 @id @default(uuid())
+  id              String   @id @default(uuid())
   name            String
-  category        String
-  schoolId        String                 @db.Uuid
+  category        String? // Optional for backward compatibility, prefer categoryId
+  categoryId      String?  @db.Uuid
+  schoolId        String   @db.Uuid
   description     String?
   quantity        Int
   minimumQuantity Int
@@ -700,6 +704,8 @@ model InventoryItem {
   unit            String
   purchaseDate    DateTime
   costPerUnit     Float
+  sellingPrice    Float?   @default(0)
+  isSellable      Boolean  @default(false)
   vendorName      String
   vendorContact   String
   warrantyPeriod  String?
@@ -707,9 +713,57 @@ model InventoryItem {
   status          String
   barcode         String?
   notes           String?
-  School          School                 @relation(fields: [schoolId], references: [id])
-  transactions    InventoryTransaction[]
-  purchaseOrders  PurchaseOrderItem[]
+
+  School            School                 @relation(fields: [schoolId], references: [id])
+  InventoryCategory InventoryCategory?     @relation(fields: [categoryId], references: [id])
+  transactions      InventoryTransaction[]
+  purchaseOrders    PurchaseOrderItem[]
+  saleItems         InventorySaleItem[]
+}
+
+model InventoryCategory {
+  id          String   @id @default(uuid()) @db.Uuid
+  schoolId    String   @db.Uuid
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  items  InventoryItem[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+}
+
+model InventorySale {
+  id            String   @id @default(uuid()) @db.Uuid
+  schoolId      String   @db.Uuid
+  buyerName     String
+  buyerId       String?  @db.Uuid // Optional link to User/Student
+  buyerType     String? // STUDENT, STAFF, EXTERNAL
+  totalAmount   Float
+  paymentMethod String // CASH, ONLINE, ETC
+  status        String // COMPLETED, REFUNDED
+  saleDate      DateTime @default(now())
+
+  school School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  items  InventorySaleItem[]
+
+  @@index([schoolId])
+  @@index([saleDate])
+}
+
+model InventorySaleItem {
+  id         String @id @default(uuid()) @db.Uuid
+  saleId     String @db.Uuid
+  itemId     String
+  quantity   Int
+  unitPrice  Float
+  totalPrice Float
+
+  sale InventorySale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  item InventoryItem @relation(fields: [itemId], references: [id])
 }
 
 model Syllabus {
@@ -922,8 +976,6 @@ model User {
 
   AuditLog              AuditLog[]
   Document              Document[]
-  issuedBooks           LibraryBook[]          @relation("IssuedBooks")
-  reservedBooks         LibraryBook[]          @relation("ReservedBooks")
   MasterAdmin           MasterAdmin?
   nonTeachingStaff      NonTeachingStaff?
   Notice                Notice[]
@@ -2322,30 +2374,86 @@ model Notification {
 }
 
 model LibraryBook {
-  schoolId     String    @db.Uuid
-  title        String
-  author       String
-  ISBN         String
-  category     String
-  createdAt    DateTime  @default(now())
-  dueAt        DateTime?
-  edition      String?
-  fineAmount   Float?
-  issuedAt     DateTime?
-  issuedToId   String?   @db.Uuid
-  publisher    String
-  reservedAt   DateTime?
-  reservedById String?   @db.Uuid
-  status       String
-  updatedAt    DateTime  @updatedAt
-  id           String    @id @default(uuid()) @db.Uuid
-  issuedTo     User?     @relation("IssuedBooks", fields: [issuedToId], references: [id])
-  reservedBy   User?     @relation("ReservedBooks", fields: [reservedById], references: [id])
-  school       School    @relation(fields: [schoolId], references: [id])
+  id          String  @id @default(uuid()) @db.Uuid
+  schoolId    String  @db.Uuid
+  title       String
+  author      String
+  ISBN        String
+  category    String
+  publisher   String
+  edition     String?
+  description String?
+  coverImage  String?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school School            @relation(fields: [schoolId], references: [id])
+  copies LibraryBookCopy[]
 
   @@index([schoolId])
-  @@index([status])
   @@index([ISBN])
+  @@index([title])
+  @@index([author])
+}
+
+model LibraryBookCopy {
+  id              String  @id @default(uuid()) @db.Uuid
+  bookId          String  @db.Uuid
+  accessionNumber String // Unique ID for the physical copy
+  status          String  @default("AVAILABLE") // AVAILABLE, ISSUED, LOST, DAMAGED, RESERVED
+  condition       String  @default("GOOD") // NEW, GOOD, FAIR, POOR
+  location        String? // Shelf number etc.
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  book         LibraryBook          @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  transactions LibraryTransaction[]
+
+  @@unique([bookId, accessionNumber])
+  @@index([status])
+}
+
+model LibraryTransaction {
+  id       String @id @default(uuid()) @db.Uuid
+  copyId   String @db.Uuid
+  userId   String @db.Uuid // Student or Staff ID
+  userType String // STUDENT, TEACHER, STAFF
+
+  issueDate  DateTime  @default(now())
+  dueDate    DateTime
+  returnDate DateTime?
+
+  status String @default("ISSUED") // ISSUED, RETURNED, OVERDUE, LOST
+
+  fineAmount Float   @default(0)
+  finePaid   Boolean @default(false)
+  remarks    String?
+
+  copy LibraryBookCopy @relation(fields: [copyId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model LibrarySettings {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @unique @db.Uuid
+
+  maxBooksStudent Int @default(3)
+  maxBooksTeacher Int @default(5)
+
+  issueDaysStudent Int @default(14)
+  issueDaysTeacher Int @default(30)
+
+  finePerDay Float  @default(5)
+  currency   String @default("INR")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Upload {

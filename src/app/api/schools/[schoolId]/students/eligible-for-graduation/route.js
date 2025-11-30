@@ -23,7 +23,6 @@ export async function GET(req, { params }) {
                 ]
             })
         };
-
         const students = await prisma.student.findMany({
             where,
             include: {
