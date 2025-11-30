@@ -40,8 +40,12 @@ import {
     Plus,
     Search,
     Copy,
+    BookMarked,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+
+import Link from "next/link";
 
 export default function LibraryManagementPage() {
     const { fullUser } = useAuth();
@@ -50,11 +54,15 @@ export default function LibraryManagementPage() {
     const [stats, setStats] = useState(null);
     const [books, setBooks] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [categoryFilter, setCategoryFilter] = useState("");
     const [isAddBookOpen, setIsAddBookOpen] = useState(false);
     const [isAddCopiesOpen, setIsAddCopiesOpen] = useState(false);
     const [selectedBook, setSelectedBook] = useState(null);
+    const [isRequestBookOpen, setIsRequestBookOpen] = useState(false);
+    const [requestRemarks, setRequestRemarks] = useState("");
+    const [requestingBook, setRequestingBook] = useState(false);
 
     const [bookForm, setBookForm] = useState({
         title: "",
@@ -99,6 +107,7 @@ export default function LibraryManagementPage() {
     };
 
     const handleAddBook = async () => {
+        setSubmitting(true);
         try {
             await axios.post(`/api/schools/${schoolId}/library/books`, bookForm);
             toast.success("Book added successfully");
@@ -107,6 +116,8 @@ export default function LibraryManagementPage() {
             resetBookForm();
         } catch (error) {
             toast.error(error.response?.data?.error || "Failed to add book");
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -127,6 +138,28 @@ export default function LibraryManagementPage() {
             });
         } catch (error) {
             toast.error("Failed to add copies");
+        }
+    };
+
+    const handleRequestBook = async () => {
+        if (!selectedBook) return;
+
+        setRequestingBook(true);
+        try {
+            await axios.post(`/api/schools/${schoolId}/library/requests`, {
+                bookId: selectedBook.id,
+                userId: fullUser.id,
+                userType: fullUser.role === "STUDENT" ? "STUDENT" : "TEACHER",
+                remarks: requestRemarks,
+            });
+            toast.success("Book request submitted successfully");
+            setIsRequestBookOpen(false);
+            setRequestRemarks("");
+            setSelectedBook(null);
+        } catch (error) {
+            toast.error(error.response?.data?.error || "Failed to request book");
+        } finally {
+            setRequestingBook(false);
         }
     };
 
@@ -242,8 +275,15 @@ export default function LibraryManagementPage() {
                                 />
                             </div>
                         </div>
-                        <Button onClick={handleAddBook} className="w-full mt-4">
-                            Add Book
+                        <Button onClick={handleAddBook} className="w-full mt-4" disabled={submitting}>
+                            {submitting ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Adding...
+                                </>
+                            ) : (
+                                "Add Book"
+                            )}
                         </Button>
                     </DialogContent>
                 </Dialog>
@@ -367,6 +407,59 @@ export default function LibraryManagementPage() {
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
+                                        {book.availableCopies === 0 && (
+                                            <Dialog
+                                                open={isRequestBookOpen && selectedBook?.id === book.id}
+                                                onOpenChange={(open) => {
+                                                    setIsRequestBookOpen(open);
+                                                    if (open) setSelectedBook(book);
+                                                }}
+                                            >
+                                                <DialogTrigger asChild>
+                                                    <Button variant="default" size="sm">
+                                                        <BookMarked className="h-4 w-4 mr-2" />
+                                                        Request Book
+                                                    </Button>
+                                                </DialogTrigger>
+                                                <DialogContent>
+                                                    <DialogHeader>
+                                                        <DialogTitle>Request Book</DialogTitle>
+                                                    </DialogHeader>
+                                                    <div className="space-y-4">
+                                                        <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                                                            <p className="font-semibold">{book.title}</p>
+                                                            <p className="text-sm text-muted-foreground">by {book.author}</p>
+                                                            <p className="text-xs text-orange-600 font-medium">
+                                                                No copies currently available
+                                                            </p>
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label>Remarks (Optional)</Label>
+                                                            <Textarea
+                                                                value={requestRemarks}
+                                                                onChange={(e) => setRequestRemarks(e.target.value)}
+                                                                placeholder="Any additional notes..."
+                                                                rows={3}
+                                                            />
+                                                        </div>
+                                                        <Button
+                                                            onClick={handleRequestBook}
+                                                            disabled={requestingBook}
+                                                            className="w-full"
+                                                        >
+                                                            {requestingBook ? (
+                                                                <>
+                                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                                    Submitting...
+                                                                </>
+                                                            ) : (
+                                                                "Submit Request"
+                                                            )}
+                                                        </Button>
+                                                    </div>
+                                                </DialogContent>
+                                            </Dialog>
+                                        )}
                                         <Dialog
                                             open={isAddCopiesOpen && selectedBook?.id === book.id}
                                             onOpenChange={(open) => {
@@ -440,9 +533,11 @@ export default function LibraryManagementPage() {
                                                 </div>
                                             </DialogContent>
                                         </Dialog>
-                                        <Button variant="outline" size="sm">
-                                            View Details
-                                        </Button>
+                                        <Link href={`/dashboard/schools/library/catalog/${book.id}`}>
+                                            <Button variant="outline" size="sm">
+                                                View Details
+                                            </Button>
+                                        </Link>
                                     </div>
                                 </div>
                             ))}

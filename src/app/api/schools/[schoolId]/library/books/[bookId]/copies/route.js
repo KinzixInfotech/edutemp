@@ -35,14 +35,14 @@ export async function POST(request, { params }) {
         const body = await request.json();
         const { count = 1, startAccessionNumber, location, condition } = body;
 
-        // If startAccessionNumber is provided, generate sequential numbers
-        // Otherwise, generate random UUID-like or auto-increment logic could be used,
-        // but here we'll assume the user provides a starting number or we just use UUIDs if not provided (though accession numbers are usually human readable).
-        // For simplicity, let's require accession numbers or generate unique ones based on timestamp if not provided.
+            // If startAccessionNumber is provided, generate sequential numbers
+            // Otherwise, generate random UUID-like or auto-increment logic could be used,
+            // but here we'll assume the user provides a starting number or we just use UUIDs if not provided (though accession numbers are usually human readable).
+            // For simplicity, let's require accession numbers or generate unique ones based on timestamp if not provided.
 
         const copiesData = [];
         for (let i = 0; i < count; i++) {
-            let accessionNumber;
+            let accessionNumber
             if (startAccessionNumber) {
                 // Try to parse as int and increment, otherwise append suffix
                 const numPart = parseInt(startAccessionNumber.replace(/\D/g, ''));

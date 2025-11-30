@@ -424,6 +424,7 @@ export const SidebarData = [
                         label: "Manage Books", url: "/dashboard/schools/library/catalog", roles: ["ADMIN"]
                     },
                     { label: "Issue & Return", url: "/dashboard/schools/library/issue", roles: ["ADMIN"] },
+                    { label: "Book Requests", url: "/dashboard/schools/library/requests", roles: ["ADMIN"] },
                     { label: "Fines & Reports", url: "/dashboard/schools/library/fines", roles: ["ADMIN"] },
                 ],
             },

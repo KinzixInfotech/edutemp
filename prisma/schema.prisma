@@ -1,7 +1,7 @@
 datasource db {
   provider = "postgresql"
-  // url      = env("DATABASE_URL")
-  url      = env("DIRECT_URL")
+  url      = env("DATABASE_URL")
+  // url      = env("DIRECT_URL")
 }
 
 generator client {
@@ -32,7 +32,7 @@ model School {
   galleries              Gallery[]
   InventoryItem          InventoryItem[]
   libraryBooks           LibraryBook[]
-
+  libraryBookRequests    LibraryBookRequest[]
   MasterAdmin            MasterAdmin?
   NonTeachingStaff       NonTeachingStaff[]
   Notice                 Notice[]
@@ -2389,8 +2389,9 @@ model LibraryBook {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  school School            @relation(fields: [schoolId], references: [id])
-  copies LibraryBookCopy[]
+  school   School               @relation(fields: [schoolId], references: [id])
+  copies   LibraryBookCopy[]
+  requests LibraryBookRequest[]
 
   @@index([schoolId])
   @@index([ISBN])
@@ -2454,6 +2455,52 @@ model LibrarySettings {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model LibraryBookRequest {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @db.Uuid
+  bookId   String @db.Uuid
+  userId   String @db.Uuid
+  userType String // STUDENT, TEACHER, STAFF
+
+  // Request Details
+  status      RequestStatus @default(PENDING)
+  requestDate DateTime      @default(now())
+
+  // Approval Details
+  approvedBy   String?   @db.Uuid
+  approvedDate DateTime?
+  pickupDate   DateTime? // Date by which book must be collected
+
+  // Collection Details
+  collectedDate DateTime?
+  collectedBy   String?   @db.Uuid // Staff who handed over the book
+
+  // Rejection/Cancellation
+  rejectedBy      String?   @db.Uuid
+  rejectedDate    DateTime?
+  rejectionReason String?
+
+  remarks String?
+
+  // Relations
+  school School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  book   LibraryBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([userId])
+  @@index([status])
+  @@index([pickupDate])
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COLLECTED
+  EXPIRED
+  CANCELLED
 }
 
 model Upload {
