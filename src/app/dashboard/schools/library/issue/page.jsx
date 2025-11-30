@@ -224,7 +224,7 @@ export default function LibraryTransactionsPage() {
                         </CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
+                                <div className="space-y-2">
                                     <Label>Select Book</Label>
                                     <Select
                                         onValueChange={(value) => {
@@ -247,7 +247,7 @@ export default function LibraryTransactionsPage() {
                                     </Select>
                                 </div>
 
-                                <div>
+                                <div className="space-y-2">
                                     <Label>Select Copy</Label>
                                     <Select
                                         value={issueForm.copyId}
@@ -270,7 +270,7 @@ export default function LibraryTransactionsPage() {
                                     </Select>
                                 </div>
 
-                                <div>
+                                <div className="space-y-2">
                                     <Label>User Type</Label>
                                     <Select
                                         value={issueForm.userType}
@@ -289,7 +289,7 @@ export default function LibraryTransactionsPage() {
                                     </Select>
                                 </div>
 
-                                <div>
+                                <div className="space-y-2">
                                     <Label>User ID</Label>
                                     <Input
                                         value={issueForm.userId}
@@ -300,7 +300,7 @@ export default function LibraryTransactionsPage() {
                                     />
                                 </div>
 
-                                <div>
+                                <div className="space-y-2">
                                     <Label>Due Date</Label>
                                     <Input
                                         type="date"
@@ -328,7 +328,7 @@ export default function LibraryTransactionsPage() {
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-4">
-                                <div>
+                                <div className="space-y-2">
                                     <Label>Transaction ID</Label>
                                     <Input
                                         value={returnForm.transactionId}
@@ -342,7 +342,7 @@ export default function LibraryTransactionsPage() {
                                     </p>
                                 </div>
 
-                                <div>
+                                <div className="space-y-2">
                                     <Label>Remarks (Optional)</Label>
                                     <Input
                                         value={returnForm.remarks}
