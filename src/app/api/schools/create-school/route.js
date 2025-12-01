@@ -21,6 +21,7 @@ const schoolSchema = z.object({
   masteradminemail: z.string().email(),
   masteradminpassword: z.string().min(6),
   adminPassword: z.string().min(6),
+  generateWebsite: z.boolean().optional(),
 }).superRefine((data, ctx) => {
   if (data.domainMode === "tenant" && !data.tenantName) {
     ctx.addIssue({
@@ -94,7 +95,53 @@ export async function POST(req) {
           profilePicture: parsed.profilePicture || "",
           location: parsed.location,
           SubscriptionType: parsed.subscriptionType,
+          SubscriptionType: parsed.subscriptionType,
           Language: parsed.language,
+          websiteConfig: parsed.generateWebsite ? {
+            hero: {
+              title: `Welcome to ${parsed.name}`,
+              subtitle: "Empowering Minds, Shaping Futures",
+              image: parsed.profilePicture || "/default-hero.jpg",
+              ctaText: "Admissions Open",
+              ctaLink: "#admissions"
+            },
+            about: {
+              title: "About Us",
+              content: `${parsed.name} is dedicated to providing quality education...`
+            },
+            principal: {
+              name: "Principal Name",
+              message: "Welcome to our school...",
+              image: "/default-principal.jpg"
+            },
+            notices: [],
+            gallery: [],
+            facilities: [
+              { title: "Library", icon: "book" },
+              { title: "Science Lab", icon: "flask" },
+              { title: "Sports", icon: "trophy" }
+            ],
+            admissions: {
+              title: "Admissions",
+              content: "Admissions are open for the academic year...",
+              link: "/admissions"
+            },
+            contact: {
+              address: parsed.location,
+              phone: parsed.phone,
+              email: parsed.email
+            },
+            theme: {
+              primaryColor: "#000000",
+              secondaryColor: "#ffffff"
+            },
+            menus: [
+              { label: "Home", link: "#hero" },
+              { label: "About", link: "#about" },
+              { label: "Admissions", link: "#admissions" },
+              { label: "Contact", link: "#contact" }
+            ]
+          } : undefined,
         },
       });
 

@@ -16,6 +16,7 @@ model School {
   profilePicture         String
   location               String
   contactNumber          String
+  websiteConfig          Json?
   SubscriptionType       String
   Language               String
   createdAt              DateTime                @default(now())

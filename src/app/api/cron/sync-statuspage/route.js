@@ -9,7 +9,8 @@ import { NextResponse } from 'next/server';
 
 import { autoStatuspage } from '@/lib/autoStatuspageSync';
 import prisma from '@/lib/prisma';
-import { getHealthMetrics } from 'middleware';
+import { getHealthMetrics } from '@/middleware';
+
 
 export async function GET(request) {
     // Verify cron secret
@@ -17,6 +18,7 @@ export async function GET(request) {
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
 
     try {
         // Get health metrics

@@ -286,9 +286,9 @@ export const SidebarData = [
             },
 
             { label: "All Schools", url: "/dashboard/schools/all-schools", icon: IconDatabase, roles: ['SUPER_ADMIN'] },
+            { label: "Manage Website", url: "/dashboard/schools/website", icon: MonitorCog, roles: ['ADMIN'] },
         ],
     },
-
     {
         title: "Manage Classes",
         items: [
