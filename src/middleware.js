@@ -18,12 +18,19 @@ export async function middleware(request) {
     const isPublicRoute = pathname === '/' || pathname.startsWith('/api/auth');
 
     if (isProtectedRoute || isAuthRoute) {
-        console.log('[Middleware] Checking auth for:', pathname);
+        // Check env vars
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+        if (!supabaseUrl || !supabaseKey) {
+            return NextResponse.next();
+        }
+
         let supabaseResponse = NextResponse.next({ request });
 
         const supabase = createServerClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+            supabaseUrl,
+            supabaseKey,
             {
                 cookies: {
                     getAll() {
@@ -42,22 +49,15 @@ export async function middleware(request) {
             }
         );
 
-        // Get user session - use getSession instead of getUser for better reliability
+        // Try getSession first (less strict)
         const {
             data: { session },
-            error
         } = await supabase.auth.getSession();
 
-        if (error) {
-            console.error('[Middleware] Auth error:', error);
-        }
-
         const user = session?.user;
-        console.log('[Middleware] User authenticated:', !!user);
 
         // Redirect logic
         if (isProtectedRoute && !user) {
-            console.log('[Middleware] Redirecting to login - no user session');
             // Redirect to login if trying to access protected route without auth
             const redirectUrl = new URL('/login', request.url);
             redirectUrl.searchParams.set('redirectTo', pathname);
@@ -65,7 +65,6 @@ export async function middleware(request) {
         }
 
         if (isAuthRoute && user) {
-            console.log('[Middleware] Redirecting to dashboard - already logged in');
             // Redirect to dashboard if already logged in
             return NextResponse.redirect(new URL('/dashboard', request.url));
         }
@@ -76,6 +75,11 @@ export async function middleware(request) {
     // ============================================
     // API METRICS TRACKING
     // ============================================
+
+    // Only track API routes, skip health endpoint
+    if (!pathname.startsWith('/api') || pathname === '/api/health' || pathname.includes('/api/health/')) {
+        return NextResponse.next();
+    }
 
     // Only track API routes, skip health endpoint
     if (!pathname.startsWith('/api') || pathname === '/api/health' || pathname.includes('/api/health/')) {
@@ -160,15 +164,13 @@ export function getHealthMetrics() {
     return apiMetrics;
 }
 
+console.log('Middleware file loaded');
+
 export const config = {
     matcher: [
-        /*
-         * Match all request paths except for the ones starting with:
-         * - _next/static (static files)
-         * - _next/image (image optimization files)
-         * - favicon.ico (favicon file)
-         * - public folder
-         */
-        '/((?!_next/static|_next/image|favicon.ico|public).*)',
+        '/dashboard/:path*',
+        '/login',
+        '/signup',
+        '/api/auth/:path*',
     ],
 };

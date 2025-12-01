@@ -1,14 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-        autoRefreshToken: true,        // Automatically refresh tokens before expiry
-        persistSession: true,           // Persist session in localStorage
-        detectSessionInUrl: true,       // Detect session from URL (OAuth flows)
-        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-        storageKey: 'supabase.auth.token',
-    },
-});
+export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
