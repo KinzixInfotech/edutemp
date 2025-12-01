@@ -1,7 +1,7 @@
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
-  // url      = env("DIRECT_URL")
+  // url      = env("DATABASE_URL")
+  url      = env("DIRECT_URL")
 }
 
 generator client {
@@ -1014,6 +1014,10 @@ model User {
   managedPartners         Partner[]                @relation("PartnerAccountManager")
   assignedLeads           PartnerLead[]            @relation("LeadAssignedTo")
   uploadedMedia           MediaLibrary[]
+
+  // Session Management
+  sessions       UserSession[]
+  securityEvents SecurityEvent[]
 
   @@index([schoolId])
   @@index([roleId])
@@ -2890,6 +2894,77 @@ enum UserStatus {
   LEFT
   DISABLED
   BANNED
+}
+
+// ============================================
+// SESSION MANAGEMENT & SECURITY
+// ============================================
+
+model UserSession {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Session Info
+  sessionToken String   @unique
+  refreshToken String?
+  expiresAt    DateTime
+
+  // Device Info
+  deviceName     String? // User-assigned name (e.g., "My iPhone")
+  deviceType     String? // mobile, desktop, tablet
+  browser        String? // Chrome, Safari, Firefox, etc.
+  browserVersion String?
+  os             String? // macOS, Windows, iOS, Android
+  osVersion      String?
+  ipAddress      String?
+  location       String? // City, Country
+  userAgent      String? // Full user agent string
+
+  // Activity
+  createdAt    DateTime @default(now())
+  lastActiveAt DateTime @default(now())
+
+  // Security
+  isRevoked     Boolean   @default(false)
+  revokedAt     DateTime?
+  revokedReason String?
+
+  @@index([userId])
+  @@index([sessionToken])
+  @@index([isRevoked])
+  @@index([expiresAt])
+}
+
+model SecurityEvent {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  eventType String // NEW_LOGIN, SUSPICIOUS_LOGIN, SESSION_REVOKED, PASSWORD_CHANGED, etc.
+  severity  String @default("INFO") // INFO, WARNING, CRITICAL
+
+  // Event Details
+  title       String
+  description String?
+  deviceInfo  String?
+  ipAddress   String?
+  location    String?
+  userAgent   String?
+
+  // Metadata
+  metadata String? // JSON string for additional data
+
+  // Status
+  isRead Boolean   @default(false)
+  readAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([eventType])
+  @@index([createdAt])
 }
 
 enum DocumentType {

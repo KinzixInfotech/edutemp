@@ -6,6 +6,7 @@ import {
     IconLogout,
     IconNotification,
     IconUserCircle,
+    IconDevices,
 } from "@tabler/icons-react"
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase'; // a
@@ -117,10 +118,14 @@ export function NavUser({ }) {
                                 <IconUserCircle />
                                 Account
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => router.push('/dashboard/settings/sessions')}>
+                                <IconDevices />
+                                Active Sessions
+                            </DropdownMenuItem>
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator />
                         <div onClick={handleLogout}>
-                        <DropdownMenuItem >
+                            <DropdownMenuItem >
                                 <IconLogout />
                                 Log out
                             </DropdownMenuItem>

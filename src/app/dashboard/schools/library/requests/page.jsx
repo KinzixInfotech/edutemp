@@ -37,10 +37,12 @@ import {
     AlertTriangle,
 } from "lucide-react";
 import { format } from "date-fns";
+import { useLibraryNotifications } from "@/context/LibraryNotificationContext";
 
 export default function BookRequestsPage() {
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;
+    const { markRequestsAsSeen, refreshCount } = useLibraryNotifications();
 
     const [loading, setLoading] = useState(false);
     const [requests, setRequests] = useState([]);
@@ -62,6 +64,8 @@ export default function BookRequestsPage() {
         if (schoolId) {
             fetchRequests();
             expireOverdueRequests();
+            // Mark all requests as seen when page loads
+            markRequestsAsSeen();
         }
     }, [schoolId]);
 
@@ -111,6 +115,7 @@ export default function BookRequestsPage() {
             setIsApproveDialogOpen(false);
             setSelectedRequest(null);
             fetchRequests();
+            refreshCount(); // Refresh badge count
         } catch (error) {
             toast.error(error.response?.data?.error || "Failed to approve request");
         } finally {
@@ -136,6 +141,7 @@ export default function BookRequestsPage() {
             setSelectedRequest(null);
             setRejectionReason("");
             fetchRequests();
+            refreshCount(); // Refresh badge count
         } catch (error) {
             toast.error(error.response?.data?.error || "Failed to reject request");
         } finally {
@@ -153,6 +159,7 @@ export default function BookRequestsPage() {
             );
             toast.success("Marked as collected");
             fetchRequests();
+            refreshCount(); // Refresh badge count
         } catch (error) {
             toast.error(error.response?.data?.error || "Failed to mark as collected");
         }

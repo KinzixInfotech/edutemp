@@ -22,6 +22,8 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { useLibraryNotifications } from "@/context/LibraryNotificationContext"
+import { Badge } from "@/components/ui/badge"
 
 export function NavSidebarSections({ sections, userRole, activePath }) {
     const { setLoading } = useLoader()
@@ -32,6 +34,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
     const previousPath = useRef(null)
     const isManualToggle = useRef(false)
     const hasInitialized = useRef(false)
+    const { unseenRequestsCount } = useLibraryNotifications()
 
     const handleClick = () => setLoading(true)
 
@@ -116,12 +119,16 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                         ref={isParentActive ? activeItemRef : null}
                                                     >
                                                         <SidebarMenuButton
-                                                            className={`w-full  justify-center py-4 hover:!bg-white rounded-md hover:!text-black transition-all hover:cursor-pointer ${isActive || isParentActive
+                                                            className={`w-full relative justify-center py-4 hover:!bg-white rounded-md hover:!text-black transition-all hover:cursor-pointer ${isActive || isParentActive
                                                                 ? "shadow-xs font-semibold border dark:bg-white dark:text-black" : ""
                                                                 }`}
                                                             style={isActive || isParentActive ? { backgroundColor: 'white' } : {}}
                                                         >
                                                             {item.icon && <item.icon className="w-4 h-4" />}
+                                                            {/* Yellow dot indicator for library requests */}
+                                                            {item.label === "Manage Library" && unseenRequestsCount > 0 && (
+                                                                <span className="absolute top-1 right-1 h-2 w-2 bg-yellow-500 rounded-full" />
+                                                            )}
                                                         </SidebarMenuButton>
                                                     </SidebarMenuItem>
                                                 </TooltipTrigger>
@@ -157,7 +164,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                             >
                                                 <CollapsibleTrigger asChild>
                                                     <SidebarMenuButton
-                                                        className={`group  w-full justify-between py-4 hover:!bg-white rounded-md hover:!text-black transition-all hover:cursor-pointer ${isActive || isParentActive
+                                                        className={`group relative w-full justify-between py-4 hover:!bg-white rounded-md hover:!text-black transition-all hover:cursor-pointer ${isActive || isParentActive
                                                             ? "shadow-xs font-semibold border dark:bg-white dark:text-black " : ""
                                                             }`}
                                                         style={isActive || isParentActive ? { backgroundColor: 'white' } : {}}
@@ -165,20 +172,22 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                         <div className="flex items-center gap-2">
                                                             {item.icon && <item.icon className="w-4 h-4" />}
                                                             <span>{item.label}</span>
+                                                            {/* Yellow dot indicator for library requests */}
+                                                            {item.label === "Manage Library" && unseenRequestsCount > 0 && (
+                                                                <span className="h-2 w-2 bg-yellow-500 rounded-full ml-1" />
+                                                            )}
                                                         </div>
                                                         <ChevronDown className="w-4 h-4 group-data-[state=open]:hidden" />
                                                         <ChevronUp className="w-4 h-4 hidden group-data-[state=open]:block" />
                                                     </SidebarMenuButton>
                                                 </CollapsibleTrigger>
                                             </SidebarMenuItem>
-
                                             <CollapsibleContent>
                                                 <SidebarMenuSub className='mt-1.5'>
                                                     {item.submenu.map((sub) => {
                                                         if (sub.roles && !sub.roles.includes(userRole)) return null
                                                         const isSubActive =
                                                             normalize(activePath) === normalize(sub.url)
-
                                                         return (
                                                             <SidebarMenuSubItem
                                                                 key={sub.label}
@@ -192,9 +201,17 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                                         }`}
                                                                     style={isSubActive ? { backgroundColor: 'white' } : {}}
                                                                 >
-                                                                    <Link href={sub.url} onClick={handleClick}>
-                                                                        {sub.icon && <sub.icon className="w-4 h-4" />}
-                                                                        <span className="">{sub.label}</span>
+                                                                    <Link href={sub.url} onClick={handleClick} className="flex items-center justify-between w-full">
+                                                                        <div className="flex items-center gap-2">
+                                                                            {sub.icon && <sub.icon className="w-4 h-4" />}
+                                                                            <span className="">{sub.label}</span>
+                                                                        </div>
+                                                                        {/* Modern circular badge for Book Requests */}
+                                                                        {sub.label === "Book Requests" && unseenRequestsCount > 0 && (
+                                                                            <span className="ml-auto flex items-center justify-center h-5 min-w-[20px] px-1.5 bg-gradient-to-br from-red-500 to-red-600 text-white text-[10px] font-bold rounded-full shadow-sm">
+                                                                                {unseenRequestsCount}
+                                                                            </span>
+                                                                        )}
                                                                     </Link>
                                                                 </SidebarMenuSubButton>
                                                             </SidebarMenuSubItem>

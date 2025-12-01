@@ -24,6 +24,7 @@ export default function LoginPhoto({ className, ...props }) {
     const [errorMsg, setErrorMsg] = useState("")
     const [mode, setMode] = useState(false)
     const [showPassword, setShowPassword] = useState(false);
+    const [rememberMe, setRememberMe] = useState(false);
     const [loading, setLoading] = useState(false)
     const [loadingl, setLoadingl] = useState(true)
     const [alreadyLoggedIn, setAlreadyLoggedIn] = useState(false)
@@ -112,6 +113,23 @@ export default function LoginPhoto({ className, ...props }) {
             // 3. Success → store user in local state/cache
             toast.success(`Welcome back, ${result.name || result.email}`);
             localStorage.setItem("user", JSON.stringify(result));
+
+            // 4. Create Session Record
+            try {
+                await fetch('/api/auth/sessions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: result.id,
+                        rememberMe,
+                        supabaseSessionToken: data.session?.access_token
+                    })
+                });
+            } catch (sessionErr) {
+                console.error("Failed to create session record:", sessionErr);
+                // Don't block login if session tracking fails
+            }
+
             router.push("/dashboard");
         } catch (err) {
             toast.error("Login Error", { description: err.message || "Something went wrong" });
@@ -301,6 +319,23 @@ export default function LoginPhoto({ className, ...props }) {
                                                             {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                                                         </button>
                                                     </div>
+                                                </div>
+
+                                                {/* Remember Me Checkbox */}
+                                                <div className="flex items-center space-x-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="rememberMe"
+                                                        checked={rememberMe}
+                                                        onChange={(e) => setRememberMe(e.target.checked)}
+                                                        className="h-4 w-4 rounded border-gray-300 text-[#0c65f1] focus:ring-[#0c65f1]"
+                                                    />
+                                                    <label
+                                                        htmlFor="rememberMe"
+                                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-gray-700"
+                                                    >
+                                                        Remember me for 90 days
+                                                    </label>
                                                 </div>
 
                                                 {/* Submit Button */}

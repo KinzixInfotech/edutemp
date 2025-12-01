@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 // GET - List all book requests
 export async function GET(req, { params }) {
     try {
-        const { schoolId } = params;
+        const { schoolId } = await params;
         const { searchParams } = new URL(req.url);
 
         const status = searchParams.get("status");
