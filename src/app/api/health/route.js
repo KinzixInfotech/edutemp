@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getHealthMetrics } from '@/middleware';
 
+
 export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const detailed = searchParams.get('detailed') === 'true';
