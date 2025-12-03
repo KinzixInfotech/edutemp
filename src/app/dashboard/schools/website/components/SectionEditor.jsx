@@ -549,6 +549,414 @@ export function SectionEditor({ section, onChange }) {
                     </>
                 )}
 
+                {/* MESSAGE QUOTE */}
+                {section.type === 'message-quote' && (
+                    <>
+                        <div className="space-y-2">
+                            <Label>Quote</Label>
+                            <Textarea
+                                value={section.data.quote || ''}
+                                onChange={(e) => handleChange('quote', e.target.value)}
+                                rows={4}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Author Name</Label>
+                            <Input
+                                value={section.data.author || ''}
+                                onChange={(e) => handleChange('author', e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Designation</Label>
+                            <Input
+                                value={section.data.designation || ''}
+                                onChange={(e) => handleChange('designation', e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Author Image</Label>
+                            <FileUploadButton
+                                field="Author Image"
+                                onChange={(url) => handleChange('image', url)}
+                            />
+                            {section.data.image && <img src={section.data.image} alt="Preview" className="w-16 h-16 object-cover rounded-full mt-2" />}
+                        </div>
+                    </>
+                )}
+
+                {/* CONTENT FEATURES */}
+                {section.type === 'content-features' && (
+                    <>
+                        <div className="space-y-2">
+                            <Label>Heading</Label>
+                            <Input
+                                value={section.data.heading || ''}
+                                onChange={(e) => handleChange('heading', e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Columns</Label>
+                            <Select
+                                value={String(section.data.columns || 3)}
+                                onValueChange={(value) => handleChange('columns', parseInt(value))}
+                            >
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="2">2 Columns</SelectItem>
+                                    <SelectItem value="3">3 Columns</SelectItem>
+                                    <SelectItem value="4">4 Columns</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                                <Label className="text-sm font-semibold">Features</Label>
+                                <Button
+                                    onClick={() => handleArrayAdd('features', {
+                                        id: uuidv4(),
+                                        icon: '✨',
+                                        title: 'New Feature',
+                                        description: 'Feature description'
+                                    })}
+                                    size="sm"
+                                    variant="outline"
+                                >
+                                    <Plus className="h-3 w-3 mr-1" /> Add Feature
+                                </Button>
+                            </div>
+                            {(section.data.features || []).map((feature, index) => (
+                                <Card key={feature.id} className="p-3">
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-xs font-medium">Feature {index + 1}</span>
+                                            <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => handleArrayRemove('features', index)}>
+                                                <Trash2 className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs">Icon/Emoji</Label>
+                                            <Input
+                                                value={feature.icon || ''}
+                                                onChange={(e) => handleArrayUpdate('features', index, 'icon', e.target.value)}
+                                                className="h-8 text-sm"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs">Title</Label>
+                                            <Input
+                                                value={feature.title || ''}
+                                                onChange={(e) => handleArrayUpdate('features', index, 'title', e.target.value)}
+                                                className="h-8 text-sm"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs">Description</Label>
+                                            <Textarea
+                                                value={feature.description || ''}
+                                                onChange={(e) => handleArrayUpdate('features', index, 'description', e.target.value)}
+                                                rows={2}
+                                                className="text-sm"
+                                            />
+                                        </div>
+                                    </div>
+                                </Card>
+                            ))}
+                        </div>
+                    </>
+                )}
+
+                {/* CONTENT STATS */}
+                {section.type === 'content-stats' && (
+                    <>
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                                <Label className="text-sm font-semibold">Statistics</Label>
+                                <Button
+                                    onClick={() => handleArrayAdd('stats', {
+                                        id: uuidv4(),
+                                        number: '100+',
+                                        label: 'Label'
+                                    })}
+                                    size="sm"
+                                    variant="outline"
+                                >
+                                    <Plus className="h-3 w-3 mr-1" /> Add Stat
+                                </Button>
+                            </div>
+                            {(section.data.stats || []).map((stat, index) => (
+                                <Card key={stat.id} className="p-3">
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-xs font-medium">Stat {index + 1}</span>
+                                            <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => handleArrayRemove('stats', index)}>
+                                                <Trash2 className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <Label className="text-xs">Number</Label>
+                                                <Input
+                                                    value={stat.number || ''}
+                                                    onChange={(e) => handleArrayUpdate('stats', index, 'number', e.target.value)}
+                                                    className="h-8 text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <Label className="text-xs">Label</Label>
+                                                <Input
+                                                    value={stat.label || ''}
+                                                    onChange={(e) => handleArrayUpdate('stats', index, 'label', e.target.value)}
+                                                    className="h-8 text-sm"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Card>
+                            ))}
+                        </div>
+                    </>
+                )}
+
+                {/* VIDEO SECTION */}
+                {section.type === 'video-section' && (
+                    <>
+                        <div className="space-y-2">
+                            <Label>Heading</Label>
+                            <Input
+                                value={section.data.heading || ''}
+                                onChange={(e) => handleChange('heading', e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Description</Label>
+                            <Textarea
+                                value={section.data.description || ''}
+                                onChange={(e) => handleChange('description', e.target.value)}
+                                rows={3}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Video URL (Embed Link)</Label>
+                            <Input
+                                value={section.data.videoUrl || ''}
+                                onChange={(e) => handleChange('videoUrl', e.target.value)}
+                                placeholder="https://www.youtube.com/embed/..."
+                            />
+                            <p className="text-xs text-muted-foreground">Make sure to use the embed URL, not the watch URL.</p>
+                        </div>
+                    </>
+                )}
+
+                {/* TABS CONTENT */}
+                {section.type === 'tabs-content' && (
+                    <>
+                        <div className="space-y-2">
+                            <Label>Heading</Label>
+                            <Input
+                                value={section.data.heading || ''}
+                                onChange={(e) => handleChange('heading', e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                                <Label className="text-sm font-semibold">Tabs</Label>
+                                <Button
+                                    onClick={() => handleArrayAdd('tabs', {
+                                        id: uuidv4(),
+                                        label: 'New Tab',
+                                        content: 'Tab content goes here.'
+                                    })}
+                                    size="sm"
+                                    variant="outline"
+                                >
+                                    <Plus className="h-3 w-3 mr-1" /> Add Tab
+                                </Button>
+                            </div>
+                            {(section.data.tabs || []).map((tab, index) => (
+                                <Card key={tab.id} className="p-3">
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-xs font-medium">Tab {index + 1}</span>
+                                            <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => handleArrayRemove('tabs', index)}>
+                                                <Trash2 className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs">Label</Label>
+                                            <Input
+                                                value={tab.label || ''}
+                                                onChange={(e) => handleArrayUpdate('tabs', index, 'label', e.target.value)}
+                                                className="h-8 text-sm"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs">Content</Label>
+                                            <Textarea
+                                                value={tab.content || ''}
+                                                onChange={(e) => handleArrayUpdate('tabs', index, 'content', e.target.value)}
+                                                rows={3}
+                                                className="text-sm"
+                                            />
+                                        </div>
+                                    </div>
+                                </Card>
+                            ))}
+                        </div>
+                    </>
+                )}
+
+                {/* ACCORDION */}
+                {section.type === 'accordion' && (
+                    <>
+                        <div className="space-y-2">
+                            <Label>Heading</Label>
+                            <Input
+                                value={section.data.heading || ''}
+                                onChange={(e) => handleChange('heading', e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                                <Label className="text-sm font-semibold">Items</Label>
+                                <Button
+                                    onClick={() => handleArrayAdd('items', {
+                                        id: uuidv4(),
+                                        title: 'New Item',
+                                        content: 'Content goes here.'
+                                    })}
+                                    size="sm"
+                                    variant="outline"
+                                >
+                                    <Plus className="h-3 w-3 mr-1" /> Add Item
+                                </Button>
+                            </div>
+                            {(section.data.items || []).map((item, index) => (
+                                <Card key={item.id} className="p-3">
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-xs font-medium">Item {index + 1}</span>
+                                            <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => handleArrayRemove('items', index)}>
+                                                <Trash2 className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs">Title</Label>
+                                            <Input
+                                                value={item.title || ''}
+                                                onChange={(e) => handleArrayUpdate('items', index, 'title', e.target.value)}
+                                                className="h-8 text-sm"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs">Content</Label>
+                                            <Textarea
+                                                value={item.content || ''}
+                                                onChange={(e) => handleArrayUpdate('items', index, 'content', e.target.value)}
+                                                rows={3}
+                                                className="text-sm"
+                                            />
+                                        </div>
+                                    </div>
+                                </Card>
+                            ))}
+                        </div>
+                    </>
+                )}
+
+                {/* TIMELINE */}
+                {section.type === 'timeline' && (
+                    <>
+                        <div className="space-y-2">
+                            <Label>Heading</Label>
+                            <Input
+                                value={section.data.heading || ''}
+                                onChange={(e) => handleChange('heading', e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                                <Label className="text-sm font-semibold">Events</Label>
+                                <Button
+                                    onClick={() => handleArrayAdd('events', {
+                                        id: uuidv4(),
+                                        year: '2024',
+                                        title: 'Event Title',
+                                        description: 'Event description.'
+                                    })}
+                                    size="sm"
+                                    variant="outline"
+                                >
+                                    <Plus className="h-3 w-3 mr-1" /> Add Event
+                                </Button>
+                            </div>
+                            {(section.data.events || []).map((event, index) => (
+                                <Card key={event.id} className="p-3">
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-xs font-medium">Event {index + 1}</span>
+                                            <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => handleArrayRemove('events', index)}>
+                                                <Trash2 className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <div className="col-span-1">
+                                                <Label className="text-xs">Year</Label>
+                                                <Input
+                                                    value={event.year || ''}
+                                                    onChange={(e) => handleArrayUpdate('events', index, 'year', e.target.value)}
+                                                    className="h-8 text-sm"
+                                                />
+                                            </div>
+                                            <div className="col-span-2">
+                                                <Label className="text-xs">Title</Label>
+                                                <Input
+                                                    value={event.title || ''}
+                                                    onChange={(e) => handleArrayUpdate('events', index, 'title', e.target.value)}
+                                                    className="h-8 text-sm"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs">Description</Label>
+                                            <Textarea
+                                                value={event.description || ''}
+                                                onChange={(e) => handleArrayUpdate('events', index, 'description', e.target.value)}
+                                                rows={2}
+                                                className="text-sm"
+                                            />
+                                        </div>
+                                    </div>
+                                </Card>
+                            ))}
+                        </div>
+                    </>
+                )}
+
+                {/* DYNAMIC SECTIONS */}
+                {(section.type === 'dynamic_notices' || section.type === 'dynamic_gallery') && (
+                    <>
+                        <div className="space-y-2">
+                            <Label>Heading</Label>
+                            <Input
+                                value={section.data.heading || ''}
+                                onChange={(e) => handleChange('heading', e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Number of Items to Show</Label>
+                            <Input
+                                type="number"
+                                value={section.data.count || 6}
+                                onChange={(e) => handleChange('count', parseInt(e.target.value))}
+                            />
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                            This section will automatically pull content from your dashboard's {section.type === 'dynamic_notices' ? 'Noticeboard' : 'Gallery'}.
+                        </p>
+                    </>
+                )}
+
                 {/* COMMON BACKGROUND COLOR */}
                 <div className="space-y-2 pt-4 border-t">
                     <Label>Background Color</Label>

@@ -55,17 +55,6 @@ export function BuilderSidebar({ onAddSection, pages, activePageId, onSelectPage
                 { type: 'dynamic_notices', label: 'Dynamic Notices', icon: Bell },
                 { type: 'dynamic_gallery', label: 'Dynamic Gallery', icon: Image },
             ]
-        },
-        {
-            category: 'Legacy',
-            sections: [
-                { type: 'hero', label: 'Hero (Old)', icon: LayoutTemplate },
-                { type: 'about', label: 'About (Old)', icon: Type },
-                { type: 'features', label: 'Features (Old)', icon: Grid },
-                { type: 'gallery', label: 'Gallery (Old)', icon: Image },
-                { type: 'principal', label: 'Principal (Old)', icon: Type },
-                { type: 'contact', label: 'Contact (Old)', icon: Phone },
-            ]
         }
     ];
 
