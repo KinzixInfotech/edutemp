@@ -5,165 +5,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Info } from "lucide-react";
+import { Plus, Trash2, MoveUp, MoveDown, Image as ImageIcon } from "lucide-react";
 import FileUploadButton from "@/components/fileupload";
-import Editor from 'react-simple-code-editor';
-import { highlight, languages } from 'prismjs/components/prism-core';
-import 'prismjs/components/prism-css';
-import 'prismjs/themes/prism.css';
-import { LayoutEditor } from './LayoutEditor';
-
-const getCssTemplate = (section) => {
-    const sectionId = `#${section.type}`;
-
-    const templates = {
-        hero: `/* Target the hero section */
-& {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 4rem 1rem;
-}
-
-/* Target the hero title */
-& h1 {
-  font-size: 3rem;
-  color: white;
-}
-
-/* Target the hero subtitle */
-& p {
-  font-size: 1.25rem;
-  color: rgba(255,255,255,0.9);
-}
-
-/* Target the CTA button */
-& .btn {
-  background: #ff6b6b;
-  color: white;
-  padding: 1rem 2rem;
-  border-radius: 8px;
-}
-
-/* Target the hero image */
-& img {
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-}`,
-        about: `/* Target the about section */
-& {
-  background: #f8f9fa;
-  padding: 3rem 0;
-}
-
-/* Target the section title */
-& .section-title {
-  color: #2c3e50;
-  font-size: 2.5rem;
-}
-
-/* Target the content */
-& .about-content {
-  font-size: 1.125rem;
-  line-height: 1.8;
-  color: #4a5568;
-}`,
-        principal: `/* Target the principal section */
-& {
-  background: white;
-  padding: 3rem 0;
-}
-
-/* Target the section title */
-& .section-title {
-  color: #2c3e50;
-}
-
-/* Target the principal image */
-& img {
-  border-radius: 50%;
-  border: 4px solid #667eea;
-}
-
-/* Target the principal name */
-& h3 {
-  font-size: 1.5rem;
-  color: #667eea;
-}
-
-/* Target the message */
-& p {
-  font-style: italic;
-  color: #4a5568;
-}`,
-        contact: `/* Target the contact section */
-& {
-  background: #2c3e50;
-  color: white;
-  padding: 3rem 0;
-}
-
-/* Target individual contact items */
-& .contact-item {
-  padding: 1rem;
-  background: rgba(255,255,255,0.05);
-}
-
-/* Target contact headings */
-& .contact-item h3 {
-  color: #3498db;
-}`,
-        dynamic_notices: `/* Target the notices section */
-& {
-  background: #f8f9fa;
-  padding: 3rem 0;
-}
-
-/* Target notice cards */
-& .notice-card {
-  background: white;
-  padding: 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-
-/* Target notice title */
-& .notice-title {
-  color: #2c3e50;
-  font-weight: 600;
-}`,
-        dynamic_gallery: `/* Target the gallery section */
-& {
-  background: white;
-  padding: 3rem 0;
-}
-
-/* Target gallery grid */
-& .gallery-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 1.5rem;
-}
-
-/* Target gallery images */
-& .gallery-img {
-  width: 100%;
-  height: 200px;
-  object-fit: cover;
-  border-radius: 8px;
-  transition: transform 0.3s;
-}
-
-& .gallery-img:hover {
-  transform: scale(1.05);
-}`
-    };
-
-    return templates[section.type] || `/* Target this section */\n& {\n  background: #f5f5f5;\n  color: #333;\n  padding: 2rem;\n}`;
-};
+import { v4 as uuidv4 } from 'uuid';
 
 export function SectionEditor({ section, onChange }) {
-    const [showCssHelp, setShowCssHelp] = useState(false);
-
     if (!section) {
         return (
             <Card className="h-full w-80 flex-shrink-0 border-l rounded-none">
@@ -181,129 +27,174 @@ export function SectionEditor({ section, onChange }) {
         });
     };
 
-    const handleCssChange = (css) => {
-        onChange({
-            ...section,
-            customCss: css
-        });
+    const handleArrayUpdate = (arrayKey, index, field, value) => {
+        const newArray = [...(section.data[arrayKey] || [])];
+        newArray[index] = { ...newArray[index], [field]: value };
+        handleChange(arrayKey, newArray);
     };
 
-    const loadTemplate = () => {
-        const template = getCssTemplate(section);
-        handleCssChange(template);
+    const handleArrayAdd = (arrayKey, newItem) => {
+        const newArray = [...(section.data[arrayKey] || []), newItem];
+        handleChange(arrayKey, newArray);
+    };
+
+    const handleArrayRemove = (arrayKey, index) => {
+        const newArray = (section.data[arrayKey] || []).filter((_, i) => i !== index);
+        handleChange(arrayKey, newArray);
+    };
+
+    const handleArrayMove = (arrayKey, index, direction) => {
+        const newArray = [...(section.data[arrayKey] || [])];
+        const newIndex = direction === 'up' ? index - 1 : index + 1;
+        if (newIndex < 0 || newIndex >= newArray.length) return;
+        [newArray[index], newArray[newIndex]] = [newArray[newIndex], newArray[index]];
+        handleChange(arrayKey, newArray);
     };
 
     return (
-        <Card className="h-full w-80 flex-shrink-0 border-l rounded-none overflow-y-auto">
-            <CardHeader className="pb-3">
-                <CardTitle className="capitalize text-base font-semibold">{section.type} Settings</CardTitle>
+        <Card className="h-full w-96 flex-shrink-0 border-l rounded-none flex flex-col overflow-hidden">
+            <CardHeader className="pb-3 pt-2 px-6 z-20 border-b flex-shrink-0">
+                <CardTitle className="text-base font-semibold capitalize">
+                    {section.type.replace(/-/g, ' ').replace(/_/g, ' ')} Settings
+                </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-                {/* Common Fields */}
-                <div className="space-y-2">
-                    <Label>Title</Label>
-                    <Input
-                        value={section.data.title || ''}
-                        onChange={(e) => handleChange('title', e.target.value)}
-                    />
-                </div>
+            <CardContent className="space-y-6 p-6 overflow-y-auto flex-1">
 
-                {/* Text Alignment */}
-                <div className="space-y-2">
-                    <Label>Text Alignment</Label>
-                    <Select
-                        value={section.data.textAlign || 'center'}
-                        onValueChange={(value) => handleChange('textAlign', value)}
-                    >
-                        <SelectTrigger>
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="left">Left</SelectItem>
-                            <SelectItem value="center">Center</SelectItem>
-                            <SelectItem value="right">Right</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
+                {/* HERO SLIDER */}
+                {section.type === 'hero-slider' && (
+                    <>
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                                <Label className="text-sm font-semibold">Slides</Label>
+                                <Button
+                                    onClick={() => handleArrayAdd('slides', {
+                                        id: uuidv4(),
+                                        image: '',
+                                        title: 'New Slide',
+                                        subtitle: 'Slide description',
+                                        buttonText: 'Learn More',
+                                        buttonLink: '#'
+                                    })}
+                                    size="sm"
+                                    variant="outline"
+                                >
+                                    <Plus className="h-3 w-3 mr-1" /> Add Slide
+                                </Button>
+                            </div>
+                            {(section.data.slides || []).map((slide, index) => (
+                                <Card key={slide.id} className="p-3">
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-xs font-medium">Slide {index + 1}</span>
+                                            <div className="flex gap-1">
+                                                {index > 0 && (
+                                                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleArrayMove('slides', index, 'up')}>
+                                                        <MoveUp className="h-3 w-3" />
+                                                    </Button>
+                                                )}
+                                                {index < (section.data.slides || []).length - 1 && (
+                                                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleArrayMove('slides', index, 'down')}>
+                                                        <MoveDown className="h-3 w-3" />
+                                                    </Button>
+                                                )}
+                                                <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => handleArrayRemove('slides', index)}>
+                                                    <Trash2 className="h-3 w-3" />
+                                                </Button>
+                                            </div>
+                                        </div>
 
-                {/* Background Color */}
-                <div className="space-y-2">
-                    <Label>Background Color</Label>
-                    <div className="flex gap-2 items-center">
-                        <Input
-                            type="color"
-                            value={section.data.bgColor || '#ffffff'}
-                            onChange={(e) => handleChange('bgColor', e.target.value)}
-                            className="w-16 h-10 p-1 cursor-pointer"
-                        />
-                        <Input
-                            type="text"
-                            value={section.data.bgColor || ''}
-                            onChange={(e) => handleChange('bgColor', e.target.value)}
-                            placeholder="e.g. #667eea or transparent"
-                            className="flex-1"
-                        />
-                        {section.data.bgColor && (
-                            <button
-                                onClick={() => handleChange('bgColor', '')}
-                                className="text-xs text-muted-foreground hover:text-foreground"
-                            >
-                                Clear
-                            </button>
-                        )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">Sets inline style. Leave empty to use default CSS.</p>
-                </div>
+                                        <div>
+                                            <Label className="text-xs">Image</Label>
+                                            <FileUploadButton
+                                                field={`Slide ${index + 1} Image`}
+                                                onChange={(url) => handleArrayUpdate('slides', index, 'image', url)}
+                                            />
+                                            {slide.image && <img src={slide.image} alt="Preview" className="w-full h-20 object-cover rounded mt-1" />}
+                                        </div>
 
-                {/* Text Color */}
-                <div className="space-y-2">
-                    <Label>Text Color</Label>
-                    <div className="flex gap-2 items-center">
-                        <Input
-                            type="color"
-                            value={section.data.textColor || '#000000'}
-                            onChange={(e) => handleChange('textColor', e.target.value)}
-                            className="w-16 h-10 p-1 cursor-pointer"
-                        />
-                        <Input
-                            type="text"
-                            value={section.data.textColor || ''}
-                            onChange={(e) => handleChange('textColor', e.target.value)}
-                            placeholder="e.g. #ffffff or white"
-                            className="flex-1"
-                        />
-                        {section.data.textColor && (
-                            <button
-                                onClick={() => handleChange('textColor', '')}
-                                className="text-xs text-muted-foreground hover:text-foreground"
-                            >
-                                Clear
-                            </button>
-                        )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">Sets inline style. Leave empty to use default CSS.</p>
-                </div>
+                                        <div>
+                                            <Label className="text-xs">Title</Label>
+                                            <Input
+                                                value={slide.title || ''}
+                                                onChange={(e) => handleArrayUpdate('slides', index, 'title', e.target.value)}
+                                                className="h-8 text-sm"
+                                            />
+                                        </div>
 
-                {/* Style Preview */}
-                {(section.data.bgColor || section.data.textColor) && (
-                    <div className="space-y-2">
-                        <Label className="text-xs">Preview</Label>
-                        <div
-                            className="p-4 rounded border"
-                            style={{
-                                background: section.data.bgColor || '#ffffff',
-                                color: section.data.textColor || '#000000'
-                            }}
-                        >
-                            <p className="text-sm font-semibold">Section Preview</p>
-                            <p className="text-xs mt-1">This shows your color choices</p>
+                                        <div>
+                                            <Label className="text-xs">Subtitle</Label>
+                                            <Input
+                                                value={slide.subtitle || ''}
+                                                onChange={(e) => handleArrayUpdate('slides', index, 'subtitle', e.target.value)}
+                                                className="h-8 text-sm"
+                                            />
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <Label className="text-xs">Button Text</Label>
+                                                <Input
+                                                    value={slide.buttonText || ''}
+                                                    onChange={(e) => handleArrayUpdate('slides', index, 'buttonText', e.target.value)}
+                                                    className="h-8 text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <Label className="text-xs">Button Link</Label>
+                                                <Input
+                                                    value={slide.buttonLink || ''}
+                                                    onChange={(e) => handleArrayUpdate('slides', index, 'buttonLink', e.target.value)}
+                                                    className="h-8 text-sm"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Card>
+                            ))}
                         </div>
-                    </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                                <Label className="text-xs">Height</Label>
+                                <Input
+                                    value={section.data.height || '600px'}
+                                    onChange={(e) => handleChange('height', e.target.value)}
+                                    className="h-8 text-sm"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-xs">Autoplay Interval (ms)</Label>
+                                <Input
+                                    type="number"
+                                    value={section.data.interval || 5000}
+                                    onChange={(e) => handleChange('interval', parseInt(e.target.value))}
+                                    className="h-8 text-sm"
+                                />
+                            </div>
+                        </div>
+                    </>
                 )}
 
-                {/* Type Specific Fields */}
-                {section.type === 'hero' && (
+                {/* HERO SIMPLE & SPLIT */}
+                {(section.type === 'hero-simple' || section.type === 'hero-split') && (
                     <>
+                        <div className="space-y-2">
+                            <Label>Background Image</Label>
+                            <FileUploadButton
+                                field="Hero Image"
+                                onChange={(url) => handleChange('image', url)}
+                            />
+                            {section.data.image && <img src={section.data.image} alt="Preview" className="w-full h-32 object-cover rounded" />}
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Title</Label>
+                            <Input
+                                value={section.data.title || ''}
+                                onChange={(e) => handleChange('title', e.target.value)}
+                            />
+                        </div>
+
                         <div className="space-y-2">
                             <Label>Subtitle</Label>
                             <Input
@@ -311,147 +202,367 @@ export function SectionEditor({ section, onChange }) {
                                 onChange={(e) => handleChange('subtitle', e.target.value)}
                             />
                         </div>
-                        <div className="space-y-2">
-                            <Label>Button Text</Label>
-                            <Input
-                                value={section.data.ctaText || ''}
-                                onChange={(e) => handleChange('ctaText', e.target.value)}
-                            />
+
+                        {section.type === 'hero-split' && (
+                            <div className="space-y-2">
+                                <Label>Description</Label>
+                                <Textarea
+                                    value={section.data.description || ''}
+                                    onChange={(e) => handleChange('description', e.target.value)}
+                                    rows={3}
+                                />
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                                <Label>Button Text</Label>
+                                <Input
+                                    value={section.data.buttonText || ''}
+                                    onChange={(e) => handleChange('buttonText', e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Button Link</Label>
+                                <Input
+                                    value={section.data.buttonLink || ''}
+                                    onChange={(e) => handleChange('buttonLink', e.target.value)}
+                                />
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label>Button Link</Label>
-                            <Input
-                                value={section.data.ctaLink || ''}
-                                onChange={(e) => handleChange('ctaLink', e.target.value)}
-                            />
-                        </div>
+
+                        {section.type === 'hero-split' && (
+                            <div className="space-y-2">
+                                <Label>Image Position</Label>
+                                <Select
+                                    value={section.data.imagePosition || 'left'}
+                                    onValueChange={(value) => handleChange('imagePosition', value)}
+                                >
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="left">Left</SelectItem>
+                                        <SelectItem value="right">Right</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {/* CONTENT IMAGE TEXT */}
+                {section.type === 'content-image-text' && (
+                    <>
                         <div className="space-y-2">
                             <Label>Image</Label>
                             <FileUploadButton
-                                field="Hero Image"
+                                field="Section Image"
                                 onChange={(url) => handleChange('image', url)}
                             />
-                            {section.data.image && (
-                                <img src={section.data.image} alt="Preview" className="w-full h-32 object-cover rounded mt-2" />
-                            )}
+                            {section.data.image && <img src={section.data.image} alt="Preview" className="w-full h-32 object-cover rounded" />}
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Heading</Label>
+                            <Input
+                                value={section.data.heading || ''}
+                                onChange={(e) => handleChange('heading', e.target.value)}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Content</Label>
+                            <Textarea
+                                value={section.data.content || ''}
+                                onChange={(e) => handleChange('content', e.target.value)}
+                                rows={5}
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                                <Label>Button Text</Label>
+                                <Input
+                                    value={section.data.buttonText || ''}
+                                    onChange={(e) => handleChange('buttonText', e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Button Link</Label>
+                                <Input
+                                    value={section.data.buttonLink || ''}
+                                    onChange={(e) => handleChange('buttonLink', e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Layout</Label>
+                            <Select
+                                value={section.data.layout || 'image-left'}
+                                onValueChange={(value) => handleChange('layout', value)}
+                            >
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="image-left">Image Left</SelectItem>
+                                    <SelectItem value="image-right">Image Right</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                     </>
                 )}
 
-                {(section.type === 'about' || section.type === 'principal') && (
-                    <div className="space-y-2">
-                        <Label>Content</Label>
-                        <Textarea
-                            value={section.data.content || section.data.message || ''}
-                            onChange={(e) => handleChange(section.type === 'principal' ? 'message' : 'content', e.target.value)}
-                            rows={5}
-                        />
-                    </div>
+                {/* CONTENT CARDS */}
+                {section.type === 'content-cards' && (
+                    <>
+                        <div className="space-y-2">
+                            <Label>Heading</Label>
+                            <Input
+                                value={section.data.heading || ''}
+                                onChange={(e) => handleChange('heading', e.target.value)}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Subheading (Optional)</Label>
+                            <Input
+                                value={section.data.subheading || ''}
+                                onChange={(e) => handleChange('subheading', e.target.value)}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Columns</Label>
+                            <Select
+                                value={String(section.data.columns || 3)}
+                                onValueChange={(value) => handleChange('columns', parseInt(value))}
+                            >
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="2">2 Columns</SelectItem>
+                                    <SelectItem value="3">3 Columns</SelectItem>
+                                    <SelectItem value="4">4 Columns</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                                <Label className="text-sm font-semibold">Cards</Label>
+                                <Button
+                                    onClick={() => handleArrayAdd('cards', {
+                                        id: uuidv4(),
+                                        icon: '🎓',
+                                        title: 'New Card',
+                                        description: 'Card description',
+                                        link: '#'
+                                    })}
+                                    size="sm"
+                                    variant="outline"
+                                >
+                                    <Plus className="h-3 w-3 mr-1" /> Add Card
+                                </Button>
+                            </div>
+                            {(section.data.cards || []).map((card, index) => (
+                                <Card key={card.id} className="p-3">
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-xs font-medium">Card {index + 1}</span>
+                                            <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => handleArrayRemove('cards', index)}>
+                                                <Trash2 className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+
+                                        <div>
+                                            <Label className="text-xs">Icon/Emoji</Label>
+                                            <Input
+                                                value={card.icon || ''}
+                                                onChange={(e) => handleArrayUpdate('cards', index, 'icon', e.target.value)}
+                                                className="h-8 text-sm"
+                                                placeholder="🎓"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <Label className="text-xs">Title</Label>
+                                            <Input
+                                                value={card.title || ''}
+                                                onChange={(e) => handleArrayUpdate('cards', index, 'title', e.target.value)}
+                                                className="h-8 text-sm"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <Label className="text-xs">Description</Label>
+                                            <Textarea
+                                                value={card.description || ''}
+                                                onChange={(e) => handleArrayUpdate('cards', index, 'description', e.target.value)}
+                                                rows={2}
+                                                className="text-sm"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <Label className="text-xs">Link (Optional)</Label>
+                                            <Input
+                                                value={card.link || ''}
+                                                onChange={(e) => handleArrayUpdate('cards', index, 'link', e.target.value)}
+                                                className="h-8 text-sm"
+                                            />
+                                        </div>
+                                    </div>
+                                </Card>
+                            ))}
+                        </div>
+                    </>
                 )}
 
-                {section.type === 'principal' && (
-                    <div className="space-y-2">
-                        <Label>Principal Name</Label>
-                        <Input
-                            value={section.data.name || ''}
-                            onChange={(e) => handleChange('name', e.target.value)}
-                        />
-                        <Label>Image</Label>
-                        <FileUploadButton
-                            field="Principal Image"
-                            onChange={(url) => handleChange('image', url)}
-                        />
-                        {section.data.image && (
-                            <img src={section.data.image} alt="Preview" className="w-full h-32 object-cover rounded mt-2" />
+                {/* GALLERY GRID */}
+                {(section.type === 'gallery-grid' || section.type === 'gallery-masonry') && (
+                    <>
+                        <div className="space-y-2">
+                            <Label>Heading</Label>
+                            <Input
+                                value={section.data.heading || ''}
+                                onChange={(e) => handleChange('heading', e.target.value)}
+                            />
+                        </div>
+
+                        {section.type === 'gallery-grid' && (
+                            <div className="space-y-2">
+                                <Label>Columns</Label>
+                                <Select
+                                    value={String(section.data.columns || 4)}
+                                    onValueChange={(value) => handleChange('columns', parseInt(value))}
+                                >
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="2">2 Columns</SelectItem>
+                                        <SelectItem value="3">3 Columns</SelectItem>
+                                        <SelectItem value="4">4 Columns</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         )}
-                    </div>
-                )}
 
-                {section.type === 'contact' && (
-                    <>
-                        <div className="space-y-2">
-                            <Label>Address</Label>
-                            <Input
-                                value={section.data.address || ''}
-                                onChange={(e) => handleChange('address', e.target.value)}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Phone</Label>
-                            <Input
-                                value={section.data.phone || ''}
-                                onChange={(e) => handleChange('phone', e.target.value)}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Email</Label>
-                            <Input
-                                value={section.data.email || ''}
-                                onChange={(e) => handleChange('email', e.target.value)}
-                            />
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                                <Label className="text-sm font-semibold">Images</Label>
+                                <Button
+                                    onClick={() => handleArrayAdd('images', { id: uuidv4(), url: '', caption: '' })}
+                                    size="sm"
+                                    variant="outline"
+                                >
+                                    <Plus className="h-3 w-3 mr-1" /> Add Image
+                                </Button>
+                            </div>
+                            {(section.data.images || []).map((image, index) => (
+                                <Card key={image.id} className="p-3">
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-xs font-medium">Image {index + 1}</span>
+                                            <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => handleArrayRemove('images', index)}>
+                                                <Trash2 className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+
+                                        <div>
+                                            <FileUploadButton
+                                                field={`Image ${index + 1}`}
+                                                onChange={(url) => handleArrayUpdate('images', index, 'url', url)}
+                                            />
+                                            {image.url && <img src={image.url} alt="Preview" className="w-full h-20 object-cover rounded mt-1" />}
+                                        </div>
+
+                                        <div>
+                                            <Label className="text-xs">Caption (Optional)</Label>
+                                            <Input
+                                                value={image.caption || ''}
+                                                onChange={(e) => handleArrayUpdate('images', index, 'caption', e.target.value)}
+                                                className="h-8 text-sm"
+                                            />
+                                        </div>
+                                    </div>
+                                </Card>
+                            ))}
                         </div>
                     </>
                 )}
 
-                {/* Dynamic Sections */}
-                {(section.type === 'dynamic_notices' || section.type === 'dynamic_gallery') && (
+                {/* MESSAGE PROFILE */}
+                {section.type === 'message-profile' && (
                     <>
                         <div className="space-y-2">
-                            <Label>Limit (Number of items)</Label>
+                            <Label>Profile Image</Label>
+                            <FileUploadButton
+                                field="Profile Image"
+                                onChange={(url) => handleChange('image', url)}
+                            />
+                            {section.data.image && <img src={section.data.image} alt="Preview" className="w-full h-32 object-cover rounded" />}
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Name</Label>
                             <Input
-                                type="number"
-                                value={section.data.limit || (section.type === 'dynamic_notices' ? 3 : 6)}
-                                onChange={(e) => handleChange('limit', parseInt(e.target.value))}
+                                value={section.data.name || ''}
+                                onChange={(e) => handleChange('name', e.target.value)}
                             />
                         </div>
+
                         <div className="space-y-2">
-                            <Label>View All Link (Optional)</Label>
+                            <Label>Designation</Label>
                             <Input
-                                value={section.data.viewAllLink || ''}
-                                onChange={(e) => handleChange('viewAllLink', e.target.value)}
-                                placeholder={section.type === 'dynamic_notices' ? '/notices' : '/gallery'}
+                                value={section.data.designation || ''}
+                                onChange={(e) => handleChange('designation', e.target.value)}
                             />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Heading (Optional)</Label>
+                            <Input
+                                value={section.data.heading || ''}
+                                onChange={(e) => handleChange('heading', e.target.value)}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Message</Label>
+                            <Textarea
+                                value={section.data.message || ''}
+                                onChange={(e) => handleChange('message', e.target.value)}
+                                rows={5}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Layout</Label>
+                            <Select
+                                value={section.data.layout || 'image-left'}
+                                onValueChange={(value) => handleChange('layout', value)}
+                            >
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="image-left">Image Left</SelectItem>
+                                    <SelectItem value="image-right">Image Right</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                     </>
                 )}
 
-                {section.type === 'custom_layout' && (
-                    <LayoutEditor
-                        data={section.data}
-                        onChange={(key, value) => handleChange(key, value)}
-                    />
-                )}
-
-                {/* Custom CSS Section - Always visible */}
+                {/* COMMON BACKGROUND COLOR */}
                 <div className="space-y-2 pt-4 border-t">
-                    <div className="flex items-center justify-between">
-                        <Label className="text-sm font-semibold">Custom CSS</Label>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={loadTemplate}
-                            className="h-7 text-xs"
-                        >
-                            Load Template
-                        </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                        Use <code className="bg-muted px-1 rounded">&</code> for section container.
-                        See template for available classes.
-                    </p>
-                    <div className="border rounded-md overflow-hidden bg-slate-950 text-slate-50 font-mono text-xs">
-                        <Editor
-                            value={section.customCss || ''}
-                            onValueChange={handleCssChange}
-                            highlight={code => highlight(code, languages.css)}
-                            padding={10}
-                            style={{
-                                fontFamily: '"Fira code", "Fira Mono", monospace',
-                                fontSize: 11,
-                                minHeight: '150px',
-                            }}
-                            textareaClassName="focus:outline-none"
-                            placeholder="/* Click 'Load Template' to see available classes */"
+                    <Label>Background Color</Label>
+                    <div className="flex gap-2">
+                        <Input
+                            type="color"
+                            value={section.data.backgroundColor || '#ffffff'}
+                            onChange={(e) => handleChange('backgroundColor', e.target.value)}
+                            className="w-16 h-10 p-1"
+                        />
+                        <Input
+                            value={section.data.backgroundColor || ''}
+                            onChange={(e) => handleChange('backgroundColor', e.target.value)}
+                            placeholder="#ffffff"
                         />
                     </div>
                 </div>

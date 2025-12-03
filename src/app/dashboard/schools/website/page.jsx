@@ -275,14 +275,333 @@ export default function ManageWebsitePage() {
 
     const getDefaultDataForType = (type) => {
         switch (type) {
-            case 'hero': return { title: 'Welcome to Our School', subtitle: 'Nurturing Minds, Building Futures', ctaText: 'Learn More', ctaLink: '/about', bgColor: '#ffffff', textColor: '#000000' };
-            case 'about': return { title: 'About Us', content: 'We are dedicated to providing quality education...', bgColor: '#f8f9fa', textColor: '#000000' };
-            case 'principal': return { name: 'Dr. Principal', message: 'Welcome to our school website...', bgColor: '#ffffff', textColor: '#000000' };
-            case 'contact': return { address: '123 School Lane', phone: '+1 234 567 890', email: 'info@school.edu', bgColor: '#1e293b', textColor: '#ffffff' };
-            case 'dynamic_notices': return { title: 'Latest Notices', limit: 3, viewAllLink: '/notices', bgColor: '#f8f9fa', textColor: '#000000' };
-            case 'dynamic_gallery': return { title: 'Photo Gallery', limit: 6, viewAllLink: '/gallery', bgColor: '#ffffff', textColor: '#000000' };
-            case 'custom_layout': return { rows: [{ id: uuidv4(), columns: [{ id: uuidv4(), width: '100%', widget: { type: 'text', content: 'Custom Content' } }] }] };
-            default: return {};
+            // Hero Sections
+            case 'hero-slider':
+                return {
+                    slides: [
+                        {
+                            id: uuidv4(),
+                            image: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=1920',
+                            title: 'Welcome to Our School',
+                            subtitle: 'Excellence in Education Since 1990',
+                            buttonText: 'Learn More',
+                            buttonLink: '#about'
+                        },
+                        {
+                            id: uuidv4(),
+                            image: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=1920',
+                            title: 'Shaping Future Leaders',
+                            subtitle: 'World-Class Faculty & Facilities',
+                            buttonText: 'Explore Programs',
+                            buttonLink: '#programs'
+                        }
+                    ],
+                    autoplay: true,
+                    interval: 5000,
+                    showArrows: true,
+                    showDots: true,
+                    height: '600px'
+                };
+
+            case 'hero-simple':
+                return {
+                    image: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=1920',
+                    title: 'Welcome to Our School',
+                    subtitle: 'Excellence in Education',
+                    buttonText: 'Get Started',
+                    buttonLink: '#',
+                    height: '500px',
+                    overlay: 'dark',
+                    textAlign: 'center'
+                };
+
+            case 'hero-split':
+                return {
+                    image: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=800',
+                    title: 'Quality Education',
+                    subtitle: 'Building Tomorrow\'s Leaders Today',
+                    description: 'Join our community of learners and discover your potential.',
+                    buttonText: 'Apply Now',
+                    buttonLink: '#',
+                    imagePosition: 'left',
+                    backgroundColor: '#f9fafb'
+                };
+
+            // Content Sections
+            case 'content-image-text':
+                return {
+                    layout: 'image-left',
+                    image: 'https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=800',
+                    heading: 'About Our School',
+                    content: 'We are committed to providing excellence in education and fostering an environment where students can thrive academically, socially, and personally. Our dedicated faculty and modern facilities create the perfect setting for learning and growth.',
+                    buttonText: 'Read More',
+                    buttonLink: '#',
+                    backgroundColor: '#ffffff',
+                    padding: '80px'
+                };
+
+            case 'content-cards':
+                return {
+                    heading: 'Why Choose Us',
+                    subheading: 'Discover what makes our school special',
+                    cards: [
+                        {
+                            id: uuidv4(),
+                            icon: '🎓',
+                            title: 'Quality Education',
+                            description: 'Comprehensive curriculum designed to meet international standards.',
+                            link: '#'
+                        },
+                        {
+                            id: uuidv4(),
+                            icon: '👨‍🏫',
+                            title: 'Expert Faculty',
+                            description: 'Experienced and dedicated teachers committed to student success.',
+                            link: '#'
+                        },
+                        {
+                            id: uuidv4(),
+                            icon: '🏫',
+                            title: 'Modern Facilities',
+                            description: 'State-of-the-art classrooms and labs for hands-on learning.',
+                            link: '#'
+                        }
+                    ],
+                    columns: 3,
+                    cardStyle: 'elevated',
+                    backgroundColor: '#f9fafb'
+                };
+
+            case 'content-features':
+                return {
+                    heading: 'Our Features',
+                    features: [
+                        {
+                            id: uuidv4(),
+                            icon: '📚',
+                            title: 'Rich Library',
+                            description: 'Extensive collection of books and digital resources.'
+                        },
+                        {
+                            id: uuidv4(),
+                            icon: '🏀',
+                            title: 'Sports Programs',
+                            description: 'Comprehensive athletics and physical education.'
+                        },
+                        {
+                            id: uuidv4(),
+                            icon: '🎨',
+                            title: 'Arts & Culture',
+                            description: 'Programs in music, drama, and visual arts.'
+                        },
+                        {
+                            id: uuidv4(),
+                            icon: '💻',
+                            title: 'Technology Integration',
+                            description: 'Modern tech labs and digital learning tools.'
+                        }
+                    ],
+                    columns: 2,
+                    backgroundColor: '#ffffff'
+                };
+
+            case 'content-stats':
+                return {
+                    stats: [
+                        { id: uuidv4(), number: '1500+', label: 'Students' },
+                        { id: uuidv4(), number: '50+', label: 'Teachers' },
+                        { id: uuidv4(), number: '98%', label: 'Success Rate' },
+                        { id: uuidv4(), number: '25+', label: 'Years of Excellence' }
+                    ],
+                    backgroundColor: '#2563eb',
+                    textColor: '#ffffff'
+                };
+
+            // Message Sections
+            case 'message-profile':
+                return {
+                    image: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400',
+                    name: 'Dr. John Smith',
+                    designation: 'Principal',
+                    heading: 'Principal\'s Message',
+                    message: 'Welcome to our school! We are dedicated to providing a nurturing environment where students can excel academically while developing important life skills. Our committed faculty and staff work tirelessly to ensure every child reaches their full potential.',
+                    layout: 'image-left',
+                    backgroundColor: '#f9fafb'
+                };
+
+            case 'message-quote':
+                return {
+                    quote: 'This school has been instrumental in shaping my child\'s future. The teachers are dedicated and the curriculum is exceptional.',
+                    author: 'Parent Name',
+                    designation: 'Parent of Class 10 Student',
+                    image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200',
+                    backgroundColor: '#ffffff'
+                };
+
+            // Media Sections
+            case 'gallery-grid':
+                return {
+                    heading: 'Photo Gallery',
+                    images: [
+                        { id: uuidv4(), url: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=600', caption: 'Campus View' },
+                        { id: uuidv4(), url: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=600', caption: 'Classroom' },
+                        { id: uuidv4(), url: 'https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=600', caption: 'Library' },
+                        { id: uuidv4(), url: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=600', caption: 'Science Lab' },
+                        { id: uuidv4(), url: 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=600', caption: 'Sports Field' },
+                        { id: uuidv4(), url: 'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?w=600', caption: 'Events' }
+                    ],
+                    columns: 4,
+                    spacing: 16,
+                    lightbox: true,
+                    backgroundColor: '#ffffff'
+                };
+
+            case 'gallery-masonry':
+                return {
+                    heading: 'Gallery',
+                    images: [
+                        { id: uuidv4(), url: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=600', caption: 'Image 1' },
+                        { id: uuidv4(), url: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=600', caption: 'Image 2' },
+                        { id: uuidv4(), url: 'https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=600', caption: 'Image 3' },
+                    ],
+                    backgroundColor: '#f9fafb'
+                };
+
+            case 'video-section':
+                return {
+                    heading: 'Virtual Tour',
+                    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+                    description: 'Take a virtual tour of our facilities and see what makes our school special.',
+                    backgroundColor: '#ffffff'
+                };
+
+            // Interactive Sections
+            case 'tabs-content':
+                return {
+                    heading: 'Our Programs',
+                    tabs: [
+                        {
+                            id: uuidv4(),
+                            label: 'Primary',
+                            content: 'Our primary education program focuses on building strong foundations in core subjects while nurturing creativity and curiosity.'
+                        },
+                        {
+                            id: uuidv4(),
+                            label: 'Secondary',
+                            content: 'Secondary education prepares students for higher learning with advanced courses and personalized guidance.'
+                        },
+                        {
+                            id: uuidv4(),
+                            label: 'Extra-Curricular',
+                            content: 'We offer a wide range of activities including sports, arts, music, and clubs to develop well-rounded students.'
+                        }
+                    ],
+                    backgroundColor: '#ffffff'
+                };
+
+            case 'accordion':
+                return {
+                    heading: 'Frequently Asked Questions',
+                    items: [
+                        {
+                            id: uuidv4(),
+                            title: 'What is the admission process?',
+                            content: 'Our admission process begins with an online application form, followed by an entrance test and interview. We review applications on a rolling basis.'
+                        },
+                        {
+                            id: uuidv4(),
+                            title: 'What are the school timings?',
+                            content: 'School hours are from 8:00 AM to 2:30 PM for primary grades and 8:00 AM to 3:30 PM for secondary grades.'
+                        },
+                        {
+                            id: uuidv4(),
+                            title: 'Do you offer transportation?',
+                            content: 'Yes, we provide safe and reliable bus transportation covering all major areas of the city.'
+                        }
+                    ],
+                    backgroundColor: '#f9fafb'
+                };
+
+            case 'timeline':
+                return {
+                    heading: 'Our Journey',
+                    events: [
+                        { id: uuidv4(), year: '1990', title: 'School Founded', description: 'Established with a vision to provide quality education.' },
+                        { id: uuidv4(), year: '2000', title: 'New Campus', description: 'Moved to modern facilities with advanced infrastructure.' },
+                        { id: uuidv4(), year: '2010', title: 'Accreditation', description: 'Received international accreditation for academic excellence.' },
+                        { id: uuidv4(), year: '2020', title: 'Digital Transformation', description: 'Fully integrated digital learning platform.' }
+                    ],
+                    backgroundColor: '#ffffff'
+                };
+
+            // Legacy Section Types
+            case 'hero':
+                return {
+                    title: 'Welcome to Our School',
+                    subtitle: 'Nurturing Minds, Building Futures',
+                    ctaText: 'Learn More',
+                    ctaLink: '/about',
+                    bgColor: '#ffffff',
+                    textColor: '#000000'
+                };
+
+            case 'about':
+                return {
+                    title: 'About Us',
+                    content: 'We are dedicated to providing quality education...',
+                    bgColor: '#f8f9fa',
+                    textColor: '#000000'
+                };
+
+            case 'principal':
+                return {
+                    name: 'Dr. Principal',
+                    message: 'Welcome to our school website...',
+                    bgColor: '#ffffff',
+                    textColor: '#000000'
+                };
+
+            case 'contact':
+                return {
+                    address: '123 School Lane',
+                    phone: '+1 234 567 890',
+                    email: 'info@school.edu',
+                    bgColor: '#1e293b',
+                    textColor: '#ffffff'
+                };
+
+            case 'dynamic_notices':
+                return {
+                    title: 'Latest Notices',
+                    limit: 3,
+                    viewAllLink: '/notices',
+                    bgColor: '#f8f9fa',
+                    textColor: '#000000'
+                };
+
+            case 'dynamic_gallery':
+                return {
+                    title: 'Photo Gallery',
+                    limit: 6,
+                    viewAllLink: '/gallery',
+                    bgColor: '#ffffff',
+                    textColor: '#000000'
+                };
+
+            case 'custom_layout':
+                return {
+                    rows: [{
+                        id: uuidv4(),
+                        columns: [{
+                            id: uuidv4(),
+                            width: '100%',
+                            widget: { type: 'text', content: 'Custom Content' }
+                        }]
+                    }]
+                };
+
+            default:
+                return {};
         }
     };
 
