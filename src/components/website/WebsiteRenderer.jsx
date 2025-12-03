@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
-import React from 'react';
+'use client';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 
 export function WebsiteRenderer({ config, school, activePage, notices, gallery }) {
@@ -252,6 +253,10 @@ export function WebsiteRenderer({ config, school, activePage, notices, gallery }
                     box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
                 }
                 
+                .website-preview-wrapper .card.flat {
+                    border-radius: 12px;
+                }
+                
                 .website-preview-wrapper .card-icon {
                     font-size: 3rem;
                     margin-bottom: 1rem;
@@ -260,6 +265,12 @@ export function WebsiteRenderer({ config, school, activePage, notices, gallery }
                 .website-preview-wrapper .card h3 {
                     font-size: 1.5rem;
                     margin-bottom: 1rem;
+                }
+                
+                .website-preview-wrapper .card a {
+                    color: var(--primary);
+                    text-decoration: none;
+                    font-weight: 600;
                 }
                 
                 /* Message Profile Section */
@@ -341,7 +352,7 @@ export function WebsiteRenderer({ config, school, activePage, notices, gallery }
                     transition: opacity 0.25s ease;
                     display: flex;
                     align-items: center;
-                    justify-center;
+                    justify-content: center;
                     color: white;
                 }
                 
@@ -467,33 +478,141 @@ export function WebsiteRenderer({ config, school, activePage, notices, gallery }
         );
     };
 
+    // Initialize hero sliders with JavaScript
+    useEffect(() => {
+        const initHeroSliders = () => {
+            const sliders = document.querySelectorAll('.hero-slider');
+
+            sliders.forEach(slider => {
+                const slides = slider.querySelectorAll('.hero-slide');
+                const dots = slider.querySelectorAll('.slider-dot');
+                let currentSlide = 0;
+                let autoplayInterval;
+
+                const showSlide = (index) => {
+                    slides.forEach(s => s.classList.remove('active'));
+                    dots.forEach(d => d.classList.remove('active'));
+
+                    if (slides[index]) {
+                        slides[index].classList.add('active');
+                    }
+                    if (dots[index]) {
+                        dots[index].classList.add('active');
+                    }
+                    currentSlide = index;
+                };
+
+                const nextSlide = () => {
+                    let next = (currentSlide + 1) % slides.length;
+                    showSlide(next);
+                };
+
+                const startAutoplay = () => {
+                    autoplayInterval = setInterval(nextSlide, 5000);
+                };
+
+                const stopAutoplay = () => {
+                    clearInterval(autoplayInterval);
+                };
+
+                // Dot navigation
+                dots.forEach((dot, index) => {
+                    dot.addEventListener('click', () => {
+                        stopAutoplay();
+                        showSlide(index);
+                        startAutoplay();
+                    });
+                });
+
+                // Start autoplay if multiple slides
+                if (slides.length > 1) {
+                    startAutoplay();
+                }
+
+                // Pause on hover
+                slider.addEventListener('mouseenter', stopAutoplay);
+                slider.addEventListener('mouseleave', () => {
+                    if (slides.length > 1) startAutoplay();
+                });
+            });
+        };
+
+        // Run after component mounts and content is rendered
+        const timer = setTimeout(initHeroSliders, 100);
+        return () => clearTimeout(timer);
+    }, [activePage]); // Re-run when page changes
+
     return (
         <div className="website-preview-wrapper">
             {generateCss()}
 
             {/* Header */}
             <header
-                className="border-b sticky top-0 z-50 bg-white/80 backdrop-blur-md"
+                className={`border-b bg-white ${config.global?.header?.style === 'sticky' ? 'sticky top-0 z-50' : ''}`}
                 style={{ background: config.global?.header?.bgColor }}
             >
-                <div className="container mx-auto px-4 py-4">
-                    <nav className={`flex items-center ${config.global?.header?.menuAlign === 'center' ? 'justify-center flex-col gap-4' : 'justify-between'}`}>
-                        <div className="flex items-center gap-2 font-bold text-xl">
+                <div className="container mx-auto px-4">
+                    <nav className="flex items-center justify-between py-4 gap-8">
+                        {/* Logo Section */}
+                        <div className="flex items-center gap-3 flex-shrink-0">
                             {(config.global?.logo || school.profilePicture) && (
-                                <img src={config.global?.logo || school.profilePicture} alt={school.name} className="h-10 w-auto object-contain" />
+                                <img
+                                    src={config.global?.logo || school.profilePicture}
+                                    alt={school.schoolName || school.name}
+                                    className="h-12 w-auto object-contain"
+                                />
                             )}
-                            <span>{school.name}</span>
+                            {/* Only show text if no custom logo uploaded */}
+                            {!config.global?.logo && (
+                                <span className="font-bold text-xl text-slate-800">{school.schoolName || school.name}</span>
+                            )}
                         </div>
-                        <div className="flex items-center gap-6 flex-wrap justify-center">
+
+                        {/* Navigation Links (Center) */}
+                        <div className="hidden md:flex items-center gap-6 flex-1 justify-center">
                             {(config.global?.header?.links || []).map((link, i) => (
+                                <div key={i} className="relative group">
+                                    <Link
+                                        href={resolveLink(link.url, link.target)}
+                                        className="text-slate-700 hover:text-primary transition-colors font-medium flex items-center gap-1"
+                                    >
+                                        {link.label}
+                                        {link.submenu && link.submenu.length > 0 && (
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        )}
+                                    </Link>
+
+                                    {/* Dropdown Submenu */}
+                                    {link.submenu && link.submenu.length > 0 && (
+                                        <div className="absolute left-0 top-full mt-2 bg-white shadow-lg rounded-lg border min-w-[200px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                                            <div className="py-2">
+                                                {link.submenu.map((subitem, si) => (
+                                                    <Link
+                                                        key={si}
+                                                        href={resolveLink(subitem.url, subitem.target || 'page')}
+                                                        className="block px-4 py-2 text-slate-600 hover:bg-slate-50 hover:text-primary transition-colors"
+                                                    >
+                                                        {subitem.label}
+                                                    </Link>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}</div>
+
+                        {/* CTA Button (Right) */}
+                        <div className="flex-shrink-0">
+                            {config.global?.header?.ctaText && (
                                 <Link
-                                    key={i}
-                                    href={resolveLink(link.url, link.target)}
-                                    className="text-slate-600 hover:text-primary transition-colors font-medium"
+                                    href={config.global?.header?.ctaLink || '#'}
+                                    className="btn btn-primary"
                                 >
-                                    {link.label}
+                                    {config.global?.header?.ctaText}
                                 </Link>
-                            ))}
+                            )}
                         </div>
                     </nav>
                 </div>
@@ -516,9 +635,9 @@ export function WebsiteRenderer({ config, school, activePage, notices, gallery }
             {/* Footer */}
             <footer
                 className="py-12"
-                style={{ background: config.global?.footer?.bgColor || '#0f172a', color: 'white' }}
+                style={{ background: config.global?.footer?.bgColor || '#0f172a', color: 'white', textAlign: config.global?.footer?.textAlign || 'center' }}
             >
-                <div className="container mx-auto px-4 text-center">
+                <div className="container mx-auto px-4">
                     <p className="opacity-80">{config.global?.footer?.text || `© ${new Date().getFullYear()} ${school.name}. All rights reserved.`}</p>
                 </div>
             </footer>
