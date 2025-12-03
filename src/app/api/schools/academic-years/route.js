@@ -14,6 +14,18 @@ export async function POST(req) {
             return NextResponse.json({ error: "Schoool id is missing" }, { status: 400 })
         }
 
+        // Check if academic year with same name exists for this school
+        const existingYear = await prisma.academicYear.findFirst({
+            where: {
+                name,
+                schoolId
+            }
+        })
+
+        if (existingYear) {
+            return NextResponse.json({ error: "Academic year with this name already exists" }, { status: 409 })
+        }
+
         const academicYear = await prisma.academicYear.create({
             data: {
                 name,

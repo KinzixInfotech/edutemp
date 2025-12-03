@@ -56,17 +56,32 @@ export default function AcademicYearsPage() {
 
     async function createYear() {
         try {
-            await fetch("/api/schools/academic-years", {
+            const payload = {
+                ...form,
+                schoolId: form.schoolId || fullUser?.schoolId || fullUser?.school?.id
+            }
+
+            if (!payload.schoolId) {
+                toast.error("School ID is missing");
+                return;
+            }
+
+            const res = await fetch("/api/schools/academic-years", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(form),
+                body: JSON.stringify(payload),
             })
+
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.error || "Failed to create");
+            }
             toast.success('Academic Year Created Successfuly');
             setForm({ name: "", startDate: "", endDate: "" });
             setOpen(false)
             fetchYears()
         } catch (err) {
-            toast.error('Failed To Create Academic Year', err.error);
+            toast.error(err.message || 'Failed To Create Academic Year');
         }
     }
 

@@ -4,7 +4,8 @@ import * as React from "react"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
-import { useAuth } from "@/context/AuthContext"
+import { useAuth } from "@/context/AuthContext";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import logocllight from '../../public/cl_light_edu.png';
 import logocldark from '../../public/cl_dark_edu.png';
@@ -56,6 +57,8 @@ import {
     TrendingUp,
 } from "lucide-react"
 import { useCommandMenu } from "./CommandMenuContext"
+import { cn } from "@/lib/utils"
+import { useEffect } from "react"
 
 export const SidebarData = [
     {
@@ -505,21 +508,59 @@ const navUser = {
     },
 }
 
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
 export function AppSidebar({ ...props }) {
     const { resolvedTheme } = useTheme()
     const { fullUser } = useAuth()
     const { setOpen } = useCommandMenu()
     const pathname = usePathname()
     const { state } = useSidebar()
+    const queryClient = useQueryClient()
 
     const logo = resolvedTheme === "dark" ? logoWhite : logoBlack
     const logoCl = resolvedTheme === "dark" ? logocldark : logocllight
     const isCollapsed = state === "collapsed"
+
+    // Fetch academic years using TanStack Query
+    const { data: academicYears = [], isLoading: loading } = useQuery({
+        queryKey: ['academic-years', fullUser?.schoolId],
+        queryFn: async () => {
+            if (!fullUser?.schoolId) return [];
+            const response = await fetch(`/api/schools/academic-years?schoolId=${fullUser.schoolId}`);
+            const data = await response.json();
+            return Array.isArray(data) ? data : (data.academicYears || []);
+        },
+        enabled: !!fullUser?.schoolId && fullUser?.role?.name === 'ADMIN',
+        staleTime: 5 * 60 * 1000, // 5 minutes
+    });
+
+    const activeYear = academicYears.find(y => y.isActive);
+
+    // Handle session switch using Mutation
+    const switchSessionMutation = useMutation({
+        mutationFn: async (yearId) => {
+            const response = await fetch('/api/schools/academic-years/activate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ academicYearId: yearId })
+            });
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries(['academic-years']);
+            window.location.reload();
+        }
+    });
+
+    const handleSessionSwitch = (yearId) => {
+        switchSessionMutation.mutate(yearId);
+    };
     // console.log(fullUser);
 
     return (
         <Sidebar collapsible="icon" {...props}>
-            <SidebarHeader className={'border  mb-2.5 rounded-md bg-background shadow-xs'}>
+            <SidebarHeader className={'border mb-2.5 rounded-md bg-background shadow-xs'}>
                 <SidebarMenu>
                     <SidebarMenuItem className=''>
                         <SidebarMenuButton
@@ -534,44 +575,63 @@ export function AppSidebar({ ...props }) {
                                 )}
                             </div>
                         </SidebarMenuButton>
-                        {!isCollapsed && (
-                            <SidebarMenuButton asChild className={'mt-1.5'}>
-                                <button
-                                    className="inline-flex h-9 w-fit dark:bg-[#171717] rounded-md bg-white px-3 py-2 text-sm text-muted-foreground/80 mb-0 border shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                                    onClick={() => setOpen(true)}
-                                >
-                                    <span className="flex grow items-center">
-                                        <SearchIcon
-                                            className="-ms-1 me-3 text-muted-foreground/80 dark:text-white"
-                                            size={16}
-                                            aria-hidden="true"
-                                        />
-                                        <span className="font-normal text-muted-foreground/70">Search</span>
-                                    </span>
-                                    <kbd className="ms-12 -me-1 inline-flex h-5 max-h-full items-center rounded border bg-muted px-1 font-[inherit] text-[0.625rem] font-medium dark:text-white text-muted-foreground/70">
-                                        ⌘K
-                                    </kbd>
-                                </button>
-                            </SidebarMenuButton>
-                        )}
-                        {isCollapsed && (
-                            <SidebarMenuButton asChild className={'mt-1.5'}>
-                                <button
-                                    className="inline-flex h-9 w-9 dark:bg-[#171717] rounded-md bg-white justify-center items-center text-sm text-muted-foreground/80 mb-0 border shadow-xs transition-[color,box-shadow] outline-none"
-                                    onClick={() => setOpen(true)}
-                                >
-                                    <SearchIcon
-                                        className="text-muted-foreground/80 dark:text-white"
-                                        size={16}
-                                        aria-hidden="true"
-                                    />
-                                </button>
-                            </SidebarMenuButton>
+                    </SidebarMenuItem>
+
+                    <SidebarMenuItem>
+                        {/* Academic Year Switcher */}
+                        {fullUser?.role?.name === 'ADMIN' && !loading && academicYears.length > 0 && (
+                            <>
+                                {!isCollapsed ? (
+                                    <SidebarMenuButton asChild className={'mt-6'}>
+                                        <Select value={activeYear?.id} onValueChange={handleSessionSwitch} >
+                                            <SelectTrigger className="h-9 w-full dark:bg-[#171717] bg-white border shadow-xs">
+                                                <SelectValue>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={cn("h-2 w-2 rounded-full", activeYear ? "bg-green-500" : "bg-gray-300")}></div>
+                                                        <span className="text-sm font-medium truncate">
+                                                            {activeYear ? activeYear.name : (academicYears.length > 0 ? 'Select Session' : 'No Sessions')}
+                                                        </span>
+                                                    </div>
+                                                </SelectValue>
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {academicYears.length > 0 ? (
+                                                    academicYears.map((year) => (
+                                                        <SelectItem key={year.id} value={year.id}>
+                                                            <div className="flex items-center gap-2">
+                                                                <div className={cn(
+                                                                    "h-2 w-2 rounded-full",
+                                                                    year.isActive ? "bg-green-500" : "bg-transparent border border-muted-foreground"
+                                                                )}></div>
+                                                                <span>{year.name}</span>
+                                                            </div>
+                                                        </SelectItem>
+                                                    ))
+                                                ) : (
+                                                    <SelectItem value="none" disabled>No sessions available</SelectItem>
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                    </SidebarMenuButton>
+                                ) : (
+                                    <SidebarMenuButton asChild className={'mt-1.5'} tooltip={activeYear?.name || 'No Session'}>
+                                        <div className="h-9 w-9 dark:bg-[#171717] rounded-md bg-white flex items-center justify-center border shadow-xs">
+                                            <div className="h-2.5 w-2.5 rounded-full bg-green-500"></div>
+                                        </div>
+                                    </SidebarMenuButton>
+                                )}
+                            </>
                         )}
                     </SidebarMenuItem>
                 </SidebarMenu>
+
             </SidebarHeader>
-            <SidebarContent className={'bg-background rounded-md border shadow-xs'}>
+            <SidebarContent
+                className={cn(
+                    'bg-background rounded-md border shadow-xs overflow-y-auto',
+                    isCollapsed && 'scrollbar-hide-collapsed'
+                )}
+            >
                 <NavSidebarSections
                     sections={SidebarData}
                     userRole={fullUser?.role?.name}

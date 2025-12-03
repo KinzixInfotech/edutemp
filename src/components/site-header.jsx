@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import { Avatar, AvatarFallback, AvatarImage, } from "@/components/ui/avatar"
 import { ModeToggle } from "./toggle"
 import { NavUser } from "./nav-user"
 import { UserDropdown } from "./header-menu"
@@ -11,11 +12,13 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover"
-import { ChevronDownIcon, School } from "lucide-react"
+import { ChevronDownIcon, School, SearchIcon } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
+import { useCommandMenu } from "./CommandMenuContext"
 export function SiteHeader({ fullUser }) {
-    const [open, setOpen] = useState(false)
+    const { setOpen } = useCommandMenu()
+    const [open, setOpenPopover] = useState(false)
     const [date, setDate] = useState(undefined)
     const pathname = usePathname()
 
@@ -35,19 +38,60 @@ export function SiteHeader({ fullUser }) {
         .filter((p) => pathname.startsWith(p.url))
         .sort((a, b) => b.url.length - a.url.length)[0]
     return (
-        <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b bg-transparent  dark:bg-transparent transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
-            <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6 ">
+        <header className="flex h-(--header-height) py-8 shrink-0 items-center gap-2 border-b bg-transparent dark:bg-transparent transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
+            <div className="flex w-full items-center gap-2 px-4 lg:gap-3 lg:px-6 relative">
                 <SidebarTrigger className="-ml-1" />
                 <Separator
                     orientation="vertical"
                     className="mx-2 data-[orientation=vertical]:h-4"
                 />
-                <h1 className="text-base items-center justify-center text-sm border gap-1 md:inline-flex hidden font-medium capitalize bg-muted px-2 py-1 rounded-lg text-center w-fit max-w-[200px] overflow-hidden whitespace-nowrap truncate ">
+                <h1 className="text-base items-center justify-center text-sm border gap-1 md:inline-flex hidden font-medium capitalize bg-muted px-2 py-1 rounded-lg text-center w-fit max-w-[200px] overflow-hidden whitespace-nowrap truncate">
                     <School size={16} />
                     {fullUser?.school?.name || 'Dashboard'}</h1>
+
+                {/* Centered Search Bar - Desktop */}
+                <div className="absolute hidden md:block left-1/2 -translate-x-1/2 w-full max-w-md px-4">
+                    <button
+                        className="inline-flex border h-9 w-full rounded-md bg-muted hover:bg-muted px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-border items-center gap-2"
+                        onClick={() => setOpen(true)}
+                    >
+                        <SearchIcon
+                            className="text-muted-foreground"
+                            size={16}
+                            aria-hidden="true"
+                        />
+                        <span className="flex-1 text-left font-normal">Search...</span>
+                        <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+                            <span className="text-xs">⌘</span>K
+                        </kbd>
+                    </button>
+                </div>
+
                 <div className="ml-auto flex items-center gap-2">
-                    {/* <UserDropdown /> */}
+                    {/* Mobile Search Button */}
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="md:hidden text-muted-foreground"
+                        onClick={() => setOpen(true)}
+                    >
+                        <SearchIcon size={20} />
+                    </Button>
+
                     <ModeToggle />
+
+                    {/* User Avatar */}
+                    <div className="flex items-center gap-2 pl-2 border-l ml-1">
+                        <Avatar className="h-8 w-8">
+                            <AvatarImage src={fullUser?.profilePicture} alt={fullUser?.name || "User"} />
+                            <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
+                                {fullUser?.name
+                                    ? fullUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+                                    : "U"}
+
+                            </AvatarFallback>
+                        </Avatar>
+                    </div>
                 </div>
             </div>
         </header>
