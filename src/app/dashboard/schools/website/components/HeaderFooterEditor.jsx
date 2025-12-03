@@ -121,18 +121,40 @@ export function HeaderFooterEditor({ config, onChange }) {
                                         </div>
                                         <div className="grid grid-cols-3 gap-2">
                                             <Select
-                                                value={link.target || 'section'}
+                                                value={link.target || 'page'}
                                                 onValueChange={(value) => handleUpdateLink(index, 'target', value)}
                                             >
                                                 <SelectTrigger>
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="section">Link to Section</SelectItem>
+                                                    <SelectItem value="page">Link to Page</SelectItem>
+                                                    <SelectItem value="section">Link to Section (Anchor)</SelectItem>
                                                     <SelectItem value="url">Custom URL</SelectItem>
                                                 </SelectContent>
                                             </Select>
-                                            {link.target === 'section' ? (
+                                            {link.target === 'page' ? (
+                                                <Select
+                                                    value={link.url || ''}
+                                                    onValueChange={(value) => handleUpdateLink(index, 'url', value)}
+                                                    className="col-span-2"
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select a page..." />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {config.pages?.length > 0 ? (
+                                                            config.pages.map(p => (
+                                                                <SelectItem key={p.id} value={p.slug}>
+                                                                    {p.name}
+                                                                </SelectItem>
+                                                            ))
+                                                        ) : (
+                                                            <SelectItem value="" disabled>No pages created</SelectItem>
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                            ) : link.target === 'section' ? (
                                                 <Select
                                                     value={link.url || ''}
                                                     onValueChange={(value) => handleUpdateLink(index, 'url', value)}
@@ -142,15 +164,13 @@ export function HeaderFooterEditor({ config, onChange }) {
                                                         <SelectValue placeholder="Select a section..." />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        {config.sections?.length > 0 ? (
-                                                            config.sections.map(s => (
-                                                                <SelectItem key={s.id} value={`#${s.type}`}>
-                                                                    {s.data.title || s.type.charAt(0).toUpperCase() + s.type.slice(1)}
+                                                        {config.pages?.map(page => (
+                                                            page.sections.map(s => (
+                                                                <SelectItem key={s.id} value={`${page.slug === '/' ? '' : page.slug}#${s.type}`}>
+                                                                    {page.name} - {s.data.title || s.type}
                                                                 </SelectItem>
                                                             ))
-                                                        ) : (
-                                                            <SelectItem value="" disabled>No sections added yet</SelectItem>
-                                                        )}
+                                                        ))}
                                                     </SelectContent>
                                                 </Select>
                                             ) : (

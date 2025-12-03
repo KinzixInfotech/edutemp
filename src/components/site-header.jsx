@@ -11,10 +11,10 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover"
-import { ChevronDownIcon } from "lucide-react"
+import { ChevronDownIcon, School } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
-export function SiteHeader() {
+export function SiteHeader({ fullUser }) {
     const [open, setOpen] = useState(false)
     const [date, setDate] = useState(undefined)
     const pathname = usePathname()
@@ -23,7 +23,7 @@ export function SiteHeader() {
     const pageTitles = [
         { url: "/dashboard", name: "Dashboard" },
         { url: "/dashboard/fees", name: "Fees" },
-          { url: "/dashboard/schools/noticeboard", name: "Noticeboard" },
+        { url: "/dashboard/schools/noticeboard", name: "Noticeboard" },
         { url: "/dashboard/fees/fee-structures", name: "All Fee Structures" },
         { url: "/dashboard/manage-students", name: "Manage All Students" },
         { url: "/dashboard/schools/create-classes", name: "All Classes & Sections " },
@@ -42,9 +42,10 @@ export function SiteHeader() {
                     orientation="vertical"
                     className="mx-2 data-[orientation=vertical]:h-4"
                 />
-                <h1 className="text-base font-medium">{currentPage ? currentPage.name : "Untitled"}</h1>
+                <h1 className="text-base items-center justify-center text-sm border gap-1 md:inline-flex hidden font-medium capitalize bg-muted px-2 py-1 rounded-lg text-center w-fit max-w-[200px] overflow-hidden whitespace-nowrap truncate ">
+                    <School size={16} />
+                    {fullUser?.school?.name || 'Dashboard'}</h1>
                 <div className="ml-auto flex items-center gap-2">
-
                     {/* <UserDropdown /> */}
                     <ModeToggle />
                 </div>

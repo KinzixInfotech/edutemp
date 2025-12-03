@@ -25,7 +25,7 @@ const TopProgressBar = dynamic(() => import("@/app/components/TopProgressBar"), 
 });
 
 export default function ClientLayout({ children }) {
-    const { loadingMsg } = useAuth();
+    const { loadingMsg, fullUser } = useAuth();
 
     // Create a single QueryClient instance for the whole app
     const [queryClient] = useState(() => new QueryClient());
@@ -83,7 +83,7 @@ export default function ClientLayout({ children }) {
 
                 <SidebarInset>
 
-                    {!hideUI && <SiteHeader />}
+                    {!hideUI && <SiteHeader fullUser={fullUser} />}
                     <main className="w-full h-full relative">
                         {loading ? (
                             <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-50">

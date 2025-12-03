@@ -11,6 +11,7 @@ import Editor from 'react-simple-code-editor';
 import { highlight, languages } from 'prismjs/components/prism-core';
 import 'prismjs/components/prism-css';
 import 'prismjs/themes/prism.css';
+import { LayoutEditor } from './LayoutEditor';
 
 const getCssTemplate = (section) => {
     const sectionId = `#${section.type}`;
@@ -110,6 +111,50 @@ const getCssTemplate = (section) => {
 /* Target contact headings */
 & .contact-item h3 {
   color: #3498db;
+}`,
+        dynamic_notices: `/* Target the notices section */
+& {
+  background: #f8f9fa;
+  padding: 3rem 0;
+}
+
+/* Target notice cards */
+& .notice-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+/* Target notice title */
+& .notice-title {
+  color: #2c3e50;
+  font-weight: 600;
+}`,
+        dynamic_gallery: `/* Target the gallery section */
+& {
+  background: white;
+  padding: 3rem 0;
+}
+
+/* Target gallery grid */
+& .gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1.5rem;
+}
+
+/* Target gallery images */
+& .gallery-img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 8px;
+  transition: transform 0.3s;
+}
+
+& .gallery-img:hover {
+  transform: scale(1.05);
 }`
     };
 
@@ -346,6 +391,35 @@ export function SectionEditor({ section, onChange }) {
                             />
                         </div>
                     </>
+                )}
+
+                {/* Dynamic Sections */}
+                {(section.type === 'dynamic_notices' || section.type === 'dynamic_gallery') && (
+                    <>
+                        <div className="space-y-2">
+                            <Label>Limit (Number of items)</Label>
+                            <Input
+                                type="number"
+                                value={section.data.limit || (section.type === 'dynamic_notices' ? 3 : 6)}
+                                onChange={(e) => handleChange('limit', parseInt(e.target.value))}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>View All Link (Optional)</Label>
+                            <Input
+                                value={section.data.viewAllLink || ''}
+                                onChange={(e) => handleChange('viewAllLink', e.target.value)}
+                                placeholder={section.type === 'dynamic_notices' ? '/notices' : '/gallery'}
+                            />
+                        </div>
+                    </>
+                )}
+
+                {section.type === 'custom_layout' && (
+                    <LayoutEditor
+                        data={section.data}
+                        onChange={(key, value) => handleChange(key, value)}
+                    />
                 )}
 
                 {/* Custom CSS Section - Always visible */}

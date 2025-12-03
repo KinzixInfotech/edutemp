@@ -50,7 +50,15 @@ export function BuilderSection({ section, isSelected, onSelect, onDelete }) {
                 </CardHeader>
                 <CardContent className="p-4 pt-0 text-sm text-muted-foreground line-clamp-2">
                     {/* Preview of content */}
-                    {section.data.title || section.data.content || "No content"}
+                    {section.type === 'dynamic_notices' ? (
+                        <span>Dynamic Notices (Latest {section.data.limit || 3})</span>
+                    ) : section.type === 'dynamic_gallery' ? (
+                        <span>Dynamic Gallery (Latest {section.data.limit || 6})</span>
+                    ) : section.type === 'custom_layout' ? (
+                        <span>Custom Layout ({section.data.rows?.length || 0} rows)</span>
+                    ) : (
+                        section.data.title || section.data.content || "No content"
+                    )}
                 </CardContent>
             </Card>
         </div>
