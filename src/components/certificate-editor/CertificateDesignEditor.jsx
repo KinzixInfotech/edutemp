@@ -85,22 +85,45 @@ export default function CertificateDesignEditor({
     initialConfig = {},
     onChange,
     templateType = 'certificate', // certificate, idcard, admitcard
-    placeholders = []
+    placeholders = [],
+    readOnly = false
 }) {
-    const [elements, setElements] = useState(initialConfig.elements || []);
+    const safeConfig = initialConfig || {};
+    const [elements, setElements] = useState(safeConfig.elements || []);
     const [selectedId, setSelectedId] = useState(null);
-    const [canvasSize, setCanvasSize] = useState(initialConfig.canvasSize || { width: 800, height: 600 });
-    const [backgroundImage, setBackgroundImage] = useState(initialConfig.backgroundImage || '');
+    const [canvasSize, setCanvasSize] = useState(safeConfig.canvasSize || { width: 800, height: 600 });
+    const [backgroundImage, setBackgroundImage] = useState(safeConfig.backgroundImage || '');
     const containerRef = useRef(null);
+    const [isInitialized, setIsInitialized] = useState(false);
+    const onChangeRef = useRef(onChange);
+    onChangeRef.current = onChange;
 
-    // Update parent on change
+    // Update state when initialConfig changes
     useEffect(() => {
-        onChange?.({
-            elements,
-            canvasSize,
-            backgroundImage
-        });
-    }, [elements, canvasSize, backgroundImage, onChange]);
+        if (initialConfig && !isInitialized && !readOnly) {
+            if (initialConfig.elements) setElements(initialConfig.elements);
+            if (initialConfig.canvasSize) setCanvasSize(initialConfig.canvasSize);
+            if (initialConfig.backgroundImage !== undefined) setBackgroundImage(initialConfig.backgroundImage);
+            setIsInitialized(true);
+        }
+        // For readOnly mode, always sync with initialConfig
+        if (readOnly && initialConfig) {
+            setElements(initialConfig.elements || []);
+            setCanvasSize(initialConfig.canvasSize || { width: 800, height: 600 });
+            setBackgroundImage(initialConfig.backgroundImage || '');
+        }
+    }, [initialConfig, readOnly, isInitialized]);
+
+    // Update parent on change - only in edit mode
+    useEffect(() => {
+        if (!readOnly && isInitialized) {
+            onChangeRef.current?.({
+                elements,
+                canvasSize,
+                backgroundImage
+            });
+        }
+    }, [elements, canvasSize, backgroundImage, readOnly, isInitialized]);
 
     const addElement = (type) => {
         const newElement = {
@@ -152,29 +175,33 @@ export default function CertificateDesignEditor({
     const selectedElement = elements.find(el => el.id === selectedId);
 
     return (
-        <div className="flex h-[calc(100vh-100px)] border rounded-lg overflow-hidden bg-background">
+        <div className={cn("flex border rounded-lg overflow-hidden bg-background", readOnly ? "h-auto border-none" : "h-[calc(100vh-100px)]")}>
             {/* Sidebar Tools */}
-            <div className="w-16 border-r flex flex-col items-center py-4 gap-4 bg-muted/20">
-                <ToolButton icon={Type} label="Text" onClick={() => addElement(ELEMENT_TYPES.TEXT)} />
-                <ToolButton icon={ImageIcon} label="Image" onClick={() => addElement(ELEMENT_TYPES.IMAGE)} />
-                <ToolButton icon={QrCode} label="QR Code" onClick={() => addElement(ELEMENT_TYPES.QRCODE)} />
-                <ToolButton icon={Square} label="Shape" onClick={() => addElement(ELEMENT_TYPES.SHAPE)} />
-            </div>
+            {!readOnly && (
+                <div className="w-16 border-r flex flex-col items-center py-4 gap-4 bg-muted/20">
+                    <ToolButton icon={Type} label="Text" onClick={() => addElement(ELEMENT_TYPES.TEXT)} />
+                    <ToolButton icon={ImageIcon} label="Image" onClick={() => addElement(ELEMENT_TYPES.IMAGE)} />
+                    <ToolButton icon={QrCode} label="QR Code" onClick={() => addElement(ELEMENT_TYPES.QRCODE)} />
+                    <ToolButton icon={Square} label="Shape" onClick={() => addElement(ELEMENT_TYPES.SHAPE)} />
+                </div>
+            )}
 
             {/* Main Canvas Area */}
-            <div className="flex-1 bg-muted/50 relative overflow-auto flex items-start justify-center py-8 px-8">
+            <div className={cn("flex-1 bg-muted/50 relative overflow-auto flex items-start justify-center py-8 px-8", readOnly && "bg-transparent p-0 overflow-visible")}>
                 <div
                     ref={containerRef}
-                    className="bg-white shadow-lg relative transition-all"
+                    className={cn("bg-white shadow-lg relative transition-all", readOnly && "shadow-none")}
                     style={{
                         width: canvasSize.width,
                         height: canvasSize.height,
                         backgroundImage: backgroundImage ? `url(${backgroundImage})` : 'none',
                         backgroundSize: 'cover',
-                        backgroundPosition: 'center'
+                        backgroundPosition: 'center',
+                        transform: readOnly ? 'scale(1)' : 'none', // Ensure no transform interferes with html2canvas
+                        transformOrigin: 'top left'
                     }}
                     onClick={(e) => {
-                        if (e.target === containerRef.current) setSelectedId(null);
+                        if (!readOnly && e.target === containerRef.current) setSelectedId(null);
                     }}
                 >
                     {elements.map((el) => (
@@ -182,15 +209,18 @@ export default function CertificateDesignEditor({
                             key={el.id}
                             size={{ width: el.width, height: el.height }}
                             position={{ x: el.x, y: el.y }}
-                            onDragStop={(e, d) => handleDragStop(el.id, d)}
-                            onResizeStop={(e, direction, ref, delta, position) => handleResizeStop(el.id, ref, position)}
+                            onDragStop={!readOnly ? (e, d) => handleDragStop(el.id, d) : undefined}
+                            onResizeStop={!readOnly ? (e, direction, ref, delta, position) => handleResizeStop(el.id, ref, position) : undefined}
                             bounds="parent"
-                            onClick={() => setSelectedId(el.id)}
+                            onClick={!readOnly ? () => setSelectedId(el.id) : undefined}
+                            disableDragging={readOnly}
+                            enableResizing={!readOnly}
                             className={cn(
-                                "border-2 border-transparent hover:border-blue-300 transition-colors",
-                                selectedId === el.id && "border-blue-500 z-50"
+                                "border-2 border-transparent transition-colors",
+                                !readOnly && "hover:border-blue-300",
+                                selectedId === el.id && !readOnly && "border-blue-500 z-50"
                             )}
-                            style={{ zIndex: el.zIndex }}
+                            style={{ zIndex: el.zIndex, pointerEvents: readOnly ? 'none' : 'auto' }}
                         >
                             <ElementRenderer element={el} />
                         </Rnd>
@@ -199,80 +229,82 @@ export default function CertificateDesignEditor({
             </div>
 
             {/* Properties Panel */}
-            <div className="w-80 border-l bg-background flex flex-col">
-                <Tabs defaultValue="properties" className="w-full flex-1 flex flex-col overflow-hidden">
-                    <TabsList className="w-full justify-start rounded-none border-b px-4 h-12 flex-shrink-0">
-                        <TabsTrigger value="properties">Properties</TabsTrigger>
-                        <TabsTrigger value="layers">Layers</TabsTrigger>
-                        <TabsTrigger value="settings">Settings</TabsTrigger>
-                    </TabsList>
+            {!readOnly && (
+                <div className="w-80 border-l bg-background flex flex-col">
+                    <Tabs defaultValue="properties" className="w-full flex-1 flex flex-col overflow-hidden">
+                        <TabsList className="w-full justify-start rounded-none border-b px-4 h-12 flex-shrink-0">
+                            <TabsTrigger value="properties">Properties</TabsTrigger>
+                            <TabsTrigger value="layers">Layers</TabsTrigger>
+                            <TabsTrigger value="settings">Settings</TabsTrigger>
+                        </TabsList>
 
-                    <TabsContent value="properties" className="flex-1 m-0 overflow-hidden">
-                        <ScrollArea className="h-full">
-                            <div className="p-4 space-y-4">
-                                {selectedElement ? (
-                                    <PropertiesEditor
-                                        element={selectedElement}
-                                        onUpdate={(updates) => updateElement(selectedElement.id, updates)}
-                                        onDelete={() => removeElement(selectedElement.id)}
-                                        onDuplicate={() => duplicateElement(selectedElement.id)}
-                                        placeholders={placeholders}
-                                    />
-                                ) : (
-                                    <div className="text-center text-muted-foreground py-8">
-                                        Select an element to edit properties
+                        <TabsContent value="properties" className="flex-1 m-0 overflow-hidden">
+                            <ScrollArea className="h-full">
+                                <div className="p-4 space-y-4">
+                                    {selectedElement ? (
+                                        <PropertiesEditor
+                                            element={selectedElement}
+                                            onUpdate={(updates) => updateElement(selectedElement.id, updates)}
+                                            onDelete={() => removeElement(selectedElement.id)}
+                                            onDuplicate={() => duplicateElement(selectedElement.id)}
+                                            placeholders={placeholders}
+                                        />
+                                    ) : (
+                                        <div className="text-center text-muted-foreground py-8">
+                                            Select an element to edit properties
+                                        </div>
+                                    )}
+                                </div>
+                            </ScrollArea>
+                        </TabsContent>
+
+                        <TabsContent value="layers" className="flex-1 m-0 overflow-hidden">
+                            <LayersPanel
+                                elements={elements}
+                                selectedId={selectedId}
+                                onSelect={setSelectedId}
+                                onReorder={setElements}
+                            />
+                        </TabsContent>
+
+                        <TabsContent value="settings" className="flex-1 m-0 overflow-hidden">
+                            <ScrollArea className="h-full">
+                                <div className="p-4 space-y-4">
+                                    <div className="space-y-2">
+                                        <Label>Canvas Size</Label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <Label className="text-xs text-muted-foreground">Width</Label>
+                                                <Input
+                                                    type="number"
+                                                    value={canvasSize.width}
+                                                    onChange={(e) => setCanvasSize({ ...canvasSize, width: parseInt(e.target.value) })}
+                                                />
+                                            </div>
+                                            <div>
+                                                <Label className="text-xs text-muted-foreground">Height</Label>
+                                                <Input
+                                                    type="number"
+                                                    value={canvasSize.height}
+                                                    onChange={(e) => setCanvasSize({ ...canvasSize, height: parseInt(e.target.value) })}
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
-                                )}
-                            </div>
-                        </ScrollArea>
-                    </TabsContent>
-
-                    <TabsContent value="layers" className="flex-1 m-0 overflow-hidden">
-                        <LayersPanel
-                            elements={elements}
-                            selectedId={selectedId}
-                            onSelect={setSelectedId}
-                            onReorder={setElements}
-                        />
-                    </TabsContent>
-
-                    <TabsContent value="settings" className="flex-1 m-0 overflow-hidden">
-                        <ScrollArea className="h-full">
-                            <div className="p-4 space-y-4">
-                                <div className="space-y-2">
-                                    <Label>Canvas Size</Label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div>
-                                            <Label className="text-xs text-muted-foreground">Width</Label>
-                                            <Input
-                                                type="number"
-                                                value={canvasSize.width}
-                                                onChange={(e) => setCanvasSize({ ...canvasSize, width: parseInt(e.target.value) })}
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label className="text-xs text-muted-foreground">Height</Label>
-                                            <Input
-                                                type="number"
-                                                value={canvasSize.height}
-                                                onChange={(e) => setCanvasSize({ ...canvasSize, height: parseInt(e.target.value) })}
-                                            />
-                                        </div>
+                                    <div className="space-y-2">
+                                        <Label>Background Image URL</Label>
+                                        <Input
+                                            value={backgroundImage}
+                                            onChange={(e) => setBackgroundImage(e.target.value)}
+                                            placeholder="https://..."
+                                        />
                                     </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label>Background Image URL</Label>
-                                    <Input
-                                        value={backgroundImage}
-                                        onChange={(e) => setBackgroundImage(e.target.value)}
-                                        placeholder="https://..."
-                                    />
-                                </div>
-                            </div>
-                        </ScrollArea>
-                    </TabsContent>
-                </Tabs>
-            </div>
+                            </ScrollArea>
+                        </TabsContent>
+                    </Tabs>
+                </div>
+            )}
         </div>
     );
 }

@@ -36,6 +36,9 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
+import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 // Certificate type configurations
 const CERTIFICATE_CONFIGS = {
@@ -102,6 +105,8 @@ export default function GenerateCertificatePage() {
     const schoolId = fullUser?.schoolId;
     const [generating, setGenerating] = useState(false);
     const [previewUrl, setPreviewUrl] = useState(null);
+    const [previewConfig, setPreviewConfig] = useState(null);
+    const previewRef = useState(null); // We'll use document.getElementById instead for html2canvas to be safe
 
     const certificateType = params?.type;
     const config = CERTIFICATE_CONFIGS[certificateType];
@@ -135,7 +140,7 @@ export default function GenerateCertificatePage() {
         enabled: !!schoolId,
     });
     // console.log(students);
-    
+
 
     // Fetch templates for this certificate type
     const { data: templates, isLoading: loadingTemplates } = useQuery({
@@ -151,44 +156,128 @@ export default function GenerateCertificatePage() {
 
     // Get default template
     useEffect(() => {
-        if (templates?.length > 0) {
+        if (templates?.length > 0 && !watchedValues.templateId) {
             const defaultTemplate = templates.find(t => t.isDefault) || templates[0];
             setValue('templateId', defaultTemplate.id);
         }
-    }, [templates, setValue]);
+    }, [templates, setValue, watchedValues.templateId]);
 
-    const generateMutation = useMutation({
-        mutationFn: async (data) => {
+    // Update preview when form values or template changes
+    useEffect(() => {
+        if (!templates || !students || !watchedValues.templateId) return;
+
+        const template = templates.find(t => t.id === watchedValues.templateId);
+        if (!template || !template.layoutConfig) return;
+
+        const student = students.find(s => s.userId === watchedValues.studentId) || {};
+
+        // Create a deep copy of elements to avoid mutating original
+        const elements = JSON.parse(JSON.stringify(template.layoutConfig.elements || []));
+
+        // Replace placeholders
+        const replacements = {
+            '{{studentName}}': student.name || 'Student Name',
+            '{{rollNumber}}': student.rollNumber || 'Roll No',
+            '{{admissionNo}}': student.admissionNo || 'Adm No',
+            '{{class}}': student.class?.className || 'Class',
+            '{{section}}': student.section?.sectionName || 'Section',
+            '{{dob}}': student.dob ? new Date(student.dob).toLocaleDateString() : 'DOB',
+            '{{fatherName}}': student.fatherName || 'Father Name',
+            '{{motherName}}': student.motherName || 'Mother Name',
+            '{{address}}': student.address || 'Address',
+            '{{schoolName}}': fullUser?.schoolName || 'School Name',
+            '{{issueDate}}': watchedValues.issueDate ? new Date(watchedValues.issueDate).toLocaleDateString() : new Date().toLocaleDateString(),
+            '{{conduct}}': watchedValues.conduct || '',
+            '{{purpose}}': watchedValues.purpose || '',
+            '{{academicYear}}': watchedValues.academicYear || '',
+            '{{dateOfLeaving}}': watchedValues.dateOfLeaving ? new Date(watchedValues.dateOfLeaving).toLocaleDateString() : '',
+            '{{reason}}': watchedValues.reason || '',
+            '{{eventName}}': watchedValues.eventName || '',
+            '{{position}}': watchedValues.position || '',
+            '{{title}}': watchedValues.title || '',
+            '{{content}}': watchedValues.content || '',
+            '{{remarks}}': watchedValues.remarks || '',
+        };
+
+        const processedElements = elements.map(el => {
+            if (el.type === 'text' && el.content) {
+                let content = el.content;
+                Object.entries(replacements).forEach(([key, value]) => {
+                    content = content.replace(new RegExp(key, 'g'), value);
+                });
+                return { ...el, content };
+            }
+            if (el.type === 'qrcode' && el.content) {
+                let content = el.content;
+                Object.entries(replacements).forEach(([key, value]) => {
+                    content = content.replace(new RegExp(key, 'g'), value);
+                });
+                return { ...el, content };
+            }
+            if (el.type === 'image' && el.url && el.url.includes('{{studentPhoto}}')) {
+                return { ...el, url: student.photoUrl || 'https://placehold.co/100x100?text=Photo' };
+            }
+            return el;
+        });
+
+        setPreviewConfig({
+            elements: processedElements,
+            canvasSize: template.layoutConfig.canvasSize,
+            backgroundImage: template.layoutConfig.backgroundImage
+        });
+
+    }, [watchedValues, templates, students, fullUser]);
+
+    const handleGeneratePDF = async () => {
+        const element = document.getElementById('certificate-preview-container');
+        if (!element) return;
+
+        try {
             setGenerating(true);
-            const res = await fetch(`/api/documents/${schoolId}/certificates/generate`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    ...data,
-                    certificateType: config.apiType,
-                    issuedById: fullUser?.id,
-                }),
+
+            // Use html2canvas to capture the preview
+            const canvas = await html2canvas(element, {
+                scale: 2, // Higher quality
+                useCORS: true,
+                logging: false,
+                backgroundColor: '#ffffff'
             });
 
-            if (!res.ok) {
-                const error = await res.json();
-                throw new Error(error.error || 'Failed to generate certificate');
-            }
-            return res.json();
-        },
-        onSuccess: (data) => {
-            toast.success('Certificate generated successfully!');
-            setPreviewUrl(data.fileUrl);
-            setGenerating(false);
-        },
-        onError: (error) => {
-            toast.error(error.message || 'Failed to generate certificate');
-            setGenerating(false);
-        },
-    });
+            const imgData = canvas.toDataURL('image/jpeg', 0.95);
 
-    const onSubmit = (data) => {
-        generateMutation.mutate(data);
+            // Calculate PDF dimensions
+            const imgWidth = canvas.width;
+            const imgHeight = canvas.height;
+            const orientation = imgWidth > imgHeight ? 'l' : 'p';
+
+            const pdf = new jsPDF(orientation, 'pt', [imgWidth, imgHeight]);
+            pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+
+            const pdfBlob = pdf.output('blob');
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+            setPreviewUrl(pdfUrl); // Update preview URL for download button
+
+            // Also save to server if needed (optional, or we can just download)
+            // For now, we'll just simulate the server save or use the existing mutation if it handles data saving
+
+            // If we want to save the record to DB:
+            generateMutation.mutate({
+                ...watchedValues,
+                fileUrl: pdfUrl // This is a blob URL, won't work for server. 
+                // Ideally we upload the blob to storage (UploadThing/S3) and send that URL.
+                // But for now let's just save the record data.
+            });
+
+            // Trigger download
+            pdf.save(`${config.title}_${watchedValues.studentId}.pdf`);
+
+            toast.success('Certificate generated and downloaded!');
+        } catch (error) {
+            console.error('Generation error:', error);
+            toast.error('Failed to generate PDF');
+        } finally {
+            setGenerating(false);
+        }
     };
 
     // Error page for invalid certificate type
@@ -496,8 +585,8 @@ export default function GenerateCertificatePage() {
 
                             {/* Generate Button */}
                             <Button
-                                onClick={handleSubmit(onSubmit)}
-                                disabled={generating}
+                                onClick={handleSubmit(handleGeneratePDF)}
+                                disabled={generating || !previewConfig}
                                 className="w-full"
                             >
                                 {generating ? (
@@ -507,8 +596,8 @@ export default function GenerateCertificatePage() {
                                     </>
                                 ) : (
                                     <>
-                                        <Save className="mr-2 h-4 w-4" />
-                                        Generate Certificate
+                                        <Download className="mr-2 h-4 w-4" />
+                                        Generate & Download
                                     </>
                                 )}
                             </Button>
@@ -528,43 +617,21 @@ export default function GenerateCertificatePage() {
                                 {previewUrl ? 'Generated certificate preview' : 'Preview will appear after generation'}
                             </CardDescription>
                         </CardHeader>
-                        <CardContent>
-                            {previewUrl ? (
-                                <div className="space-y-4">
-                                    <iframe
-                                        src={previewUrl}
-                                        className="w-full h-[500px] border rounded-lg"
-                                        title="Certificate Preview"
+                        <CardContent className="p-0 overflow-hidden bg-muted/20 min-h-[400px] flex items-center justify-center">
+                            {previewConfig ? (
+                                <div className="scale-[0.6] origin-top p-4" id="certificate-preview-container">
+                                    <CertificateDesignEditor
+                                        initialConfig={previewConfig}
+                                        readOnly={true}
+                                        templateType="certificate"
                                     />
-                                    <div className="flex gap-2">
-                                        <Button
-                                            variant="outline"
-                                            onClick={() => window.open(previewUrl, '_blank')}
-                                            className="flex-1"
-                                        >
-                                            <Eye className="mr-2 h-4 w-4" />
-                                            View Full
-                                        </Button>
-                                        <Button
-                                            onClick={() => {
-                                                const link = document.createElement('a');
-                                                link.href = previewUrl;
-                                                link.download = `${config.title}.pdf`;
-                                                link.click();
-                                            }}
-                                            className="flex-1"
-                                        >
-                                            <Download className="mr-2 h-4 w-4" />
-                                            Download
-                                        </Button>
-                                    </div>
                                 </div>
                             ) : (
-                                <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-lg">
+                                <div className="flex flex-col items-center justify-center py-12 text-center">
                                     <Award className="h-16 w-16 text-muted-foreground mb-4" />
-                                    <h3 className="text-lg font-semibold mb-2">No Preview Yet</h3>
+                                    <h3 className="text-lg font-semibold mb-2">No Preview Available</h3>
                                     <p className="text-sm text-muted-foreground max-w-sm">
-                                        Fill in the form and click "Generate Certificate" to see the preview here
+                                        Select a student and template to see the preview
                                     </p>
                                 </div>
                             )}

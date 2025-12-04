@@ -16,6 +16,9 @@ import {
     ArrowLeft,
     Trash2,
     AlertCircle,
+    Layout,
+    Info,
+    X
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -35,6 +38,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
+import FileUploadButton from '@/components/fileupload';
+import CropImageDialog from '@/app/components/CropImageDialog';
+import { uploadFiles } from '@/app/components/utils/uploadThing';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -99,10 +105,26 @@ const TEMPLATE_CONFIGS = {
 };
 
 const PLACEHOLDERS = [
-    'studentName', 'rollNumber', 'admissionNo', 'class', 'section',
-    'dob', 'gender', 'fatherName', 'motherName', 'address',
-    'schoolName', 'examCenter', 'issueDate', 'validUntil',
-    'principalSignature', 'classTeacherSignature', 'studentId'
+    { value: 'studentName', label: 'Student Name' },
+    { value: 'rollNumber', label: 'Roll Number' },
+    { value: 'admissionNo', label: 'Admission Number' },
+    { value: 'class', label: 'Class' },
+    { value: 'section', label: 'Section' },
+    { value: 'dob', label: 'Date of Birth' },
+    { value: 'gender', label: 'Gender' },
+    { value: 'fatherName', label: 'Father Name' },
+    { value: 'motherName', label: 'Mother Name' },
+    { value: 'address', label: 'Address' },
+    { value: 'schoolName', label: 'School Name' },
+    { value: 'examCenter', label: 'Exam Center' },
+    { value: 'issueDate', label: 'Issue Date' },
+    { value: 'validUntil', label: 'Valid Until' },
+    { value: 'principalSignature', label: 'Principal Signature' },
+    { value: 'classTeacherSignature', label: 'Class Teacher Signature' },
+    { value: 'studentId', label: 'Student ID' },
+    { value: 'verificationUrl', label: 'Verification URL' },
+    { value: 'bloodGroup', label: 'Blood Group' },
+    { value: 'studentPhoto', label: 'Student Photo' },
 ];
 
 export default function EditTemplatePage() {
@@ -116,12 +138,20 @@ export default function EditTemplatePage() {
     const templateId = params?.id;
     const config = TEMPLATE_CONFIGS[templateType];
 
+    const [activeTab, setActiveTab] = useState('builder');
     const [editorConfig, setEditorConfig] = useState({
         elements: [],
         canvasSize: { width: 800, height: 600 },
         backgroundImage: ''
     });
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [rawImage, setRawImage] = useState(null);
+    const [cropDialogOpen, setCropDialogOpen] = useState(false);
+    const [currentField, setCurrentField] = useState(null);
+    const [resetKeys, setResetKeys] = useState({
+        background: 0,
+    });
 
     // Fetch template data
     const { data: template, isLoading } = useQuery({
@@ -232,6 +262,13 @@ export default function EditTemplatePage() {
         },
     });
 
+    const handleImageUpload = (field, previewUrl) => {
+        if (!previewUrl || previewUrl === rawImage) return;
+        setCurrentField(field);
+        setRawImage(previewUrl);
+        setCropDialogOpen(true);
+    };
+
     const onSubmit = (data) => {
         updateMutation.mutate(data);
     };
@@ -297,31 +334,82 @@ export default function EditTemplatePage() {
     const Icon = config.icon;
 
     return (
-        <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-4 sm:space-y-6">
-            {/* Header */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="space-y-1">
-                    <div className="flex items-center gap-2">
+        <div className="flex flex-col h-[calc(100vh-4rem)]">
+            {/* Crop Dialog */}
+            {cropDialogOpen && rawImage && currentField && (
+                <CropImageDialog
+                    image={rawImage}
+                    onClose={() => { if (!uploading) setCropDialogOpen(false); }}
+                    uploading={uploading}
+                    open={cropDialogOpen}
+                    onCropComplete={async (croppedBlob) => {
+                        const now = new Date();
+                        const iso = now.toISOString().replace(/[:.]/g, "-");
+                        const perf = Math.floor(performance.now() * 1000);
+                        const timestamp = `${iso}-${perf}`;
+                        const filename = `${timestamp}.jpg`;
+                        const file = new File([croppedBlob], filename, { type: "image/jpeg" });
+                        try {
+                            setUploading(true);
+                            const res = await uploadFiles("logoupload", { files: [file] });
+                            if (res && res[0]?.url) {
+                                if (currentField === 'backgroundImage') {
+                                    setEditorConfig(prev => ({ ...prev, backgroundImage: res[0].url }));
+                                }
+                                toast.success("Image uploaded successfully!");
+                            } else {
+                                toast.error("Upload failed");
+                            }
+                        } catch (err) {
+                            toast.error("Something went wrong during upload");
+                            console.error(err);
+                        } finally {
+                            setUploading(false);
+                            setCropDialogOpen(false);
+                            setCurrentField(null);
+                            setRawImage(null);
+                        }
+                    }}
+                />
+            )}
+
+            {/* Header Toolbar */}
+            <div className="h-16 border-b bg-background flex items-center justify-between px-6 flex-shrink-0">
+                <div className="flex items-center gap-4">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => router.push(config.backUrl)}
+                    >
+                        <ArrowLeft className="h-4 w-4 mr-2" />
+                        Back
+                    </Button>
+                    <div className="h-6 w-px bg-border" />
+                    <h1 className="font-semibold text-lg flex items-center gap-2">
+                        <Icon className="w-5 h-5" />
+                        Edit {config.title}
+                    </h1>
+                    <div className="flex items-center bg-muted rounded-md p-1">
                         <Button
-                            variant="ghost"
+                            variant={activeTab === 'builder' ? 'secondary' : 'ghost'}
                             size="sm"
-                            onClick={() => router.push(config.backUrl)}
+                            onClick={() => setActiveTab('builder')}
+                            className="h-7 text-xs"
                         >
-                            <ArrowLeft className="h-4 w-4" />
+                            <Layout className="h-3 w-3 mr-1" /> Builder
                         </Button>
-                        <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold flex items-center gap-2">
-                            <Icon className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 flex-shrink-0" />
-                            <span>Edit {config.title}</span>
-                        </h1>
-                        {template.isDefault && (
-                            <Badge variant="secondary">Default</Badge>
-                        )}
+                        <Button
+                            variant={activeTab === 'details' ? 'secondary' : 'ghost'}
+                            size="sm"
+                            onClick={() => setActiveTab('details')}
+                            className="h-7 text-xs"
+                        >
+                            <Info className="h-3 w-3 mr-1" /> Details
+                        </Button>
                     </div>
-                    <p className="text-xs sm:text-sm text-muted-foreground ml-10 sm:ml-12">
-                        {template.name}
-                    </p>
                 </div>
-                <div className="flex gap-2">
+
+                <div className="flex items-center gap-2">
                     <Button
                         variant="destructive"
                         size="sm"
@@ -333,7 +421,6 @@ export default function EditTemplatePage() {
                     <Button
                         onClick={handleSubmit(onSubmit)}
                         disabled={updateMutation.isPending}
-                        size="sm"
                     >
                         {updateMutation.isPending ? (
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -345,65 +432,111 @@ export default function EditTemplatePage() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-200px)]">
-                {/* Basic Info - Left Column */}
-                <div className="lg:col-span-1 space-y-6 h-full overflow-auto">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Template Details</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="name">Template Name *</Label>
-                                <Input id="name" {...register('name')} placeholder="e.g., Annual Sports Certificate" />
-                                {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
-                            </div>
+            {/* Main Workspace */}
+            <div className="flex-1 overflow-hidden">
+                {activeTab === 'builder' ? (
+                    <div className="h-full relative">
+                        <CertificateDesignEditor
+                            initialConfig={editorConfig}
+                            onChange={setEditorConfig}
+                            templateType={templateType}
+                            placeholders={PLACEHOLDERS}
+                        />
+                    </div>
+                ) : (
+                    <div className="h-full flex items-center justify-center bg-muted/30 p-8 overflow-auto">
+                        <Card className="w-full max-w-2xl">
+                            <CardHeader>
+                                <CardTitle>Template Information</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                <div className="space-y-2">
+                                    <Label htmlFor="name">Template Name *</Label>
+                                    <Input
+                                        id="name"
+                                        {...register('name')}
+                                        placeholder="e.g., Annual Sports Certificate"
+                                    />
+                                    {errors.name && (
+                                        <p className="text-xs text-red-500">{errors.name.message}</p>
+                                    )}
+                                </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="description">Description</Label>
-                                <Textarea id="description" {...register('description')} placeholder="Brief description..." />
-                            </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="description">Description</Label>
+                                    <Textarea
+                                        id="description"
+                                        {...register('description')}
+                                        placeholder="Brief description of this template..."
+                                        rows={3}
+                                    />
+                                </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="type">Certificate Type</Label>
-                                <Select
-                                    value={watchedValues.type}
-                                    onValueChange={(value) => setValue('type', value)}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {config.types.map((type) => (
-                                            <SelectItem key={type.value} value={type.value}>
-                                                {type.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="type">Document Type</Label>
+                                    <Select
+                                        value={watchedValues.type}
+                                        onValueChange={(value) => setValue('type', value)}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {config.types.map((type) => (
+                                                <SelectItem key={type.value} value={type.value}>
+                                                    {type.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
 
-                            <div className="flex items-center justify-between">
-                                <Label htmlFor="isDefault">Set as Default</Label>
-                                <Switch
-                                    id="isDefault"
-                                    checked={watchedValues.isDefault}
-                                    onCheckedChange={(checked) => setValue('isDefault', checked)}
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                                <div className="flex items-center justify-between py-2 border-t">
+                                    <div className="space-y-0.5">
+                                        <Label htmlFor="isDefault">Set as Default Template</Label>
+                                        <p className="text-sm text-muted-foreground">
+                                            This template will be used by default for new documents
+                                        </p>
+                                    </div>
+                                    <Switch
+                                        id="isDefault"
+                                        checked={watchedValues.isDefault}
+                                        onCheckedChange={(checked) => setValue('isDefault', checked)}
+                                    />
+                                </div>
 
-                {/* Editor - Right Column (Span 3) */}
-                <div className="lg:col-span-3 h-full">
-                    <CertificateDesignEditor
-                        initialConfig={editorConfig}
-                        onChange={setEditorConfig}
-                        templateType={templateType}
-                        placeholders={PLACEHOLDERS}
-                    />
-                </div>
+                                <div className="space-y-2 pt-4 border-t">
+                                    <Label className="text-sm">Background Image (Optional)</Label>
+                                    <p className="text-xs text-muted-foreground mb-3">
+                                        Recommended: {editorConfig.canvasSize.width}x{editorConfig.canvasSize.height}px
+                                    </p>
+                                    <FileUploadButton
+                                        onChange={(previewUrl) => handleImageUpload('backgroundImage', previewUrl)}
+                                        resetKey={resetKeys.background}
+                                        disabled={uploading}
+                                    />
+                                    {editorConfig.backgroundImage && (
+                                        <div className="relative mt-3 group">
+                                            <img
+                                                src={editorConfig.backgroundImage}
+                                                alt="Background"
+                                                className="w-full h-32 object-cover border rounded"
+                                            />
+                                            <Button
+                                                variant="destructive"
+                                                size="icon"
+                                                className="absolute -top-2 -right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                onClick={() => setEditorConfig(prev => ({ ...prev, backgroundImage: '' }))}
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
             </div>
 
             <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

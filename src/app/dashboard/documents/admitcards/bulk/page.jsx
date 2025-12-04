@@ -36,6 +36,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/context/AuthContext';
+import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
 
 const formSchema = z.object({
     examId: z.string().min(1, 'Exam is required'),
@@ -57,6 +58,7 @@ export default function BulkGenerateAdmitCardsPage() {
     const [generating, setGenerating] = useState(false);
     const [progress, setProgress] = useState(0);
     const [results, setResults] = useState(null);
+    const [previewConfig, setPreviewConfig] = useState(null);
 
     const {
         register,
@@ -132,11 +134,72 @@ export default function BulkGenerateAdmitCardsPage() {
 
     // Set default template
     useEffect(() => {
-        if (templates?.length > 0) {
+        if (templates?.length > 0 && !watchedValues.templateId) {
             const defaultTemplate = templates.find(t => t.isDefault) || templates[0];
             setValue('templateId', defaultTemplate.id);
         }
-    }, [templates, setValue]);
+    }, [templates, setValue, watchedValues.templateId]);
+
+    // Update preview
+    useEffect(() => {
+        if (!templates || !watchedValues.templateId) return;
+
+        const template = templates.find(t => t.id === watchedValues.templateId);
+        if (!template || !template.layoutConfig) return;
+
+        const exam = exams?.find(e => e.id.toString() === watchedValues.examId) || {};
+
+        // Use dummy data or first student if available (but we don't fetch students here yet)
+        // So use generic placeholders
+        const elements = JSON.parse(JSON.stringify(template.layoutConfig.elements || []));
+
+        const replacements = {
+            '{{studentName}}': 'John Doe (Sample)',
+            '{{rollNumber}}': '12345',
+            '{{admissionNo}}': 'ADM001',
+            '{{class}}': classes?.find(c => c.id.toString() === watchedValues.classId)?.className || 'Class X',
+            '{{section}}': sections?.find(s => s.id.toString() === watchedValues.sectionId)?.name || 'A',
+            '{{dob}}': '2010-01-01',
+            '{{fatherName}}': 'Robert Doe',
+            '{{motherName}}': 'Jane Doe',
+            '{{address}}': '123 School Lane',
+            '{{schoolName}}': fullUser?.schoolName || 'School Name',
+            '{{examName}}': exam.title || 'Mid Term Exam',
+            '{{examDate}}': watchedValues.examDate ? new Date(watchedValues.examDate).toLocaleDateString() : '2024-01-01',
+            '{{examTime}}': watchedValues.examTime || '09:00 AM',
+            '{{seatNumber}}': `${watchedValues.seatNumberPrefix}${watchedValues.startingSeatNumber}`,
+            '{{center}}': watchedValues.center || 'Main Hall',
+            '{{venue}}': watchedValues.venue || 'Block A',
+        };
+
+        const processedElements = elements.map(el => {
+            if (el.type === 'text' && el.content) {
+                let content = el.content;
+                Object.entries(replacements).forEach(([key, value]) => {
+                    content = content.replace(new RegExp(key, 'g'), value);
+                });
+                return { ...el, content };
+            }
+            if (el.type === 'qrcode' && el.content) {
+                let content = el.content;
+                Object.entries(replacements).forEach(([key, value]) => {
+                    content = content.replace(new RegExp(key, 'g'), value);
+                });
+                return { ...el, content };
+            }
+            if (el.type === 'image' && el.url && el.url.includes('{{studentPhoto}}')) {
+                return { ...el, url: 'https://placehold.co/100x100?text=Photo' };
+            }
+            return el;
+        });
+
+        setPreviewConfig({
+            elements: processedElements,
+            canvasSize: template.layoutConfig.canvasSize,
+            backgroundImage: template.layoutConfig.backgroundImage
+        });
+
+    }, [watchedValues, templates, exams, classes, sections, fullUser]);
 
     const bulkGenerateMutation = useMutation({
         mutationFn: async (data) => {
@@ -445,6 +508,38 @@ export default function BulkGenerateAdmitCardsPage() {
                             </Button>
                         </div>
                     </div>
+                </CardContent>
+            </Card>
+
+            {/* Preview Section */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Sample Preview
+                    </CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">
+                        Preview of how the admit card will look with sample data
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="p-0 overflow-hidden bg-muted/20 min-h-[400px] flex items-center justify-center">
+                    {previewConfig ? (
+                        <div className="scale-[0.6] origin-top p-4">
+                            <CertificateDesignEditor
+                                initialConfig={previewConfig}
+                                readOnly={true}
+                                templateType="admitcard"
+                            />
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center py-12 text-center">
+                            <FileText className="h-16 w-16 text-muted-foreground mb-4" />
+                            <h3 className="text-lg font-semibold mb-2">No Preview Available</h3>
+                            <p className="text-sm text-muted-foreground max-w-sm">
+                                Select a template to see the preview
+                            </p>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
