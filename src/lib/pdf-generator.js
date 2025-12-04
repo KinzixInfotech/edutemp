@@ -1,140 +1,158 @@
 import jsPDF from 'jspdf';
+import QRCode from 'qrcode';
 
-export async function generatePDF({ template, student, certificateNumber, issueDate, customFields }) {
+export async function generatePDF({ template, student, certificateNumber, issueDate, customFields, verificationUrl }) {
     try {
-        const layoutConfig = template.layoutConfig;
+        const layoutConfig = template.layoutConfig || {};
+        const elements = layoutConfig.elements || [];
+        const canvasSize = layoutConfig.canvasSize || { width: 800, height: 600 };
+        const orientation = canvasSize.width > canvasSize.height ? 'landscape' : 'portrait';
 
-        // Create PDF with template settings
+        // Initialize PDF
         const doc = new jsPDF({
-            orientation: layoutConfig.orientation || 'portrait',
-            unit: 'mm',
+            orientation,
+            unit: 'pt',
             format: 'a4',
         });
 
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
 
-        // Background
-        doc.setFillColor(layoutConfig.backgroundColor || '#FFFFFF');
-        doc.rect(0, 0, pageWidth, pageHeight, 'F');
+        // Calculate scale factor to fit canvas to PDF page
+        const scaleX = pageWidth / canvasSize.width;
+        const scaleY = pageHeight / canvasSize.height;
+        const scale = Math.min(scaleX, scaleY);
 
-        // Border
-        if (layoutConfig.borderColor && layoutConfig.borderWidth) {
-            doc.setDrawColor(layoutConfig.borderColor);
-            doc.setLineWidth(layoutConfig.borderWidth);
-            doc.rect(10, 10, pageWidth - 20, pageHeight - 20);
-        }
+        // Center the content
+        const offsetX = (pageWidth - canvasSize.width * scale) / 2;
+        const offsetY = (pageHeight - canvasSize.height * scale) / 2;
 
-        // Logo
-        if (layoutConfig.logoUrl) {
+        // Helper to scale coordinates and sizes
+        const s = (val) => val * scale;
+        const sx = (val) => s(val) + offsetX;
+        const sy = (val) => s(val) + offsetY;
+
+        // Background Image
+        if (layoutConfig.backgroundImage) {
             try {
-                doc.addImage(layoutConfig.logoUrl, 'PNG', pageWidth / 2 - 20, 20, 40, 40);
+                doc.addImage(
+                    layoutConfig.backgroundImage,
+                    'PNG', // Assuming PNG or JPG, jsPDF detects usually
+                    offsetX,
+                    offsetY,
+                    s(canvasSize.width),
+                    s(canvasSize.height)
+                );
             } catch (error) {
-                console.error('Error adding logo:', error);
+                console.error('Error adding background image:', error);
             }
+        } else if (layoutConfig.backgroundColor) {
+            doc.setFillColor(layoutConfig.backgroundColor);
+            doc.rect(0, 0, pageWidth, pageHeight, 'F');
         }
 
-        // Header Text
-        if (layoutConfig.headerText) {
-            doc.setFontSize(24);
-            doc.setFont(layoutConfig.fontFamily || 'helvetica', 'bold');
-            doc.setTextColor(layoutConfig.primaryColor || '#000000');
-            doc.text(layoutConfig.headerText, pageWidth / 2, 70, { align: 'center' });
-        }
+        // Prepare data for placeholders
+        const data = {
+            '{{studentName}}': student.name || '',
+            '{{studentId}}': student.studentId || '',
+            '{{rollNumber}}': student.rollNumber || '',
+            '{{class}}': student.class?.className || '',
+            '{{section}}': student.section?.sectionName || '',
+            '{{dob}}': student.dob ? new Date(student.dob).toLocaleDateString() : '',
+            '{{fatherName}}': student.fatherName || '',
+            '{{motherName}}': student.motherName || '',
+            '{{schoolName}}': template.school?.name || '', // Assuming template includes school
+            '{{issueDate}}': new Date(issueDate).toLocaleDateString(),
+            '{{certificateNumber}}': certificateNumber,
+            '{{verificationUrl}}': verificationUrl || '',
+            ...customFields
+        };
 
-        // Certificate Title
-        doc.setFontSize(20);
-        doc.setFont(layoutConfig.fontFamily || 'helvetica', 'normal');
-        doc.setTextColor(layoutConfig.textColor || '#000000');
-        doc.text(template.name.toUpperCase(), pageWidth / 2, 90, { align: 'center' });
+        // Render Elements
+        for (const el of elements) {
+            try {
+                const x = sx(el.x);
+                const y = sy(el.y);
+                const w = s(el.width);
+                const h = s(el.height);
 
-        // Certificate Number
-        doc.setFontSize(10);
-        doc.text(`Certificate No: ${certificateNumber}`, pageWidth / 2, 100, { align: 'center' });
+                switch (el.type) {
+                    case 'text': {
+                        let content = el.content || '';
+                        // Replace placeholders
+                        Object.entries(data).forEach(([key, value]) => {
+                            content = content.replace(new RegExp(key, 'g'), value);
+                        });
 
-        // Main Content
-        doc.setFontSize(layoutConfig.fontSize || 14);
-        let yPosition = 120;
+                        doc.setFontSize(s(el.fontSize));
+                        doc.setTextColor(el.color || '#000000');
 
-        doc.text('This is to certify that', pageWidth / 2, yPosition, { align: 'center' });
-        yPosition += 15;
+                        // Font handling (basic mapping)
+                        const fontStyle = el.fontWeight === 'bold' ? 'bold' : 'normal';
+                        const fontName = el.fontFamily === 'Times New Roman' ? 'times' : 'helvetica';
+                        doc.setFont(fontName, fontStyle);
 
-        doc.setFont(layoutConfig.fontFamily || 'helvetica', 'bold');
-        doc.setFontSize(18);
-        doc.text(student.name, pageWidth / 2, yPosition, { align: 'center' });
-        yPosition += 10;
+                        // Alignment
+                        const align = el.textAlign || 'left';
+                        let textX = x;
+                        if (align === 'center') textX = x + w / 2;
+                        if (align === 'right') textX = x + w;
 
-        // Underline for name
-        doc.setLineWidth(0.5);
-        doc.line(pageWidth / 2 - 50, yPosition, pageWidth / 2 + 50, yPosition);
-        yPosition += 15;
+                        // Vertical alignment (approximate centering)
+                        const textY = y + h / 2 + s(el.fontSize) / 3;
 
-        // Class and Roll Number
-        doc.setFontSize(layoutConfig.fontSize || 14);
-        doc.setFont(layoutConfig.fontFamily || 'helvetica', 'normal');
-        doc.text(
-            `Class: ${student.class?.className || 'N/A'} | Roll No: ${student.rollNumber}`,
-            pageWidth / 2,
-            yPosition,
-            { align: 'center' }
-        );
-        yPosition += 15;
+                        doc.text(content, textX, textY, { align, baseline: 'middle' });
+                        break;
+                    }
+                    case 'image': {
+                        if (el.url) {
+                            let imgUrl = el.url;
+                            // Handle dynamic images if needed (e.g. {{studentPhoto}})
+                            if (imgUrl.includes('{{studentPhoto}}') && student.photoUrl) {
+                                imgUrl = student.photoUrl;
+                            }
 
-        // Custom Fields
-        if (customFields) {
-            Object.entries(customFields).forEach(([key, value]) => {
-                if (value) {
-                    const label = key.replace(/([A-Z])/g, ' $1').trim();
-                    doc.text(`${label}: ${value}`, pageWidth / 2, yPosition, { align: 'center' });
-                    yPosition += 10;
+                            doc.addImage(imgUrl, 'PNG', x, y, w, h);
+                        }
+                        break;
+                    }
+                    case 'qrcode': {
+                        let content = el.content || '';
+                        Object.entries(data).forEach(([key, value]) => {
+                            content = content.replace(new RegExp(key, 'g'), value);
+                        });
+
+                        if (content) {
+                            const qrDataUrl = await QRCode.toDataURL(content);
+                            doc.addImage(qrDataUrl, 'PNG', x, y, w, h);
+                        }
+                        break;
+                    }
+                    case 'shape': {
+                        doc.setFillColor(el.backgroundColor || 'transparent');
+                        doc.setDrawColor(el.borderColor || 'transparent');
+                        doc.setLineWidth(s(el.borderWidth || 0));
+
+                        if (el.shapeType === 'circle') {
+                            const radius = Math.min(w, h) / 2;
+                            doc.circle(x + w / 2, y + h / 2, radius, 'FD');
+                        } else {
+                            // Rectangle
+                            if (el.borderRadius > 0) {
+                                doc.roundedRect(x, y, w, h, s(el.borderRadius), s(el.borderRadius), 'FD');
+                            } else {
+                                doc.rect(x, y, w, h, 'FD');
+                            }
+                        }
+                        break;
+                    }
                 }
-            });
-        }
-
-        // Issue Date
-        yPosition += 10;
-        doc.setFontSize(12);
-        doc.text(
-            `Date of Issue: ${new Date(issueDate).toLocaleDateString()}`,
-            pageWidth / 2,
-            yPosition,
-            { align: 'center' }
-        );
-
-        // Signature
-        if (layoutConfig.signatureUrl) {
-            try {
-                doc.addImage(layoutConfig.signatureUrl, 'PNG', 30, pageHeight - 50, 40, 20);
-                doc.setFontSize(10);
-                doc.text('Authorized Signature', 30, pageHeight - 25);
-            } catch (error) {
-                console.error('Error adding signature:', error);
+            } catch (err) {
+                console.error(`Error rendering element ${el.id}:`, err);
             }
         }
 
-        // Stamp
-        if (layoutConfig.stampUrl) {
-            try {
-                doc.addImage(layoutConfig.stampUrl, 'PNG', pageWidth - 70, pageHeight - 50, 40, 40);
-            } catch (error) {
-                console.error('Error adding stamp:', error);
-            }
-        }
-
-        // Footer Text
-        if (layoutConfig.footerText) {
-            doc.setFontSize(10);
-            doc.setTextColor('#666666');
-            doc.text(layoutConfig.footerText, pageWidth / 2, pageHeight - 15, { align: 'center' });
-        }
-
-        // Convert to blob and upload (you'll need to implement upload logic)
-        const pdfBlob = doc.output('blob');
-
-        // Upload to your storage (S3, Cloudinary, etc.)
-        // For now, return a data URL
         const pdfDataUrl = doc.output('dataurlstring');
-
         return pdfDataUrl;
     } catch (error) {
         console.error('Error generating PDF:', error);

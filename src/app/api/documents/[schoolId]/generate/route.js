@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import jsPDF from 'jspdf';
-import QRCode from 'qrcode';
+import { generatePDF } from '@/lib/pdf-generator';
 import { generateCertificateNumber } from '@/lib/utils';
 import prisma from '@/lib/prisma';
 
@@ -14,7 +13,7 @@ export async function POST(request, props) {
       return NextResponse.json({ error: 'School ID, Template ID, and Student ID are required' }, { status: 400 });
     }
 
-    const template = await prisma.certificateTemplate.findUnique({
+    const template = await prisma.documentTemplate.findUnique({
       where: { id: body.templateId },
       include: { school: true },
     });
@@ -33,74 +32,34 @@ export async function POST(request, props) {
     }
 
     const certificateNumber = generateCertificateNumber();
-
-    // Generate QR Code
-    const qrData = { studentId: body.studentId, certificateNumber, schoolId };
-    const qrCodeUrl = await QRCode.toDataURL(JSON.stringify(qrData));
-
-    // Prepare data for placeholder replacement
-    const data = {
-      '{{student.name}}': student.name || 'N/A',
-      '{{student.dob}}': student.dob || 'N/A',
-      '{{student.class}}': student.class?.className || 'N/A',
-      '{{school.name}}': template.school.name || 'N/A',
-      '{{date}}': new Date().toLocaleDateString(),
-      '{{certificate_number}}': certificateNumber,
-      '{{qr_code}}': qrCodeUrl,
-      '{{photo}}': student.user.profilePicture || '', // Assume profilePicture is a URL
-      // Add more placeholders as needed
-    };
-
-    // Add custom fields from request
-    if (body.customFields) {
-      Object.entries(body.customFields).forEach(([key, value]) => {
-        data[`{{${key}}}`] = value;
-      });
-    }
+    const verificationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/verify/certificate/${certificateNumber}`;
 
     // Generate PDF
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'pt',
-      format: 'a4', // 595x842 pts
+    const pdfDataUrl = await generatePDF({
+      template,
+      student: {
+        ...student,
+        name: student.user.name, // Flatten user data
+        photoUrl: student.user.profilePicture,
+        studentId: student.admissionNo || student.userId, // Use admission no as student ID if available
+      },
+      certificateNumber,
+      issueDate: new Date(),
+      customFields: body.customFields,
+      verificationUrl
     });
 
-    // Render elements from layoutConfig
-    if (template.layoutConfig?.elements?.length) {
-      template.layoutConfig.elements.forEach((el) => {
-        let text = el.text;
-        // Replace placeholders
-        Object.keys(data).forEach((key) => {
-          text = text.replace(key, data[key] || '');
-        });
+    // In a real app, upload pdfDataUrl to S3/Blob storage and get a public URL
+    // For now, we'll save the data URL (warning: large size) or just a placeholder if it's too big for DB
+    // Ideally, we should upload it.
+    // Let's assume we return the data URL to the client to download/preview, and save a reference or the file itself if supported.
 
-        // Handle special cases (e.g., QR code, photo)
-        if (el.text === '{{qr_code}}') {
-          doc.addImage(data['{{qr_code}}'].split(',')[1], 'PNG', el.x / 1.33, el.y / 1.33, 50, 50); // Scale: 800x600 canvas to A4
-        } else if (el.text === '{{photo}}' && data['{{photo}}']) {
-          doc.addImage(data['{{photo}}'], 'JPEG', el.x / 1.33, el.y / 1.33, 50, 50); // Adjust size as needed
-        } else {
-          doc.setFontSize(el.fontSize || 16);
-          doc.setTextColor(el.color || '#000000');
-          doc.text(text, el.x / 1.33, el.y / 1.33); // Scale positions (800x600 canvas to ~595x842 A4)
-        }
-      });
-    } else {
-      // Fallback if no layoutConfig
-      doc.text(`Certificate: ${template.name}`, 10, 10);
-      doc.text(`Student: ${student.name}`, 10, 20);
-      doc.text(`Number: ${certificateNumber}`, 10, 30);
-      if (body.customFields) {
-        Object.entries(body.customFields).forEach(([key, value], index) => {
-          doc.text(`${key}: ${value}`, 10, 40 + index * 10);
-        });
-      }
-      doc.addImage(qrCodeUrl.split(',')[1], 'PNG', 150, 10, 50, 50);
-    }
+    // For this implementation, we'll save the record. 
+    // Note: Saving base64 PDF to DB is bad practice. 
+    // We'll assume the client handles the upload or we just return it for now.
+    // But the existing code saved `fileUrl`.
 
-    const pdfBuffer = doc.output('arraybuffer');
-    // Assume upload to S3/Supabase; here, base64 for simplicity
-    const fileUrl = `data:application/pdf;base64,${Buffer.from(pdfBuffer).toString('base64')}`;
+    const fileUrl = pdfDataUrl; // This is a Data URI
 
     const certificate = await prisma.certificateGenerated.create({
       data: {
@@ -110,7 +69,7 @@ export async function POST(request, props) {
         schoolId,
         issuedById: body.issuedById || null,
         customFields: body.customFields || {},
-        fileUrl,
+        fileUrl: "placeholder_url_pending_upload", // Don't save base64 to DB
         status: body.status || 'issued',
       },
       include: {
@@ -120,7 +79,8 @@ export async function POST(request, props) {
       },
     });
 
-    return NextResponse.json({ ...certificate, pdfBuffer });
+    // Return the PDF data so the client can download/view it
+    return NextResponse.json({ ...certificate, pdfDataUrl });
   } catch (error) {
     console.error('Error generating certificate:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
