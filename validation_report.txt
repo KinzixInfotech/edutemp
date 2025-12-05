@@ -1,0 +1,92 @@
+🔍 Scanning API routes for common errors...
+
+
+❌ Issues in src/app/api/admin/cron-health/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/auth/google-calendar/callback/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/auth/google-calendar/disconnect/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/auth/google-calendar/refresh/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/auth/google-calendar/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/cron/auto-mark-absent/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/cron/event-reminders/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/cron/event-reminders/test/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/cron/sync-statuspage/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/schools/[schoolId]/calendar/events/[eventId]/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/schools/[schoolId]/calendar/events/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/schools/[schoolId]/calendar/populate/route.js:
+   - Line 422: Suspicious active code 'const params = ...' inside commented block.
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/schools/[schoolId]/calendar/upcoming/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/schools/fee/admin/dashboard/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/schools/fee/admin/reports/collection/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/schools/fee/admin/reports/overdue/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/schools/fee/assign/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/schools/fee/discounts/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/schools/fee/global-structures/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/schools/fee/parent/my-fees/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/schools/fee/parent/payment-history/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/schools/fee/payments/online/initiate/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/schools/fee/payments/receipt/[receiptNumber]/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/schools/fee/payments/record-offline/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/schools/fee/payments/records/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/schools/fee/payments/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/schools/fee/reminders/schedule/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/schools/fee/reminders/send/route.js:
+   - Possible merge conflict markers found.
+
+❌ Issues in src/app/api/schools/fee/students/[studentId]/route.js:
+   - Possible merge conflict markers found.
+
+✅ Scan complete. Checked 283 files.

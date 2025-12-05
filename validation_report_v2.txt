@@ -1,0 +1,4 @@
+🔍 Scanning API routes for common errors...
+
+
+✅ Scan complete. Checked 283 files.
