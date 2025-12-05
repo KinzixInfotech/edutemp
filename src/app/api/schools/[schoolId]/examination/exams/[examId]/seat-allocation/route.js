@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 // GET /api/schools/[schoolId]/examination/exams/[examId]/seat-allocation
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+  const params = await props.params;
     try {
-        const { examId } = await params;
+        const { examId } = params;
 
         const allocations = await prisma.seatAllocation.findMany({
             where: { examId: examId },
@@ -42,9 +43,10 @@ export async function GET(req, { params }) {
 
 // POST /api/schools/[schoolId]/examination/exams/[examId]/seat-allocation
 // Auto-allocate seats
-export async function POST(req, { params }) {
+export async function POST(req, props) {
+  const params = await props.params;
     try {
-        const { schoolId, examId } = await params;
+        const { schoolId, examId } = params;
 
         // 1. Fetch Exam and its Classes
         const exam = await prisma.exam.findUnique({

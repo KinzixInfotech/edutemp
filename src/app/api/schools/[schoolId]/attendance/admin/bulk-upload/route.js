@@ -4,7 +4,8 @@ import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { parse } from 'csv-parse/sync';
 
-export async function POST(req, { params }) {
+export async function POST(req, props) {
+  const params = await props.params;
     const { schoolId } = params;
 
     try {
@@ -72,7 +73,8 @@ export async function POST(req, { params }) {
 }
 
 // Generate template
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+  const params = await props.params;
     const { schoolId } = params;
 
     const template = `userId,date,status,remarks

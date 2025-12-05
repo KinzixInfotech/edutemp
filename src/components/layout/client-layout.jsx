@@ -77,13 +77,14 @@ export default function ClientLayout({ children }) {
                     "--header-height": "calc(var(--spacing) * 12)",
                 }}
             >
+
                 <OnboardingDialog />
-                {!hideUI && <AppSidebar variant="inset" />}
+                {!hideUI && <AppSidebar />}
                 <TopProgressBar />
 
-                <SidebarInset>
-
+                <SidebarInset className={'bg-[#f9fafb] dark:bg-black'}>
                     {!hideUI && <SiteHeader fullUser={fullUser} />}
+
                     <main className="w-full h-full relative">
                         {loading ? (
                             <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-50">
@@ -93,7 +94,7 @@ export default function ClientLayout({ children }) {
                             children
                         )}
                     </main>
-                    <footer className="w-full border-t bg-muted dark:bg-muted/30 rounded-b-lg  text-xs text-muted-foreground mt-8">
+                    <footer className="w-full border-t bg-white dark:bg-muted/30 rounded-b-lg  text-xs text-muted-foreground mt-8">
                         <div className="max-w-7xl mx-auto px-4 py-3  flex flex-col md:flex-row justify-between items-center gap-2">
                             <StatusIndicator />
                             <div className="flex items-center gap-4">

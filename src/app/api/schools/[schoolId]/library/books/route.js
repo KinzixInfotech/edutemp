@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { remember, generateKey, invalidatePattern } from "@/lib/cache";
 
 // GET: List all books with filtering and pagination
 export async function GET(request, { params }) {
@@ -10,53 +11,61 @@ export async function GET(request, { params }) {
         const category = searchParams.get("category");
         const page = parseInt(searchParams.get("page") || "1");
         const limit = parseInt(searchParams.get("limit") || "10");
-        const skip = (page - 1) * limit;
 
-        const where = {
-            schoolId,
-            OR: [
-                { title: { contains: search, mode: "insensitive" } },
-                { author: { contains: search, mode: "insensitive" } },
-                { ISBN: { contains: search, mode: "insensitive" } },
-            ],
-            ...(category && { category }),
-        };
+        const cacheKey = generateKey('library:books', { schoolId, search, category, page, limit });
 
-        const [books, total] = await Promise.all([
-            prisma.libraryBook.findMany({
-                where,
-                include: {
-                    copies: true, // Include copies to count availability
-                },
-                skip,
-                take: limit,
-                orderBy: { createdAt: "desc" },
-            }),
-            prisma.libraryBook.count({ where }),
-        ]);
+        const result = await remember(cacheKey, async () => {
+            const skip = (page - 1) * limit;
 
-        // Process books to add availability stats
-        const enhancedBooks = books.map((book) => {
-            const totalCopies = book.copies.length;
-            const availableCopies = book.copies.filter(
-                (c) => c.status === "AVAILABLE"
-            ).length;
-            return {
-                ...book,
-                totalCopies,
-                availableCopies,
+            const where = {
+                schoolId,
+                OR: [
+                    { title: { contains: search, mode: "insensitive" } },
+                    { author: { contains: search, mode: "insensitive" } },
+                    { ISBN: { contains: search, mode: "insensitive" } },
+                ],
+                ...(category && { category }),
             };
-        });
 
-        return NextResponse.json({
-            data: enhancedBooks,
-            meta: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit),
-            },
-        });
+            const [books, total] = await Promise.all([
+                prisma.libraryBook.findMany({
+                    where,
+                    include: {
+                        copies: true,
+                    },
+                    skip,
+                    take: limit,
+                    orderBy: { createdAt: "desc" },
+                }),
+                prisma.libraryBook.count({ where }),
+            ]);
+
+            // Process books to add availability stats
+            const enhancedBooks = books.map((book) => {
+                const totalCopies = book.copies.length;
+                const availableCopies = book.copies.filter(
+                    (c) => c.status === "AVAILABLE"
+                ).length;
+                return {
+                    ...book,
+                    totalCopies,
+                    availableCopies,
+                };
+            });
+
+            return {
+                data: enhancedBooks,
+                meta: {
+                    total,
+                    page,
+                    limit,
+                    totalPages: Math.ceil(total / limit),
+                },
+            };
+        }, 300);
+
+        // Return data array for backward compatibility
+        return NextResponse.json(result.data);
     } catch (error) {
         console.error("Error fetching books:", error);
         return NextResponse.json(
@@ -104,6 +113,9 @@ export async function POST(request, { params }) {
                 coverImage,
             },
         });
+
+        await invalidatePattern(`library:books:*${schoolId}*`);
+        await invalidatePattern(`library:stats:*${schoolId}*`);
 
         return NextResponse.json(newBook, { status: 201 });
     } catch (error) {

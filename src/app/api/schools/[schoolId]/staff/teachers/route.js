@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 // GET /api/schools/[schoolId]/staff/teachers
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+  const params = await props.params;
     try {
-        const { schoolId } = await params;
+        const { schoolId } = params;
 
         const teachers = await prisma.teachingStaff.findMany({
             where: { schoolId },

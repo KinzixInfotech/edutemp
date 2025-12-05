@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 // GET /api/schools/[schoolId]/examination/exams/[examId]/questions
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+  const params = await props.params;
     try {
-        const { examId } = await params;
+        const { examId } = params;
 
         const questions = await prisma.onlineExamQuestion.findMany({
             where: { examId: examId },
@@ -23,9 +24,10 @@ export async function GET(req, { params }) {
 
 // PUT /api/schools/[schoolId]/examination/exams/[examId]/questions
 // Replaces/Updates questions list
-export async function PUT(req, { params }) {
+export async function PUT(req, props) {
+  const params = await props.params;
     try {
-        const { examId } = await params;
+        const { examId } = params;
         const body = await req.json();
         const { questions } = body; // Expecting array of questions
 

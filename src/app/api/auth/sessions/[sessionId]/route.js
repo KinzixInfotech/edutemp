@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
 // DELETE - Revoke specific session
-export async function DELETE(req, { params }) {
+export async function DELETE(req, props) {
+  const params = await props.params;
     try {
         const { sessionId } = params;
         const userId = req.headers.get("x-user-id");
@@ -53,7 +54,8 @@ export async function DELETE(req, { params }) {
 }
 
 // PATCH - Update session (e.g., rename device)
-export async function PATCH(req, { params }) {
+export async function PATCH(req, props) {
+  const params = await props.params;
     try {
         const { sessionId } = params;
         const userId = req.headers.get("x-user-id");

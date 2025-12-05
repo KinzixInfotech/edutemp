@@ -2,6 +2,7 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
+import { remember, generateKey, invalidatePattern } from "@/lib/cache";
 
 // Validation schemas
 const createNoticeSchema = z.object({
@@ -94,11 +95,13 @@ export async function POST(request) {
             },
         });
 
+        await invalidatePattern('notices:*');
+
         return NextResponse.json(notice, { status: 201 });
     } catch (error) {
         console.error('Error creating notice:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-    } 
+    }
 }
 
 // Example POST Response (Success):
@@ -162,6 +165,8 @@ export async function PUT(request) {
             },
         });
 
+        await invalidatePattern('notices:*');
+
         return NextResponse.json(notice);
     } catch (error) {
         console.error('Error updating notice:', error);
@@ -214,6 +219,8 @@ export async function DELETE(request) {
             });
         }
 
+        await invalidatePattern('notices:*');
+
         return NextResponse.json({ message: 'Notice deleted successfully' });
     } catch (error) {
         console.error('Error deleting notice:', error);
@@ -235,17 +242,6 @@ export async function DELETE(request) {
 export async function GET(request) {
     try {
         const { searchParams } = new URL(request.url);
-        // const parsed = fetchNoticesSchema.safeParse({
-        //     schoolId: searchParams.get('schoolId'),
-        //     status: searchParams.get('status'),
-        //     audience: searchParams.get('audience'),
-        //     priority: searchParams.get('priority'),
-        //     publishedAtStart: searchParams.get('publishedAtStart'),
-        //     publishedAtEnd: searchParams.get('publishedAtEnd'),
-        //     limit: searchParams.get('limit'),
-        //     offset: searchParams.get('offset'),
-        //     sortBy: searchParams.get('sortBy'),
-        // });
 
         const parsed = fetchNoticesSchema.safeParse({
             schoolId: normalizeParam(searchParams.get('schoolId')),
@@ -274,40 +270,47 @@ export async function GET(request) {
             sortBy,
         } = parsed.data;
 
-        const where = {
-            schoolId,
-            status,
-            audience,
-            priority,
-            publishedAt: publishedAtStart && publishedAtEnd
-                ? { gte: new Date(publishedAtStart), lte: new Date(publishedAtEnd) }
-                : undefined,
-        };
+        const cacheKey = generateKey('notices:list', { schoolId, status, audience, priority, publishedAtStart, publishedAtEnd, limit, offset, sortBy });
 
-        const [notices, total] = await Promise.all([
-            prisma.notice.findMany({
-                where,
-                include: {
-                    School: { select: { id: true, name: true } },
-                    Author: { select: { id: true, name: true } },
-                },
-                orderBy: { [sortBy]: 'desc' },
-                take: limit,
-                skip: offset,
-            }),
-            prisma.notice.count({ where }),
-        ]);
+        const result = await remember(cacheKey, async () => {
+            const where = {
+                schoolId,
+                status,
+                audience,
+                priority,
+                publishedAt: publishedAtStart && publishedAtEnd
+                    ? { gte: new Date(publishedAtStart), lte: new Date(publishedAtEnd) }
+                    : undefined,
+            };
 
-        return NextResponse.json({
-            notices,
-            total,
-            limit,
-            offset,
-        });
+            const [notices, total] = await Promise.all([
+                prisma.notice.findMany({
+                    where,
+                    include: {
+                        School: { select: { id: true, name: true } },
+                        Author: { select: { id: true, name: true } },
+                    },
+                    orderBy: { [sortBy]: 'desc' },
+                    take: limit,
+                    skip: offset,
+                }),
+                prisma.notice.count({ where }),
+            ]);
+
+            return {
+                notices,
+                total,
+                limit,
+                offset,
+            };
+        }, 300); // 5 minutes cache
+
+        // Return notices array for backward compatibility
+        return NextResponse.json(result.notices);
     } catch (error) {
         console.error('Error fetching notices:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-    } 
+    }
 }
 
 // Example GET Response (Success):

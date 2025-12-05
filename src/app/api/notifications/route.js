@@ -1,6 +1,7 @@
 // app/api/notifications/route.js
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { remember, generateKey, invalidatePattern } from "@/lib/cache";
 
 /**
  * GET - Fetch notifications for a user
@@ -20,59 +21,66 @@ export async function GET(req) {
     }
 
     try {
-        const skip = (page - 1) * limit;
-        const where = {
-            receiverId: userId,
-            ...(schoolId && { schoolId }),
-            ...(unreadOnly && { isRead: false }),
-            ...(type && { type }),
-        };
+        const cacheKey = generateKey('notifications:list', { userId, schoolId, unreadOnly, page, limit, type });
 
-        // Get notifications
-        const notifications = await prisma.notification.findMany({
-            where,
-            include: {
-                sender: {
-                    select: {
-                        id: true,
-                        name: true,
-                        profilePicture: true,
-                        role: {
-                            select: {
-                                name: true
+        const result = await remember(cacheKey, async () => {
+            const skip = (page - 1) * limit;
+            const where = {
+                receiverId: userId,
+                ...(schoolId && { schoolId }),
+                ...(unreadOnly && { isRead: false }),
+                ...(type && { type }),
+            };
+
+            // Get notifications
+            const notifications = await prisma.notification.findMany({
+                where,
+                include: {
+                    sender: {
+                        select: {
+                            id: true,
+                            name: true,
+                            profilePicture: true,
+                            role: {
+                                select: {
+                                    name: true
+                                }
                             }
                         }
                     }
-                }
-            },
-            orderBy: [
-                { isRead: 'asc' },
-                { createdAt: 'desc' }
-            ],
-            skip,
-            take: limit,
-        });
+                },
+                orderBy: [
+                    { isRead: 'asc' },
+                    { createdAt: 'desc' }
+                ],
+                skip,
+                take: limit,
+            });
 
-        // Get total count
-        const totalCount = await prisma.notification.count({ where });
-        const unreadCount = await prisma.notification.count({
-            where: { receiverId: userId, isRead: false }
-        });
+            // Get total count
+            const totalCount = await prisma.notification.count({ where });
+            const unreadCount = await prisma.notification.count({
+                where: { receiverId: userId, isRead: false }
+            });
 
-        // Group by date for better UX
-        const grouped = groupNotificationsByDate(notifications);
+            // Group by date for better UX
+            const grouped = groupNotificationsByDate(notifications);
 
-        return NextResponse.json({
-            success: true,
-            notifications: grouped,
-            pagination: {
-                page,
-                limit,
-                total: totalCount,
-                totalPages: Math.ceil(totalCount / limit),
-            },
-            unreadCount,
-        });
+            return {
+                success: true,
+                notifications: grouped,
+                pagination: {
+                    page,
+                    limit,
+                    total: totalCount,
+                    totalPages: Math.ceil(totalCount / limit),
+                },
+                unreadCount,
+            };
+        }, 60); // 1 minute cache
+
+        // Return notifications array for backward compatibility
+        return NextResponse.json(result.data);
     } catch (error) {
         console.error("Fetch notifications error:", error);
         return NextResponse.json(
@@ -139,6 +147,8 @@ export async function PUT(req) {
                 },
             });
 
+            await invalidatePattern(`notifications:*${userId}*`);
+
             return NextResponse.json({
                 success: true,
                 message: "All notifications marked as read"
@@ -162,6 +172,8 @@ export async function PUT(req) {
                 readAt: new Date(),
             },
         });
+
+        await invalidatePattern(`notifications:*${userId || 'unknown'}*`);
 
         return NextResponse.json({
             success: true,
@@ -197,6 +209,8 @@ export async function DELETE(req) {
                 id: { in: notificationIds },
             },
         });
+
+        await invalidatePattern('notifications:*');
 
         return NextResponse.json({
             success: true,

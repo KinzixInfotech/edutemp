@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
-export async function GET(req, { params }) {
-    const { schoolId, sectionId } = await params;
+export async function GET(req, props) {
+  const params = await props.params;
+    const { schoolId, sectionId } = params;
 
     if (!schoolId || !sectionId) {
         return NextResponse.json({ error: "School ID and Section ID are required" }, { status: 400 });

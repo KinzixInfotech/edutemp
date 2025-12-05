@@ -2,10 +2,13 @@
 
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { remember, generateKey, invalidatePattern } from "@/lib/cache";
 
 // GET - Fetch leave requests
-export async function GET(req, { params }) {
-    const { schoolId } = await params; // Fix: await params
+// GET - Fetch leave requests
+export async function GET(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
     const { searchParams } = new URL(req.url);
 
     const statusParam = searchParams.get('status');
@@ -17,124 +20,133 @@ export async function GET(req, { params }) {
     const endDate = searchParams.get('endDate');
 
     try {
-        const skip = (page - 1) * limit;
+        const cacheKey = generateKey('attendance:leaves', {
+            schoolId, statusParam, userId, leaveType, page, limit, startDate, endDate
+        });
 
-        // Smart status handling - works for both single and multiple
-        let statusCondition;
-        if (statusParam) {
-            const statuses = statusParam.includes(',')
-                ? statusParam.split(',').map(s => s.trim())
-                : [statusParam];
-            statusCondition = statuses.length === 1
-                ? { status: statuses[0] }
-                : { status: { in: statuses } };
-        } else {
-            statusCondition = { status: 'PENDING' };
-        }
+        const result = await remember(cacheKey, async () => {
+            const skip = (page - 1) * limit;
 
-        const where = {
-            schoolId,
-            ...statusCondition, // Use smart condition
-            ...(userId && { userId }),
-            ...(leaveType && { leaveType }),
-            ...(startDate && endDate && {
-                startDate: { gte: new Date(startDate) },
-                endDate: { lte: new Date(endDate) }
-            })
-        };
+            // Smart status handling - works for both single and multiple
+            let statusCondition;
+            if (statusParam) {
+                const statuses = statusParam.includes(',')
+                    ? statusParam.split(',').map(s => s.trim())
+                    : [statusParam];
+                statusCondition = statuses.length === 1
+                    ? { status: statuses[0] }
+                    : { status: { in: statuses } };
+            } else {
+                statusCondition = { status: 'PENDING' };
+            }
+
+            const where = {
+                schoolId,
+                ...statusCondition, // Use smart condition
+                ...(userId && { userId }),
+                ...(leaveType && { leaveType }),
+                ...(startDate && endDate && {
+                    startDate: { gte: new Date(startDate) },
+                    endDate: { lte: new Date(endDate) }
+                })
+            };
 
 
-        const [leaves, total] = await Promise.all([
-            prisma.leaveRequest.findMany({
-                where,
-                include: {
-                    user: {
-                        select: {
-                            id: true,
-                            name: true,
-                            email: true,
-                            profilePicture: true,
-                            role: { select: { name: true } },
-                            student: {
-                                select: {
-                                    admissionNo: true,
-                                    rollNumber: true,
-                                    class: { select: { className: true } },
-                                    section: { select: { name: true } }
-                                }
-                            },
-                            teacher: {
-                                select: {
-                                    employeeId: true,
-                                    designation: true,
-                                    department: { select: { name: true } }
+            const [leaves, total] = await Promise.all([
+                prisma.leaveRequest.findMany({
+                    where,
+                    include: {
+                        user: {
+                            select: {
+                                id: true,
+                                name: true,
+                                email: true,
+                                profilePicture: true,
+                                role: { select: { name: true } },
+                                student: {
+                                    select: {
+                                        admissionNo: true,
+                                        rollNumber: true,
+                                        class: { select: { className: true } },
+                                        section: { select: { name: true } }
+                                    }
+                                },
+                                teacher: {
+                                    select: {
+                                        employeeId: true,
+                                        designation: true,
+                                        department: { select: { name: true } }
+                                    }
                                 }
                             }
-                        }
-                    },
-                    reviewer: {
-                        select: { name: true }
-                    },
-                    documents: true
-                },
-                orderBy: [
-                    { status: 'asc' },
-                    { submittedAt: 'desc' }
-                ],
-                skip,
-                take: limit
-            }),
-            prisma.leaveRequest.count({ where })
-        ]);
-
-        // Get leave balance for each user
-        const academicYear = await prisma.academicYear.findFirst({
-            where: { schoolId, isActive: true },
-            select: { id: true }
-        });
-
-        const leavesWithBalance = await Promise.all(
-            leaves.map(async (leave) => {
-                const balance = await prisma.leaveBalance.findFirst({
-                    where: {
-                        userId: leave.userId,
-                        schoolId,
-                        academicYearId: academicYear.id
-                    }
-                });
-
-                return {
-                    ...leave,
-                    balance: balance ? {
-                        casualLeave: {
-                            total: balance.casualLeaveTotal,
-                            used: balance.casualLeaveUsed,
-                            balance: balance.casualLeaveBalance
                         },
-                        sickLeave: {
-                            total: balance.sickLeaveTotal,
-                            used: balance.sickLeaveUsed,
-                            balance: balance.sickLeaveBalance
+                        reviewer: {
+                            select: { name: true }
                         },
-                        earnedLeave: {
-                            total: balance.earnedLeaveTotal,
-                            used: balance.earnedLeaveUsed,
-                            balance: balance.earnedLeaveBalance
-                        }
-                    } : null
-                };
-            })
-        );
+                        documents: true
+                    },
+                    orderBy: [
+                        { status: 'asc' },
+                        { submittedAt: 'desc' }
+                    ],
+                    skip,
+                    take: limit
+                }),
+                prisma.leaveRequest.count({ where })
+            ]);
 
-        return NextResponse.json({
-            leaves: leavesWithBalance,
-            pagination: {
-                page,
-                limit,
-                total,
-                totalPages: Math.ceil(total / limit)
-            }
-        });
+            // Get leave balance for each user
+            const academicYear = await prisma.academicYear.findFirst({
+                where: { schoolId, isActive: true },
+                select: { id: true }
+            });
+
+            const leavesWithBalance = await Promise.all(
+                leaves.map(async (leave) => {
+                    const balance = await prisma.leaveBalance.findFirst({
+                        where: {
+                            userId: leave.userId,
+                            schoolId,
+                            academicYearId: academicYear?.id
+                        }
+                    });
+
+                    return {
+                        ...leave,
+                        balance: balance ? {
+                            casualLeave: {
+                                total: balance.casualLeaveTotal,
+                                used: balance.casualLeaveUsed,
+                                balance: balance.casualLeaveBalance
+                            },
+                            sickLeave: {
+                                total: balance.sickLeaveTotal,
+                                used: balance.sickLeaveUsed,
+                                balance: balance.sickLeaveBalance
+                            },
+                            earnedLeave: {
+                                total: balance.earnedLeaveTotal,
+                                used: balance.earnedLeaveUsed,
+                                balance: balance.earnedLeaveBalance
+                            }
+                        } : null
+                    };
+                })
+            );
+
+            return {
+                leaves: leavesWithBalance,
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    totalPages: Math.ceil(total / limit)
+                }
+            };
+        }, 300); // Cache for 5 minutes
+
+        // Return leaves array for backward compatibility
+        return NextResponse.json(result.leaves);
 
     } catch (error) {
         console.error('Leave fetch error:', error);
@@ -146,7 +158,8 @@ export async function GET(req, { params }) {
 }
 
 // POST - Approve or reject leave requests
-export async function POST(req, { params }) {
+export async function POST(req, props) {
+  const params = await props.params;
     const { schoolId } = params;
     const { leaveRequestIds, action, adminRemarks, reviewedBy } = await req.json();
 
@@ -315,6 +328,11 @@ export async function POST(req, { params }) {
             }
         });
 
+        if (results.approved.length > 0 || results.rejected.length > 0 || results.cancelled.length > 0) {
+            await invalidatePattern(`attendance:leaves:${schoolId}*`);
+            await invalidatePattern(`attendance:stats:${schoolId}*`); // Leaves affect stats
+        }
+
         return NextResponse.json({
             success: true,
             results,
@@ -336,7 +354,8 @@ export async function POST(req, { params }) {
 }
 
 // PUT - Create new leave request (by teacher/staff)
-export async function PUT(req, { params }) {
+export async function PUT(req, props) {
+  const params = await props.params;
     const { schoolId } = params;
     const {
         userId,
@@ -421,6 +440,8 @@ export async function PUT(req, { params }) {
             });
         }
 
+        await invalidatePattern(`attendance:leaves:${schoolId}*`);
+
         return NextResponse.json({
             success: true,
             message: 'Leave request submitted successfully',
@@ -437,7 +458,8 @@ export async function PUT(req, { params }) {
 }
 
 // DELETE - Cancel leave request
-export async function DELETE(req, { params }) {
+export async function DELETE(req, props) {
+  const params = await props.params;
     const { schoolId } = params;
     const { searchParams } = new URL(req.url);
     const leaveRequestId = searchParams.get('leaveRequestId');
@@ -472,6 +494,8 @@ export async function DELETE(req, { params }) {
             where: { id: leaveRequestId },
             data: { status: 'CANCELLED' }
         });
+
+        await invalidatePattern(`attendance:leaves:${schoolId}*`);
 
         return NextResponse.json({
             success: true,

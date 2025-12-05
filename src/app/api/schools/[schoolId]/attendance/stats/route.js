@@ -4,9 +4,12 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { ISTDate } from '../bulk/route';
+import { apiResponse, errorResponse } from "@/lib/api-utils";
+import { remember, generateKey } from "@/lib/cache";
 
 // GET - Fetch attendance statistics
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+  const params = await props.params;
     const { schoolId } = params;
     const { searchParams } = new URL(req.url);
 
@@ -18,192 +21,197 @@ export async function GET(req, { params }) {
     const classId = searchParams.get('classId');
 
     try {
-        // Get active academic year
-        const academicYear = await prisma.academicYear.findFirst({
-            where: { schoolId, isActive: true },
-            select: { id: true, startDate: true, endDate: true }
-        });
+        const cacheKey = generateKey('attendance:stats', { schoolId, userId, month, year, classId });
 
-        if (!academicYear) {
-            return NextResponse.json({ error: 'No active academic year' }, { status: 404 });
-        }
+        const result = await remember(cacheKey, async () => {
+            // Get active academic year
+            const academicYear = await prisma.academicYear.findFirst({
+                where: { schoolId, isActive: true },
+                select: { id: true, startDate: true, endDate: true }
+            });
 
-        // 1. USER-SPECIFIC STATS
-        if (userId) {
-            const currentMonth = month ? parseInt(month) : new Date().getMonth() + 1;
-            const currentYear = year ? parseInt(year) : new Date().getFullYear();
+            if (!academicYear) {
+                throw new Error('No active academic year');
+            }
 
-            const [monthlyStats, yearlyStats, recentAttendance] = await Promise.all([
-                // Monthly stats
-                prisma.attendanceStats.findUnique({
-                    where: {
-                        userId_academicYearId_month_year: {
+            // 1. USER-SPECIFIC STATS
+            if (userId) {
+                const currentMonth = month ? parseInt(month) : new Date().getMonth() + 1;
+                const currentYear = year ? parseInt(year) : new Date().getFullYear();
+
+                const [monthlyStats, yearlyStats, recentAttendance] = await Promise.all([
+                    // Monthly stats
+                    prisma.attendanceStats.findUnique({
+                        where: {
+                            userId_academicYearId_month_year: {
+                                userId,
+                                academicYearId: academicYear.id,
+                                month: currentMonth,
+                                year: currentYear
+                            }
+                        }
+                    }),
+
+                    // Yearly stats
+                    prisma.attendanceStats.findMany({
+                        where: {
                             userId,
                             academicYearId: academicYear.id,
-                            month: currentMonth,
                             year: currentYear
-                        }
-                    }
-                }),
+                        },
+                        orderBy: { month: 'asc' }
+                    }),
 
-                // Yearly stats
-                prisma.attendanceStats.findMany({
-                    where: {
-                        userId,
-                        academicYearId: academicYear.id,
-                        year: currentYear
-                    },
-                    orderBy: { month: 'asc' }
-                }),
+                    // Recent attendance
+                    prisma.attendance.findMany({
+                        where: {
+                            userId,
+                            schoolId,
+                            date: {
+                                gte: ISTDate(new Date(currentYear, currentMonth - 1, 1)),
+                                lte: ISTDate(new Date(currentYear, currentMonth, 0))
+                            }
+                        },
+                        orderBy: { date: 'desc' }
+                    })
+                ]);
 
-                // Recent attendance
-                prisma.attendance.findMany({
+                // Calculate streaks
+                const streak = calculateStreak(recentAttendance);
+
+                // Get working days in month
+                const workingDays = await prisma.schoolCalendar.count({
                     where: {
-                        userId,
                         schoolId,
                         date: {
                             gte: ISTDate(new Date(currentYear, currentMonth - 1, 1)),
                             lte: ISTDate(new Date(currentYear, currentMonth, 0))
-                        }
+                        },
+                        dayType: 'WORKING_DAY'
+                    }
+                });
+                return {
+                    userId,
+                    monthlyStats: monthlyStats || {
+                        totalWorkingDays: workingDays,
+                        totalPresent: 0,
+                        totalAbsent: 0,
+                        totalHalfDay: 0,
+                        totalLate: 0,
+                        totalLeaves: 0,
+                        attendancePercentage: 0
                     },
-                    orderBy: { date: 'desc' }
-                })
-            ]);
+                    yearlyStats,
+                    yearlyAggregate: yearlyStats.reduce((acc, stat) => ({
+                        totalPresent: acc.totalPresent + stat.totalPresent,
+                        totalAbsent: acc.totalAbsent + stat.totalAbsent,
+                        totalHalfDay: acc.totalHalfDay + stat.totalHalfDay,
+                        totalLate: acc.totalLate + stat.totalLate,
+                        totalLeaves: acc.totalLeaves + stat.totalLeaves,
+                        totalWorkingDays: acc.totalWorkingDays + stat.totalWorkingDays
+                    }), {
+                        totalPresent: 0,
+                        totalAbsent: 0,
+                        totalHalfDay: 0,
+                        totalLate: 0,
+                        totalLeaves: 0,
+                        totalWorkingDays: 0
+                    }),
+                    recentAttendance,
+                    streak,
+                    workingDaysInMonth: workingDays
+                };
+            }
 
-            // Calculate streaks
-            const streak = calculateStreak(recentAttendance);
-
-            // Get working days in month
-            const workingDays = await prisma.schoolCalendar.count({
-                where: {
-                    schoolId,
-                    date: {
-                        gte: ISTDate(new Date(currentYear, currentMonth - 1, 1)),
-                        lte: ISTDate(new Date(currentYear, currentMonth, 0))
+            // 2. CLASS-SPECIFIC STATS
+            if (classId) {
+                const students = await prisma.student.findMany({
+                    where: {
+                        schoolId,
+                        classId: parseInt(classId),
+                        user: { deletedAt: null, status: 'ACTIVE' }
                     },
-                    dayType: 'WORKING_DAY'
-                }
-            });
-            return NextResponse.json({
-                userId,
-                monthlyStats: monthlyStats || {
-                    totalWorkingDays: workingDays,
-                    totalPresent: 0,
-                    totalAbsent: 0,
-                    totalHalfDay: 0,
-                    totalLate: 0,
-                    totalLeaves: 0,
-                    attendancePercentage: 0
-                },
-                yearlyStats,
-                yearlyAggregate: yearlyStats.reduce((acc, stat) => ({
-                    totalPresent: acc.totalPresent + stat.totalPresent,
-                    totalAbsent: acc.totalAbsent + stat.totalAbsent,
-                    totalHalfDay: acc.totalHalfDay + stat.totalHalfDay,
-                    totalLate: acc.totalLate + stat.totalLate,
-                    totalLeaves: acc.totalLeaves + stat.totalLeaves,
-                    totalWorkingDays: acc.totalWorkingDays + stat.totalWorkingDays
-                }), {
-                    totalPresent: 0,
-                    totalAbsent: 0,
-                    totalHalfDay: 0,
-                    totalLate: 0,
-                    totalLeaves: 0,
-                    totalWorkingDays: 0
-                }),
-                recentAttendance,
-                streak,
-                workingDaysInMonth: workingDays
-            });
-        }
+                    select: { userId: true }
+                });
 
-        // 2. CLASS-SPECIFIC STATS
-        if (classId) {
-            const students = await prisma.student.findMany({
-                where: {
-                    schoolId,
+                const studentIds = students.map(s => s.userId);
+
+                const classStats = await prisma.$queryRaw`
+            SELECT 
+              u.id as "userId",
+              u.name,
+              s."admissionNo",
+              s."rollNumber",
+              COALESCE(ast."attendancePercentage", 0) as "attendancePercentage",
+              COALESCE(ast."totalPresent", 0) as "totalPresent",
+              COALESCE(ast."totalAbsent", 0) as "totalAbsent",
+              COALESCE(ast."totalLate", 0) as "totalLate",
+              COALESCE(ast."totalWorkingDays", 0) as "totalWorkingDays"
+            FROM "User" u
+            INNER JOIN "Student" s ON s."userId" = u.id
+            LEFT JOIN "AttendanceStats" ast ON ast."userId" = u.id 
+              AND ast."academicYearId" = ${academicYear.id}::uuid
+              AND ast.month = ${parseInt(month || new Date().getMonth() + 1)}
+              AND ast.year = ${parseInt(year || new Date().getFullYear())}
+            WHERE u.id = ANY(${studentIds}::uuid[])
+            ORDER BY s."rollNumber", u.name
+          `;
+
+                return {
                     classId: parseInt(classId),
-                    user: { deletedAt: null, status: 'ACTIVE' }
-                },
-                select: { userId: true }
-            });
+                    students: classStats.map(stat => ({
+                        ...stat,
+                        attendancePercentage: Number(stat.attendancePercentage),
+                        totalPresent: Number(stat.totalPresent),
+                        totalAbsent: Number(stat.totalAbsent),
+                        totalLate: Number(stat.totalLate),
+                        totalWorkingDays: Number(stat.totalWorkingDays)
+                    }))
+                };
+            }
 
-            const studentIds = students.map(s => s.userId);
+            // 3. SCHOOL-WIDE COMPARISON
+            const comparison = await prisma.$queryRaw`
+          SELECT 
+            r.name as "roleName",
+            AVG(ast."attendancePercentage") as "avgAttendance",
+            COUNT(DISTINCT ast."userId") as "totalUsers",
+            SUM(ast."totalPresent") as "totalPresent",
+            SUM(ast."totalAbsent") as "totalAbsent"
+          FROM "AttendanceStats" ast
+          INNER JOIN "User" u ON u.id = ast."userId"
+          INNER JOIN "Role" r ON r.id = u."roleId"
+          WHERE ast."schoolId" = ${schoolId}::uuid
+            AND ast."academicYearId" = ${academicYear.id}::uuid
+            AND ast.month = ${parseInt(month || new Date().getMonth() + 1)}
+            AND ast.year = ${parseInt(year || new Date().getFullYear())}
+          GROUP BY r.name
+          ORDER BY "avgAttendance" DESC
+        `;
 
-            const classStats = await prisma.$queryRaw`
-        SELECT 
-          u.id as "userId",
-          u.name,
-          s."admissionNo",
-          s."rollNumber",
-          COALESCE(ast."attendancePercentage", 0) as "attendancePercentage",
-          COALESCE(ast."totalPresent", 0) as "totalPresent",
-          COALESCE(ast."totalAbsent", 0) as "totalAbsent",
-          COALESCE(ast."totalLate", 0) as "totalLate",
-          COALESCE(ast."totalWorkingDays", 0) as "totalWorkingDays"
-        FROM "User" u
-        INNER JOIN "Student" s ON s."userId" = u.id
-        LEFT JOIN "AttendanceStats" ast ON ast."userId" = u.id 
-          AND ast."academicYearId" = ${academicYear.id}::uuid
-          AND ast.month = ${parseInt(month || new Date().getMonth() + 1)}
-          AND ast.year = ${parseInt(year || new Date().getFullYear())}
-        WHERE u.id = ANY(${studentIds}::uuid[])
-        ORDER BY s."rollNumber", u.name
-      `;
-
-            return NextResponse.json({
-                classId: parseInt(classId),
-                students: classStats.map(stat => ({
-                    ...stat,
-                    attendancePercentage: Number(stat.attendancePercentage),
-                    totalPresent: Number(stat.totalPresent),
-                    totalAbsent: Number(stat.totalAbsent),
-                    totalLate: Number(stat.totalLate),
-                    totalWorkingDays: Number(stat.totalWorkingDays)
+            return {
+                comparison: comparison.map(c => ({
+                    ...c,
+                    avgAttendance: Number(c.avgAttendance).toFixed(2),
+                    totalUsers: Number(c.totalUsers),
+                    totalPresent: Number(c.totalPresent),
+                    totalAbsent: Number(c.totalAbsent)
                 }))
-            });
-        }
+            };
+        }, 300); // 5 minutes cache
 
-        // 3. SCHOOL-WIDE COMPARISON
-        const comparison = await prisma.$queryRaw`
-      SELECT 
-        r.name as "roleName",
-        AVG(ast."attendancePercentage") as "avgAttendance",
-        COUNT(DISTINCT ast."userId") as "totalUsers",
-        SUM(ast."totalPresent") as "totalPresent",
-        SUM(ast."totalAbsent") as "totalAbsent"
-      FROM "AttendanceStats" ast
-      INNER JOIN "User" u ON u.id = ast."userId"
-      INNER JOIN "Role" r ON r.id = u."roleId"
-      WHERE ast."schoolId" = ${schoolId}::uuid
-        AND ast."academicYearId" = ${academicYear.id}::uuid
-        AND ast.month = ${parseInt(month || new Date().getMonth() + 1)}
-        AND ast.year = ${parseInt(year || new Date().getFullYear())}
-      GROUP BY r.name
-      ORDER BY "avgAttendance" DESC
-    `;
-
-        return NextResponse.json({
-            comparison: comparison.map(c => ({
-                ...c,
-                avgAttendance: Number(c.avgAttendance).toFixed(2),
-                totalUsers: Number(c.totalUsers),
-                totalPresent: Number(c.totalPresent),
-                totalAbsent: Number(c.totalAbsent)
-            }))
-        });
+        // Stats is an object, not an array, so return as-is
+        return apiResponse(result);
 
     } catch (error) {
         console.error('Stats error:', error);
-        return NextResponse.json({
-            error: 'Failed to fetch statistics',
-            details: error.message
-        }, { status: 500 });
+        return errorResponse(error.message || 'Failed to fetch statistics', 500);
     }
 }
 
 // POST - Force recalculate stats
-export async function POST(req, { params }) {
+export async function POST(req, props) {
+  const params = await props.params;
     const { schoolId } = params;
     const body = await req.json();
     const { userId, month, year } = body;

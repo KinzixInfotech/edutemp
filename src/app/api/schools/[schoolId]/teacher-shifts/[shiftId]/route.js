@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 // DELETE /api/schools/[schoolId]/teacher-shifts/[shiftId]
-export async function DELETE(req, { params }) {
+export async function DELETE(req, props) {
+  const params = await props.params;
     try {
-        const { schoolId, shiftId } = await params;
+        const { schoolId, shiftId } = params;
 
         const shift = await prisma.teacherShift.findUnique({
             where: {
@@ -37,9 +38,10 @@ export async function DELETE(req, { params }) {
 }
 
 // PUT /api/schools/[schoolId]/teacher-shifts/[shiftId]
-export async function PUT(req, { params }) {
+export async function PUT(req, props) {
+  const params = await props.params;
     try {
-        const { schoolId, shiftId } = await params;
+        const { schoolId, shiftId } = params;
         const body = await req.json();
         const { classId, sectionId, subjectId, teacherId, timeSlotId, date, roomNumber, notes, status } = body;
 

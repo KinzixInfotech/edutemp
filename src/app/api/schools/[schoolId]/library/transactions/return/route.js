@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { invalidatePattern } from "@/lib/cache";
 
 export async function POST(request, { params }) {
     try {
@@ -73,6 +74,8 @@ export async function POST(request, { params }) {
 
             return updated;
         });
+
+        await invalidatePattern(`library:*${schoolId}*`);
 
         return NextResponse.json(updatedTransaction);
     } catch (error) {

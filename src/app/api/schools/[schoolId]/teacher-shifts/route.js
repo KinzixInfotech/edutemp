@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 // GET /api/schools/[schoolId]/teacher-shifts
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+  const params = await props.params;
     try {
-        const { schoolId } = await params;
+        const { schoolId } = params;
         const { searchParams } = new URL(req.url);
         const startDate = searchParams.get('startDate');
         const endDate = searchParams.get('endDate');
@@ -64,9 +65,10 @@ export async function GET(req, { params }) {
 }
 
 // POST /api/schools/[schoolId]/teacher-shifts
-export async function POST(req, { params }) {
+export async function POST(req, props) {
+  const params = await props.params;
     try {
-        const { schoolId } = await params;
+        const { schoolId } = params;
         const body = await req.json();
         const { classId, sectionId, subjectId, teacherId, timeSlotId, date, roomNumber, notes } = body;
 

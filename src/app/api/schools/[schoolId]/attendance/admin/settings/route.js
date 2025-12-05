@@ -3,7 +3,8 @@ import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
 // GET - Fetch current attendance config
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+  const params = await props.params;
   const { schoolId } = params;
 console.log(schoolId);
 
@@ -61,7 +62,8 @@ console.log(schoolId);
 }
 
 // PUT - Update attendance config
-export async function PUT(req, { params }) {
+export async function PUT(req, props) {
+  const params = await props.params;
   const { schoolId } = params;
   const updates = await req.json();
 
@@ -154,7 +156,8 @@ export async function PUT(req, { params }) {
 }
 
 // POST - Test geofencing configuration
-export async function POST(req, { params }) {
+export async function POST(req, props) {
+  const params = await props.params;
   const { schoolId } = params;
   const { latitude, longitude } = await req.json();
 

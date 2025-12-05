@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 // GET: Get attendance for a hall in an exam
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+  const params = await props.params;
     try {
-        const { examId, hallId } = await params;
+        const { examId, hallId } = params;
 
         // Get all students allocated to this hall for this exam
         const allocations = await prisma.seatAllocation.findMany({
@@ -52,9 +53,10 @@ export async function GET(req, { params }) {
 }
 
 // POST: Mark attendance
-export async function POST(req, { params }) {
+export async function POST(req, props) {
+  const params = await props.params;
     try {
-        const { examId, hallId } = await params;
+        const { examId, hallId } = params;
         const body = await req.json();
         const { students, markedBy } = body; // students: [{ studentId, status }]
 

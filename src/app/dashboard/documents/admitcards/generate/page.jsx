@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -34,7 +34,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
-import html2canvas from 'html2canvas';
+import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
 
 const formSchema = z.object({
@@ -51,11 +51,13 @@ const formSchema = z.object({
 export default function GenerateAdmitCardPage() {
     const router = useRouter();
     const { fullUser } = useAuth();
+    console.log(fullUser);
 
     const schoolId = fullUser?.schoolId;
     const [generating, setGenerating] = useState(false);
     const [previewUrl, setPreviewUrl] = useState(null);
     const [previewConfig, setPreviewConfig] = useState(null);
+    const lastExamIdRef = useRef(null);
 
     const {
         register,
@@ -128,14 +130,6 @@ export default function GenerateAdmitCardPage() {
         staleTime: 5 * 60 * 1000,
     });
 
-    // Set default template
-    useEffect(() => {
-        if (templates?.length > 0 && !watchedValues.templateId) {
-            const defaultTemplate = templates.find(t => t.isDefault) || templates[0];
-            setValue('templateId', defaultTemplate.id);
-        }
-    }, [templates, setValue, watchedValues.templateId]);
-
     // Update preview when form values or template changes
     useEffect(() => {
         if (!templates || !students || !templateId) return;
@@ -144,6 +138,7 @@ export default function GenerateAdmitCardPage() {
         if (!template || !template.layoutConfig) return;
 
         const student = students.find(s => s.userId === studentId) || {};
+        console.log(student);
 
         const exam = exams?.find(e => e.id?.toString() === examId) || {};
 
@@ -153,6 +148,30 @@ export default function GenerateAdmitCardPage() {
         // Get student's section name
         const studentSection = student.class?.sections?.find(s => s.id === student.sectionId);
         const sectionName = studentSection?.name || student.section?.name || 'Section';
+
+        // Format exam schedule as a table
+        let examScheduleText = '';
+        if (examId && exam.subjects && exam.subjects.length > 0) {
+            // Create table rows - each subject on a new line
+            exam.subjects.forEach((examSubject, index) => {
+                const date = examSubject.date
+                    ? new Date(examSubject.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                    : 'TBA';
+                const subjectName = examSubject.subject?.subjectName || 'Subject';
+                const time = examSubject.startTime && examSubject.endTime
+                    ? `${examSubject.startTime} - ${examSubject.endTime}`
+                    : examTime || 'TBA';
+                const marks = examSubject.maxMarks || '100';
+
+                // Add line break between rows
+                if (index > 0) examScheduleText += '\n';
+                examScheduleText += `${date}  |  ${subjectName}  |  ${time}  |  ${marks}`;
+            });
+        } else if (examId) {
+            examScheduleText = `${exam.title || exam.name}\nNo subject schedule available yet`;
+        } else {
+            examScheduleText = '(Exam schedule will be populated during generation)';
+        }
 
         // Replace placeholders
         const replacements = {
@@ -168,12 +187,42 @@ export default function GenerateAdmitCardPage() {
             '{{schoolName}}': fullUser?.schoolName || fullUser?.school?.name || 'School Name',
             '{{examName}}': exam.title || exam.name || 'Exam Name',
             '{{schoolAddress}}': fullUser?.school.location || 'Location not added',
-            '{{examDate}}': examDate ? new Date(examDate).toLocaleDateString() : 'Exam Date',
+            '{{examDate}}': examDate ? new Date(examDate).toLocaleDateString() : exam.startDate ? new Date(exam.startDate).toLocaleDateString() : 'Exam Date',
             '{{examTime}}': examTime || 'Exam Time',
             '{{seatNumber}}': seatNumber || 'Seat No',
             '{{center}}': center || 'Exam Center',
             '{{venue}}': venue || 'Venue',
+            '{{examSchedule}}': examScheduleText,
+            '{{verificationUrl}}': `${window.location.origin}/verify/admitcard?studentId=${studentId}&examId=${examId}&seat=${seatNumber}`,
         };
+
+        // Add individual exam subject rows (for table-like display)
+        if (exam.subjects && exam.subjects.length > 0) {
+            for (let i = 0; i < 10; i++) {
+                const subject = exam.subjects[i];
+                if (subject) {
+                    const date = subject.date
+                        ? new Date(subject.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+                        : '';
+                    const name = subject.subject?.subjectName || '';
+                    const time = subject.startTime && subject.endTime
+                        ? `${subject.startTime} - ${subject.endTime}`
+                        : '';
+                    const marks = subject.maxMarks || '';
+
+                    // Full row with all info
+                    replacements[`{{exam_subject_${i + 1}}}`] = `${date}  |  ${name}  |  ${time}  |  ${marks}`;
+                } else {
+                    // Empty if no subject at this index
+                    replacements[`{{exam_subject_${i + 1}}}`] = '';
+                }
+            }
+        } else {
+            // No subjects - empty all rows
+            for (let i = 0; i < 10; i++) {
+                replacements[`{{exam_subject_${i + 1}}}`] = '';
+            }
+        }
 
         // Image replacements (URLs)
         const imageReplacements = {
@@ -209,6 +258,23 @@ export default function GenerateAdmitCardPage() {
                 }
                 return { ...el, url };
             }
+            if (el.type === 'table' && el.dataSource === 'exam_subjects') {
+                // Populate table with exam subjects
+                const tableData = exam.subjects && exam.subjects.length > 0
+                    ? exam.subjects.map(subject => ({
+                        date: subject.date
+                            ? new Date(subject.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+                            : '',
+                        subject: subject.subject?.subjectName || '',
+                        time: subject.startTime && subject.endTime
+                            ? `${subject.startTime} - ${subject.endTime}`
+                            : '',
+                        marks: subject.maxMarks || '',
+                    }))
+                    : [];
+
+                return { ...el, tableData };
+            }
             return el;
         });
 
@@ -222,8 +288,9 @@ export default function GenerateAdmitCardPage() {
     }, [templateId, studentId, examId, seatNumber, center, examDate, examTime, venue, templates, students, exams, fullUser]);
 
     const handleGeneratePDF = async () => {
-        const element = document.getElementById('admitcard-preview-container');
-        if (!element) {
+        const canvasElement = document.querySelector('#admitcard-preview-container [style*="background"]');
+
+        if (!canvasElement) {
             toast.error('Preview not ready');
             return;
         }
@@ -231,37 +298,42 @@ export default function GenerateAdmitCardPage() {
         try {
             setGenerating(true);
 
-            const canvasEl = element.querySelector('[class*="relative"]') || element.firstChild || element;
-
-            const canvas = await html2canvas(canvasEl, {
-                scale: 2,
-                useCORS: true,
-                logging: false,
-                backgroundColor: '#ffffff',
-                allowTaint: true,
+            // Use html-to-image with font options
+            const dataUrl = await htmlToImage.toPng(canvasElement, {
+                quality: 1.0,
+                pixelRatio: 2,
+                skipFonts: true, // Skip font parsing to avoid errors
+                preferCanvas: true, // Prefer canvas rendering for better compatibility
             });
 
-            const imgData = canvas.toDataURL('image/png', 1.0);
+            // Create image to get dimensions
+            const img = new Image();
+            img.src = dataUrl;
 
-            const imgWidth = canvas.width;
-            const imgHeight = canvas.height;
+            await new Promise((resolve) => {
+                img.onload = resolve;
+            });
+
+            const imgWidth = img.width / 2;
+            const imgHeight = img.height / 2;
             const orientation = imgWidth > imgHeight ? 'l' : 'p';
 
             const pdf = new jsPDF({
                 orientation,
                 unit: 'pt',
-                format: [imgWidth / 2, imgHeight / 2]
+                format: [imgWidth, imgHeight]
             });
-            pdf.addImage(imgData, 'PNG', 0, 0, imgWidth / 2, imgHeight / 2);
+
+            pdf.addImage(dataUrl, 'PNG', 0, 0, imgWidth, imgHeight);
+            pdf.save(`AdmitCard_${seatNumber || 'preview'}.pdf`);
 
             const pdfBlob = pdf.output('blob');
             const pdfUrl = URL.createObjectURL(pdfBlob);
             setPreviewUrl(pdfUrl);
 
-            pdf.save(`AdmitCard_${seatNumber || 'preview'}.pdf`);
             toast.success('Admit card generated and downloaded!');
         } catch (error) {
-            console.error('Generation error:', error);
+            console.error('PDF generation error:', error);
             toast.error('Failed to generate PDF: ' + error.message);
         } finally {
             setGenerating(false);

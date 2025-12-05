@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 export default function WidgetContainer({ title, children, onRemove, className }) {
     return (
         <div className={cn(
-            "relative group rounded-xl bg-muted p-0 overflow-hidden flex flex-col",
+            "relative group rounded-2xl bg-muted p-0 overflow-hidden flex flex-col  bg-white dark:bg-muted border",
             className
         )}>
             <div className="flex items-center justify-between p-4 border-b border-border/50 shrink-0">

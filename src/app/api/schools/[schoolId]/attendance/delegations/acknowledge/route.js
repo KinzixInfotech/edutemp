@@ -3,8 +3,9 @@ import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
 // POST - Mark delegation as acknowledged by substitute teacher
-export async function POST(req, { params }) {
-    const { schoolId } = await params;
+export async function POST(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
 
     try {
         const body = await req.json();

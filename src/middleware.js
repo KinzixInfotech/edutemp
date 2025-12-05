@@ -7,6 +7,45 @@ const apiMetrics = new Map();
 
 export async function middleware(request) {
     const { pathname } = request.nextUrl;
+    const hostname = request.headers.get('host') || '';
+
+    // ============================================
+    // DOMAIN-BASED ROUTING (School Explorer)
+    // ============================================
+
+    // Check if request is for school subdomain
+    const isSchoolDomain = hostname.includes('school.edubreezy.com') ||
+        hostname.includes('school.localhost');
+
+    // Skip domain routing for static files and API routes
+    const skipDomainRouting = pathname.startsWith('/_next') ||
+        pathname.startsWith('/api') ||
+        pathname === '/favicon.ico';
+
+    if (!skipDomainRouting) {
+        // Handle school.edubreezy.com subdomain
+        if (isSchoolDomain) {
+            // Redirect root to /explore
+            if (pathname === '/') {
+                return NextResponse.redirect(new URL('/explore', request.url));
+            }
+
+            // Only allow /explore routes on school subdomain
+            if (!pathname.startsWith('/explore')) {
+                return NextResponse.redirect(new URL('/explore', request.url));
+            }
+
+            // Public routes don't need auth - continue to next middleware section
+        }
+
+        // Handle main domain (edubreezy.com)
+        // Redirect /explore routes to school subdomain
+        if (!isSchoolDomain && pathname.startsWith('/explore')) {
+            const schoolUrl = new URL(request.url);
+            schoolUrl.hostname = 'school.edubreezy.com';
+            return NextResponse.redirect(schoolUrl);
+        }
+    }
 
     // ============================================
     // AUTH PROTECTION
@@ -172,5 +211,7 @@ export const config = {
         '/login',
         '/signup',
         '/api/auth/:path*',
+        '/explore/:path*',  // Add for school subdomain routing
+        '/',                 // Add for root subdomain redirect
     ],
 };

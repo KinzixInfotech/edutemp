@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
 // GET: List all forms for a school
-export async function GET(req, { params }) {
-    const { schoolId } = await params;
+export async function GET(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
     const { searchParams } = new URL(req.url);
     const category = searchParams.get("category");
 
@@ -34,8 +35,9 @@ export async function GET(req, { params }) {
 }
 
 // POST: Create a new form
-export async function POST(req, { params }) {
-    const { schoolId } = await params;
+export async function POST(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
 
     try {
         const body = await req.json();

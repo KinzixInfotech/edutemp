@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
 // GET - Get count of unseen pending requests
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+  const params = await props.params;
     try {
         const { schoolId } = params;
 

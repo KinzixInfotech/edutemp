@@ -120,9 +120,10 @@ async function saveCalendarConfig(schoolId, config) {
 // -------------------------------------------------------------------
 // GET – calendar status + attendance-config flag
 // -------------------------------------------------------------------
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+    const params = await props.params;
     try {
-        const { schoolId } = await params;
+        const { schoolId } = params;
 
         const academicYear = await prisma.academicYear.findFirst({
             where: { schoolId, isActive: true },
@@ -200,9 +201,10 @@ export async function GET(req, { params }) {
 // -------------------------------------------------------------------
 // POST – populate calendar + upsert AttendanceConfig
 // -------------------------------------------------------------------
-export async function POST(req, { params }) {
+export async function POST(req, props) {
+    const params = await props.params;
     try {
-        const { schoolId } = await params;
+        const { schoolId } = params;
         const {
             forceRefresh = false,
             fetchGoogleHolidays = true,
@@ -386,9 +388,10 @@ export async function POST(req, { params }) {
 // -------------------------------------------------------------------
 // DELETE – clear calendar (including hidden config)
 // -------------------------------------------------------------------
-export async function DELETE(req, { params }) {
+export async function DELETE(req, props) {
+    const params = await props.params;
     try {
-        const { schoolId } = await params;
+        const { schoolId } = params;
         const academicYear = await prisma.academicYear.findFirst({
             where: { schoolId, isActive: true },
         });
@@ -415,9 +418,10 @@ export async function DELETE(req, { params }) {
 
 
 // GET - Check calendar status with configuration details
-// export async function GET(req, { params }) {
+// export async function GET(req, props) {
+const params = await props.params;
 //     try {
-//         const { schoolId } = await params;
+//         const { schoolId } = params;
 
 //         // Get academic year
 //         const academicYear = await prisma.academicYear.findFirst({
@@ -626,9 +630,10 @@ export async function DELETE(req, { params }) {
 // }
 
 // // POST - Populate calendar
-// export async function POST(req, { params }) {
+// export async function POST(req, props) {
+// const params = await props.params;
 //     try {
-//         const { schoolId } = await params;
+//         const { schoolId } = params;
 //         const body = await req.json();
 
 //         const {
@@ -860,9 +865,10 @@ export async function DELETE(req, { params }) {
 // }
 
 // DELETE - Clear calendar
-// export async function DELETE(req, { params }) {
+// export async function DELETE(req, props) {
+
 //     try {
-//         const { schoolId } = await params;
+//         const { schoolId } = params;
 
 //         const academicYear = await prisma.academicYear.findFirst({
 //             where: { schoolId, isActive: true },

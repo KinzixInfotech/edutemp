@@ -1,43 +1,66 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { remember, generateKey, invalidatePattern } from "@/lib/cache";
+import { getPagination, paginate } from "@/lib/api-utils";
 
 // GET /api/schools/[schoolId]/examination/exams
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+  const params = await props.params;
     try {
-        const { schoolId } = await params;
+        const { schoolId } = params;
         const { searchParams } = new URL(req.url);
         const academicYearId = searchParams.get('academicYearId');
         const status = searchParams.get('status');
+        const { page, limit } = getPagination(req);
 
-        const where = {
-            schoolId,
-            ...(academicYearId && { academicYearId }),
-            ...(status && { status }),
-        };
+        const cacheKey = generateKey('examination:exams', { schoolId, academicYearId, status, page, limit });
 
-        const exams = await prisma.exam.findMany({
-            where,
-            include: {
-                academicYear: true,
-                classes: {
-                    select: {
-                        id: true,
-                        className: true,
+        const result = await remember(cacheKey, async () => {
+            const where = {
+                schoolId,
+                ...(academicYearId && { academicYearId }),
+                ...(status && { status }),
+            };
+
+            return await paginate(prisma.exam, {
+                where,
+                include: {
+                    academicYear: true,
+                    classes: {
+                        select: {
+                            id: true,
+                            className: true,
+                        },
+                    },
+                    subjects: {
+                        include: {
+                            subject: {
+                                select: {
+                                    id: true,
+                                    subjectName: true,
+                                    subjectCode: true,
+                                }
+                            }
+                        },
+                        orderBy: {
+                            date: 'asc'
+                        }
+                    },
+                    _count: {
+                        select: {
+                            subjects: true,
+                            results: true,
+                        },
                     },
                 },
-                _count: {
-                    select: {
-                        subjects: true,
-                        results: true,
-                    },
+                orderBy: {
+                    createdAt: 'desc',
                 },
-            },
-            orderBy: {
-                createdAt: 'desc',
-            },
-        });
+            }, page, limit);
+        }, 300);
 
-        return NextResponse.json(exams);
+        // Return data array for backward compatibility
+        return NextResponse.json(result.data);
     } catch (error) {
         console.error('Error fetching exams:', error);
         return NextResponse.json(
@@ -48,9 +71,10 @@ export async function GET(req, { params }) {
 }
 
 // POST /api/schools/[schoolId]/examination/exams
-export async function POST(req, { params }) {
+export async function POST(req, props) {
+  const params = await props.params;
     try {
-        const { schoolId } = await params;
+        const { schoolId } = params;
         const body = await req.json();
         console.log("Create Exam Body:", body);
         const { title, type, startDate, endDate, academicYearId, classIds } = body;
@@ -78,6 +102,8 @@ export async function POST(req, { params }) {
                 securitySettings: body.securitySettings || undefined,
             },
         });
+
+        await invalidatePattern(`examination:*${schoolId}*`);
 
         return NextResponse.json(exam);
     } catch (error) {

@@ -3,8 +3,9 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
-export async function PUT(req, { params }) {
-    const { id } = await params; // ✅ await params before accessing id
+export async function PUT(req, props) {
+  const params = await props.params;
+    const { id } = params; // ✅ await params before accessing id
     try {
         const body = await req.json(); // ✅ parse the body
         const { title, ISBN, author, publisher, edition, category, status } = body;
@@ -21,8 +22,9 @@ export async function PUT(req, { params }) {
     }
 }
 
-export async function DELETE(req, { params }) {
-    const { id } = await params;
+export async function DELETE(req, props) {
+  const params = await props.params;
+    const { id } = params;
     try {
         await prisma.libraryBook.delete({ where: { id } });
         return NextResponse.json({ message: "Book deleted successfully" }, { status: 200 });

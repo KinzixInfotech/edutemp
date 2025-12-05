@@ -43,8 +43,9 @@ const getNextDay = (date) => {
 const toInt = (v) => (typeof v === 'number' ? v : parseInt(v, 10));
 
 // GET - Fetch students for bulk marking
-export async function GET(req, { params }) {
-    const { schoolId } = await params;
+export async function GET(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
     const { searchParams } = new URL(req.url);
 
     const classId = searchParams.get('classId');
@@ -158,8 +159,9 @@ export async function GET(req, { params }) {
     }
 }
 // POST - Submit bulk attendance (UPDATED)
-export async function POST(req, { params }) {
-  const { schoolId } = await params;
+export async function POST(req, props) {
+  const params = await props.params;
+  const { schoolId } = params;
   const body = await req.json();
   const {
     classId,
@@ -500,8 +502,9 @@ export async function POST(req, { params }) {
   }
 }
 // POST - Submit bulk attendance
-// export async function POST(req, { params }) {
-//     const { schoolId } = await params;
+// export async function POST(req, props) {
+  const params = await props.params;
+//     const { schoolId } = params;
 //     const body = await req.json();
 //     const {
 //         classId,
@@ -975,8 +978,9 @@ async function updateAttendanceStats(client, schoolId, date) {
 }
 
 // PUT - Update existing bulk attendance
-export async function PUT(req, { params }) {
-    const { schoolId } = await params;
+export async function PUT(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
     const body = await req.json();
     const { bulkId, updates, markedBy } = body;
 

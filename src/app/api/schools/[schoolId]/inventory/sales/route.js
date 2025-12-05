@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { remember, generateKey, invalidatePattern } from "@/lib/cache";
+import { getPagination, paginate } from "@/lib/api-utils";
 
 // GET: List sales
 export async function GET(request, { params }) {
@@ -8,30 +10,36 @@ export async function GET(request, { params }) {
         const { searchParams } = new URL(request.url);
         const startDate = searchParams.get("startDate");
         const endDate = searchParams.get("endDate");
+        const { page, limit } = getPagination(request.url);
 
-        const where = {
-            schoolId,
-            ...(startDate && endDate && {
-                saleDate: {
-                    gte: new Date(startDate),
-                    lte: new Date(endDate),
-                },
-            }),
-        };
+        const cacheKey = generateKey('inventory:sales', { schoolId, startDate, endDate, page, limit });
 
-        const sales = await prisma.inventorySale.findMany({
-            where,
-            include: {
-                items: {
-                    include: {
-                        item: true,
+        const result = await remember(cacheKey, async () => {
+            const where = {
+                schoolId,
+                ...(startDate && endDate && {
+                    saleDate: {
+                        gte: new Date(startDate),
+                        lte: new Date(endDate),
+                    },
+                }),
+            };
+
+            return await paginate(prisma.inventorySale, {
+                where,
+                include: {
+                    items: {
+                        include: {
+                            item: true,
+                        },
                     },
                 },
-            },
-            orderBy: { saleDate: "desc" },
-        });
+                orderBy: { saleDate: "desc" },
+            }, page, limit);
+        }, 300);
 
-        return NextResponse.json(sales);
+        // Return data array for backward compatibility
+        return NextResponse.json(result.data);
     } catch (error) {
         console.error("Error fetching sales:", error);
         return NextResponse.json(
@@ -146,6 +154,8 @@ export async function POST(request, { params }) {
 
             return newSale;
         });
+
+        await invalidatePattern(`inventory:*${schoolId}*`);
 
         return NextResponse.json(sale, { status: 201 });
     } catch (error) {

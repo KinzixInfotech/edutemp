@@ -2,6 +2,8 @@
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { paginate, getPagination, apiResponse, errorResponse } from "@/lib/api-utils";
+import { remember, generateKey } from "@/lib/cache";
 
 // export async function GET(req) {
 //     try {
@@ -60,6 +62,8 @@ export async function GET(req) {
             return NextResponse.json({ error: "schoolId is required" }, { status: 400 });
         }
 
+        const { page, limit, skip } = getPagination(req);
+
         const where = {
             schoolId,
             ...(classId && { classId }),
@@ -67,30 +71,34 @@ export async function GET(req) {
             ...(admissionNumber && { admissionNumber: { contains: admissionNumber, mode: "insensitive" } }),
         };
 
-        const students = await prisma.student.findMany({
-            where,
-            include: {
-                user: {
-                    select: {
-                        name: true,
-                        profilePicture: true,
+        const cacheKey = generateKey('students', { schoolId, classId, sectionId, admissionNumber, page, limit });
 
-                    }
-                },
-                class: {
-                    select: {
-                        className: true,
-                        sections: { select: { id: true, name: true } },
+        const result = await remember(cacheKey, async () => {
+            return await paginate(prisma.student, {
+                where,
+                include: {
+                    user: {
+                        select: {
+                            name: true,
+                            profilePicture: true,
+                        }
                     },
+                    class: {
+                        select: {
+                            className: true,
+                            sections: { select: { id: true, name: true } },
+                        },
+                    },
+                    StudentFeeStructure: true,
                 },
-                StudentFeeStructure: true,
-            },
-            orderBy: { user: { name: "asc" } },
-        });
+                orderBy: { user: { name: "asc" } },
+            }, page, limit);
+        }, 300); // Cache for 5 mins
 
-        return NextResponse.json(students);
+        // Return data array for backward compatibility
+        return apiResponse(result.data);
     } catch (err) {
         console.error("Fetch Students API error:", err);
-        return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });
+        return errorResponse(err.message || "Internal server error");
     }
 }

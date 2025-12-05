@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 // GET /api/schools/[schoolId]/examination/halls
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+  const params = await props.params;
     try {
-        const { schoolId } = await params;
+        const { schoolId } = params;
 
         const halls = await prisma.examHall.findMany({
             where: { schoolId },
@@ -22,9 +23,10 @@ export async function GET(req, { params }) {
 }
 
 // POST /api/schools/[schoolId]/examination/halls
-export async function POST(req, { params }) {
+export async function POST(req, props) {
+  const params = await props.params;
     try {
-        const { schoolId } = await params;
+        const { schoolId } = params;
         const body = await req.json();
         const { name, roomNumber, capacity } = body;
 

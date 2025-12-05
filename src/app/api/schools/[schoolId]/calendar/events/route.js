@@ -4,6 +4,7 @@
 
 import { google } from "googleapis";
 import prisma from "@/lib/prisma";
+import { remember, generateKey, invalidatePattern } from "@/lib/cache";
 
 // GET: Fetch all events (Custom + Google Calendar)
 export async function GET(req, props) {
@@ -16,128 +17,134 @@ export async function GET(req, props) {
         const endDate = searchParams.get('endDate');
         const type = searchParams.get('type'); // 'upcoming', 'all', 'month'
 
-        // Build date filter
-        const dateFilter = {};
-        if (startDate && endDate) {
-            dateFilter.startDate = { gte: new Date(startDate) };
-            dateFilter.endDate = { lte: new Date(endDate) };
-        } else if (type === 'upcoming') {
-            dateFilter.startDate = { gte: new Date() };
-        }
+        const cacheKey = generateKey('calendar:events', { schoolId, startDate, endDate, type });
 
-        // Fetch custom events from database
-        const customEvents = await prisma.calendarEvent.findMany({
-            where: {
-                schoolId,
-                deletedAt: null,
-                status: { not: 'CANCELLED' },
-                ...dateFilter,
-            },
-            include: {
-                createdBy: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                    },
-                },
-                targets: {
-                    include: {
-                        class: true,
-                        section: true,
-                        role: true,
-                    },
-                },
-            },
-            orderBy: { startDate: 'asc' },
-        });
-
-        // Fetch Google Calendar events (if user is authenticated)
-        let googleEvents = [];
-        const gmailAccount = await prisma.gmailAccount.findFirst({
-            where: {
-                user: {
-
-                    schoolId,
-                    // status: 'ACTIVE',
-                },
-            },
-            orderBy: { lastUsedAt: 'desc' },
-        });
-        console.log(gmailAccount, schoolId, 'gmail');
-
-        if (gmailAccount && gmailAccount.accessToken) {
-            try {
-                googleEvents = await fetchGoogleCalendarEvents(
-                    gmailAccount.accessToken,
-                    gmailAccount.refreshToken,
-                    gmailAccount.id,
-                    startDate,
-                    endDate
-                );
-            } catch (error) {
-                console.error('Google Calendar fetch error:', error);
-                // Continue without Google events if fetch fails
+        const result = await remember(cacheKey, async () => {
+            // Build date filter
+            const dateFilter = {};
+            if (startDate && endDate) {
+                dateFilter.startDate = { gte: new Date(startDate) };
+                dateFilter.endDate = { lte: new Date(endDate) };
+            } else if (type === 'upcoming') {
+                dateFilter.startDate = { gte: new Date() };
             }
-        }
+
+            // Fetch custom events from database
+            const customEvents = await prisma.calendarEvent.findMany({
+                where: {
+                    schoolId,
+                    deletedAt: null,
+                    status: { not: 'CANCELLED' },
+                    ...dateFilter,
+                },
+                include: {
+                    createdBy: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                        },
+                    },
+                    targets: {
+                        include: {
+                            class: true,
+                            section: true,
+                            role: true,
+                        },
+                    },
+                },
+                orderBy: { startDate: 'asc' },
+            });
+
+            // Fetch Google Calendar events (if user is authenticated)
+            let googleEvents = [];
+            const gmailAccount = await prisma.gmailAccount.findFirst({
+                where: {
+                    user: {
+
+                        schoolId,
+                        // status: 'ACTIVE',
+                    },
+                },
+                orderBy: { lastUsedAt: 'desc' },
+            });
+            console.log(gmailAccount, schoolId, 'gmail');
+
+            if (gmailAccount && gmailAccount.accessToken) {
+                try {
+                    googleEvents = await fetchGoogleCalendarEvents(
+                        gmailAccount.accessToken,
+                        gmailAccount.refreshToken,
+                        gmailAccount.id,
+                        startDate,
+                        endDate
+                    );
+                } catch (error) {
+                    console.error('Google Calendar fetch error:', error);
+                    // Continue without Google events if fetch fails
+                }
+            }
 
 
-        // Transform and combine events
-        const transformedCustomEvents = customEvents.map(event => ({
-            id: event.id,
-            title: event.title,
-            description: event.description,
-            start: event.startDate,
-            end: event.endDate,
-            startTime: event.startTime,
-            endTime: event.endTime,
-            allDay: event.isAllDay,
-            location: event.location,
-            venue: event.venue,
-            color: event.color,
-            eventType: event.eventType,
-            category: event.category,
-            priority: event.priority,
-            status: event.status,
-            isRecurring: event.isRecurring,
-            recurrenceRule: event.recurrenceRule,
-            targetAudience: event.targetAudience,
-            isPublic: event.isPublic,
-            source: 'custom',
-            createdBy: event.createdBy,
-            targets: event.targets,
-        }));
+            // Transform and combine events
+            const transformedCustomEvents = customEvents.map(event => ({
+                id: event.id,
+                title: event.title,
+                description: event.description,
+                start: event.startDate,
+                end: event.endDate,
+                startTime: event.startTime,
+                endTime: event.endTime,
+                allDay: event.isAllDay,
+                location: event.location,
+                venue: event.venue,
+                color: event.color,
+                eventType: event.eventType,
+                category: event.category,
+                priority: event.priority,
+                status: event.status,
+                isRecurring: event.isRecurring,
+                recurrenceRule: event.recurrenceRule,
+                targetAudience: event.targetAudience,
+                isPublic: event.isPublic,
+                source: 'custom',
+                createdBy: event.createdBy,
+                targets: event.targets,
+            }));
 
-        const transformedGoogleEvents = googleEvents.map(event => ({
-            id: `google-${event.id}`,
-            title: event.summary || 'Untitled Event',
-            description: event.description || '',
-            start: event.start.dateTime || event.start.date,
-            end: event.end.dateTime || event.end.date,
-            allDay: !event.start.dateTime,
-            location: event.location,
-            color: '#EA4335', // Google red
-            eventType: 'CUSTOM',
-            category: 'OTHER',
-            priority: 'NORMAL',
-            status: 'SCHEDULED',
-            source: 'google',
-            htmlLink: event.htmlLink,
-        }));
+            const transformedGoogleEvents = googleEvents.map(event => ({
+                id: `google-${event.id}`,
+                title: event.summary || 'Untitled Event',
+                description: event.description || '',
+                start: event.start.dateTime || event.start.date,
+                end: event.end.dateTime || event.end.date,
+                allDay: !event.start.dateTime,
+                location: event.location,
+                color: '#EA4335', // Google red
+                eventType: 'CUSTOM',
+                category: 'OTHER',
+                priority: 'NORMAL',
+                status: 'SCHEDULED',
+                source: 'google',
+                htmlLink: event.htmlLink,
+            }));
 
-        const allEvents = [...transformedCustomEvents, ...transformedGoogleEvents];
+            const allEvents = [...transformedCustomEvents, ...transformedGoogleEvents];
 
-        // Sort by start date
-        allEvents.sort((a, b) => new Date(a.start) - new Date(b.start));
+            // Sort by start date
+            allEvents.sort((a, b) => new Date(a.start) - new Date(b.start));
 
-        return new Response(
-            JSON.stringify({
+            return {
                 events: allEvents,
                 total: allEvents.length,
                 customCount: transformedCustomEvents.length,
                 googleCount: transformedGoogleEvents.length,
                 hasGoogleCalendar: !!gmailAccount,
-            }),
+            };
+        }, 300); // 5 minutes cache
+
+        return new Response(
+            JSON.stringify(result),
             { status: 200 }
         );
     } catch (error) {
@@ -250,6 +257,8 @@ export async function POST(req, props) {
 
             return newEvent;
         });
+
+        await invalidatePattern(`calendar:*${schoolId}*`);
 
         return new Response(
             JSON.stringify({

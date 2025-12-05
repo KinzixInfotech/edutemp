@@ -1,20 +1,25 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { remember, generateKey, invalidatePattern } from "@/lib/cache";
 
 // GET: List all categories
 export async function GET(request, { params }) {
     try {
         const { schoolId } = await params;
 
-        const categories = await prisma.inventoryCategory.findMany({
-            where: { schoolId },
-            include: {
-                _count: {
-                    select: { items: true },
+        const cacheKey = generateKey('inventory:categories', { schoolId });
+
+        const categories = await remember(cacheKey, async () => {
+            return await prisma.inventoryCategory.findMany({
+                where: { schoolId },
+                include: {
+                    _count: {
+                        select: { items: true },
+                    },
                 },
-            },
-            orderBy: { name: "asc" },
-        });
+                orderBy: { name: "asc" },
+            });
+        }, 300);
 
         return NextResponse.json(categories);
     } catch (error) {
@@ -47,6 +52,9 @@ export async function POST(request, { params }) {
                 description,
             },
         });
+
+        await invalidatePattern(`inventory:categories:*${schoolId}*`);
+        await invalidatePattern(`inventory:items:*${schoolId}*`);
 
         return NextResponse.json(category, { status: 201 });
     } catch (error) {

@@ -55,6 +55,7 @@ import {
     BookOpen,
     School,
     TrendingUp,
+    Globe,
 } from "lucide-react"
 import { useCommandMenu } from "./CommandMenuContext"
 import { cn } from "@/lib/utils"
@@ -81,7 +82,6 @@ export const SidebarData = [
             },
         ],
     },
-
     {
         items: [
             { label: "Home", url: "/dashboard", icon: House, roles: ["PARTNER"] },
@@ -104,7 +104,7 @@ export const SidebarData = [
         title: "Admission  Management",
         items: [
             {
-                label: "  Admission",
+                label: "Admission",
                 icon: BookCopy,
                 roles: ["ADMIN"],
                 submenu: [
@@ -112,7 +112,7 @@ export const SidebarData = [
                         label: "OverView", url: "/dashboard/schools/admissions/overview", roles: ["ADMIN"]
                     },
                     { label: "Settings", url: "/dashboard/schools/admissions/form-settings", roles: ["ADMIN"] },
-                    { label: "Registration Fee", url: "/dashboard/schools/admissions/fees-verification", roles: ["ADMIN"] },
+                    // { label: "Registration Fee", url: "/dashboard/schools/admissions/fees-verification", roles: ["ADMIN"] },
                     { label: "All Applications", url: "/dashboard/schools/admissions/applications", roles: ["ADMIN"] },
                     { label: "Enrolled Students", url: "/dashboard/schools/admissions/enrolled", roles: ["ADMIN"] },
                     { label: "Waitlist/Rejected", url: "/dashboard/schools/admissions/waitlist-rejected", roles: ["ADMIN"] },
@@ -120,7 +120,6 @@ export const SidebarData = [
             },
         ],
     },
-
     {
         title: "Marketing",
         items: [
@@ -131,6 +130,53 @@ export const SidebarData = [
                 submenu: [
                     {
                         label: "Partner Management", url: "/dashboard/partnerprogram/admin/partners", roles: ["SUPER_ADMIN"]
+                    },
+                ],
+            },
+        ],
+    },
+    {
+        title: "School Explorer",
+        items: [
+            {
+                label: "School Explorer",
+                icon: Globe,
+                roles: ["ADMIN"],
+                submenu: [
+                    {
+                        label: "Public Profile",
+                        url: "/dashboard/school-explorer/profile",
+                        roles: ["ADMIN"],
+                    },
+                    {
+                        label: "Admission Inquiries",
+                        url: "/dashboard/school-explorer/inquiries",
+                        roles: ["ADMIN"],
+                    },
+                    {
+                        label: "Analytics",
+                        url: "/dashboard/school-explorer/analytics",
+                        roles: ["ADMIN"],
+                    },
+                    {
+                        label: "Achievements",
+                        url: "/dashboard/school-explorer/achievements",
+                        roles: ["ADMIN"],
+                    },
+                    {
+                        label: "Facilities",
+                        url: "/dashboard/school-explorer/facilities",
+                        roles: ["ADMIN"],
+                    },
+                    {
+                        label: "Gallery",
+                        url: "/dashboard/school-explorer/gallery",
+                        roles: ["ADMIN"],
+                    },
+                    {
+                        label: "Reviews",
+                        url: "/dashboard/school-explorer/reviews",
+                        roles: ["ADMIN"],
                     },
                 ],
             },
@@ -210,7 +256,7 @@ export const SidebarData = [
                         roles: ["ADMIN"],
                     },
                     {
-                        label: "Bulk Generation (per Class / Exam)",
+                        label: "Bulk Generation",
                         url: "/dashboard/documents/admitcards/bulk",
                         roles: ["ADMIN"],
                     },
@@ -509,6 +555,8 @@ const navUser = {
 }
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { SessionSwitchDialog, shouldShowSessionWarning } from "./SessionSwitchDialog";
+import { SessionSwitchLoader } from "./SessionSwitchLoader";
 
 export function AppSidebar({ ...props }) {
     const { resolvedTheme } = useTheme()
@@ -517,6 +565,9 @@ export function AppSidebar({ ...props }) {
     const pathname = usePathname()
     const { state } = useSidebar()
     const queryClient = useQueryClient()
+
+    const [showSwitchDialog, setShowSwitchDialog] = React.useState(false);
+    const [pendingYearId, setPendingYearId] = React.useState(null);
 
     const logo = resolvedTheme === "dark" ? logoWhite : logoBlack
     const logoCl = resolvedTheme === "dark" ? logocldark : logocllight
@@ -554,18 +605,40 @@ export function AppSidebar({ ...props }) {
     });
 
     const handleSessionSwitch = (yearId) => {
-        switchSessionMutation.mutate(yearId);
+        if (yearId === activeYear?.id) return; // Don't switch if same session
+
+        // Check if we should show the warning
+        if (shouldShowSessionWarning()) {
+            setPendingYearId(yearId);
+            setShowSwitchDialog(true);
+        } else {
+            // Directly switch without showing dialog
+            switchSessionMutation.mutate(yearId);
+        }
+    };
+
+    const confirmSessionSwitch = () => {
+        if (pendingYearId) {
+            switchSessionMutation.mutate(pendingYearId);
+        }
+        setShowSwitchDialog(false);
+        setPendingYearId(null);
+    };
+
+    const cancelSessionSwitch = () => {
+        setShowSwitchDialog(false);
+        setPendingYearId(null);
     };
     // console.log(fullUser);
 
     return (
         <Sidebar collapsible="icon" {...props}>
-            <SidebarHeader className={'border mb-2.5 rounded-md bg-background shadow-xs'}>
+            <SidebarHeader className={'bg-background border-b'}>
                 <SidebarMenu>
                     <SidebarMenuItem className=''>
                         <SidebarMenuButton
                             asChild
-                            className="data-[slot=sidebar-menu-button]:!p-1.5 h-fit flex items-center justify-center dark:bg-[#171717] border bg-white pointer-events-none"
+                            className="data-[slot=sidebar-menu-button]:!p-1.5 h-fit flex items-center justify-center dark:bg-[#171717] bg-background pointer-events-none"
                         >
                             <div>
                                 {!isCollapsed ? (
@@ -584,7 +657,7 @@ export function AppSidebar({ ...props }) {
                                 {!isCollapsed ? (
                                     <SidebarMenuButton asChild className={'mt-6'}>
                                         <Select value={activeYear?.id} onValueChange={handleSessionSwitch} >
-                                            <SelectTrigger className="h-9 w-full dark:bg-[#171717] bg-white border shadow-xs">
+                                            <SelectTrigger className="h-9 w-full dark:bg-[#171717] bg-white border ">
                                                 <SelectValue>
                                                     <div className="flex items-center gap-2">
                                                         <div className={cn("h-2 w-2 rounded-full", activeYear ? "bg-green-500" : "bg-gray-300")}></div>
@@ -615,7 +688,7 @@ export function AppSidebar({ ...props }) {
                                     </SidebarMenuButton>
                                 ) : (
                                     <SidebarMenuButton asChild className={'mt-1.5'} tooltip={activeYear?.name || 'No Session'}>
-                                        <div className="h-9 w-9 dark:bg-[#171717] rounded-md bg-white flex items-center justify-center border shadow-xs">
+                                        <div className="h-9 w-9 dark:bg-[#171717] rounded-md bg-white flex items-center justify-center border ">
                                             <div className="h-2.5 w-2.5 rounded-full bg-green-500"></div>
                                         </div>
                                     </SidebarMenuButton>
@@ -628,7 +701,7 @@ export function AppSidebar({ ...props }) {
             </SidebarHeader>
             <SidebarContent
                 className={cn(
-                    'bg-background rounded-md border shadow-xs overflow-y-auto',
+                    'bg-background  overflow-y-auto',
                     isCollapsed && 'scrollbar-hide-collapsed'
                 )}
             >
@@ -638,9 +711,21 @@ export function AppSidebar({ ...props }) {
                     activePath={pathname}
                 />
             </SidebarContent>
-            <SidebarFooter className='border-t rounded-md mt-2.5 border shadow-xs bg-background'>
+            <SidebarFooter className='border-t bg-background'>
                 <NavUser user={navUser.user} />
             </SidebarFooter>
+
+            {/* Session Switch Warning Dialog */}
+            <SessionSwitchDialog
+                isOpen={showSwitchDialog}
+                onClose={cancelSessionSwitch}
+                onConfirm={confirmSessionSwitch}
+                fromSession={activeYear?.name || 'Current Session'}
+                toSession={academicYears.find(y => y.id === pendingYearId)?.name || 'New Session'}
+            />
+
+            {/* Session Switch Loader */}
+            <SessionSwitchLoader isActive={switchSessionMutation.isPending} />
         </Sidebar>
     )
 }

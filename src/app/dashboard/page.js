@@ -30,6 +30,7 @@ import { useGlobalLoading } from '@/lib/utils';
 import PartnerDashboard from './partnerprogram/dashboard/page';
 import { WIDGETS, DEFAULT_WIDGETS } from '@/components/dashboard/widgets/registry';
 import WelcomeBanner from '@/components/dashboard/WelcomeBanner';
+import DailyStatsCards from '@/components/dashboard/DailyStatsCards';
 import {
   Dialog,
   DialogContent,
@@ -235,6 +236,21 @@ export default function Dashboard() {
     staleTime: 1000 * 60 * 5,
   });
 
+  // Fetch active academic year for ADMIN
+  const academicYearsQuery = useQuery({
+    queryKey: ['academic-years', fullUser?.schoolId],
+    queryFn: async () => {
+      if (!fullUser?.schoolId) return [];
+      const response = await fetch(`/api/schools/academic-years?schoolId=${fullUser.schoolId}`);
+      const data = await response.json();
+      return Array.isArray(data) ? data : (data.academicYears || []);
+    },
+    enabled: fullUser?.role?.name === 'ADMIN' && !!fullUser?.schoolId,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const activeAcademicYear = academicYearsQuery.data?.find(y => y.isActive);
+
   // Data extraction
   const schoolTrendData = schoolTrendQuery.data || {};
   const chartDataSuper = schoolTrendData.data?.map(item => ({
@@ -362,6 +378,14 @@ export default function Dashboard() {
                   </div>
                 </DialogContent>
               </Dialog>
+            </div>
+
+            {/* Daily Stats Cards */}
+            <div className='px-4 mt-4'>
+              <DailyStatsCards
+                schoolId={fullUser?.schoolId}
+                academicYearId={activeAcademicYear?.id}
+              />
             </div>
 
             {/* Dynamic Widgets Grid */}

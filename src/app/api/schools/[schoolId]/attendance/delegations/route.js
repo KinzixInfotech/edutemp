@@ -22,8 +22,9 @@ const ISTDate = (input) => {
 };
 
 // GET - Fetch delegations with filters
-export async function GET(req, { params }) {
-    const { schoolId } = await params;
+export async function GET(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
     const { searchParams } = new URL(req.url);
 
     const substituteTeacherId = searchParams.get('substituteTeacherId');
@@ -100,8 +101,9 @@ export async function GET(req, { params }) {
 }
 
 // POST - Create new delegation
-export async function POST(req, { params }) {
-    const { schoolId } = await params;
+export async function POST(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
     const body = await req.json();
 
     const {
@@ -246,8 +248,9 @@ export async function POST(req, { params }) {
 }
 
 // PATCH - Update delegation (cancel, complete)
-export async function PATCH(req, { params }) {
-    const { schoolId } = await params;
+export async function PATCH(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
     const body = await req.json();
     const { delegationId, status, updatedById } = body;
 
@@ -296,8 +299,9 @@ export async function PATCH(req, { params }) {
 }
 
 // DELETE - Remove delegation
-export async function DELETE(req, { params }) {
-    const { schoolId } = await params;
+export async function DELETE(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
     const { searchParams } = new URL(req.url);
     const delegationId = searchParams.get('delegationId');
 

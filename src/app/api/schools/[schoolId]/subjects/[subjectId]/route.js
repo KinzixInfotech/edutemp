@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 // GET /api/schools/[schoolId]/subjects/[subjectId]
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+  const params = await props.params;
     try {
-        const { subjectId } = await params;
+        const { subjectId } = params;
 
         const subject = await prisma.subject.findUnique({
             where: { id: parseInt(subjectId) },
@@ -49,9 +50,10 @@ export async function GET(req, { params }) {
 }
 
 // PUT /api/schools/[schoolId]/subjects/[subjectId]
-export async function PUT(req, { params }) {
+export async function PUT(req, props) {
+  const params = await props.params;
     try {
-        const { schoolId, subjectId } = await params;
+        const { schoolId, subjectId } = params;
         const body = await req.json();
         const { subjectName, subjectCode, classId, departmentId } = body;
 
@@ -122,9 +124,10 @@ export async function PUT(req, { params }) {
 }
 
 // DELETE /api/schools/[schoolId]/subjects/[subjectId]
-export async function DELETE(req, { params }) {
+export async function DELETE(req, props) {
+  const params = await props.params;
     try {
-        const { schoolId, subjectId } = await params;
+        const { schoolId, subjectId } = params;
 
         // Verify subject exists and belongs to this school
         const subject = await prisma.subject.findFirst({

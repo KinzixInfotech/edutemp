@@ -2,7 +2,8 @@ import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
 // app/api/schools/[schoolId]/teachers/[userId]/route.js
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+  const params = await props.params;
     const { schoolId, userId } = params;
 
 

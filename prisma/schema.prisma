@@ -82,8 +82,195 @@ model School {
   alumni                  Alumni[]
   inventoryCategories     InventoryCategory[]
   inventorySales          InventorySale[]
+  publicProfile           SchoolPublicProfile? // School Explorer public profile
 
   @@index([name])
+}
+
+// ============================================
+// SCHOOL EXPLORER - PUBLIC DISCOVERY PLATFORM
+// ============================================
+
+model SchoolPublicProfile {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @unique @db.Uuid
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  // Visibility
+  isPubliclyVisible Boolean @default(false)
+  isFeatured        Boolean @default(false)
+  isVerified        Boolean @default(false)
+
+  // Basic Info
+  tagline     String?
+  description String? @db.Text
+  vision      String? @db.Text
+  mission     String? @db.Text
+
+  // Media
+  coverImage String?
+  logoImage  String?
+  videoUrl   String?
+
+  // Contact
+  publicEmail String?
+  publicPhone String?
+  website     String?
+
+  // Fees
+  minFee          Int?
+  maxFee          Int?
+  feeStructureUrl String?
+
+  // Stats
+  establishedYear     Int?
+  totalStudents       Int    @default(0)
+  totalTeachers       Int    @default(0)
+  studentTeacherRatio Float?
+
+  // Ratings
+  overallRating        Float @default(0)
+  academicRating       Float @default(0)
+  infrastructureRating Float @default(0)
+  sportsRating         Float @default(0)
+
+  // Metadata
+  profileViews      Int      @default(0)
+  lastProfileUpdate DateTime @updatedAt
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  achievements SchoolAchievement[]
+  facilities   SchoolFacility[]
+  badges       SchoolBadge[]
+  gallery      SchoolGallery[]
+  ratings      SchoolRating[]
+  inquiries    AdmissionInquiry[]
+
+  @@index([isPubliclyVisible])
+  @@index([isFeatured])
+  @@index([overallRating])
+}
+
+model SchoolAchievement {
+  id        String              @id @default(uuid()) @db.Uuid
+  profileId String              @db.Uuid
+  profile   SchoolPublicProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String? @db.Text
+  category    String // "Academic", "Sports", "Cultural", "Innovation"
+  year        Int
+  imageUrl    String?
+  rank        Int? // e.g., 1st place
+  level       String? // "National", "State", "District"
+
+  createdAt DateTime @default(now())
+
+  @@index([profileId])
+  @@index([category])
+  @@index([year])
+}
+
+model SchoolFacility {
+  id        String              @id @default(uuid()) @db.Uuid
+  profileId String              @db.Uuid
+  profile   SchoolPublicProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  category    String // "Infrastructure", "Lab", "Sports", "Transport"
+  name        String
+  description String?
+  isAvailable Boolean @default(true)
+  icon        String?
+
+  @@index([profileId])
+  @@index([category])
+}
+
+model SchoolBadge {
+  id        String              @id @default(uuid()) @db.Uuid
+  profileId String              @db.Uuid
+  profile   SchoolPublicProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  badgeType String // "Tech-Enabled", "Best Sports", "Top Performer"
+  earnedAt  DateTime  @default(now())
+  expiresAt DateTime?
+
+  @@index([profileId])
+}
+
+model SchoolGallery {
+  id        String              @id @default(uuid()) @db.Uuid
+  profileId String              @db.Uuid
+  profile   SchoolPublicProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  imageUrl     String
+  caption      String?
+  category     String? // "Campus", "Events", "Labs", "Sports"
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@index([profileId])
+  @@index([category])
+}
+
+model SchoolRating {
+  id        String              @id @default(uuid()) @db.Uuid
+  profileId String              @db.Uuid
+  profile   SchoolPublicProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  // Authentication & Verification
+  userId     String? @db.Uuid // Supabase auth user ID
+  parentId   String? @db.Uuid // Link to Parent table (optional, for verification)
+  isVerified Boolean @default(false) // Auto-set to true if parentId exists
+  parentName String? // Display name for the review
+
+  // Ratings
+  academicRating       Float
+  infrastructureRating Float
+  teacherRating        Float
+  sportsRating         Float
+  overallRating        Float
+  review               String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([profileId, userId]) // One review per user per school
+  @@index([profileId])
+  @@index([userId])
+}
+
+model AdmissionInquiry {
+  id        String              @id @default(uuid()) @db.Uuid
+  profileId String              @db.Uuid
+  profile   SchoolPublicProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  // Student Info
+  studentName    String
+  studentAge     Int?
+  preferredGrade String
+
+  // Parent Info
+  parentName  String
+  parentEmail String
+  parentPhone String
+
+  // Additional
+  message String? @db.Text
+  source  String? // "Website", "Directory", "Comparison"
+
+  // Status
+  status     String  @default("New") // "New", "Contacted", "Scheduled", "Converted", "Closed"
+  assignedTo String? @db.Uuid
+  notes      String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([profileId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 // ============================================

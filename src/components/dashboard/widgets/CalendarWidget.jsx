@@ -83,12 +83,12 @@ export default function CalendarWidget({ fullUser, onRemove }) {
 
                 {/* Mini Calendar with Event Indicators */}
                 <div className="flex-1 flex flex-col">
-                    <div className="grid grid-cols-7 gap-1 text-center mb-2">
+                    <div className="grid grid-cols-7 gap-2 text-center mb-3">
                         {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-                            <span key={i} className="text-[10px] font-medium text-muted-foreground">{d}</span>
+                            <span key={i} className="text-xs font-semibold text-muted-foreground">{d}</span>
                         ))}
                     </div>
-                    <div className="grid grid-cols-7 gap-1 text-center">
+                    <div className="grid grid-cols-7 gap-2 text-center">
                         {(() => {
                             if (!currentTime) return null;
                             const today = currentTime.getDate();
@@ -109,16 +109,23 @@ export default function CalendarWidget({ fullUser, onRemove }) {
                                 days.push(
                                     <div
                                         key={i}
-                                        className={`text-xs py-1 rounded-md flex flex-col items-center justify-center relative transition-colors
-                                            ${isToday ? 'bg-primary text-white font-bold' : 'text-foreground/80 hover:bg-muted'}
+                                        className={`
+                                            aspect-square text-sm font-medium rounded-lg 
+                                            flex flex-col items-center justify-center 
+                                            relative transition-all duration-200 cursor-pointer
+                                            border
+                                            ${isToday
+                                                ? 'bg-primary text-primary-foreground border-primary shadow-sm scale-105'
+                                                : 'text-foreground border-border/40 hover:border-primary/50 hover:bg-muted/50'
+                                            }
                                         `}
                                     >
                                         <span>{i}</span>
                                         {hasEvent && !isToday && (
-                                            <div className="w-1 h-1 rounded-full bg-blue-500 mt-0.5" />
+                                            <div className="absolute bottom-1 w-1 h-1 rounded-full bg-blue-500" />
                                         )}
                                         {hasEvent && isToday && (
-                                            <div className="w-1 h-1 rounded-full bg-white mt-0.5" />
+                                            <div className="absolute bottom-1 w-1 h-1 rounded-full bg-primary-foreground" />
                                         )}
                                     </div>
                                 );

@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
 // GET: Fetch single application by ID
-export async function GET(req, { params }) {
-    const { id } = await params;
+export async function GET(req, props) {
+  const params = await props.params;
+    const { id } = params;
     const { searchParams } = new URL(req.url);
     const schoolId = searchParams.get("schoolId");
 

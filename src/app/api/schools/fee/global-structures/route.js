@@ -6,6 +6,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
+import { paginate, getPagination, apiResponse, errorResponse } from "@/lib/api-utils";
+import { remember, generateKey, invalidatePattern } from "@/lib/cache";
 
 // Validation Schema
 const createSchema = z.object({
@@ -43,39 +45,42 @@ export async function GET(req) {
         const classId = searchParams.get("classId");
 
         if (!schoolId) {
-            return NextResponse.json({ error: "schoolId required" }, { status: 400 });
+            return errorResponse("schoolId required", 400);
         }
 
-        const where = {
-            schoolId,
-            ...(academicYearId && { academicYearId }),
-            ...(classId && { classId: parseInt(classId) }),
-            isActive: true,
-        };
+        const { page, limit, skip } = getPagination(req);
+        const cacheKey = generateKey('fee-structures', { schoolId, academicYearId, classId, page, limit });
 
-        const structures = await prisma.globalFeeStructure.findMany({
-            where,
-            include: {
-                academicYear: { select: { name: true, startDate: true, endDate: true } },
-                class: { select: { className: true } },
-                particulars: { orderBy: { displayOrder: "asc" } },
-                installmentRules: { orderBy: { installmentNumber: "asc" } },
-                _count: {
-                    select: {
-                        studentFees: { where: { academicYearId } }
-                    }
+        const result = await remember(cacheKey, async () => {
+            const where = {
+                schoolId,
+                ...(academicYearId && { academicYearId }),
+                ...(classId && { classId: parseInt(classId) }),
+                isActive: true,
+            };
+
+            return await paginate(prisma.globalFeeStructure, {
+                where,
+                include: {
+                    academicYear: { select: { name: true, startDate: true, endDate: true } },
+                    class: { select: { className: true } },
+                    particulars: { orderBy: { displayOrder: "asc" } },
+                    installmentRules: { orderBy: { installmentNumber: "asc" } },
+                    _count: {
+                        select: {
+                            studentFees: { where: { academicYearId } }
+                        }
+                    },
                 },
-            },
-            orderBy: { createdAt: "desc" },
-        });
+                orderBy: { createdAt: "desc" },
+            }, page, limit);
+        }, 300);
 
-        return NextResponse.json(structures);
+        // Return data array for backward compatibility
+        return apiResponse(result.data);
     } catch (error) {
         console.error("GET Global Fee Structures Error:", error);
-        return NextResponse.json(
-            { error: "Failed to fetch fee structures" },
-            { status: 500 }
-        );
+        return errorResponse("Failed to fetch fee structures");
     }
 }
 
@@ -264,6 +269,16 @@ export async function PATCH(req) {
             return updated;
         });
 
+        // Invalidate cache (we need schoolId, but it's not in body, fetch from structure)
+        // Since we are inside transaction, we can't easily get schoolId outside unless we fetch it before.
+        // But we fetched structure inside transaction.
+        // Let's just invalidate all fee structures for now or try to get schoolId.
+        // Actually, we can fetch schoolId from the structure we updated.
+        const updatedStructure = result;
+        if (updatedStructure && updatedStructure.schoolId) {
+            await invalidatePattern(`fee-structures:${updatedStructure.schoolId}*`);
+        }
+
         return NextResponse.json({
             message: "Fee structure updated successfully",
             structure: result,
@@ -299,7 +314,11 @@ export async function DELETE(req) {
             );
         }
 
-        await prisma.globalFeeStructure.delete({ where: { id } });
+        const deleted = await prisma.globalFeeStructure.delete({ where: { id } });
+
+        if (deleted && deleted.schoolId) {
+            await invalidatePattern(`fee-structures:${deleted.schoolId}*`);
+        }
 
         return NextResponse.json({ message: "Fee structure deleted successfully" });
     } catch (error) {
@@ -413,6 +432,9 @@ export async function POST(req) {
 
             return structure;
         });
+
+        // Invalidate cache
+        await invalidatePattern(`fee-structures:${schoolId}*`);
 
         return NextResponse.json({
             message: "Fee structure created successfully",

@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
 // POST: Submit a form
-export async function POST(req, { params }) {
-    const { formId } = await params;
+export async function POST(req, props) {
+  const params = await props.params;
+    const { formId } = params;
 
     try {
         const body = await req.json();
@@ -90,8 +91,9 @@ export async function POST(req, { params }) {
 }
 
 // GET: Fetch public form details
-export async function GET(req, { params }) {
-    const { formId } = await params;
+export async function GET(req, props) {
+  const params = await props.params;
+    const { formId } = params;
 
     try {
         const form = await prisma.form.findUnique({

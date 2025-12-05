@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+  const params = await props.params;
     try {
-        const { schoolId } = await params;
+        const { schoolId } = params;
         const { searchParams } = new URL(req.url);
         const examId = searchParams.get('examId');
         const classId = searchParams.get('classId');

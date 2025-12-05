@@ -38,7 +38,7 @@ export function SiteHeader({ fullUser }) {
         .filter((p) => pathname.startsWith(p.url))
         .sort((a, b) => b.url.length - a.url.length)[0]
     return (
-        <header className="flex h-(--header-height) py-8 shrink-0 items-center gap-2 border-b bg-transparent dark:bg-transparent transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
+        <header className="flex sticky top-0 z-50 h-(--header-height) py-8 shrink-0 items-center gap-2 border-b bg-[#ffffffa3] dark:bg-[#09090b94] backdrop-blur-sm transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
             <div className="flex w-full items-center gap-2 px-4 lg:gap-3 lg:px-6 relative">
                 <SidebarTrigger className="-ml-1" />
                 <Separator
@@ -82,7 +82,7 @@ export function SiteHeader({ fullUser }) {
 
                     {/* User Avatar */}
                     <div className="flex items-center gap-2 pl-2 border-l ml-1">
-                        <Avatar className="h-8 w-8">
+                        <Avatar className="h-8 w-8 rounded-full">
                             <AvatarImage src={fullUser?.profilePicture} alt={fullUser?.name || "User"} />
                             <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
                                 {fullUser?.name

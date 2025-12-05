@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
 // PATCH - Approve or Reject request
-export async function PATCH(req, { params }) {
+export async function PATCH(req, props) {
+  const params = await props.params;
     try {
         const { schoolId, requestId } = params;
         const body = await req.json();
@@ -88,7 +89,8 @@ export async function PATCH(req, { params }) {
 }
 
 // DELETE - Cancel request (user-initiated)
-export async function DELETE(req, { params }) {
+export async function DELETE(req, props) {
+  const params = await props.params;
     try {
         const { schoolId, requestId } = params;
 

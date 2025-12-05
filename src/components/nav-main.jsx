@@ -119,10 +119,10 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                         ref={isParentActive ? activeItemRef : null}
                                                     >
                                                         <SidebarMenuButton
-                                                            className={`w-full relative justify-center py-4 hover:!bg-white rounded-md hover:!text-black transition-all hover:cursor-pointer ${isActive || isParentActive
-                                                                ? "shadow-xs font-semibold border dark:bg-white dark:text-black" : ""
+                                                            className={`w-full hover:bg-[#eff6ff]! relative justify-center py-4  rounded-md hover:!text-[#1b83c5] transition-all hover:cursor-pointer ${isActive || isParentActive
+                                                                ? "shadow-xs font-semibold border  dark:bg-[#eff6ff] dark:text-[#1b83c5]" : ""
                                                                 }`}
-                                                            style={isActive || isParentActive ? { backgroundColor: 'white' } : {}}
+                                                        // style={isActive || isParentActive ? { backgroundColor: 'white' } : {}}
                                                         >
                                                             {item.icon && <item.icon className="w-4 h-4" />}
                                                             {/* Yellow dot indicator for library requests */}
@@ -164,10 +164,10 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                             >
                                                 <CollapsibleTrigger asChild>
                                                     <SidebarMenuButton
-                                                        className={`group relative w-full justify-between py-4 hover:!bg-white rounded-md hover:!text-black transition-all hover:cursor-pointer ${isActive || isParentActive
-                                                            ? "shadow-xs font-semibold border dark:bg-white dark:text-black " : ""
+                                                        className={`group font-medium relative w-full justify-between py-4 hover:bg-[#eff6ff] dark:hover:bg-[#eff6ff]    hover:text-[#1b83c5] dark:hover:text-[#1b83c5]   py-4 transition-all rounded-sm hover:cursor-pointer ${isActive || isParentActive
+                                                            ? "bg-[#eff6ff]!  text-[#1b83c5]! dark:bg-[#fff]! dark:text-black!" : ""
                                                             }`}
-                                                        style={isActive || isParentActive ? { backgroundColor: 'white' } : {}}
+                                                        style={isActive || isParentActive ? { backgroundColor: '#eff6ff', color: '#1b83c5' } : {}}
                                                     >
                                                         <div className="flex items-center gap-2">
                                                             {item.icon && <item.icon className="w-4 h-4" />}
@@ -195,11 +195,9 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                             >
                                                                 <SidebarMenuSubButton
                                                                     asChild
-                                                                    className={`transition-all ${isSubActive
-                                                                        ? "shadow-md font-semibold  dark:bg-white dark:text-black"
-                                                                        : ""
+                                                                    className={`w-full font-medium  hover:bg-[#eff6ff] hover:text-[#1b83c5]   py-4 transition-all rounded-sm hover:cursor-pointer ${isSubActive
+                                                                        ? "bg-[#eff6ff]!  dark:bg-[#fff]! dark:text-black!  text-[#1b83c5]! dark:bg-white! dark:text-black! dark:border-primary/50" : ""
                                                                         }`}
-                                                                    style={isSubActive ? { backgroundColor: 'white' } : {}}
                                                                 >
                                                                     <Link href={sub.url} onClick={handleClick} className="flex items-center justify-between w-full">
                                                                         <div className="flex items-center gap-2">
@@ -233,8 +231,8 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                 >
                                                     <SidebarMenuButton
                                                         asChild
-                                                        className={`w-full justify-center py-4 hover:!bg-white hover:!text-black transition-all rounded-md hover:cursor-pointer ${isActive
-                                                            ? "font-semibold border dark:bg-[#1a3a5a] dark:text-black dark:border-primary/50" : ""
+                                                        className={`w-full font-medium  hover:bg-[#eff6ff] hover:text-[#1b83c5]   py-4 transition-all rounded-sm hover:cursor-pointer ${isActive
+                                                            ? "bg-[#eff6ff]!  text-[#1b83c5]! dark:bg-white dark:text-black " : ""
                                                             }`}
                                                         style={isActive ? { backgroundColor: 'white' } : {}}
                                                     >
@@ -258,10 +256,10 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                     >
                                         <SidebarMenuButton
                                             asChild
-                                            className={`w-full py-4 hover:!bg-white hover:!text-black transition-all rounded-md hover:cursor-pointer ${isActive
-                                                ? "font-semibold border dark:bg-white dark:text-black dark:border-primary/50" : ""
+                                            className={`w-full font-medium  hover:bg-[#eff6ff] hover:text-[#1b83c5]   py-4 transition-all rounded-sm hover:cursor-pointer ${isActive
+                                                ? "bg-[#eff6ff]!  text-[#1b83c5]!    dark:bg-white! dark:text-black!" : ""
                                                 }`}
-                                            style={isActive ? { backgroundColor: 'white' } : {}}
+                                            style={isActive ? { backgroundColor: '#eff6ff', color: '#1b83c5' } : {}}
                                         >
                                             <Link href={item.url} onClick={handleClick}>
                                                 {item.icon && <item.icon className="w-4 h-4" />}

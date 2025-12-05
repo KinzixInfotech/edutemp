@@ -2,6 +2,7 @@
 
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { remember, generateKey } from "@/lib/cache";
 
 // SIMPLE: Use the same ISTDate function from bulk attendance
 export const ISTDate = (input) => {
@@ -12,12 +13,12 @@ export const ISTDate = (input) => {
         const day = String(now.getDate()).padStart(2, '0');
         return new Date(`${year}-${month}-${day}T00:00:00.000Z`);
     }
-    
+
     // If input is YYYY-MM-DD, just append time
     if (typeof input === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input)) {
         return new Date(`${input}T00:00:00.000Z`);
     }
-    
+
     // Otherwise parse normally
     const d = new Date(input);
     const year = d.getFullYear();
@@ -26,8 +27,9 @@ export const ISTDate = (input) => {
     return new Date(`${year}-${month}-${day}T00:00:00.000Z`);
 }
 
-export async function GET(req, { params }) {
-    const { schoolId } = await params; // FIX: Await params
+export async function GET(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
     const { searchParams } = new URL(req.url);
 
     const reportType = searchParams.get('reportType') || 'MONTHLY';
@@ -42,50 +44,40 @@ export async function GET(req, { params }) {
     const classId = searchParams.get('classId');
     const sectionId = searchParams.get('sectionId');
     const format = searchParams.get('format') || 'JSON';
+    const userId = searchParams.get('userId'); // For metadata
 
     try {
-        let reportData;
+        const cacheKey = generateKey('attendance:reports', {
+            schoolId, reportType, startDate: startDate.toISOString(), endDate: endDate.toISOString(), classId, sectionId
+        });
 
-        switch (reportType) {
-            case 'MONTHLY':
-                reportData = await generateMonthlyReport(schoolId, startDate, endDate);
-                break;
+        const reportData = await remember(cacheKey, async () => {
+            switch (reportType) {
+                case 'MONTHLY':
+                    return await generateMonthlyReport(schoolId, startDate, endDate);
 
-            case 'CLASS_WISE':
-                reportData = await generateClassWiseReport(schoolId, startDate, endDate, classId);
-                break;
+                case 'CLASS_WISE':
+                    return await generateClassWiseReport(schoolId, startDate, endDate, classId);
 
-            case 'STUDENT_WISE':
-                reportData = await generateStudentWiseReport(schoolId, startDate, endDate, classId, sectionId);
-                break;
+                case 'STUDENT_WISE':
+                    return await generateStudentWiseReport(schoolId, startDate, endDate, classId, sectionId);
 
-            case 'TEACHER_PERFORMANCE':
-                reportData = await generateTeacherReport(schoolId, startDate, endDate);
-                break;
+                case 'TEACHER_PERFORMANCE':
+                    return await generateTeacherReport(schoolId, startDate, endDate);
 
-            case 'DEFAULTERS':
-                console.log('Defaulters query params:', {
-                    schoolId,
-                    startDate,
-                    endDate,
-                    startDateParam,
-                    endDateParam
-                });
-                reportData = await generateDefaultersReport(schoolId, startDate, endDate);
-                console.log('Defaulters found:', reportData.count);
-                break;
+                case 'DEFAULTERS':
+                    return await generateDefaultersReport(schoolId, startDate, endDate);
 
-            case 'LEAVE_ANALYSIS':
-                reportData = await generateLeaveAnalysis(schoolId, startDate, endDate);
-                break;
+                case 'LEAVE_ANALYSIS':
+                    return await generateLeaveAnalysis(schoolId, startDate, endDate);
 
-            case 'SUMMARY':
-                reportData = await generateSummaryReport(schoolId, startDate, endDate);
-                break;
+                case 'SUMMARY':
+                    return await generateSummaryReport(schoolId, startDate, endDate);
 
-            default:
-                return NextResponse.json({ error: 'Invalid report type' }, { status: 400 });
-        }
+                default:
+                    throw new Error('Invalid report type');
+            }
+        }, 300); // Cache for 5 minutes
 
         if (format === 'PDF' || format === 'EXCEL') {
             return NextResponse.json({
@@ -97,7 +89,7 @@ export async function GET(req, { params }) {
                     generatedAt: new Date(),
                     schoolId,
                     period: { startDate, endDate },
-                    generatedBy: searchParams.get('userId') || 'admin'
+                    generatedBy: userId || 'admin'
                 }
             });
         }
@@ -236,7 +228,7 @@ async function generateClassWiseReport(schoolId, startDate, endDate, classId) {
     };
 }
 
-// 3. Student-wise Report - FIXED
+// 3. Student-wise Report - OPTIMIZED
 async function generateStudentWiseReport(schoolId, startDate, endDate, classId, sectionId) {
     const where = {
         schoolId,
@@ -277,40 +269,38 @@ async function generateStudentWiseReport(schoolId, startDate, endDate, classId, 
         ]
     });
 
-    // ✅ FIX: Calculate streak for EACH student individually
-    const studentStats = await Promise.all(
-        students.map(async (student) => {
-            const attendance = student.user.attendance;
-            const present = attendance.filter(a => a.status === 'PRESENT').length;
-            const absent = attendance.filter(a => a.status === 'ABSENT').length;
-            const late = attendance.filter(a => a.status === 'LATE').length;
-            const leaves = attendance.filter(a => a.status === 'ON_LEAVE').length;
-            const total = attendance.length;
-            const percentage = total > 0 ? ((present + late) / total * 100).toFixed(2) : 0;
-            
-            // ✅ FIX: Calculate streak for THIS student
-            const streak = await calculateStreak(student.userId, schoolId);
-            
-            return {
-                userId: student.userId,
-                name: student.name,
-                admissionNo: student.admissionNo,
-                rollNumber: student.rollNumber,
-                className: student.class.className,
-                streak: streak,
-                sectionName: student.section?.name,
-                attendance: {
-                    total,
-                    present,
-                    absent,
-                    late,
-                    leaves,
-                    percentage: Number(percentage)
-                },
-                records: attendance
-            };
-        })
-    );
+    // Batch fetch streaks
+    const studentIds = students.map(s => s.userId);
+    const streaks = await batchCalculateStreak(studentIds, schoolId);
+
+    const studentStats = students.map((student) => {
+        const attendance = student.user.attendance;
+        const present = attendance.filter(a => a.status === 'PRESENT').length;
+        const absent = attendance.filter(a => a.status === 'ABSENT').length;
+        const late = attendance.filter(a => a.status === 'LATE').length;
+        const leaves = attendance.filter(a => a.status === 'ON_LEAVE').length;
+        const total = attendance.length;
+        const percentage = total > 0 ? ((present + late) / total * 100).toFixed(2) : 0;
+
+        return {
+            userId: student.userId,
+            name: student.name,
+            admissionNo: student.admissionNo,
+            rollNumber: student.rollNumber,
+            className: student.class.className,
+            streak: streaks[student.userId] || 0,
+            sectionName: student.section?.name,
+            attendance: {
+                total,
+                present,
+                absent,
+                late,
+                leaves,
+                percentage: Number(percentage)
+            },
+            records: attendance
+        };
+    });
 
     return {
         type: 'STUDENT_WISE',
@@ -319,7 +309,7 @@ async function generateStudentWiseReport(schoolId, startDate, endDate, classId, 
     };
 }
 
-// 4. Teacher Performance Report
+// 4. Teacher Performance Report - OPTIMIZED
 async function generateTeacherReport(schoolId, startDate, endDate) {
     const teachers = await prisma.attendance.groupBy({
         by: ['userId'],
@@ -333,60 +323,67 @@ async function generateTeacherReport(schoolId, startDate, endDate) {
         _avg: { workingHours: true }
     });
 
-    const teacherDetails = await Promise.all(
-        teachers.map(async (t) => {
-            const user = await prisma.user.findUnique({
-                where: { id: t.userId },
-                select: {
-                    name: true,
-                    email: true,
-                    teacher: {
-                        select: {
-                            employeeId: true,
-                            designation: true,
-                            department: { select: { name: true } }
-                        }
+    const teacherIds = teachers.map(t => t.userId);
+
+    // Batch fetch user details and streaks
+    const [users, streaks] = await Promise.all([
+        prisma.user.findMany({
+            where: { id: { in: teacherIds } },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                teacher: {
+                    select: {
+                        employeeId: true,
+                        designation: true,
+                        department: { select: { name: true } }
+                    }
+                },
+                attendance: {
+                    where: {
+                        date: { gte: startDate, lte: endDate }
                     },
-                    attendance: {
-                        where: {
-                            date: { gte: startDate, lte: endDate }
-                        },
-                        select: {
-                            status: true,
-                            isLateCheckIn: true,
-                            lateByMinutes: true
-                        }
+                    select: {
+                        status: true,
+                        isLateCheckIn: true,
+                        lateByMinutes: true
                     }
                 }
-            });
+            }
+        }),
+        batchCalculateStreak(teacherIds, schoolId)
+    ]);
 
-            const attendance = user.attendance;
-            const present = attendance.filter(a => a.status === 'PRESENT').length;
-            const late = attendance.filter(a => a.status === 'LATE').length;
-            const avgLateMinutes = late > 0
-                ? attendance.filter(a => a.isLateCheckIn).reduce((sum, a) => sum + (a.lateByMinutes || 0), 0) / late
-                : 0;
+    const userMap = users.reduce((acc, u) => { acc[u.id] = u; return acc; }, {});
 
-            // Calculate streak
-            const streak = await calculateStreak(t.userId, schoolId);
+    const teacherDetails = teachers.map((t) => {
+        const user = userMap[t.userId];
+        if (!user) return null;
 
-            return {
-                userId: t.userId,
-                name: user.name,
-                employeeId: user.teacher?.employeeId,
-                designation: user.teacher?.designation,
-                department: user.teacher?.department?.name,
-                totalDays: t._count.id,
-                presentDays: present,
-                lateDays: late,
-                totalHours: t._sum.workingHours || 0,
-                avgHours: t._avg.workingHours || 0,
-                avgLateMinutes: avgLateMinutes.toFixed(2),
-                streak,
-                attendancePercentage: ((present + late) / t._count.id * 100).toFixed(2)
-            };
-        })
-    );
+        const attendance = user.attendance;
+        const present = attendance.filter(a => a.status === 'PRESENT').length;
+        const late = attendance.filter(a => a.status === 'LATE').length;
+        const avgLateMinutes = late > 0
+            ? attendance.filter(a => a.isLateCheckIn).reduce((sum, a) => sum + (a.lateByMinutes || 0), 0) / late
+            : 0;
+
+        return {
+            userId: t.userId,
+            name: user.name,
+            employeeId: user.teacher?.employeeId,
+            designation: user.teacher?.designation,
+            department: user.teacher?.department?.name,
+            totalDays: t._count.id,
+            presentDays: present,
+            lateDays: late,
+            totalHours: t._sum.workingHours || 0,
+            avgHours: t._avg.workingHours || 0,
+            avgLateMinutes: avgLateMinutes.toFixed(2),
+            streak: streaks[t.userId] || 0,
+            attendancePercentage: ((present + late) / t._count.id * 100).toFixed(2)
+        };
+    }).filter(Boolean);
 
     return {
         type: 'TEACHER_PERFORMANCE',
@@ -443,8 +440,6 @@ async function generateDefaultersReport(schoolId, startDate, endDate) {
         delete whereClause.year;
     }
 
-    console.log('Defaulters where clause:', JSON.stringify(whereClause, null, 2));
-
     const defaulters = await prisma.attendanceStats.findMany({
         where: whereClause,
         include: {
@@ -474,8 +469,6 @@ async function generateDefaultersReport(schoolId, startDate, endDate) {
         },
         orderBy: { attendancePercentage: 'asc' }
     });
-
-    console.log(`Found ${defaulters.length} defaulters with attendance < 75%`);
 
     return {
         type: 'DEFAULTERS',
@@ -595,38 +588,73 @@ async function generateSummaryReport(schoolId, startDate, endDate) {
     };
 }
 
-// Helper: Calculate streak - FIXED
-export async function calculateStreak(userId, schoolId) {
+// Helper: Calculate streak - BATCHED
+async function batchCalculateStreak(userIds, schoolId) {
+    if (!userIds.length) return {};
+
+    // Fetch last 100 records for ALL users in the list
+    // We can't easily do "Limit 100 per user" in one query without window functions or raw SQL.
+    // For now, let's fetch records for the last 30 days for these users, which should cover most streaks.
+    // Or just fetch all records for these users if the dataset isn't huge.
+    // A better approach for "streak" is to fetch records where date is recent.
+
+    // Let's use a raw query to get the last 30 records for each user
+    // Or just fetch records for the last 60 days.
+    const twoMonthsAgo = new Date();
+    twoMonthsAgo.setDate(twoMonthsAgo.getDate() - 60);
+
     const records = await prisma.attendance.findMany({
         where: {
-            userId,
+            userId: { in: userIds },
             schoolId,
-            status: { in: ['PRESENT', 'LATE'] }
+            status: { in: ['PRESENT', 'LATE'] },
+            date: { gte: twoMonthsAgo }
         },
-        orderBy: { date: 'desc' },
-        take: 100,
-        select: { date: true }
+        select: { userId: true, date: true },
+        orderBy: { date: 'desc' }
     });
 
-    if (records.length === 0) return 0;
+    const recordsByUser = records.reduce((acc, r) => {
+        if (!acc[r.userId]) acc[r.userId] = [];
+        acc[r.userId].push(r);
+        return acc;
+    }, {});
 
-    console.log(records.length, records, ISTDate());
+    const streaks = {};
+    const expectedDate = ISTDate(); // Today midnight
 
-    let streak = 0;
-    let expectedDate = ISTDate(); // Use ISTDate for today at midnight UTC
+    for (const userId of userIds) {
+        const userRecords = recordsByUser[userId] || [];
+        let streak = 0;
+        let currentExpected = new Date(expectedDate);
 
-    for (const record of records) {
-        const recordDate = ISTDate(record.date); // Convert record date to midnight UTC
+        for (const record of userRecords) {
+            const recordDate = ISTDate(record.date);
 
-        console.log('Comparing:', recordDate.toISOString(), 'vs', expectedDate.toISOString());
-
-        if (recordDate.getTime() === expectedDate.getTime()) {
-            streak++;
-            expectedDate.setDate(expectedDate.getDate() - 1);
-        } else {
-            break;
+            // If record matches expected date
+            if (recordDate.getTime() === currentExpected.getTime()) {
+                streak++;
+                currentExpected.setDate(currentExpected.getDate() - 1);
+            } else if (recordDate.getTime() > currentExpected.getTime()) {
+                // Future record? Should not happen with desc sort and today start
+                continue;
+            } else {
+                // Gap found
+                // Check if the gap is a holiday? 
+                // For simplicity, we break on gap.
+                // To be accurate we need to check calendar for holidays.
+                // Assuming streak breaks on non-attendance.
+                break;
+            }
         }
+        streaks[userId] = streak;
     }
 
-    return streak;
+    return streaks;
+}
+
+// Legacy single streak calculation (kept for backward compatibility if needed)
+export async function calculateStreak(userId, schoolId) {
+    const streaks = await batchCalculateStreak([userId], schoolId);
+    return streaks[userId] || 0;
 }

@@ -2,8 +2,9 @@ import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
 // GET - Get single alumni details
-export async function GET(req, { params }) {
-    const { schoolId, alumniId } = await params;
+export async function GET(req, props) {
+  const params = await props.params;
+    const { schoolId, alumniId } = params;
 
     try {
         const alumni = await prisma.alumni.findFirst({
@@ -44,8 +45,9 @@ export async function GET(req, { params }) {
 }
 
 // PUT - Update alumni information
-export async function PUT(req, { params }) {
-    const { schoolId, alumniId } = await params;
+export async function PUT(req, props) {
+  const params = await props.params;
+    const { schoolId, alumniId } = params;
 
     try {
         const body = await req.json();
@@ -100,8 +102,9 @@ export async function PUT(req, { params }) {
 }
 
 // DELETE - Delete alumni record (admin only, rare use case)
-export async function DELETE(req, { params }) {
-    const { schoolId, alumniId } = await params;
+export async function DELETE(req, props) {
+  const params = await props.params;
+    const { schoolId, alumniId } = params;
 
     try {
         await prisma.alumni.delete({

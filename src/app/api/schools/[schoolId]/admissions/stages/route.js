@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
 // GET: Fetch all stages for a school
-export async function GET(req, { params }) {
-    const { schoolId } = await params;
+export async function GET(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
 
     try {
         const stages = await prisma.stage.findMany({
@@ -22,8 +23,9 @@ export async function GET(req, { params }) {
 }
 
 // POST: Create a new stage
-export async function POST(req, { params }) {
-    const { schoolId } = await params;
+export async function POST(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
 
     try {
         const body = await req.json();
@@ -56,8 +58,9 @@ export async function POST(req, { params }) {
 }
 
 // PUT: Update a stage
-export async function PUT(req, { params }) {
-    const { schoolId } = await params;
+export async function PUT(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
     const { searchParams } = new URL(req.url);
     const stageId = searchParams.get("id");
 
@@ -91,8 +94,9 @@ export async function PUT(req, { params }) {
 }
 
 // DELETE: Delete a stage
-export async function DELETE(req, { params }) {
-    const { schoolId } = await params;
+export async function DELETE(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
     const { searchParams } = new URL(req.url);
     const stageId = searchParams.get("id");
 

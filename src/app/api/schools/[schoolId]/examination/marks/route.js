@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { remember, generateKey, invalidatePattern } from "@/lib/cache";
 
 // GET /api/schools/[schoolId]/examination/marks
 // Fetch marks for a specific exam, class, and subject
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+  const params = await props.params;
     try {
-        const { schoolId } = await params;
+        const { schoolId } = params;
         const { searchParams } = new URL(req.url);
         const examId = searchParams.get('examId');
         const classId = searchParams.get('classId');
@@ -18,45 +20,49 @@ export async function GET(req, { params }) {
             );
         }
 
-        // Fetch all students in the class
-        const students = await prisma.student.findMany({
-            where: {
-                schoolId,
-                classId: parseInt(classId),
-            },
-            select: {
-                userId: true,
-                name: true,
-                rollNumber: true,
-                admissionNo: true,
-            },
-            orderBy: {
-                rollNumber: 'asc',
-            },
-        });
+        const cacheKey = generateKey('examination:marks', { schoolId, examId, classId, subjectId });
 
-        // Fetch existing marks
-        const marks = await prisma.examResult.findMany({
-            where: {
-                examId: examId,
-                subjectId: parseInt(subjectId),
-                studentId: {
-                    in: students.map((s) => s.userId),
+        const studentMarks = await remember(cacheKey, async () => {
+            // Fetch all students in the class
+            const students = await prisma.student.findMany({
+                where: {
+                    schoolId,
+                    classId: parseInt(classId),
                 },
-            },
-        });
+                select: {
+                    userId: true,
+                    name: true,
+                    rollNumber: true,
+                    admissionNo: true,
+                },
+                orderBy: {
+                    rollNumber: 'asc',
+                },
+            });
 
-        // Combine students with their marks
-        const studentMarks = students.map((student) => {
-            const mark = marks.find((m) => m.studentId === student.userId);
-            return {
-                ...student,
-                marksObtained: mark?.marksObtained || '',
-                grade: mark?.grade || '',
-                remarks: mark?.remarks || '',
-                isAbsent: mark?.isAbsent || false,
-            };
-        });
+            // Fetch existing marks
+            const marks = await prisma.examResult.findMany({
+                where: {
+                    examId: examId,
+                    subjectId: parseInt(subjectId),
+                    studentId: {
+                        in: students.map((s) => s.userId),
+                    },
+                },
+            });
+
+            // Combine students with their marks
+            return students.map((student) => {
+                const mark = marks.find((m) => m.studentId === student.userId);
+                return {
+                    ...student,
+                    marksObtained: mark?.marksObtained || '',
+                    grade: mark?.grade || '',
+                    remarks: mark?.remarks || '',
+                    isAbsent: mark?.isAbsent || false,
+                };
+            });
+        }, 300);
 
         return NextResponse.json(studentMarks);
     } catch (error) {
@@ -70,9 +76,10 @@ export async function GET(req, { params }) {
 
 // POST /api/schools/[schoolId]/examination/marks
 // Bulk update marks
-export async function POST(req, { params }) {
+export async function POST(req, props) {
+  const params = await props.params;
     try {
-        const { schoolId } = await params;
+        const { schoolId } = params;
         const body = await req.json();
         const { examId, subjectId, marks } = body; // marks: [{ studentId, marksObtained, grade, remarks, isAbsent }]
 
@@ -112,6 +119,9 @@ export async function POST(req, { params }) {
                 })
             )
         );
+
+        await invalidatePattern(`examination:marks:*${schoolId}*`);
+        await invalidatePattern(`examination:overview:*${schoolId}*`);
 
         return NextResponse.json({ message: 'Marks updated successfully' });
     } catch (error) {

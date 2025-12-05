@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma"
 import { NextResponse } from "next/server"
+import { remember, invalidatePattern, generateKey } from "@/lib/cache"
 
 // 👉 Create new academic year
 export async function POST(req) {
@@ -36,6 +37,9 @@ export async function POST(req) {
             },
         })
 
+        // Invalidate cache for this school's academic years
+        await invalidatePattern(`academic-years:${schoolId}*`)
+
         return NextResponse.json(academicYear)
     } catch (err) {
         console.error(err)
@@ -51,10 +55,15 @@ export async function GET(req) {
         if (!schoolId) {
             return NextResponse.json({ error: "Schoool id is missing" }, { status: 400 })
         }
-        const academicYears = await prisma.academicYear.findMany({
-            orderBy: { createdAt: "desc" },
-            where: schoolId ? { schoolId } : {}, // filter if schoolId exists
-        })
+
+        const cacheKey = generateKey('academic-years', { schoolId });
+
+        const academicYears = await remember(cacheKey, async () => {
+            return await prisma.academicYear.findMany({
+                orderBy: { createdAt: "desc" },
+                where: { schoolId },
+            })
+        }, 3600 * 24); // Cache for 24 hours as this rarely changes
 
         return NextResponse.json(academicYears)
     } catch (err) {

@@ -5,7 +5,8 @@ import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
 // GET - Fetch pending approvals
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+  const params = await props.params;
     const { schoolId } = params;
     const { searchParams } = new URL(req.url);
 
@@ -85,7 +86,8 @@ export async function GET(req, { params }) {
 }
 
 // POST - Approve or reject attendance
-export async function POST(req, { params }) {
+export async function POST(req, props) {
+  const params = await props.params;
     const { schoolId } = params;
     const body = await req.json();
     const { attendanceIds, action, approvedBy, remarks } = body;

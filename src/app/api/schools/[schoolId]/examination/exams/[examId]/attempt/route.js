@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 // POST: Start Attempt
-export async function POST(req, { params }) {
+export async function POST(req, props) {
+  const params = await props.params;
     try {
-        const { examId } = await params;
+        const { examId } = params;
         const body = await req.json();
         const { studentId } = body;
 
@@ -104,9 +105,10 @@ export async function POST(req, { params }) {
 }
 
 // PUT: Submit Attempt
-export async function PUT(req, { params }) {
+export async function PUT(req, props) {
+  const params = await props.params;
     try {
-        const { examId } = await params;
+        const { examId } = params;
         const body = await req.json();
         const { attemptId, answers, securityViolations, finish } = body;
 

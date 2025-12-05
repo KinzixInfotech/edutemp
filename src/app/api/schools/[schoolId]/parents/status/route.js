@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { invalidatePattern } from "@/lib/cache";
 
 export async function PATCH(req, props) {
     const params = await props.params;
@@ -24,6 +25,8 @@ export async function PATCH(req, props) {
             where: { id: { in: userIds } },
             data: { status },
         });
+
+        await invalidatePattern(`parents:*${schoolId}*`);
 
         return NextResponse.json({ success: true });
     } catch (error) {

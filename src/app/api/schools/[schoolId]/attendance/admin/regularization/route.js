@@ -3,8 +3,9 @@ import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
 // GET - Fetch regularization requests
-export async function GET(req, { params }) {
-    const { schoolId } = await params; // Fix: await params
+export async function GET(req, props) {
+  const params = await props.params;
+    const { schoolId } = params; // Fix: await params
     const { searchParams } = new URL(req.url);
 
     const statusParam = searchParams.get('status');
@@ -120,7 +121,8 @@ export async function GET(req, { params }) {
 }
 
 // POST - Approve or reject requests
-export async function POST(req, { params }) {
+export async function POST(req, props) {
+  const params = await props.params;
     const { schoolId } = params;
     const { attendanceIds, action, approvedBy, remarks } = await req.json();
 
@@ -234,7 +236,8 @@ export async function POST(req, { params }) {
 }
 
 // PUT - Request regularization (for teachers/staff to request correction)
-export async function PUT(req, { params }) {
+export async function PUT(req, props) {
+  const params = await props.params;
     const { schoolId } = params;
     const {
         userId,

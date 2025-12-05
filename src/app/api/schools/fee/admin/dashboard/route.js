@@ -11,15 +11,34 @@ import { Prisma } from "@prisma/client";
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
-    const schoolId = searchParams.get("schoolId");
-    const academicYearId = searchParams.get("academicYearId");
+
+    // Sanitize UUIDs - remove any trailing characters like :200
+    const sanitizeUUID = (uuid) => {
+      if (!uuid) return null;
+      // Extract only the UUID part (before any colon or other separator)
+      const cleaned = uuid.split(':')[0].trim();
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      return uuidRegex.test(cleaned) ? cleaned : null;
+    };
+
+    const schoolId = sanitizeUUID(searchParams.get("schoolId"));
+    const academicYearId = sanitizeUUID(searchParams.get("academicYearId"));
     const classId = searchParams.get("classId");
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
 
+    console.log('📊 [FEE DASHBOARD] Request params:', {
+      schoolId,
+      academicYearId,
+      classId,
+      startDate,
+      endDate
+    });
+
     if (!schoolId || !academicYearId) {
       return NextResponse.json(
-        { error: "schoolId and academicYearId required" },
+        { error: "Invalid or missing schoolId/academicYearId" },
         { status: 400 }
       );
     }
@@ -29,12 +48,11 @@ export async function GET(req) {
       academicYearId,
       ...(classId && classId !== 'all' && { student: { classId: parseInt(classId) } }),
     };
-    // console.log({
-    //   schoolId,
-    //   academicYearId,
-    //   startDate,
-    //   endDate
-    // });
+
+    // Debug: Check if any StudentFee records exist
+    const totalRecords = await prisma.studentFee.count({ where: { schoolId, academicYearId } });
+    console.log(`📊 [FEE DASHBOARD] Total StudentFee records: ${totalRecords}`);
+
     // Parallel queries for performance
     const [
       totalExpected,

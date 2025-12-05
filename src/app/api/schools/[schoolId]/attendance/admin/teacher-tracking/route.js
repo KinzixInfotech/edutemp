@@ -2,7 +2,8 @@
 // import prisma from '@/lib/prisma';
 // import { NextResponse } from 'next/server';
 
-// export async function GET(req, { params }) {
+// export async function GET(req, props) {
+  const params = await props.params;
 //     const { schoolId } = params;
 //     const { searchParams } = new URL(req.url);
 
@@ -201,8 +202,9 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
-export async function GET(req, { params }) {
-    const { schoolId } = await params; // Fix: await params
+export async function GET(req, props) {
+  const params = await props.params;
+    const { schoolId } = params; // Fix: await params
     const { searchParams } = new URL(req.url);
 
     const dateParam = searchParams.get('date');

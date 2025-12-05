@@ -30,8 +30,9 @@ const calculateDays = (startDate, endDate) => {
 };
 
 // GET - Fetch teachers on leave for a specific date (default: today)
-export async function GET(req, { params }) {
-    const { schoolId } = await params;
+export async function GET(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
     const { searchParams } = new URL(req.url);
     const date = searchParams.get('date') || null;
     const checkDate = ISTDate(date);

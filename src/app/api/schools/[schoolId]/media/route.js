@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
 // GET: Fetch all media items for a school
-export async function GET(req, { params }) {
-    const { schoolId } = await params;
+export async function GET(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search") || "";
     const page = parseInt(searchParams.get("page") || "1");
@@ -59,8 +60,9 @@ export async function GET(req, { params }) {
 }
 
 // POST: Create new media item
-export async function POST(req, { params }) {
-    const { schoolId } = await params;
+export async function POST(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
 
     if (!schoolId) {
         return NextResponse.json({ error: "School ID is required" }, { status: 400 });
@@ -108,8 +110,9 @@ export async function POST(req, { params }) {
 }
 
 // DELETE: Delete media item
-export async function DELETE(req, { params }) {
-    const { schoolId } = await params;
+export async function DELETE(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 

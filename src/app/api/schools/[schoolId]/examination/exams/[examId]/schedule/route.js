@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 // POST /api/schools/[schoolId]/examination/exams/[examId]/schedule
-export async function POST(req, { params }) {
+export async function POST(req, props) {
+  const params = await props.params;
     try {
-        const { examId } = await params;
+        const { examId } = params;
         const body = await req.json();
         const { subjectId, date, startTime, endTime, duration, maxMarks, passingMarks } = body;
 
@@ -68,9 +69,10 @@ export async function POST(req, { params }) {
 }
 
 // DELETE /api/schools/[schoolId]/examination/exams/[examId]/schedule
-export async function DELETE(req, { params }) {
+export async function DELETE(req, props) {
+  const params = await props.params;
     try {
-        const { examId } = await params;
+        const { examId } = params;
         const { searchParams } = new URL(req.url);
         const subjectId = searchParams.get('subjectId');
 

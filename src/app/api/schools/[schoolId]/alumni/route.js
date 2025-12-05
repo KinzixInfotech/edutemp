@@ -2,8 +2,9 @@ import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
 // GET - Fetch alumni with filters
-export async function GET(req, { params }) {
-    const { schoolId } = await params;
+export async function GET(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
     const { searchParams } = new URL(req.url);
 
     const graduationYear = searchParams.get('graduationYear');

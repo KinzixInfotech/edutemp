@@ -2,8 +2,9 @@ import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
 // POST - Revert alumni back to active student
-export async function POST(req, { params }) {
-    const { schoolId, alumniId } = await params;
+export async function POST(req, props) {
+  const params = await props.params;
+    const { schoolId, alumniId } = params;
 
     try {
         // Get alumni record

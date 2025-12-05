@@ -35,6 +35,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
 import html2canvas from 'html2canvas';
@@ -106,7 +107,6 @@ export default function GenerateCertificatePage() {
     const [generating, setGenerating] = useState(false);
     const [previewUrl, setPreviewUrl] = useState(null);
     const [previewConfig, setPreviewConfig] = useState(null);
-    const previewRef = useState(null); // We'll use document.getElementById instead for html2canvas to be safe
 
     const certificateType = params?.type;
     const config = CERTIFICATE_CONFIGS[certificateType];
@@ -226,177 +226,138 @@ export default function GenerateCertificatePage() {
             backgroundImage: template.layoutConfig.backgroundImage
         });
 
-    }, [watchedValues, templates, students, fullUser]);
+    }, [JSON.stringify(watchedValues), templates, students, fullUser]);
 
     const handleGeneratePDF = async () => {
-        const element = document.getElementById('certificate-preview-container');
-        if (!element) return;
+        // Target the specific content div
+        const element = document.getElementById('certificate-capture-target');
+        if (!element) {
+            toast.error('Preview not ready');
+            return;
+        }
 
         try {
             setGenerating(true);
 
-            // Use html2canvas to capture the preview
-            const canvas = await html2canvas(element, {
-                scale: 2, // Higher quality
-                useCORS: true,
-                logging: false,
-                backgroundColor: '#ffffff'
+            // Use html-to-image with font options (matching admit card generation)
+            const dataUrl = await htmlToImage.toPng(element, {
+                quality: 1.0,
+                pixelRatio: 2,
+                skipFonts: true, // Skip font parsing to avoid errors
+                preferCanvas: true, // Prefer canvas rendering for better compatibility
+                backgroundColor: '#ffffff', // Ensure white background for the image
             });
 
-            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+            // Create image to get dimensions
+            const img = new Image();
+            img.src = dataUrl;
 
-            // Calculate PDF dimensions
-            const imgWidth = canvas.width;
-            const imgHeight = canvas.height;
+            await new Promise((resolve) => {
+                img.onload = resolve;
+            });
+
+            const imgWidth = img.width / 2; // Adjust for pixelRatio 2
+            const imgHeight = img.height / 2;
             const orientation = imgWidth > imgHeight ? 'l' : 'p';
 
-            const pdf = new jsPDF(orientation, 'pt', [imgWidth, imgHeight]);
-            pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+            const pdf = new jsPDF({
+                orientation,
+                unit: 'pt',
+                format: [imgWidth, imgHeight]
+            });
+
+            pdf.addImage(dataUrl, 'PNG', 0, 0, imgWidth, imgHeight);
+            pdf.save(`${config.title}_${watchedValues.studentId || 'certificate'}.pdf`);
 
             const pdfBlob = pdf.output('blob');
             const pdfUrl = URL.createObjectURL(pdfBlob);
-            setPreviewUrl(pdfUrl); // Update preview URL for download button
-
-            // Also save to server if needed (optional, or we can just download)
-            // For now, we'll just simulate the server save or use the existing mutation if it handles data saving
-
-            // If we want to save the record to DB:
-            generateMutation.mutate({
-                ...watchedValues,
-                fileUrl: pdfUrl // This is a blob URL, won't work for server. 
-                // Ideally we upload the blob to storage (UploadThing/S3) and send that URL.
-                // But for now let's just save the record data.
-            });
-
-            // Trigger download
-            pdf.save(`${config.title}_${watchedValues.studentId}.pdf`);
+            setPreviewUrl(pdfUrl);
 
             toast.success('Certificate generated and downloaded!');
         } catch (error) {
             console.error('Generation error:', error);
-            toast.error('Failed to generate PDF');
+            toast.error('Failed to generate PDF: ' + error.message);
         } finally {
             setGenerating(false);
         }
     };
 
-    // Error page for invalid certificate type
-    if (!certificateType || !config) {
-        return (
-            <div className="flex items-center justify-center min-h-screen p-4">
-                <Card className="max-w-md w-full">
-                    <CardHeader>
-                        <div className="flex items-center gap-2 text-destructive">
-                            <AlertCircle className="h-6 w-6" />
-                            <CardTitle className="text-xl">Invalid Certificate Type</CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <Alert variant="destructive">
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertTitle>Error</AlertTitle>
-                            <AlertDescription>
-                                The certificate type "<strong>{params?.type || 'unknown'}</strong>" is not recognized.
-                            </AlertDescription>
-                        </Alert>
-
-                        <div className="space-y-2">
-                            <p className="text-sm text-muted-foreground">Valid certificate types:</p>
-                            <ul className="list-disc list-inside space-y-1 text-sm">
-                                {Object.entries(CERTIFICATE_CONFIGS).map(([key, value]) => (
-                                    <li key={key}>
-                                        <code className="bg-muted px-2 py-0.5 rounded">{key}</code> - {value.title}
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-
-                        <Button
-                            onClick={() => router.push('/dashboard/documents/generate/character')}
-                            className="w-full"
-                        >
-                            Go to Character Certificate
-                        </Button>
-                    </CardContent>
-                </Card>
-            </div>
-        );
-    }
-
     if (!schoolId || loadingStudents || loadingTemplates) {
         return (
-            <div className="flex items-center justify-center min-h-screen">
+            <div className="flex items-center justify-center h-screen">
                 <Loader2 className="h-8 w-8 animate-spin" />
             </div>
         );
     }
 
     return (
-        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-4 sm:space-y-6">
-            {/* Header */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="space-y-1">
+        <div className="h-screen flex flex-col bg-background overflow-hidden">
+            {/* Header Toolbar */}
+            <div className="h-14 border-b bg-background flex items-center justify-between px-4 flex-shrink-0">
+                <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2">
-                        {/* <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => router.back()}
-                            className="mr-2"
-                        >
-                            <ArrowLeft className="h-4 w-4" />
-                        </Button> */}
-                        <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold flex items-center gap-2">
-                            <Award className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 flex-shrink-0 text-primary" />
-                            <span>{config.title}</span>
-                        </h1>
+                        <Award className="w-5 h-5 text-primary" />
+                        <h1 className="font-semibold text-lg">{config.title}</h1>
                     </div>
-                    <p className="text-xs sm:text-sm text-muted-foreground ml-10 sm:ml-12">
+                    <div className="h-6 w-px bg-border mx-2" />
+                    <p className="text-xs text-muted-foreground hidden sm:block">
                         {config.description}
                     </p>
                 </div>
-                {previewUrl && (
+
+                <div className="flex items-center gap-2">
+                    {previewUrl && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(previewUrl, '_blank')}
+                        >
+                            <Eye className="mr-2 h-4 w-4" />
+                            View PDF
+                        </Button>
+                    )}
                     <Button
-                        variant="outline"
-                        onClick={() => window.open(previewUrl, '_blank')}
+                        onClick={handleSubmit(handleGeneratePDF)}
+                        disabled={generating || !previewConfig}
                         size="sm"
                     >
-                        <Download className="mr-2 h-4 w-4" />
-                        Download PDF
+                        {generating ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                            <Download className="mr-2 h-4 w-4" />
+                        )}
+                        Generate & Download
                     </Button>
-                )}
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                {/* Form Section */}
-                <div className="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base sm:text-lg">Certificate Details</CardTitle>
-                            <CardDescription className="text-xs sm:text-sm">
-                                Fill in the required information
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
+            {/* Main Content - Sidebar + Preview */}
+            <div className="flex-1 flex overflow-hidden">
+                {/* Left Sidebar - Form */}
+                <div className="w-80 border-r bg-background flex-shrink-0 flex flex-col">
+                    <ScrollArea className="flex-1">
+                        <div className="p-4 space-y-4">
+                            <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Details</h2>
+
                             {/* Student Selection */}
-                            <div className="space-y-2">
-                                <Label htmlFor="studentId" className="text-sm flex items-center gap-2">
-                                    <User className="h-4 w-4" />
+                            <div className="space-y-1.5">
+                                <Label htmlFor="studentId" className="text-xs flex items-center gap-1.5">
+                                    <User className="h-3.5 w-3.5" />
                                     Select Student *
                                 </Label>
                                 <Select
                                     value={watchedValues.studentId}
                                     onValueChange={(value) => setValue('studentId', value)}
                                 >
-                                    <SelectTrigger className="text-sm">
+                                    <SelectTrigger className="h-9 text-sm">
                                         <SelectValue placeholder="Choose a student..." />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {students?.map((student) => (
                                             <SelectItem key={student.userId} value={student.userId}>
-                                                <div className="flex flex-col">
-                                                    {/* <span>{student.name}</span> */}
+                                                <div className="flex flex-col text-left">
                                                     <span>{student.name}</span>
-                                                    <span className="text-xs text-muted-foreground">
+                                                    <span className="text-[10px] text-muted-foreground">
                                                         Roll: {student.rollNumber} | Class: {student.class?.className}
                                                     </span>
                                                 </div>
@@ -410,16 +371,16 @@ export default function GenerateCertificatePage() {
                             </div>
 
                             {/* Template Selection */}
-                            <div className="space-y-2">
-                                <Label htmlFor="templateId" className="text-sm flex items-center gap-2">
-                                    <FileText className="h-4 w-4" />
+                            <div className="space-y-1.5">
+                                <Label htmlFor="templateId" className="text-xs flex items-center gap-1.5">
+                                    <FileText className="h-3.5 w-3.5" />
                                     Certificate Template
                                 </Label>
                                 <Select
                                     value={watchedValues.templateId}
                                     onValueChange={(value) => setValue('templateId', value)}
                                 >
-                                    <SelectTrigger className="text-sm">
+                                    <SelectTrigger className="h-9 text-sm">
                                         <SelectValue placeholder="Choose a template..." />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -427,7 +388,7 @@ export default function GenerateCertificatePage() {
                                             <SelectItem key={template.id} value={template.id}>
                                                 {template.name}
                                                 {template.isDefault && (
-                                                    <Badge variant="secondary" className="ml-2 text-xs">Default</Badge>
+                                                    <Badge variant="secondary" className="ml-2 text-[10px] h-4">Default</Badge>
                                                 )}
                                             </SelectItem>
                                         ))}
@@ -436,31 +397,33 @@ export default function GenerateCertificatePage() {
                             </div>
 
                             {/* Issue Date */}
-                            <div className="space-y-2">
-                                <Label htmlFor="issueDate" className="text-sm flex items-center gap-2">
-                                    <Calendar className="h-4 w-4" />
+                            <div className="space-y-1.5">
+                                <Label htmlFor="issueDate" className="text-xs flex items-center gap-1.5">
+                                    <Calendar className="h-3.5 w-3.5" />
                                     Issue Date *
                                 </Label>
                                 <Input
                                     id="issueDate"
                                     type="date"
                                     {...register('issueDate')}
-                                    className="text-sm"
+                                    className="h-9 text-sm"
                                 />
                                 {errors.issueDate && (
                                     <p className="text-xs text-red-500">{errors.issueDate.message}</p>
                                 )}
                             </div>
 
+                            <div className="h-px bg-border my-2" />
+
                             {/* Dynamic Fields Based on Certificate Type */}
                             {config.fields.includes('conduct') && (
-                                <div className="space-y-2">
-                                    <Label htmlFor="conduct" className="text-sm">Conduct</Label>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="conduct" className="text-xs">Conduct</Label>
                                     <Select
                                         value={watchedValues.conduct}
                                         onValueChange={(value) => setValue('conduct', value)}
                                     >
-                                        <SelectTrigger className="text-sm">
+                                        <SelectTrigger className="h-9 text-sm">
                                             <SelectValue placeholder="Select conduct..." />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -474,169 +437,140 @@ export default function GenerateCertificatePage() {
                             )}
 
                             {config.fields.includes('purpose') && (
-                                <div className="space-y-2">
-                                    <Label htmlFor="purpose" className="text-sm">Purpose</Label>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="purpose" className="text-xs">Purpose</Label>
                                     <Input
                                         id="purpose"
                                         {...register('purpose')}
                                         placeholder="e.g., Bank account, Passport"
-                                        className="text-sm"
+                                        className="h-9 text-sm"
                                     />
                                 </div>
                             )}
 
                             {config.fields.includes('academicYear') && (
-                                <div className="space-y-2">
-                                    <Label htmlFor="academicYear" className="text-sm">Academic Year</Label>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="academicYear" className="text-xs">Academic Year</Label>
                                     <Input
                                         id="academicYear"
                                         {...register('academicYear')}
                                         placeholder="e.g., 2023-2024"
-                                        className="text-sm"
+                                        className="h-9 text-sm"
                                     />
                                 </div>
                             )}
 
                             {config.fields.includes('dateOfLeaving') && (
-                                <div className="space-y-2">
-                                    <Label htmlFor="dateOfLeaving" className="text-sm">Date of Leaving</Label>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="dateOfLeaving" className="text-xs">Date of Leaving</Label>
                                     <Input
                                         id="dateOfLeaving"
                                         type="date"
                                         {...register('dateOfLeaving')}
-                                        className="text-sm"
+                                        className="h-9 text-sm"
                                     />
                                 </div>
                             )}
 
                             {config.fields.includes('reason') && (
-                                <div className="space-y-2">
-                                    <Label htmlFor="reason" className="text-sm">Reason</Label>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="reason" className="text-xs">Reason</Label>
                                     <Input
                                         id="reason"
                                         {...register('reason')}
                                         placeholder="Reason for leaving/transfer"
-                                        className="text-sm"
+                                        className="h-9 text-sm"
                                     />
                                 </div>
                             )}
 
                             {config.fields.includes('eventName') && (
-                                <div className="space-y-2">
-                                    <Label htmlFor="eventName" className="text-sm">Event/Competition Name *</Label>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="eventName" className="text-xs">Event/Competition Name *</Label>
                                     <Input
                                         id="eventName"
                                         {...register('eventName')}
                                         placeholder="e.g., Science Fair 2024"
-                                        className="text-sm"
+                                        className="h-9 text-sm"
                                     />
                                 </div>
                             )}
 
                             {config.fields.includes('position') && (
-                                <div className="space-y-2">
-                                    <Label htmlFor="position" className="text-sm">Position/Achievement</Label>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="position" className="text-xs">Position/Achievement</Label>
                                     <Input
                                         id="position"
                                         {...register('position')}
                                         placeholder="e.g., 1st Place, Gold Medal"
-                                        className="text-sm"
+                                        className="h-9 text-sm"
                                     />
                                 </div>
                             )}
 
                             {config.fields.includes('title') && (
-                                <div className="space-y-2">
-                                    <Label htmlFor="title" className="text-sm">Certificate Title</Label>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="title" className="text-xs">Certificate Title</Label>
                                     <Input
                                         id="title"
                                         {...register('title')}
                                         placeholder="Enter certificate title"
-                                        className="text-sm"
+                                        className="h-9 text-sm"
                                     />
                                 </div>
                             )}
 
                             {config.fields.includes('content') && (
-                                <div className="space-y-2">
-                                    <Label htmlFor="content" className="text-sm">Certificate Content</Label>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="content" className="text-xs">Certificate Content</Label>
                                     <Textarea
                                         id="content"
                                         {...register('content')}
                                         placeholder="Enter certificate content..."
                                         rows={5}
-                                        className="text-sm"
+                                        className="text-sm resize-none"
                                     />
                                 </div>
                             )}
 
                             {config.fields.includes('remarks') && (
-                                <div className="space-y-2">
-                                    <Label htmlFor="remarks" className="text-sm">Remarks (Optional)</Label>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="remarks" className="text-xs">Remarks (Optional)</Label>
                                     <Textarea
                                         id="remarks"
                                         {...register('remarks')}
                                         placeholder="Any additional remarks..."
                                         rows={3}
-                                        className="text-sm"
+                                        className="text-sm resize-none"
                                     />
                                 </div>
                             )}
-
-                            {/* Generate Button */}
-                            <Button
-                                onClick={handleSubmit(handleGeneratePDF)}
-                                disabled={generating || !previewConfig}
-                                className="w-full"
-                            >
-                                {generating ? (
-                                    <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Generating...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Download className="mr-2 h-4 w-4" />
-                                        Generate & Download
-                                    </>
-                                )}
-                            </Button>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </ScrollArea>
                 </div>
 
-                {/* Preview Section */}
-                <div className="lg:sticky lg:top-4 lg:self-start">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                                <Eye className="h-4 w-4" />
-                                Preview
-                            </CardTitle>
-                            <CardDescription className="text-xs sm:text-sm">
-                                {previewUrl ? 'Generated certificate preview' : 'Preview will appear after generation'}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="p-0 overflow-hidden bg-muted/20 min-h-[400px] flex items-center justify-center">
-                            {previewConfig ? (
-                                <div className="scale-[0.6] origin-top p-4" id="certificate-preview-container">
-                                    <CertificateDesignEditor
-                                        initialConfig={previewConfig}
-                                        readOnly={true}
-                                        templateType="certificate"
-                                    />
-                                </div>
-                            ) : (
-                                <div className="flex flex-col items-center justify-center py-12 text-center">
-                                    <Award className="h-16 w-16 text-muted-foreground mb-4" />
-                                    <h3 className="text-lg font-semibold mb-2">No Preview Available</h3>
-                                    <p className="text-sm text-muted-foreground max-w-sm">
-                                        Select a student and template to see the preview
-                                    </p>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
+                {/* Right Side - Preview Canvas */}
+                <div className="flex-1 bg-muted/30 overflow-auto" id="certificate-preview-container">
+                    {!previewConfig ? (
+                        <div className="flex flex-col items-center justify-center h-full">
+                            <Award className="h-16 w-16 text-muted-foreground mb-4" />
+                            <h3 className="text-lg font-semibold mb-2">No Preview Available</h3>
+                            <p className="text-sm text-muted-foreground">
+                                Select a student and template to see the preview
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="min-h-full p-8 flex items-start justify-center">
+                            <div id="certificate-capture-target" className="bg-white">
+                                <CertificateDesignEditor
+                                    key={JSON.stringify(previewConfig)}
+                                    initialConfig={previewConfig}
+                                    readOnly={true}
+                                    templateType="certificate"
+                                />
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { invalidatePattern } from '@/lib/cache';
 
 // ──────────────────────────────────────────────────────────────────────
 // CONFIGURATION CONSTANTS (Fallback defaults)
@@ -31,8 +32,9 @@ function getISTNow() {
 // ──────────────────────────────────────────────────────────────────────
 // POST – Mark Check-in / Check-out
 // ──────────────────────────────────────────────────────────────────────
-export async function POST(req, { params }) {
-    const { schoolId } = await params;
+export async function POST(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
     const body = await req.json();
     const { userId, type, location, deviceInfo, remarks } = body;
 
@@ -118,7 +120,7 @@ export async function POST(req, { params }) {
         checkOutDeadline.setHours(checkOutDeadline.getHours() + CHECK_OUT_GRACE_HOURS);
 
         // ───── 4. Transaction ─────
-        return await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx) => {
             // ────────────────────────
             // CHECK_IN
             // ────────────────────────
@@ -128,31 +130,40 @@ export async function POST(req, { params }) {
                 });
 
                 if (existing?.checkInTime) {
-                    return NextResponse.json({
+                    return {
                         success: false,
-                        message: 'Already checked in today',
-                        attendance: existing
-                    });
+                        json: {
+                            success: false,
+                            message: 'Already checked in today',
+                            attendance: existing
+                        }
+                    };
                 }
 
                 // Check if within check-in window
                 if (now < schoolStart) {
-                    return NextResponse.json({
+                    return {
                         success: false,
-                        message: `Check-in opens at ${config.defaultStartTime}`,
-                        opensAt: schoolStart.toISOString(),
-                    });
+                        json: {
+                            success: false,
+                            message: `Check-in opens at ${config.defaultStartTime}`,
+                            opensAt: schoolStart.toISOString(),
+                        }
+                    };
                 }
 
                 if (now > checkInDeadline) {
-                    return NextResponse.json({
+                    return {
                         success: false,
-                        message: `Check-in window closed at ${checkInDeadline.toLocaleTimeString('en-US', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                        })}`,
-                        closedAt: checkInDeadline.toISOString(),
-                    });
+                        json: {
+                            success: false,
+                            message: `Check-in window closed at ${checkInDeadline.toLocaleTimeString('en-US', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                            })}`,
+                            closedAt: checkInDeadline.toISOString(),
+                        }
+                    };
                 }
 
                 // Calculate if late using grace period from config
@@ -187,18 +198,21 @@ export async function POST(req, { params }) {
                     });
                 }
 
-                return NextResponse.json({
+                return {
                     success: true,
-                    message: isLate
-                        ? `Checked in (Late by ${lateByMinutes} min)`
-                        : 'Checked in successfully',
-                    attendance,
-                    isLate,
-                    checkOutWindow: {
-                        start: checkOutStart.toISOString(),
-                        end: checkOutDeadline.toISOString(),
+                    json: {
+                        success: true,
+                        message: isLate
+                            ? `Checked in (Late by ${lateByMinutes} min)`
+                            : 'Checked in successfully',
+                        attendance,
+                        isLate,
+                        checkOutWindow: {
+                            start: checkOutStart.toISOString(),
+                            end: checkOutDeadline.toISOString(),
+                        }
                     }
-                });
+                };
             }
 
             // ────────────────────────
@@ -210,40 +224,52 @@ export async function POST(req, { params }) {
                 });
 
                 if (!attendance?.checkInTime) {
-                    return NextResponse.json({
+                    return {
                         success: false,
-                        message: 'No check-in record found for today'
-                    });
+                        json: {
+                            success: false,
+                            message: 'No check-in record found for today'
+                        }
+                    };
                 }
 
                 if (attendance.checkOutTime) {
-                    return NextResponse.json({
+                    return {
                         success: false,
-                        message: 'Already checked out today',
-                        attendance
-                    });
+                        json: {
+                            success: false,
+                            message: 'Already checked out today',
+                            attendance
+                        }
+                    };
                 }
 
                 const checkInTime = new Date(attendance.checkInTime);
 
                 // Check if within check-out window
                 if (now < checkOutStart) {
-                    return NextResponse.json({
+                    return {
                         success: false,
-                        message: `Check-out opens at ${config.defaultEndTime}`,
-                        opensAt: checkOutStart.toISOString(),
-                    });
+                        json: {
+                            success: false,
+                            message: `Check-out opens at ${config.defaultEndTime}`,
+                            opensAt: checkOutStart.toISOString(),
+                        }
+                    };
                 }
 
                 if (now > checkOutDeadline) {
-                    return NextResponse.json({
+                    return {
                         success: false,
-                        message: `Check-out window closed at ${checkOutDeadline.toLocaleTimeString('en-US', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                        })}. Contact admin for manual check-out.`,
-                        deadline: checkOutDeadline.toISOString(),
-                    });
+                        json: {
+                            success: false,
+                            message: `Check-out window closed at ${checkOutDeadline.toLocaleTimeString('en-US', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                            })}. Contact admin for manual check-out.`,
+                            deadline: checkOutDeadline.toISOString(),
+                        }
+                    };
                 }
 
                 // Check minimum working hours (from config)
@@ -256,11 +282,14 @@ export async function POST(req, { params }) {
                         minute: '2-digit'
                     });
 
-                    return NextResponse.json({
+                    return {
                         success: false,
-                        message: `Minimum ${MIN_WORKING_HOURS} hours required. Can check out after ${timeStr}`,
-                        minTime: minCheckOut.toISOString(),
-                    });
+                        json: {
+                            success: false,
+                            message: `Minimum ${MIN_WORKING_HOURS} hours required. Can check out after ${timeStr}`,
+                            minTime: minCheckOut.toISOString(),
+                        }
+                    };
                 }
 
                 // Calculate working hours
@@ -286,14 +315,25 @@ export async function POST(req, { params }) {
                     },
                 });
 
-                return NextResponse.json({
+                return {
                     success: true,
-                    message: `Checked out successfully. Worked ${workingHours.toFixed(2)} hours`,
-                    attendance: updated,
-                    workingHours: updated.workingHours,
-                });
+                    json: {
+                        success: true,
+                        message: `Checked out successfully. Worked ${workingHours.toFixed(2)} hours`,
+                        attendance: updated,
+                        workingHours: updated.workingHours,
+                    }
+                };
             }
         });
+
+        if (result.success) {
+            // Invalidate attendance cache
+            await invalidatePattern(`attendance:${schoolId}*`);
+        }
+
+        return NextResponse.json(result.json);
+
     } catch (error) {
         console.error('Mark attendance error:', error);
         return NextResponse.json({
@@ -306,8 +346,9 @@ export async function POST(req, { params }) {
 // ──────────────────────────────────────────────────────────────────────
 // GET – Today's status + LIVE working hours
 // ──────────────────────────────────────────────────────────────────────
-export async function GET(req, { params }) {
-    const { schoolId } = await params;
+export async function GET(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
     const userId = new URL(req.url).searchParams.get('userId');
 
     if (!userId) {

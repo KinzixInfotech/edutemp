@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
 // GET: Fetch form details and fields
-export async function GET(req, { params }) {
-    const { schoolId, formId } = await params;
+export async function GET(req, props) {
+  const params = await props.params;
+    const { schoolId, formId } = params;
 
     try {
         const form = await prisma.form.findUnique({
@@ -30,8 +31,9 @@ export async function GET(req, { params }) {
 }
 
 // PUT: Update form details and fields
-export async function PUT(req, { params }) {
-    const { schoolId, formId } = await params;
+export async function PUT(req, props) {
+  const params = await props.params;
+    const { schoolId, formId } = params;
 
     try {
         const body = await req.json();
@@ -91,8 +93,9 @@ export async function PUT(req, { params }) {
 }
 
 // DELETE: Delete form
-export async function DELETE(req, { params }) {
-    const { schoolId, formId } = await params;
+export async function DELETE(req, props) {
+  const params = await props.params;
+    const { schoolId, formId } = params;
 
     try {
         await prisma.form.delete({

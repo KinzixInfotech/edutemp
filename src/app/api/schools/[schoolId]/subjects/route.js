@@ -1,37 +1,44 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { paginate, getPagination, apiResponse, errorResponse } from "@/lib/api-utils";
+import { remember, generateKey, invalidatePattern } from "@/lib/cache";
 
 // GET /api/schools/[schoolId]/subjects
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+  const params = await props.params;
     try {
-        const { schoolId } = await params;
+        const { schoolId } = params;
 
-        const subjects = await prisma.subject.findMany({
-            where: {
-                class: {
-                    schoolId: schoolId,
+        const { page, limit, skip } = getPagination(req);
+        const cacheKey = generateKey('subjects', { schoolId, page, limit });
+
+        const result = await remember(cacheKey, async () => {
+            return await paginate(prisma.subject, {
+                where: {
+                    class: {
+                        schoolId: schoolId,
+                    },
                 },
-            },
-            include: {
-                class: true,
-            },
-            orderBy: { subjectName: 'asc' },
-        });
+                include: {
+                    class: true,
+                },
+                orderBy: { subjectName: 'asc' },
+            }, page, limit);
+        }, 300);
 
-        return NextResponse.json(subjects);
+        // Return data array for backward compatibility
+        return apiResponse(result.data);
     } catch (error) {
         console.error('Error fetching subjects:', error);
-        return NextResponse.json(
-            { error: 'Failed to fetch subjects' },
-            { status: 500 }
-        );
+        return errorResponse('Failed to fetch subjects');
     }
 }
 
 // POST /api/schools/[schoolId]/subjects
-export async function POST(req, { params }) {
+export async function POST(req, props) {
+  const params = await props.params;
     try {
-        const { schoolId } = await params;
+        const { schoolId } = params;
         const body = await req.json();
         const { subjectName, subjectCode, classId, departmentId } = body;
 
@@ -95,6 +102,9 @@ export async function POST(req, { params }) {
                 },
             },
         });
+
+        // Invalidate subjects cache
+        await invalidatePattern(`subjects:${schoolId}*`);
 
         return NextResponse.json(subject);
     } catch (error) {

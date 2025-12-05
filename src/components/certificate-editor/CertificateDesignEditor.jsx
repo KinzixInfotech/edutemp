@@ -8,6 +8,7 @@ import {
     Image as ImageIcon,
     QrCode,
     Square,
+    Table as TableIcon,
     Trash2,
     Move,
     Copy,
@@ -36,6 +37,7 @@ const ELEMENT_TYPES = {
     IMAGE: 'image',
     QRCODE: 'qrcode',
     SHAPE: 'shape',
+    TABLE: 'table',
 };
 
 const DEFAULT_ELEMENTS = {
@@ -78,6 +80,26 @@ const DEFAULT_ELEMENTS = {
         borderColor: '#000000',
         borderWidth: 1,
         borderRadius: 0,
+    },
+    [ELEMENT_TYPES.TABLE]: {
+        type: ELEMENT_TYPES.TABLE,
+        width: 600,
+        height: 200,
+        columns: [
+            { key: 'date', label: 'Date', placeholder: '{{exam_date}}', width: 150 },
+            { key: 'subject', label: 'Subject', placeholder: '{{exam_subject_name}}', width: 200 },
+            { key: 'time', label: 'Time', placeholder: '{{exam_time}}', width: 150 },
+            { key: 'marks', label: 'Max Marks', placeholder: '{{exam_max_marks}}', width: 100 },
+        ],
+        rowHeight: 30,
+        headerBackgroundColor: '#e0f2fe',
+        rowBackgroundColor: '#ffffff',
+        borderColor: '#cbd5e1',
+        borderWidth: 1,
+        fontSize: 12,
+        headerFontWeight: 'bold',
+        textAlign: 'center',
+        dataSource: 'exam_subjects', // Special key to populate from exam subjects
     },
 };
 
@@ -175,7 +197,7 @@ export default function CertificateDesignEditor({
     const selectedElement = elements.find(el => el.id === selectedId);
 
     return (
-        <div className={cn("flex border rounded-lg overflow-hidden bg-background", readOnly ? "h-auto border-none" : "h-[calc(100vh-100px)]")}>
+        <div className={cn("flex border  overflow-hidden bg-background", readOnly ? "h-auto border-none" : "h-[calc(100vh-100px)]")}>
             {/* Sidebar Tools */}
             {!readOnly && (
                 <div className="w-16 border-r flex flex-col items-center py-4 gap-4 bg-muted/20">
@@ -183,6 +205,7 @@ export default function CertificateDesignEditor({
                     <ToolButton icon={ImageIcon} label="Image" onClick={() => addElement(ELEMENT_TYPES.IMAGE)} />
                     <ToolButton icon={QrCode} label="QR Code" onClick={() => addElement(ELEMENT_TYPES.QRCODE)} />
                     <ToolButton icon={Square} label="Shape" onClick={() => addElement(ELEMENT_TYPES.SHAPE)} />
+                    <ToolButton icon={TableIcon} label="Table" onClick={() => addElement(ELEMENT_TYPES.TABLE)} />
                 </div>
             )}
 
@@ -357,6 +380,79 @@ function ElementRenderer({ element }) {
             );
         case ELEMENT_TYPES.SHAPE:
             return <div style={style} />;
+        case ELEMENT_TYPES.TABLE:
+            return (
+                <div style={{ ...style, overflow: 'auto' }}>
+                    <table style={{
+                        width: '100%',
+                        borderCollapse: 'collapse',
+                        fontSize: `${element.fontSize || 12}px`,
+                        textAlign: element.textAlign || 'center'
+                    }}>
+                        <thead>
+                            <tr style={{
+                                backgroundColor: element.headerBackgroundColor || '#e0f2fe',
+                                fontWeight: element.headerFontWeight || 'bold'
+                            }}>
+                                {element.columns && element.columns.map((col, idx) => (
+                                    <th
+                                        key={idx}
+                                        style={{
+                                            padding: '8px',
+                                            border: `${element.borderWidth || 1}px solid ${element.borderColor || '#cbd5e1'}`,
+                                            width: col.width || 'auto'
+                                        }}
+                                    >
+                                        {col.label}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {element.tableData && element.tableData.length > 0 ? (
+                                // Show actual data during generation
+                                element.tableData.map((row, rowIdx) => (
+                                    <tr key={rowIdx} style={{
+                                        backgroundColor: element.rowBackgroundColor || '#ffffff'
+                                    }}>
+                                        {element.columns && element.columns.map((col, colIdx) => (
+                                            <td
+                                                key={colIdx}
+                                                style={{
+                                                    padding: '6px',
+                                                    border: `${element.borderWidth || 1}px solid ${element.borderColor || '#cbd5e1'}`,
+                                                    height: `${element.rowHeight || 30}px`
+                                                }}
+                                            >
+                                                {row[col.key] || ''}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))
+                            ) : (
+                                // Show one sample row in builder mode
+                                <tr style={{
+                                    backgroundColor: element.rowBackgroundColor || '#ffffff'
+                                }}>
+                                    {element.columns && element.columns.map((col, idx) => (
+                                        <td
+                                            key={idx}
+                                            style={{
+                                                padding: '6px',
+                                                border: `${element.borderWidth || 1}px solid ${element.borderColor || '#cbd5e1'}`,
+                                                height: `${element.rowHeight || 30}px`,
+                                                color: '#94a3b8'
+                                            }}
+                                        >
+                                            {col.placeholder || ''}
+                                        </td>
+                                    ))}
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            );
         default:
             return null;
     }
@@ -634,6 +730,123 @@ function PropertiesEditor({ element, onUpdate, onDelete, onDuplicate, placeholde
                     )}
                 </>
             )}
+
+            {element.type === ELEMENT_TYPES.TABLE && (
+                <>
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                            <Label>Table Columns</Label>
+                            <Button
+                                size="sm"
+                                onClick={() => {
+                                    const newColumns = [...(element.columns || []), {
+                                        key: `col_${Date.now()}`,
+                                        label: 'New Column',
+                                        placeholder: '{{placeholder}}',
+                                        width: 100
+                                    }];
+                                    onUpdate({ columns: newColumns });
+                                }}
+                            >
+                                Add Column
+                            </Button>
+                        </div>
+                        <div className="space-y-3 max-h-60 overflow-y-auto">
+                            {element.columns && element.columns.map((col, idx) => (
+                                <div key={idx} className="p-3 border rounded-lg space-y-2 bg-muted/30">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm font-medium">Column {idx + 1}</span>
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => {
+                                                const newColumns = element.columns.filter((_, i) => i !== idx);
+                                                onUpdate({ columns: newColumns });
+                                            }}
+                                        >
+                                            <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                    </div>
+                                    <div>
+                                        <Label className="text-xs">Label</Label>
+                                        <Input
+                                            value={col.label}
+                                            onChange={(e) => {
+                                                const newColumns = [...element.columns];
+                                                newColumns[idx].label = e.target.value;
+                                                onUpdate({ columns: newColumns });
+                                            }}
+                                            placeholder="Column header"
+                                            className="h-8"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label className="text-xs">Data Key</Label>
+                                        <Input
+                                            value={col.key}
+                                            onChange={(e) => {
+                                                const newColumns = [...element.columns];
+                                                newColumns[idx].key = e.target.value;
+                                                onUpdate({ columns: newColumns });
+                                            }}
+                                            placeholder="e.g., date, subject"
+                                            className="h-8"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label className="text-xs">Placeholder</Label>
+                                        <Input
+                                            value={col.placeholder}
+                                            onChange={(e) => {
+                                                const newColumns = [...element.columns];
+                                                newColumns[idx].placeholder = e.target.value;
+                                                onUpdate({ columns: newColumns });
+                                            }}
+                                            placeholder="{{placeholder_name}}"
+                                            className="h-8"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label className="text-xs">Width (px)</Label>
+                                        <Input
+                                            type="number"
+                                            value={col.width}
+                                            onChange={(e) => {
+                                                const newColumns = [...element.columns];
+                                                newColumns[idx].width = parseInt(e.target.value);
+                                                onUpdate({ columns: newColumns });
+                                            }}
+                                            className="h-8"
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Header Background</Label>
+                        <Input type="color" value={element.headerBackgroundColor} onChange={(e) => onUpdate({ headerBackgroundColor: e.target.value })} className="w-full h-8" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Row Background</Label>
+                        <Input type="color" value={element.rowBackgroundColor} onChange={(e) => onUpdate({ rowBackgroundColor: e.target.value })} className="w-full h-8" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Border Color</Label>
+                        <Input type="color" value={element.borderColor} onChange={(e) => onUpdate({ borderColor: e.target.value })} className="w-full h-8" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Font Size</Label>
+                        <Slider
+                            value={[element.fontSize || 12]}
+                            min={8}
+                            max={24}
+                            step={1}
+                            onValueChange={([val]) => onUpdate({ fontSize: val })}
+                        />
+                    </div>
+                </>
+            )}
         </div>
     );
 }
@@ -677,6 +890,7 @@ function LayersPanel({ elements, selectedId, onSelect, onReorder }) {
                                     {el.type === ELEMENT_TYPES.IMAGE && <ImageIcon className="h-4 w-4 text-muted-foreground" />}
                                     {el.type === ELEMENT_TYPES.QRCODE && <QrCode className="h-4 w-4 text-muted-foreground" />}
                                     {el.type === ELEMENT_TYPES.SHAPE && <Square className="h-4 w-4 text-muted-foreground" />}
+                                    {el.type === ELEMENT_TYPES.TABLE && <TableIcon className="h-4 w-4 text-muted-foreground" />}
                                 </div>
                                 <span className="text-sm truncate flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
                                     {label}

@@ -21,8 +21,9 @@
 // // };
 
 // // // GET - Check if teacher has active delegations for today or specific date
-// // export async function GET(req, { params }) {
-// //     const { schoolId } = await params;
+// // export async function GET(req, props) {
+  const params = await props.params;
+// //     const { schoolId } = params;
 // //     const { searchParams } = new URL(req.url);
 
 // //     const teacherId = searchParams.get('teacherId');
@@ -181,8 +182,9 @@
 // };
 
 // // GET - Check if teacher has active delegations for today or specific date
-// export async function GET(req, { params }) {
-//     const { schoolId } = await params;
+// export async function GET(req, props) {
+  const params = await props.params;
+//     const { schoolId } = params;
 //     const { searchParams } = new URL(req.url);
 
 //     const teacherId = searchParams.get('teacherId');
@@ -303,8 +305,9 @@
 // }
 
 // // POST - Mark delegation as acknowledged by substitute teacher
-// export async function POST(req, { params }) {
-//     const { schoolId } = await params;
+// export async function POST(req, props) {
+  const params = await props.params;
+//     const { schoolId } = params;
 
 //     try {
 //         const body = await req.json();
@@ -394,8 +397,9 @@ const generateDelegationVersion = (delegation) => {
 };
 
 // GET - Check if teacher has active delegations for today or specific date
-export async function GET(req, { params }) {
-    const { schoolId } = await params;
+export async function GET(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
     const { searchParams } = new URL(req.url);
 
     const teacherId = searchParams.get('teacherId');
@@ -517,8 +521,9 @@ export async function GET(req, { params }) {
 }
 
 // POST - Mark delegation as acknowledged by substitute teacher
-export async function POST(req, { params }) {
-    const { schoolId } = await params;
+export async function POST(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
 
     try {
         const body = await req.json();

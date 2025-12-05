@@ -1,5 +1,7 @@
 import prisma from "@/lib/prisma"
 import { NextResponse } from "next/server"
+import { paginate, getPagination, apiResponse, errorResponse } from "@/lib/api-utils"
+import { remember, generateKey, invalidatePattern } from "@/lib/cache"
 
 // 👉 Create new class and automatically connect to active academic year
 export async function POST(req) {
@@ -27,16 +29,11 @@ export async function POST(req) {
         ...(activeAcademicYear && {
           academicYearId: activeAcademicYear.id,
         }),
-        // sections: sections?.length
-        //   ? {
-        //       create: sections.map((sec) => ({
-        //         name: sec.name,
-        //       })),
-        //     }
-        //   : undefined,
       },
-      // include: { sections: true },
     })
+
+    // Invalidate classes cache
+    await invalidatePattern(`classes:${schoolId}*`)
 
     return NextResponse.json(newClass, { status: 201 })
   } catch (error) {
@@ -55,15 +52,24 @@ export async function GET(req, props) {
     const getAcademicYear = searchParams.get("getAcademicYear") === "true" // Check if getAcademicYear=true
     const getStudent = searchParams.get("getStudent") === "true"
     const showStructure = searchParams.get("showStructure") === "true"
+
     if (!schoolId) {
-      return NextResponse.json({ error: "schoolId is required" }, { status: 400 })
+      return errorResponse("schoolId is required", 400)
     }
-    const classes = await prisma.class.findMany({
-      where: {
+
+    const { page, limit, skip } = getPagination(req);
+    const cacheKey = generateKey('classes', { schoolId, academicYearId, getAcademicYear, getStudent, showStructure, page, limit });
+
+    const result = await remember(cacheKey, async () => {
+      // If limit is -1, fetch all (useful for dropdowns)
+      const isAll = limit === -1;
+
+      const where = {
         schoolId,
         ...(academicYearId && { academicYearId }),
-      },
-      include: {
+      };
+
+      const include = {
         FeeStructure: {
           include: {
             feeParticulars: {
@@ -89,46 +95,59 @@ export async function GET(req, props) {
           ? { students: true }
           : { _count: { select: { students: true, FeeStructure: true } } }),
         ...(showStructure && { FeeStructure: true }),
-      },
-    });
+      };
 
-    //post process the count of fee structure to show the user that fee is assigned or not
+      let classes;
+      let total;
 
-    const result = await Promise.all(
-      classes.map(async (cls) => {
-        const assigned = await prisma.class.findFirst({
-          where: {
-            id: cls.id,
-            academicYearId, //  match the year
+      if (isAll) {
+        classes = await prisma.class.findMany({ where, include });
+        total = classes.length;
+      } else {
+        const paged = await paginate(prisma.class, { where, include }, page, limit);
+        classes = paged.data;
+        total = paged.meta.total;
+      }
 
-            // Student: {
-            //   classId: cls.id, //  restrict to this class
-            // },
-            // feeParticulars: {
-            //   some: {
-            //     globalParticular: {
-            //       feeStructure: {
-            //         classId: cls.id, //  ensure the fee structure belongs to this class
-            //       },
-            //     },
-            //   },
-            // },
-          },
-          include: {
-            FeeStructure: true,
-          }
-          // select: { id: true },
-        });
+      //post process the count of fee structure to show the user that fee is assigned or not
+      const processedClasses = await Promise.all(
+        classes.map(async (cls) => {
+          const assigned = await prisma.class.findFirst({
+            where: {
+              id: cls.id,
+              academicYearId, //  match the year
+            },
+            include: {
+              FeeStructure: true,
+            }
+          });
 
-        return {
-          ...cls,
-          isStructureAssigned: !!assigned,
-        };
-      })
-    );
-    return NextResponse.json(result)
+          return {
+            ...cls,
+            isStructureAssigned: !!assigned,
+          };
+        })
+      );
+
+      if (isAll) return processedClasses;
+
+      return {
+        data: processedClasses,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / (limit === -1 ? total : limit)),
+        }
+      };
+
+    }, 300); // Cache for 5 minutes
+
+    // Return data array for backward compatibility
+    // If isAll, result is array; otherwise result.data
+    return apiResponse(Array.isArray(result) ? result : result.data);
   } catch (error) {
     console.error("[CLASS_GET_ERROR]", error)
-    return NextResponse.json({ error: "Failed to fetch classes" }, { status: 500 })
+    return errorResponse("Failed to fetch classes")
   }
 }

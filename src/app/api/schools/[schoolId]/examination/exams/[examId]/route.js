@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
 // GET /api/schools/[schoolId]/examination/exams/[examId]
-export async function GET(req, { params }) {
+export async function GET(req, props) {
+  const params = await props.params;
     try {
-        const { examId } = await params;
+        const { examId } = params;
 
         const exam = await prisma.exam.findUnique({
             where: { id: examId },
@@ -38,9 +39,10 @@ export async function GET(req, { params }) {
 }
 
 // PUT /api/schools/[schoolId]/examination/exams/[examId]
-export async function PUT(req, { params }) {
+export async function PUT(req, props) {
+  const params = await props.params;
     try {
-        const { examId } = await params;
+        const { examId } = params;
         const body = await req.json();
         const { title, type, startDate, endDate, status, classIds } = body;
 
@@ -72,9 +74,10 @@ export async function PUT(req, { params }) {
 }
 
 // DELETE /api/schools/[schoolId]/examination/exams/[examId]
-export async function DELETE(req, { params }) {
+export async function DELETE(req, props) {
+  const params = await props.params;
     try {
-        const { examId } = await params;
+        const { examId } = params;
         const id = examId;
 
         // Delete all related records in proper order to avoid foreign key constraints

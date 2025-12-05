@@ -1,29 +1,33 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { paginate, getPagination, apiResponse, errorResponse } from "@/lib/api-utils";
+import { remember, generateKey } from "@/lib/cache";
 
 export async function GET(req, props) {
     const params = await props.params;
     const { schoolId } = params;
 
     if (!schoolId) {
-        return NextResponse.json({ error: "Missing schoolId" }, { status: 400 });
+        return errorResponse("Missing schoolId", 400);
     }
 
     try {
-        const staff = await prisma.NonTeachingStaff.findMany({
-            where: { schoolId },
-            include: {
-                user: true,
-            },
-        });
+        const { page, limit, skip } = getPagination(req);
+        const cacheKey = generateKey('non-teaching-staff', { schoolId, page, limit });
 
-        return NextResponse.json({ success: true, data: staff });
+        const result = await remember(cacheKey, async () => {
+            return await paginate(prisma.NonTeachingStaff, {
+                where: { schoolId },
+                include: {
+                    user: true,
+                },
+            }, page, limit);
+        }, 300);
+
+        // Return data array for backward compatibility
+        return apiResponse(result.data);
     } catch (error) {
-        console.error("❌ Fetch non teaching  staff error:", error);
-        return NextResponse.json(
-            { error: "Failed to fetch non teaching  staff" },
-            { status: 500 }
-        );
+        console.error("❌ Fetch non teaching staff error:", error);
+        return errorResponse("Failed to fetch non teaching staff");
     }
 }
-

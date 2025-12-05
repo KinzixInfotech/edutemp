@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { paginate, getPagination, apiResponse, errorResponse } from "@/lib/api-utils";
+import { remember, generateKey } from "@/lib/cache";
 
 export async function GET(req, props) {
     const params = await props.params;
@@ -7,7 +9,7 @@ export async function GET(req, props) {
     const { searchParams } = new URL(req.url);
 
     if (!schoolId) {
-        return NextResponse.json({ error: "Missing schoolId" }, { status: 400 });
+        return errorResponse("Missing schoolId", 400);
     }
 
     let include = { user: true }; // always include user
@@ -17,7 +19,7 @@ export async function GET(req, props) {
         try {
             // Try to parse JSON first
             if (includeParam.trim().startsWith("{")) {
-                // If they send something like `?include={"Class":{"include":{"sections":true}}}`
+                // If they send something like `?include={"Class":{"include":{"sections":true}}}`app
                 include = { ...include, ...JSON.parse(includeParam) };
             } else {
                 // If they send a comma-separated list like "class,sections"
@@ -33,17 +35,22 @@ export async function GET(req, props) {
     }
 
     try {
-        const staff = await prisma.teachingStaff.findMany({
-            where: { schoolId },
-            include,
-        });
+        const { page, limit, skip } = getPagination(req);
 
-        return NextResponse.json({ success: true, data: staff });
+        // Include 'include' param in cache key to handle different relation requests
+        const cacheKey = generateKey('teaching-staff', { schoolId, include: JSON.stringify(include), page, limit });
+
+        const result = await remember(cacheKey, async () => {
+            return await paginate(prisma.teachingStaff, {
+                where: { schoolId },
+                include,
+            }, page, limit);
+        }, 300);
+
+        // Return data array for backward compatibility
+        return apiResponse(result.data);
     } catch (error) {
         console.error("❌ Fetch teaching staff error:", error);
-        return NextResponse.json(
-            { error: "Failed to fetch teaching staff" },
-            { status: 500 }
-        );
+        return errorResponse("Failed to fetch teaching staff");
     }
 }

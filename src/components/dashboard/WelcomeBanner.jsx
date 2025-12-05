@@ -25,11 +25,11 @@ export default function WelcomeBanner({ fullUser }) {
     }, []);
 
     return (
-        <div className="rounded-2xl bg-muted p-6 mb-6">
+        <div className="rounded-2xl bg-muted p-6 mb-6 bg-white border dark:bg-muted">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-5">
                     {/* Icon */}
-                    <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-background">
+                    <div className="flex items-center justify-center w-16 h-16 rounded-2xl  bg-muted">
                         {timeIcon}
                     </div>
 

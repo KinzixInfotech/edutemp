@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
-export async function POST(req, { params }) {
-    const { schoolId } = await params;
+export async function POST(req, props) {
+  const params = await props.params;
+    const { schoolId } = params;
     const body = await req.json();
     const { promotions, toYearId, promotedBy } = body;
     // promotions: [{ studentId, toClassId, toSectionId, status, remarks }]

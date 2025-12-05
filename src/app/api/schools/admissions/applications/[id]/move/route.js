@@ -3,8 +3,9 @@ import prisma from "@/lib/prisma";
 import { supabaseAdmin } from "@/lib/supbase-admin";
 
 // POST: Move application to a different stage
-export async function POST(req, { params }) {
-    const { id } = await params;
+export async function POST(req, props) {
+  const params = await props.params;
+    const { id } = params;
     let createdUserId = null;
 
     try {

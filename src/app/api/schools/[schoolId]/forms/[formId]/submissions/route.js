@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
 // GET: Fetch submissions for a form
-export async function GET(req, { params }) {
-    const { schoolId, formId } = await params;
+export async function GET(req, props) {
+  const params = await props.params;
+    const { schoolId, formId } = params;
 
     try {
         const submissions = await prisma.application.findMany({
