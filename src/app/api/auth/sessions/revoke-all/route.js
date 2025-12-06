@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import redis from "@/lib/redis";
 
 // POST - Revoke all sessions except current
 export async function POST(req) {
@@ -25,6 +26,9 @@ export async function POST(req) {
                 revokedReason: "User signed out everywhere",
             },
         });
+
+        // Invalidate cache
+        await redis.del(`sessions:${userId}`);
 
         // Log security event
         await prisma.securityEvent.create({

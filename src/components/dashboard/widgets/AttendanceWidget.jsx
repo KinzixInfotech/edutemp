@@ -27,13 +27,31 @@ export default function AttendanceWidget({ fullUser, onRemove }) {
     if (isLoading) {
         return (
             <WidgetContainer title="Today's Attendance" onRemove={onRemove}>
-                <div className="space-y-4">
-                    <div className="flex justify-between">
-                        <Skeleton className="h-10 w-20" />
-                        <Skeleton className="h-10 w-20" />
-                        <Skeleton className="h-10 w-20" />
+                <div className="space-y-6">
+                    {/* Student Skeleton */}
+                    <div className="space-y-3">
+                        <div className="flex justify-between">
+                            <Skeleton className="h-5 w-24" />
+                            <Skeleton className="h-4 w-12" />
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                            <Skeleton className="h-16 w-full rounded-lg" />
+                            <Skeleton className="h-16 w-full rounded-lg" />
+                            <Skeleton className="h-16 w-full rounded-lg" />
+                        </div>
                     </div>
-                    <Skeleton className="h-32 w-full rounded-lg" />
+                    {/* Teacher Skeleton */}
+                    <div className="space-y-3">
+                        <div className="flex justify-between">
+                            <Skeleton className="h-5 w-24" />
+                            <Skeleton className="h-4 w-12" />
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                            <Skeleton className="h-16 w-full rounded-lg" />
+                            <Skeleton className="h-16 w-full rounded-lg" />
+                            <Skeleton className="h-16 w-full rounded-lg" />
+                        </div>
+                    </div>
                 </div>
             </WidgetContainer>
         );
@@ -57,41 +75,79 @@ export default function AttendanceWidget({ fullUser, onRemove }) {
     const studentStats = getStats('STUDENT');
     const teacherStats = getStats('TEACHING_STAFF');
 
-    const renderStatRow = (title, stats, iconComponent, bgColorClass) => (
-        <div className="space-y-3">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <div className={`p-2 ${bgColorClass}/10 rounded-lg`}>
-                        {iconComponent}
-                    </div>
-                    <span className="font-medium text-sm">{title}</span>
-                </div>
-                <span className="text-xs text-muted-foreground">Total: {stats.total}</span>
-            </div>
+    // Calculate Ratio check for zeros
+    const ratio = teacherStats.total > 0 ? Math.round(studentStats.total / teacherStats.total) : 0;
 
-            <div className="grid grid-cols-3 gap-2">
-                <div className="flex flex-col items-center p-2 bg-green-500/5 rounded-lg border border-green-500/10">
-                    <span className="text-lg font-bold text-green-600">{stats.present}</span>
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Present</span>
-                </div>
-                <div className="flex flex-col items-center p-2 bg-red-500/5 rounded-lg border border-red-500/10">
-                    <span className="text-lg font-bold text-red-600">{stats.absent}</span>
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Absent</span>
-                </div>
-                <div className="flex flex-col items-center p-2 bg-yellow-500/5 rounded-lg border border-yellow-500/10">
-                    <span className="text-lg font-bold text-yellow-600">{stats.late}</span>
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Late</span>
-                </div>
-            </div>
-        </div>
-    );
+
 
     return (
         <WidgetContainer title="Today's Attendance" onRemove={onRemove} className="h-full">
-            <div className="grid grid-cols-1 gap-5">
-                {renderStatRow("Students", studentStats, <Users className="h-4 w-4 text-blue-600" />, "bg-blue-500")}
-                <div className="h-px bg-border/40" />
-                {renderStatRow("Teachers", teacherStats, <UserCheck className="h-4 w-4 text-purple-600" />, "bg-purple-500")}
+            <div className="flex flex-col h-full gap-4">
+
+                {/* Students Section */}
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                        <div className="flex items-center gap-1.5">
+                            <Users className="h-3.5 w-3.5 text-blue-600" />
+                            <span>Students</span>
+                        </div>
+                        <span>Total: {studentStats.total}</span>
+                    </div>
+                    {/* Inline Grid for manual control or use helper */}
+                    <div className="grid grid-cols-3 gap-2">
+                        <div className="flex flex-col items-center p-1.5 bg-blue-500/5 rounded-lg border border-blue-500/10">
+                            <span className="text-lg font-bold text-blue-600">{studentStats.present}</span>
+                            <span className="text-[9px] text-muted-foreground uppercase tracking-wider">Present</span>
+                        </div>
+                        <div className="flex flex-col items-center p-1.5 bg-red-500/5 rounded-lg border border-red-500/10">
+                            <span className="text-lg font-bold text-red-600">{studentStats.absent}</span>
+                            <span className="text-[9px] text-muted-foreground uppercase tracking-wider">Absent</span>
+                        </div>
+                        <div className="flex flex-col items-center p-1.5 bg-yellow-500/5 rounded-lg border border-yellow-500/10">
+                            <span className="text-lg font-bold text-yellow-600">{studentStats.late}</span>
+                            <span className="text-[9px] text-muted-foreground uppercase tracking-wider">Late</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Center: Ratio Highlight */}
+                <div className="flex-1 flex flex-col items-center justify-center p-2 rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50/50 border border-indigo-100 dark:from-indigo-900/10 dark:to-purple-900/10 dark:border-indigo-800/20">
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-indigo-600/80 dark:text-indigo-400">Student-Teacher Ratio</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <Users className="h-6 w-6 text-indigo-600 dark:text-indigo-400 opacity-60" />
+                        <span className="text-3xl font-extrabold tracking-tight text-indigo-600 dark:text-indigo-400">
+                            {ratio}<span className="text-xl text-indigo-400 dark:text-indigo-600">:1</span>
+                        </span>
+                    </div>
+                </div>
+
+                {/* Teachers Section */}
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                        <div className="flex items-center gap-1.5">
+                            <UserCheck className="h-3.5 w-3.5 text-purple-600" />
+                            <span>Teachers</span>
+                        </div>
+                        <span>Total: {teacherStats.total}</span>
+                    </div>
+                    {/* Inline Grid */}
+                    <div className="grid grid-cols-3 gap-2">
+                        <div className="flex flex-col items-center p-1.5 bg-purple-500/5 rounded-lg border border-purple-500/10">
+                            <span className="text-lg font-bold text-purple-600">{teacherStats.present}</span>
+                            <span className="text-[9px] text-muted-foreground uppercase tracking-wider">Present</span>
+                        </div>
+                        <div className="flex flex-col items-center p-1.5 bg-red-500/5 rounded-lg border border-red-500/10">
+                            <span className="text-lg font-bold text-red-600">{teacherStats.absent}</span>
+                            <span className="text-[9px] text-muted-foreground uppercase tracking-wider">Absent</span>
+                        </div>
+                        <div className="flex flex-col items-center p-1.5 bg-yellow-500/5 rounded-lg border border-yellow-500/10">
+                            <span className="text-lg font-bold text-yellow-600">{teacherStats.late}</span>
+                            <span className="text-[9px] text-muted-foreground uppercase tracking-wider">Late</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </WidgetContainer>
     );

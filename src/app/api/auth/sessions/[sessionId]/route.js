@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import redis from "@/lib/redis";
 
 // DELETE - Revoke specific session
 export async function DELETE(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     try {
         const { sessionId } = params;
         const userId = req.headers.get("x-user-id");
@@ -31,6 +32,9 @@ export async function DELETE(req, props) {
             },
         });
 
+        // Invalidate cache
+        await redis.del(`sessions:${userId}`);
+
         // Log security event
         await prisma.securityEvent.create({
             data: {
@@ -55,7 +59,7 @@ export async function DELETE(req, props) {
 
 // PATCH - Update session (e.g., rename device)
 export async function PATCH(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     try {
         const { sessionId } = params;
         const userId = req.headers.get("x-user-id");
@@ -83,6 +87,9 @@ export async function PATCH(req, props) {
                 lastActiveAt: new Date(),
             },
         });
+
+        // Invalidate cache
+        await redis.del(`sessions:${userId}`);
 
         return NextResponse.json({ session: updatedSession });
     } catch (error) {

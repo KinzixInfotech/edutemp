@@ -14,7 +14,8 @@ import {
     Search,
     Filter,
     Plus,
-    Users
+    Users,
+    Share2
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/context/AuthContext';
 import {
     AlertDialog,
@@ -64,7 +66,7 @@ export default function AdmitCardHistoryPage() {
             if (!schoolId) throw new Error('No school ID');
             const params = new URLSearchParams({ schoolId });
             if (examFilter !== 'all') params.append('examId', examFilter);
-            
+
             const res = await fetch(`/api/documents/${schoolId}/admitcards/history?${params}`);
             if (!res.ok) throw new Error('Failed to fetch admit cards');
             return res.json();
@@ -77,33 +79,35 @@ export default function AdmitCardHistoryPage() {
         queryKey: ['exams', schoolId],
         queryFn: async () => {
             if (!schoolId) throw new Error('No school ID');
-            const res = await fetch(`/api/exams?schoolId=${schoolId}`);
+            const res = await fetch(`/api/schools/${schoolId}/examination/exams`);
             if (!res.ok) throw new Error('Failed to fetch exams');
-            return res.json();
+            const data = await res.json();
+            return data.data || data;
         },
         enabled: !!schoolId,
     });
 
     // Delete mutation
     const deleteMutation = useMutation({
-        mutationFn: async (id) => {
-            const res = await fetch(`/api/documents/${schoolId}/admitcards/${id}`, {
+        mutationFn: async ({ id, isBatch }) => {
+            const params = new URLSearchParams(isBatch ? { batchId: id } : { id });
+            const res = await fetch(`/api/documents/${schoolId}/admitcards/history?${params.toString()}`, {
                 method: 'DELETE',
             });
             if (!res.ok) {
                 const error = await res.json();
-                throw new Error(error.error || 'Failed to delete admit card');
+                throw new Error(error.error || 'Failed to delete');
             }
             return res.json();
         },
         onSuccess: () => {
-            toast.success('Admit card deleted successfully');
+            toast.success('Deleted successfully');
             queryClient.invalidateQueries(['admitcards-history']);
             refetch();
             setDeleteId(null);
         },
         onError: (error) => {
-            toast.error(error.message || 'Failed to delete admit card');
+            toast.error(error.message || 'Failed to delete');
         },
     });
 
@@ -219,80 +223,237 @@ export default function AdmitCardHistoryPage() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Student Details</TableHead>
+                                        <TableHead>Type / Student</TableHead>
                                         <TableHead>Exam</TableHead>
-                                        <TableHead>Seat Number</TableHead>
+                                        <TableHead>Details</TableHead>
                                         <TableHead>Center</TableHead>
                                         <TableHead>Issue Date</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {filteredAdmitCards.map((card) => (
-                                        <TableRow key={card.id}>
-                                            <TableCell>
-                                                <div className="flex flex-col">
-                                                    <span className="font-medium">{card.student?.name}</span>
-                                                    <span className="text-xs text-muted-foreground">
-                                                        Roll: {card.student?.rollNumber}
+                                    {/* Group cards by batch (heuristic: same exam + same minute) */}
+                                    {(() => {
+                                        const groups = new Map();
+
+                                        // Sort by date desc
+                                        const sorted = [...filteredAdmitCards].sort((a, b) =>
+                                            new Date(b.issueDate) - new Date(a.issueDate)
+                                        );
+
+                                        sorted.forEach(card => {
+                                            // Create a key based on Exam + Time (down to minute)
+                                            // Also use batchId from layoutConfig if available as a stronger signal
+                                            const batchId = card.layoutConfig?.batchId;
+                                            let key;
+
+                                            if (batchId) {
+                                                key = `batch-${batchId}`;
+                                            } else {
+                                                const timeKey = new Date(card.issueDate).toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+                                                key = `time-${card.examId}-${timeKey}`;
+                                            }
+
+                                            if (!groups.has(key)) {
+                                                groups.set(key, []);
+                                            }
+                                            groups.get(key).push(card);
+                                        });
+
+                                        // Convert groups to rows
+                                        const rows = [];
+                                        groups.forEach((cards, key) => {
+                                            if (cards.length > 1) {
+                                                // Batch Row
+                                                const first = cards[0];
+                                                rows.push({
+                                                    type: 'BATCH',
+                                                    id: key,
+                                                    count: cards.length,
+                                                    exam: first.exam,
+                                                    issueDate: first.issueDate,
+                                                    center: first.center,
+                                                    // Use the first card's config to find ZIP if available
+                                                    zipUrl: first.layoutConfig?.zipUrl,
+                                                    cards: cards
+                                                });
+                                            } else {
+                                                // Single Row
+                                                rows.push({
+                                                    type: 'SINGLE',
+                                                    ...cards[0]
+                                                });
+                                            }
+                                        });
+
+                                        return rows.map((item) => (
+                                            <TableRow key={item.id}>
+                                                <TableCell>
+                                                    {item.type === 'BATCH' ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="bg-primary/10 p-2 rounded-md">
+                                                                <Users className="h-4 w-4 text-primary" />
+                                                            </div>
+                                                            <div className="flex flex-col">
+                                                                <span className="font-medium">Bulk Generation</span>
+                                                                <span className="text-xs text-muted-foreground">
+                                                                    {item.count} Students
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center gap-3">
+                                                            <Avatar className="h-9 w-9 border">
+                                                                <AvatarImage src={item.student?.user?.profilePicture} alt={item.student?.name} />
+                                                                <AvatarFallback>{item.student?.name?.[0]}</AvatarFallback>
+                                                            </Avatar>
+                                                            <div className="flex flex-col">
+                                                                <span className="font-medium">{item.student?.name}</span>
+                                                                <span className="text-xs text-muted-foreground">
+                                                                    Roll: {item.student?.rollNumber}
+                                                                </span>
+                                                                <span className="text-xs text-muted-foreground">
+                                                                    Class: {item.student?.class?.className}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-sm font-medium">{item.exam?.title}</span>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {item.type === 'BATCH' ? (
+                                                        <Badge variant="secondary">
+                                                            {item.count} Cards
+                                                        </Badge>
+                                                    ) : (
+                                                        <Badge variant="outline" className="font-mono">
+                                                            {item.seatNumber}
+                                                        </Badge>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="text-sm">{item.center || 'N/A'}</span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="text-sm">
+                                                        {format(new Date(item.issueDate), 'MMM dd, yyyy h:mm a')}
                                                     </span>
-                                                    <span className="text-xs text-muted-foreground">
-                                                        Class: {card.student?.class?.className}
-                                                    </span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm font-medium">{card.exam?.title}</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline" className="font-mono">
-                                                    {card.seatNumber}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                <span className="text-sm">{card.center || 'N/A'}</span>
-                                            </TableCell>
-                                            <TableCell>
-                                                <span className="text-sm">
-                                                    {format(new Date(card.issueDate), 'MMM dd, yyyy')}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex justify-end gap-2">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => router.push(`/dashboard/documents/admitcards/${card.id}`)}
-                                                    >
-                                                        <Eye className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => {
-                                                            // Download logic - you'll need fileUrl from API
-                                                            const link = document.createElement('a');
-                                                            link.href = card.fileUrl || '#';
-                                                            link.download = `admit-card-${card.seatNumber}.pdf`;
-                                                            link.click();
-                                                        }}
-                                                    >
-                                                        <Download className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => setDeleteId(card.id)}
-                                                        className="text-destructive hover:text-destructive"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <div className="flex justify-end gap-2">
+                                                        {item.type === 'BATCH' ? (
+                                                            <>
+                                                                {item.zipUrl ? (
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        onClick={() => {
+                                                                            window.open(item.zipUrl, '_blank');
+                                                                        }}
+                                                                        title="Download ZIP"
+                                                                    >
+                                                                        <Download className="h-4 w-4 text-green-600" />
+                                                                    </Button>
+                                                                ) : (
+                                                                    <Button variant="ghost" size="sm" disabled>
+                                                                        <Download className="h-4 w-4 text-muted-foreground" />
+                                                                    </Button>
+                                                                )}
+                                                                {item.zipUrl && (
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        onClick={() => {
+                                                                            navigator.clipboard.writeText(item.zipUrl);
+                                                                            toast.success('Link copied to clipboard');
+                                                                        }}
+                                                                        title="Copy Link"
+                                                                    >
+                                                                        <Share2 className="h-4 w-4" />
+                                                                    </Button>
+                                                                )}
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() => {
+                                                                        // Extract batchId from row ID (format: batch-<uuid>)
+                                                                        const batchId = item.id.replace(/^batch-/, '');
+                                                                        router.push(`/dashboard/documents/admitcards/batch/${batchId}`);
+                                                                    }}
+                                                                    title="View Batch Details"
+                                                                >
+                                                                    <Eye className="h-4 w-4" />
+                                                                </Button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() => router.push(`/dashboard/documents/admitcards/${item.id}`)}
+                                                                >
+                                                                    <Eye className="h-4 w-4" />
+                                                                </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() => {
+                                                                        if (item.fileUrl) {
+                                                                            const link = document.createElement('a');
+                                                                            link.href = item.fileUrl;
+                                                                            link.download = `admit-card-${item.seatNumber}.pdf`;
+                                                                            link.click();
+                                                                        } else if (item.layoutConfig?.fileUrl) {
+                                                                            // Fallback if I stored it in layoutConfig
+                                                                            const link = document.createElement('a');
+                                                                            link.href = item.layoutConfig.fileUrl;
+                                                                            link.download = `admit-card-${item.seatNumber}.pdf`;
+                                                                            link.click();
+                                                                        } else {
+                                                                            toast.error("PDF not available for download");
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    <Download className="h-4 w-4" />
+                                                                </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() => {
+                                                                        if (item.fileUrl) {
+                                                                            navigator.clipboard.writeText(item.fileUrl);
+                                                                            toast.success('Link copied to clipboard');
+                                                                        } else {
+                                                                            toast.error("Link not available");
+                                                                        }
+                                                                    }}
+                                                                    title="Copy Link"
+                                                                >
+                                                                    <Share2 className="h-4 w-4" />
+                                                                </Button>
+                                                            </>
+                                                        )}
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => setDeleteId({
+                                                                id: item.type === 'BATCH' ? item.id.replace('batch-', '') : item.id,
+                                                                isBatch: item.type === 'BATCH'
+                                                            })}
+                                                            className="text-destructive hover:text-destructive"
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ));
+                                    })()}
                                 </TableBody>
                             </Table>
                         </div>

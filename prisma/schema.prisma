@@ -17,6 +17,8 @@ model School {
   location               String
   contactNumber          String
   websiteConfig          Json?
+  signatureUrl           String?
+  stampUrl               String?
   SubscriptionType       String
   Language               String
   createdAt              DateTime                @default(now())
@@ -83,6 +85,13 @@ model School {
   inventoryCategories     InventoryCategory[]
   inventorySales          InventorySale[]
   publicProfile           SchoolPublicProfile? // School Explorer public profile
+
+  // Payroll Management
+  payrollConfig    PayrollConfig?
+  salaryStructures SalaryStructure[]
+  payrollPeriods   PayrollPeriod[]
+  leaveBuckets     LeaveBucket[]
+  payrollAuditLogs PayrollAuditLog[]
 
   @@index([name])
 }
@@ -1206,6 +1215,9 @@ model User {
   // Session Management
   sessions       UserSession[]
   securityEvents SecurityEvent[]
+
+  // Payroll Management
+  payrollProfile EmployeePayrollProfile?
 
   @@index([schoolId])
   @@index([roleId])
@@ -3034,8 +3046,15 @@ model DigitalIdCard {
   layoutConfig   Json
   generatedAt    DateTime      @default(now())
 
+  // New fields for file handling and status
+  fileUrl    String?
+  status     String    @default("active") // active, expired, revoked
+  validUntil DateTime?
+  templateId String?
+
   @@index([schoolId])
   @@index([studentId])
+  @@index([status])
 }
 
 model AdmitCard {
@@ -3852,4 +3871,540 @@ model Alumni {
   @@index([graduationYear])
   @@index([leavingReason])
   @@index([email])
+}
+
+// ============================================
+// PAYROLL MANAGEMENT SYSTEM
+// ============================================
+
+// Payroll Configuration per School
+model PayrollConfig {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @unique @db.Uuid
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  // Pay Cycle
+  payCycleDay Int @default(1) // Day of month to run payroll
+  paymentDay  Int @default(7) // Day when salaries are disbursed
+
+  // Working Hours
+  standardWorkingDays  Int   @default(26)
+  standardWorkingHours Float @default(8)
+
+  // Statutory Configuration - Provident Fund
+  enablePF          Boolean @default(true)
+  pfEmployerPercent Float   @default(12)
+  pfEmployeePercent Float   @default(12)
+  pfWageLimit       Float   @default(15000) // Basic wage limit for PF
+
+  // Statutory Configuration - ESI
+  enableESI          Boolean @default(true)
+  esiEmployerPercent Float   @default(3.25)
+  esiEmployeePercent Float   @default(0.75)
+  esiWageLimit       Float   @default(21000) // Gross wage limit for ESI
+
+  // Professional Tax
+  enableProfessionalTax Boolean @default(true)
+  professionalTaxSlab   Json? // State-wise PT slabs
+
+  // TDS Configuration
+  enableTDS Boolean @default(true)
+  tdsSlabs  Json? // Income tax slabs
+
+  // Leave Encashment
+  enableLeaveEncashment Boolean @default(false)
+  leaveEncashmentRate   Float? // Per day rate
+
+  // Overtime
+  enableOvertime Boolean @default(false)
+  overtimeRate   Float   @default(1.5) // Multiplier
+
+  // Grace Period for Late
+  lateGraceMinutes Int   @default(15)
+  halfDayThreshold Float @default(4) // Hours for half day
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Employee Payroll Profile (extends User/Staff)
+model EmployeePayrollProfile {
+  id       String @id @default(uuid()) @db.Uuid
+  userId   String @unique @db.Uuid
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  schoolId String @db.Uuid
+
+  // Employment Details
+  employeeType     EmployeeType   @default(TEACHING)
+  employmentType   EmploymentType @default(PERMANENT)
+  joiningDate      DateTime
+  confirmationDate DateTime?
+  exitDate         DateTime?
+
+  // Salary Details
+  salaryStructureId String?          @db.Uuid
+  salaryStructure   SalaryStructure? @relation(fields: [salaryStructureId], references: [id])
+
+  // Bank Details
+  bankName      String?
+  bankBranch    String?
+  accountNumber String?
+  ifscCode      String?
+  accountHolder String?
+  upiId         String?
+
+  // Tax Details
+  panNumber    String?
+  aadharNumber String?
+  uanNumber    String? // PF UAN
+  esiNumber    String?
+
+  // Tax Regime
+  taxRegime       TaxRegime @default(NEW)
+  taxDeclarations Json? // Investment declarations for old regime
+
+  // Status
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  payslips     Payslip[]
+  deductions   EmployeeDeduction[]
+  loans        EmployeeLoan[]
+  payrollItems PayrollItem[]
+
+  @@index([schoolId])
+  @@index([userId])
+  @@index([employeeType])
+  @@index([isActive])
+}
+
+enum EmployeeType {
+  TEACHING
+  NON_TEACHING
+}
+
+enum EmploymentType {
+  PERMANENT
+  CONTRACT
+  PROBATION
+  TEMPORARY
+  PART_TIME
+}
+
+enum TaxRegime {
+  OLD
+  NEW
+}
+
+// Salary Structure Template
+model SalaryStructure {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @db.Uuid
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+
+  // Earnings
+  basicSalary      Float @default(0)
+  hraPercent       Float @default(40) // % of basic
+  daPercent        Float @default(0) // Dearness Allowance
+  taAmount         Float @default(0) // Transport Allowance
+  medicalAllowance Float @default(0)
+  specialAllowance Float @default(0)
+  otherAllowances  Json? // Custom allowances [{name, amount, type}]
+
+  // Calculated CTC
+  grossSalary Float @default(0)
+  ctc         Float @default(0)
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employees EmployeePayrollProfile[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+  @@index([isActive])
+}
+
+// Payroll Period (Monthly processing)
+model PayrollPeriod {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @db.Uuid
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  month     Int // 1-12
+  year      Int
+  startDate DateTime
+  endDate   DateTime
+
+  // Working Days
+  totalWorkingDays Int
+  holidays         Int @default(0)
+  weekends         Int @default(0)
+
+  // Status
+  status      PayrollStatus @default(DRAFT)
+  processedAt DateTime?
+  processedBy String?       @db.Uuid
+  approvedAt  DateTime?
+  approvedBy  String?       @db.Uuid
+  paidAt      DateTime?
+
+  // Summary
+  totalEmployees   Int   @default(0)
+  totalGrossSalary Float @default(0)
+  totalDeductions  Float @default(0)
+  totalNetSalary   Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  payrollItems PayrollItem[]
+
+  @@unique([schoolId, month, year])
+  @@index([schoolId])
+  @@index([status])
+  @@index([month, year])
+}
+
+enum PayrollStatus {
+  DRAFT
+  PROCESSING
+  PENDING_APPROVAL
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+// Individual Payroll Entry for each employee
+model PayrollItem {
+  id       String        @id @default(uuid()) @db.Uuid
+  periodId String        @db.Uuid
+  period   PayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  employeeId String                 @db.Uuid
+  employee   EmployeePayrollProfile @relation(fields: [employeeId], references: [id])
+
+  // Attendance Data (synced from attendance module)
+  daysWorked    Int   @default(0)
+  daysAbsent    Int   @default(0)
+  daysLeave     Int   @default(0)
+  daysHoliday   Int   @default(0)
+  overtimeHours Float @default(0)
+  lateCount     Int   @default(0)
+  halfDayCount  Int   @default(0)
+
+  // Earnings Breakdown
+  basicEarned    Float @default(0)
+  hraEarned      Float @default(0)
+  daEarned       Float @default(0)
+  taEarned       Float @default(0)
+  medicalEarned  Float @default(0)
+  specialEarned  Float @default(0)
+  overtimeEarned Float @default(0)
+  incentives     Float @default(0)
+  arrears        Float @default(0)
+  otherEarnings  Json? // [{name, amount}]
+  grossEarnings  Float @default(0)
+
+  // Deductions Breakdown
+  pfEmployee       Float @default(0)
+  pfEmployer       Float @default(0)
+  esiEmployee      Float @default(0)
+  esiEmployer      Float @default(0)
+  professionalTax  Float @default(0)
+  tds              Float @default(0)
+  loanDeduction    Float @default(0)
+  advanceDeduction Float @default(0)
+  lossOfPay        Float @default(0)
+  otherDeductions  Json? // [{name, amount}]
+  totalDeductions  Float @default(0)
+
+  // Net Salary
+  netSalary Float @default(0)
+
+  // Payment Status
+  paymentStatus  PayrollPaymentStatus  @default(PENDING)
+  paymentMethod  PayrollPaymentMethod?
+  transactionId  String?
+  paidAt         DateTime?
+  paymentRemarks String?
+
+  // Payslip Reference
+  payslipId String? @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([periodId, employeeId])
+  @@index([periodId])
+  @@index([employeeId])
+  @@index([paymentStatus])
+}
+
+enum PayrollPaymentStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+enum PayrollPaymentMethod {
+  BANK_TRANSFER
+  NEFT
+  RTGS
+  UPI
+  CASH
+  CHEQUE
+}
+
+// Payslip Generation
+model Payslip {
+  id         String                 @id @default(uuid()) @db.Uuid
+  employeeId String                 @db.Uuid
+  employee   EmployeePayrollProfile @relation(fields: [employeeId], references: [id])
+
+  month Int
+  year  Int
+
+  // Employee Snapshot (for record keeping)
+  employeeName     String
+  employeeId_staff String // Employee ID from staff record
+  designation      String?
+  department       String?
+  bankAccount      String?
+  panNumber        String?
+  uanNumber        String?
+
+  // Payslip Data (full snapshot)
+  earnings   Json // {basic, hra, da, ta, medical, special, overtime, incentives, arrears, others}
+  deductions Json // {pf, esi, pt, tds, loan, advance, lop, others}
+  netSalary  Float
+
+  // Attendance Summary
+  attendanceSummary Json // {daysWorked, daysAbsent, daysLeave, holidays, lateCount}
+
+  // PDF
+  pdfUrl String?
+
+  // Status
+  status       PayslipStatus @default(GENERATED)
+  sentAt       DateTime?
+  downloadedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([employeeId, month, year])
+  @@index([employeeId])
+  @@index([month, year])
+  @@index([status])
+}
+
+enum PayslipStatus {
+  GENERATED
+  SENT
+  DOWNLOADED
+}
+
+// Employee Deductions (recurring deductions like fines, adjustments)
+model EmployeeDeduction {
+  id         String                 @id @default(uuid()) @db.Uuid
+  employeeId String                 @db.Uuid
+  employee   EmployeePayrollProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  type        DeductionType
+  description String
+  amount      Float
+  startDate   DateTime
+  endDate     DateTime?
+  frequency   DeductionFrequency @default(ONE_TIME)
+  isActive    Boolean            @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([employeeId])
+  @@index([isActive])
+}
+
+enum DeductionType {
+  PF_ARREARS
+  FINE
+  ADJUSTMENT
+  SALARY_ADVANCE
+  OTHER
+}
+
+enum DeductionFrequency {
+  ONE_TIME
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+// Employee Loans/Advances
+model EmployeeLoan {
+  id         String                 @id @default(uuid()) @db.Uuid
+  employeeId String                 @db.Uuid
+  employee   EmployeePayrollProfile @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  type            LoanType
+  principalAmount Float
+  interestRate    Float      @default(0)
+  totalAmount     Float
+  emiAmount       Float
+  tenure          Int // months
+  startDate       DateTime
+  amountPaid      Float      @default(0)
+  amountPending   Float
+  status          LoanStatus @default(ACTIVE)
+
+  approvedBy String?   @db.Uuid
+  approvedAt DateTime?
+
+  remarks String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  repayments LoanRepayment[]
+
+  @@index([employeeId])
+  @@index([status])
+}
+
+enum LoanType {
+  SALARY_ADVANCE
+  PERSONAL_LOAN
+  EMERGENCY_LOAN
+  FESTIVAL_ADVANCE
+}
+
+enum LoanStatus {
+  PENDING_APPROVAL
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  DEFAULTED
+}
+
+model LoanRepayment {
+  id     String       @id @default(uuid()) @db.Uuid
+  loanId String       @db.Uuid
+  loan   EmployeeLoan @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  amount        Float
+  month         Int
+  year          Int
+  payrollItemId String?         @db.Uuid
+  status        RepaymentStatus @default(PENDING)
+  paidAt        DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([loanId, month, year])
+  @@index([loanId])
+  @@index([status])
+}
+
+enum RepaymentStatus {
+  PENDING
+  DEDUCTED
+  SKIPPED
+  PAID_EXTERNALLY
+}
+
+// Enhanced Leave Bucket (monthly/yearly limits per leave type)
+model LeaveBucket {
+  id             String @id @default(uuid()) @db.Uuid
+  schoolId       String @db.Uuid
+  school         School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYearId String @db.Uuid
+
+  leaveType LeaveType
+
+  // Limits
+  yearlyLimit     Int     @default(0)
+  monthlyLimit    Int     @default(0) // 0 means no monthly limit
+  carryForward    Boolean @default(false)
+  maxCarryForward Int     @default(0)
+  encashable      Boolean @default(false)
+  encashmentRate  Float? // Per day rate
+
+  // Probation Rules
+  applicableDuringProbation Boolean @default(false)
+  probationLimit            Int     @default(0)
+
+  // Applicability
+  applicableTo EmployeeType[] // [TEACHING, NON_TEACHING]
+
+  // Description
+  description String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([schoolId, academicYearId, leaveType])
+  @@index([schoolId])
+  @@index([academicYearId])
+}
+
+// Payroll Audit Log
+model PayrollAuditLog {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @db.Uuid
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  action     PayrollAuditAction
+  entityType PayrollEntityType
+  entityId   String             @db.Uuid
+
+  performedBy   String @db.Uuid
+  performerName String
+
+  // Change Details
+  previousData Json?
+  newData      Json?
+  description  String?
+
+  // Context
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([schoolId])
+  @@index([entityType, entityId])
+  @@index([performedBy])
+  @@index([createdAt])
+}
+
+enum PayrollAuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  PROCESS
+  APPROVE
+  REJECT
+  PAY
+  GENERATE_PAYSLIP
+  SEND_PAYSLIP
+}
+
+enum PayrollEntityType {
+  PAYROLL_CONFIG
+  SALARY_STRUCTURE
+  EMPLOYEE_PROFILE
+  PAYROLL_PERIOD
+  PAYROLL_ITEM
+  PAYSLIP
+  LOAN
+  DEDUCTION
+  LEAVE_BUCKET
 }

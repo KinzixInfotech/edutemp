@@ -106,9 +106,10 @@ export default function PdfExportSettings() {
         queryKey: ['pdf-settings', schoolId],
         queryFn: async () => {
             if (!schoolId) throw new Error('No school ID');
-            const res = await fetch(`/api/documents/${schoolId}/pdf-settings`);
+            const res = await fetch(`/api/schools/${schoolId}/settings/documents`);
             if (!res.ok) throw new Error('Failed to fetch');
-            return res.json();
+            const data = await res.json();
+            return data.pdfSettings || {};
         },
         enabled: !!schoolId,
     });
@@ -116,10 +117,10 @@ export default function PdfExportSettings() {
     const saveMutation = useMutation({
         mutationFn: async (data) => {
             if (!schoolId) throw new Error('No school ID');
-            const res = await fetch(`/api/documents/${schoolId}/pdf-settings`, {
-                method: 'POST',
+            const res = await fetch(`/api/schools/${schoolId}/settings/documents`, {
+                method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
+                body: JSON.stringify({ pdfSettings: data }),
             });
             if (!res.ok) throw new Error('Failed to save');
             return res.json();
@@ -240,7 +241,7 @@ export default function PdfExportSettings() {
     const onError = (errors) => {
         console.error('❌ Form validation errors:', errors);
         console.error('Error keys:', Object.keys(errors));
-        
+
         // Show each error as a toast
         Object.entries(errors).forEach(([field, error]) => {
             toast.error(`${field}: ${error.message}`);
@@ -252,7 +253,7 @@ export default function PdfExportSettings() {
         console.log('Current form values:', watched);
         console.log('Form state errors:', errors);
         console.log('Error keys:', Object.keys(errors));
-        
+
         // Try to submit
         const result = await handleSubmit(onSubmit, onError)();
         console.log('Submit result:', result);
@@ -495,10 +496,10 @@ export default function PdfExportSettings() {
                                 {watched.passwordProtect && (
                                     <div className="flex flex-col gap-2.5">
                                         <Label className="text-sm sm:text-base">Password (min 6 characters)</Label>
-                                        <Input 
-                                            type="password" 
-                                            {...register('password')} 
-                                            className="text-sm" 
+                                        <Input
+                                            type="password"
+                                            {...register('password')}
+                                            className="text-sm"
                                         />
                                         {errors.password && (
                                             <p className="text-xs text-red-500 mt-1">

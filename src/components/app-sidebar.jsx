@@ -56,6 +56,9 @@ import {
     School,
     TrendingUp,
     Globe,
+    Wallet,
+    Receipt,
+    HandCoins,
 } from "lucide-react"
 import { useCommandMenu } from "./CommandMenuContext"
 import { cn } from "@/lib/utils"
@@ -208,7 +211,7 @@ export const SidebarData = [
                 ],
             },
             {
-                label: "Generate Certificates",
+                label: "Certificates",
                 icon: FileBadge,
                 roles: ["ADMIN", "TEACHER"],
                 submenu: [
@@ -240,6 +243,16 @@ export const SidebarData = [
                     {
                         label: "Custom Certificate",
                         url: "/dashboard/documents/generate/custom",
+                        roles: ["ADMIN"],
+                    },
+                    {
+                        label: "Bulk Generation",
+                        url: "/dashboard/documents/certificates/bulk",
+                        roles: ["ADMIN"],
+                    },
+                    {
+                        label: "History / Downloads",
+                        url: "/dashboard/documents/certificates/history",
                         roles: ["ADMIN"],
                     },
                 ],
@@ -277,11 +290,7 @@ export const SidebarData = [
                         url: "/dashboard/documents/idcards/generate",
                         roles: ["ADMIN"],
                     },
-                    {
-                        label: "Design / Customize Layout",
-                        url: "/dashboard/documents/idcards/design",
-                        roles: ["ADMIN"],
-                    },
+
                     {
                         label: "Reissue / Expire Old IDs",
                         url: "/dashboard/documents/idcards/manage",
@@ -299,16 +308,7 @@ export const SidebarData = [
                         url: "/dashboard/documents/settings/stamp-settings",
                         roles: ["ADMIN"],
                     },
-                    {
-                        label: "QR / Verification Settings",
-                        url: "/dashboard/documents/settings/qr-settings",
-                        roles: ["ADMIN"],
-                    },
-                    {
-                        label: "PDF Output Settings",
-                        url: "/dashboard/documents/settings/pdf-export-settings",
-                        roles: ["ADMIN"],
-                    },
+
                 ],
             },
         ],
@@ -412,6 +412,9 @@ export const SidebarData = [
                         label: "Leave Management", url: "/dashboard/attendance/leave-management/", roles: ["ADMIN"]
                     },
                     {
+                        label: "Leave Buckets", url: "/dashboard/attendance/leave-buckets/", roles: ["ADMIN"]
+                    },
+                    {
                         label: "Attendance Regularization", url: "/dashboard/attendance/regularization/", roles: ["ADMIN"]
                     },
                     {
@@ -458,6 +461,26 @@ export const SidebarData = [
                 icon: Settings,
                 url: "/dashboard/fees/settings",
                 roles: ["ADMIN"],
+            },
+        ],
+    },
+    {
+        title: "Payroll Management",
+        items: [
+            {
+                label: "Payroll",
+                icon: Wallet,
+                roles: ["ADMIN"],
+                submenu: [
+                    { label: "Overview", url: "/dashboard/payroll/overview", roles: ["ADMIN"] },
+                    { label: "Employees", url: "/dashboard/payroll/employees", roles: ["ADMIN"] },
+                    { label: "Salary Structures", url: "/dashboard/payroll/salary-structures", roles: ["ADMIN"] },
+                    { label: "Run Payroll", url: "/dashboard/payroll/process", roles: ["ADMIN"] },
+                    { label: "Payslips", url: "/dashboard/payroll/payslips", roles: ["ADMIN"] },
+                    { label: "Loans & Advances", url: "/dashboard/payroll/loans", roles: ["ADMIN"] },
+                    { label: "Reports", url: "/dashboard/payroll/reports", roles: ["ADMIN"] },
+                    { label: "Settings", url: "/dashboard/payroll/settings", roles: ["ADMIN"] },
+                ],
             },
         ],
     },

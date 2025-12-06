@@ -176,36 +176,10 @@ export default function Dashboard() {
   const [date, setDate] = useState(new Date());
   const { fullUser, loading } = useAuth();
 
-  // Widget State
-  const [activeWidgets, setActiveWidgets] = useState(DEFAULT_WIDGETS);
-  const [isWidgetDialogOpen, setIsWidgetDialogOpen] = useState(false);
+  // Widget State - Removed as per fixed layout requirement
+  // const [activeWidgets, setActiveWidgets] = useState(DEFAULT_WIDGETS);
+  // const [isWidgetDialogOpen, setIsWidgetDialogOpen] = useState(false);
 
-  // Load saved widgets from local storage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('adminDashboardWidgets');
-    if (saved) {
-      try {
-        setActiveWidgets(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to parse saved widgets", e);
-      }
-    }
-  }, []);
-
-  // Save widgets to local storage whenever they change
-  useEffect(() => {
-    localStorage.setItem('adminDashboardWidgets', JSON.stringify(activeWidgets));
-  }, [activeWidgets]);
-
-  const toggleWidget = (widgetId) => {
-    setActiveWidgets(prev => {
-      if (prev.includes(widgetId)) {
-        return prev.filter(id => id !== widgetId);
-      } else {
-        return [...prev, widgetId];
-      }
-    });
-  };
 
   // Super Admin Queries
   const schoolTrendQuery = useQuery({
@@ -342,42 +316,7 @@ export default function Dashboard() {
 
             <div className='px-4 flex items-center justify-between'>
               <h2 className="text-xl font-semibold tracking-tight">Dashboard Overview</h2>
-              <Dialog open={isWidgetDialogOpen} onOpenChange={setIsWidgetDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <LayoutDashboard className="h-4 w-4" />
-                    Customize Widgets
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Customize Dashboard</DialogTitle>
-                    <DialogDescription>
-                      Select the widgets you want to display on your dashboard.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    {Object.values(WIDGETS).map((widget) => (
-                      <div key={widget.id} className="flex items-start space-x-3 space-y-0 rounded-md border p-4">
-                        <Checkbox
-                          id={widget.id}
-                          checked={activeWidgets.includes(widget.id)}
-                          onCheckedChange={() => toggleWidget(widget.id)}
-                        />
-                        <div className="space-y-1 leading-none">
-                          <Label htmlFor={widget.id} className="font-medium flex items-center gap-2">
-                            <widget.icon className="h-4 w-4 text-muted-foreground" />
-                            {widget.title}
-                          </Label>
-                          <p className="text-sm text-muted-foreground">
-                            {widget.description}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </DialogContent>
-              </Dialog>
+              {/* Customization option removed as per request */}
             </div>
 
             {/* Daily Stats Cards */}
@@ -388,9 +327,9 @@ export default function Dashboard() {
               />
             </div>
 
-            {/* Dynamic Widgets Grid */}
-            <div className="px-4 grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              {activeWidgets.map(widgetId => {
+            {/* Fixed Widgets Grid */}
+            <div className="px-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+              {['CALENDAR', 'QUICK_ACTIONS', 'ATTENDANCE', 'FEE_STATS', 'RECENT_PAYMENTS', 'NOTICE_BOARD'].map(widgetId => {
                 const widgetConfig = WIDGETS[widgetId];
                 if (!widgetConfig) return null;
                 const WidgetComponent = widgetConfig.component;
@@ -398,7 +337,7 @@ export default function Dashboard() {
                   <div key={widgetId} className={widgetConfig.defaultSize}>
                     <WidgetComponent
                       fullUser={fullUser}
-                      onRemove={() => toggleWidget(widgetId)}
+                    // onRemove prop removed as widgets are now fixed
                     />
                   </div>
                 );

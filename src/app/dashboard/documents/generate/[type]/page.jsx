@@ -37,8 +37,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
+import { useUploadThing } from '@/lib/uploadthing';
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
-import html2canvas from 'html2canvas';
+import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
 
 // Certificate type configurations
@@ -110,6 +111,7 @@ export default function GenerateCertificatePage() {
 
     const certificateType = params?.type;
     const config = CERTIFICATE_CONFIGS[certificateType];
+    const { startUpload } = useUploadThing("certificatePdf");
 
     const {
         register,
@@ -239,24 +241,21 @@ export default function GenerateCertificatePage() {
         try {
             setGenerating(true);
 
-            // Use html-to-image with font options (matching admit card generation)
+            // Use html-to-image with font options
             const dataUrl = await htmlToImage.toPng(element, {
                 quality: 1.0,
                 pixelRatio: 2,
-                skipFonts: true, // Skip font parsing to avoid errors
-                preferCanvas: true, // Prefer canvas rendering for better compatibility
-                backgroundColor: '#ffffff', // Ensure white background for the image
+                skipFonts: true,
+                preferCanvas: true,
+                backgroundColor: '#ffffff',
             });
 
-            // Create image to get dimensions
+            // Create PDF
             const img = new Image();
             img.src = dataUrl;
+            await new Promise((resolve) => img.onload = resolve);
 
-            await new Promise((resolve) => {
-                img.onload = resolve;
-            });
-
-            const imgWidth = img.width / 2; // Adjust for pixelRatio 2
+            const imgWidth = img.width / 2;
             const imgHeight = img.height / 2;
             const orientation = imgWidth > imgHeight ? 'l' : 'p';
 
@@ -267,13 +266,43 @@ export default function GenerateCertificatePage() {
             });
 
             pdf.addImage(dataUrl, 'PNG', 0, 0, imgWidth, imgHeight);
-            pdf.save(`${config.title}_${watchedValues.studentId || 'certificate'}.pdf`);
 
+            // Generate Filename
+            const filename = `${config.title}_${watchedValues.studentId || 'certificate'}.pdf`;
+            pdf.save(filename); // Client Download
+
+            // Upload and Save to History
             const pdfBlob = pdf.output('blob');
+            // Fix: Filename for upload needs to be proper
+            const uploadFile = new File([pdfBlob], filename, { type: "application/pdf" });
+
+            toast.message('Saving to history...');
+            const uploadRes = await startUpload([uploadFile]);
+
+            if (uploadRes && uploadRes[0]) {
+                await fetch(`/api/documents/${schoolId}/certificates/history`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        templateId: watchedValues.templateId,
+                        students: [{
+                            studentId: watchedValues.studentId,
+                            customFields: {
+                                layoutConfig: previewConfig, // Store snapshot
+                                ...watchedValues // Store form values (issueDate, etc.)
+                            },
+                            fileUrl: uploadRes[0].url
+                        }]
+                    })
+                });
+                toast.success('Certificate saved to history');
+            } else {
+                toast.warning('Downloaded but failed to save to history');
+            }
+
             const pdfUrl = URL.createObjectURL(pdfBlob);
             setPreviewUrl(pdfUrl);
 
-            toast.success('Certificate generated and downloaded!');
         } catch (error) {
             console.error('Generation error:', error);
             toast.error('Failed to generate PDF: ' + error.message);
@@ -291,15 +320,23 @@ export default function GenerateCertificatePage() {
     }
 
     return (
-        <div className="h-screen flex flex-col bg-background overflow-hidden">
+        <div className="absolute inset-0 flex flex-col bg-background z-10">
             {/* Header Toolbar */}
             <div className="h-14 border-b bg-background flex items-center justify-between px-4 flex-shrink-0">
                 <div className="flex items-center gap-3">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => router.push('/dashboard/documents')}
+                    >
+                        <ArrowLeft className="h-4 w-4 mr-2" />
+                        Back
+                    </Button>
+                    <div className="h-6 w-px bg-border" />
                     <div className="flex items-center gap-2">
                         <Award className="w-5 h-5 text-primary" />
                         <h1 className="font-semibold text-lg">{config.title}</h1>
                     </div>
-                    <div className="h-6 w-px bg-border mx-2" />
                     <p className="text-xs text-muted-foreground hidden sm:block">
                         {config.description}
                     </p>

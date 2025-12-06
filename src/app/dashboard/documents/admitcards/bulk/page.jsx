@@ -43,6 +43,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
+import { useUploadThing } from '@/lib/uploadthing';
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
 
 const formSchema = z.object({
@@ -97,6 +98,7 @@ export default function BulkGenerateAdmitCardsPage() {
     });
 
     const watchedValues = watch();
+    // const { startUpload } = useUploadThing("bulkAdmitCardZip"); // Removed for server-side upload
 
     // Fetch classes
     const { data: classes, isLoading: loadingClasses } = useQuery({
@@ -339,6 +341,7 @@ export default function BulkGenerateAdmitCardsPage() {
 
     const generateAdmitCards = async (data) => {
         const failures = [];
+        const generatedStudents = []; // Track successes
         setFailedStudents([]);
         setShowReport(false);
 
@@ -511,6 +514,15 @@ export default function BulkGenerateAdmitCardsPage() {
                         const pdfBlob = pdf.output('blob');
 
                         folder.file(`${student.rollNumber || 'student'}-${student.name}.pdf`, pdfBlob);
+
+                        // Collect successful generation data
+                        generatedStudents.push({
+                            studentId: student.id,
+                            seatNumber: seatNo,
+                            center: data.center || '',
+                            layoutConfig: studentConfig,
+                            // We don't have individual fileUrl since we only upload ZIP for bulk
+                        });
                     }
                 } catch (err) {
                     console.error(`Failed to generate admit card for student ${students[i].name}:`, err);
@@ -527,14 +539,60 @@ export default function BulkGenerateAdmitCardsPage() {
 
             setStatusMessage('Compressing files...');
             const content = await zip.generateAsync({ type: 'blob' });
+
+            // Trigger download immediately for user
             saveAs(content, `AdmitCards-${exam.title}.zip`);
+
+            // Upload ZIP if we have any successes via Server-Side Upload
+            let uploadedZipUrl = null;
+            if (generatedStudents.length > 0) {
+                try {
+                    setStatusMessage('Preparing upload...');
+                    const zipFile = new File([content], `AdmitCards-${exam.title}-${Date.now()}.zip`, { type: "application/zip" });
+
+                    const formData = new FormData();
+                    formData.append('file', zipFile);
+
+                    const payload = {
+                        examId: data.examId,
+                        zipUrl: null, // Set by server
+                        students: generatedStudents
+                    };
+                    formData.append('data', JSON.stringify(payload));
+
+                    setStatusMessage('Uploading to server (this may take a while)...');
+                    // We can't easily track upload progress with fetch without XHR, but detailed messages help
+
+                    const histRes = await fetch(`/api/documents/${schoolId}/admitcards/history`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!histRes.ok) {
+                        const errData = await histRes.json();
+                        throw new Error(errData.message || 'Failed to save to history');
+                    }
+
+                    setStatusMessage('Finalizing records...');
+                    toast.success('Saved to history successfully');
+
+                } catch (uploadErr) {
+                    console.error('Failed to upload/save history:', uploadErr);
+                    toast.error('Failed to save to history (ZIP downloaded locally)');
+                }
+            }
 
             if (failures.length > 0) {
                 setFailedStudents(failures);
                 setShowReport(true);
                 toast.warning(`Generated with ${failures.length} errors.`);
             } else {
-                toast.success('All admit cards generated successfully!');
+                toast.success('All admit cards generated successfully!', {
+                    action: {
+                        label: 'View History',
+                        onClick: () => router.push('/dashboard/documents/admitcards/history')
+                    }
+                });
             }
 
         } catch (error) {

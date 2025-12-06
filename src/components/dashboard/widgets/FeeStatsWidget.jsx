@@ -41,12 +41,24 @@ export default function FeeStatsWidget({ fullUser, onRemove }) {
     if (isLoading) {
         return (
             <WidgetContainer title="Fee Collection" onRemove={onRemove}>
-                <div className="space-y-4">
-                    <Skeleton className="h-20 w-full rounded-lg" />
-                    <Skeleton className="h-4 w-full" />
+                <div className="space-y-6">
+                    <div className="flex justify-between items-end">
+                        <div className="space-y-2">
+                            <Skeleton className="h-4 w-24" />
+                            <Skeleton className="h-8 w-32" />
+                        </div>
+                        <Skeleton className="h-6 w-16 rounded-full" />
+                    </div>
+                    <div className="space-y-2">
+                        <div className="flex justify-between">
+                            <Skeleton className="h-3 w-16" />
+                            <Skeleton className="h-3 w-24" />
+                        </div>
+                        <Skeleton className="h-2 w-full" />
+                    </div>
                     <div className="grid grid-cols-2 gap-4">
-                        <Skeleton className="h-16 w-full rounded-lg" />
-                        <Skeleton className="h-16 w-full rounded-lg" />
+                        <Skeleton className="h-24 w-full rounded-lg" />
+                        <Skeleton className="h-24 w-full rounded-lg" />
                     </div>
                 </div>
             </WidgetContainer>
@@ -58,45 +70,45 @@ export default function FeeStatsWidget({ fullUser, onRemove }) {
 
     return (
         <WidgetContainer title="Fee Collection" onRemove={onRemove} className="h-full">
-            <div className="space-y-6 h-full flex flex-col justify-between">
-                {/* Main Stat */}
-                <div className="flex items-end justify-between">
-                    <div>
-                        <p className="text-sm text-muted-foreground font-medium mb-1">Total Collected</p>
-                        <div className="flex items-center gap-1">
-                            <IndianRupee className="h-6 w-6 text-primary" />
-                            <span className="text-3xl font-bold tracking-tight">
-                                {stats.totalCollected.toLocaleString('en-IN')}
-                            </span>
-                        </div>
-                    </div>
-                    <div className={`flex items-center gap-1 text-sm font-medium px-2 py-1 rounded-full ${percentage >= 50 ? 'bg-green-500/10 text-green-600' : 'bg-yellow-500/10 text-yellow-600'
-                        }`}>
-                        {percentage >= 50 ? <TrendingUp className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
-                        {percentage}%
-                    </div>
-                </div>
+            <div className="flex flex-col h-full gap-4">
 
-                {/* Progress Bar */}
+                {/* Top: Progress and Target */}
                 <div className="space-y-2">
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Progress</span>
+                    <div className="flex justify-between items-center text-xs font-medium text-muted-foreground">
+                        <span>Collection Progress</span>
                         <span>Target: ₹{stats.totalExpected.toLocaleString('en-IN')}</span>
                     </div>
-                    <Progress value={percentage} className="h-2" />
+                    <Progress value={percentage} className="h-2.5 bg-muted" />
                 </div>
 
-                {/* Secondary Stats */}
-                <div className="grid grid-cols-2 gap-4 pt-2">
-                    <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
-                        <p className="text-xs text-muted-foreground font-medium">Outstanding</p>
-                        <p className="text-lg font-semibold text-destructive mt-1">
+                {/* Center: "Profit"/Revenue Highlight */}
+                <div className="flex-1 flex flex-col items-center justify-center p-2 rounded-xl bg-gradient-to-br from-green-50 to-emerald-50/50 border border-green-100 dark:from-green-900/10 dark:to-emerald-900/10 dark:border-green-800/20">
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-green-600/80 dark:text-green-400">Total Revenue</span>
+                        <div className={`flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${percentage >= 50 ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' : 'bg-yellow-100 text-yellow-700'}`}>
+                            {percentage >= 50 ? <TrendingUp className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
+                            {percentage}%
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <IndianRupee className="h-8 w-8 text-green-600 dark:text-green-400" />
+                        <span className="text-4xl font-extrabold tracking-tight text-green-600 dark:text-green-400">
+                            {stats.totalCollected.toLocaleString('en-IN')}
+                        </span>
+                    </div>
+                </div>
+
+                {/* Bottom: Secondary Stats */}
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 rounded-xl bg-muted/40 border border-border/50 flex flex-col items-center justify-center text-center">
+                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Outstanding</p>
+                        <p className="text-lg font-bold text-destructive mt-0.5">
                             ₹{stats.totalBalance.toLocaleString('en-IN')}
                         </p>
                     </div>
-                    <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
-                        <p className="text-xs text-muted-foreground font-medium">Discount Given</p>
-                        <p className="text-lg font-semibold text-blue-600 mt-1">
+                    <div className="p-3 rounded-xl bg-muted/40 border border-border/50 flex flex-col items-center justify-center text-center">
+                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Discount</p>
+                        <p className="text-lg font-bold text-blue-600 mt-0.5">
                             ₹{stats.totalDiscount?.toLocaleString('en-IN') || 0}
                         </p>
                     </div>

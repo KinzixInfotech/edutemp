@@ -96,9 +96,10 @@ export default function Page() {
     const { data: settings, isLoading } = useQuery({
         queryKey: ['qr-settings', schoolId],
         queryFn: async () => {
-            const res = await fetch(`/api/documents/${schoolId}/qr-settings`);
+            const res = await fetch(`/api/schools/${schoolId}/settings/documents`);
             if (!res.ok) throw new Error('Failed');
-            return res.json();
+            const data = await res.json();
+            return data.qrSettings || {};
         },
         enabled: !!schoolId,
     });
@@ -128,10 +129,10 @@ export default function Page() {
     // SAVE MUTATION
     const saveMutation = useMutation({
         mutationFn: async (data) => {
-            const res = await fetch(`/api/documents/${schoolId}/qr-settings`, {
-                method: 'POST',
+            const res = await fetch(`/api/schools/${schoolId}/settings/documents`, {
+                method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...data, userId }),
+                body: JSON.stringify({ qrSettings: { ...data, userId } }),
             });
             if (!res.ok) {
                 const error = await res.json().catch(() => ({ error: 'Unknown error' }));

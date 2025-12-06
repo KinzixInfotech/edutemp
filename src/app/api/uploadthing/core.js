@@ -135,4 +135,32 @@ export const ourFileRouter = {
                 throw error; // Re-throw to let UploadThing handle it
             }
         }),
+
+    bulkAdmitCardZip: f({ blob: { maxFileSize: "32MB" } })
+        .input(z.object({ schoolId: z.string() }))
+        .onUploadComplete(({ metadata, file }) => {
+            console.log("Bulk Admit Card ZIP uploaded for school:", metadata.schoolId)
+            console.log("File URL:", file.ufsUrl)
+            return { url: file.ufsUrl }
+        }),
+
+    admitCardPdf: f({ pdf: { maxFileSize: "16MB" } })
+        .input(z.object({ schoolId: z.string() }))
+        .onUploadComplete(({ metadata, file }) => {
+            console.log("Admit Card PDF uploaded for school:", metadata.schoolId)
+            console.log("File URL:", file.ufsUrl)
+            return { url: file.ufsUrl }
+        }),
+    certificatePdf: f({ pdf: { maxFileSize: "10MB" } })
+        .input(z.object({ schoolId: z.string() }))
+        .onUploadComplete(({ metadata, file }) => {
+            console.log("Certificate PDF uploaded for school:", metadata.schoolId)
+            return { url: file.ufsUrl }
+        }),
+    bulkCertificateZip: f({ blob: { maxFileSize: "64MB" } })
+        .input(z.object({ schoolId: z.string() }))
+        .onUploadComplete(({ metadata, file }) => {
+            console.log("Bulk Certificate ZIP uploaded for school:", metadata.schoolId)
+            return { url: file.ufsUrl }
+        }),
 }

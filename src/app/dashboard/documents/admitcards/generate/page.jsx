@@ -33,6 +33,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
+import { useUploadThing } from '@/lib/uploadthing';
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
 import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
@@ -80,6 +81,7 @@ export default function GenerateAdmitCardPage() {
     });
 
     const watchedValues = watch();
+    // const { startUpload } = useUploadThing("admitCardPdf"); // Removed for server-side upload
 
     // Get specific values for dependencies
     const studentId = watchedValues.studentId;
@@ -325,13 +327,52 @@ export default function GenerateAdmitCardPage() {
             });
 
             pdf.addImage(dataUrl, 'PNG', 0, 0, imgWidth, imgHeight);
-            pdf.save(`AdmitCard_${seatNumber || 'preview'}.pdf`);
 
+            // Save locally
+            pdf.save(`AdmitCard_${seatNumber || 'preview'}.pdf`);
             const pdfBlob = pdf.output('blob');
             const pdfUrl = URL.createObjectURL(pdfBlob);
             setPreviewUrl(pdfUrl);
 
-            toast.success('Admit card generated and downloaded!');
+            // Upload and Save to History via Server-Side Upload
+            const pdfFile = new File([pdfBlob], `AdmitCard-${studentId}-${seatNumber || 'single'}.pdf`, { type: "application/pdf" });
+
+            toast.message('Generating and Saving...');
+
+            const formData = new FormData();
+            formData.append('file', pdfFile);
+
+            const payload = {
+                examId: examId || undefined,
+                zipUrl: null,
+                students: [{
+                    studentId,
+                    seatNumber: seatNumber || '',
+                    center: center || '',
+                    layoutConfig: previewConfig,
+                    // fileUrl will be set by server
+                }]
+            };
+            formData.append('data', JSON.stringify(payload));
+
+            const res = await fetch(`/api/documents/${schoolId}/admitcards/history`, {
+                method: 'POST',
+                // Content-Type header is explicitly NOT set so browser sets multipart/form-data with boundary
+                body: formData
+            });
+
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.message || 'Failed to save to history');
+            }
+
+            toast.success('Admit card saved to history', {
+                action: {
+                    label: 'View History',
+                    onClick: () => router.push('/dashboard/documents/admitcards/history')
+                }
+            });
+
         } catch (error) {
             console.error('PDF generation error:', error);
             toast.error('Failed to generate PDF: ' + error.message);
