@@ -297,15 +297,20 @@ async function getAuthenticatedUser(req) {
 //         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
 //     }
 // }
+// ------------------ GET: Get full user data by userId ------------------
 export async function GET(req) {
     try {
+        console.log("🔍 [API] GET /api/auth/user hit");
         const sessionUser = await getAuthenticatedUser(req);
         if (!sessionUser) {
+            console.log("❌ [API] Unlimited access failed: No session user");
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         const { searchParams } = new URL(req.url);
         const userId = searchParams.get("userId");
+        console.log(`🔍 [API] Fetching data for userId: ${userId} | Requested by: ${sessionUser.id}`);
+
         if (!userId) {
             return NextResponse.json({ error: "Missing userId" }, { status: 400 });
         }
@@ -317,6 +322,7 @@ export async function GET(req) {
                 include: { role: true },
             });
             if (currentUser.role.name !== "SUPER_ADMIN") {
+                console.log("❌ [API] Forbidden: Non-superadmin trying to fetch another user");
                 return NextResponse.json({ error: "Forbidden" }, { status: 403 });
             }
         }
@@ -324,14 +330,18 @@ export async function GET(req) {
         const start = performance.now();
 
         // Base user info
+        console.log("🔍 [API] Fetching base user info from Prisma...");
         const user = await prisma.user.findUnique({
             where: { id: userId },
             include: { role: true }, // fetch role relation
         });
 
         if (!user) {
+            console.log("❌ [API] User not found in database");
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
+
+        console.log(`✅ [API] User found: ${user.email} | Role: ${user.role?.name}`);
 
         // Base response
         let response = {
@@ -344,29 +354,33 @@ export async function GET(req) {
         };
 
         // Role-specific fetch
+        console.log(`🔍 [API] Fetching specific details for role: ${user.role.name}`);
         switch (user.role.name) {
             case "ADMIN": {
                 const admin = await prisma.admin.findUnique({
                     where: { userId },
                     include: { school: true }, // fetch related school
                 });
+                console.log("✅ [API] Admin details fetched:", admin ? "Found" : "Not Found");
                 response.schoolId = admin?.schoolId;
                 response.school = admin?.school;
                 break;
             }
             case "TEACHING_STAFF": {
-                const teacher = await prisma.TeachingStaff.findUnique({
+                const teacher = await prisma.teachingStaff.findUnique({
                     where: { userId },
                     select: { schoolId: true },
                 });
+                console.log("✅ [API] Teaching Staff details fetched:", teacher ? "Found" : "Not Found");
                 response.schoolId = teacher?.schoolId;
                 break;
             }
             case "NON_TEACHING_STAFF": {
-                const staff = await prisma.staff.findUnique({
+                const staff = await prisma.nonTeachingStaff.findUnique({
                     where: { userId },
                     select: { schoolId: true },
                 });
+                console.log("✅ [API] Non-Teaching Staff details fetched:", staff ? "Found" : "Not Found");
                 response.schoolId = staff?.schoolId;
                 break;
             }
@@ -375,6 +389,7 @@ export async function GET(req) {
                     where: { userId },
                     include: { class: true, section: true },
                 });
+                console.log("✅ [API] Student details fetched:", student ? "Found" : "Not Found");
                 response.schoolId = student?.schoolId;
                 response.studentData = student;
                 response.class = student?.class;
@@ -386,6 +401,7 @@ export async function GET(req) {
                     where: { userId },
                     include: { user: true, school: true, studentLinks: true },
                 });
+                console.log("✅ [API] Parent details fetched:", parent ? "Found" : "Not Found");
                 if (!parent) {
                     return NextResponse.json({ error: "Parent not found" }, { status: 404 });
                 }
@@ -399,18 +415,21 @@ export async function GET(req) {
                     where: { userId },
                     include: { user: true },
                 });
+                console.log("✅ [API] Partner details fetched:", partner ? "Found" : "Not Found");
                 response.partner = partner;
                 break;
             }
+            default:
+                console.log("⚠️ [API] Unhandled role:", user.role.name);
         }
 
         const end = performance.now();
-        console.log(`🕒 User query took ${end - start}ms`);
+        console.log(`🕒 [API] Request completed in ${end - start}ms`);
 
         return NextResponse.json(response);
     } catch (err) {
-        console.error("❌ Error in GET /api/auth/user:", err);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+        console.error("❌ [API] Critical Error in GET /api/auth/user:", err);
+        return NextResponse.json({ error: "Internal Server Error", details: err.message }, { status: 500 });
     }
 }
 // ------------------ PUT: Update user profile ------------------
@@ -449,7 +468,7 @@ export async function PUT(req) {
                 });
                 break;
             case "TEACHING_STAFF":
-                updatedUser = await prisma.teacher.update({
+                updatedUser = await prisma.teachingStaff.update({
                     where: { userId: id },
                     data: updates,
                 });
