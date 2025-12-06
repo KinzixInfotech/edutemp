@@ -2,7 +2,11 @@
 
 import { Loader2, RefreshCw } from 'lucide-react';
 
-export function SessionSwitchLoader({ isActive = false }) {
+export function SessionSwitchLoader({
+    isActive = false,
+    title = "Switching Session",
+    message = "Please wait while we load data for the new academic session..."
+}) {
     if (!isActive) return null;
 
     return (
@@ -18,9 +22,9 @@ export function SessionSwitchLoader({ isActive = false }) {
 
                 {/* Text */}
                 <div className="text-center space-y-2">
-                    <h2 className="text-2xl font-semibold tracking-tight">Switching Session</h2>
+                    <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
                     <p className="text-sm text-muted-foreground max-w-sm">
-                        Please wait while we load data for the new academic session...
+                        {message}
                     </p>
                 </div>
 

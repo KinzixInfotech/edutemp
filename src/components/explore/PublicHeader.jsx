@@ -78,7 +78,8 @@ export default function PublicHeader() {
     const navLinks = [
         { href: '/explore', label: 'Home' },
         { href: '/explore/schools', label: 'Schools' },
-        { href: '/explore/leaderboard', label: 'Leaderboard' },
+        { href: 'https://www.edubreezy.com/', label: 'ERP' },
+        { href: '/explore/about', label: 'About' },
     ];
 
     return (

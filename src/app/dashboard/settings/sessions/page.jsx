@@ -83,13 +83,13 @@ export default function SessionsPage() {
     });
 
     const StatsCard = ({ label, value, icon: Icon, color }) => (
-        <Card className="border-0 shadow-sm bg-muted/30">
+        <Card className="border  bg-white dark:bg-white dark:bg-muted ">
             <CardContent className="p-4 flex items-center justify-between">
                 <div className="flex flex-col gap-1">
                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</span>
                     <span className="text-2xl font-bold tracking-tight">{String(value).padStart(2, '0')}</span>
                 </div>
-                <div className={cn("p-2.5 rounded-xl bg-white dark:bg-zinc-900 shadow-sm", color)}>
+                <div className={cn("p-2.5 rounded-xl bg-white dark:bg-zinc-900 ", color)}>
                     <Icon className="w-5 h-5" />
                 </div>
             </CardContent>
@@ -117,7 +117,7 @@ export default function SessionsPage() {
                         size="icon"
                         onClick={() => queryClient.invalidateQueries(['sessions'])}
                         disabled={isRefetching}
-                        className={cn("hover:bg-muted", isRefetching && "animate-spin cursor-not-allowed")}
+                        className={cn("hover:bg-white dark:bg-muted", isRefetching && "animate-spin cursor-not-allowed")}
                     >
                         <RefreshCw className="h-4 w-4" />
                     </Button>
@@ -131,7 +131,7 @@ export default function SessionsPage() {
                             }
                         }}
                         disabled={sessions.length <= 1 || revokeAllMutation.isPending}
-                        className="shadow-sm"
+                        className=""
                     >
                         {revokeAllMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-4 w-4" />}
                         Sign Out Everywhere
@@ -167,7 +167,7 @@ export default function SessionsPage() {
                     <p className="text-sm font-medium animate-pulse">Scanning active sessions...</p>
                 </div>
             ) : sessions.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-24 text-muted-foreground border-2 border-dashed rounded-xl bg-muted/10">
+                <div className="flex flex-col items-center justify-center py-24 text-muted-foreground border-2 border-dashed rounded-xl bg-white dark:bg-muted/10">
                     <ShieldAlert className="h-12 w-12 mb-4 opacity-20" />
                     <p className="text-lg font-medium">No active sessions found</p>
                 </div>
@@ -178,15 +178,15 @@ export default function SessionsPage() {
                             key={session.id}
                             className={cn(
                                 "group overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-primary/20",
-                                session.isCurrent ? "border-green-500/50 shadow-md ring-1 ring-green-500/20 bg-green-50/10 dark:bg-green-900/10" : "bg-card"
+                                session.isCurrent ? "border-green-500/50  ring-1 ring-green-500/20 bg-green-50/10 dark:bg-green-900/10" : "bg-card"
                             )}
                         >
                             <div className={cn("h-1.5 w-full", session.isCurrent ? "bg-green-500" : "bg-zinc-100 dark:bg-zinc-800 group-hover:bg-primary/50 transition-colors")} />
                             <CardContent className="p-6">
                                 <div className="flex justify-between items-start mb-6">
                                     <div className={cn(
-                                        "p-3 rounded-2xl shadow-sm transition-transform group-hover:scale-105",
-                                        session.isCurrent ? "bg-green-100 dark:bg-green-900/30 text-green-600" : "bg-muted text-muted-foreground"
+                                        "p-3 rounded-2xl  transition-transform group-hover:scale-105",
+                                        session.isCurrent ? "bg-green-100 dark:bg-green-900/30 text-green-600" : "bg-white dark:bg-muted text-muted-foreground"
                                     )}>
                                         {getDeviceIcon(session.deviceType)}
                                     </div>
@@ -216,15 +216,15 @@ export default function SessionsPage() {
 
                                     <div className="space-y-3 pt-2 border-t">
                                         <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                                            <div className="p-1.5 bg-muted rounded-md"><MapPin className="w-3.5 h-3.5" /></div>
+                                            <div className="p-1.5 bg-white dark:bg-muted rounded-md"><MapPin className="w-3.5 h-3.5" /></div>
                                             <span className="font-medium text-foreground/80">{session.location || 'Unknown Location'}</span>
                                         </div>
                                         <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                                            <div className="p-1.5 bg-muted rounded-md"><ShieldAlert className="w-3.5 h-3.5" /></div>
-                                            <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{(session.ipAddress === '::1' || session.ipAddress === '127.0.0.1') ? '127.0.0.1 (Localhost)' : (session.ipAddress || 'Unknown IP')}</span>
+                                            <div className="p-1.5 bg-white dark:bg-muted rounded-md"><ShieldAlert className="w-3.5 h-3.5" /></div>
+                                            <span className="font-mono text-xs bg-white dark:bg-muted px-2 py-0.5 rounded">{(session.ipAddress === '::1' || session.ipAddress === '127.0.0.1') ? '127.0.0.1 (Localhost)' : (session.ipAddress || 'Unknown IP')}</span>
                                         </div>
                                         <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                                            <div className="p-1.5 bg-muted rounded-md"><Clock className="w-3.5 h-3.5" /></div>
+                                            <div className="p-1.5 bg-white dark:bg-muted rounded-md"><Clock className="w-3.5 h-3.5" /></div>
                                             <span>Active since {new Date(session.createdAt || session.lastActiveAt).toLocaleDateString()}</span>
                                         </div>
                                     </div>

@@ -20,6 +20,7 @@ export async function GET(req) {
         const maxFee = searchParams.get('maxFee') ? parseInt(searchParams.get('maxFee')) : undefined;
         const minRating = searchParams.get('minRating') ? parseFloat(searchParams.get('minRating')) : undefined;
         const location = searchParams.get('location') || '';
+        const featured = searchParams.get('featured') === 'true';
         const sort = searchParams.get('sort') || 'name'; // name, rating, fees
 
         // Generate cache key based on all parameters
@@ -31,6 +32,7 @@ export async function GET(req) {
             maxFee,
             minRating,
             location,
+            featured,
             sort
         });
 
@@ -38,7 +40,7 @@ export async function GET(req) {
         const result = await remember(cacheKey, async () => {
             // Build where clause
             const where = {
-                isPubliclyVisible: true,
+                // isPubliclyVisible: true, // Temporary: Allow hidden schools to show for development
                 ...(search && {
                     OR: [
                         { school: { name: { contains: search, mode: 'insensitive' } } },
@@ -52,6 +54,7 @@ export async function GET(req) {
                 ...(minFee && { minFee: { gte: minFee } }),
                 ...(maxFee && { maxFee: { lte: maxFee } }),
                 ...(minRating && { overallRating: { gte: minRating } }),
+                ...(featured && { isFeatured: true }),
             };
 
             // Build orderBy

@@ -9,7 +9,7 @@ export async function generateMetadata(props) {
     try {
         // Use absolute URL for server-side fetch
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-        const response = await fetch(`${baseUrl}/api/public/schools/${id}`, { next: { revalidate: 60 } });
+        const response = await fetch(`${baseUrl}/api/public/schools/${id}`, { next: { revalidate: 600 } });
 
         if (!response.ok) return { title: 'School Not Found' };
 
@@ -35,9 +35,59 @@ export async function generateMetadata(props) {
     }
 }
 
+// 10 minute ISR for the page itself
+export const revalidate = 600;
+
+async function getSchool(id) {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const res = await fetch(`${baseUrl}/api/public/schools/${id}`, { next: { revalidate: 600 } });
+    if (!res.ok) return null;
+    return res.json();
+}
+
 export default async function SchoolProfilePage(props) {
     const params = await props.params;
     const { id } = params;
 
-    return <SchoolProfileClient schoolId={id} />;
+    // Server-side fetch (deduped with generateMetadata if URLs match)
+    const school = await getSchool(id);
+
+    const isDev = process.env.NODE_ENV === 'development';
+    const baseUrl = isDev ? 'http://school.localhost:3000' : 'https://school.edubreezy.com';
+
+    // JSON-LD for School
+    const jsonLd = school ? {
+        '@context': 'https://schema.org',
+        '@type': 'School',
+        name: school.school?.name,
+        image: school.school?.profilePicture ? [school.school.profilePicture] : [],
+        description: school.description || `School profile for ${school.school?.name}`,
+        address: {
+            '@type': 'PostalAddress',
+            streetAddress: school.school?.location, // Assuming full address in location for now
+            addressCountry: 'IN'
+        },
+        telephone: school.school?.contactNumber,
+        url: `${baseUrl}/explore/schools/${id}`,
+        aggregateRating: school.overallRating > 0 ? {
+            '@type': 'AggregateRating',
+            ratingValue: school.overallRating.toFixed(1),
+            reviewCount: school._count?.ratings || 0,
+            bestRating: '5',
+            worstRating: '1'
+        } : undefined,
+        priceRange: school.minFee && school.maxFee ? `₹${school.minFee} - ₹${school.maxFee}` : undefined,
+    } : null;
+
+    return (
+        <>
+            {jsonLd && (
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+                />
+            )}
+            <SchoolProfileClient schoolId={id} initialData={school} />
+        </>
+    );
 }

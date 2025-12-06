@@ -16,6 +16,7 @@ import { ChevronDownIcon, School, SearchIcon } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
 import { useCommandMenu } from "./CommandMenuContext"
+import { SchoolDetailPopup } from "./school-detail-popup"
 export function SiteHeader({ fullUser }) {
     const { setOpen } = useCommandMenu()
     const [open, setOpenPopover] = useState(false)
@@ -31,23 +32,25 @@ export function SiteHeader({ fullUser }) {
         { url: "/dashboard/manage-students", name: "Manage All Students" },
         { url: "/dashboard/schools/create-classes", name: "All Classes & Sections " },
         { url: "/dashboard/calendar", name: "Manage Calendar" },
-
     ]
     // Find the longest matching URL (deepest route)
     const currentPage = pageTitles
         .filter((p) => pathname.startsWith(p.url))
         .sort((a, b) => b.url.length - a.url.length)[0]
     return (
-        <header className="flex sticky top-0 z-50 h-(--header-height) py-8 shrink-0 items-center gap-2 border-b bg-[#ffffffa3] dark:bg-[#09090b94] backdrop-blur-sm transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
+        <header className="flex sticky top-0 z-50 h-[var(--header-height)] shrink-0 items-center gap-2 border-b bg-[#ffffffa3] dark:bg-[#09090b94] backdrop-blur-sm transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-[var(--header-height)]">
             <div className="flex w-full items-center gap-2 px-4 lg:gap-3 lg:px-6 relative">
                 <SidebarTrigger className="-ml-1" />
                 <Separator
                     orientation="vertical"
                     className="mx-2 data-[orientation=vertical]:h-4"
                 />
-                <h1 className="text-base items-center justify-center text-sm border gap-1 md:inline-flex hidden font-medium capitalize bg-muted px-2 py-1 rounded-lg text-center w-fit max-w-[200px] overflow-hidden whitespace-nowrap truncate">
-                    <School size={16} />
-                    {fullUser?.school?.name || 'Dashboard'}</h1>
+                <SchoolDetailPopup school={fullUser?.school}>
+                    <div className="text-base font-bold  text-sm border gap-1 md:inline-flex hidden font-medium capitalize bg-muted px-2 py-1 rounded-lg text-center w-fit max-w-[200px] flex flex-col overflow-hidden whitespace-nowrap truncate cursor-pointer hover:bg-muted/80 transition-colors">
+                        <div className="flex items-center gap-1"> <School size={16} />
+                            {fullUser?.school?.name || 'Dashboard'}</div>
+                    </div>
+                </SchoolDetailPopup>
 
                 {/* Centered Search Bar - Desktop */}
                 <div className="absolute hidden md:block left-1/2 -translate-x-1/2 w-full max-w-md px-4">

@@ -125,6 +125,7 @@
     "rough-notation": "^0.5.1",
     "sonner": "^2.0.6",
     "superjson": "^2.2.2",
+    "svg-dotted-map": "^2.0.1",
     "tailwind-merge": "^3.3.1",
     "tls": "^0.0.1",
     "uploadthing": "^7.7.3",

@@ -994,7 +994,6 @@ export function Profile() {
               setUploading(false)
               setCropDialogOpen(false);
             }
-
           }}
         />
       )}

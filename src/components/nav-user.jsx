@@ -1,4 +1,5 @@
 "use client"
+import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import {
     IconCreditCard,
@@ -32,13 +33,18 @@ import {
     SidebarMenuItem,
     useSidebar,
 } from "@/components/ui/sidebar"
+import { SessionSwitchLoader } from './SessionSwitchLoader';
 
 export function NavUser({ }) {
     const { isMobile } = useSidebar()
     const router = useRouter();
     const { setOpen } = useSettingsDialog()
+
     const { fullUser, loading } = useAuth();
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
+
     const handleLogout = async () => {
+        setIsLoggingOut(true);
         toast("Logging Out");
 
         const user = await supabase.auth.getUser();
@@ -59,10 +65,12 @@ export function NavUser({ }) {
         if (error) {
             toast.error("Logout error:", error.message);
             console.error("Logout error:", error.message);
+            setIsLoggingOut(false);
         } else {
             localStorage.removeItem("user");
             toast.success("Logged Out Successfully");
             router.push('/login');
+            // We don't set setIsLoggingOut(false) here so the loader stays until redirect
         }
     };
     return (
@@ -135,7 +143,11 @@ export function NavUser({ }) {
                     </DropdownMenuContent>
                 </DropdownMenu>
             </SidebarMenuItem>
+            <SessionSwitchLoader
+                isActive={isLoggingOut}
+                title="Logging Out"
+                message="Please wait while we securely log you out..."
+            />
         </SidebarMenu>
-
     )
 }

@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
-export default function SchoolProfileClient({ schoolId }) {
+export default function SchoolProfileClient({ schoolId, initialData }) {
     const [reviewPage, setReviewPage] = useState(1);
 
     const { data: school, isLoading, isError } = useQuery({
@@ -27,6 +27,7 @@ export default function SchoolProfileClient({ schoolId }) {
             if (!response.ok) throw new Error('School not found');
             return response.json();
         },
+        initialData,
         staleTime: 10 * 60 * 1000,
     });
 
@@ -327,19 +328,47 @@ export default function SchoolProfileClient({ schoolId }) {
                             </Card>
 
                             {/* Fee Information */}
-                            {(school.minFee || school.maxFee) && (
+                            {((school.minFee || school.maxFee) || (school.detailedFeeStructure && school.detailedFeeStructure.length > 0)) && (
                                 <Card className="p-6">
-                                    <h3 className="font-semibold mb-4">Annual Fee Range</h3>
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <DollarSign className="h-5 w-5 text-primary" />
-                                        <span className="text-2xl font-bold">
-                                            ₹{school.minFee?.toLocaleString()} - ₹{school.maxFee?.toLocaleString()}
-                                        </span>
-                                    </div>
+                                    <h3 className="font-semibold mb-4">Fee Structure</h3>
+
+                                    {(school.minFee || school.maxFee) && (
+                                        <div className="flex items-center gap-2 mb-4 p-3 bg-primary/5 rounded-lg border border-primary/10">
+                                            <DollarSign className="h-5 w-5 text-primary" />
+                                            <div>
+                                                <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Annual Range</p>
+                                                <span className="text-xl font-bold text-primary">
+                                                    ₹{school.minFee?.toLocaleString()} - ₹{school.maxFee?.toLocaleString()}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {school.detailedFeeStructure && school.detailedFeeStructure.length > 0 && (
+                                        <div className="rounded-md border overflow-hidden mb-4">
+                                            <table className="w-full text-sm">
+                                                <thead className="bg-muted/50">
+                                                    <tr>
+                                                        <th className="p-2 text-left font-medium">Class</th>
+                                                        <th className="p-2 text-right font-medium">Annual Total</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y">
+                                                    {school.detailedFeeStructure.map((fee, idx) => (
+                                                        <tr key={idx} className="bg-white">
+                                                            <td className="p-2">{fee.className}</td>
+                                                            <td className="p-2 text-right font-medium">₹{fee.total?.toLocaleString()}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+
                                     {school.feeStructureUrl && (
                                         <a href={school.feeStructureUrl} target="_blank" rel="noopener noreferrer">
-                                            <Button variant="outline" size="sm" className="w-full mt-2">
-                                                View Fee Structure
+                                            <Button variant="outline" size="sm" className="w-full">
+                                                View Complete Fee PDF
                                             </Button>
                                         </a>
                                     )}

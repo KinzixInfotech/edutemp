@@ -16,9 +16,14 @@ import OnboardingDialog from "../OnboardDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/lib/supabase";
 import LoaderPage from "../loader-page";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from "@tanstack/react-query";
 import NetworkStatusDialog from "../NetworkIndicatordialog";
+import { DatabaseErrorDialog } from "../database-error-dialog";
 import Link from "next/link";
+import { DynamicBreadcrumb } from "../dynamic-breadcrumb";
+import { BreadcrumbHeader } from "../breadcrumb-header";
+import axios from "axios";
+import { toast } from "sonner";
 
 const TopProgressBar = dynamic(() => import("@/app/components/TopProgressBar"), {
     ssr: false,
@@ -27,8 +32,115 @@ const TopProgressBar = dynamic(() => import("@/app/components/TopProgressBar"), 
 export default function ClientLayout({ children }) {
     const { loadingMsg, fullUser } = useAuth();
 
+    const [isDbDown, setIsDbDown] = useState(false);
+
+    // Global Error Interceptor for Fetch and Axios
+    useEffect(() => {
+        // 1. Intercept Axios
+        const interceptor = axios.interceptors.response.use(
+            (response) => response,
+            (error) => {
+                // Only trigger DB Error Dialog for specific database connection issues
+                const errorMessage = error.response?.data?.error || error.response?.data?.message || '';
+                const isDatabaseError =
+                    errorMessage.toLowerCase().includes('database') ||
+                    errorMessage.toLowerCase().includes('prisma') ||
+                    errorMessage.toLowerCase().includes('connection') ||
+                    error.response?.status === 503; // Service Unavailable often means DB down
+
+                if (isDatabaseError) {
+                    setIsDbDown(true);
+                }
+                return Promise.reject(error);
+            }
+        );
+
+        // 2. Intercept Global Fetch
+        const originalFetch = window.fetch;
+        window.fetch = async (...args) => {
+            try {
+                const response = await originalFetch(...args);
+                // clone response to read text without consuming body for caller
+                const clone = response.clone();
+
+                if (response.status === 500 || response.status === 503) {
+                    try {
+                        const text = await clone.text();
+                        const isDatabaseError =
+                            text.toLowerCase().includes('database') ||
+                            text.toLowerCase().includes('prisma') ||
+                            text.toLowerCase().includes('connection') ||
+                            response.status === 503;
+
+                        if (isDatabaseError) {
+                            setIsDbDown(true);
+                        }
+                    } catch (e) {
+                        // ignore json parse error
+                    }
+                }
+                return response;
+            } catch (error) {
+                throw error;
+            }
+        };
+
+        return () => {
+            // Cleanup
+            axios.interceptors.response.eject(interceptor);
+            window.fetch = originalFetch;
+        };
+    }, []);
+
+    // Report outage effect
+    useEffect(() => {
+        if (isDbDown) {
+            // Fire and forget
+            fetch('/api/report-outage', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'DATABASE_DOWN',
+                    error: 'Client detected 500/503 error'
+                })
+            }).then(() => {
+                toast.error("System Outage Reported", {
+                    description: "Engineering team has been notified.",
+                    duration: 5000,
+                });
+            }).catch(console.error);
+        }
+    }, [isDbDown]);
+
     // Create a single QueryClient instance for the whole app
-    const [queryClient] = useState(() => new QueryClient());
+    const [queryClient] = useState(() => new QueryClient({
+        defaultOptions: {
+            queries: {
+                staleTime: 1000 * 60 * 5, // 5 minutes
+                refetchOnWindowFocus: false,
+                retry: 1,
+            },
+        },
+        queryCache: new QueryCache({
+            // Keep this as backup for well-behaved queries that throw
+            onError: (error) => {
+                const msg = error?.message?.toLowerCase() || '';
+                const isDatabaseError = msg.includes('database') || msg.includes('prisma') || msg.includes('connection');
+                if (isDatabaseError || error?.status === 503 || error?.statusCode === 503) {
+                    setIsDbDown(true);
+                }
+            }
+        }),
+        mutationCache: new MutationCache({
+            onError: (error) => {
+                const msg = error?.message?.toLowerCase() || '';
+                const isDatabaseError = msg.includes('database') || msg.includes('prisma') || msg.includes('connection');
+                if (isDatabaseError || error?.status === 503 || error?.statusCode === 503) {
+                    setIsDbDown(true);
+                }
+            }
+        })
+    }));
 
     const router = useRouter();
     const pathname = usePathname();
@@ -74,7 +186,7 @@ export default function ClientLayout({ children }) {
             <SidebarProvider
                 style={{
                     "--sidebar-width": "calc(var(--spacing) * 72)",
-                    "--header-height": "calc(var(--spacing) * 12)",
+                    "--header-height": "calc(var(--spacing) * 16)",
                 }}
             >
 
@@ -85,7 +197,10 @@ export default function ClientLayout({ children }) {
                 <SidebarInset className={'bg-[#f9fafb] dark:bg-black'}>
                     {!hideUI && <SiteHeader fullUser={fullUser} />}
 
-                    <main className="w-full h-full relative">
+                    {!hideUI && <BreadcrumbHeader />}
+
+                    <main className="w-full h-full relative ">
+                        {/* {!hideUI && <DynamicBreadcrumb />} */}
                         {loading ? (
                             <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-50">
                                 <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -106,6 +221,7 @@ export default function ClientLayout({ children }) {
                 </SidebarInset>
             </SidebarProvider>
             <NetworkStatusDialog />
+            <DatabaseErrorDialog open={isDbDown} />
         </QueryClientProvider>
 
     );

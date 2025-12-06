@@ -6,8 +6,9 @@ import SchoolCard from '@/components/explore/SchoolCard';
 import SchoolFilters from '@/components/explore/SchoolFilters';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { AlertCircle, ChevronLeft, ChevronRight, MapPin, GraduationCap } from 'lucide-react';
 
 export default function SchoolsPage() {
     const [filters, setFilters] = useState({
@@ -40,6 +41,23 @@ export default function SchoolsPage() {
         cacheTime: 10 * 60 * 1000, // 10 minutes
     });
 
+    const { data: featuredSchoolsData } = useQuery({
+        queryKey: ['featured-schools-listing', filters.location],
+        queryFn: async () => {
+            if (filters.location) {
+                const res = await fetch(`/api/public/schools?featured=true&location=${encodeURIComponent(filters.location)}&limit=4`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.schools.length > 0) return { ...data, source: 'local' };
+                }
+            }
+            const res = await fetch(`/api/public/schools?featured=true&limit=4`);
+            if (!res.ok) throw new Error('Failed to fetch featured schools');
+            return { ...(await res.json()), source: 'global' };
+        },
+        staleTime: 5 * 60 * 1000,
+    });
+
     const handleFilterChange = (newFilters) => {
         setFilters((prev) => ({
             ...prev,
@@ -63,6 +81,58 @@ export default function SchoolsPage() {
                         Discover and compare {data?.pagination?.total || ''} schools
                     </p>
                 </div>
+
+                {/* Featured Schools Section (New) */}
+                {featuredSchoolsData?.schools?.length > 0 && (
+                    <div className="mb-12">
+                        <div className="flex items-center gap-2 mb-6">
+                            <div className="h-6 w-1 bg-yellow-500 rounded-full" />
+                            <h2 className="text-2xl font-bold tracking-tight">Featured Schools</h2>
+                            {featuredSchoolsData.source === 'local' && filters.location && (
+                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-600 border border-yellow-500/20">
+                                    in {filters.location}
+                                </span>
+                            )}
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            {featuredSchoolsData.schools.map((profile) => (
+                                <Link key={profile.id} href={`/explore/schools/${profile.schoolId}`} className="group block h-full">
+                                    <div className="relative h-full rounded-xl overflow-hidden border border-border/50 bg-card hover:shadow-lg transition-all duration-300">
+                                        <div className="absolute top-3 right-3 z-10 px-2 py-1 rounded bg-yellow-400 text-black text-[10px] font-bold uppercase tracking-wider shadow-sm">
+                                            Featured
+                                        </div>
+                                        <div className="h-32 w-full bg-muted relative overflow-hidden">
+                                            {profile.coverImage ? (
+                                                <img src={profile.coverImage} alt={profile.school?.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                            ) : (
+                                                <div className="w-full h-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                                                    <GraduationCap className="w-8 h-8 text-muted-foreground/30" />
+                                                </div>
+                                            )}
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                                            <div className="absolute bottom-3 left-3 flex items-center gap-2">
+                                                <div className="w-8 h-8 rounded-md bg-white p-0.5 shadow-sm">
+                                                    <img src={profile.school?.profilePicture || '/placeholder-logo.png'} alt="Logo" className="w-full h-full object-cover rounded-sm" />
+                                                </div>
+                                                <div className="text-white">
+                                                    <h3 className="font-bold text-xs leading-tight drop-shadow-md line-clamp-1">{profile.school?.name}</h3>
+                                                    <p className="text-[10px] text-white/90 flex items-center gap-1">
+                                                        <MapPin className="w-2 h-2" /> {profile.school?.location?.split(',')[0]}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="p-3">
+                                            <p className="text-xs text-muted-foreground line-clamp-1">
+                                                {profile.tagline || "Excellence in education"}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </Link>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     {/* Filters Sidebar */}

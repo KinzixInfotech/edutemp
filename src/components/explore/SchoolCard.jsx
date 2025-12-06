@@ -79,16 +79,19 @@ export default function SchoolCard({ school }) {
                         </div>
                     </div>
 
+
                     {/* Rating */}
-                    <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
-                            <Star className="h-4 w-4 text-yellow-600 dark:text-yellow-400 fill-current" />
+                    {overallRating > 0 && (
+                        <div className="flex items-center gap-2">
+                            <div className="h-8 w-8 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
+                                <Star className="h-4 w-4 text-yellow-600 dark:text-yellow-400 fill-current" />
+                            </div>
+                            <div className="text-xs">
+                                <div className="text-muted-foreground">Rating</div>
+                                <div className="font-semibold">{overallRating.toFixed(1)}/10</div>
+                            </div>
                         </div>
-                        <div className="text-xs">
-                            <div className="text-muted-foreground">Rating</div>
-                            <div className="font-semibold">{overallRating.toFixed(1)}/10</div>
-                        </div>
-                    </div>
+                    )}
 
                     {/* Teacher Ratio */}
                     {studentTeacherRatio && (

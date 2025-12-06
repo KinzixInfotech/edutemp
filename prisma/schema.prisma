@@ -127,9 +127,10 @@ model SchoolPublicProfile {
   website     String?
 
   // Fees
-  minFee          Int?
-  maxFee          Int?
-  feeStructureUrl String?
+  minFee               Int?
+  maxFee               Int?
+  feeStructureUrl      String?
+  detailedFeeStructure Json?
 
   // Stats
   establishedYear     Int?

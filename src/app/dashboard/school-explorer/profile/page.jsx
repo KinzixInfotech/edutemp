@@ -295,8 +295,11 @@ export default function PublicProfileSettings() {
 
                 {/* Fees */}
                 <Card className="p-6">
-                    <h2 className="text-xl font-semibold mb-4">Fee Range</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                </Card>
+                {/* Fees */}
+                <Card className="p-6">
+                    <h2 className="text-xl font-semibold mb-4">Fee Structure</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                         <div>
                             <Label htmlFor="minFee">Minimum Fee (₹/year)</Label>
                             <Input
@@ -329,6 +332,108 @@ export default function PublicProfileSettings() {
                                 placeholder="https://yourschool.com/fees.pdf"
                                 className="mt-2"
                             />
+                        </div>
+                    </div>
+
+                    <Separator className="my-6" />
+
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-medium">Class-wise Fee Breakdown</h3>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    const currentFees = Array.isArray(formData.detailedFeeStructure) ? formData.detailedFeeStructure : [];
+                                    handleChange('detailedFeeStructure', [...currentFees, { className: '', admissionFee: 0, tuitionFee: 0, total: 0 }]);
+                                }}
+                            >
+                                + Add Class
+                            </Button>
+                        </div>
+
+                        <div className="border rounded-md overflow-hidden">
+                            <table className="w-full text-sm">
+                                <thead className="bg-muted">
+                                    <tr>
+                                        <th className="p-2 text-left">Class</th>
+                                        <th className="p-2 text-left">Admission Fee</th>
+                                        <th className="p-2 text-left">Tuition Fee (Annual)</th>
+                                        <th className="p-2 text-left">Total</th>
+                                        <th className="p-2 w-10"></th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {Array.isArray(formData.detailedFeeStructure) && formData.detailedFeeStructure.length > 0 ? (
+                                        formData.detailedFeeStructure.map((fee, index) => (
+                                            <tr key={index}>
+                                                <td className="p-2">
+                                                    <Input
+                                                        value={fee.className}
+                                                        onChange={(e) => {
+                                                            const newFees = [...formData.detailedFeeStructure];
+                                                            newFees[index].className = e.target.value;
+                                                            handleChange('detailedFeeStructure', newFees);
+                                                        }}
+                                                        placeholder="e.g. Class 1"
+                                                        className="h-8"
+                                                    />
+                                                </td>
+                                                <td className="p-2">
+                                                    <Input
+                                                        type="number"
+                                                        value={fee.admissionFee}
+                                                        onChange={(e) => {
+                                                            const newFees = [...formData.detailedFeeStructure];
+                                                            newFees[index].admissionFee = parseInt(e.target.value) || 0;
+                                                            newFees[index].total = (newFees[index].admissionFee || 0) + (newFees[index].tuitionFee || 0);
+                                                            handleChange('detailedFeeStructure', newFees);
+                                                        }}
+                                                        className="h-8"
+                                                    />
+                                                </td>
+                                                <td className="p-2">
+                                                    <Input
+                                                        type="number"
+                                                        value={fee.tuitionFee}
+                                                        onChange={(e) => {
+                                                            const newFees = [...formData.detailedFeeStructure];
+                                                            newFees[index].tuitionFee = parseInt(e.target.value) || 0;
+                                                            newFees[index].total = (newFees[index].admissionFee || 0) + (newFees[index].tuitionFee || 0);
+                                                            handleChange('detailedFeeStructure', newFees);
+                                                        }}
+                                                        className="h-8"
+                                                    />
+                                                </td>
+                                                <td className="p-2 font-medium">
+                                                    ₹{fee.total?.toLocaleString()}
+                                                </td>
+                                                <td className="p-2">
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                                                        onClick={() => {
+                                                            const newFees = formData.detailedFeeStructure.filter((_, i) => i !== index);
+                                                            handleChange('detailedFeeStructure', newFees);
+                                                        }}
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+                                                    </Button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={5} className="p-4 text-center text-muted-foreground">
+                                                No fee details added yet. Click "Add Class" to start.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </Card>
