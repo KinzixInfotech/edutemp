@@ -134,12 +134,15 @@ export default function ExploreHomeClient() {
 
                 {/* Hero Section */}
                 <motion.div
-                    className="text-center max-w-4xl mx-auto space-y-8"
+                    className="text-center max-w-4xl mx-auto space-y-8 relative"
                     initial="hidden"
                     animate="visible"
                     variants={staggerContainer}
                 >
-                    <motion.div variants={fadeInUp}>
+                    {/* Dotted Pattern Background - Full Width & Height */}
+                    {/* <div className="absolute -top-24 left-[50%] right-[50%] -ml-[50vw] -mr-[50vw] w-screen h-[600px] bg-[radial-gradient(circle,#64748b_1.5px,transparent_1.5px)] [background-size:20px_20px] opacity-30 dark:opacity-20 pointer-events-none" /> */}
+
+                    <motion.div variants={fadeInUp} className="relative z-10">
                         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/5 text-primary text-sm font-medium border border-primary/10 mb-6 backdrop-blur-sm">
                             <Trophy className="h-3.5 w-3.5" />
                             <span>Trusted by 500+ Top Schools</span>
@@ -147,21 +150,21 @@ export default function ExploreHomeClient() {
                     </motion.div>
 
                     <motion.h1
-                        className="text-5xl md:text-7xl font-bold tracking-tight leading-tight"
+                        className="text-5xl md:text-7xl font-bold tracking-tight leading-tight relative z-10"
                         variants={fadeInUp}
                     >
                         Find the <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">Perfect School</span>
-                        <br /> for Your Child
+                        <br />for Your Child
                     </motion.h1>
 
                     <motion.p
-                        className="text-xl text-muted-foreground/80 max-w-2xl mx-auto leading-relaxed"
+                        className="text-xl text-muted-foreground/80 max-w-2xl mx-auto leading-relaxed relative z-10"
                         variants={fadeInUp}
                     >
                         Browse verified schools, compare facilities, and view transparent fee structures—all in one modern platform.
                     </motion.p>
 
-                    <motion.div variants={fadeInUp} className="pt-4">
+                    <motion.div variants={fadeInUp} className="pt-4 relative z-10">
                         <Link href="/explore/schools" className="block max-w-[500px] mx-auto w-full">
                             <div className="relative group cursor-pointer">
                                 <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full opacity-20 group-hover:opacity-40 blur transition duration-500" />
@@ -212,7 +215,7 @@ export default function ExploreHomeClient() {
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                                 {featuredSchoolsData.schools.map((profile) => (
                                     <motion.div key={profile.id} variants={fadeInUp}>
-                                        <Link href={`/explore/schools/${profile.id}`} className="group block h-full">
+                                        <Link href={`/explore/schools/${profile.schoolId}`} className="group block h-full">
                                             <div className="relative h-full rounded-2xl overflow-hidden border border-border bg-white dark:bg-gray-900  hover:shadow-xl hover:shadow-yellow-500/10 transition-all duration-300">
                                                 {/* Badge */}
                                                 <div className="absolute top-3 right-3 z-10 px-2 py-1 rounded-md bg-yellow-400/90 text-black text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm shadow-sm">
@@ -332,7 +335,7 @@ export default function ExploreHomeClient() {
                                     whileHover={{ y: -8 }}
                                     className="h-full"
                                 >
-                                    <Link href={`/explore/schools/${profile.id}`} className="block h-full">
+                                    <Link href={`/explore/schools/${profile.schoolId}`} className="block h-full">
                                         <Card className="h-full border border-border bg-card  hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-300 rounded-3xl group overflow-hidden relative flex flex-col">
 
                                             {/* Cover Image - Condition Check */}

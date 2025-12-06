@@ -18,6 +18,7 @@ import { useState } from "react"
 import { useCommandMenu } from "./CommandMenuContext"
 import { SchoolDetailPopup } from "./school-detail-popup"
 export function SiteHeader({ fullUser }) {
+    console.log(fullUser)
     const { setOpen } = useCommandMenu()
     const [open, setOpenPopover] = useState(false)
     const [date, setDate] = useState(undefined)
@@ -46,7 +47,7 @@ export function SiteHeader({ fullUser }) {
                     className="mx-2 data-[orientation=vertical]:h-4"
                 />
                 <SchoolDetailPopup school={fullUser?.school}>
-                    <div className="text-base font-bold  text-sm border gap-1 md:inline-flex hidden font-medium capitalize bg-muted px-2 py-1 rounded-lg text-center w-fit max-w-[200px] flex flex-col overflow-hidden whitespace-nowrap truncate cursor-pointer hover:bg-muted/80 transition-colors">
+                    <div className="text-base font-bold  text-sm border gap-1 inline-flex  font-medium capitalize bg-muted px-2 py-1 rounded-lg text-center w-fit max-w-[200px] flex flex-col overflow-hidden whitespace-nowrap truncate cursor-pointer hover:bg-muted/80 transition-colors">
                         <div className="flex items-center gap-1"> <School size={16} />
                             {fullUser?.school?.name || 'Dashboard'}</div>
                     </div>
@@ -55,7 +56,8 @@ export function SiteHeader({ fullUser }) {
                 {/* Centered Search Bar - Desktop */}
                 <div className="absolute hidden md:block left-1/2 -translate-x-1/2 w-full max-w-md px-4">
                     <button
-                        className="inline-flex border h-9 w-full rounded-md bg-muted hover:bg-muted px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-border items-center gap-2"
+                        className="inline-flex  border h-9 w-full rounded-md bg-muted hover:bg-muted px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-border items-center gap-2"
+
                         onClick={() => setOpen(true)}
                     >
                         <SearchIcon

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { School, Menu, LogIn, LogOut, User } from 'lucide-react';
+import { School, Menu, LogIn, LogOut, User, ChevronRight } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
@@ -23,34 +23,46 @@ export default function PublicHeader() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        checkUser();
-    }, []);
-
-    const checkUser = async () => {
-        try {
+        let subscription;
+        const initAuth = async () => {
             const { createClient } = await import('@supabase/supabase-js');
             const supabase = createClient(
                 process.env.NEXT_PUBLIC_SUPABASE_URL,
                 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
             );
 
+            // Initial check
             const { data: { session } } = await supabase.auth.getSession();
-            setUser(session?.user || null);
+            handleAuthChange(session);
 
-            // Fetch parent data from localStorage
-            if (session?.user && typeof window !== 'undefined') {
-                const storedData = localStorage.getItem('parentUser');
-                if (storedData) {
-                    const userData = JSON.parse(storedData);
-                    setParentData(userData);
-                }
+            // Listen for changes
+            const { data: { subscription: sub } } = supabase.auth.onAuthStateChange((_event, session) => {
+                handleAuthChange(session);
+            });
+            subscription = sub;
+        };
+
+        initAuth();
+
+        return () => {
+            subscription?.unsubscribe();
+        };
+    }, []);
+
+    const handleAuthChange = (session) => {
+        setUser(session?.user || null);
+        if (session?.user && typeof window !== 'undefined') {
+            const storedData = localStorage.getItem('parentUser');
+            if (storedData) {
+                setParentData(JSON.parse(storedData));
             }
-        } catch (error) {
-            console.error('Auth check error:', error);
-        } finally {
-            setLoading(false);
+        } else {
+            setParentData(null);
         }
+        setLoading(false);
     };
+
+
 
     const handleLogout = async () => {
         try {
@@ -167,64 +179,85 @@ export default function PublicHeader() {
                     {/* Mobile Menu Button */}
                     <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
                         <SheetTrigger asChild className="md:hidden">
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" className="h-10 w-10">
                                 <Menu className="h-5 w-5" />
+                                <span className="sr-only">Toggle menu</span>
                             </Button>
                         </SheetTrigger>
-                        <SheetContent side="right">
-                            <nav className="flex flex-col gap-4 mt-6">
+                        <SheetContent side="right" className="w-[300px] sm:w-[340px] p-0 flex flex-col">
+                            {/* Header */}
+                            <div className="flex items-center h-16 px-6 border-b shrink-0">
+                                <Link href="/explore" onClick={() => setMobileMenuOpen(false)}>
+                                    <Image src='/edu_ex.png' width={120} height={36} alt="EduBreezy" priority />
+                                </Link>
+                            </div>
+
+                            {/* Navigation Links */}
+                            <nav className="flex-1 py-6 overflow-y-auto">
                                 {navLinks.map((link) => (
                                     <Link
                                         key={link.href}
                                         href={link.href}
-                                        className="text-sm font-medium"
+                                        className="flex items-center justify-between h-12 px-6 text-base font-medium border-b text-foreground/80 hover:text-primary hover:bg-muted/50 transition-colors"
                                         onClick={() => setMobileMenuOpen(false)}
                                     >
                                         {link.label}
+                                        <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
                                     </Link>
                                 ))}
-                                <div className="border-t pt-4 mt-4 space-y-2">
-                                    {user ? (
-                                        <>
-                                            <div className="flex items-center gap-3 px-2 py-2 bg-muted/50 rounded-lg">
-                                                <Avatar className="h-10 w-10">
-                                                    <AvatarImage src={parentData?.profilePicture || user.user_metadata?.avatar_url} />
-                                                    <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                                                        {(parentData?.name || user.email)?.charAt(0).toUpperCase() || 'P'}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-medium truncate">{parentData?.name || user.email}</p>
-                                                    {parentData?.parent?.school && (
-                                                        <p className="text-xs text-muted-foreground truncate">
-                                                            {parentData.parent.school.name}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <Button variant="outline" className="w-full gap-2" onClick={handleLogout}>
-                                                <LogOut className="h-4 w-4" />
-                                                Logout
-                                            </Button>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Link href="/explore/login" className="block">
-                                                <Button variant="outline" className="w-full gap-2">
-                                                    <LogIn className="h-4 w-4" />
-                                                    Login
-                                                </Button>
-                                            </Link>
-                                            <Link href="/login" className="block">
-                                                <Button className="w-full gap-2">
-                                                    <School className="h-4 w-4" />
-                                                    School Login
-                                                </Button>
-                                            </Link>
-                                        </>
-                                    )}
-                                </div>
                             </nav>
+
+                            {/* Bottom Section - Buttons */}
+                            <div className="shrink-0 border-t p-6 space-y-3">
+                                {loading ? (
+                                    <div className="h-12 bg-muted animate-pulse rounded-lg" />
+                                ) : user ? (
+                                    <>
+                                        {/* User Info */}
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <Avatar className="h-10 w-10">
+                                                <AvatarImage src={parentData?.profilePicture || user.user_metadata?.avatar_url} />
+                                                <AvatarFallback className="bg-primary/10 text-primary font-medium">
+                                                    {(parentData?.name || user.email)?.charAt(0).toUpperCase() || 'P'}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium truncate">{parentData?.name || user.email?.split('@')[0]}</p>
+                                                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                                            </div>
+                                        </div>
+                                        {/* Buttons */}
+                                        <Link href="/explore/profile" onClick={() => setMobileMenuOpen(false)} className="block">
+                                            <Button variant="outline" className="w-full h-12 gap-2 text-sm">
+                                                <User className="h-4 w-4" />
+                                                My Profile
+                                            </Button>
+                                        </Link>
+                                        <Button
+                                            className="w-full h-12 gap-2 text-sm"
+                                            onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
+                                        >
+                                            <LogOut className="h-4 w-4" />
+                                            Sign Out
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Link href="/explore/login" className="block" onClick={() => setMobileMenuOpen(false)}>
+                                            <Button variant="outline" className="w-full h-12 gap-2 text-sm font-medium">
+                                                <LogIn className="h-4 w-4" />
+                                                Parent Login
+                                            </Button>
+                                        </Link>
+                                        <Link href="/login" className="block" onClick={() => setMobileMenuOpen(false)}>
+                                            <Button className="w-full h-12 gap-2 text-sm font-medium">
+                                                <School className="h-4 w-4" />
+                                                School Login
+                                            </Button>
+                                        </Link>
+                                    </>
+                                )}
+                            </div>
                         </SheetContent>
                     </Sheet>
                 </div>
@@ -232,3 +265,4 @@ export default function PublicHeader() {
         </header>
     );
 }
+

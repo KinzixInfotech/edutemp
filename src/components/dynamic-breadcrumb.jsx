@@ -46,7 +46,7 @@ export function DynamicBreadcrumb() {
     ])
 
     return (
-        <Breadcrumb className="hidden md:flex">
+        <Breadcrumb className="flex">
             <BreadcrumbList>
                 {/* Always show Dashboard as home if we are in dashboard routes? 
             Assuming /dashboard is the root for this app's context */}

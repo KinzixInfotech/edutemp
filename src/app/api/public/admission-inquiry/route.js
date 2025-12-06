@@ -30,7 +30,7 @@ export async function POST(req) {
 
         // Check if school profile exists and is public
         const profile = await prisma.schoolPublicProfile.findUnique({
-            where: { id: profileId, isPubliclyVisible: true },
+            where: { schoolId: profileId, isPubliclyVisible: true },
             select: { id: true, schoolId: true }
         });
 
@@ -44,7 +44,7 @@ export async function POST(req) {
         // Create admission inquiry
         const inquiry = await prisma.admissionInquiry.create({
             data: {
-                profileId,
+                profileId: profile.id, // Use the resolved internal ID
                 studentName,
                 studentAge,
                 preferredGrade,

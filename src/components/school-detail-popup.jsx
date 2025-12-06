@@ -15,7 +15,7 @@ import { Globe, MapPin, Mail, Phone, School, ExternalLink, Calendar, CheckCircle
 
 export function SchoolDetailPopup({ school, children }) {
     if (!school) return children
-
+    console.log(school)
     const createdDate = school.createdAt ? new Date(school.createdAt).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',

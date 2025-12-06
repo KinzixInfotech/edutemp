@@ -19,8 +19,9 @@ import Link from 'next/link';
 
 export default function SchoolProfileClient({ schoolId, initialData }) {
     const [reviewPage, setReviewPage] = useState(1);
+    const [showAllFees, setShowAllFees] = useState(false);
 
-    const { data: school, isLoading, isError } = useQuery({
+    const { data: school, isLoading, isError, refetch: schoolRefetch } = useQuery({
         queryKey: ['school-profile', schoolId],
         queryFn: async () => {
             const response = await fetch(`/api/public/schools/${schoolId}`);
@@ -30,12 +31,8 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
         initialData,
         staleTime: 10 * 60 * 1000,
     });
+    console.log(school, 'school');
 
-    // Alias the refetch function to schoolRefetch
-    const { refetch: schoolRefetch } = useQuery({
-        queryKey: ['school-profile', schoolId],
-        enabled: false // This hook is just to get the refetch function if needed, but cleaner to destructure from original
-    });
 
     const { data: reviewsData, isLoading: reviewsLoading, refetch: refetchReviews } = useQuery({
         queryKey: ['school-reviews', schoolId, reviewPage],
@@ -345,28 +342,54 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                                     )}
 
                                     {school.detailedFeeStructure && school.detailedFeeStructure.length > 0 && (
-                                        <div className="rounded-md border overflow-hidden mb-4">
-                                            <table className="w-full text-sm">
-                                                <thead className="bg-muted/50">
-                                                    <tr>
-                                                        <th className="p-2 text-left font-medium">Class</th>
-                                                        <th className="p-2 text-right font-medium">Annual Total</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y">
-                                                    {school.detailedFeeStructure.map((fee, idx) => (
-                                                        <tr key={idx} className="bg-white">
-                                                            <td className="p-2">{fee.className}</td>
-                                                            <td className="p-2 text-right font-medium">₹{fee.total?.toLocaleString()}</td>
+                                        <div className="space-y-3">
+                                            <h4 className="text-sm font-medium text-muted-foreground">Class-wise Breakdown</h4>
+                                            <div className="rounded-lg border overflow-hidden">
+                                                <table className="w-full text-sm">
+                                                    <thead className="bg-muted/70">
+                                                        <tr>
+                                                            <th className="px-3 py-2.5 text-left font-semibold text-xs uppercase tracking-wide">Class</th>
+                                                            <th className="px-3 py-2.5 text-right font-semibold text-xs uppercase tracking-wide hidden sm:table-cell">Admission</th>
+                                                            <th className="px-3 py-2.5 text-right font-semibold text-xs uppercase tracking-wide hidden sm:table-cell">Tuition</th>
+                                                            <th className="px-3 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">Total</th>
                                                         </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
+                                                    </thead>
+                                                    <tbody className="divide-y">
+                                                        {(showAllFees ? school.detailedFeeStructure : school.detailedFeeStructure.slice(0, 4)).map((fee, idx) => (
+                                                            <tr key={idx} className="hover:bg-muted/30 transition-colors">
+                                                                <td className="px-3 py-2.5 font-medium">{fee.className}</td>
+                                                                <td className="px-3 py-2.5 text-right text-muted-foreground hidden sm:table-cell">
+                                                                    ₹{fee.admissionFee?.toLocaleString() || '0'}
+                                                                </td>
+                                                                <td className="px-3 py-2.5 text-right text-muted-foreground hidden sm:table-cell">
+                                                                    ₹{fee.tuitionFee?.toLocaleString() || '0'}
+                                                                </td>
+                                                                <td className="px-3 py-2.5 text-right font-semibold text-primary">
+                                                                    ₹{fee.total?.toLocaleString() || '0'}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            {school.detailedFeeStructure.length > 4 && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="w-full text-xs"
+                                                    onClick={() => setShowAllFees(!showAllFees)}
+                                                >
+                                                    {showAllFees ? 'Show Less' : `Show All ${school.detailedFeeStructure.length} Classes`}
+                                                </Button>
+                                            )}
+                                            <p className="text-xs text-muted-foreground">
+                                                * All fees are per academic year. Additional charges may apply.
+                                            </p>
                                         </div>
                                     )}
 
                                     {school.feeStructureUrl && (
-                                        <a href={school.feeStructureUrl} target="_blank" rel="noopener noreferrer">
+                                        <a href={school.feeStructureUrl} target="_blank" rel="noopener noreferrer" className="block mt-4">
                                             <Button variant="outline" size="sm" className="w-full">
                                                 View Complete Fee PDF
                                             </Button>

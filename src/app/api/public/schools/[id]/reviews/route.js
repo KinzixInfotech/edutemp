@@ -8,16 +8,32 @@ const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
+// Helper to resolve profileId from schoolId (params.id)
+async function getProfileId(schoolId) {
+    const profile = await prisma.schoolPublicProfile.findUnique({
+        where: { schoolId },
+        select: { id: true }
+    });
+    return profile?.id;
+}
+
 export async function GET(req, props) {
     try {
         const params = await props.params;
-        const { id: profileId } = params;
+        const { id: schoolId } = params; // params.id is schoolId
+
+        // Resolve generic PublicProfile ID
+        const profileId = await getProfileId(schoolId);
+        if (!profileId) {
+            return NextResponse.json({ error: 'School profile not found' }, { status: 404 });
+        }
+
         const { searchParams } = new URL(req.url);
         const page = parseInt(searchParams.get('page') || '1');
         const limit = parseInt(searchParams.get('limit') || '10');
         const skip = (page - 1) * limit;
 
-        // Fetch reviews with pagination
+        // Fetch reviews with pagination using profileId
         const [reviews, total] = await Promise.all([
             prisma.schoolRating.findMany({
                 where: { profileId },
@@ -44,7 +60,7 @@ export async function GET(req, props) {
 export async function POST(req, props) {
     try {
         const params = await props.params;
-        const { id: profileId } = params;
+        const { id: schoolId } = params; // params.id is schoolId
         const body = await req.json();
 
         // 1. Check Supabase authentication
@@ -82,12 +98,10 @@ export async function POST(req, props) {
         }
 
         // 3. Verify parent belongs to this school
-        // We check two things:
-        // a) The parent's direct schoolId matches
-        // b) OR any of their students attend this school
+        // Look up the profile specifically to get both ID and Verify the specific schoolId
         const profile = await prisma.schoolPublicProfile.findUnique({
-            where: { id: profileId },
-            select: { schoolId: true }
+            where: { schoolId },
+            select: { id: true, schoolId: true }
         });
 
         if (!profile) {
@@ -115,7 +129,7 @@ export async function POST(req, props) {
         const existingReview = await prisma.schoolRating.findUnique({
             where: {
                 profileId_userId: {
-                    profileId,
+                    profileId: profile.id, // Must use profile.id, NOT schoolId
                     userId: user.id
                 }
             }
@@ -143,9 +157,10 @@ export async function POST(req, props) {
             });
         } else {
             // Create new review
+            // CRITICAL FIX: Use profileId key, do NOT set 'id' manually
             rating = await prisma.schoolRating.create({
                 data: {
-                    profileId,
+                    profileId: profile.id,
                     ...reviewData
                 }
             });
@@ -153,7 +168,7 @@ export async function POST(req, props) {
 
         // 5. Recalculate school average ratings
         const allRatings = await prisma.schoolRating.findMany({
-            where: { profileId },
+            where: { profileId: profile.id }, // Use profile.id
             select: {
                 academicRating: true,
                 infrastructureRating: true,
@@ -168,7 +183,7 @@ export async function POST(req, props) {
         const avgOverall = allRatings.reduce((sum, r) => sum + r.overallRating, 0) / allRatings.length;
 
         await prisma.schoolPublicProfile.update({
-            where: { id: profileId },
+            where: { id: profile.id },
             data: {
                 academicRating: avgAcademic,
                 infrastructureRating: avgInfrastructure,

@@ -96,7 +96,7 @@ export default function SchoolsPage() {
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                             {featuredSchoolsData.schools.map((profile) => (
-                                <Link key={profile.id} href={`/explore/schools/${profile.schoolId}`} className="group block h-full">
+                                <Link key={profile.schoolId} href={`/explore/schools/${profile.schoolId}`} className="group block h-full">
                                     <div className="relative h-full rounded-xl overflow-hidden border border-border/50 bg-card hover:shadow-lg transition-all duration-300">
                                         <div className="absolute top-3 right-3 z-10 px-2 py-1 rounded bg-yellow-400 text-black text-[10px] font-bold uppercase tracking-wider shadow-sm">
                                             Featured

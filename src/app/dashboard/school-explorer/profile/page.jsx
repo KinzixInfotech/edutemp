@@ -299,7 +299,7 @@ export default function PublicProfileSettings() {
                 {/* Fees */}
                 <Card className="p-6">
                     <h2 className="text-xl font-semibold mb-4">Fee Structure</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <div>
                             <Label htmlFor="minFee">Minimum Fee (₹/year)</Label>
                             <Input
@@ -334,6 +334,30 @@ export default function PublicProfileSettings() {
                             />
                         </div>
                     </div>
+
+                    {/* Auto-calculate button */}
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mb-6 gap-2"
+                        disabled={!Array.isArray(formData.detailedFeeStructure) || formData.detailedFeeStructure.length === 0}
+                        onClick={() => {
+                            const fees = formData.detailedFeeStructure;
+                            const totals = fees.map(f => f.total || 0).filter(t => t > 0);
+                            if (totals.length > 0) {
+                                handleChange('minFee', Math.min(...totals));
+                                handleChange('maxFee', Math.max(...totals));
+                            }
+                        }}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect width="16" height="16" x="4" y="4" rx="2" />
+                            <path d="M8 10h8" />
+                            <path d="M8 14h4" />
+                        </svg>
+                        Calculate from Fee Breakdown
+                    </Button>
 
                     <Separator className="my-6" />
 
@@ -556,7 +580,7 @@ export default function PublicProfileSettings() {
                             variant="outline"
                             asChild
                         >
-                            <a href={`http://school.edubreezy.com/explore/schools/${formData.id}`} target="_blank" className="gap-2">
+                            <a href={`http://school.edubreezy.com/explore/schools/${formData.schoolId}`} target="_blank" className="gap-2">
                                 {formData.isPubliclyVisible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                                 {formData.isPubliclyVisible ? 'View Public Profile' : 'Preview (Hidden)'}
                             </a>

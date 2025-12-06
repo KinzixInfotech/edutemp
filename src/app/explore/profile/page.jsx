@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -24,13 +25,24 @@ export default function ParentProfilePage() {
     const router = useRouter();
     const [parentData, setParentData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [accessToken, setAccessToken] = useState(null);
 
     useEffect(() => {
-        const loadParentData = () => {
+        const loadParentData = async () => {
             if (typeof window !== 'undefined') {
                 const storedData = localStorage.getItem('parentUser');
                 if (storedData) {
                     setParentData(JSON.parse(storedData));
+                    // Get access token for reviews query
+                    const { createClient } = await import('@supabase/supabase-js');
+                    const supabase = createClient(
+                        process.env.NEXT_PUBLIC_SUPABASE_URL,
+                        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+                    );
+                    const { data: session } = await supabase.auth.getSession();
+                    if (session?.session?.access_token) {
+                        setAccessToken(session.session.access_token);
+                    }
                 } else {
                     router.push('/explore/login?returnTo=/explore/profile');
                 }
@@ -40,6 +52,25 @@ export default function ParentProfilePage() {
 
         loadParentData();
     }, [router]);
+
+    // TanStack Query for reviews with caching
+    const { data: reviewsData, isLoading: loadingReviews } = useQuery({
+        queryKey: ['parent-reviews', accessToken],
+        queryFn: async () => {
+            const res = await fetch('/api/parents/reviews', {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            });
+            if (!res.ok) throw new Error('Failed to fetch reviews');
+            return res.json();
+        },
+        enabled: !!accessToken, // Only run when token is available
+        staleTime: 5 * 60 * 1000, // 5 minutes
+        gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+    });
+
+    const myReviews = reviewsData?.reviews || [];
 
     const handleLogout = async () => {
         try {
@@ -211,10 +242,53 @@ export default function ParentProfilePage() {
 
                 {/* Recent Activity */}
                 <Card className="p-6">
-                    <h2 className="text-lg font-semibold mb-4">Recent Reviews</h2>
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                        Your recent reviews will appear here
-                    </p>
+                    <h2 className="text-lg font-semibold mb-4">My Reviews</h2>
+
+                    {loadingReviews ? (
+                        <div className="flex justify-center py-8">
+                            <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+                        </div>
+                    ) : myReviews.length > 0 ? (
+                        <div className="space-y-4">
+                            {myReviews.map((review) => (
+                                <div key={review.id} className="p-4 rounded-lg bg-muted/30 border border-border/50">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="flex items-center gap-3">
+                                            <Avatar className="h-10 w-10 border border-border">
+                                                <AvatarImage src={review.profile?.school?.profilePicture} />
+                                                <AvatarFallback><School className="h-4 w-4" /></AvatarFallback>
+                                            </Avatar>
+                                            <div>
+                                                <h3 className="font-semibold text-sm">{review.profile?.school?.name || 'Unknown School'}</h3>
+                                                <p className="text-xs text-muted-foreground">{new Date(review.createdAt).toLocaleDateString()}</p>
+                                            </div>
+                                        </div>
+                                        <Badge variant={review.overallRating >= 4 ? "default" : "secondary"}>
+                                            {review.overallRating}/5
+                                        </Badge>
+                                    </div>
+
+                                    <p className="text-sm text-foreground/90 italic">"{review.review || 'No written review'}"</p>
+
+                                    <div className="flex gap-4 mt-3 pt-3 border-t border-border/30 text-xs text-muted-foreground">
+                                        <span>Academic: <b>{review.academicRating}</b></span>
+                                        <span>Infrastructure: <b>{review.infrastructureRating}</b></span>
+                                        <span>Teacher: <b>{review.teacherRating}</b></span>
+                                    </div>
+
+                                    <Link href={`/explore/schools/${review.profile?.school?.publicProfile?.id}`}>
+                                        <Button variant="link" size="sm" className="px-0 mt-2 h-auto text-primary">
+                                            View School Profile &rarr;
+                                        </Button>
+                                    </Link>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-sm text-muted-foreground text-center py-8">
+                            You haven't submitted any reviews yet.
+                        </p>
+                    )}
                 </Card>
             </div>
         </div >

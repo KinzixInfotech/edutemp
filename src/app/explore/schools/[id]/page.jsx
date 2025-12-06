@@ -1,14 +1,23 @@
 
 import SchoolProfileClient from '@/components/explore/SchoolProfileClient';
 
+// Helper to get Base URL
+const getBaseUrl = () => {
+    // Force localhost in development or if explicitly set
+    if (process.env.NODE_ENV === 'development') {
+        return 'http://localhost:3000';
+    }
+    const url = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    return url.replace(/\/$/, ''); // Remove trailing slash
+};
+
 // Generate dynamic metadata for SEO
 export async function generateMetadata(props) {
     const params = await props.params;
     const { id } = params;
 
     try {
-        // Use absolute URL for server-side fetch
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const baseUrl = getBaseUrl();
         const response = await fetch(`${baseUrl}/api/public/schools/${id}`, { next: { revalidate: 600 } });
 
         if (!response.ok) return { title: 'School Not Found' };
@@ -39,10 +48,15 @@ export async function generateMetadata(props) {
 export const revalidate = 600;
 
 async function getSchool(id) {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const res = await fetch(`${baseUrl}/api/public/schools/${id}`, { next: { revalidate: 600 } });
-    if (!res.ok) return null;
-    return res.json();
+    const baseUrl = getBaseUrl();
+    try {
+        const res = await fetch(`${baseUrl}/api/public/schools/${id}`, { next: { revalidate: 600 } });
+        if (!res.ok) return null;
+        return res.json();
+    } catch (e) {
+        console.error('[getSchool] Error:', e);
+        return null;
+    }
 }
 
 export default async function SchoolProfilePage(props) {

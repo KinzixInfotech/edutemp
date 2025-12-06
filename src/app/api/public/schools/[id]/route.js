@@ -11,12 +11,14 @@ export async function GET(req, props) {
         const params = await props.params;
         const { id } = params;
 
+        // console.log(id); // Cleaned up log
+
         const cacheKey = generateKey('school-profile', { id });
 
         const school = await remember(cacheKey, async () => {
             const profile = await prisma.schoolPublicProfile.findUnique({
                 where: {
-                    id,
+                    schoolId: id,
                     isPubliclyVisible: true
                 },
                 include: {
@@ -74,7 +76,7 @@ export async function GET(req, props) {
         if (!alreadyViewed) {
             // Increment view count
             await prisma.schoolPublicProfile.update({
-                where: { id },
+                where: { schoolId: id },
                 data: { profileViews: { increment: 1 } }
             });
 

@@ -8,8 +8,9 @@ import { Badge } from '@/components/ui/badge';
 
 export default function SchoolCard({ school }) {
     const {
-        id,
+        schoolId,
         tagline,
+
         minFee,
         maxFee,
         totalStudents,
@@ -125,12 +126,12 @@ export default function SchoolCard({ school }) {
 
                 {/* Actions */}
                 <div className="flex gap-2 pt-3">
-                    <Link href={`/explore/schools/${id}`} className="flex-1">
+                    <Link href={`/explore/schools/${schoolId}`} className="flex-1">
                         <Button variant="outline" className="w-full">
                             View Profile
                         </Button>
                     </Link>
-                    <Link href={`/explore/schools/${id}#apply`} className="flex-1">
+                    <Link href={`/explore/schools/${schoolId}#apply`} className="flex-1">
                         <Button className="w-full">
                             Apply Now
                         </Button>
