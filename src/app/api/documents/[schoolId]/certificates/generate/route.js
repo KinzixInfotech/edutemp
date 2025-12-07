@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { generatePDF } from '@/lib/pdf-generator';
 import { toBase64 } from '@/lib/utils';
+import { sendNotification } from '@/lib/notifications/notificationHelper';
 
 export async function POST(request, props) {
     const params = await props.params;
@@ -15,6 +16,7 @@ export async function POST(request, props) {
             certificateType,
             issueDate,
             issuedById,
+            showToParent = false,
             ...customFields
         } = body;
 
@@ -101,6 +103,8 @@ export async function POST(request, props) {
                 customFields: customFields,
                 fileUrl: pdfUrl,
                 status: 'issued',
+                showToParent,
+                sharedAt: showToParent ? new Date() : null,
             },
             include: {
                 student: {
@@ -127,6 +131,33 @@ export async function POST(request, props) {
         });
 
         // console.log('✅ Certificate saved:', certificate.id);
+
+        // Send notification to parent if showToParent enabled
+        if (showToParent) {
+            try {
+                const parentRelation = await prisma.studentParentLink.findFirst({
+                    where: { studentId },
+                    select: { parent: { select: { userId: true } } }
+                });
+                if (parentRelation) {
+                    await sendNotification({
+                        schoolId,
+                        title: "🎖️ Certificate Available",
+                        message: `${template.name || 'Certificate'} for ${student.name} is now available`,
+                        type: 'GENERAL',
+                        priority: 'NORMAL',
+                        icon: '🎖️',
+                        targetOptions: { userIds: [parentRelation.parent.userId] },
+                        senderId: issuedById || 'system',
+                        sendPush: true,
+                        actionUrl: '/documents',
+                        metadata: { certificateId: certificate.id, type: 'certificate' }
+                    });
+                }
+            } catch (notifErr) {
+                console.warn('⚠️ Notification failed:', notifErr.message);
+            }
+        }
 
         return NextResponse.json(certificate, { status: 201 });
 

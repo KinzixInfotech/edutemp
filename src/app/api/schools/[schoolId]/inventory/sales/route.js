@@ -10,7 +10,7 @@ export async function GET(request, { params }) {
         const { searchParams } = new URL(request.url);
         const startDate = searchParams.get("startDate");
         const endDate = searchParams.get("endDate");
-        const { page, limit } = getPagination(request.url);
+        const { page, limit } = getPagination(request);
 
         const cacheKey = generateKey('inventory:sales', { schoolId, startDate, endDate, page, limit });
 

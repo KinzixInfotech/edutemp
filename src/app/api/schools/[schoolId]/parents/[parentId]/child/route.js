@@ -45,13 +45,15 @@ export async function GET(req, props) {
 
         // Transform response
         const children = linkedChildren.map(link => ({
-            id:link.id,
+            id: link.id,
             studentId: link.student.userId,
             name: link.student.name,
             admissionNo: link.student.admissionNo,
             rollNumber: link.student.rollNumber,
             class: link.student.class?.className,
+            classId: link.student.classId,
             section: link.student.section?.name,
+            sectionId: link.student.sectionId,
             profilePicture: link.student.user?.profilePicture,
             relation: link.relation,
             isPrimary: link.isPrimary,

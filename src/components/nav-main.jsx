@@ -231,7 +231,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                 >
                                                     <SidebarMenuButton
                                                         asChild
-                                                        className={`w-full font-medium  hover:bg-[#eff6ff] hover:text-[#1b83c5]   py-4 transition-all rounded-sm hover:cursor-pointer ${isActive
+                                                        className={`w-full font-medium  hover:bg-[#eff6ff] hover:text-[#1b83c5]  hover:border-none  py-4 transition-all rounded-sm hover:cursor-pointer ${isActive
                                                             ? "bg-[#eff6ff]!  text-[#1b83c5]! dark:bg-white dark:text-black " : ""
                                                             }`}
                                                         style={isActive ? { backgroundColor: 'white' } : {}}
@@ -248,7 +248,6 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                         </Tooltip>
                                     )
                                 }
-
                                 return (
                                     <SidebarMenuItem
                                         key={item.label}
@@ -256,7 +255,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                     >
                                         <SidebarMenuButton
                                             asChild
-                                            className={`w-full font-medium  hover:bg-[#eff6ff] hover:text-[#1b83c5]   py-4 transition-all rounded-sm hover:cursor-pointer ${isActive
+                                            className={`w-full font-medium  hover:bg-[#eff6ff] hover:text-[#1b83c5]   py-4 transition-al  rounded-sm hover:border-none hover:cursor-pointer ${isActive
                                                 ? "bg-[#eff6ff]!  text-[#1b83c5]!    dark:bg-white! dark:text-black!" : ""
                                                 }`}
                                             style={isActive ? { backgroundColor: '#eff6ff', color: '#1b83c5' } : {}}

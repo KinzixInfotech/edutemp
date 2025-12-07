@@ -57,6 +57,8 @@ const formSchema = z.object({
     venue: z.string().optional(),
     seatNumberPrefix: z.string().default(''),
     startingSeatNumber: z.number().min(1).default(1),
+    feePaidMonth: z.string().optional(),
+    showToParent: z.boolean().default(false),
 });
 
 export default function BulkGenerateAdmitCardsPage() {
@@ -94,6 +96,8 @@ export default function BulkGenerateAdmitCardsPage() {
             venue: '',
             seatNumberPrefix: '',
             startingSeatNumber: 1,
+            feePaidMonth: '',
+            showToParent: false,
         },
     });
 
@@ -556,7 +560,8 @@ export default function BulkGenerateAdmitCardsPage() {
                     const payload = {
                         examId: data.examId,
                         zipUrl: null, // Set by server
-                        students: generatedStudents
+                        students: generatedStudents,
+                        showToParent: data.showToParent || false,
                     };
                     formData.append('data', JSON.stringify(payload));
 
@@ -747,8 +752,8 @@ export default function BulkGenerateAdmitCardsPage() {
             {/* Main Content - Sidebar + Preview */}
             <div className="flex-1 flex overflow-hidden">
                 {/* Left Sidebar - Form */}
-                <div className="w-80 border-r bg-background flex-shrink-0 flex flex-col">
-                    <ScrollArea className="flex-1">
+                <div className="w-80 border-r bg-background flex-shrink-0 flex flex-col overflow-hidden">
+                    <ScrollArea className="flex-1 h-full">
                         <div className="p-4 space-y-6">
                             {/* Exam Selection */}
                             <div className="space-y-1.5">
@@ -942,6 +947,62 @@ export default function BulkGenerateAdmitCardsPage() {
                                 <p className="text-[10px] text-muted-foreground">
                                     Example: {watchedValues.seatNumberPrefix}{watchedValues.startingSeatNumber}
                                 </p>
+                            </div>
+
+                            <div className="h-px bg-border my-2" />
+
+                            {/* Fee Filter */}
+                            <div className="space-y-4">
+                                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Fee Filter (Optional)</h3>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="feePaidMonth" className="text-xs">Only Fee Paid Up To</Label>
+                                    <Select
+                                        value={watchedValues.feePaidMonth || 'none'}
+                                        onValueChange={(value) => setValue('feePaidMonth', value === 'none' ? '' : value)}
+                                    >
+                                        <SelectTrigger className="h-9 text-sm">
+                                            <SelectValue placeholder="No filter (all students)" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">No Filter</SelectItem>
+                                            <SelectItem value="1">January</SelectItem>
+                                            <SelectItem value="2">February</SelectItem>
+                                            <SelectItem value="3">March</SelectItem>
+                                            <SelectItem value="4">April</SelectItem>
+                                            <SelectItem value="5">May</SelectItem>
+                                            <SelectItem value="6">June</SelectItem>
+                                            <SelectItem value="7">July</SelectItem>
+                                            <SelectItem value="8">August</SelectItem>
+                                            <SelectItem value="9">September</SelectItem>
+                                            <SelectItem value="10">October</SelectItem>
+                                            <SelectItem value="11">November</SelectItem>
+                                            <SelectItem value="12">December</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-[10px] text-muted-foreground">
+                                        Only include students who have paid fees up to selected month
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="h-px bg-border my-2" />
+
+                            {/* Parent Sharing */}
+                            <div className="space-y-4">
+                                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Share with Parents</h3>
+                                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                    <div className="space-y-0.5">
+                                        <Label className="text-sm font-medium">Push to Parents</Label>
+                                        <p className="text-[10px] text-muted-foreground">
+                                            Send notification & make visible in parent app
+                                        </p>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        {...register('showToParent')}
+                                        className="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </ScrollArea>

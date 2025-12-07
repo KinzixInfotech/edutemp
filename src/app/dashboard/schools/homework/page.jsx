@@ -72,10 +72,10 @@ export default function HomeworkManagement() {
         queryKey: ['subjects', formData.classId],
         queryFn: async () => {
             if (!formData.classId) return [];
-            const res = await axios.get(`/api/schools/subjects?classId=${formData.classId}`);
+            const res = await axios.get(`/api/schools/${fullUser.schoolId}/subjects?classId=${formData.classId}`);
             return res.data;
         },
-        enabled: !!formData.classId,
+        enabled: !!formData.classId && !!fullUser?.schoolId,
     });
 
     // Fetch statistics

@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { sendNotification } from '@/lib/notifications/notificationHelper';
 
 // GET /api/schools/[schoolId]/timetable/entries
 export async function GET(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     try {
         const { schoolId } = params;
         const { searchParams } = new URL(req.url);
@@ -57,7 +58,7 @@ export async function GET(req, props) {
 
 // POST /api/schools/[schoolId]/timetable/entries
 export async function POST(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     try {
         const { schoolId } = params;
         const body = await req.json();
@@ -136,6 +137,27 @@ export async function POST(req, props) {
                 timeSlot: { select: { label: true, startTime: true, endTime: true } },
             },
         });
+
+        // Send notification to parents of students in this class
+        try {
+            await sendNotification({
+                schoolId,
+                title: '📅 Timetable Updated',
+                message: `Timetable for ${entry.class.className}${entry.section ? ' - ' + entry.section.name : ''} has been updated.`,
+                type: 'GENERAL',
+                priority: 'NORMAL',
+                icon: '📅',
+                targetOptions: {
+                    classIds: [parseInt(classId)],
+                    userTypes: ['STUDENT'],
+                    includeParents: true,
+                },
+                sendPush: true,
+                actionUrl: '/my-child/parent-timetable',
+            });
+        } catch (notifErr) {
+            console.warn('Timetable notification failed:', notifErr.message);
+        }
 
         return NextResponse.json(entry);
     } catch (error) {

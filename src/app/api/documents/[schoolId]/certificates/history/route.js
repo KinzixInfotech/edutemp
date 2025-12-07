@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { v4 as uuidv4 } from 'uuid';
+import { sendNotification } from '@/lib/notifications/notificationHelper';
 
 export async function GET(request, props) {
     const params = await props.params;
@@ -102,6 +103,55 @@ export async function POST(request, props) {
         });
 
         console.log("CreateMany result:", result);
+
+
+
+        // -------------------------------------------------------------
+        // Send Notifications if Show To Parent is checked
+        // -------------------------------------------------------------
+        const notifyStudentIds = students
+            .filter(s => s.customFields && s.customFields.showToParent === true)
+            .map(s => s.studentId);
+
+        if (notifyStudentIds.length > 0) {
+            console.log(`Sending notifications for ${notifyStudentIds.length} students...`);
+
+            // Fetch students with parent info
+            const studentsWithParents = await prisma.student.findMany({
+                where: { userId: { in: notifyStudentIds } },
+                select: {
+                    userId: true,
+                    name: true,
+                    studentParentLinks: {
+                        select: {
+                            parent: {
+                                select: { userId: true } // Parent's User ID (for FCM)
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Group by Parent (optimized) or send individually?
+            // Sending individually per student is better for "Targeted" message: "Certificate for Mansha is ready"
+
+            for (const student of studentsWithParents) {
+                const parentUserIds = student.studentParentLinks.map(link => link.parent?.userId).filter(Boolean);
+
+                if (parentUserIds.length > 0) {
+                    await sendNotification({
+                        schoolId,
+                        title: "New Certificate Available",
+                        message: `A new certificate for ${student.name} has been shared.`,
+                        type: 'GENERAL',
+                        targetOptions: { userIds: parentUserIds },
+                        sendPush: true,
+                        icon: '📜',
+                        actionUrl: '/my-child/parent-documents'
+                    });
+                }
+            }
+        }
 
         return NextResponse.json({
             success: true,

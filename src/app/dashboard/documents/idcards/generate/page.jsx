@@ -42,6 +42,7 @@ const formSchema = z.object({
     studentId: z.string().optional(),
     templateId: z.string().min(1, 'Template is required'),
     validUntil: z.string().optional(),
+    showToParent: z.boolean().default(false),
 });
 
 export default function GenerateIdCardPage() {
@@ -71,7 +72,8 @@ export default function GenerateIdCardPage() {
             sectionId: '',
             studentId: '',
             templateId: '',
-            validUntil: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0] // 1 year validity default
+            validUntil: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
+            showToParent: false,
         },
     });
 
@@ -376,7 +378,9 @@ export default function GenerateIdCardPage() {
                 formData.append('data', JSON.stringify({
                     students: generatedCardsData,
                     templateId: watched.templateId,
-                    validUntil: watched.validUntil
+                    templateId: watched.templateId,
+                    validUntil: watched.validUntil,
+                    showToParent: watched.showToParent
                 }));
 
                 const saveRes = await fetch(`/api/documents/${schoolId}/idcards/history`, {
@@ -526,6 +530,26 @@ export default function GenerateIdCardPage() {
                                 <div className="space-y-1.5">
                                     <Label>Valid Until</Label>
                                     <Input type="date" {...register('validUntil')} />
+                                </div>
+
+                                <div className="h-px bg-border my-2" />
+
+                                {/* Parent Sharing */}
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Share with Parents</Label>
+                                    <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                        <div className="space-y-0.5">
+                                            <Label className="text-sm font-medium">Push to Parents</Label>
+                                            <p className="text-[10px] text-muted-foreground">
+                                                Send notification & make visible in parent app
+                                            </p>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            {...register('showToParent')}
+                                            className="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>

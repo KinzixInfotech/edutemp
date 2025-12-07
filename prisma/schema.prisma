@@ -3029,10 +3029,15 @@ model CertificateGenerated {
   status       String   @default("issued")
   createdAt    DateTime @default(now())
 
+  // Parent sharing
+  showToParent Boolean   @default(false)
+  sharedAt     DateTime?
+
   @@index([schoolId])
   @@index([studentId])
   @@index([templateId])
   @@index([status])
+  @@index([showToParent])
 }
 
 model DigitalIdCard {
@@ -3053,9 +3058,14 @@ model DigitalIdCard {
   validUntil DateTime?
   templateId String?
 
+  // Parent sharing
+  showToParent Boolean   @default(false)
+  sharedAt     DateTime?
+
   @@index([schoolId])
   @@index([studentId])
   @@index([status])
+  @@index([showToParent])
 }
 
 model AdmitCard {
@@ -3071,9 +3081,14 @@ model AdmitCard {
   layoutConfig Json
   issueDate    DateTime @default(now())
 
+  // Parent sharing
+  showToParent Boolean   @default(false)
+  sharedAt     DateTime?
+
   @@index([schoolId])
   @@index([studentId])
   @@index([examId])
+  @@index([showToParent])
 }
 
 model AuditLog {

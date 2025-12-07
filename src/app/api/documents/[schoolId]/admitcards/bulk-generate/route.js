@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { generateAdmitCardPDF } from '@/lib/pdf-generator-admitcard';
-// import { generateAdmitCardPDF } from '@/lib/admitcard-pdf-generator';
+import { sendNotification } from '@/lib/notifications/notificationHelper';
 
 export async function POST(request, props) {
     const params = await props.params;
@@ -21,13 +21,14 @@ export async function POST(request, props) {
             seatNumberPrefix,
             startingSeatNumber,
             issuedById,
+            showToParent = false, // NEW: Share with parents option
         } = body;
 
-        console.log('📝 Bulk Generate Request:', { 
-            examId, 
-            classId, 
-            sectionId, 
-            schoolId 
+        console.log('📝 Bulk Generate Request:', {
+            examId,
+            classId,
+            sectionId,
+            schoolId
         });
 
         // 1. Fetch exam
@@ -91,7 +92,7 @@ export async function POST(request, props) {
 
         // 4. Convert images to base64
         let layoutConfig = { ...template.layoutConfig };
-        
+
         // Convert logo
         if (layoutConfig?.logoUrl && !layoutConfig.logoUrl.startsWith('data:')) {
             try {
@@ -192,14 +193,16 @@ export async function POST(request, props) {
                         schoolId,
                         seatNumber,
                         center: center || null,
-                        fileUrl: pdfDataUrl, // 🔥 IMPORTANT: Store the PDF URL
                         layoutConfig: {
                             ...layoutConfig,
                             examDate,
                             examTime,
                             venue,
+                            fileUrl: pdfDataUrl, // Store PDF in layoutConfig
                         },
                         issueDate: new Date(),
+                        showToParent,
+                        sharedAt: showToParent ? new Date() : null,
                     },
                 });
 
@@ -230,17 +233,53 @@ export async function POST(request, props) {
 
         console.log(`✅ Bulk generation complete: ${results.successCount} success, ${results.failedCount} failed`);
 
+        // Send push notification to parents if showToParent is enabled
+        if (showToParent && results.successCount > 0) {
+            try {
+                // Get unique student IDs from successfully generated cards
+                const successStudentIds = results.admitCards.map(c => c.studentId || students.find(s => s.name === c.studentName)?.userId).filter(Boolean);
+
+                // Get parent user IDs for these students
+                const parentRelations = await prisma.studentParentLink.findMany({
+                    where: { studentId: { in: successStudentIds } },
+                    select: { parent: { select: { userId: true } }, student: { select: { user: { select: { name: true } } } } }
+                });
+
+                const parentUserIds = [...new Set(parentRelations.map(p => p.parent.userId))];
+
+                if (parentUserIds.length > 0) {
+                    await sendNotification({
+                        schoolId,
+                        title: "📋 Admit Card Available",
+                        message: `Admit card for ${exam.title} is now available for download`,
+                        type: 'GENERAL',
+                        priority: 'HIGH',
+                        icon: '📋',
+                        targetOptions: { userIds: parentUserIds },
+                        senderId: issuedById || 'system',
+                        sendPush: true,
+                        actionUrl: '/documents',
+                        metadata: { examId, examTitle: exam.title, type: 'admitcard' }
+                    });
+                    console.log(`📲 Sent notification to ${parentUserIds.length} parents`);
+                }
+            } catch (notifError) {
+                console.error('⚠️ Failed to send parent notification:', notifError.message);
+            }
+        }
+
         return NextResponse.json({
             ...results,
             totalCount: students.length,
             message: `Successfully generated ${results.successCount} admit cards`,
+            sharedWithParents: showToParent,
         }, { status: 201 });
 
     } catch (error) {
         console.error('❌ Bulk generation error:', error);
         return NextResponse.json(
-            { 
-                error: 'Failed to generate admit cards', 
+            {
+                error: 'Failed to generate admit cards',
                 message: error.message,
                 ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
             },

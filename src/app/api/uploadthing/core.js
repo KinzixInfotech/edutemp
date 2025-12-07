@@ -90,6 +90,14 @@ export const ourFileRouter = {
             return { url: file.ufsUrl }
         }),
 
+    homework: f({ pdf: { maxFileSize: "10MB" } })
+        .input(z.object({ schoolId: z.string(), classId: z.string() }))
+        .onUploadComplete(({ metadata, file }) => {
+            console.log("Homework uploaded for school:", metadata.schoolId)
+            console.log("File URL:", file.ufsUrl)
+            return { url: file.ufsUrl }
+        }),
+
 
     // Image upload for school media library
     schoolImageUpload: f({ image: { maxFileSize: "5MB", maxFileCount: 10 } })
@@ -151,7 +159,7 @@ export const ourFileRouter = {
             console.log("File URL:", file.ufsUrl)
             return { url: file.ufsUrl }
         }),
-    certificatePdf: f({ pdf: { maxFileSize: "10MB" } })
+    certificatePdf: f({ pdf: { maxFileSize: "32MB" } })
         .input(z.object({ schoolId: z.string() }))
         .onUploadComplete(({ metadata, file }) => {
             console.log("Certificate PDF uploaded for school:", metadata.schoolId)

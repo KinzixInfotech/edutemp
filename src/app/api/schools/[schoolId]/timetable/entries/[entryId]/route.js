@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { sendNotification } from '@/lib/notifications/notificationHelper';
 
 // GET /api/schools/[schoolId]/timetable/entries/[entryId]
 export async function GET(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     try {
         const { entryId } = params;
 
@@ -37,7 +38,7 @@ export async function GET(req, props) {
 
 // PUT /api/schools/[schoolId]/timetable/entries/[entryId]
 export async function PUT(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     try {
         const { entryId } = params;
         const body = await req.json();
@@ -63,6 +64,27 @@ export async function PUT(req, props) {
             },
         });
 
+        // Send notification to parents of students in this class
+        try {
+            await sendNotification({
+                schoolId: entry.schoolId,
+                title: '📅 Timetable Updated',
+                message: `Timetable for ${entry.class.className}${entry.section ? ' - ' + entry.section.name : ''} has been updated.`,
+                type: 'GENERAL',
+                priority: 'NORMAL',
+                icon: '📅',
+                targetOptions: {
+                    classIds: [entry.classId],
+                    userTypes: ['STUDENT'],
+                    includeParents: true,
+                },
+                sendPush: true,
+                actionUrl: '/my-child/parent-timetable',
+            });
+        } catch (notifErr) {
+            console.warn('Timetable update notification failed:', notifErr.message);
+        }
+
         return NextResponse.json(entry);
     } catch (error) {
         console.error('Error updating timetable entry:', error);
@@ -75,7 +97,7 @@ export async function PUT(req, props) {
 
 // DELETE /api/schools/[schoolId]/timetable/entries/[entryId]
 export async function DELETE(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     try {
         const { entryId } = params;
 

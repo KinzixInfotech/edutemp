@@ -1,5 +1,6 @@
 // lib/notifications/notificationHelper.js
 import prisma from "@/lib/prisma";
+import { messaging } from "@/lib/firebase-admin";
 
 /**
  * Send notification to users
@@ -509,19 +510,50 @@ async function sendPushNotifications({ userIds, title, message, data = {} }) {
             return;
         }
 
-        // Send to Firebase Cloud Messaging (implement based on your FCM setup)
-        // This is a placeholder - implement based on your FCM configuration
-        console.log(`Sending push notification to ${tokens.length} devices`);
+        // Sanitize data (FCM requires all values to be strings)
+        const stringifiedData = Object.entries(data).reduce((acc, [key, value]) => {
+            if (value !== null && value !== undefined) {
+                acc[key] = String(value);
+            }
+            return acc;
+        }, { click_action: 'FLUTTER_NOTIFICATION_CLICK' });
 
-        // Example FCM implementation (uncomment when FCM is configured):
-        /*
-        const admin = require('firebase-admin');
-        await admin.messaging().sendMulticast({
+        // Send to Firebase Cloud Messaging
+        console.log(`Sending push notification to ${tokens.length} devices`);
+        console.log(`Payload Title: ${title}`);
+
+        const response = await messaging.sendEachForMulticast({
             tokens,
-            notification: { title, body: message },
-            data
+            notification: {
+                title,
+                body: message,
+            },
+            data: stringifiedData,
+            android: {
+                notification: {
+                    channelId: 'default', // CRITICALLY IMPORTANT FOR ANDROID 8+
+
+                    priority: 'high',
+                },
+            },
+            apns: {
+                payload: {
+                    aps: {
+                        sound: 'default',
+                        contentAvailable: true,
+                    },
+                },
+            },
         });
-        */
+
+        console.log(`Sent notification to ${response.successCount} parents (Failed: ${response.failureCount})`);
+        if (response.failureCount > 0) {
+            response.responses.forEach((resp, idx) => {
+                if (!resp.success) {
+                    console.error(`Token ${tokens[idx]} failed:`, resp.error);
+                }
+            });
+        }
     } catch (error) {
         console.error('Push notification error:', error);
         // Don't throw error - push notification failure shouldn't break the flow

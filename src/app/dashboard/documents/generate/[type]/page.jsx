@@ -98,6 +98,7 @@ const formSchema = z.object({
     date: z.string().optional(),
     title: z.string().optional(),
     content: z.string().optional(),
+    showToParent: z.boolean().default(false),
 });
 
 export default function GenerateCertificatePage() {
@@ -125,6 +126,7 @@ export default function GenerateCertificatePage() {
             studentId: '',
             templateId: '',
             issueDate: new Date().toISOString().split('T')[0],
+            showToParent: false,
         },
     });
 
@@ -277,7 +279,7 @@ export default function GenerateCertificatePage() {
             const uploadFile = new File([pdfBlob], filename, { type: "application/pdf" });
 
             toast.message('Saving to history...');
-            const uploadRes = await startUpload([uploadFile]);
+            const uploadRes = await startUpload([uploadFile], { schoolId });
 
             if (uploadRes && uploadRes[0]) {
                 await fetch(`/api/documents/${schoolId}/certificates/history`, {
@@ -582,6 +584,26 @@ export default function GenerateCertificatePage() {
                                     />
                                 </div>
                             )}
+
+                            <div className="h-px bg-border my-2" />
+
+                            {/* Parent Sharing */}
+                            <div className="space-y-2">
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Share with Parents</Label>
+                                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                    <div className="space-y-0.5">
+                                        <Label className="text-sm dark:text-black font-medium">Push to Parents</Label>
+                                        <p className="text-[10px] dark:text-muted-foreground">
+                                            Send notification & make visible in parent app
+                                        </p>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        {...register('showToParent')}
+                                        className="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
+                                    />
+                                </div>
+                            </div>
                         </div>
                     </ScrollArea>
                 </div>

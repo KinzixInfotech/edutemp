@@ -79,8 +79,8 @@ export async function GET(req) {
             };
         }, 60); // 1 minute cache
 
-        // Return notifications array for backward compatibility
-        return NextResponse.json(result.data);
+        // Return the full result object
+        return NextResponse.json(result);
     } catch (error) {
         console.error("Fetch notifications error:", error);
         return NextResponse.json(

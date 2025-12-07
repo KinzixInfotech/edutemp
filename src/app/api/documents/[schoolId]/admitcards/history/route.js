@@ -87,7 +87,7 @@ export async function POST(request, props) {
         const body = JSON.parse(bodyStr);
         console.log("Admit Card History POST received:", { schoolId, bodySummary: { ...body, students: body.students?.length } });
 
-        const { examId, students, batchId: clientBatchId } = body;
+        const { examId, students, batchId: clientBatchId, showToParent } = body;
         let { zipUrl } = body; // Might be null if uploading now
 
         // 1. Handle Server-Side Upload if file is present
@@ -142,6 +142,8 @@ export async function POST(request, props) {
                 fileUrl: student.fileUrl || null // For single cards or specific overrides
             },
             issueDate: new Date(),
+            showToParent: showToParent || false,
+            sharedAt: showToParent ? new Date() : null,
         }));
 
         console.log("Saving admit cards count:", admitCardsData.length);
@@ -151,6 +153,38 @@ export async function POST(request, props) {
         });
 
         console.log("CreateMany result:", result);
+
+        // Send push notifications if showToParent is enabled
+        if (showToParent && students.length > 0) {
+            try {
+                const { sendNotification } = await import('@/lib/notifications/notificationHelper');
+
+                const studentIds = students.map(s => s.studentId).filter(Boolean);
+
+                // Get parent user IDs for these students
+                const parentRelations = await prisma.studentParentLink.findMany({
+                    where: { studentId: { in: studentIds } },
+                    select: { parent: { select: { userId: true } } }
+                });
+
+                const parentUserIds = [...new Set(parentRelations.map(p => p.parent.userId))];
+
+                if (parentUserIds.length > 0) {
+                    await sendNotification({
+                        schoolId,
+                        title: 'New Admit Card Available',
+                        message: 'An admit card has been shared with you. Check your Documents section.',
+                        type: 'EXAM',
+                        targetOptions: { userIds: parentUserIds },
+                        metadata: { type: 'admit_card', examId },
+                    });
+                    console.log(`Sent notification to ${parentUserIds.length} parents`);
+                }
+            } catch (notifError) {
+                console.error('Failed to send parent notifications:', notifError);
+                // Don't fail the whole request for notification errors
+            }
+        }
 
         return NextResponse.json({
             success: true,

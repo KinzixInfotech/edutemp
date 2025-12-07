@@ -133,11 +133,39 @@ export async function POST(req) {
         } = body;
 
         // Validation
-        if (!schoolId || !classId || !teacherId || !title || !dueDate) {
+        if (!schoolId || !classId || !title || !dueDate) {
             return NextResponse.json(
                 { error: "Missing required fields" },
                 { status: 400 }
             );
+        }
+
+        // Check if teacherId exists in TeachingStaff (optional - for non-teacher users)
+        let validTeacherId = null;
+        if (teacherId) {
+            const teacher = await prisma.teachingStaff.findUnique({
+                where: { userId: teacherId },
+                select: { userId: true }
+            });
+            if (teacher) {
+                validTeacherId = teacher.userId;
+            }
+        }
+
+        // If no valid teacher found, try to find any teacher from the school (for admin users)
+        if (!validTeacherId) {
+            const anyTeacher = await prisma.teachingStaff.findFirst({
+                where: { schoolId },
+                select: { userId: true }
+            });
+            if (anyTeacher) {
+                validTeacherId = anyTeacher.userId;
+            } else {
+                return NextResponse.json(
+                    { error: "No teachers found in this school. Please add a teacher first." },
+                    { status: 400 }
+                );
+            }
         }
 
         // Create homework
@@ -147,7 +175,7 @@ export async function POST(req) {
                 classId: parseInt(classId),
                 sectionId: sectionId ? parseInt(sectionId) : null,
                 subjectId: subjectId ? parseInt(subjectId) : null,
-                teacherId,
+                teacherId: validTeacherId,
                 title,
                 description,
                 fileUrl,

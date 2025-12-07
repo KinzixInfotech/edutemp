@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { generateAdmitCardPDF } from '@/lib/pdf-generator-admitcard';
+import { sendNotification } from '@/lib/notifications/notificationHelper';
 
 export async function POST(request, props) {
     const params = await props.params;
@@ -18,13 +19,14 @@ export async function POST(request, props) {
             examTime,
             venue,
             issuedById,
+            showToParent = false,
         } = body;
 
-        console.log('📝 Generate Admit Card Request:', { 
-            studentId, 
-            examId, 
-            seatNumber, 
-            schoolId 
+        console.log('📝 Generate Admit Card Request:', {
+            studentId,
+            examId,
+            seatNumber,
+            schoolId
         });
 
         // 1. Fetch student details
@@ -166,8 +168,11 @@ export async function POST(request, props) {
                     examDate,
                     examTime,
                     venue,
+                    fileUrl: pdfDataUrl,
                 },
                 issueDate: new Date(),
+                showToParent,
+                sharedAt: showToParent ? new Date() : null,
             },
             include: {
                 student: {
@@ -199,6 +204,33 @@ export async function POST(request, props) {
 
         console.log('✅ Admit card saved:', admitCard.id);
 
+        // Send notification to parent if showToParent enabled
+        if (showToParent) {
+            try {
+                const parentRelation = await prisma.studentParentLink.findFirst({
+                    where: { studentId: admitCard.studentId },
+                    select: { parent: { select: { userId: true } } }
+                });
+                if (parentRelation) {
+                    await sendNotification({
+                        schoolId,
+                        title: "📋 Admit Card Available",
+                        message: `Admit card for ${exam.title} is now available for ${student.name}`,
+                        type: 'GENERAL',
+                        priority: 'HIGH',
+                        icon: '📋',
+                        targetOptions: { userIds: [parentRelation.parent.userId] },
+                        senderId: issuedById || 'system',
+                        sendPush: true,
+                        actionUrl: '/documents',
+                        metadata: { examId, type: 'admitcard' }
+                    });
+                }
+            } catch (notifErr) {
+                console.warn('⚠️ Notification failed:', notifErr.message);
+            }
+        }
+
         return NextResponse.json({
             id: admitCard.id,
             seatNumber: admitCard.seatNumber,
@@ -213,8 +245,8 @@ export async function POST(request, props) {
     } catch (error) {
         console.error('❌ Error:', error);
         return NextResponse.json(
-            { 
-                error: 'Failed to generate admit card', 
+            {
+                error: 'Failed to generate admit card',
                 message: error.message,
                 ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
             },

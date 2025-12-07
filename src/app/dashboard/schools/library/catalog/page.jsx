@@ -97,7 +97,7 @@ export default function LibraryManagementPage() {
             ]);
 
             setStats(statsRes.data);
-            setBooks(booksRes.data.data);
+            setBooks(booksRes.data || []);
         } catch (error) {
             console.error("Failed to fetch library data", error);
             toast.error("Failed to load library data");

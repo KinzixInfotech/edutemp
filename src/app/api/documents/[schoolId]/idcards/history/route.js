@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { v4 as uuidv4 } from 'uuid';
+import { sendNotification } from '@/lib/notifications/notificationHelper';
 
 export async function GET(request, props) {
     const params = await props.params;
@@ -59,7 +60,7 @@ export async function POST(request, props) {
         }
 
         const body = JSON.parse(bodyStr);
-        const { students, batchId: clientBatchId, templateId, validUntil } = body;
+        const { students, batchId: clientBatchId, templateId, validUntil, showToParent = false, issuedById } = body;
         let { zipUrl } = body;
 
         // Server-side upload
@@ -96,13 +97,45 @@ export async function POST(request, props) {
                 zipUrl: zipUrl || null
             },
             generatedAt: new Date(),
+            showToParent,
+            sharedAt: showToParent ? new Date() : null,
         }));
 
         const result = await prisma.digitalIdCard.createMany({
             data: idCardsData
         });
 
-        return NextResponse.json({ success: true, count: result.count, batchId });
+        // Send notification to parents if showToParent is enabled
+        if (showToParent && students.length > 0) {
+            try {
+                const studentIds = students.map(s => s.studentId);
+                const parentRelations = await prisma.studentParentLink.findMany({
+                    where: { studentId: { in: studentIds } },
+                    select: { parent: { select: { userId: true } } }
+                });
+                const parentUserIds = [...new Set(parentRelations.map(p => p.parent.userId))];
+
+                if (parentUserIds.length > 0) {
+                    await sendNotification({
+                        schoolId,
+                        title: "🪪 ID Card Available",
+                        message: `New ID card is now available for download`,
+                        type: 'GENERAL',
+                        priority: 'NORMAL',
+                        icon: '🪪',
+                        targetOptions: { userIds: parentUserIds },
+                        senderId: issuedById || 'system',
+                        sendPush: true,
+                        actionUrl: '/documents',
+                        metadata: { batchId, type: 'idcard' }
+                    });
+                }
+            } catch (notifErr) {
+                console.warn('⚠️ Notification failed:', notifErr.message);
+            }
+        }
+
+        return NextResponse.json({ success: true, count: result.count, batchId, sharedWithParents: showToParent });
 
     } catch (error) {
         console.error('Error saving ID cards:', error);

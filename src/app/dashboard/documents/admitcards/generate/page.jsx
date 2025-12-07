@@ -47,6 +47,7 @@ const formSchema = z.object({
     examDate: z.string().min(1, 'Exam date is required'),
     examTime: z.string().optional(),
     venue: z.string().optional(),
+    showToParent: z.boolean().default(false),
 });
 
 export default function GenerateAdmitCardPage() {
@@ -77,6 +78,7 @@ export default function GenerateAdmitCardPage() {
             examDate: new Date().toISOString().split('T')[0],
             examTime: '',
             venue: '',
+            showToParent: false,
         },
     });
 
@@ -289,7 +291,7 @@ export default function GenerateAdmitCardPage() {
 
     }, [templateId, studentId, examId, seatNumber, center, examDate, examTime, venue, templates, students, exams, fullUser]);
 
-    const handleGeneratePDF = async () => {
+    const handleGeneratePDF = async (data) => {
         const canvasElement = document.querySelector('#admitcard-preview-container [style*="background"]');
 
         if (!canvasElement) {
@@ -345,6 +347,7 @@ export default function GenerateAdmitCardPage() {
             const payload = {
                 examId: examId || undefined,
                 zipUrl: null,
+                showToParent: data.showToParent || false,
                 students: [{
                     studentId,
                     seatNumber: seatNumber || '',
@@ -584,6 +587,26 @@ export default function GenerateAdmitCardPage() {
                                     placeholder="e.g., Room 201"
                                     className="h-9 text-sm"
                                 />
+                            </div>
+
+                            <div className="h-px bg-border my-2" />
+
+                            {/* Parent Sharing */}
+                            <div className="space-y-2">
+                                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Share with Parents</h3>
+                                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                    <div className="space-y-0.5">
+                                        <Label className="text-sm font-medium">Push to Parents</Label>
+                                        <p className="text-[10px] text-muted-foreground">
+                                            Send notification & make visible in parent app
+                                        </p>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        {...register('showToParent')}
+                                        className="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </ScrollArea>
