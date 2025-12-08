@@ -2608,6 +2608,7 @@ model LibraryBookCopy {
   id              String  @id @default(uuid()) @db.Uuid
   bookId          String  @db.Uuid
   accessionNumber String // Unique ID for the physical copy
+  barcode         String? @unique // Scannable barcode unique to this copy
   status          String  @default("AVAILABLE") // AVAILABLE, ISSUED, LOST, DAMAGED, RESERVED
   condition       String  @default("GOOD") // NEW, GOOD, FAIR, POOR
   location        String? // Shelf number etc.
@@ -2617,15 +2618,18 @@ model LibraryBookCopy {
 
   book         LibraryBook          @relation(fields: [bookId], references: [id], onDelete: Cascade)
   transactions LibraryTransaction[]
+  requests     LibraryBookRequest[]
 
-  @@unique([bookId, accessionNumber])
+  @@index([bookId])
   @@index([status])
+  @@index([barcode])
 }
 
 model LibraryTransaction {
   id       String @id @default(uuid()) @db.Uuid
-  copyId   String @db.Uuid
+  schoolId String @db.Uuid
   userId   String @db.Uuid // Student or Staff ID
+  copyId   String @db.Uuid // specific copy
   userType String // STUDENT, TEACHER, STAFF
 
   issueDate  DateTime  @default(now())
@@ -2676,7 +2680,9 @@ model LibraryBookRequest {
   // Approval Details
   approvedBy   String?   @db.Uuid
   approvedDate DateTime?
+  pickupCode   String?   @unique // 6-char unique code for collection
   pickupDate   DateTime? // Date by which book must be collected
+  copyId       String?   @db.Uuid // Assigned copy on approval
 
   // Collection Details
   collectedDate DateTime?
@@ -2690,8 +2696,9 @@ model LibraryBookRequest {
   remarks String?
 
   // Relations
-  school School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  book   LibraryBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  school School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  book   LibraryBook      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  copy   LibraryBookCopy? @relation(fields: [copyId], references: [id])
 
   @@index([schoolId])
   @@index([userId])

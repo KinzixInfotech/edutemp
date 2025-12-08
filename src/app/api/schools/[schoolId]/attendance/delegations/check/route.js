@@ -5,21 +5,39 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 
 const ISTDate = (input) => {
-    if (!input) {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        return new Date(`${year} -${month} -${day} T00:00:00.000Z`);
+    try {
+        if (!input || input === 'undefined' || input === 'null') {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return new Date(`${year}-${month}-${day}T00:00:00.000Z`);
+        }
+
+        let d;
+        if (typeof input === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input)) {
+            return new Date(`${input}T00:00:00.000Z`);
+        } else {
+            d = new Date(input);
+        }
+
+        if (isNaN(d.getTime())) {
+            // Invalid date, fallback to now
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return new Date(`${year}-${month}-${day}T00:00:00.000Z`);
+        }
+
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return new Date(`${year}-${month}-${day}T00:00:00.000Z`);
+    } catch (e) {
+        // Ultimate fallback
+        return new Date();
     }
-    if (typeof input === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input)) {
-        return new Date(`${input} T00:00:00.000Z`);
-    }
-    const d = new Date(input);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return new Date(`${year} -${month} -${day} T00:00:00.000Z`);
 };
 
 // Generate version hash for delegation tracking

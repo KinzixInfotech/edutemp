@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
 export async function GET(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     try {
         const { schoolId, bookId } = params;
 
@@ -109,6 +109,47 @@ export async function GET(req, props) {
         console.error("Error fetching book details:", error);
         return NextResponse.json(
             { error: "Failed to fetch book details" },
+            { status: 500 }
+        );
+    }
+}
+
+// DELETE - Delete a book
+export async function DELETE(req, props) {
+    const params = await props.params;
+    try {
+        const { schoolId, bookId } = params;
+
+        // Check if there are active loans
+        const activeLoans = await prisma.libraryTransaction.findFirst({
+            where: {
+                copy: {
+                    bookId: bookId
+                },
+                status: 'ISSUED'
+            }
+        });
+
+        if (activeLoans) {
+            return NextResponse.json(
+                { error: "Cannot delete book with active loans. Please return all copies first." },
+                { status: 400 }
+            );
+        }
+
+        // Delete book
+        await prisma.libraryBook.delete({
+            where: {
+                id: bookId,
+                schoolId: schoolId,
+            }
+        });
+
+        return NextResponse.json({ message: "Book deleted successfully" });
+    } catch (error) {
+        console.error("Error deleting book:", error);
+        return NextResponse.json(
+            { error: "Failed to delete book" },
             { status: 500 }
         );
     }

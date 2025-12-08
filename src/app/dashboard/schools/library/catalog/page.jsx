@@ -22,6 +22,16 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
     Table,
     TableBody,
     TableCell,
@@ -41,6 +51,7 @@ import {
     Search,
     Copy,
     BookMarked,
+    Trash2,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
@@ -63,6 +74,11 @@ export default function LibraryManagementPage() {
     const [isRequestBookOpen, setIsRequestBookOpen] = useState(false);
     const [requestRemarks, setRequestRemarks] = useState("");
     const [requestingBook, setRequestingBook] = useState(false);
+
+    // Delete state
+    const [bookToDelete, setBookToDelete] = useState(null);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
     const [bookForm, setBookForm] = useState({
         title: "",
@@ -161,6 +177,28 @@ export default function LibraryManagementPage() {
         } finally {
             setRequestingBook(false);
         }
+    };
+
+    const handleDeleteBook = async () => {
+        if (!bookToDelete) return;
+        setDeleting(true);
+        try {
+            await axios.delete(`/api/schools/${schoolId}/library/books/${bookToDelete.id}`);
+            toast.success("Book deleted successfully");
+            setBooks(books.filter((b) => b.id !== bookToDelete.id));
+            setIsDeleteDialogOpen(false);
+            setBookToDelete(null);
+            fetchData(); // Refresh stats
+        } catch (error) {
+            toast.error(error.response?.data?.error || "Failed to delete book");
+        } finally {
+            setDeleting(false);
+        }
+    };
+
+    const confirmDelete = (book) => {
+        setBookToDelete(book);
+        setIsDeleteDialogOpen(true);
     };
 
     const resetBookForm = () => {
@@ -538,6 +576,13 @@ export default function LibraryManagementPage() {
                                                 View Details
                                             </Button>
                                         </Link>
+                                        <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            onClick={() => confirmDelete(book)}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
                                     </div>
                                 </div>
                             ))}
@@ -545,6 +590,38 @@ export default function LibraryManagementPage() {
                     )}
                 </CardContent>
             </Card>
-        </div>
+
+            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the book
+                            "{bookToDelete?.title}" and all its copies from the library.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={(e) => {
+                                e.preventDefault();
+                                handleDeleteBook();
+                            }}
+                            disabled={deleting}
+                            className="bg-red-600 hover:bg-red-700"
+                        >
+                            {deleting ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Deleting...
+                                </>
+                            ) : (
+                                "Delete"
+                            )}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </div >
     );
 }

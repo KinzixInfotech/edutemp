@@ -5,7 +5,7 @@ import { getPagination, paginate } from "@/lib/api-utils";
 
 // GET - List all book requests
 export async function GET(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     try {
         const { schoolId } = params;
         const { searchParams } = new URL(req.url);
@@ -39,6 +39,23 @@ export async function GET(req, props) {
                                 ISBN: true,
                                 category: true,
                                 coverImage: true,
+                                copies: {
+                                    where: { status: 'AVAILABLE' },
+                                    select: {
+                                        id: true,
+                                        accessionNumber: true,
+                                        barcode: true,
+                                        condition: true
+                                    }
+                                }
+                            },
+                        },
+                        copy: {
+                            select: {
+                                id: true,
+                                accessionNumber: true,
+                                barcode: true,
+                                condition: true,
                             },
                         },
                     },
@@ -105,7 +122,7 @@ export async function GET(req, props) {
 
 // POST - Create new book request
 export async function POST(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     try {
         const { schoolId } = params;
         const body = await req.json();

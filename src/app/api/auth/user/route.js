@@ -399,7 +399,21 @@ export async function GET(req) {
             case "PARENT": {
                 const parent = await prisma.parent.findUnique({
                     where: { userId },
-                    include: { user: true, school: true, studentLinks: true },
+                    include: {
+                        user: true,          // fetch related User object
+                        school: true,        // fetch related School object
+                        studentLinks: {
+                            include: {
+                                student: {
+                                    include: {
+                                        class: true,
+                                        section: true,
+                                        user: true,
+                                    }
+                                }
+                            }
+                        },  // fetch related StudentParentLink array with student details
+                    },
                 });
                 console.log("✅ [API] Parent details fetched:", parent ? "Found" : "Not Found");
                 if (!parent) {

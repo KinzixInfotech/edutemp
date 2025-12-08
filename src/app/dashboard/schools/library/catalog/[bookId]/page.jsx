@@ -32,9 +32,13 @@ import {
     CheckCircle2,
     XCircle,
     Clock,
+    RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import dynamic from "next/dynamic";
+
+const Barcode = dynamic(() => import("react-barcode"), { ssr: false });
 
 export default function BookDetailPage() {
     const { fullUser } = useAuth();
@@ -53,8 +57,8 @@ export default function BookDetailPage() {
         }
     }, [schoolId, bookId]);
 
-    const fetchBookDetails = async () => {
-        setLoading(true);
+    const fetchBookDetails = async (showLoader = true) => {
+        if (showLoader) setLoading(true);
         try {
             const res = await axios.get(
                 `/api/schools/${schoolId}/library/books/${bookId}`
@@ -65,7 +69,21 @@ export default function BookDetailPage() {
             console.error("Failed to fetch book details", error);
             toast.error("Failed to load book details");
         } finally {
-            setLoading(false);
+            if (showLoader) setLoading(false);
+        }
+    };
+
+    const handleGenerateBarcode = async (copyId) => {
+        try {
+            const barcode = `LIB-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+            await axios.patch(
+                `/api/schools/${schoolId}/library/books/${bookId}/copies/${copyId}`,
+                { barcode }
+            );
+            toast.success("Barcode generated");
+            fetchBookDetails(false);
+        } catch (error) {
+            toast.error("Failed to generate barcode");
         }
     };
 
@@ -430,6 +448,7 @@ export default function BookDetailPage() {
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Accession Number</TableHead>
+                                        <TableHead>Barcode</TableHead>
                                         <TableHead>Status</TableHead>
                                         <TableHead>Condition</TableHead>
                                         <TableHead>Location</TableHead>
@@ -441,6 +460,29 @@ export default function BookDetailPage() {
                                         <TableRow key={copy.id}>
                                             <TableCell className="font-mono text-sm">
                                                 {copy.accessionNumber}
+                                            </TableCell>
+                                            <TableCell className="font-mono text-sm">
+                                                {copy.barcode ? (
+                                                    <div className="bg-white p-1 inline-block rounded border">
+                                                        <Barcode
+                                                            value={copy.barcode}
+                                                            width={1}
+                                                            height={30}
+                                                            fontSize={10}
+                                                            margin={0}
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleGenerateBarcode(copy.id)}
+                                                        className="h-7 text-xs"
+                                                    >
+                                                        <RefreshCw className="h-3 w-3 mr-1" />
+                                                        Generate
+                                                    </Button>
+                                                )}
                                             </TableCell>
                                             <TableCell>
                                                 <Badge {...getStatusBadge(copy.status)}>
