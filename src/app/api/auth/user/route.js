@@ -369,10 +369,15 @@ export async function GET(req) {
             case "TEACHING_STAFF": {
                 const teacher = await prisma.teachingStaff.findUnique({
                     where: { userId },
-                    select: { schoolId: true },
+                    include: {
+                        school: true,
+                        department: true,
+                    },
                 });
                 console.log("✅ [API] Teaching Staff details fetched:", teacher ? "Found" : "Not Found");
                 response.schoolId = teacher?.schoolId;
+                response.school = teacher?.school;
+                response.teacherData = teacher;
                 break;
             }
             case "NON_TEACHING_STAFF": {
