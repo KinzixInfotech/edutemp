@@ -28,6 +28,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function ExamListPage() {
   const { fullUser } = useAuth();
@@ -100,6 +107,20 @@ export default function ExamListPage() {
     setCopiedId(examId);
     toast.success("Exam URL copied to clipboard!");
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const updateExamStatus = async (examId, newStatus) => {
+    try {
+      await axios.put(
+        `/api/schools/${fullUser.schoolId}/examination/exams/${examId}`,
+        { status: newStatus }
+      );
+      toast.success(`Exam status updated to ${newStatus}`);
+      fetchExams();
+    } catch (error) {
+      console.error("Error updating exam status:", error);
+      toast.error("Failed to update exam status");
+    }
   };
 
   if (loading) {
@@ -191,17 +212,19 @@ export default function ExamListPage() {
                         : "Not set"}
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        variant={
-                          exam.status === "PUBLISHED"
-                            ? "default"
-                            : exam.status === "COMPLETED"
-                              ? "secondary"
-                              : "outline"
-                        }
+                      <Select
+                        value={exam.status}
+                        onValueChange={(newStatus) => updateExamStatus(exam.id, newStatus)}
                       >
-                        {exam.status}
-                      </Badge>
+                        <SelectTrigger className="w-[130px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="DRAFT">DRAFT</SelectItem>
+                          <SelectItem value="PUBLISHED">PUBLISHED</SelectItem>
+                          <SelectItem value="COMPLETED">COMPLETED</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">

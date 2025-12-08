@@ -166,7 +166,10 @@ export async function POST(req, props) {
                 const grossEarnings = basicEarned + hraEarned + daEarned + taEarned + medicalEarned + specialEarned;
 
                 // Calculate Loss of Pay
-                const lossOfPay = (daysAbsent * structure.grossSalary) / workingDays;
+                // NOTE: Since earnings are already pro-rated based on worked days (workFactor),
+                // we don't need to deduct LOP separately - that would be double-counting.
+                // LOP is only applicable if there are unpaid leave days beyond normal absence.
+                let lossOfPay = 0;
 
                 // Calculate statutory deductions
                 let pfEmployee = 0;

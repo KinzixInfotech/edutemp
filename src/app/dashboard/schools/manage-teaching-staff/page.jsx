@@ -15,10 +15,12 @@ export default function TeacherListPage() {
         queryKey: ["teachers", schoolId],
         queryFn: async () => {
             const res = await axios.get(`/api/schools/teaching-staff/${schoolId}`);
-            return res.data.data || [];
+            return res.data || [];
         },
         enabled: !!schoolId,
     });
+
+    console.log(teachers);
 
     const subjects = ["Math", "Science", "English", "History", "Physics", "Chemistry", "Biology", "Computer Science"];
 

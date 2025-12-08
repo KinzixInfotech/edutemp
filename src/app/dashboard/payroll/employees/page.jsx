@@ -192,6 +192,32 @@ export default function PayrollEmployees() {
         }
     });
 
+    // Auto-sync all staff mutation
+    const syncMutation = useMutation({
+        mutationFn: async () => {
+            const res = await fetch(`/api/schools/${schoolId}/payroll/employees/sync`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    employmentType: "PERMANENT"
+                })
+            });
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.error || "Failed to sync staff");
+            }
+            return res.json();
+        },
+        onSuccess: (result) => {
+            toast.success(result.message);
+            queryClient.invalidateQueries(["payroll-employees"]);
+            queryClient.invalidateQueries(["all-staff"]);
+        },
+        onError: (error) => {
+            toast.error(error.message);
+        }
+    });
+
     const handleAddEmployee = (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
@@ -204,6 +230,9 @@ export default function PayrollEmployees() {
             salaryStructureId: formData.get("salaryStructureId") || null
         });
     };
+
+    // Calculate not enrolled count
+    const notEnrolledCount = (availableStaff?.teaching?.length || 0) + (availableStaff?.nonTeaching?.length || 0);
 
     if (!schoolId) {
         return (
@@ -229,11 +258,16 @@ export default function PayrollEmployees() {
                     <Button variant="outline" size="icon" onClick={() => refetch()}>
                         <RefreshCw className="h-4 w-4" />
                     </Button>
-                    <Button variant="outline" onClick={() => setShowBulkDialog(true)}>
-                        <UsersRound className="mr-2 h-4 w-4" /> Add All Staff
+                    <Button
+                        variant="default"
+                        onClick={() => syncMutation.mutate()}
+                        disabled={syncMutation.isPending}
+                    >
+                        <UsersRound className="mr-2 h-4 w-4" />
+                        {syncMutation.isPending ? "Syncing..." : "Sync All Staff"}
                     </Button>
-                    <Button onClick={() => setShowAddDialog(true)}>
-                        <UserPlus className="mr-2 h-4 w-4" /> Add Employee
+                    <Button variant="outline" onClick={() => setShowAddDialog(true)}>
+                        <UserPlus className="mr-2 h-4 w-4" /> Add Single
                     </Button>
                 </div>
             </div>

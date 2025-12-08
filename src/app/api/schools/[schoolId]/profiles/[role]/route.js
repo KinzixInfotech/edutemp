@@ -287,6 +287,18 @@ export async function POST(req, context) {
                                 AcademicYear: { connect: { id: activeAcademicYear.id } },
                             },
                         });
+
+                        // ✅ Auto-create payroll profile for teaching staff
+                        await tx.employeePayrollProfile.create({
+                            data: {
+                                schoolId: parsed.schoolId,
+                                userId: user.id,
+                                employeeType: 'TEACHING',
+                                employmentType: 'PERMANENT',
+                                joiningDate: new Date(),
+                                isActive: true
+                            }
+                        });
                         break;
 
                     case "NON_TEACHING_STAFF":
@@ -338,6 +350,18 @@ export async function POST(req, context) {
                                 },
                             });
                         }
+
+                        // ✅ Auto-create payroll profile for non-teaching staff
+                        await tx.employeePayrollProfile.create({
+                            data: {
+                                schoolId: parsed.schoolId,
+                                userId: user.id,
+                                employeeType: 'NON_TEACHING',
+                                employmentType: 'PERMANENT',
+                                joiningDate: new Date(),
+                                isActive: true
+                            }
+                        });
                         break;
 
                     case "PARENT":

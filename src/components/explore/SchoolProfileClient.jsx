@@ -113,7 +113,7 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                             <img
                                 src={school.logoImage || school.school.profilePicture}
                                 alt={school.school.name}
-                                className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg object-cover border-2 shrink-0"
+                                className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-2 shrink-0"
                             />
                         ) : (
                             <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
