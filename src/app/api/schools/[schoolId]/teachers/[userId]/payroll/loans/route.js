@@ -22,7 +22,6 @@ export async function GET(req, props) {
             if (!profile) {
                 return { error: 'Payroll profile not found' };
             }
-
             // Get all loans for this employee
             const loans = await prisma.employeeLoan.findMany({
                 where: { employeeId: profile.id },

@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { messaging } from '@/lib/firebase-admin';
+import { remember, generateKey, invalidatePattern } from '@/lib/cache';
 
 export async function GET(request, props) {
     const params = await props.params;
@@ -27,152 +28,168 @@ export async function GET(request, props) {
             ...(priority && { priority }),
         };
 
-        let notices;
-        let totalCount;
-
-        if (userId) {
-            const user = await prisma.user.findUnique({
-                where: { id: userId },
-                include: {
-                    role: true,
-                    student: {
-                        include: {
-                            class: true,
-                            section: true,
-                        }
-                    },
-                    teacher: true,
-                }
-            });
-
-            if (!user) {
-                return NextResponse.json({ error: 'User not found' }, { status: 404 });
-            }
-
-            const audienceFilter = {
-                OR: [
-                    { audience: 'ALL' },
-                    { audience: user.role.name === 'STUDENT' ? 'STUDENTS' : 'TEACHERS' },
-                ]
-            };
-
-            if (user.student) {
-                audienceFilter.OR.push(
-                    {
-                        AND: [
-                            { audience: 'CLASS' },
-                            {
-                                NoticeTarget: {
-                                    some: {
-                                        classId: user.student.classId
-                                    }
-                                }
-                            }
-                        ]
-                    },
-                    {
-                        AND: [
-                            { audience: 'SECTION' },
-                            {
-                                NoticeTarget: {
-                                    some: {
-                                        sectionId: user.student.sectionId
-                                    }
-                                }
-                            }
-                        ]
-                    }
-                );
-            }
-
-            where.AND = [audienceFilter];
-
-            notices = await prisma.notice.findMany({
-                where,
-                include: {
-                    Author: {
-                        select: {
-                            name: true,
-                            email: true,
-                        }
-                    },
-                    NoticeReads: {
-                        where: { userId },
-                        select: { readAt: true }
-                    },
-                    _count: {
-                        select: { NoticeReads: true }
-                    }
-                },
-                orderBy: [
-                    { publishedAt: 'desc' }
-                ],
-                take: limit,
-                skip,
-            });
-
-            totalCount = await prisma.notice.count({ where });
-
-            notices = notices.map(notice => ({
-                id: notice.id,
-                title: notice.title,
-                subtitle: notice.subtitle || notice.description.substring(0, 100),
-                description: notice.description,
-                category: notice.category,
-                priority: notice.priority,
-                publishedAt: notice.publishedAt,
-                expiryDate: notice.expiryDate,
-                fileUrl: notice.fileUrl,
-                attachments: notice.attachments,
-                issuedBy: notice.issuedBy || notice.Author?.name,
-                issuerRole: notice.issuerRole,
-                importantDates: notice.importantDates,
-                read: notice.NoticeReads.length > 0,
-                readAt: notice.NoticeReads[0]?.readAt,
-                viewCount: notice._count.NoticeReads,
-                createdAt: notice.createdAt,
-            }));
-
-        } else {
-            notices = await prisma.notice.findMany({
-                where,
-                include: {
-                    Author: {
-                        select: {
-                            name: true,
-                            email: true,
-                        }
-                    },
-                    NoticeTarget: {
-                        include: {
-                            Class: { select: { className: true } },
-                            Section: { select: { name: true } },
-                        }
-                    },
-                    _count: {
-                        select: { NoticeReads: true }
-                    }
-                },
-                orderBy: [
-                    { priority: 'desc' },
-                    { publishedAt: 'desc' }
-                ],
-                take: limit,
-                skip,
-            });
-
-            totalCount = await prisma.notice.count({ where });
-        }
-
-        return NextResponse.json({
-            notices,
-            pagination: {
-                total: totalCount,
-                page,
-                limit,
-                totalPages: Math.ceil(totalCount / limit),
-            }
+        // Generate cache key based on all query params
+        const cacheKey = generateKey('notices:list', {
+            schoolId,
+            category,
+            status,
+            priority,
+            userId,
+            limit,
+            page
         });
+
+        const result = await remember(cacheKey, async () => {
+
+            let notices;
+            let totalCount;
+
+            if (userId) {
+                const user = await prisma.user.findUnique({
+                    where: { id: userId },
+                    include: {
+                        role: true,
+                        student: {
+                            include: {
+                                class: true,
+                                section: true,
+                            }
+                        },
+                        teacher: true,
+                    }
+                });
+
+                if (!user) {
+                    return NextResponse.json({ error: 'User not found' }, { status: 404 });
+                }
+
+                const audienceFilter = {
+                    OR: [
+                        { audience: 'ALL' },
+                        { audience: user.role.name === 'STUDENT' ? 'STUDENTS' : 'TEACHERS' },
+                    ]
+                };
+
+                if (user.student) {
+                    audienceFilter.OR.push(
+                        {
+                            AND: [
+                                { audience: 'CLASS' },
+                                {
+                                    NoticeTarget: {
+                                        some: {
+                                            classId: user.student.classId
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            AND: [
+                                { audience: 'SECTION' },
+                                {
+                                    NoticeTarget: {
+                                        some: {
+                                            sectionId: user.student.sectionId
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    );
+                }
+
+                where.AND = [audienceFilter];
+
+                notices = await prisma.notice.findMany({
+                    where,
+                    include: {
+                        Author: {
+                            select: {
+                                name: true,
+                                email: true,
+                            }
+                        },
+                        NoticeReads: {
+                            where: { userId },
+                            select: { readAt: true }
+                        },
+                        _count: {
+                            select: { NoticeReads: true }
+                        }
+                    },
+                    orderBy: [
+                        { publishedAt: 'desc' }
+                    ],
+                    take: limit,
+                    skip,
+                });
+
+                totalCount = await prisma.notice.count({ where });
+
+                notices = notices.map(notice => ({
+                    id: notice.id,
+                    title: notice.title,
+                    subtitle: notice.subtitle || notice.description.substring(0, 100),
+                    description: notice.description,
+                    category: notice.category,
+                    priority: notice.priority,
+                    publishedAt: notice.publishedAt,
+                    expiryDate: notice.expiryDate,
+                    fileUrl: notice.fileUrl,
+                    attachments: notice.attachments,
+                    issuedBy: notice.issuedBy || notice.Author?.name,
+                    issuerRole: notice.issuerRole,
+                    importantDates: notice.importantDates,
+                    read: notice.NoticeReads.length > 0,
+                    readAt: notice.NoticeReads[0]?.readAt,
+                    viewCount: notice._count.NoticeReads,
+                    createdAt: notice.createdAt,
+                }));
+
+            } else {
+                notices = await prisma.notice.findMany({
+                    where,
+                    include: {
+                        Author: {
+                            select: {
+                                name: true,
+                                email: true,
+                            }
+                        },
+                        NoticeTarget: {
+                            include: {
+                                Class: { select: { className: true } },
+                                Section: { select: { name: true } },
+                            }
+                        },
+                        _count: {
+                            select: { NoticeReads: true }
+                        }
+                    },
+                    orderBy: [
+                        { priority: 'desc' },
+                        { publishedAt: 'desc' }
+                    ],
+                    take: limit,
+                    skip,
+                });
+
+                totalCount = await prisma.notice.count({ where });
+            }
+
+            return {
+                notices,
+                pagination: {
+                    total: totalCount,
+                    page,
+                    limit,
+                    totalPages: Math.ceil(totalCount / limit),
+                }
+            };
+        }, 120); // Cache for 2 minutes
+
+        return NextResponse.json(result);
 
     } catch (error) {
         return NextResponse.json(

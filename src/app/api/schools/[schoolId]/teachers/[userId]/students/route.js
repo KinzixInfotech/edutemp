@@ -139,7 +139,7 @@ export async function GET(req, props) {
                     // Get student record to check admission/join date
                     const studentRecord = await prisma.student.findUnique({
                         where: { userId: student.id },
-                        select: { admissionDate: true, createdAt: true }
+                        select: { admissionDate: true }
                     });
 
                     // Use the later of academic year start or student admission date
@@ -148,11 +148,6 @@ export async function GET(req, props) {
                         const admissionDate = new Date(studentRecord.admissionDate);
                         if (admissionDate > academicYearStart) {
                             startDate = admissionDate;
-                        }
-                    } else if (studentRecord?.createdAt) {
-                        const createdDate = new Date(studentRecord.createdAt);
-                        if (createdDate > academicYearStart) {
-                            startDate = createdDate;
                         }
                     }
 

@@ -113,7 +113,7 @@ export default function LibraryTransactionsPage() {
                 const res = await axios.get(
                     `/api/schools/${schoolId}/library/books?search=${debouncedBookQuery}`
                 );
-                setBookSearchResults(res.data.data || []);
+                setBookSearchResults(res.data || []);
             } catch (error) {
                 console.error("Book search error:", error);
             } finally {
