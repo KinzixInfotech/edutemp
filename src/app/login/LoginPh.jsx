@@ -11,9 +11,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import image from '../../../public/edulogin.png';
-import { Loader2, Eye, EyeOff, Lock, Mail, ArrowRight, Shield, CheckCircle2, Sparkles } from "lucide-react"
+import { Loader2, Eye, EyeOff, Lock, Mail, ArrowRight, Shield, CheckCircle2, Sparkles, AlertCircle } from "lucide-react"
 import animation from "../../../public/er.json";
 import Lottie from "lottie-react"
+import axios from "axios"
 import Link from "next/link"
 import Image from "next/image"
 
@@ -45,7 +46,8 @@ export default function LoginPhoto({ className, ...props }) {
 
     useEffect(() => {
         if (!schoolCode) {
-            setLoadingl(false)
+            // Redirect to school login page if no school code
+            router.push('/schoollogin');
         } else {
             fetchSchool();
         }
@@ -76,6 +78,18 @@ export default function LoginPhoto({ className, ...props }) {
         setLoading(true);
 
         try {
+            // 0. Check rate limit first
+            const rateLimitCheck = await axios.get('/api/auth/check-rate-limit');
+
+            if (rateLimitCheck.data.blocked) {
+                setErrorMsg("Too many failed attempts. Please try again in 15 minutes.");
+                toast.error("Account Temporarily Locked", {
+                    description: "Too many failed login attempts. Your IP has been blocked for 15 minutes."
+                });
+                setLoading(false);
+                return;
+            }
+
             // 1. Authenticate with Supabase
             const { data, error } = await supabase.auth.signInWithPassword({
                 email,
@@ -83,8 +97,23 @@ export default function LoginPhoto({ className, ...props }) {
             });
 
             if (error || !data.user) {
-                setErrorMsg(error?.message || "Login failed");
-                toast.error("Authorization Failed", { description: error?.message });
+                // Record failed attempt
+                try {
+                    await axios.post('/api/auth/record-attempt', {
+                        email,
+                        success: false,
+                        reason: 'invalid_credentials',
+                        schoolCode: school?.schoolCode
+                    });
+                } catch (recordErr) {
+                    console.error('Failed to record attempt:', recordErr);
+                }
+
+                setErrorMsg(error?.message || "Invalid email or password");
+                toast.error("Login Failed", {
+                    description: error?.message || "Invalid email or password"
+                });
+                setLoading(false);
                 return;
             }
 
@@ -107,14 +136,64 @@ export default function LoginPhoto({ className, ...props }) {
                         description: "text-sm mt-1 !text-black dark:!text-white",
                     },
                 });
+                setLoading(false);
                 return;
             }
 
-            // 3. Success → store user in local state/cache
+            // 2.5 Validate school association if schoolCode is provided
+            if (schoolCode && school) {
+                // Check if user belongs to this school
+                if (result.schoolId !== school.id) {
+                    await supabase.auth.signOut();
+
+                    // Record failed attempt
+                    try {
+                        await axios.post('/api/auth/record-attempt', {
+                            email,
+                            success: false,
+                            reason: 'school_mismatch',
+                            schoolCode: school.schoolCode
+                        });
+                    } catch (recordErr) {
+                        console.error('Failed to record attempt:', recordErr);
+                    }
+
+                    setErrorMsg("Your account is not associated with this school");
+                    toast.error("Access Denied", {
+                        description: "Your account doesn't belong to " + school.name
+                    });
+                    setLoading(false);
+                    return;
+                }
+            } else if (!schoolCode) {
+                // No school code - only allow SUPER_ADMIN
+                if (result.role?.name !== 'SUPER_ADMIN') {
+                    await supabase.auth.signOut();
+                    setErrorMsg("School code required for your account type");
+                    toast.error("School Code Required", {
+                        description: "Please use the school login page with your school code"
+                    });
+                    setLoading(false);
+                    return;
+                }
+            }
+
+            // 3. Record successful login
+            try {
+                await axios.post('/api/auth/record-attempt', {
+                    email,
+                    success: true,
+                    schoolCode: school?.schoolCode
+                });
+            } catch (recordErr) {
+                console.error('Failed to record successful attempt:', recordErr);
+            }
+
+            // 4. Success → store user in local state/cache
             toast.success(`Welcome back, ${result.name || result.email}`);
             localStorage.setItem("user", JSON.stringify(result));
 
-            // 4. Create Session Record
+            // 5. Create Session Record
             try {
                 await fetch('/api/auth/sessions', {
                     method: 'POST',
@@ -322,20 +401,28 @@ export default function LoginPhoto({ className, ...props }) {
                                                 </div>
 
                                                 {/* Remember Me Checkbox */}
-                                                <div className="flex items-center space-x-2">
-                                                    <input
-                                                        type="checkbox"
-                                                        id="rememberMe"
-                                                        checked={rememberMe}
-                                                        onChange={(e) => setRememberMe(e.target.checked)}
-                                                        className="h-4 w-4 rounded border-gray-300 text-[#0c65f1] focus:ring-[#0c65f1]"
-                                                    />
-                                                    <label
-                                                        htmlFor="rememberMe"
-                                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-gray-700"
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center space-x-2">
+                                                        <input
+                                                            type="checkbox"
+                                                            id="rememberMe"
+                                                            checked={rememberMe}
+                                                            onChange={(e) => setRememberMe(e.target.checked)}
+                                                            className="h-4 w-4 rounded border-gray-300 text-[#0c65f1] focus:ring-[#0c65f1]"
+                                                        />
+                                                        <label
+                                                            htmlFor="rememberMe"
+                                                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-gray-700"
+                                                        >
+                                                            Remember me
+                                                        </label>
+                                                    </div>
+                                                    <Link
+                                                        href="/forgot-password"
+                                                        className="text-sm font-medium text-[#0c65f1] hover:underline"
                                                     >
-                                                        Remember me for 90 days
-                                                    </label>
+                                                        Forgot Password?
+                                                    </Link>
                                                 </div>
 
                                                 {/* Submit Button */}

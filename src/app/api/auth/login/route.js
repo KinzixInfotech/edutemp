@@ -42,7 +42,7 @@ export async function POST(req) {
     const isSchoolLogin = Boolean(schoolCode?.trim());
 
     // ✅ If school login — only allow school roles
-    const schoolRoles = ["ADMIN", "TEACHING_STAFF", "NON_TEACHING_STAFF", "STUDENT", "PARENT"];
+    const schoolRoles = ["ADMIN", "TEACHING_STAFF", "NON_TEACHING_STAFF", "STUDENT", "PARENT", "LIBRARIAN", "ACCOUNTANT"];
     if (isSchoolLogin && !schoolRoles.includes(user.role.name)) {
       await supabase.auth.signOut();
       return NextResponse.json({ error: "Only school users can login here" }, { status: 403 });
@@ -68,10 +68,10 @@ export async function POST(req) {
         schoolId = (await prisma.admin.findUnique({ where: { userId } }))?.schoolId;
         break;
       case "TEACHING_STAFF":
-        schoolId = (await prisma.teacher.findUnique({ where: { userId } }))?.schoolId;
+        schoolId = (await prisma.teachingStaff.findUnique({ where: { userId } }))?.schoolId;
         break;
       case "NON_TEACHING_STAFF":
-        schoolId = (await prisma.staff.findUnique({ where: { userId } }))?.schoolId;
+        schoolId = (await prisma.nonTeachingStaff.findUnique({ where: { userId } }))?.schoolId;
         break;
       case "STUDENT":
         schoolId = (await prisma.student.findFirst({ where: { userId } }))?.schoolId;
@@ -79,9 +79,15 @@ export async function POST(req) {
       case "PARENT":
         const parent = await prisma.parent.findUnique({
           where: { userId },
-          include: { students: { select: { schoolId: true }, take: 1 } },
+          include: { studentLinks: { select: { student: { select: { schoolId: true } } }, take: 1 } },
         });
-        schoolId = parent?.students?.[0]?.schoolId || null;
+        schoolId = parent?.studentLinks?.[0]?.student?.schoolId || null;
+        break;
+      case "LIBRARIAN":
+        schoolId = (await prisma.librarian.findUnique({ where: { userId } }))?.schoolId;
+        break;
+      case "ACCOUNTANT":
+        schoolId = (await prisma.accountant.findUnique({ where: { userId } }))?.schoolId;
         break;
     }
 

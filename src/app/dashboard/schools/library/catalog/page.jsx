@@ -61,6 +61,7 @@ import Link from "next/link";
 export default function LibraryManagementPage() {
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;
+    console.log(fullUser, 'from catalog');
 
     const [stats, setStats] = useState(null);
     const [books, setBooks] = useState([]);

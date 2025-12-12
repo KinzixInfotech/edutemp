@@ -7,7 +7,7 @@ export default function Home() {
     return (
         <div className="">
             {/* hero section */}
-            <Hero/>
+            <Hero />
             {/* feature section */}
             {/* <FeatureTabs /> */}
             {/* alternate features */}

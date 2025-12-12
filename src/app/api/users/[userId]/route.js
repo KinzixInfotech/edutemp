@@ -138,7 +138,7 @@ export async function PATCH(req, props) {
         }
 
         const mappedRole = existingUser.role.name;
-        console.log(mappedRole,'mapped role')
+        console.log(mappedRole, 'mapped role')
         let parsed;
 
         // Validate payload based on role
@@ -163,6 +163,12 @@ export async function PATCH(req, props) {
                     delete parsed.adminData.name;
                     console.log("Moved adminData.name to parsed.name:", parsed.name); // Debug
                 }
+                break;
+            case "LIBRARIAN":
+                parsed = baseUserSchema.parse(body);
+                break;
+            case "ACCOUNTANT":
+                parsed = baseUserSchema.parse(body);
                 break;
             case "SUPER_ADMIN":
                 parsed = superAdminSchema.parse(body);

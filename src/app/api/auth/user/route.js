@@ -429,6 +429,28 @@ export async function GET(req) {
                 response.school = parent?.school;
                 break;
             }
+            case "LIBRARIAN": {
+                const librarian = await prisma.librarian.findUnique({
+                    where: { userId },
+                    include: { school: true },
+                });
+                console.log("✅ [API] Librarian details fetched:", librarian ? "Found" : "Not Found");
+                response.schoolId = librarian?.schoolId;
+                response.school = librarian?.school;
+                response.librarianData = librarian;
+                break;
+            }
+            case "ACCOUNTANT": {
+                const accountant = await prisma.accountant.findUnique({
+                    where: { userId },
+                    include: { school: true },
+                });
+                console.log("✅ [API] Accountant details fetched:", accountant ? "Found" : "Not Found");
+                response.schoolId = accountant?.schoolId;
+                response.school = accountant?.school;
+                response.accountantData = accountant;
+                break;
+            }
             case "PARTNER": {
                 const partner = await prisma.partner.findUnique({
                     where: { userId },

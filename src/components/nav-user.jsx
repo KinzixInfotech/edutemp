@@ -85,9 +85,10 @@ export function NavUser({ }) {
                             <Avatar className="h-8 w-8  rounded-full` ">
                                 <AvatarImage src={fullUser?.
                                     profilePicture} alt={fullUser?.name} />
-                                <AvatarFallback className="rounded-full">
-
-                                    {fullUser?.email?.[0]?.toUpperCase() ?? "U"}
+                                <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
+                                    {fullUser?.name
+                                        ? fullUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+                                        : "U"}
                                 </AvatarFallback>
                             </Avatar>
                             <div className="grid flex-1 text-left text-sm leading-tight">
@@ -109,8 +110,10 @@ export function NavUser({ }) {
                             <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                                 <Avatar className="h-8 w-8 rounded-full">
                                     <AvatarImage src={fullUser?.profilePicture} alt={fullUser?.name} />
-                                    <AvatarFallback className="rounded-full">
-                                        {fullUser?.email?.[0]?.toUpperCase() ?? "U"}
+                                    <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
+                                        {fullUser?.name
+                                            ? fullUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+                                            : "U"}
                                     </AvatarFallback>
                                 </Avatar>
                                 <div className="grid flex-1 text-left text-sm leading-tight">

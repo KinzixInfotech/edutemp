@@ -24,6 +24,7 @@ const footerData = {
             items: [
                 { label: "Support", link: "/support" },
                 { label: "Pricing", link: "/pricing" },
+                { label: "Developer Login", link: "/developer-login" },
                 { label: "Community", link: "/community" },
                 { label: "Knowledge Base", link: "/kb" },
                 { label: "My Account", link: "/account" },

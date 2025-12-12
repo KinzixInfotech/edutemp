@@ -10,6 +10,19 @@ export async function middleware(request) {
     const hostname = request.headers.get('host') || '';
 
     // ============================================
+    // AUTH CALLBACK FALLBACK
+    // ============================================
+    // If Supabase redirects to root (likely due to missing whitelist entry),
+    // forward the code to the callback handler to complete login.
+    if (pathname === '/' && request.nextUrl.searchParams.has('code')) {
+        const callbackUrl = new URL('/auth/callback', request.url);
+        callbackUrl.search = request.nextUrl.search;
+        // Default to reset-password if type is recovery (though usually type isn't passed in search params)
+        // We preserve next param if it exists, otherwise it defaults to dashboard in the callback
+        return NextResponse.redirect(callbackUrl);
+    }
+
+    // ============================================
     // DOMAIN-BASED ROUTING (School Explorer)
     // ============================================
 

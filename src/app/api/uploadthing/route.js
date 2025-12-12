@@ -7,8 +7,8 @@ const f = createUploadthing();
 export const ourFileRouter = {
   profilePictureUploader: f({ image: { maxFileSize: "4MB" } })
     .input(z.object({
-      schoolId: z.string().nullable(),
-      username: z.string().nullable(),
+      schoolId: z.string().nullish(),
+      username: z.string().nullish(),
     }))
     .onUploadComplete(async ({ metadata, file }) => {
       if (metadata.schoolId) {
@@ -24,7 +24,25 @@ export const ourFileRouter = {
       }
       return { url: file.ufsUrl };
     }),
-
+  // profilePictureUploaderEdubreezy: f({ image: { maxFileSize: "4MB" } })
+  //   .input(z.object({
+  //     schoolId: z.string().nullable(),
+  //     username: z.string().nullable(),
+  //   }))
+  //   .onUploadComplete(async ({ metadata, file }) => {
+  //     if (metadata.schoolId) {
+  //       await prisma.upload.create({
+  //         data: {
+  //           schoolId: metadata.schoolId,
+  //           fileUrl: file.ufsUrl,
+  //           fileName: file.name,
+  //           mimeType: file.type,
+  //           size: file.size,
+  //         },
+  //       });
+  //     }
+  //     return { url: file.ufsUrl };
+  //   }),
   feeReceiptUploader: f({ pdf: { maxFileSize: "2MB" } })
     .input(z.object({
       paymentId: z.string(),
@@ -40,8 +58,8 @@ export const ourFileRouter = {
 
   logoupload: f({ image: { maxFileSize: "4MB" } })
     .input(z.object({
-      schoolId: z.string().nullable(),
-      username: z.string().nullable(),
+      schoolId: z.string().nullish(),
+      username: z.string().nullish(),
     }))
     .onUploadComplete(async ({ metadata, file }) => {
       if (metadata.schoolId) {

@@ -866,6 +866,84 @@ export function Profile() {
         );
         break;
 
+      case "LIBRARIAN":
+        profileFields = (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+            <ProfileItem
+              label="Name"
+              value={updatedFields.name || fullUser?.name}
+              name="name"
+              onChange={handleInputChange}
+            />
+            <ProfileItem
+              label="Email"
+              value={updatedFields.email || fullUser?.email}
+              name="email"
+              onChange={handleInputChange}
+            />
+            <ProfileItem
+              label="School"
+              value={fullUser?.school?.name}
+              name="school"
+            />
+            <ProfileItem
+              label="School Code"
+              value={fullUser?.school?.schoolCode}
+              name="schoolCode"
+            />
+            <ProfileItem
+              label="Role"
+              value={fullUser?.role?.name}
+              name="role"
+            />
+            <ProfileItem
+              label="Joined Date"
+              value={fullUser?.librarianData?.createdAt ? new Date(fullUser?.librarianData?.createdAt).toLocaleDateString() : ''}
+              name="joinedDate"
+            />
+          </div>
+        );
+        break;
+
+      case "ACCOUNTANT":
+        profileFields = (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+            <ProfileItem
+              label="Name"
+              value={updatedFields.name || fullUser?.name}
+              name="name"
+              onChange={handleInputChange}
+            />
+            <ProfileItem
+              label="Email"
+              value={updatedFields.email || fullUser?.email}
+              name="email"
+              onChange={handleInputChange}
+            />
+            <ProfileItem
+              label="School"
+              value={fullUser?.school?.name}
+              name="school"
+            />
+            <ProfileItem
+              label="School Code"
+              value={fullUser?.school?.schoolCode}
+              name="schoolCode"
+            />
+            <ProfileItem
+              label="Role"
+              value={fullUser?.role?.name}
+              name="role"
+            />
+            <ProfileItem
+              label="Joined Date"
+              value={fullUser?.accountantData?.createdAt ? new Date(fullUser?.accountantData?.createdAt).toLocaleDateString() : ''}
+              name="joinedDate"
+            />
+          </div>
+        );
+        break;
+
       case "SUPER_ADMIN":
         profileFields = (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">

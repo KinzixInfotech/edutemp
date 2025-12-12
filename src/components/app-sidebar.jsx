@@ -504,6 +504,27 @@ export const SidebarData = [
         ],
     },
     {
+        title: "Librarian Dashboard",
+        items: [
+            { label: "Home", url: "/dashboard", icon: House, roles: ["LIBRARIAN"] },
+            { label: "Manage Books", url: "/dashboard/schools/library/catalog", icon: BookOpen, roles: ["LIBRARIAN"] },
+            { label: "Issue & Return", url: "/dashboard/schools/library/issue", icon: BookMarked, roles: ["LIBRARIAN"] },
+            { label: "Book Requests", url: "/dashboard/schools/library/requests", icon: Inbox, roles: ["LIBRARIAN"] },
+            { label: "Fines & Reports", url: "/dashboard/schools/library/fines", icon: Receipt, roles: ["LIBRARIAN"] },
+        ],
+    },
+    {
+        title: "Accountant Dashboard",
+        items: [
+            { label: "Home", url: "/dashboard", icon: House, roles: ["ACCOUNTANT"] },
+            { label: "Fee Overview", url: "/dashboard/fees/overview", icon: LayoutDashboard, roles: ["ACCOUNTANT"] },
+            { label: "Manage Fee Structure", url: "/dashboard/fees/manage-fee-structure", icon: FileSpreadsheet, roles: ["ACCOUNTANT"] },
+            { label: "Track Payments", url: "/dashboard/fees/payments", icon: CreditCard, roles: ["ACCOUNTANT"] },
+            { label: "Reports", url: "/dashboard/fees/reports", icon: BarChart3, roles: ["ACCOUNTANT"] },
+            { label: "Fee Settings", url: "/dashboard/fees/settings", icon: Settings, roles: ["ACCOUNTANT"] },
+        ],
+    },
+    {
         title: "Transport Management",
         items: [
             {
@@ -559,6 +580,20 @@ export const SidebarData = [
         title: "Alumni",
         items: [
             { label: "Alumni Management", url: "/dashboard/schools/alumni/", icon: TrendingUp, roles: ["ADMIN"] },
+        ],
+    },
+    {
+        title: "Settings",
+        items: [
+            {
+                label: "System Settings",
+                icon: Settings,
+                roles: ["ADMIN"],
+                submenu: [
+                    { label: "Role Management", url: "/dashboard/settings/roles", roles: ["ADMIN"] },
+                    { label: "General Settings", url: "/dashboard/settings/general", roles: ["ADMIN"] },
+                ],
+            },
         ],
     },
 ]

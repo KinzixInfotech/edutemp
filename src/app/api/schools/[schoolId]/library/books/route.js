@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
 import { remember, generateKey, invalidatePattern } from "@/lib/cache";
 
 // GET: List all books with filtering and pagination

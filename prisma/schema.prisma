@@ -92,6 +92,8 @@ model School {
   payrollPeriods   PayrollPeriod[]
   leaveBuckets     LeaveBucket[]
   payrollAuditLogs PayrollAuditLog[]
+  librarians       Librarian[]
+  accountants      Accountant[]
 
   @@index([name])
 }
@@ -1157,19 +1159,21 @@ model Role {
 }
 
 model User {
-  id             String     @id @db.Uuid
-  schoolId       String?    @db.Uuid
+  id             String      @id @db.Uuid
+  schoolId       String?     @db.Uuid
   roleId         Int
-  email          String     @unique
+  email          String      @unique
   password       String
   name           String?
-  gender         String     @default("Unknown")
-  profilePicture String     @default("default.png")
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  gender         String      @default("Unknown")
+  profilePicture String      @default("default.png")
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
   deletedAt      DateTime?
-  status         UserStatus @default(ACTIVE)
+  status         UserStatus  @default(ACTIVE)
   Admin          Admin?
+  librarian      Librarian?
+  accountant     Accountant?
   fcmToken       String?
 
   AuditLog              AuditLog[]
@@ -1266,6 +1270,32 @@ model MasterAdmin {
   schoolId String @unique @db.Uuid
   school   School @relation(fields: [schoolId], references: [id])
   User     User   @relation(fields: [userId], references: [id])
+}
+
+model Librarian {
+  userId      String    @id @db.Uuid
+  schoolId    String    @db.Uuid
+  permissions Json? // Flexible permission structure
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  school      School    @relation(fields: [schoolId], references: [id])
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@index([schoolId])
+}
+
+model Accountant {
+  userId      String    @id @db.Uuid
+  schoolId    String    @db.Uuid
+  permissions Json? // Flexible permission structure
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  school      School    @relation(fields: [schoolId], references: [id])
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@index([schoolId])
 }
 
 model Student {
@@ -4430,4 +4460,19 @@ enum PayrollEntityType {
   LOAN
   DEDUCTION
   LEAVE_BUCKET
+}
+
+model LoginAttempt {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String
+  ipAddress String
+  success   Boolean
+  reason    String?
+  schoolId  String?  @db.Uuid
+  timestamp DateTime @default(now())
+  userAgent String?
+
+  @@index([ipAddress])
+  @@index([email])
+  @@index([timestamp])
 }
