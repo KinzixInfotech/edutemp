@@ -65,7 +65,7 @@ export async function middleware(request) {
     // ============================================
 
     // Define protected routes
-    const isProtectedRoute = pathname.startsWith('/dashboard');
+    const isProtectedRoute = pathname.startsWith('/dashboard') || pathname.startsWith('/reset-password');
     const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/signup');
     const isPublicRoute = pathname === '/' || pathname.startsWith('/api/auth');
 
@@ -226,5 +226,6 @@ export const config = {
         '/api/auth/:path*',
         '/explore/:path*',  // Add for school subdomain routing
         '/',                 // Add for root subdomain redirect
+        '/reset-password',   // Check auth for reset password
     ],
 };

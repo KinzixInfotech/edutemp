@@ -591,7 +591,6 @@ export const SidebarData = [
                 roles: ["ADMIN"],
                 submenu: [
                     { label: "Role Management", url: "/dashboard/settings/roles", roles: ["ADMIN"] },
-                    { label: "General Settings", url: "/dashboard/settings/general", roles: ["ADMIN"] },
                 ],
             },
         ],

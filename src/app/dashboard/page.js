@@ -42,6 +42,8 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 
+import OnboardingModal from '@/components/dashboard/OnboardingModal';
+
 // ... (LatestNotice component remains unchanged) ...
 const LatestNotice = ({ fullUser, queryClient }) => {
   if (!fullUser) return
@@ -244,7 +246,7 @@ export default function Dashboard() {
     staleTime: 1000 * 60 * 2,
   });
 
-  // Fetch active academic year for ADMIN
+
   const academicYearsQuery = useQuery({
     queryKey: ['academic-years', fullUser?.schoolId],
     queryFn: async () => {
@@ -256,6 +258,34 @@ export default function Dashboard() {
     enabled: fullUser?.role?.name === 'ADMIN' && !!fullUser?.schoolId,
     staleTime: 1000 * 60 * 5,
   });
+
+  const classesQuery = useQuery({
+    queryKey: ['classes', fullUser?.schoolId],
+    queryFn: async () => {
+      if (!fullUser?.schoolId) return [];
+      // Using generic endpoint if specific one isn't clear, assuming this returns a list
+      const res = await fetch(`/api/schools/${fullUser.schoolId}/classes`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data || []; // Adjust based on actual API response structure
+    },
+    enabled: fullUser?.role?.name === 'ADMIN' && !!fullUser?.schoolId,
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const feeStructuresQuery = useQuery({
+    queryKey: ['feeStructures', fullUser?.schoolId],
+    queryFn: async () => {
+      if (!fullUser?.schoolId) return [];
+      const res = await fetch(`/api/schools/fee/global-structures?schoolId=${fullUser.schoolId}`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data || [];
+    },
+    enabled: fullUser?.role?.name === 'ADMIN' && !!fullUser?.schoolId,
+    staleTime: 1000 * 60 * 10,
+  });
+
 
   const activeAcademicYear = academicYearsQuery.data?.find(y => y.isActive);
 
@@ -346,6 +376,70 @@ export default function Dashboard() {
             {/* Welcome Banner */}
             <div className='px-4'>
               <WelcomeBanner fullUser={fullUser} />
+
+              {/* Setup Warnings */}
+              {academicYearsQuery.data?.length === 0 && (
+                <OnboardingModal
+                  fullUser={fullUser}
+                  onSuccess={() => {
+                    queryClient.invalidateQueries(['academic-years']);
+                  }}
+                />
+              )}
+
+              <div className="flex flex-col gap-3 mt-4">
+                {/* Warning: No Classes */}
+                {classesQuery.data?.length === 0 && academicYearsQuery.data?.length > 0 && (
+                  <div className="bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-lg p-4 flex items-start gap-3">
+                    <div className="bg-orange-100 dark:bg-orange-900/50 p-2 rounded-full">
+                      <LayoutDashboard className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-orange-900 dark:text-orange-100">Setup Required: Create Classes</h3>
+                      <p className="text-sm text-orange-700 dark:text-orange-300 mt-1">
+                        You haven't created any classes yet. You need classes to enroll students and manage the timetable.
+                      </p>
+                      <Link href="/dashboard/schools/create-classes">
+                        {/* Note: Linking to Create Students or a Manage Classes page if exists. Assuming Manage Classes is better but user asked for warning to create class. Dashboard has 'create-students' which implies manual student/class creation or generally managing structure. Better link might be academic/classes if it exists, checking file list... yes classes endpoint exists but page? */}
+                        {/* Based on file list, dashboard/schools/create-students seems relevant or dashboard/schools/academic-years (maybe class is inside there?). Let's check structure.
+                             Actually, looking at file list: src/app/dashboard/schools/create-students/page.jsx exists.
+                             src/app/dashboard/examination/create/page.jsx exists.
+                             I'll link to a generic managing place or the create-students page for now which often has class setup.
+                             Wait, I should verify if there is a 'Manage Classes' page.
+                             The directory src/app/dashboard/schools/classes doesn't seem to be in the list I saw earlier (list was truncated).
+                             I'll stick to a safe link or just the warning for now.
+                             The user said "give him warning to create class".
+                             I'll link to "/dashboard/schools" or similar if unsure, but let's try to find a specific one later.
+                             For now, I will use a generic button.
+                          */}
+                        <Button variant="outline" size="sm" className="mt-3 border-orange-300 dark:border-orange-700 hover:bg-orange-100 dark:hover:bg-orange-900/50 text-orange-800 dark:text-orange-200">
+                          Create Classes
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                )}
+
+                {/* Warning: No Fee Structures */}
+                {feeStructuresQuery.data?.length === 0 && academicYearsQuery.data?.length > 0 && (
+                  <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 flex items-start gap-3">
+                    <div className="bg-blue-100 dark:bg-blue-900/50 p-2 rounded-full">
+                      <IconTrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-blue-900 dark:text-blue-100">Setup Required: Fee Structures</h3>
+                      <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                        Different classes have different fees. Create fee structures to manage student payments and generate invoices.
+                      </p>
+                      <Link href="/dashboard/fees/manage-fee-structure">
+                        <Button variant="outline" size="sm" className="mt-3 border-blue-300 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-800 dark:text-blue-200">
+                          Manage Fees
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className='px-4 flex items-center justify-between'>

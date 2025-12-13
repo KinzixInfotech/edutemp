@@ -604,6 +604,12 @@ export function Profile() {
           ...(updatedFields.name && { name: updatedFields.name }),
           ...(updatedFields.email && { email: updatedFields.email }),
         };
+      } else if (role === "ACCOUNTANT" || role === "LIBRARIAN") {
+        payload = {
+          ...payload,
+          ...(updatedFields.name && { name: updatedFields.name }),
+          ...(updatedFields.email && { email: updatedFields.email }),
+        };
       }
 
       // Include profile picture if uploaded
@@ -997,6 +1003,10 @@ export function Profile() {
         originalData = { ...fullUser.school, name: fullUser?.name, email: fullUser?.email, id: fullUser?.id, domain: fullUser?.school?.domain };
         break;
       case "SUPER_ADMIN":
+        originalData = { name: fullUser?.name, email: fullUser?.email, role: fullUser?.role?.name };
+        break;
+      case "ACCOUNTANT":
+      case "LIBRARIAN":
         originalData = { name: fullUser?.name, email: fullUser?.email, role: fullUser?.role?.name };
         break;
       default:

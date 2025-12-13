@@ -136,7 +136,7 @@ const Hero = () => {
                             Enter Your School Code
                         </label>
 
-                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                        <div className="flex flex-col gap-2 sm:gap-3">
                             {/* Input Group */}
                             <div className="flex flex-1 items-center gap-2 bg-gray-50 border-2 border-gray-200 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 focus-within:ring-2 transition-all"
                                 style={{
@@ -165,10 +165,10 @@ const Hero = () => {
                             <Link
                                 href={code ? `/login?schoolCode=EB-${code}` : "#"}
                                 passHref
-                                className="w-full sm:w-auto"
+                                className="w-full"
                             >
                                 <Button
-                                    className="w-full sm:w-auto h-11 sm:h-12 px-6 sm:px-8 text-white font-bold text-sm sm:text-base rounded-xl shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 active:scale-95 group"
+                                    className="w-full h-11 sm:h-12 px-6 sm:px-8 text-white font-bold text-sm sm:text-base rounded-xl border disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 active:scale-95 group"
                                     disabled={!code}
                                     style={{
                                         background: code ? 'linear-gradient(135deg, #0c65f1 0%, #0a52c6 100%)' : '#cbd5e1'
@@ -180,8 +180,8 @@ const Hero = () => {
                                         if (code) e.currentTarget.style.background = 'linear-gradient(135deg, #0c65f1 0%, #0a52c6 100%)';
                                     }}
                                 >
-                                    <span>Get Started</span>
-                                    <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 ml-1 sm:ml-2 group-hover:translate-x-1 transition-transform" />
+                                    <span>Continue</span>
+                                    <ChevronRight size={45} className="group-hover:translate-x-1 transition-transform" />
                                 </Button>
                             </Link>
                         </div>

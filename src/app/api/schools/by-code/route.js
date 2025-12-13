@@ -12,6 +12,7 @@ export async function GET(req) {
 
     const school = await prisma.school.findUnique({
         where: { schoolCode: code },
+        include: { publicProfile: true }
     });
 
     if (!school) {

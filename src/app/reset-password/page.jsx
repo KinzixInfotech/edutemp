@@ -6,8 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Lock, Eye, EyeOff, Loader2, CheckCircle2 } from 'lucide-react';
+import { Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -18,18 +17,18 @@ export default function ResetPasswordPage() {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [verifying, setVerifying] = useState(true);
     const [session, setSession] = useState(null);
 
     useEffect(() => {
         // Check for active session (established via callback)
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        const checkSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
             setSession(session);
-            if (!session) {
-                // If no session, they might have lost the link context or it expired
-                // But the middleware/callback should have established it.
-                // We will show a warning if no session is found after a short delay
-            }
-        });
+            setVerifying(false);
+        };
+
+        checkSession();
 
         const {
             data: { subscription },
@@ -100,99 +99,110 @@ export default function ResetPasswordPage() {
         }
     };
 
-    if (!session && !loading) {
-        // Optional: Render loading state or error if session detection takes time
-        // But usually it's fast. If persistent no session, show message.
+    if (verifying) {
+        return (
+            <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+            </div>
+        );
+    }
+
+    if (!session) {
+        return (
+            <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4 font-sans">
+                <div className="w-full max-w-[480px] bg-white rounded-[32px] shadow-2xl shadow-gray-200/50 p-8 sm:p-12 text-center">
+                    <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Lock className="w-8 h-8 text-red-500" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Invalid or Expired Link</h2>
+                    <p className="text-gray-500 mb-8">
+                        The password reset link is invalid or has expired. Please request a new one.
+                    </p>
+                    <Link href="/forgot-password">
+                        <Button className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl">
+                            Request New Link
+                        </Button>
+                    </Link>
+                </div>
+            </div>
+        );
     }
 
     return (
-        <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center p-4 relative overflow-hidden">
-            {/* Subtle background pattern */}
-            <div className="absolute inset-0 opacity-[0.03]"
-                style={{
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
-                }}
-            />
+        <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4 font-sans">
+            <div className="w-full max-w-[480px] bg-white rounded-[32px] shadow-2xl shadow-gray-200/50 p-8 sm:p-12 relative overflow-hidden">
 
-            <div className="w-full max-w-md relative z-10">
-                <div className="text-center mb-8">
-                    <Link href="/" className="inline-block">
-                        <Image
-                            src="/edu.png"
-                            width={160}
-                            height={54}
-                            alt="EduBreezy"
-                            priority
-                            className="mx-auto"
-                        />
-                    </Link>
+                {/* Header */}
+                <div className="text-center mb-10">
+                    <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                        <Lock className="w-7 h-7 text-[#0166fb]" />
+                    </div>
+                    <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                        Set New Password
+                    </h1>
+                    <p className="text-gray-500 text-sm">
+                        Please enter your new password below.
+                    </p>
                 </div>
 
-                <Card className="border-0 shadow-xl bg-gray-50 dark:bg-gray-900">
-                    <CardContent className="p-8 sm:p-10">
-                        <div className="mb-8">
-                            <div className="flex items-center justify-center mb-6">
-                                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
-                                    <Lock className="w-6 h-6 text-primary" />
-                                </div>
-                            </div>
-                            <h1 className="text-2xl sm:text-3xl font-bold text-center mb-2">
-                                Set New Password
-                            </h1>
-                            <p className="text-center text-sm text-muted-foreground">
-                                Please enter your new password below
-                            </p>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="space-y-1.5">
+                        <Label htmlFor="password" className="text-xs font-semibold uppercase tracking-wider text-gray-500 ml-1">New Password</Label>
+                        <div className="relative">
+                            <Input
+                                id="password"
+                                type={showPassword ? 'text' : 'password'}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="h-12 bg-gray-50 border focus:bg-white focus:border-[#0166fb] focus:ring-4 focus:ring-[#0166fb]/10 rounded-lg transition-all font-medium text-gray-900 placeholder:text-gray-400 pr-10"
+                                required
+                                minLength={6}
+                                placeholder="••••••••"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-4 top-3.5 text-gray-400 hover:text-gray-600 transition-colors focus:outline-none"
+                            >
+                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
                         </div>
+                    </div>
 
-                        <form onSubmit={handleSubmit} className="space-y-5">
-                            <div className="space-y-2">
-                                <Label htmlFor="password" className="text-sm font-medium">New Password</Label>
-                                <div className="relative">
-                                    <Input
-                                        id="password"
-                                        type={showPassword ? 'text' : 'password'}
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        className="h-11 pr-10"
-                                        required
-                                        minLength={6}
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                                    >
-                                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                    </button>
-                                </div>
-                            </div>
+                    <div className="space-y-1.5">
+                        <Label htmlFor="confirmPassword" className="text-xs font-semibold uppercase tracking-wider text-gray-500 ml-1">Confirm Password</Label>
+                        <Input
+                            id="confirmPassword"
+                            type="password"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            className="h-12 bg-gray-50 border focus:bg-white focus:border-[#0166fb] focus:ring-4 focus:ring-[#0166fb]/10 rounded-lg transition-all font-medium text-gray-900 placeholder:text-gray-400"
+                            required
+                            minLength={6}
+                            placeholder="••••••••"
+                        />
+                    </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="confirmPassword" className="text-sm font-medium">Confirm Password</Label>
-                                <Input
-                                    id="confirmPassword"
-                                    type="password"
-                                    value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
-                                    className="h-11"
-                                    required
-                                    minLength={6}
-                                />
-                            </div>
+                    <Button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full h-12 bg-[#0166fb] hover:bg-[#0166fb]/80 text-white font-medium rounded-lg active:scale-[0.98] transition-all duration-300"
+                    >
+                        {loading ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Updating...
+                            </>
+                        ) : (
+                            'Update Password'
+                        )}
+                    </Button>
+                </form>
 
-                            <Button type="submit" className="w-full h-11 text-base font-medium" disabled={loading}>
-                                {loading ? (
-                                    <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Updating...
-                                    </>
-                                ) : (
-                                    'Reset Password'
-                                )}
-                            </Button>
-                        </form>
-                    </CardContent>
-                </Card>
+                {/* Optional Footer/Branding */}
+                <div className="mt-8 pt-6 border-t border-gray-100 text-center">
+                    <p className="text-xs text-gray-400">Secure Password Reset · EduBreezy</p>
+                </div>
             </div>
         </div>
     );
