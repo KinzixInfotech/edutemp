@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { format } from "date-fns"
+import { format, differenceInYears } from "date-fns"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Calendar } from "@/components/ui/calendar"
 import { toast } from "sonner"
@@ -132,6 +132,39 @@ export default function NewProfilePage() {
         }
     })
 
+    // --- Helper Functions ---
+
+    // 1. Auto Calculate Age
+    useEffect(() => {
+        if (form.dob) {
+            const ageComp = differenceInYears(new Date(), new Date(form.dob))
+            updateForm("age", ageComp.toString())
+        }
+    }, [form.dob, updateForm])
+
+    // 2. Generate ID
+    const [generatingId, setGeneratingId] = useState(false)
+    const generateId = async (type) => {
+        try {
+            setGeneratingId(true)
+            const res = await fetch(`/api/schools/${schoolId}/settings/next-id?type=${type}`)
+            if (!res.ok) throw new Error("Failed to generate ID")
+            const data = await res.json()
+
+            if (type === 'student') {
+                updateForm("admissionNo", data.nextId)
+            } else {
+                updateForm("empployeeId", data.nextId)
+            }
+            toast.success("ID Generated Successfully")
+        } catch (error) {
+            console.error(error)
+            toast.error("Could not generate ID")
+        } finally {
+            setGeneratingId(false)
+        }
+    }
+
     const sections = form.classId === "ALL"
         ? classes.flatMap((cls) => cls.sections || [])
         : (classes.find((cls) => cls.id.toString() === form.classId)?.sections || [])
@@ -257,7 +290,14 @@ export default function NewProfilePage() {
                         const file = new File([croppedBlob], filename, { type: "image/jpeg" })
                         try {
                             setUploading(true)
-                            const res = await uploadFiles("profilePictureUploader", { files: [file] })
+                            const res = await uploadFiles("profilePictureUploader", {
+                                files: [file],
+                                input: {
+                                    schoolId: schoolId,
+                                    username: form.name || form.studentName || form.guardianName || "User",
+                                    profileId: crypto.randomUUID()
+                                }
+                            })
                             if (res && res[0]?.url) {
                                 updateForm("profilePicture", res[0].ufsUrl)
                                 setPreviewUrl(res[0].ufsUrl)
@@ -316,7 +356,17 @@ export default function NewProfilePage() {
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-sm font-medium">Employee ID</Label>
-                                                <Input value={form.empployeeId} onChange={(e) => updateForm("empployeeId", e.target.value)} placeholder="Enter employee ID" />
+                                                <div className="flex gap-2">
+                                                    <Input value={form.empployeeId} onChange={(e) => updateForm("empployeeId", e.target.value)} placeholder="Enter employee ID" />
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        onClick={() => generateId('employee')}
+                                                        disabled={generatingId}
+                                                    >
+                                                        {generatingId ? <Loader2 className="h-4 w-4 animate-spin" /> : "Generate"}
+                                                    </Button>
+                                                </div>
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-sm font-medium">Designation</Label>
@@ -393,7 +443,22 @@ export default function NewProfilePage() {
                                             <div className="col-span-full"><h3 className="text-lg font-semibold mb-4">Student Information</h3></div>
                                             <div className="space-y-2">
                                                 <Label className="text-sm font-medium">Admission Number *</Label>
-                                                <Input value={form.admissionNo} onChange={(e) => updateForm("admissionNo", e.target.value)} placeholder="Enter admission number" className={errors.admissionNo ? "border-red-500" : ""} />
+                                                <div className="flex gap-2">
+                                                    <Input
+                                                        value={form.admissionNo}
+                                                        onChange={(e) => updateForm("admissionNo", e.target.value)}
+                                                        placeholder="Enter admission number"
+                                                        className={errors.admissionNo ? "border-red-500" : ""}
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        onClick={() => generateId('student')}
+                                                        disabled={generatingId}
+                                                    >
+                                                        {generatingId ? <Loader2 className="h-4 w-4 animate-spin" /> : "Generate"}
+                                                    </Button>
+                                                </div>
                                                 {errors.admissionNo && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.admissionNo}</p>}
                                             </div>
                                             <div className="space-y-2">

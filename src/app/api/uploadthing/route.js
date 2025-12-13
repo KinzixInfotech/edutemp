@@ -9,7 +9,16 @@ export const ourFileRouter = {
     .input(z.object({
       schoolId: z.string().nullish(),
       username: z.string().nullish(),
+      profileId: z.string().optional(),
     }))
+    .middleware(async ({ input }) => {
+      // This code runs on your server before upload
+      return {
+        schoolId: input.schoolId,
+        username: input.username,
+        profileId: input.profileId
+      };
+    })
     .onUploadComplete(async ({ metadata, file }) => {
       if (metadata.schoolId) {
         await prisma.upload.create({

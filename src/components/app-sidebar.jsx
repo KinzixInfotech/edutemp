@@ -590,6 +590,7 @@ export const SidebarData = [
                 icon: Settings,
                 roles: ["ADMIN"],
                 submenu: [
+                    { label: "General Settings", url: "/dashboard/settings", roles: ["ADMIN"] },
                     { label: "Role Management", url: "/dashboard/settings/roles", roles: ["ADMIN"] },
                 ],
             },

@@ -94,6 +94,7 @@ model School {
   payrollAuditLogs PayrollAuditLog[]
   librarians       Librarian[]
   accountants      Accountant[]
+  settings         SchoolSettings?
 
   @@index([name])
 }
@@ -4475,4 +4476,16 @@ model LoginAttempt {
   @@index([ipAddress])
   @@index([email])
   @@index([timestamp])
+}
+
+model SchoolSettings {
+  id                String   @id @default(uuid()) @db.Uuid
+  schoolId          String   @unique @db.Uuid
+  school            School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  admissionNoPrefix String?
+  employeeIdPrefix  String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([schoolId])
 }
