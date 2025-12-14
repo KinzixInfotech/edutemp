@@ -532,12 +532,15 @@ export const SidebarData = [
                 icon: Car,
                 roles: ["ADMIN"],
                 submenu: [
-                    {
-                        label: "Manage Vehicle & Fleet", url: "/dashboard/schools/transport/vehicles", roles: ["ADMIN"]
-                    },
-                    { label: "Route", url: "/dashboard/schools/transport/route", roles: ["ADMIN"] },
+                    { label: "Vehicles & Fleet", url: "/dashboard/schools/transport/vehicles", roles: ["ADMIN"] },
+                    { label: "Routes", url: "/dashboard/schools/transport/route", roles: ["ADMIN"] },
+                    { label: "Bus Stops", url: "/dashboard/schools/transport/stops", roles: ["ADMIN"] },
+                    { label: "Drivers", url: "/dashboard/schools/transport/drivers", roles: ["ADMIN"] },
+                    { label: "Conductors", url: "/dashboard/schools/transport/conductors", roles: ["ADMIN"] },
+                    { label: "Trips", url: "/dashboard/schools/transport/trips", roles: ["ADMIN"] },
                     { label: "Student Assignment", url: "/dashboard/schools/transport/student-assign", roles: ["ADMIN"] },
-                    { label: "Reporting", url: "/dashboard/fees/fee-overrides", roles: ["ADMIN"] },
+                    { label: "Transport Fees", url: "/dashboard/schools/transport/fees", roles: ["ADMIN"] },
+                    { label: "Bus Requests", url: "/dashboard/schools/transport/requests", roles: ["ADMIN"] },
                 ],
             },
         ],

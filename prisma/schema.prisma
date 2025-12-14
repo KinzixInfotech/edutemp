@@ -95,6 +95,9 @@ model School {
   librarians       Librarian[]
   accountants      Accountant[]
   settings         SchoolSettings?
+  transportStaffs  TransportStaff[]
+  transportFees    TransportFee[]
+  busRequests      BusRequest[]
 
   @@index([name])
 }
@@ -817,34 +820,42 @@ model Payment {
 // Note: Use PostgreSQL provider as in current schema.
 // Transport Models
 model Vehicle {
-  id             String            @id @default(uuid()) @db.Uuid
-  schoolId       String            @db.Uuid
-  licensePlate   String            @unique
-  model          String
-  capacity       Int
-  maintenanceDue DateTime?
-  status         String // e.g., "active", "maintenance", "inactive"
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  school         School            @relation(fields: [schoolId], references: [id])
-  routes         Route[]
-  locations      VehicleLocation[]
+  id                 String              @id @default(uuid()) @db.Uuid
+  schoolId           String              @db.Uuid
+  licensePlate       String              @unique
+  model              String
+  capacity           Int
+  maintenanceDue     DateTime?
+  status             String // e.g., "active", "maintenance", "inactive"
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  school             School              @relation(fields: [schoolId], references: [id])
+  routes             Route[]
+  locations          VehicleLocation[]
+  vehicleAssignments VehicleAssignment[]
+  busTrips           BusTrip[]
 
   @@index([schoolId])
   @@index([licensePlate])
 }
 
 model Route {
-  id                 String                   @id @default(uuid()) @db.Uuid
-  schoolId           String                   @db.Uuid
-  name               String
-  stops              Json // Array of {name: string, lat: float, lng: float}
-  assignedVehicleId  String?                  @db.Uuid
-  createdAt          DateTime                 @default(now())
-  updatedAt          DateTime                 @updatedAt
-  school             School                   @relation(fields: [schoolId], references: [id])
-  vehicle            Vehicle?                 @relation(fields: [assignedVehicleId], references: [id])
-  studentAssignments StudentRouteAssignment[]
+  id                     String                   @id @default(uuid()) @db.Uuid
+  schoolId               String                   @db.Uuid
+  name                   String
+  stops                  Json // Array of {name: string, lat: float, lng: float}
+  assignedVehicleId      String?                  @db.Uuid
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  school                 School                   @relation(fields: [schoolId], references: [id])
+  vehicle                Vehicle?                 @relation(fields: [assignedVehicleId], references: [id])
+  studentAssignments     StudentRouteAssignment[]
+  busStops               BusStop[]
+  studentStopAssignments StudentStopAssignment[]
+  busTrips               BusTrip[]
+  busAttendances         BusAttendance[]
+  transportFees          TransportFee[]
+  busRequests            BusRequest[]
 
   @@index([schoolId])
   @@index([name])
@@ -864,15 +875,289 @@ model StudentRouteAssignment {
 }
 
 model VehicleLocation {
-  id        String   @id @default(uuid()) @db.Uuid
-  vehicleId String   @db.Uuid
-  latitude  Float
-  longitude Float
-  timestamp DateTime @default(now())
-  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id])
+  id               String          @id @default(uuid()) @db.Uuid
+  vehicleId        String          @db.Uuid
+  tripId           String?         @db.Uuid
+  transportStaffId String?         @db.Uuid
+  latitude         Float
+  longitude        Float
+  speed            Float?
+  heading          Float?
+  accuracy         Float?
+  timestamp        DateTime        @default(now())
+  vehicle          Vehicle         @relation(fields: [vehicleId], references: [id])
+  trip             BusTrip?        @relation(fields: [tripId], references: [id])
+  transportStaff   TransportStaff? @relation(fields: [transportStaffId], references: [id])
 
   @@index([vehicleId])
+  @@index([tripId])
   @@index([timestamp])
+}
+
+// ============================================
+// TRANSPORT MODULE - ENHANCED
+// ============================================
+
+enum TransportRole {
+  DRIVER
+  CONDUCTOR
+}
+
+// Transport Staff (Drivers & Conductors)
+model TransportStaff {
+  id               String        @id @default(uuid()) @db.Uuid
+  userId           String        @unique @db.Uuid
+  schoolId         String        @db.Uuid
+  role             TransportRole
+  employeeId       String
+  name             String
+  contactNumber    String
+  email            String
+  licenseNumber    String? // For drivers only
+  licenseExpiry    DateTime?
+  address          String?
+  emergencyContact String?
+  profilePicture   String?
+  isActive         Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school             School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  vehicleAssignments VehicleAssignment[]
+  attendanceRecords  BusAttendance[]     @relation("BusAttendanceMarkedBy")
+  locationUpdates    VehicleLocation[]
+  driverTrips        BusTrip[]           @relation("TripDriver")
+  conductorTrips     BusTrip[]           @relation("TripConductor")
+
+  @@unique([schoolId, employeeId])
+  @@index([schoolId])
+  @@index([role])
+  @@index([isActive])
+}
+
+// Vehicle Assignment (Driver/Conductor to Vehicle)
+model VehicleAssignment {
+  id               String        @id @default(uuid()) @db.Uuid
+  vehicleId        String        @db.Uuid
+  transportStaffId String        @db.Uuid
+  role             TransportRole
+  isActive         Boolean       @default(true)
+  assignedAt       DateTime      @default(now())
+
+  vehicle        Vehicle        @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  transportStaff TransportStaff @relation(fields: [transportStaffId], references: [id], onDelete: Cascade)
+
+  @@unique([vehicleId, transportStaffId, role])
+  @@index([vehicleId])
+  @@index([transportStaffId])
+  @@index([isActive])
+}
+
+// Bus Stop with schedule
+model BusStop {
+  id         String   @id @default(uuid()) @db.Uuid
+  routeId    String   @db.Uuid
+  name       String
+  latitude   Float
+  longitude  Float
+  orderIndex Int // Order in route
+  pickupTime String? // e.g., "07:30"
+  dropTime   String? // e.g., "14:30"
+  address    String?
+  landmark   String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  route              Route                   @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  studentAssignments StudentStopAssignment[]
+  attendanceRecords  BusAttendance[]
+
+  @@unique([routeId, orderIndex])
+  @@index([routeId])
+  @@index([isActive])
+}
+
+// Student assigned to specific stop
+model StudentStopAssignment {
+  id         String   @id @default(uuid()) @db.Uuid
+  studentId  String   @db.Uuid
+  stopId     String   @db.Uuid
+  routeId    String   @db.Uuid
+  pickupStop Boolean  @default(true)
+  dropStop   Boolean  @default(true)
+  isActive   Boolean  @default(true)
+  assignedAt DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  stop    BusStop @relation(fields: [stopId], references: [id], onDelete: Cascade)
+  route   Route   @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, routeId])
+  @@index([studentId])
+  @@index([stopId])
+  @@index([routeId])
+  @@index([isActive])
+}
+
+// Bus Trip (daily trip tracking)
+model BusTrip {
+  id          String    @id @default(uuid()) @db.Uuid
+  vehicleId   String    @db.Uuid
+  routeId     String    @db.Uuid
+  driverId    String    @db.Uuid
+  conductorId String?   @db.Uuid
+  tripType    String // PICKUP, DROP
+  status      String // SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED
+  date        DateTime  @db.Date
+  startedAt   DateTime?
+  completedAt DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  vehicle           Vehicle           @relation(fields: [vehicleId], references: [id])
+  route             Route             @relation(fields: [routeId], references: [id])
+  driver            TransportStaff    @relation("TripDriver", fields: [driverId], references: [id])
+  conductor         TransportStaff?   @relation("TripConductor", fields: [conductorId], references: [id])
+  attendanceRecords BusAttendance[]
+  locationLog       VehicleLocation[]
+
+  @@unique([vehicleId, routeId, tripType, date])
+  @@index([vehicleId])
+  @@index([routeId])
+  @@index([driverId])
+  @@index([conductorId])
+  @@index([date])
+  @@index([status])
+}
+
+// Bus Attendance (per trip per student)
+model BusAttendance {
+  id         String   @id @default(uuid()) @db.Uuid
+  studentId  String   @db.Uuid
+  routeId    String   @db.Uuid
+  stopId     String   @db.Uuid
+  tripId     String   @db.Uuid
+  tripType   String // PICKUP, DROP
+  status     String // PRESENT, ABSENT, LATE, EXCUSED
+  markedById String   @db.Uuid
+  markedAt   DateTime @default(now())
+  latitude   Float? // Location when marked
+  longitude  Float?
+  notes      String?
+
+  student  Student        @relation(fields: [studentId], references: [userId])
+  route    Route          @relation(fields: [routeId], references: [id])
+  stop     BusStop        @relation(fields: [stopId], references: [id])
+  trip     BusTrip        @relation(fields: [tripId], references: [id])
+  markedBy TransportStaff @relation("BusAttendanceMarkedBy", fields: [markedById], references: [id])
+
+  @@unique([studentId, tripId])
+  @@index([studentId])
+  @@index([tripId])
+  @@index([stopId])
+  @@index([markedAt])
+  @@index([status])
+}
+
+// Transport Fee Structure
+model TransportFee {
+  id             String   @id @default(uuid()) @db.Uuid
+  schoolId       String   @db.Uuid
+  routeId        String?  @db.Uuid
+  name           String
+  amount         Float
+  frequency      String // MONTHLY, QUARTERLY, HALF_YEARLY, YEARLY
+  academicYearId String?  @db.Uuid
+  description    String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  school       School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  route        Route?                @relation(fields: [routeId], references: [id])
+  academicYear AcademicYear?         @relation(fields: [academicYearId], references: [id])
+  studentFees  StudentTransportFee[]
+
+  @@index([schoolId])
+  @@index([routeId])
+  @@index([isActive])
+}
+
+// Student Transport Fee Assignment
+model StudentTransportFee {
+  id             String    @id @default(uuid()) @db.Uuid
+  studentId      String    @db.Uuid
+  transportFeeId String    @db.Uuid
+  startDate      DateTime
+  endDate        DateTime?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+
+  student      Student               @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  transportFee TransportFee          @relation(fields: [transportFeeId], references: [id], onDelete: Cascade)
+  payments     TransportFeePayment[]
+
+  @@unique([studentId, transportFeeId])
+  @@index([studentId])
+  @@index([transportFeeId])
+  @@index([isActive])
+}
+
+// Transport Fee Payment
+model TransportFeePayment {
+  id                    String   @id @default(uuid()) @db.Uuid
+  studentTransportFeeId String   @db.Uuid
+  amount                Float
+  paymentDate           DateTime
+  paymentMethod         String // CASH, ONLINE, CHEQUE, UPI
+  transactionId         String?
+  status                String // PAID, PENDING, FAILED, REFUNDED
+  collectedById         String?  @db.Uuid
+  receiptNumber         String?
+  notes                 String?
+  createdAt             DateTime @default(now())
+
+  studentTransportFee StudentTransportFee @relation(fields: [studentTransportFeeId], references: [id], onDelete: Cascade)
+
+  @@index([studentTransportFeeId])
+  @@index([paymentDate])
+  @@index([status])
+}
+
+// Bus Request from Parent
+model BusRequest {
+  id            String    @id @default(uuid()) @db.Uuid
+  studentId     String    @db.Uuid
+  parentId      String    @db.Uuid
+  schoolId      String    @db.Uuid
+  routeId       String?   @db.Uuid
+  stopId        String?   @db.Uuid
+  requestType   String // NEW, CHANGE_STOP, CHANGE_ROUTE, CANCEL
+  status        String // PENDING, APPROVED, REJECTED, IN_REVIEW
+  preferredStop String?
+  stopLatitude  Float?
+  stopLongitude Float?
+  reason        String?
+  notes         String?
+  processedById String?   @db.Uuid
+  processedAt   DateTime?
+  adminNotes    String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  student Student @relation(fields: [studentId], references: [userId])
+  parent  Parent  @relation(fields: [parentId], references: [id])
+  school  School  @relation(fields: [schoolId], references: [id])
+  route   Route?  @relation(fields: [routeId], references: [id])
+
+  @@index([studentId])
+  @@index([parentId])
+  @@index([schoolId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model Assignment {
@@ -1224,6 +1509,7 @@ model User {
 
   // Payroll Management
   payrollProfile EmployeePayrollProfile?
+  transportStaff TransportStaff?
 
   @@index([schoolId])
   @@index([roleId])
@@ -1357,6 +1643,10 @@ model Student {
   studentExamAttempts    StudentExamAttempt[]
   hallAttendances        HallAttendance[]
   promotionHistories     PromotionHistory[]
+  studentStopAssignments StudentStopAssignment[]
+  busAttendances         BusAttendance[]
+  studentTransportFees   StudentTransportFee[]
+  busRequests            BusRequest[]
 
   @@index([classId])
   @@index([sectionId])
@@ -1406,6 +1696,7 @@ model Parent {
   user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   school       School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   studentLinks StudentParentLink[]
+  busRequests  BusRequest[]
 
   @@index([schoolId])
   @@index([contactNumber])
@@ -2029,6 +2320,7 @@ model AcademicYear {
   timetableTemplates     TimetableTemplate[]
   promotionHistoriesFrom PromotionHistory[]   @relation("PromotionFromYear")
   promotionHistoriesTo   PromotionHistory[]   @relation("PromotionToYear")
+  transportFees          TransportFee[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
