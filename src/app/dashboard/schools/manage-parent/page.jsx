@@ -47,11 +47,10 @@ export default function ParentListPage() {
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;
     const queryClient = useQueryClient();
-
     const [selected, setSelected] = useState([]);
     const [dialogData, setDialogData] = useState(null);
     console.log(dialogData);
-    
+
     const [search, setSearch] = useState('');
     const [studentSearchOpen, setStudentSearchOpen] = useState(false);
     const [studentSearchQuery, setStudentSearchQuery] = useState('');
@@ -73,7 +72,7 @@ export default function ParentListPage() {
         staleTime: 30 * 1000,
     });
 
-    const parents = parentData.parents || [];
+    const parents = parentData || [];
     const total = parentData.total || 0;
     const pageCount = Math.ceil(total / itemsPerPage);
 

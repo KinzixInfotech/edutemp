@@ -198,7 +198,12 @@ export default function NewProfilePage() {
             if (!form.guardianName) newErrors.guardianName = "Guardian name is required"
             if (!form.email) newErrors.email = "Email is required"
             if (!form.contactNumber) newErrors.contactNumber = "Contact number is required"
-            else if (!/^\d{10}$/.test(form.contactNumber)) newErrors.contactNumber = "Invalid contact number"
+            else if (!/^\d{10}$/.test(form.contactNumber)) newErrors.contactNumber = "Invalid contact number (must be 10 digits)"
+            if (!form.gender) newErrors.gender = "Gender is required"
+            if (!form.password) newErrors.password = "Password is required"
+            else if (form.password.length < 6) newErrors.password = "Password must be at least 6 characters"
+            if (form.alternateNumber && !/^\d{10}$/.test(form.alternateNumber)) newErrors.alternateNumber = "Invalid alternate number"
+            if (form.emergencyContactNumber && !/^\d{10}$/.test(form.emergencyContactNumber)) newErrors.emergencyContactNumber = "Invalid emergency number"
         }
 
         if ((roleType === "teacher" || roleType === "staff") && form.contactNumber && !/^\d{10}$/.test(form.contactNumber)) {
@@ -693,9 +698,21 @@ export default function NewProfilePage() {
                                         <>
                                             <div className="col-span-full"><h3 className="text-lg font-semibold mb-4">Parent Information</h3></div>
                                             <div className="space-y-2">
-                                                <Label className="text-sm font-medium">Guardian Name *</Label>
-                                                <Input value={form.guardianName} onChange={(e) => updateForm("guardianName", e.target.value)} placeholder="Enter guardian name" className={errors.guardianName ? "border-red-500" : ""} />
+                                                <Label className="text-sm font-medium">Parent/Guardian Name *</Label>
+                                                <Input value={form.guardianName} onChange={(e) => updateForm("guardianName", e.target.value)} placeholder="Enter full name" className={errors.guardianName ? "border-red-500" : ""} />
                                                 {errors.guardianName && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.guardianName}</p>}
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-sm font-medium">Gender *</Label>
+                                                <Select value={form.gender} onValueChange={(value) => updateForm("gender", value)}>
+                                                    <SelectTrigger className={`w-full ${errors.gender ? "border-red-500" : ""}`}><SelectValue placeholder="Select gender" /></SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="MALE">Male</SelectItem>
+                                                        <SelectItem value="FEMALE">Female</SelectItem>
+                                                        <SelectItem value="OTHER">Other</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                                {errors.gender && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.gender}</p>}
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-sm font-medium">Email Address *</Label>
@@ -703,33 +720,67 @@ export default function NewProfilePage() {
                                                 {errors.email && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.email}</p>}
                                             </div>
                                             <div className="space-y-2">
-                                                <Label className="text-sm font-medium">Password</Label>
-                                                <Input type="password" value={form.password} onChange={(e) => updateForm("password", e.target.value)} placeholder="Enter password" />
+                                                <Label className="text-sm font-medium">Password *</Label>
+                                                <Input type="password" value={form.password} onChange={(e) => updateForm("password", e.target.value)} placeholder="Min 6 characters" className={errors.password ? "border-red-500" : ""} />
+                                                {errors.password && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.password}</p>}
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-sm font-medium">Contact Number *</Label>
-                                                <Input value={form.contactNumber} onChange={(e) => updateForm("contactNumber", e.target.value)} placeholder="10-digit number" className={errors.contactNumber ? "border-red-500" : ""} />
+                                                <Input value={form.contactNumber} onChange={(e) => updateForm("contactNumber", e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="10-digit mobile number" className={errors.contactNumber ? "border-red-500" : ""} maxLength={10} />
                                                 {errors.contactNumber && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.contactNumber}</p>}
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-sm font-medium">Alternate Number</Label>
-                                                <Input value={form.alternateNumber} onChange={(e) => updateForm("alternateNumber", e.target.value)} placeholder="Alternate number" />
+                                                <Input value={form.alternateNumber} onChange={(e) => updateForm("alternateNumber", e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="Alternate number (optional)" className={errors.alternateNumber ? "border-red-500" : ""} maxLength={10} />
+                                                {errors.alternateNumber && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.alternateNumber}</p>}
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-sm font-medium">Occupation</Label>
-                                                <Input value={form.occupation} onChange={(e) => updateForm("occupation", e.target.value)} placeholder="Enter occupation" />
+                                                <Input value={form.occupation} onChange={(e) => updateForm("occupation", e.target.value)} placeholder="e.g., Engineer, Doctor, Teacher" />
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-sm font-medium">Qualification</Label>
-                                                <Input value={form.qualification} onChange={(e) => updateForm("qualification", e.target.value)} placeholder="Enter qualification" />
+                                                <Select value={form.qualification} onValueChange={(value) => updateForm("qualification", value)}>
+                                                    <SelectTrigger className="w-full"><SelectValue placeholder="Select qualification" /></SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="10th">10th</SelectItem>
+                                                        <SelectItem value="12th">12th</SelectItem>
+                                                        <SelectItem value="Graduate">Graduate</SelectItem>
+                                                        <SelectItem value="Post Graduate">Post Graduate</SelectItem>
+                                                        <SelectItem value="PhD">PhD</SelectItem>
+                                                        <SelectItem value="Diploma">Diploma</SelectItem>
+                                                        <SelectItem value="Other">Other</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-sm font-medium">Annual Income</Label>
-                                                <Input value={form.annualIncome} onChange={(e) => updateForm("annualIncome", e.target.value)} placeholder="e.g., ₹5,00,000" />
+                                                <Select value={form.annualIncome} onValueChange={(value) => updateForm("annualIncome", value)}>
+                                                    <SelectTrigger className="w-full"><SelectValue placeholder="Select income range" /></SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="Below 2L">Below ₹2,00,000</SelectItem>
+                                                        <SelectItem value="2L-5L">₹2,00,000 - ₹5,00,000</SelectItem>
+                                                        <SelectItem value="5L-10L">₹5,00,000 - ₹10,00,000</SelectItem>
+                                                        <SelectItem value="10L-20L">₹10,00,000 - ₹20,00,000</SelectItem>
+                                                        <SelectItem value="Above 20L">Above ₹20,00,000</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-sm font-medium">Blood Group</Label>
-                                                <Input value={form.bloodGroup} onChange={(e) => updateForm("bloodGroup", e.target.value)} placeholder="e.g., B+" />
+                                                <Select value={form.bloodGroup} onValueChange={(value) => updateForm("bloodGroup", value)}>
+                                                    <SelectTrigger className="w-full"><SelectValue placeholder="Select blood group" /></SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="A+">A+</SelectItem>
+                                                        <SelectItem value="A-">A-</SelectItem>
+                                                        <SelectItem value="B+">B+</SelectItem>
+                                                        <SelectItem value="B-">B-</SelectItem>
+                                                        <SelectItem value="AB+">AB+</SelectItem>
+                                                        <SelectItem value="AB-">AB-</SelectItem>
+                                                        <SelectItem value="O+">O+</SelectItem>
+                                                        <SelectItem value="O-">O-</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
 
                                             <div className="col-span-full mt-6">
@@ -1042,6 +1093,6 @@ export default function NewProfilePage() {
                     </CardContent>
                 </Card>
             </div>
-        </div>
+        </div >
     )
 }

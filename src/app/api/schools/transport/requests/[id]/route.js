@@ -19,7 +19,7 @@ export async function GET(req, props) {
                         name: true,
                         admissionNo: true,
                         class: { select: { className: true } },
-                        section: { select: { sectionName: true } },
+                        section: { select: { name: true } },
                     }
                 },
                 parent: { select: { id: true, name: true, contactNumber: true, email: true } },
@@ -44,7 +44,7 @@ export async function PUT(req, props) {
 
     try {
         const data = await req.json();
-        const { status, adminNotes, processedById, routeId, stopId } = data;
+        const { status, adminNotes, processedById, routeId, stopId, transportFeeId } = data;
 
         const existingRequest = await prisma.busRequest.findUnique({ where: { id } });
         if (!existingRequest) {
@@ -68,7 +68,7 @@ export async function PUT(req, props) {
                     ...(stopId && { stopId }),
                 },
                 include: {
-                    student: { select: { userId: true, name: true } },
+                    student: { select: { userId: true, name: true, schoolId: true } },
                     route: { select: { name: true } },
                 },
             });
@@ -88,10 +88,62 @@ export async function PUT(req, props) {
                             stopId: finalStopId,
                         },
                     });
+
+                    // Also create route assignment if it doesn't exist
+                    const existingRouteAssignment = await tx.studentRouteAssignment.findFirst({
+                        where: { studentId: existingRequest.studentId, routeId: finalRouteId },
+                    });
+
+                    if (!existingRouteAssignment) {
+                        await tx.studentRouteAssignment.create({
+                            data: {
+                                studentId: existingRequest.studentId,
+                                routeId: finalRouteId,
+                                schoolId: existingRequest.schoolId,
+                            },
+                        });
+                    }
+
+                    // Assign transport fee if provided
+                    if (transportFeeId) {
+                        // Check if student already has this fee assigned
+                        const existingFee = await tx.studentTransportFee.findFirst({
+                            where: {
+                                studentId: existingRequest.studentId,
+                                transportFeeId: transportFeeId,
+                                isActive: true,
+                            },
+                        });
+
+                        if (!existingFee) {
+                            // Get the transport fee details
+                            const transportFee = await tx.transportFee.findUnique({
+                                where: { id: transportFeeId },
+                            });
+
+                            if (transportFee) {
+                                await tx.studentTransportFee.create({
+                                    data: {
+                                        studentId: existingRequest.studentId,
+                                        transportFeeId: transportFeeId,
+                                        schoolId: existingRequest.schoolId,
+                                        amount: transportFee.amount,
+                                        startDate: new Date(),
+                                        isActive: true,
+                                    },
+                                });
+                            }
+                        }
+                    }
                 } else if (existingRequest.requestType === 'CANCEL') {
                     await tx.studentStopAssignment.updateMany({
                         where: { studentId: existingRequest.studentId },
                         data: { isActive: false },
+                    });
+                    // Deactivate transport fees when cancelling
+                    await tx.studentTransportFee.updateMany({
+                        where: { studentId: existingRequest.studentId, isActive: true },
+                        data: { isActive: false, endDate: new Date() },
                     });
                 }
             }
@@ -100,6 +152,7 @@ export async function PUT(req, props) {
         });
 
         await invalidatePattern(`bus-requests:*schoolId:${existingRequest.schoolId}*`);
+        await invalidatePattern(`transport-fees:*schoolId:${existingRequest.schoolId}*`);
 
         return NextResponse.json({ success: true, request });
     } catch (error) {
@@ -107,3 +160,4 @@ export async function PUT(req, props) {
         return NextResponse.json({ error: 'Failed to process bus request' }, { status: 500 });
     }
 }
+

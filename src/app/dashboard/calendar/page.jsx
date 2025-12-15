@@ -391,22 +391,23 @@ export default function SchoolCalendar() {
                             {/* Calendar Grid */}
                             <div className="flex-1 flex flex-col">
                                 {/* Weekday Headers */}
-                                <div className="grid grid-cols-7 gap-2 mb-2">
-                                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => (
+                                <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
+                                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
                                         <div
-                                            key={day}
+                                            key={`${day}-${idx}`}
                                             className={cn(
-                                                "text-center text-xs md:text-sm font-semibold text-muted-foreground py-2 rounded-lg",
+                                                "text-center text-[10px] sm:text-xs md:text-sm font-semibold text-muted-foreground py-1.5 sm:py-2 rounded-lg",
                                                 (idx === 0 || idx === 6) && "bg-muted/50"
                                             )}
                                         >
-                                            {day}
+                                            <span className="hidden sm:inline">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][idx]}</span>
+                                            <span className="sm:hidden">{day}</span>
                                         </div>
                                     ))}
                                 </div>
 
                                 {/* Calendar Days */}
-                                <div className="grid grid-cols-7 gap-2 flex-1">
+                                <div className="grid grid-cols-7 gap-1 sm:gap-2 flex-1">
                                     {eventsLoading ? (
                                         <div className="col-span-7 flex items-center justify-center">
                                             <div className="flex flex-col items-center gap-3">
@@ -426,8 +427,8 @@ export default function SchoolCalendar() {
                                                     key={idx}
                                                     onClick={() => handleDateClick(day)}
                                                     className={cn(
-                                                        "min-h-[90px] md:min-h-[110px] p-2 rounded-xl border-2 transition-all duration-200",
-                                                        "hover:border-primary hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]",
+                                                        "min-h-[60px] sm:min-h-[80px] md:min-h-[100px] p-1 sm:p-2 rounded-lg sm:rounded-xl border sm:border-2 transition-all duration-200",
+                                                        "hover:border-primary hover:shadow-lg sm:hover:scale-[1.02] active:scale-[0.98]",
                                                         !day.isCurrentMonth && "opacity-30 hover:opacity-50",
                                                         isToday && "bg-gradient-to-br from-primary/15 to-primary/5 border-primary shadow-md",
                                                         isSelected && "border-primary shadow-xl ring-2 ring-primary/20",
@@ -453,26 +454,13 @@ export default function SchoolCalendar() {
                                                                 </Badge>
                                                             )}
                                                         </div>
-                                                        <div className="space-y-1 overflow-y-auto flex-1 scrollbar-thin">
-                                                            {dayEvents.slice(0, 2).map((event, i) => (
-                                                                // <div
-                                                                //     key={i}
-                                                                //     className="relative overflow-hidden text-[10px] md:text-xs px-2 py-1 rounded-md text-white font-medium shadow-sm"
-                                                                //     style={{ backgroundColor: event.color }}
-                                                                //     title={event.title}
-                                                                // >
-                                                                //     <div className="marquee-wrapper">
-                                                                //         <div className="marquee">
-                                                                //             <span>{event.title}</span>
-                                                                //             <span>{event.title}</span>
-                                                                //         </div>
-                                                                //     </div>
-                                                                // </div>
+                                                        <div className="space-y-0.5 sm:space-y-1 overflow-y-auto flex-1 scrollbar-thin">
+                                                            {dayEvents.slice(0, window?.innerWidth < 640 ? 1 : 2).map((event, i) => (
                                                                 <EventTitle title={event.title} color={event.color} key={i} />
                                                             ))}
-                                                            {dayEvents.length > 2 && (
-                                                                <div className="text-[10px] md:text-xs text-primary font-semibold bg-primary/10 rounded-md px-2 py-1">
-                                                                    +{dayEvents.length - 2} more
+                                                            {dayEvents.length > (window?.innerWidth < 640 ? 1 : 2) && (
+                                                                <div className="text-[8px] sm:text-[10px] md:text-xs text-primary font-semibold bg-primary/10 rounded px-1 sm:px-2 py-0.5 sm:py-1">
+                                                                    +{dayEvents.length - (window?.innerWidth < 640 ? 1 : 2)} more
                                                                 </div>
                                                             )}
                                                         </div>
@@ -488,22 +476,22 @@ export default function SchoolCalendar() {
                     </Card>
                 </div>
 
-                {/* Enhanced Sidebar */}
-                <div className="lg:w-80 xl:w-96">
-                    <Card className="shadow-xl border-2 hover:border-primary/20 transition-all h-full">
-                        <CardContent className="p-6">
-                            <div className="flex items-center justify-between mb-5">
-                                <h3 className="text-lg font-bold flex items-center gap-2">
-                                    <div className="p-2 bg-primary/10 rounded-lg">
-                                        <Clock className="h-5 w-5 text-primary" />
+                {/* Enhanced Sidebar - Collapsible on mobile */}
+                <div className="w-full lg:w-80 xl:w-96">
+                    <Card className="shadow-xl border-2 hover:border-primary/20 transition-all">
+                        <CardContent className="p-4 sm:p-6">
+                            <div className="flex items-center justify-between mb-4 sm:mb-5">
+                                <h3 className="text-base sm:text-lg font-bold flex items-center gap-2">
+                                    <div className="p-1.5 sm:p-2 bg-primary/10 rounded-lg">
+                                        <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                                     </div>
                                     <span>Upcoming</span>
                                 </h3>
-                                <Badge variant="outline" className="font-semibold">
+                                <Badge variant="outline" className="font-semibold text-xs sm:text-sm">
                                     {upcomingEvents.length} events
                                 </Badge>
                             </div>
-                            <div className="space-y-3 max-h-[600px] overflow-y-auto scrollbar-thin pr-1">
+                            <div className="space-y-2 sm:space-y-3 max-h-[300px] lg:max-h-[600px] overflow-y-auto scrollbar-thin pr-1">
                                 {upcomingEvents.length === 0 ? (
                                     <div className="text-center py-12">
                                         <Calendar className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
@@ -666,7 +654,7 @@ export default function SchoolCalendar() {
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                             <div className="space-y-2">
                                 <label className="text-sm font-semibold">Event Type</label>
                                 <Select
@@ -739,7 +727,7 @@ export default function SchoolCalendar() {
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                             <div className="space-y-2">
                                 <label className="text-sm font-semibold">Start Date *</label>
                                 <Input
@@ -773,7 +761,7 @@ export default function SchoolCalendar() {
                         </div>
 
                         {!formData.isAllDay && (
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                                 <div className="space-y-2">
                                     <label className="text-sm font-semibold">Start Time</label>
                                     <Input
@@ -796,7 +784,7 @@ export default function SchoolCalendar() {
                             </div>
                         )}
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                             <div className="space-y-2">
                                 <label className="text-sm font-semibold flex items-center gap-2">
                                     <MapPin className="h-4 w-4" />
@@ -854,14 +842,14 @@ export default function SchoolCalendar() {
                             </div>
                         </div>
 
-                        <div className="flex justify-end gap-3 pt-4 border-t">
+                        <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-4 border-t">
                             <Button
                                 variant="outline"
                                 onClick={() => {
                                     setIsCreateOpen(false);
                                     resetForm();
                                 }}
-                                className="gap-2"
+                                className="gap-2 w-full sm:w-auto"
                             >
                                 <X className="h-4 w-4" />
                                 Cancel
@@ -869,7 +857,7 @@ export default function SchoolCalendar() {
                             <Button
                                 onClick={handleCreateEvent}
                                 disabled={!formData.title || !formData.startDate || createEventMutation.isPending}
-                                className="gap-2 bg-gradient-to-r from-primary to-primary/80"
+                                className="gap-2 bg-gradient-to-r from-primary to-primary/80 w-full sm:w-auto"
                             >
                                 {createEventMutation.isPending ? (
                                     <>

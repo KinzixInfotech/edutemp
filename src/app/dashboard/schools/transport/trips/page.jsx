@@ -8,19 +8,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
-import { Loader2, Plus, Calendar, Bus, PlayCircle, CheckCircle, XCircle } from "lucide-react";
-import { format } from "date-fns";
+import { Loader2, Plus, Search, Bus, Calendar, PlayCircle, CheckCircle, Clock, Edit2, Trash2, ChevronLeft, ChevronRight, Eye } from "lucide-react";
 
-async function fetchTrips({ schoolId, date, status }) {
+async function fetchTrips({ schoolId, search, date, status, page = 1, limit = 10 }) {
     const params = new URLSearchParams({ schoolId });
+    if (search) params.append("search", search);
     if (date) params.append("date", date);
     if (status) params.append("status", status);
+    params.append("page", page);
+    params.append("limit", limit);
     const response = await fetch(`/api/schools/transport/trips?${params}`);
     if (!response.ok) throw new Error("Failed to fetch trips");
     return response.json();
@@ -38,17 +40,9 @@ async function fetchVehicles({ schoolId }) {
     return response.json();
 }
 
-async function fetchDrivers({ schoolId }) {
-    const params = new URLSearchParams({ schoolId, role: 'DRIVER', isActive: 'true' });
-    const response = await fetch(`/api/schools/transport/staff?${params}`);
-    if (!response.ok) throw new Error("Failed to fetch drivers");
-    return response.json();
-}
-
-async function fetchConductors({ schoolId }) {
-    const params = new URLSearchParams({ schoolId, role: 'CONDUCTOR', isActive: 'true' });
-    const response = await fetch(`/api/schools/transport/staff?${params}`);
-    if (!response.ok) throw new Error("Failed to fetch conductors");
+async function fetchStaff({ schoolId, role }) {
+    const response = await fetch(`/api/schools/transport/staff?schoolId=${schoolId}&role=${role}`);
+    if (!response.ok) throw new Error("Failed to fetch staff");
     return response.json();
 }
 
@@ -65,21 +59,33 @@ async function createTrip(data) {
     return response.json();
 }
 
+async function deleteTrip(id) {
+    const response = await fetch(`/api/schools/transport/trips/${id}`, { method: "DELETE" });
+    if (!response.ok) throw new Error("Failed to delete trip");
+    return true;
+}
+
 export default function TripManagement() {
     const { fullUser } = useAuth();
-    const [drawerMode, setDrawerMode] = useState(null);
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+    const [selectedTrip, setSelectedTrip] = useState(null);
     const [formData, setFormData] = useState({});
-    const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+    const [search, setSearch] = useState("");
+    const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
     const [statusFilter, setStatusFilter] = useState("");
+    const [page, setPage] = useState(1);
     const [saving, setSaving] = useState(false);
-    const [formError, setFormError] = useState("");
+    const [formErrors, setFormErrors] = useState({});
 
     const queryClient = useQueryClient();
     const schoolId = fullUser?.schoolId;
+    const limit = 10;
 
     const { data: { trips = [], total = 0 } = {}, isLoading } = useQuery({
-        queryKey: ["trips", schoolId, selectedDate, statusFilter],
-        queryFn: () => fetchTrips({ schoolId, date: selectedDate, status: statusFilter }),
+        queryKey: ["trips", schoolId, search, dateFilter, statusFilter, page],
+        queryFn: () => fetchTrips({ schoolId, search, date: dateFilter, status: statusFilter, page, limit }),
         enabled: !!schoolId,
         staleTime: 60 * 1000,
     });
@@ -98,13 +104,13 @@ export default function TripManagement() {
 
     const { data: { staff: drivers = [] } = {} } = useQuery({
         queryKey: ["drivers", schoolId],
-        queryFn: () => fetchDrivers({ schoolId }),
+        queryFn: () => fetchStaff({ schoolId, role: 'DRIVER' }),
         enabled: !!schoolId,
     });
 
     const { data: { staff: conductors = [] } = {} } = useQuery({
         queryKey: ["conductors", schoolId],
-        queryFn: () => fetchConductors({ schoolId }),
+        queryFn: () => fetchStaff({ schoolId, role: 'CONDUCTOR' }),
         enabled: !!schoolId,
     });
 
@@ -113,243 +119,332 @@ export default function TripManagement() {
         onMutate: () => setSaving(true),
         onSuccess: () => {
             queryClient.invalidateQueries(["trips"]);
-            setDrawerMode(null);
+            setDialogOpen(false);
             toast.success("Trip scheduled successfully");
         },
         onSettled: () => setSaving(false),
         onError: (error) => toast.error(error.message),
     });
 
+    const deleteMutation = useMutation({
+        mutationFn: deleteTrip,
+        onSuccess: () => {
+            queryClient.invalidateQueries(["trips"]);
+            setDeleteDialogOpen(false);
+            toast.success("Trip deleted");
+        },
+        onError: () => toast.error("Failed to delete trip"),
+    });
+
+    const validateForm = () => {
+        const errors = {};
+        if (!formData.routeId) errors.routeId = "Route is required";
+        if (!formData.vehicleId) errors.vehicleId = "Vehicle is required";
+        if (!formData.driverId) errors.driverId = "Driver is required";
+        if (!formData.tripDate) errors.tripDate = "Date is required";
+        if (!formData.tripType) errors.tripType = "Trip type is required";
+        setFormErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
+
     const handleSubmit = () => {
-        setFormError("");
-        if (!formData.vehicleId || !formData.routeId || !formData.driverId || !formData.tripType || !formData.date) {
-            setFormError("Vehicle, Route, Driver, Type, and Date are required");
-            return;
-        }
-        createMutation.mutate(formData);
+        if (!validateForm()) return;
+        createMutation.mutate({ ...formData, schoolId });
     };
 
-    const handleAdd = () => { setFormData({ date: selectedDate }); setDrawerMode("add"); };
-
-    const statusColors = {
-        SCHEDULED: "secondary",
-        IN_PROGRESS: "default",
-        COMPLETED: "success",
-        CANCELLED: "destructive"
+    const handleAdd = () => {
+        setFormData({ tripDate: new Date().toISOString().split('T')[0], tripType: 'PICKUP' });
+        setFormErrors({});
+        setDialogOpen(true);
     };
 
-    const StatusIcon = ({ status }) => {
-        switch (status) {
-            case "SCHEDULED": return <Calendar className="h-4 w-4" />;
-            case "IN_PROGRESS": return <PlayCircle className="h-4 w-4 text-blue-500" />;
-            case "COMPLETED": return <CheckCircle className="h-4 w-4 text-green-500" />;
-            case "CANCELLED": return <XCircle className="h-4 w-4 text-red-500" />;
-            default: return null;
-        }
+    const handleDeleteClick = (trip) => {
+        setSelectedTrip(trip);
+        setDeleteDialogOpen(true);
     };
 
-    const scheduledTrips = trips.filter(t => t.status === "SCHEDULED").length;
-    const inProgressTrips = trips.filter(t => t.status === "IN_PROGRESS").length;
-    const completedTrips = trips.filter(t => t.status === "COMPLETED").length;
+    const handleViewDetails = (trip) => {
+        setSelectedTrip(trip);
+        setDetailsDialogOpen(true);
+    };
+
+    // Stats
+    const scheduledTrips = trips.filter(t => t.status === 'SCHEDULED').length;
+    const inProgressTrips = trips.filter(t => t.status === 'IN_PROGRESS').length;
+    const completedTrips = trips.filter(t => t.status === 'COMPLETED').length;
+    const totalPages = Math.ceil(total / limit);
+
+    const statusConfig = {
+        SCHEDULED: { label: "Scheduled", className: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
+        IN_PROGRESS: { label: "In Progress", className: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" },
+        COMPLETED: { label: "Completed", className: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
+        CANCELLED: { label: "Cancelled", className: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
+    };
 
     return (
-        <div className="p-6 space-y-6">
-            {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="p-4 md:p-6 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-foreground">Trip Management</h1>
+                    <p className="text-muted-foreground text-sm mt-1">Schedule and monitor bus trips</p>
+                </div>
+                <Button onClick={handleAdd} className="w-full sm:w-auto">
+                    <Plus className="h-4 w-4 mr-2" /> Schedule Trip
+                </Button>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-medium">Total Trips</CardTitle>
                         <Bus className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{total}</div>
-                    </CardContent>
+                    <CardContent><div className="text-2xl font-bold">{total}</div></CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-medium">Scheduled</CardTitle>
-                        <Calendar className="h-4 w-4 text-yellow-600" />
+                        <Clock className="h-4 w-4 text-blue-600" />
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-yellow-600">{scheduledTrips}</div>
-                    </CardContent>
+                    <CardContent><div className="text-2xl font-bold text-blue-600">{scheduledTrips}</div></CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-                        <PlayCircle className="h-4 w-4 text-blue-600" />
+                        <PlayCircle className="h-4 w-4 text-yellow-600" />
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-blue-600">{inProgressTrips}</div>
-                    </CardContent>
+                    <CardContent><div className="text-2xl font-bold text-yellow-600">{inProgressTrips}</div></CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-medium">Completed</CardTitle>
                         <CheckCircle className="h-4 w-4 text-green-600" />
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-green-600">{completedTrips}</div>
-                    </CardContent>
+                    <CardContent><div className="text-2xl font-bold text-green-600">{completedTrips}</div></CardContent>
                 </Card>
             </div>
 
             {/* Filters */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-between">
-                <div className="flex gap-4">
-                    <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-[160px]" />
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="w-[150px]">
-                            <SelectValue placeholder="All Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Status</SelectItem>
-                            <SelectItem value="SCHEDULED">Scheduled</SelectItem>
-                            <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                            <SelectItem value="COMPLETED">Completed</SelectItem>
-                            <SelectItem value="CANCELLED">Cancelled</SelectItem>
-                        </SelectContent>
-                    </Select>
+            <div className="flex flex-col sm:flex-row gap-4">
+                <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="Search..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} className="pl-10 dark:bg-muted bg-white" />
                 </div>
-                <Button onClick={handleAdd}>
-                    <Plus className="h-4 w-4 mr-2" /> Schedule Trip
-                </Button>
+                <Input type="date" value={dateFilter} onChange={(e) => { setDateFilter(e.target.value); setPage(1); }} className="w-auto dark:bg-muted bg-white" />
+                <Select value={statusFilter} onValueChange={(val) => { setStatusFilter(val === "all" ? "" : val); setPage(1); }}>
+                    <SelectTrigger className="w-[150px] dark:bg-muted bg-white">
+                        <SelectValue placeholder="All Status" />
+                    </SelectTrigger>
+                    <SelectContent className="dark:bg-muted bg-white">
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="SCHEDULED">Scheduled</SelectItem>
+                        <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                        <SelectItem value="COMPLETED">Completed</SelectItem>
+                    </SelectContent>
+                </Select>
             </div>
 
-            {/* Table */}
-            <div className="overflow-x-auto rounded-lg border">
-                <Table className="min-w-[1000px]">
-                    <TableHeader>
-                        <TableRow className="bg-muted">
-                            <TableHead>Date</TableHead>
-                            <TableHead>Type</TableHead>
-                            <TableHead>Route</TableHead>
-                            <TableHead>Vehicle</TableHead>
-                            <TableHead>Driver</TableHead>
-                            <TableHead>Conductor</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Started</TableHead>
-                            <TableHead>Attendance</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {isLoading ? (
-                            Array(4).fill(0).map((_, i) => (
-                                <TableRow key={i}>
-                                    {Array(9).fill(0).map((_, j) => (
-                                        <TableCell key={j}><Skeleton className="h-6 w-16" /></TableCell>
-                                    ))}
-                                </TableRow>
-                            ))
-                        ) : trips.length > 0 ? (
-                            trips.map((trip, index) => (
-                                <TableRow key={trip.id} className={index % 2 === 0 ? "bg-muted/50" : ""}>
-                                    <TableCell>{format(new Date(trip.date), 'MMM dd, yyyy')}</TableCell>
-                                    <TableCell>
-                                        <Badge variant={trip.tripType === "PICKUP" ? "default" : "outline"}>
-                                            {trip.tripType}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className="font-medium">{trip.route?.name}</TableCell>
-                                    <TableCell>{trip.vehicle?.licensePlate}</TableCell>
-                                    <TableCell>{trip.driver?.name}</TableCell>
-                                    <TableCell>{trip.conductor?.name || "-"}</TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <StatusIcon status={trip.status} />
-                                            <Badge variant={statusColors[trip.status]}>{trip.status}</Badge>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        {trip.startedAt ? format(new Date(trip.startedAt), 'HH:mm') : "-"}
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge variant="outline">{trip._count?.attendanceRecords || 0}</Badge>
-                                    </TableCell>
-                                </TableRow>
-                            ))
-                        ) : (
-                            <TableRow>
-                                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                                    No trips found for selected date. Schedule a new trip.
-                                </TableCell>
+            <div className="rounded-lg border overflow-hidden">
+                <div className="overflow-x-auto">
+                    <Table className={'bg-white dark:bg-muted'}>
+                        <TableHeader>
+                            <TableRow className="bg-muted/50">
+                                <TableHead className="w-12">#</TableHead>
+                                <TableHead>Route</TableHead>
+                                <TableHead>Vehicle</TableHead>
+                                <TableHead>Driver</TableHead>
+                                <TableHead>Type</TableHead>
+                                <TableHead>Date</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
-                        )}
-                    </TableBody>
-                </Table>
+                        </TableHeader>
+                        <TableBody>
+                            {isLoading ? (
+                                Array(5).fill(0).map((_, i) => (
+                                    <TableRow key={i}>{Array(8).fill(0).map((_, j) => (<TableCell key={j}><Skeleton className="h-5 w-20" /></TableCell>))}</TableRow>
+                                ))
+                            ) : trips.length > 0 ? (
+                                trips.map((trip, index) => (
+                                    <TableRow key={trip.id} className="hover:bg-muted/30">
+                                        <TableCell className="text-muted-foreground">{(page - 1) * limit + index + 1}</TableCell>
+                                        <TableCell className="font-semibold">{trip.route?.name || "N/A"}</TableCell>
+                                        <TableCell><Badge variant="outline">{trip.vehicle?.licensePlate || "N/A"}</Badge></TableCell>
+                                        <TableCell>{trip.driver?.name || "N/A"}</TableCell>
+                                        <TableCell>
+                                            <Badge variant={trip.tripType === 'PICKUP' ? 'default' : 'secondary'}>
+                                                {trip.tripType === 'PICKUP' ? '🌅 Pickup' : '🌆 Drop'}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>{new Date(trip.tripDate).toLocaleDateString()}</TableCell>
+                                        <TableCell>
+                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusConfig[trip.status]?.className || ''}`}>
+                                                {statusConfig[trip.status]?.label || trip.status}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex justify-end gap-1">
+                                                <Button size="sm" variant="ghost" onClick={() => handleViewDetails(trip)}><Eye className="h-4 w-4" /></Button>
+                                                {trip.status === 'SCHEDULED' && (
+                                                    <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDeleteClick(trip)}><Trash2 className="h-4 w-4" /></Button>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={8} className="text-center py-12">
+                                        <Bus className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
+                                        <p className="text-muted-foreground">No trips found for selected date</p>
+                                        <Button variant="link" onClick={handleAdd} className="mt-2">Schedule a trip</Button>
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </div>
+                {totalPages > 1 && (
+                    <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/20">
+                        <p className="text-sm text-muted-foreground">Showing {(page - 1) * limit + 1} to {Math.min(page * limit, total)} of {total}</p>
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" onClick={() => setPage(p => p - 1)} disabled={page === 1}><ChevronLeft className="h-4 w-4" /></Button>
+                            <span className="text-sm font-medium px-2">{page} / {totalPages}</span>
+                            <Button variant="outline" size="sm" onClick={() => setPage(p => p + 1)} disabled={page >= totalPages}><ChevronRight className="h-4 w-4" /></Button>
+                        </div>
+                    </div>
+                )}
             </div>
 
-            {/* Drawer */}
-            <Drawer open={!!drawerMode} onOpenChange={() => setDrawerMode(null)} direction="right">
-                <DrawerContent className="w-[400px] flex flex-col h-full">
-                    <DrawerHeader>
-                        <DrawerTitle>Schedule Trip</DrawerTitle>
-                    </DrawerHeader>
-                    <div className="p-4 flex-1 overflow-y-auto space-y-4">
-                        {formError && <p className="text-red-500 text-sm">{formError}</p>}
-                        <div className="space-y-4">
-                            <div>
-                                <Label>Date*</Label>
-                                <Input type="date" name="date" value={formData.date || ""} onChange={(e) => setFormData({ ...formData, date: e.target.value })} />
-                            </div>
-                            <div>
-                                <Label>Trip Type*</Label>
-                                <Select value={formData.tripType || ""} onValueChange={(v) => setFormData({ ...formData, tripType: v })}>
-                                    <SelectTrigger><SelectValue placeholder="Select Type" /></SelectTrigger>
+            {/* Schedule Trip Dialog */}
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Schedule New Trip</DialogTitle>
+                        <DialogDescription>Create a new bus trip for a route</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Route <span className="text-destructive">*</span></Label>
+                                <Select value={formData.routeId || ""} onValueChange={(val) => setFormData({ ...formData, routeId: val })}>
+                                    <SelectTrigger className={formErrors.routeId ? "border-destructive" : ""}>
+                                        <SelectValue placeholder="Select route" />
+                                    </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="PICKUP">PICKUP (Morning)</SelectItem>
-                                        <SelectItem value="DROP">DROP (Afternoon)</SelectItem>
+                                        {routes.map((r) => (<SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>))}
                                     </SelectContent>
                                 </Select>
+                                {formErrors.routeId && <p className="text-xs text-destructive">{formErrors.routeId}</p>}
                             </div>
-                            <div>
-                                <Label>Route*</Label>
-                                <Select value={formData.routeId || ""} onValueChange={(v) => setFormData({ ...formData, routeId: v })}>
-                                    <SelectTrigger><SelectValue placeholder="Select Route" /></SelectTrigger>
+                            <div className="space-y-2">
+                                <Label>Vehicle <span className="text-destructive">*</span></Label>
+                                <Select value={formData.vehicleId || ""} onValueChange={(val) => setFormData({ ...formData, vehicleId: val })}>
+                                    <SelectTrigger className={formErrors.vehicleId ? "border-destructive" : ""}>
+                                        <SelectValue placeholder="Select vehicle" />
+                                    </SelectTrigger>
                                     <SelectContent>
-                                        {routes.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                                        {vehicles.filter(v => v.status === 'active').map((v) => (<SelectItem key={v.id} value={v.id}>{v.licensePlate}</SelectItem>))}
                                     </SelectContent>
                                 </Select>
-                            </div>
-                            <div>
-                                <Label>Vehicle*</Label>
-                                <Select value={formData.vehicleId || ""} onValueChange={(v) => setFormData({ ...formData, vehicleId: v })}>
-                                    <SelectTrigger><SelectValue placeholder="Select Vehicle" /></SelectTrigger>
-                                    <SelectContent>
-                                        {vehicles.map(v => <SelectItem key={v.id} value={v.id}>{v.licensePlate} - {v.model}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label>Driver*</Label>
-                                <Select value={formData.driverId || ""} onValueChange={(v) => setFormData({ ...formData, driverId: v })}>
-                                    <SelectTrigger><SelectValue placeholder="Select Driver" /></SelectTrigger>
-                                    <SelectContent>
-                                        {drivers.map(d => <SelectItem key={d.id} value={d.id}>{d.name} ({d.employeeId})</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label>Conductor (optional)</Label>
-                                <Select value={formData.conductorId || ""} onValueChange={(v) => setFormData({ ...formData, conductorId: v || null })}>
-                                    <SelectTrigger><SelectValue placeholder="Select Conductor" /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="">None</SelectItem>
-                                        {conductors.map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.employeeId})</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label>Notes</Label>
-                                <Input name="notes" value={formData.notes || ""} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
+                                {formErrors.vehicleId && <p className="text-xs text-destructive">{formErrors.vehicleId}</p>}
                             </div>
                         </div>
-                        <Button onClick={handleSubmit} disabled={saving} className="w-full mt-4">
-                            {saving ? <><Loader2 className="animate-spin mr-2" size={18} /> Scheduling...</> : "Schedule Trip"}
-                        </Button>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Driver <span className="text-destructive">*</span></Label>
+                                <Select value={formData.driverId || ""} onValueChange={(val) => setFormData({ ...formData, driverId: val })}>
+                                    <SelectTrigger className={formErrors.driverId ? "border-destructive" : ""}>
+                                        <SelectValue placeholder="Select driver" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {drivers.filter(d => d.isActive).map((d) => (<SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>))}
+                                    </SelectContent>
+                                </Select>
+                                {formErrors.driverId && <p className="text-xs text-destructive">{formErrors.driverId}</p>}
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Conductor</Label>
+                                <Select value={formData.conductorId || "none"} onValueChange={(val) => setFormData({ ...formData, conductorId: val === "none" ? null : val })}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select conductor" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">No conductor</SelectItem>
+                                        {conductors.filter(c => c.isActive).map((c) => (<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Date <span className="text-destructive">*</span></Label>
+                                <Input type="date" value={formData.tripDate || ""} onChange={(e) => setFormData({ ...formData, tripDate: e.target.value })} className={formErrors.tripDate ? "border-destructive" : ""} />
+                                {formErrors.tripDate && <p className="text-xs text-destructive">{formErrors.tripDate}</p>}
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Trip Type <span className="text-destructive">*</span></Label>
+                                <Select value={formData.tripType || "PICKUP"} onValueChange={(val) => setFormData({ ...formData, tripType: val })}>
+                                    <SelectTrigger className={formErrors.tripType ? "border-destructive" : ""}>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="PICKUP">🌅 Morning Pickup</SelectItem>
+                                        <SelectItem value="DROP">🌆 Afternoon Drop</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                {formErrors.tripType && <p className="text-xs text-destructive">{formErrors.tripType}</p>}
+                            </div>
+                        </div>
                     </div>
-                </DrawerContent>
-            </Drawer>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
+                        <Button onClick={handleSubmit} disabled={saving}>
+                            {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Scheduling...</> : "Schedule Trip"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Trip Details Dialog */}
+            <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Trip Details</DialogTitle>
+                    </DialogHeader>
+                    {selectedTrip && (
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><p className="text-sm text-muted-foreground">Route</p><p className="font-medium">{selectedTrip.route?.name}</p></div>
+                                <div><p className="text-sm text-muted-foreground">Vehicle</p><p className="font-medium">{selectedTrip.vehicle?.licensePlate}</p></div>
+                                <div><p className="text-sm text-muted-foreground">Driver</p><p className="font-medium">{selectedTrip.driver?.name}</p></div>
+                                <div><p className="text-sm text-muted-foreground">Conductor</p><p className="font-medium">{selectedTrip.conductor?.name || "N/A"}</p></div>
+                                <div><p className="text-sm text-muted-foreground">Date</p><p className="font-medium">{new Date(selectedTrip.tripDate).toLocaleDateString()}</p></div>
+                                <div><p className="text-sm text-muted-foreground">Type</p><Badge>{selectedTrip.tripType}</Badge></div>
+                                <div><p className="text-sm text-muted-foreground">Status</p><span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusConfig[selectedTrip.status]?.className || ''}`}>{statusConfig[selectedTrip.status]?.label}</span></div>
+                                {selectedTrip.startTime && <div><p className="text-sm text-muted-foreground">Started</p><p className="font-medium">{new Date(selectedTrip.startTime).toLocaleTimeString()}</p></div>}
+                                {selectedTrip.endTime && <div><p className="text-sm text-muted-foreground">Ended</p><p className="font-medium">{new Date(selectedTrip.endTime).toLocaleTimeString()}</p></div>}
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete Confirmation */}
+            <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Cancel Trip</DialogTitle>
+                        <DialogDescription>Are you sure you want to cancel this trip?</DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Keep Trip</Button>
+                        <Button variant="destructive" onClick={() => deleteMutation.mutate(selectedTrip?.id)} disabled={deleteMutation.isPending}>
+                            {deleteMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Cancelling...</> : "Cancel Trip"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

@@ -87,7 +87,7 @@ export default function StudentListPage() {
         queryKey: ['parents', schoolId],
         queryFn: async () => {
             const res = await axios.get(`/api/schools/${schoolId}/parents`);
-            return res.data.parents || [];
+            return res.data || [];
         },
         enabled: !!schoolId && !!dialogData,
         staleTime: 5 * 60 * 1000,
@@ -590,11 +590,42 @@ export default function StudentListPage() {
                                 </div>
                             </div>
 
+                            {/* Already Linked Parents */}
+                            {dialogData.studentParentLinks?.length > 0 && (
+                                <div className="p-4 rounded-lg border bg-green-50 dark:bg-green-950/30">
+                                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-green-700 dark:text-green-400">
+                                        <LinkIcon className="h-4 w-4" />
+                                        Linked Parents ({dialogData.studentParentLinks.length})
+                                    </h3>
+                                    <div className="space-y-2">
+                                        {dialogData.studentParentLinks.map((link) => (
+                                            <div key={link.id} className="flex items-center gap-3 p-3 rounded-lg bg-white dark:bg-card border">
+                                                <Avatar className="h-9 w-9">
+                                                    <AvatarImage src={link.parent?.user?.profilePicture} />
+                                                    <AvatarFallback className="text-xs">
+                                                        {link.parent?.name?.[0]?.toUpperCase() || "P"}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-medium text-sm truncate">{link.parent?.name}</p>
+                                                    <p className="text-xs text-muted-foreground truncate">
+                                                        {link.parent?.user?.email || 'No email'}
+                                                    </p>
+                                                </div>
+                                                <Badge variant="outline" className="bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400 text-xs">
+                                                    {link.relationship || 'Parent'}
+                                                </Badge>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Link Parent Account */}
                             <div className="p-4 rounded-lg border bg-card">
                                 <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
                                     <LinkIcon className="h-4 w-4" />
-                                    Link Parent Account
+                                    Link Additional Parent
                                 </h3>
                                 <div className="flex gap-2">
                                     <Select
@@ -605,11 +636,13 @@ export default function StudentListPage() {
                                             <SelectValue placeholder="Select Parent" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {allParents.map((parent) => (
-                                                <SelectItem key={parent.userId} value={parent.userId}>
-                                                    {parent.name} ({parent.user?.email || 'No Email'})
-                                                </SelectItem>
-                                            ))}
+                                            {allParents
+                                                .filter(parent => !dialogData.studentParentLinks?.some(lp => lp.parent?.userId === parent.userId))
+                                                .map((parent) => (
+                                                    <SelectItem key={parent.userId} value={parent.userId}>
+                                                        {parent.name} ({parent.user?.email || 'No Email'})
+                                                    </SelectItem>
+                                                ))}
                                         </SelectContent>
                                     </Select>
                                     <Button

@@ -12,6 +12,11 @@ export async function GET(req, props) {
     const includeHistory = searchParams.get('history') === 'true';
     const historyLimit = parseInt(searchParams.get('historyLimit')) || 50;
 
+    // Validate vehicleId
+    if (!vehicleId || vehicleId === 'undefined' || vehicleId === 'null') {
+        return NextResponse.json({ error: 'Valid vehicleId is required' }, { status: 400 });
+    }
+
     try {
         // Try Redis first for latest location
         const cached = await redis.get(`vehicle-location:${vehicleId}`);

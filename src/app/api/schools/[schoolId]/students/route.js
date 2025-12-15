@@ -49,7 +49,16 @@ export async function GET(req, props) {
             include: {
                 user: true,
                 class: { select: { className: true } },
-                section: { select: { name: true } }
+                section: { select: { name: true } },
+                studentParentLinks: {
+                    include: {
+                        parent: {
+                            include: {
+                                user: { select: { email: true, profilePicture: true } }
+                            }
+                        }
+                    }
+                }
             },
             skip,
             take: limitNum

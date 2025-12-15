@@ -17,6 +17,7 @@ import { usePathname } from "next/navigation"
 import { useState } from "react"
 import { useCommandMenu } from "./CommandMenuContext"
 import { SchoolDetailPopup } from "./school-detail-popup"
+import { RequestsDropdown } from "./requests-dropdown"
 export function SiteHeader({ fullUser }) {
     console.log(fullUser)
     const { setOpen } = useCommandMenu()
@@ -84,6 +85,9 @@ export function SiteHeader({ fullUser }) {
                     </Button>
 
                     <ModeToggle />
+
+                    {/* Requests Dropdown */}
+                    <RequestsDropdown schoolId={fullUser?.school?.id} />
 
                     {/* User Avatar */}
                     <div className="flex items-center gap-2 pl-2 border-l ml-1">
