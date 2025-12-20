@@ -1,4 +1,4 @@
-// app/api/schools/transport/fees/route.js
+/Users/manshajami/Documents/edutemp/src/app/api/schools/transport// app/api/schools/transport/fees/route.js
 // Transport Fee Structure management
 // GET: List transport fee structures
 // POST: Create new fee structure

@@ -42,7 +42,7 @@ export async function POST(req) {
     const isSchoolLogin = Boolean(schoolCode?.trim());
 
     // ✅ If school login — only allow school roles
-    const schoolRoles = ["ADMIN", "TEACHING_STAFF", "NON_TEACHING_STAFF", "STUDENT", "PARENT", "LIBRARIAN", "ACCOUNTANT"];
+    const schoolRoles = ["ADMIN", "TEACHING_STAFF", "NON_TEACHING_STAFF", "STUDENT", "PARENT", "LIBRARIAN", "ACCOUNTANT", "DRIVER", "CONDUCTOR"];
     if (isSchoolLogin && !schoolRoles.includes(user.role.name)) {
       await supabase.auth.signOut();
       return NextResponse.json({ error: "Only school users can login here" }, { status: 403 });
@@ -88,6 +88,10 @@ export async function POST(req) {
         break;
       case "ACCOUNTANT":
         schoolId = (await prisma.accountant.findUnique({ where: { userId } }))?.schoolId;
+        break;
+      case "DRIVER":
+      case "CONDUCTOR":
+        schoolId = (await prisma.transportStaff.findUnique({ where: { userId } }))?.schoolId;
         break;
     }
 

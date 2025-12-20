@@ -26,6 +26,16 @@ export async function POST(req) {
             return NextResponse.json({ error: 'Trip not found' }, { status: 404 });
         }
 
+        // Look up TransportStaff from userId (markedById might be userId from mobile app)
+        let transportStaffId = markedById;
+        const transportStaff = await prisma.transportStaff.findFirst({
+            where: { userId: markedById },
+            select: { id: true }
+        });
+        if (transportStaff) {
+            transportStaffId = transportStaff.id;
+        }
+
         // Process each student
         const results = await prisma.$transaction(async (tx) => {
             const attendanceResults = [];
@@ -44,7 +54,7 @@ export async function POST(req) {
                     update: {
                         status,
                         stopId,
-                        markedById,
+                        markedById: transportStaffId,
                         markedAt: new Date(),
                         latitude,
                         longitude,
@@ -57,7 +67,7 @@ export async function POST(req) {
                         routeId: trip.routeId,
                         tripType: trip.tripType,
                         status,
-                        markedById,
+                        markedById: transportStaffId,
                         latitude,
                         longitude,
                         notes,

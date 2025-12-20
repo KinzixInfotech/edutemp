@@ -3,7 +3,7 @@ import Image from "next/image";
 
 const footerData = {
     logo: {
-        src: "/edu.png",
+        src: "/favicon.ico",
         alt: "EduBreezy",
         width: 200,
         height: 200,

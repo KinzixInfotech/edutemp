@@ -1,0 +1,26 @@
+{
+    "name": "EduBreezy",
+    "short_name": "EduBreezy",
+    "description": "India's leading school management and explorer platform. Find schools, read reviews, manage operations.",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#0068fd",
+    "icons": [
+        {
+            "src": "/favicon.ico",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "/favicon.ico",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ],
+    "categories": [
+        "education",
+        "productivity"
+    ],
+    "lang": "en-IN"
+}

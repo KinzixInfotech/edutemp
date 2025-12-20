@@ -39,6 +39,14 @@ export async function GET(req) {
                     capacity: true,
                     maintenanceDue: true,
                     status: true,
+                    fuelType: true,
+                    mileage: true,
+                    rcNumber: true,
+                    rcExpiry: true,
+                    insuranceNumber: true,
+                    insuranceExpiry: true,
+                    pucNumber: true,
+                    pucExpiry: true,
                     createdAt: true,
                     updatedAt: true,
                 },
@@ -69,11 +77,16 @@ export async function GET(req) {
 export async function POST(req) {
     try {
         const data = await req.json();
-        const { capacity, ...rest } = data;
+        const { capacity, mileage, rcExpiry, insuranceExpiry, pucExpiry, maintenanceDue, ...rest } = data;
         const vehicle = await prisma.vehicle.create({
             data: {
                 ...rest,
-                capacity: parseInt(capacity, 10), // ensures it's stored as an integer
+                capacity: parseInt(capacity, 10),
+                mileage: mileage ? parseFloat(mileage) : null,
+                rcExpiry: rcExpiry ? new Date(rcExpiry) : null,
+                insuranceExpiry: insuranceExpiry ? new Date(insuranceExpiry) : null,
+                pucExpiry: pucExpiry ? new Date(pucExpiry) : null,
+                maintenanceDue: maintenanceDue ? new Date(maintenanceDue) : null,
             },
             select: {
                 id: true,
@@ -82,6 +95,14 @@ export async function POST(req) {
                 capacity: true,
                 maintenanceDue: true,
                 status: true,
+                fuelType: true,
+                mileage: true,
+                rcNumber: true,
+                rcExpiry: true,
+                insuranceNumber: true,
+                insuranceExpiry: true,
+                pucNumber: true,
+                pucExpiry: true,
                 createdAt: true,
                 updatedAt: true,
             },

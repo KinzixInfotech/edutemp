@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
-import { Loader2, Plus, Search, Car, Users, AlertTriangle, CheckCircle, Edit2, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Plus, Search, Car, Users, AlertTriangle, CheckCircle, Edit2, Trash2, ChevronLeft, ChevronRight, FileText } from "lucide-react";
 
 async function fetchVehicles({ schoolId, search, page = 1, limit = 10 }) {
     const params = new URLSearchParams({ schoolId });
@@ -144,11 +144,20 @@ export default function VehicleManagement() {
 
     const handleEdit = (vehicle) => {
         setSelectedVehicle(vehicle);
+        const formatDate = (date) => date ? new Date(date).toISOString().split('T')[0] : '';
         setFormData({
             licensePlate: vehicle.licensePlate,
             model: vehicle.model,
             capacity: vehicle.capacity,
             status: vehicle.status,
+            fuelType: vehicle.fuelType || "DIESEL",
+            mileage: vehicle.mileage,
+            rcNumber: vehicle.rcNumber,
+            rcExpiry: formatDate(vehicle.rcExpiry),
+            insuranceNumber: vehicle.insuranceNumber,
+            insuranceExpiry: formatDate(vehicle.insuranceExpiry),
+            pucNumber: vehicle.pucNumber,
+            pucExpiry: formatDate(vehicle.pucExpiry),
         });
         setFormErrors({});
         setDialogOpen(true);
@@ -334,70 +343,137 @@ export default function VehicleManagement() {
                             {selectedVehicle ? "Update vehicle details below" : "Enter vehicle details to add to your fleet"}
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="licensePlate">License Plate <span className="text-destructive">*</span></Label>
-                            <Input
-                                id="licensePlate"
-                                placeholder="e.g., MH 01 AB 1234"
-                                value={formData.licensePlate || ""}
-                                onChange={(e) => setFormData({ ...formData, licensePlate: e.target.value.toUpperCase() })}
-                                className={formErrors.licensePlate ? "border-destructive" : ""}
-                            />
-                            {formErrors.licensePlate && <p className="text-xs text-destructive">{formErrors.licensePlate}</p>}
+                    <div className="grid gap-4 py-4 h-[60vh] overflow-y-auto pr-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="licensePlate">License Plate <span className="text-destructive">*</span></Label>
+                                <Input
+                                    id="licensePlate"
+                                    placeholder="e.g., MH 01 AB 1234"
+                                    value={formData.licensePlate || ""}
+                                    onChange={(e) => setFormData({ ...formData, licensePlate: e.target.value.toUpperCase() })}
+                                    className={formErrors.licensePlate ? "border-destructive" : ""}
+                                />
+                                {formErrors.licensePlate && <p className="text-xs text-destructive">{formErrors.licensePlate}</p>}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="model">Model / Make <span className="text-destructive">*</span></Label>
+                                <Input
+                                    id="model"
+                                    placeholder="e.g., Tata Starbus"
+                                    value={formData.model || ""}
+                                    onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+                                    className={formErrors.model ? "border-destructive" : ""}
+                                />
+                                {formErrors.model && <p className="text-xs text-destructive">{formErrors.model}</p>}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="capacity">Seating Capacity <span className="text-destructive">*</span></Label>
+                                <Input
+                                    id="capacity"
+                                    type="number"
+                                    min="1"
+                                    placeholder="e.g., 40"
+                                    value={formData.capacity || ""}
+                                    onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
+                                    className={formErrors.capacity ? "border-destructive" : ""}
+                                />
+                                {formErrors.capacity && <p className="text-xs text-destructive">{formErrors.capacity}</p>}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="fuelType">Fuel Type</Label>
+                                <Select value={formData.fuelType || "DIESEL"} onValueChange={(val) => setFormData({ ...formData, fuelType: val })}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select fuel type" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="DIESEL">Diesel</SelectItem>
+                                        <SelectItem value="PETROL">Petrol</SelectItem>
+                                        <SelectItem value="CNG">CNG</SelectItem>
+                                        <SelectItem value="EV">Electric (EV)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="mileage">Mileage (km/l)</Label>
+                                <Input
+                                    id="mileage"
+                                    type="number"
+                                    step="0.1"
+                                    placeholder="e.g., 12.5"
+                                    value={formData.mileage || ""}
+                                    onChange={(e) => setFormData({ ...formData, mileage: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="status">Status <span className="text-destructive">*</span></Label>
+                                <Select value={formData.status || "active"} onValueChange={(val) => setFormData({ ...formData, status: val })}>
+                                    <SelectTrigger className={formErrors.status ? "border-destructive" : ""}>
+                                        <SelectValue placeholder="Select status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="active">Active</SelectItem>
+                                        <SelectItem value="maintenance">Maintenance</SelectItem>
+                                        <SelectItem value="inactive">Inactive</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="model">Model / Make <span className="text-destructive">*</span></Label>
-                            <Input
-                                id="model"
-                                placeholder="e.g., Tata Starbus"
-                                value={formData.model || ""}
-                                onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-                                className={formErrors.model ? "border-destructive" : ""}
-                            />
-                            {formErrors.model && <p className="text-xs text-destructive">{formErrors.model}</p>}
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="capacity">Seating Capacity <span className="text-destructive">*</span></Label>
-                            <Input
-                                id="capacity"
-                                type="number"
-                                min="1"
-                                placeholder="e.g., 40"
-                                value={formData.capacity || ""}
-                                onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
-                                className={formErrors.capacity ? "border-destructive" : ""}
-                            />
-                            {formErrors.capacity && <p className="text-xs text-destructive">{formErrors.capacity}</p>}
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="status">Status <span className="text-destructive">*</span></Label>
-                            <Select value={formData.status || "active"} onValueChange={(val) => setFormData({ ...formData, status: val })}>
-                                <SelectTrigger className={formErrors.status ? "border-destructive" : ""}>
-                                    <SelectValue placeholder="Select status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="active">
-                                        <div className="flex items-center gap-2">
-                                            <span className="h-2 w-2 rounded-full bg-green-500" />
-                                            Active
-                                        </div>
-                                    </SelectItem>
-                                    <SelectItem value="maintenance">
-                                        <div className="flex items-center gap-2">
-                                            <span className="h-2 w-2 rounded-full bg-yellow-500" />
-                                            Under Maintenance
-                                        </div>
-                                    </SelectItem>
-                                    <SelectItem value="inactive">
-                                        <div className="flex items-center gap-2">
-                                            <span className="h-2 w-2 rounded-full bg-gray-400" />
-                                            Inactive
-                                        </div>
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            {formErrors.status && <p className="text-xs text-destructive">{formErrors.status}</p>}
+
+                        <div className="border-t pt-4">
+                            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                <FileText className="h-4 w-4" /> Documents & Compliance
+                            </h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label>RC Number</Label>
+                                    <Input
+                                        placeholder="Registration Certificate No."
+                                        value={formData.rcNumber || ""}
+                                        onChange={(e) => setFormData({ ...formData, rcNumber: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>RC Expiry</Label>
+                                    <Input
+                                        type="date"
+                                        value={formData.rcExpiry || ""}
+                                        onChange={(e) => setFormData({ ...formData, rcExpiry: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Insurance Policy No.</Label>
+                                    <Input
+                                        placeholder="Policy Number"
+                                        value={formData.insuranceNumber || ""}
+                                        onChange={(e) => setFormData({ ...formData, insuranceNumber: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Insurance Expiry</Label>
+                                    <Input
+                                        type="date"
+                                        value={formData.insuranceExpiry || ""}
+                                        onChange={(e) => setFormData({ ...formData, insuranceExpiry: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>PUC Number</Label>
+                                    <Input
+                                        placeholder="Pollution Certificate No."
+                                        value={formData.pucNumber || ""}
+                                        onChange={(e) => setFormData({ ...formData, pucNumber: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>PUC Expiry</Label>
+                                    <Input
+                                        type="date"
+                                        value={formData.pucExpiry || ""}
+                                        onChange={(e) => setFormData({ ...formData, pucExpiry: e.target.value })}
+                                    />
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <DialogFooter className="gap-2 sm:gap-0">

@@ -35,7 +35,22 @@ export async function GET(req) {
                 select: {
                     id: true,
                     studentId: true,
-                    student: { select: { name: true } },
+                    student: {
+                        select: {
+                            name: true,
+                            admissionNo: true,
+                            rollNumber: true,
+                            user: {
+                                select: { profilePicture: true }
+                            },
+                            section: {
+                                select: {
+                                    name: true,
+                                    class: { select: { className: true } }
+                                }
+                            }
+                        }
+                    },
                     routeId: true,
                     route: { select: { name: true } },
                     assignedAt: true,

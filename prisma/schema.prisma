@@ -826,6 +826,14 @@ model Vehicle {
   model              String
   capacity           Int
   maintenanceDue     DateTime?
+  fuelType           String? // e.g., DIESEL, PETROL, CNG, EV
+  mileage            Float? // km/l or km/charge
+  rcNumber           String?
+  rcExpiry           DateTime?
+  insuranceNumber    String?
+  insuranceExpiry    DateTime?
+  pucNumber          String?
+  pucExpiry          DateTime?
   status             String // e.g., "active", "maintenance", "inactive"
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt

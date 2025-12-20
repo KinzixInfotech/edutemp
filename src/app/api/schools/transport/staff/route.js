@@ -19,6 +19,7 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const schoolId = searchParams.get('schoolId');
     const search = searchParams.get('search') || '';
+    const userId = searchParams.get('userId');
     const role = searchParams.get('role'); // DRIVER, CONDUCTOR, or null for all
     const isActive = searchParams.get('isActive');
     const page = parseInt(searchParams.get('page')) || 1;
@@ -31,7 +32,7 @@ export async function GET(req) {
 
     try {
         // Build cache key
-        const cacheKey = generateKey('transport-staff', { schoolId, search, role, isActive, page, limit });
+        const cacheKey = generateKey('transport-staff', { schoolId, search, role, isActive, page, limit, userId });
 
         // Try cache first
         const data = await remember(cacheKey, async () => {
@@ -47,6 +48,7 @@ export async function GET(req) {
                         { contactNumber: { contains: search, mode: 'insensitive' } },
                     ],
                 }),
+                ...(userId && { userId }),
             };
 
             const [staff, total] = await Promise.all([
@@ -60,7 +62,21 @@ export async function GET(req) {
                             where: { isActive: true },
                             include: {
                                 vehicle: {
-                                    select: { id: true, licensePlate: true, model: true }
+                                    select: {
+                                        id: true,
+                                        licensePlate: true,
+                                        model: true,
+                                        capacity: true,
+                                        fuelType: true,
+                                        mileage: true,
+                                        rcExpiry: true,
+                                        insuranceExpiry: true,
+                                        pucExpiry: true,
+                                        maintenanceDue: true,
+                                        routes: {
+                                            select: { id: true, name: true, stops: true }
+                                        }
+                                    }
                                 }
                             }
                         },

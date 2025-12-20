@@ -149,7 +149,9 @@ export default function TripManagement() {
 
     const handleSubmit = () => {
         if (!validateForm()) return;
-        createMutation.mutate({ ...formData, schoolId });
+        // Convert tripDate to date for API
+        const { tripDate, ...rest } = formData;
+        createMutation.mutate({ ...rest, date: tripDate, schoolId });
     };
 
     const handleAdd = () => {
@@ -276,7 +278,7 @@ export default function TripManagement() {
                                                 {trip.tripType === 'PICKUP' ? '🌅 Pickup' : '🌆 Drop'}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell>{new Date(trip.tripDate).toLocaleDateString()}</TableCell>
+                                        <TableCell>{new Date(trip.date).toLocaleDateString()}</TableCell>
                                         <TableCell>
                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusConfig[trip.status]?.className || ''}`}>
                                                 {statusConfig[trip.status]?.label || trip.status}
@@ -419,7 +421,7 @@ export default function TripManagement() {
                                 <div><p className="text-sm text-muted-foreground">Vehicle</p><p className="font-medium">{selectedTrip.vehicle?.licensePlate}</p></div>
                                 <div><p className="text-sm text-muted-foreground">Driver</p><p className="font-medium">{selectedTrip.driver?.name}</p></div>
                                 <div><p className="text-sm text-muted-foreground">Conductor</p><p className="font-medium">{selectedTrip.conductor?.name || "N/A"}</p></div>
-                                <div><p className="text-sm text-muted-foreground">Date</p><p className="font-medium">{new Date(selectedTrip.tripDate).toLocaleDateString()}</p></div>
+                                <div><p className="text-sm text-muted-foreground">Date</p><p className="font-medium">{new Date(selectedTrip.date).toLocaleDateString()}</p></div>
                                 <div><p className="text-sm text-muted-foreground">Type</p><Badge>{selectedTrip.tripType}</Badge></div>
                                 <div><p className="text-sm text-muted-foreground">Status</p><span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusConfig[selectedTrip.status]?.className || ''}`}>{statusConfig[selectedTrip.status]?.label}</span></div>
                                 {selectedTrip.startTime && <div><p className="text-sm text-muted-foreground">Started</p><p className="font-medium">{new Date(selectedTrip.startTime).toLocaleTimeString()}</p></div>}

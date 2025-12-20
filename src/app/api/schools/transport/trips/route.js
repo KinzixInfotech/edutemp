@@ -54,7 +54,7 @@ export async function GET(req) {
                 prisma.busTrip.findMany({
                     where,
                     include: {
-                        vehicle: { select: { id: true, licensePlate: true, model: true } },
+                        vehicle: { select: { id: true, licensePlate: true, model: true, capacity: true, fuelType: true, mileage: true, rcExpiry: true, insuranceExpiry: true, pucExpiry: true, maintenanceDue: true } },
                         route: { select: { id: true, name: true } },
                         driver: { select: { id: true, name: true, contactNumber: true } },
                         conductor: { select: { id: true, name: true, contactNumber: true } },
@@ -126,7 +126,7 @@ export async function POST(req) {
                 notes,
             },
             include: {
-                vehicle: { select: { id: true, licensePlate: true } },
+                vehicle: { select: { id: true, licensePlate: true, model: true, capacity: true, fuelType: true, mileage: true, rcExpiry: true, insuranceExpiry: true, pucExpiry: true, maintenanceDue: true } },
                 route: { select: { id: true, name: true } },
                 driver: { select: { id: true, name: true } },
                 conductor: { select: { id: true, name: true } },

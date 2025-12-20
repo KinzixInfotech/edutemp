@@ -718,7 +718,7 @@ export function AppSidebar({ ...props }) {
                                 {!isCollapsed ? (
                                     <SidebarMenuButton asChild className={'mt-6'}>
                                         <Select value={activeYear?.id} onValueChange={handleSessionSwitch} >
-                                            <SelectTrigger className="h-9 w-full dark:bg-[#171717] bg-white border ">
+                                            <SelectTrigger className="h-9 bg-[#f9fafb] w-full dark:bg-[#171717]  border ">
                                                 <SelectValue>
                                                     <div className="flex items-center gap-2">
                                                         <div className={cn("h-2 w-2 rounded-full", activeYear ? "bg-green-500" : "bg-gray-300")}></div>

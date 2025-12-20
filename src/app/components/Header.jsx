@@ -147,7 +147,7 @@ export default function Header() {
                     {/* Logo - Left side */}
                     <div className="flex items-center gap-2 flex-row justify-center">
                         <Link href="/" className="text-primary hover:text-primary/90">
-                            <Image src='/edu.png' width={200} height={200} alt="EduBreezy" priority />
+                            <Image src='/favicon.ico' width={200} height={200} alt="EduBreezy" priority />
                         </Link>
 
                     </div>

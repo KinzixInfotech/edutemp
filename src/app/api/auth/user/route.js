@@ -451,6 +451,28 @@ export async function GET(req) {
                 response.accountantData = accountant;
                 break;
             }
+            case "DRIVER":
+            case "CONDUCTOR": {
+                const transportStaff = await prisma.transportStaff.findUnique({
+                    where: { userId },
+                    include: {
+                        school: true,
+                        vehicleAssignments: {
+                            where: { isActive: true },
+                            include: {
+                                vehicle: {
+                                    select: { id: true, licensePlate: true, model: true, capacity: true }
+                                }
+                            }
+                        }
+                    },
+                });
+                console.log("✅ [API] Transport Staff details fetched:", transportStaff ? "Found" : "Not Found");
+                response.schoolId = transportStaff?.schoolId;
+                response.school = transportStaff?.school;
+                response.transportStaffData = transportStaff;
+                break;
+            }
             case "PARTNER": {
                 const partner = await prisma.partner.findUnique({
                     where: { userId },

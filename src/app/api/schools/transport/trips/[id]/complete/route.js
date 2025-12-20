@@ -10,7 +10,13 @@ export async function POST(req, props) {
     const { id } = params;
 
     try {
-        const data = await req.json();
+        // Handle empty body gracefully
+        let data = {};
+        try {
+            data = await req.json();
+        } catch (e) {
+            // No body provided, that's okay
+        }
         const { driverId, notes } = data;
 
         const trip = await prisma.busTrip.findUnique({
