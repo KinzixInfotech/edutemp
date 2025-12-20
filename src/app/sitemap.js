@@ -3,13 +3,17 @@
 
 import prisma from '@/lib/prisma';
 
+// Force dynamic rendering to avoid build-time database queries
+export const dynamic = 'force-dynamic';
+export const revalidate = 3600; // Revalidate every hour
+
 export default async function sitemap() {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://edubreezy.com';
     const schoolBaseUrl = process.env.NODE_ENV === 'development'
         ? 'http://school.localhost:3000'
         : 'https://school.edubreezy.com';
 
-    // Static pages
+    // Static pages - always included
     const staticPages = [
         {
             url: baseUrl,
@@ -59,7 +63,13 @@ export default async function sitemap() {
         },
     ];
 
-    // Dynamic school pages - fetch all public schools
+    // Skip database query during build time
+    if (process.env.NEXT_PHASE === 'phase-production-build') {
+        console.log('[Sitemap] Skipping database query during build');
+        return [...staticPages, ...explorerPages];
+    }
+
+    // Dynamic school pages - fetch all public schools at runtime
     let schoolPages = [];
     try {
         const schools = await prisma.school.findMany({
@@ -83,7 +93,9 @@ export default async function sitemap() {
         }));
     } catch (error) {
         console.error('Sitemap: Error fetching schools:', error);
+        // Return static pages only if database fails
     }
 
     return [...staticPages, ...explorerPages, ...schoolPages];
 }
+
