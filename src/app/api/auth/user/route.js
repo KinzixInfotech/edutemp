@@ -461,7 +461,29 @@ export async function GET(req) {
                             where: { isActive: true },
                             include: {
                                 vehicle: {
-                                    select: { id: true, licensePlate: true, model: true, capacity: true }
+                                    select: { id: true, licensePlate: true, model: true, capacity: true, fuelType: true, mileage: true }
+                                }
+                            }
+                        },
+                        driverRouteAssignments: {
+                            where: { isActive: true },
+                            include: {
+                                vehicle: {
+                                    select: { id: true, licensePlate: true, model: true, capacity: true, fuelType: true, mileage: true }
+                                },
+                                route: {
+                                    select: { id: true, name: true }
+                                }
+                            }
+                        },
+                        conductorRouteAssignments: {
+                            where: { isActive: true },
+                            include: {
+                                vehicle: {
+                                    select: { id: true, licensePlate: true, model: true, capacity: true, fuelType: true, mileage: true }
+                                },
+                                route: {
+                                    select: { id: true, name: true }
                                 }
                             }
                         }

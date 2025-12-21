@@ -221,7 +221,7 @@ export default function ClientLayout({ children }) {
                 </SidebarInset>
             </SidebarProvider>
             <NetworkStatusDialog />
-            <DatabaseErrorDialog open={isDbDown} />
+            {/* <DatabaseErrorDialog open={isDbDown} /> */}
         </QueryClientProvider>
 
     );

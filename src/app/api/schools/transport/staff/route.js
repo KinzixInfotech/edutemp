@@ -80,6 +80,50 @@ export async function GET(req) {
                                 }
                             }
                         },
+                        // Include permanent route assignments for drivers
+                        driverRouteAssignments: {
+                            where: { isActive: true },
+                            include: {
+                                route: { select: { id: true, name: true } },
+                                vehicle: {
+                                    select: {
+                                        id: true,
+                                        licensePlate: true,
+                                        model: true,
+                                        capacity: true,
+                                        fuelType: true,
+                                        mileage: true,
+                                        rcExpiry: true,
+                                        insuranceExpiry: true,
+                                        pucExpiry: true,
+                                        maintenanceDue: true,
+                                        status: true,
+                                    }
+                                }
+                            }
+                        },
+                        // Include permanent route assignments for conductors
+                        conductorRouteAssignments: {
+                            where: { isActive: true },
+                            include: {
+                                route: { select: { id: true, name: true } },
+                                vehicle: {
+                                    select: {
+                                        id: true,
+                                        licensePlate: true,
+                                        model: true,
+                                        capacity: true,
+                                        fuelType: true,
+                                        mileage: true,
+                                        rcExpiry: true,
+                                        insuranceExpiry: true,
+                                        pucExpiry: true,
+                                        maintenanceDue: true,
+                                        status: true,
+                                    }
+                                }
+                            }
+                        },
                     },
                     skip,
                     take: limit,

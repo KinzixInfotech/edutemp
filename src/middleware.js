@@ -101,12 +101,11 @@ export async function middleware(request) {
             }
         );
 
-        // Try getSession first (less strict)
+        // Use getUser() for secure authentication (validates with Supabase server)
         const {
-            data: { session },
-        } = await supabase.auth.getSession();
-
-        const user = session?.user;
+            data: { user },
+            error,
+        } = await supabase.auth.getUser();
 
         // Redirect logic
         if (isProtectedRoute && !user) {

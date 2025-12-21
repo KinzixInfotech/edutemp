@@ -27,6 +27,7 @@ export default function PublicExamPage() {
     const [hallInfo, setHallInfo] = useState(null);
     const [examInfo, setExamInfo] = useState(null);
     const [errorMsg, setErrorMsg] = useState("");
+    console.log(student);
 
     // Exam Data
     const [examData, setExamData] = useState(null);

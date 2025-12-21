@@ -16,6 +16,7 @@ import { SidebarData } from "./app-sidebar"
 import { CircleUserRound } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
 import { useSettingsDialog } from "@/context/Settingsdialog-context"
+import { useLibraryNotifications } from "@/context/LibraryNotificationContext"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -30,6 +31,7 @@ export default function CommandMenu({ open, setOpen }) {
     const userRole = fullUser?.role?.name
     const { setOpen: setProfileOpen } = useSettingsDialog()
     const router = useRouter()
+    const { unseenRequestsCount } = useLibraryNotifications()
 
     useEffect(() => {
         const down = (e) => {
@@ -45,7 +47,7 @@ export default function CommandMenu({ open, setOpen }) {
     return (
         <CommandDialog open={open} onOpenChange={setOpen}>
             <CommandInput placeholder="Search & Navigate..." />
-            <CommandList >
+            <CommandList className={'border-t'}>
                 <CommandEmpty>No results found.</CommandEmpty>
                 <CommandGroup heading="Profile" >
                     <CommandItem
@@ -54,7 +56,7 @@ export default function CommandMenu({ open, setOpen }) {
                             setOpen(false)
                         }}
                     >
-                        <CircleUserRound className="mr-2 h-4 w-4" />
+                        <CircleUserRound className="h-5 w-5" />
                         Profile
                     </CommandItem>
                 </CommandGroup>
@@ -106,29 +108,47 @@ export default function CommandMenu({ open, setOpen }) {
                                     )
                                     return visibleSubItems.map((sub, subIndex) => (
                                         <CommandItem
-                                            className="border-t rounded-none"
+                                            className="group"
                                             key={`${itemIndex}-${subIndex}`}
                                             onSelect={() => {
                                                 router.push(sub.url)
                                                 setOpen(false)
                                             }}
                                         >
-                                            {item.icon && <item.icon className="mr-2 h-4 w-4" />}
-                                            {item.label} &gt; {sub.label}
+                                            {item.icon && <item.icon />}
+                                            <div className="flex items-center gap-2 flex-1">
+                                                <span className="text-zinc-400 dark:text-zinc-500 group-data-[selected=true]:text-white/70">
+                                                    {item.label}
+                                                    {/* Yellow dot for Manage Library parent */}
+                                                    {item.label === "Manage Library" && unseenRequestsCount > 0 && (
+                                                        <span className="inline-block ml-1.5 h-2 w-2 bg-yellow-500 rounded-full group-data-[selected=true]:bg-yellow-300" />
+                                                    )}
+                                                </span>
+                                                <span className="text-zinc-300 dark:text-zinc-600 group-data-[selected=true]:text-white/50">/</span>
+                                                <span className="group-data-[selected=true]:text-white flex items-center gap-1.5">
+                                                    {sub.label}
+                                                    {/* Red badge for Book Requests */}
+                                                    {sub.label === "Book Requests" && unseenRequestsCount > 0 && (
+                                                        <span className="flex items-center justify-center h-4 min-w-[16px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full group-data-[selected=true]:bg-red-400">
+                                                            {unseenRequestsCount}
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            </div>
                                         </CommandItem>
                                     ))
                                 }
 
                                 return (
                                     <CommandItem
-                                        className="border-t rounded-none"
+                                        className="group"
                                         key={itemIndex}
                                         onSelect={() => {
                                             router.push(item.url)
                                             setOpen(false)
                                         }}
                                     >
-                                        {item.icon && <item.icon className="mr-2 h-4 w-4" />}
+                                        {item.icon && <item.icon />}
                                         {item.label}
                                     </CommandItem>
                                 )

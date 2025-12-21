@@ -119,10 +119,9 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                         ref={isParentActive ? activeItemRef : null}
                                                     >
                                                         <SidebarMenuButton
-                                                            className={`w-full hover:bg-[#eff6ff]! relative justify-center py-4  rounded-md hover:!text-[#1b83c5] transition-all hover:cursor-pointer ${isActive || isParentActive
-                                                                ? "shadow-xs font-semibold border  dark:bg-[#eff6ff] dark:text-[#1b83c5]" : ""
+                                                            className={`w-full hover:bg-zinc-100 dark:hover:bg-zinc-800/60 relative justify-center py-4 rounded-lg transition-all duration-150 ${isActive || isParentActive
+                                                                ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" : ""
                                                                 }`}
-                                                        // style={isActive || isParentActive ? { backgroundColor: 'white' } : {}}
                                                         >
                                                             {item.icon && <item.icon className="w-4 h-4" />}
                                                             {/* Yellow dot indicator for library requests */}
@@ -164,10 +163,9 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                             >
                                                 <CollapsibleTrigger asChild>
                                                     <SidebarMenuButton
-                                                        className={`group font-medium relative w-full justify-between py-4 hover:bg-[#eff6ff] dark:hover:bg-[#eff6ff]    hover:text-[#1b83c5] dark:hover:text-[#1b83c5]   py-4 transition-all rounded-sm hover:cursor-pointer ${isActive || isParentActive
-                                                            ? "bg-[#eff6ff]!  text-[#1b83c5]! dark:bg-[#fff]! dark:text-black!" : ""
+                                                        className={`group font-medium relative w-full justify-between py-4 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-all duration-150 rounded-lg ${isActive || isParentActive
+                                                            ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" : ""
                                                             }`}
-                                                        style={isActive || isParentActive ? { backgroundColor: '#eff6ff', color: '#1b83c5' } : {}}
                                                     >
                                                         <div className="flex items-center gap-2">
                                                             {item.icon && <item.icon className="w-4 h-4" />}
@@ -195,8 +193,8 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                             >
                                                                 <SidebarMenuSubButton
                                                                     asChild
-                                                                    className={`w-full font-medium  hover:bg-[#eff6ff] hover:text-[#1b83c5]   py-4 transition-all rounded-sm hover:cursor-pointer ${isSubActive
-                                                                        ? "bg-[#eff6ff]!  dark:bg-[#fff]! dark:text-black!  text-[#1b83c5]! dark:bg-white! dark:text-black! dark:border-primary/50" : ""
+                                                                    className={`w-full font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800/60 py-4 transition-all duration-150 rounded-lg ${isSubActive
+                                                                        ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-semibold" : ""
                                                                         }`}
                                                                 >
                                                                     <Link href={sub.url} onClick={handleClick} className="flex items-center justify-between w-full">
@@ -231,10 +229,9 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                 >
                                                     <SidebarMenuButton
                                                         asChild
-                                                        className={`w-full font-medium  hover:bg-[#eff6ff] hover:text-[#1b83c5]  hover:border-none  py-4 transition-all rounded-sm hover:cursor-pointer ${isActive
-                                                            ? "bg-[#eff6ff]!  text-[#1b83c5]! dark:bg-white dark:text-black " : ""
+                                                        className={`w-full font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800/60 py-4 transition-all duration-150 rounded-lg ${isActive
+                                                            ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" : ""
                                                             }`}
-                                                        style={isActive ? { backgroundColor: 'white' } : {}}
                                                     >
                                                         <Link href={item.url} onClick={handleClick}>
                                                             {item.icon && <item.icon className="w-4 h-4" />}
@@ -255,10 +252,9 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                     >
                                         <SidebarMenuButton
                                             asChild
-                                            className={`w-full font-medium  hover:bg-[#eff6ff] hover:text-[#1b83c5]   py-4 transition-al  rounded-sm hover:border-none hover:cursor-pointer ${isActive
-                                                ? "bg-[#eff6ff]!  text-[#1b83c5]!    dark:bg-white! dark:text-black!" : ""
+                                            className={`w-full font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800/60 py-4 transition-all duration-150 rounded-lg ${isActive
+                                                ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" : ""
                                                 }`}
-                                            style={isActive ? { backgroundColor: '#eff6ff', color: '#1b83c5' } : {}}
                                         >
                                             <Link href={item.url} onClick={handleClick}>
                                                 {item.icon && <item.icon className="w-4 h-4" />}

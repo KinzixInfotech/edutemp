@@ -173,8 +173,16 @@ export async function POST(req, context) {
             }
         }
 
+        // ✅ Determine the correct name field based on role
+        const userName = mappedRole === "STUDENT"
+            ? parsed.studentName
+            : mappedRole === "PARENT"
+                ? parsed.guardianName
+                : parsed.name;
+
         // ✅ Supabase user creation
         const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+            user_metadata: { name: userName },
             email: parsed.email,
             password: parsed.password,
             email_confirm: true,
@@ -201,7 +209,7 @@ export async function POST(req, context) {
                         id: createdUserId,
                         password: parsed.password,
                         profilePicture: parsed.profilePicture,
-                        name: parsed.name,
+                        name: userName,
                         email: parsed.email,
                         school: { connect: { id: parsed.schoolId } },
                         role: { connect: { id: role.id } },
