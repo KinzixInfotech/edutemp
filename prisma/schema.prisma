@@ -98,6 +98,7 @@ model School {
   transportStaffs  TransportStaff[]
   transportFees    TransportFee[]
   busRequests      BusRequest[]
+  routeAssignments RouteAssignment[]
 
   @@index([name])
 }
@@ -842,6 +843,7 @@ model Vehicle {
   locations          VehicleLocation[]
   vehicleAssignments VehicleAssignment[]
   busTrips           BusTrip[]
+  routeAssignments   RouteAssignment[]
 
   @@index([schoolId])
   @@index([licensePlate])
@@ -864,6 +866,7 @@ model Route {
   busAttendances         BusAttendance[]
   transportFees          TransportFee[]
   busRequests            BusRequest[]
+  routeAssignment        RouteAssignment?
 
   @@index([schoolId])
   @@index([name])
@@ -930,13 +933,15 @@ model TransportStaff {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  school             School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  vehicleAssignments VehicleAssignment[]
-  attendanceRecords  BusAttendance[]     @relation("BusAttendanceMarkedBy")
-  locationUpdates    VehicleLocation[]
-  driverTrips        BusTrip[]           @relation("TripDriver")
-  conductorTrips     BusTrip[]           @relation("TripConductor")
+  user                      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school                    School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  vehicleAssignments        VehicleAssignment[]
+  attendanceRecords         BusAttendance[]     @relation("BusAttendanceMarkedBy")
+  locationUpdates           VehicleLocation[]
+  driverTrips               BusTrip[]           @relation("TripDriver")
+  conductorTrips            BusTrip[]           @relation("TripConductor")
+  driverRouteAssignments    RouteAssignment[]   @relation("RouteAssignmentDriver")
+  conductorRouteAssignments RouteAssignment[]   @relation("RouteAssignmentConductor")
 
   @@unique([schoolId, employeeId])
   @@index([schoolId])
@@ -959,6 +964,29 @@ model VehicleAssignment {
   @@unique([vehicleId, transportStaffId, role])
   @@index([vehicleId])
   @@index([transportStaffId])
+  @@index([isActive])
+}
+
+// Permanent Route Assignment (Driver/Conductor to Route)
+model RouteAssignment {
+  id          String   @id @default(uuid()) @db.Uuid
+  schoolId    String   @db.Uuid
+  routeId     String   @unique @db.Uuid // One assignment per route
+  vehicleId   String   @db.Uuid
+  driverId    String   @db.Uuid
+  conductorId String?  @db.Uuid
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school    School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  route     Route           @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  vehicle   Vehicle         @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  driver    TransportStaff  @relation("RouteAssignmentDriver", fields: [driverId], references: [id])
+  conductor TransportStaff? @relation("RouteAssignmentConductor", fields: [conductorId], references: [id])
+
+  @@index([schoolId])
+  @@index([driverId])
   @@index([isActive])
 }
 

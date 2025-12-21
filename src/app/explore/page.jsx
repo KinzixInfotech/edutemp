@@ -11,7 +11,7 @@ export const metadata = {
         images: ['/edu_ex.png'],
     },
     alternates: {
-        canonical: 'https://edubreezy.com/explore',
+        canonical: 'https://school.edubreezy.com/explore',
     }
 };
 
