@@ -543,7 +543,7 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Calendar, TrendingUp, Download, ChevronLeft, ChevronRight,
-  CheckCircle, XCircle, Clock, AlertCircle, FileText, BarChart3,
+  CheckCircle, XCircle, Clock, AlertCircle,
   Search,
   Users,
   History
@@ -553,10 +553,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/context/AuthContext';
 import LoaderPage from '@/components/loader-page';
-import { calculateStreak } from '@/app/api/schools/[schoolId]/attendance/admin/reports/route';
 
 export default function StudentAttendanceHistory() {
   const { fullUser } = useAuth();
@@ -564,7 +562,6 @@ export default function StudentAttendanceHistory() {
   if (!schoolId) return <LoaderPage />
 
   const [studentId, setStudentId] = useState('');
-  const [streak, setStreak] = useState(null);
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
   const [searchTerm, setSearchTerm] = useState('');
@@ -612,8 +609,9 @@ export default function StudentAttendanceHistory() {
     enabled: !!studentId
   });
 
-  const { student, period, stats, calendar, records, comparison } = data || {};
 
+  const { student, period, stats, calendar, records, comparison } = data || {};
+  console.log(student, 'from me');
   const getStatusColor = (status) => {
     switch (status) {
       case 'PRESENT': return 'bg-green-500';
@@ -689,7 +687,7 @@ export default function StudentAttendanceHistory() {
       className.includes(searchTerm.toLowerCase())
     );
   });
-
+  console.log(filteredStudents);
   const cn = (...classes) => classes.filter(Boolean).join(' ');
   if (!studentId) {
     return (
@@ -851,74 +849,123 @@ export default function StudentAttendanceHistory() {
   const today = new Date();
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">
-            {student?.name}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {student?.admissionNo} • {student?.className} {student?.sectionName && `- ${student.sectionName}`}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setStudentId('')}>
-            Change Student
-          </Button>
-          <Button variant="outline" onClick={() => handleExport('pdf')}>
-            <Download className="w-4 h-4 mr-2" />
-            Export PDF
-          </Button>
-        </div>
+    <div className="p-4 sm:p-6 space-y-6">
+      {/* Header with Change Student Button */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Student Attendance History</h1>
+        <Button variant="outline" size="sm" onClick={() => setStudentId('')}>
+          <ChevronLeft className="w-4 h-4 mr-1" />
+          Change Student
+        </Button>
       </div>
+
+      {/* Student Profile Card */}
+      <Card className="border">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row items-start gap-4">
+            {/* Profile Picture */}
+            <div className="w-20 h-20 rounded-full bg-primary/10 border-2 flex items-center justify-center text-2xl font-bold text-primary flex-shrink-0 overflow-hidden">
+              {student?.profilePicture ? (
+                <img
+                  src={student.profilePicture}
+                  alt={student.name}
+                  className="w-full h-full rounded-full object-cover"
+                />
+              ) : (
+                student?.name?.charAt(0) || 'S'
+              )}
+            </div>
+
+            {/* Student Info */}
+            <div className="flex-1 min-w-0">
+              <h2 className="text-xl font-bold mb-2">{student?.name}</h2>
+
+              <div className="flex flex-wrap gap-2 mb-3">
+                <Badge variant="outline">
+                  Class {student?.className}{student?.sectionName && ` - ${student.sectionName}`}
+                </Badge>
+                {student?.rollNumber && (
+                  <Badge variant="secondary">
+                    Roll #{student.rollNumber}
+                  </Badge>
+                )}
+              </div>
+
+              <p className="text-sm text-muted-foreground">
+                <span className="font-medium">Admission No:</span> {student?.admissionNo || 'N/A'}
+              </p>
+            </div>
+
+            {/* Streak & Attendance */}
+            <div className="flex gap-3 sm:gap-4 flex-shrink-0">
+              {/* Streak */}
+              <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800">
+                <span className="text-2xl">🔥</span>
+                <div>
+                  <p className="text-xl font-bold text-orange-600">{stats?.streak || 0}</p>
+                  <p className="text-[10px] text-orange-600/70">Day Streak</p>
+                </div>
+              </div>
+
+              {/* Attendance % */}
+              <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-primary/5 border">
+                <TrendingUp className="w-6 h-6 text-primary" />
+                <div>
+                  <p className="text-xl font-bold text-primary">{stats?.attendancePercentage?.toFixed(0) || 0}%</p>
+                  <p className="text-[10px] text-muted-foreground">Attendance</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border-l-4 border-green-500">
-          <CardContent className="pt-6">
+        <Card>
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Present</p>
                 <p className="text-2xl font-bold text-green-600">{stats?.totalPresent || 0}</p>
               </div>
-              <CheckCircle className="w-10 h-10 text-green-500 opacity-20" />
+              <CheckCircle className="w-10 h-10 text-green-500/20" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-red-500">
-          <CardContent className="pt-6">
+        <Card>
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Absent</p>
                 <p className="text-2xl font-bold text-red-600">{stats?.totalAbsent || 0}</p>
               </div>
-              <XCircle className="w-10 h-10 text-red-500 opacity-20" />
+              <XCircle className="w-10 h-10 text-red-500/20" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-yellow-500">
-          <CardContent className="pt-6">
+        <Card>
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Late</p>
                 <p className="text-2xl font-bold text-yellow-600">{stats?.totalLate || 0}</p>
               </div>
-              <Clock className="w-10 h-10 text-yellow-500 opacity-20" />
+              <Clock className="w-10 h-10 text-yellow-500/20" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-blue-500">
-          <CardContent className="pt-6">
+        <Card>
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Percentage</p>
-                <p className="text-2xl font-bold text-blue-600">{stats?.attendancePercentage?.toFixed(1) || 0}%</p>
+                <p className="text-sm text-muted-foreground">On Leave</p>
+                <p className="text-2xl font-bold text-blue-600">{stats?.totalLeaves || 0}</p>
               </div>
-              <TrendingUp className="w-10 h-10 text-blue-500 opacity-20" />
+              <AlertCircle className="w-10 h-10 text-blue-500/20" />
             </div>
           </CardContent>
         </Card>
@@ -955,26 +1002,22 @@ export default function StudentAttendanceHistory() {
           <TabsTrigger value="comparison">Comparison</TabsTrigger>
         </TabsList>
 
-        {/* Calendar View - Updated UI */}
+        {/* Calendar View - Simplified UI */}
         <TabsContent value="calendar">
-          <Card className="shadow-xl border-2 hover:border-primary/20 transition-all">
-            <CardHeader>
+          <Card className="border">
+            <CardHeader className="pb-4">
               <CardTitle>Monthly Calendar</CardTitle>
               <CardDescription>Color-coded attendance calendar</CardDescription>
-             <Badge>Streak {streak ?? "..."}</Badge>
             </CardHeader>
             <CardContent>
               {/* Calendar Grid */}
               <div className="flex flex-col">
                 {/* Weekday Headers */}
-                <div className="grid grid-cols-7 gap-2 mb-2">
+                <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => (
                     <div
                       key={day}
-                      className={cn(
-                        "text-center text-xs md:text-sm font-semibold text-muted-foreground py-2 rounded-lg",
-                        (idx === 0 || idx === 6) && "bg-muted/50"
-                      )}
+                      className="text-center text-xs font-medium text-muted-foreground py-2"
                     >
                       {day}
                     </div>
@@ -982,57 +1025,41 @@ export default function StudentAttendanceHistory() {
                 </div>
 
                 {/* Calendar Days */}
-                <div className="grid grid-cols-7 gap-2">
+                <div className="grid grid-cols-7 gap-1 sm:gap-2">
                   {calendar?.map((day, idx) => {
                     const isToday = day.day === today.getDate() &&
                       month === today.getMonth() + 1 &&
                       year === today.getFullYear();
-                    const isWeekend = idx % 7 === 0 || idx % 7 === 6;
 
                     return (
                       <div
                         key={idx}
                         className={cn(
-                          "min-h-[90px] md:min-h-[110px] p-2 rounded-xl border-2 transition-all duration-200",
-                          day.isWorkingDay && "hover:border-primary hover:shadow-lg hover:scale-[1.02]",
-                          !day.isWorkingDay && "opacity-30",
-                          isToday && "bg-gradient-to-br from-primary/15 to-primary/5 border-primary shadow-md",
-                          !isToday && day.isWorkingDay && "border-border bg-card",
-                          isWeekend && day.isWorkingDay && "bg-muted/30"
+                          "min-h-[70px] sm:min-h-[90px] p-1.5 sm:p-2 rounded-lg border transition-colors",
+                          !day.isWorkingDay && "opacity-40 bg-muted/20",
+                          isToday && "bg-primary/10 border-primary",
+                          !isToday && day.isWorkingDay && "border-border bg-card hover:bg-muted/50"
                         )}
                         title={day.marked ? `${day.status} - ${day.markedBy}` : 'Not marked'}
                       >
                         <div className="flex flex-col h-full">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className={cn(
-                              "text-xs md:text-sm font-bold",
-                              isToday && "text-primary",
-                              !day.isWorkingDay && "text-muted-foreground"
-                            )}>
-                              {day.day}
-                            </span>
-                            {day.marked && (
-                              <Badge
-                                variant="secondary"
-                                className="h-5 min-w-5 px-1.5 text-xs"
-                              >
-                                ✓
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="space-y-1 overflow-y-auto flex-1">
-                            {day.marked && (
-                              <div
-                                className={cn(
-                                  "text-[10px] md:text-xs px-2 py-1 rounded-md text-white font-medium shadow-sm flex items-center justify-center gap-1",
-                                  getStatusColor(day.status)
-                                )}
-                              >
-                                {getStatusIcon(day.status)}
-                                <span className="truncate">{day.status}</span>
-                              </div>
-                            )}
-                          </div>
+                          <span className={cn(
+                            "text-xs font-medium mb-1",
+                            isToday && "text-primary font-bold"
+                          )}>
+                            {day.day}
+                          </span>
+                          {day.marked && (
+                            <div
+                              className={cn(
+                                "text-[9px] sm:text-xs px-1.5 py-0.5 rounded text-white font-medium flex items-center justify-center gap-0.5",
+                                getStatusColor(day.status)
+                              )}
+                            >
+                              {getStatusIcon(day.status)}
+                              <span className="hidden sm:inline">{day.status}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -1041,26 +1068,26 @@ export default function StudentAttendanceHistory() {
               </div>
 
               {/* Legend */}
-              <div className="mt-6 flex flex-wrap gap-4 justify-center">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-green-500"></div>
-                  <span className="text-sm">Present</span>
+              <div className="mt-4 pt-4 border-t flex flex-wrap gap-3 sm:gap-4 justify-center text-xs sm:text-sm">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded bg-green-500"></div>
+                  <span>Present</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-red-500"></div>
-                  <span className="text-sm">Absent</span>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded bg-red-500"></div>
+                  <span>Absent</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-yellow-500"></div>
-                  <span className="text-sm">Late</span>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded bg-yellow-500"></div>
+                  <span>Late</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-blue-500"></div>
-                  <span className="text-sm">On Leave</span>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded bg-blue-500"></div>
+                  <span>On Leave</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded border-2 border-gray-200"></div>
-                  <span className="text-sm">Not Marked</span>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded border bg-muted/50"></div>
+                  <span>Not Marked</span>
                 </div>
               </div>
             </CardContent>

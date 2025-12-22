@@ -1,14 +1,13 @@
-// app/api/schools/[schoolId]/attendance/admin/student-history/route.js
+// app/api/schools/[schoolId]/attendance/admin/teacher-history/route.js
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { calculateStreak } from '../reports/route';
 
 export async function GET(req, props) {
     const params = await props.params;
     const { schoolId } = params;
     const { searchParams } = new URL(req.url);
 
-    const studentId = searchParams.get('studentId');
+    const teacherId = searchParams.get('teacherId');
     const month = searchParams.get('month')
         ? parseInt(searchParams.get('month'))
         : new Date().getMonth() + 1;
@@ -16,14 +15,14 @@ export async function GET(req, props) {
         ? parseInt(searchParams.get('year'))
         : new Date().getFullYear();
 
-    if (!studentId) {
-        return NextResponse.json({ error: 'studentId required' }, { status: 400 });
+    if (!teacherId) {
+        return NextResponse.json({ error: 'teacherId required' }, { status: 400 });
     }
 
     try {
-        // Verify student exists with all details needed for profile
-        const student = await prisma.student.findUnique({
-            where: { userId: studentId },
+        // Get teacher details
+        const teacher = await prisma.teachingStaff.findUnique({
+            where: { userId: teacherId },
             include: {
                 user: {
                     select: {
@@ -32,27 +31,24 @@ export async function GET(req, props) {
                         profilePicture: true,
                     }
                 },
-                class: {
-                    select: { className: true }
-                },
-                section: {
+                department: {
                     select: { name: true }
                 }
             }
         });
 
-        if (!student || student.schoolId !== schoolId) {
-            return NextResponse.json({ error: 'Student not found' }, { status: 404 });
+        if (!teacher || teacher.schoolId !== schoolId) {
+            return NextResponse.json({ error: 'Teacher not found' }, { status: 404 });
         }
 
         // Get date range for the month
-        const startDate = new Date(year, month - 1, 1);
-        const endDate = new Date(year, month, 0);
+        const startDate = new Date(Date.UTC(year, month - 1, 1));
+        const endDate = new Date(Date.UTC(year, month, 0));
 
         // Fetch attendance records for the month
         const attendanceRecords = await prisma.attendance.findMany({
             where: {
-                userId: studentId,
+                userId: teacherId,
                 schoolId,
                 date: {
                     gte: startDate,
@@ -73,37 +69,50 @@ export async function GET(req, props) {
             orderBy: { date: 'asc' }
         });
 
-        // Get monthly stats
+        // Get academic year for leave balance
         const academicYear = await prisma.academicYear.findFirst({
             where: { schoolId, isActive: true },
             select: { id: true }
         });
 
-        const monthlyStats = await prisma.attendanceStats.findUnique({
+        // Get monthly stats
+        const monthlyStats = academicYear ? await prisma.attendanceStats.findUnique({
             where: {
                 userId_academicYearId_month_year: {
-                    userId: studentId,
+                    userId: teacherId,
                     academicYearId: academicYear.id,
                     month,
                     year
                 }
             }
-        });
+        }) : null;
 
-        const streak = await calculateStreak(studentId, schoolId);
+        // Get leave balance
+        const leaveBalance = academicYear ? await prisma.leaveBalance.findUnique({
+            where: {
+                userId_academicYearId: {
+                    userId: teacherId,
+                    academicYearId: academicYear.id
+                }
+            }
+        }) : null;
+
+        // Calculate streak
+        const streak = await calculateStreak(teacherId, schoolId);
+
         // Calculate stats if not found
         let stats;
         if (monthlyStats) {
             stats = {
                 totalWorkingDays: monthlyStats.totalWorkingDays,
                 totalPresent: monthlyStats.totalPresent,
-                streak,
                 totalAbsent: monthlyStats.totalAbsent,
                 totalLate: monthlyStats.totalLate,
                 totalHalfDay: monthlyStats.totalHalfDay,
                 totalLeaves: monthlyStats.totalLeaves,
                 attendancePercentage: monthlyStats.attendancePercentage,
-                avgWorkingHours: monthlyStats.avgWorkingHours
+                avgWorkingHours: monthlyStats.avgWorkingHours,
+                streak
             };
         } else {
             // Calculate from records
@@ -122,14 +131,38 @@ export async function GET(req, props) {
                 totalWorkingDays: totalDays,
                 totalPresent: present,
                 totalAbsent: absent,
-                streak,
                 totalLate: late,
                 totalHalfDay: halfDay,
                 totalLeaves: leaves,
                 attendancePercentage: Number(percentage.toFixed(2)),
-                avgWorkingHours: 0
+                avgWorkingHours: 0,
+                streak
             };
         }
+
+        // Format leave balance
+        const leaves = leaveBalance ? {
+            casual: {
+                total: leaveBalance.casualLeaveTotal,
+                used: leaveBalance.casualLeaveUsed,
+                balance: leaveBalance.casualLeaveBalance
+            },
+            sick: {
+                total: leaveBalance.sickLeaveTotal,
+                used: leaveBalance.sickLeaveUsed,
+                balance: leaveBalance.sickLeaveBalance
+            },
+            earned: {
+                total: leaveBalance.earnedLeaveTotal,
+                used: leaveBalance.earnedLeaveUsed,
+                balance: leaveBalance.earnedLeaveBalance
+            },
+            maternity: {
+                total: leaveBalance.maternityLeaveTotal,
+                used: leaveBalance.maternityLeaveUsed,
+                balance: leaveBalance.maternityLeaveBalance
+            }
+        } : null;
 
         // Get working days from calendar
         const workingDays = await prisma.schoolCalendar.findMany({
@@ -164,46 +197,28 @@ export async function GET(req, props) {
                 isWorkingDay,
                 marked: !!attendance,
                 checkInTime: attendance?.checkInTime,
+                checkOutTime: attendance?.checkOutTime,
+                workingHours: attendance?.workingHours,
+                isLateCheckIn: attendance?.isLateCheckIn,
+                lateByMinutes: attendance?.lateByMinutes,
+                checkInLocation: attendance?.checkInLocation,
+                deviceInfo: attendance?.deviceInfo,
                 remarks: attendance?.remarks,
                 markedBy: attendance?.marker?.name,
                 leaveType: attendance?.leaveRequest?.leaveType
             });
         }
 
-        // Get comparison with previous months
-        const previousMonths = await prisma.attendanceStats.findMany({
-            where: {
-                userId: studentId,
-                schoolId,
-                academicYearId: academicYear.id,
-                year
-            },
-            orderBy: [
-                { year: 'desc' },
-                { month: 'desc' }
-            ],
-            take: 6
-        });
-
-        const comparisonData = previousMonths.map(m => ({
-            month: m.month,
-            year: m.year,
-            percentage: m.attendancePercentage,
-            present: m.totalPresent,
-            absent: m.totalAbsent
-        }));
-
         return NextResponse.json({
-            student: {
-                userId: student.userId,
-                name: student.name,
-                email: student.user?.email,
-                profilePicture: student.user?.profilePicture,
-                admissionNo: student.admissionNo,
-                rollNumber: student.rollNumber,
-                className: student.class?.className,
-                sectionName: student.section?.name,
-                bloodGroup: student.bloodGroup,
+            teacher: {
+                userId: teacher.userId,
+                name: teacher.name,
+                email: teacher.email,
+                profilePicture: teacher.user?.profilePicture,
+                employeeId: teacher.employeeId,
+                designation: teacher.designation,
+                department: teacher.department?.name,
+                contactNumber: teacher.contactNumber,
             },
             period: {
                 month,
@@ -211,6 +226,7 @@ export async function GET(req, props) {
                 monthName: new Date(year, month - 1).toLocaleDateString('en-US', { month: 'long' })
             },
             stats,
+            leaves,
             calendar: calendarData,
             records: attendanceRecords.map(r => ({
                 date: r.date,
@@ -220,86 +236,61 @@ export async function GET(req, props) {
                 workingHours: r.workingHours,
                 isLateCheckIn: r.isLateCheckIn,
                 lateByMinutes: r.lateByMinutes,
+                checkInLocation: r.checkInLocation,
+                checkOutLocation: r.checkOutLocation,
+                deviceInfo: r.deviceInfo,
                 remarks: r.remarks,
                 markedBy: r.marker?.name,
                 markedAt: r.markedAt,
                 leaveType: r.leaveRequest?.leaveType,
                 leaveReason: r.leaveRequest?.reason
-            })),
-            comparison: comparisonData
+            }))
         });
 
     } catch (error) {
-        console.error('Student history error:', error);
+        console.error('Teacher history error:', error);
         return NextResponse.json({
-            error: 'Failed to fetch student attendance history',
+            error: 'Failed to fetch teacher attendance history',
             details: error.message
         }, { status: 500 });
     }
 }
 
-// POST - Export student report
-export async function POST(req, props) {
-    const params = await props.params;
-    const { schoolId } = params;
-    const { studentId, format, startDate, endDate } = await req.json();
-
-    if (!studentId || !format) {
-        return NextResponse.json({
-            error: 'studentId and format required'
-        }, { status: 400 });
-    }
-
+// Calculate consecutive attendance streak
+async function calculateStreak(userId, schoolId) {
     try {
-        // Fetch student data
-        const student = await prisma.student.findUnique({
-            where: { userId: studentId },
-            include: {
-                user: { select: { name: true } },
-                class: { select: { className: true } },
-                section: { select: { name: true } }
-            }
-        });
-
-        // Fetch attendance records
         const records = await prisma.attendance.findMany({
             where: {
-                userId: studentId,
+                userId,
                 schoolId,
-                ...(startDate && endDate && {
-                    date: {
-                        gte: new Date(startDate),
-                        lte: new Date(endDate)
-                    }
-                })
+                status: { in: ['PRESENT', 'LATE'] }
             },
-            orderBy: { date: 'asc' }
+            orderBy: { date: 'desc' },
+            take: 100,
+            select: { date: true }
         });
 
-        // Return data for frontend to generate PDF/Excel
-        return NextResponse.json({
-            success: true,
-            format,
-            student: {
-                name: student.user.name,
-                admissionNo: student.admissionNo,
-                class: student.class.className,
-                section: student.section?.name
-            },
-            records: records.map(r => ({
-                date: r.date.toLocaleDateString('en-IN'),
-                status: r.status,
-                checkIn: r.checkInTime?.toLocaleTimeString('en-IN'),
-                checkOut: r.checkOutTime?.toLocaleTimeString('en-IN'),
-                hours: r.workingHours,
-                remarks: r.remarks
-            }))
-        });
+        if (records.length === 0) return 0;
 
+        let streak = 0;
+        let expectedDate = new Date();
+        expectedDate.setHours(0, 0, 0, 0);
+
+        for (const record of records) {
+            const recordDate = new Date(record.date);
+            recordDate.setHours(0, 0, 0, 0);
+
+            if (recordDate.getTime() === expectedDate.getTime()) {
+                streak++;
+                expectedDate.setDate(expectedDate.getDate() - 1);
+            } else {
+                break;
+            }
+        }
+
+        return streak;
     } catch (error) {
-        console.error('Export error:', error);
-        return NextResponse.json({
-            error: 'Failed to export report'
-        }, { status: 500 });
+        console.error('Streak calculation error:', error);
+        return 0;
     }
 }

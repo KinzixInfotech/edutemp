@@ -325,7 +325,7 @@ export default function PublicExamPage() {
                                             onChange={(e) => setCredentials({ ...credentials, email: e.target.value })}
                                             required
                                             className="pl-12 h-12 bg-gray-50 border-2 border-gray-200 focus:border-[#0c65f1] focus:bg-white transition-all rounded-xl font-medium"
-                                        />
+                                         />
                                     </div>
                                 </div>
 

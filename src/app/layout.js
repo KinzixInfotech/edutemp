@@ -108,6 +108,11 @@ export default function RootLayout({ children }) {
   return (
     <Provider>
       <html lang="en" suppressHydrationWarning={true}>
+        <head>
+          <link rel="preconnect" href="https://fonts.googleapis.com" />
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin />
+          <link href="https://fonts.googleapis.com/css2?family=Cedarville+Cursive&family=Edu+NSW+ACT+Cursive:wght@400..700&display=swap" rel="stylesheet" />
+        </head>
         <body className="min-h-screen flex flex-col">
           <ClientProduct>{children}</ClientProduct>
           <Suspense fallback={<div />}>

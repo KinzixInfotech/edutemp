@@ -114,6 +114,7 @@ export default function Header() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [AlreadyLoggedIn, setAlreadyLoggedIn] = useState(false);
     const [activeSubmenu, setActiveSubmenu] = useState(null);
+    const [isScrolled, setIsScrolled] = useState(false);
     const pathname = usePathname();
 
     useEffect(() => {
@@ -123,6 +124,15 @@ export default function Header() {
             }
         })
     }, [])
+
+    // Scroll detection for homepage
+    useEffect(() => {
+        const handleScroll = () => {
+            setIsScrolled(window.scrollY > 50);
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
     const handleMouseEnter = (menuName) => {
         setActiveSubmenu(menuName);
@@ -140,8 +150,19 @@ export default function Header() {
         setActiveSubmenu(null);
     };
 
+    // Check if we're on the homepage
+    const isHomePage = pathname === '/';
+
+    // Dynamic classes for header
+    const headerClasses = isHomePage
+        ? `fixed w-full left-0 right-0 top-0 z-50 transition-all duration-300 ${isScrolled
+            ? 'bg-white/80 backdrop-blur-md border-b border-gray-200 shadow-none border-b'
+            : 'bg-transparent border-b-0'
+        }`
+        : 'fixed w-full left-0 right-0 top-0 z-50 bg-white border-b border-gray-200';
+
     return (
-        <div className="fixed w-full border-b-black bg-white left-0 right-0 top-0 z-50 border-b border-gray-200">
+        <div className={headerClasses}>
             <nav className="px-6 lg:px-16 py-1">
                 <div className="max-w-7xl mx-auto flex h-16 items-center justify-between gap-4">
                     {/* Logo - Left side */}

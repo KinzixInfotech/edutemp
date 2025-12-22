@@ -46,8 +46,10 @@ export async function GET(request) {
         const today = ISTDate(now);
 
         // Calculate date range to check (yesterday and before)
+        // Use midnight of yesterday for start, and end of day for end to capture all records
         const endDate = new Date(today);
         endDate.setDate(endDate.getDate() - 1); // Yesterday
+        endDate.setHours(23, 59, 59, 999); // End of day to include all records for yesterday
 
         // Start date depends on mode
         let startDate;
@@ -281,6 +283,53 @@ async function processSchool(school, startDate, endDate) {
         } catch (error) {
             console.error(`[SCHOOL ${school.id}] ❌ Failed to auto-populate:`, error.message);
         }
+    }
+
+    // Sync holidays from CalendarEvents to SchoolCalendar
+    try {
+        const holidayEvents = await prisma.calendarEvent.findMany({
+            where: {
+                schoolId: school.id,
+                eventType: 'HOLIDAY',
+                startDate: {
+                    gte: startDate,
+                    lte: endDate,
+                },
+            },
+            select: {
+                startDate: true,
+                endDate: true,
+                title: true,
+            },
+        });
+
+        if (holidayEvents.length > 0) {
+            console.log(`[SCHOOL ${school.id}] Found ${holidayEvents.length} holiday events to sync`);
+
+            for (const holiday of holidayEvents) {
+                // Mark each day in the holiday range
+                let current = new Date(holiday.startDate);
+                const end = holiday.endDate ? new Date(holiday.endDate) : current;
+
+                while (current <= end) {
+                    await prisma.schoolCalendar.updateMany({
+                        where: {
+                            schoolId: school.id,
+                            date: ISTDate(current),
+                        },
+                        data: {
+                            isHoliday: true,
+                            dayType: 'HOLIDAY',
+                            holidayName: holiday.title,
+                        },
+                    });
+                    current.setDate(current.getDate() + 1);
+                }
+            }
+            console.log(`[SCHOOL ${school.id}] ✅ Synced holiday events to SchoolCalendar`);
+        }
+    } catch (error) {
+        console.error(`[SCHOOL ${school.id}] ❌ Failed to sync holidays:`, error.message);
     }
 
     // Get working days in range

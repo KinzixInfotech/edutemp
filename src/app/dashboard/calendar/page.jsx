@@ -476,7 +476,7 @@ export default function SchoolCalendar() {
                                                         !day.isCurrentMonth && "opacity-40",
                                                         isToday && "bg-primary/10 border-primary",
                                                         isSelected && "border-primary bg-primary/5",
-                                                        day.isCurrentMonth && !isToday && !isSelected && "border-border/50 bg-card",
+                                                        day.isCurrentMonth && !isToday && !isSelected && "border-border bg-card",
                                                         isWeekend && day.isCurrentMonth && !isToday && !isSelected && "bg-muted/20"
                                                     )}
                                                 >

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
     MapPin, Clock, Smartphone, Award, TrendingUp, RefreshCw,
-    Download, Filter, Eye, Navigation
+    Download, Search, Users, History, ChevronLeft, ChevronRight,
+    CheckCircle, XCircle, AlertCircle, Calendar, Phone, Mail, User
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,334 +13,725 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/context/AuthContext';
+import LoaderPage from '@/components/loader-page';
 
 export default function TeacherTracking() {
-     const { fullUser } = useAuth();
-     const schoolId = fullUser?.schoolId;
+    const { fullUser } = useAuth();
+    const schoolId = fullUser?.schoolId;
 
+    const [teacherId, setTeacherId] = useState('');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedTeacher, setSelectedTeacher] = useState(null);
+    const [month, setMonth] = useState(new Date().getMonth() + 1);
+    const [year, setYear] = useState(new Date().getFullYear());
+    const [recentTeachers, setRecentTeachers] = useState([]);
 
-    const { data, isLoading, refetch } = useQuery({
+    // Load recent teachers from localStorage
+    useEffect(() => {
+        if (schoolId) {
+            const stored = localStorage.getItem(`recent-teachers-${schoolId}`);
+            if (stored) {
+                setRecentTeachers(JSON.parse(stored));
+            }
+        }
+    }, [schoolId]);
+
+    // Save to recent teachers
+    const addToRecentTeachers = (teacher) => {
+        const recent = [teacher, ...recentTeachers.filter(t => t.userId !== teacher.userId)].slice(0, 6);
+        setRecentTeachers(recent);
+        localStorage.setItem(`recent-teachers-${schoolId}`, JSON.stringify(recent));
+    };
+
+    // Fetch all teachers for tracking (today's data)
+    const { data: trackingData, isLoading: trackingLoading, refetch } = useQuery({
         queryKey: ['teacher-tracking', schoolId, date],
         queryFn: async () => {
-            // src/app/api/schools/[schoolId]/attendance/admin/ teacher-tracking/route.js
-
             const res = await fetch(`/api/schools/${schoolId}/attendance/admin/teacher-tracking?date=${date}`);
             if (!res.ok) throw new Error('Failed');
             return res.json();
         },
         refetchInterval: 30000,
+        enabled: !!schoolId && !teacherId
     });
 
-    const { summary, teachers, locations } = data || {};
+    // Fetch teacher history when a teacher is selected
+    const { data: historyData, isLoading: historyLoading } = useQuery({
+        queryKey: ['teacher-history', schoolId, teacherId, month, year],
+        queryFn: async () => {
+            const params = new URLSearchParams({
+                teacherId,
+                month: month.toString(),
+                year: year.toString()
+            });
+            const res = await fetch(`/api/schools/${schoolId}/attendance/admin/teacher-history?${params}`);
+            if (!res.ok) throw new Error('Failed');
+            return res.json();
+        },
+        enabled: !!teacherId && !!schoolId
+    });
+
+    const { summary, teachers, locations } = trackingData || {};
+    const { teacher, period, stats, leaves, calendar, records } = historyData || {};
 
     const filteredTeachers = teachers?.filter(t =>
-        t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.employeeId?.toLowerCase().includes(searchQuery.toLowerCase())
+        t.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.employeeId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.email?.toLowerCase().includes(searchQuery.toLowerCase())
     ) || [];
+
+    const handleSelectTeacher = (t) => {
+        setTeacherId(t.userId);
+        addToRecentTeachers(t);
+    };
+
+    const handlePrevMonth = () => {
+        if (month === 1) {
+            setMonth(12);
+            setYear(year - 1);
+        } else {
+            setMonth(month - 1);
+        }
+    };
+
+    const handleNextMonth = () => {
+        if (month === 12) {
+            setMonth(1);
+            setYear(year + 1);
+        } else {
+            setMonth(month + 1);
+        }
+    };
 
     const openInMaps = (lat, lng) => {
         window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank');
     };
 
-    if (isLoading) {
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'PRESENT': return 'bg-green-500';
+            case 'ABSENT': return 'bg-red-500';
+            case 'LATE': return 'bg-yellow-500';
+            case 'ON_LEAVE': return 'bg-blue-500';
+            case 'HALF_DAY': return 'bg-orange-500';
+            default: return 'bg-gray-200';
+        }
+    };
+
+    const cn = (...classes) => classes.filter(Boolean).join(' ');
+
+    if (!schoolId) return <LoaderPage />;
+
+    // Teacher Search/Selection View
+    if (!teacherId) {
+        if (trackingLoading) {
+            return (
+                <div className="flex items-center justify-center h-screen">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                </div>
+            );
+        }
+
         return (
-            <div className="flex items-center justify-center h-screen">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <div className="p-4 sm:p-6 space-y-6">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold flex items-center gap-2">
+                            <MapPin className="w-7 h-7 text-primary" />
+                            Teacher Tracking
+                        </h1>
+                        <p className="text-sm text-muted-foreground mt-1">
+                            Search and view detailed attendance history for any teacher
+                        </p>
+                    </div>
+                    <div className="flex gap-2">
+                        <Input
+                            type="date"
+                            value={date}
+                            onChange={(e) => setDate(e.target.value)}
+                            max={new Date().toISOString().split('T')[0]}
+                            className="w-auto"
+                        />
+                        <Button variant="outline" onClick={() => refetch()}>
+                            <RefreshCw className="w-4 h-4" />
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Summary Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <Card>
+                        <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Total Teachers</p>
+                                    <p className="text-2xl font-bold text-primary">{summary?.total || 0}</p>
+                                </div>
+                                <Users className="w-10 h-10 text-primary/20" />
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Checked In</p>
+                                    <p className="text-2xl font-bold text-green-600">{summary?.checkedIn || 0}</p>
+                                </div>
+                                <CheckCircle className="w-10 h-10 text-green-500/20" />
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Late Check-ins</p>
+                                    <p className="text-2xl font-bold text-yellow-600">{summary?.late || 0}</p>
+                                </div>
+                                <Clock className="w-10 h-10 text-yellow-500/20" />
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Avg Hours</p>
+                                    <p className="text-2xl font-bold text-purple-600">{summary?.avgWorkingHours || 0}h</p>
+                                </div>
+                                <TrendingUp className="w-10 h-10 text-purple-500/20" />
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Search Card */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Search className="w-5 h-5" />
+                            Search Teacher
+                        </CardTitle>
+                        <CardDescription>Find by name, email, or employee ID to view detailed history</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-6">
+                            {/* Search Input */}
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                                <Input
+                                    placeholder="Type teacher name, email, or employee ID..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="pl-11 h-12 text-lg"
+                                />
+                            </div>
+
+                            {/* Search Results */}
+                            {searchQuery && filteredTeachers.length > 0 ? (
+                                <div>
+                                    <p className="text-sm text-muted-foreground mb-3">
+                                        Found {filteredTeachers.length} teacher{filteredTeachers.length !== 1 ? 's' : ''}
+                                    </p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
+                                        {filteredTeachers.slice(0, 12).map((t) => (
+                                            <Card
+                                                key={t.userId}
+                                                className="cursor-pointer hover:border-primary transition-all"
+                                                onClick={() => handleSelectTeacher(t)}
+                                            >
+                                                <CardContent className="pt-4 pb-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-xl font-bold text-primary flex-shrink-0">
+                                                            {t.profilePicture ? (
+                                                                <img
+                                                                    src={t.profilePicture}
+                                                                    className='rounded-full object-cover w-12 h-12'
+                                                                    alt={t.name}
+                                                                />
+                                                            ) : (
+                                                                t.name?.charAt(0) || 'T'
+                                                            )}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <h4 className="font-semibold truncate">{t.name}</h4>
+                                                            <p className="text-sm text-muted-foreground">
+                                                                {t.employeeId} • {t.designation}
+                                                            </p>
+                                                            <Badge variant={
+                                                                t.status === 'PRESENT' ? 'default' :
+                                                                    t.status === 'LATE' ? 'warning' : 'destructive'
+                                                            } className="mt-1">
+                                                                {t.status || 'Not Marked'}
+                                                            </Badge>
+                                                        </div>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : searchQuery ? (
+                                <div className="text-center py-12">
+                                    <Users className="w-16 h-16 mx-auto mb-3 text-muted-foreground opacity-50" />
+                                    <p className="text-lg font-medium">No teachers found</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        No teachers match "{searchQuery}"
+                                    </p>
+                                </div>
+                            ) : null}
+
+                            {/* Recent Teachers */}
+                            {!searchQuery && recentTeachers.length > 0 && (
+                                <div>
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <History className="w-4 h-4 text-muted-foreground" />
+                                        <h3 className="font-semibold text-sm">Recently Viewed</h3>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {recentTeachers.map((t) => (
+                                            <Card
+                                                key={t.userId}
+                                                className="cursor-pointer hover:border-primary transition-all"
+                                                onClick={() => handleSelectTeacher(t)}
+                                            >
+                                                <CardContent className="pt-4 pb-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center text-xl font-bold text-purple-600 flex-shrink-0">
+                                                            {t.profilePicture ? (
+                                                                <img
+                                                                    src={t.profilePicture}
+                                                                    className='rounded-full object-cover w-12 h-12'
+                                                                    alt={t.name}
+                                                                />
+                                                            ) : (
+                                                                t.name?.charAt(0) || 'T'
+                                                            )}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <h4 className="font-semibold truncate">{t.name}</h4>
+                                                            <p className="text-sm text-muted-foreground">
+                                                                {t.employeeId}
+                                                            </p>
+                                                            <Badge variant="secondary" className="mt-1">
+                                                                {t.designation}
+                                                            </Badge>
+                                                        </div>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Empty State */}
+                            {!searchQuery && recentTeachers.length === 0 && (
+                                <div className="text-center py-12">
+                                    <Search className="w-16 h-16 mx-auto mb-3 text-muted-foreground opacity-50" />
+                                    <p className="text-lg font-medium">Start Searching</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Type a teacher name, email, or employee ID to begin
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
         );
     }
 
+    // Teacher History View
+    if (historyLoading) {
+        return (
+            <div className="flex flex-col items-center justify-center h-screen">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+                <p className="text-muted-foreground">Loading attendance data...</p>
+            </div>
+        );
+    }
+
+    const today = new Date();
+
     return (
-        <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+        <div className="p-4 sm:p-6 space-y-6">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
-                        <MapPin className="w-8 h-8 text-blue-600" />
-                        Teacher Tracking & Monitoring
-                    </h1>
-                    <p className="text-sm text-muted-foreground mt-1">
-                        Real-time GPS tracking and attendance monitoring
-                    </p>
-                </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => refetch()}>
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        Refresh
-                    </Button>
-                    <Button>
-                        <Download className="w-4 h-4 mr-2" />
-                        Export
-                    </Button>
-                </div>
+            <div className="flex items-center justify-between">
+                <h1 className="text-2xl font-bold">Teacher Attendance History</h1>
+                <Button variant="outline" size="sm" onClick={() => setTeacherId('')}>
+                    <ChevronLeft className="w-4 h-4 mr-1" />
+                    Change Teacher
+                </Button>
             </div>
 
-            {/* Filters */}
-            <Card>
-                <CardContent className="pt-6">
-                    <div className="flex gap-4">
-                        <div className="flex-1">
-                            <Input
-                                type="date"
-                                value={date}
-                                onChange={(e) => setDate(e.target.value)}
-                                max={new Date().toISOString().split('T')[0]}
-                            />
+            {/* Teacher Profile Card */}
+            <Card className="border">
+                <CardContent className="p-4 sm:p-6">
+                    <div className="flex flex-col sm:flex-row items-start gap-4">
+                        {/* Profile Picture */}
+                        <div className="w-20 h-20 rounded-full bg-primary/10 border-2 flex items-center justify-center text-2xl font-bold text-primary flex-shrink-0 overflow-hidden">
+                            {teacher?.profilePicture ? (
+                                <img
+                                    src={teacher.profilePicture}
+                                    alt={teacher.name}
+                                    className="w-full h-full rounded-full object-cover"
+                                />
+                            ) : (
+                                teacher?.name?.charAt(0) || 'T'
+                            )}
                         </div>
-                        <div className="flex-1">
-                            <Input
-                                placeholder="Search by name or employee ID..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
+
+                        {/* Teacher Info */}
+                        <div className="flex-1 min-w-0">
+                            <h2 className="text-xl font-bold mb-2">{teacher?.name}</h2>
+
+                            <div className="flex flex-wrap gap-2 mb-3">
+                                <Badge variant="outline">
+                                    {teacher?.designation}
+                                </Badge>
+                                {teacher?.department && (
+                                    <Badge variant="secondary">
+                                        {teacher.department}
+                                    </Badge>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-muted-foreground">
+                                <div className="flex items-center gap-2">
+                                    <User className="w-4 h-4" />
+                                    <span>{teacher?.employeeId}</span>
+                                </div>
+                                {teacher?.email && (
+                                    <div className="flex items-center gap-2">
+                                        <Mail className="w-4 h-4" />
+                                        <span>{teacher.email}</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Streak & Attendance */}
+                        <div className="flex gap-3 sm:gap-4 flex-shrink-0">
+                            {/* Streak */}
+                            <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800">
+                                <span className="text-2xl">🔥</span>
+                                <div>
+                                    <p className="text-xl font-bold text-orange-600">{stats?.streak || 0}</p>
+                                    <p className="text-[10px] text-orange-600/70">Day Streak</p>
+                                </div>
+                            </div>
+
+                            {/* Attendance % */}
+                            <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-primary/5 border">
+                                <TrendingUp className="w-6 h-6 text-primary" />
+                                <div>
+                                    <p className="text-xl font-bold text-primary">{stats?.attendancePercentage?.toFixed(0) || 0}%</p>
+                                    <p className="text-[10px] text-muted-foreground">Attendance</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </CardContent>
             </Card>
 
-            {/* Summary Cards */}
+            {/* Leave Balance */}
+            {leaves && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="p-3 rounded-lg border bg-card">
+                        <p className="text-xs text-muted-foreground mb-1">Casual Leave</p>
+                        <p className="text-lg font-semibold">{leaves.casual.balance}<span className="text-sm text-muted-foreground">/{leaves.casual.total}</span></p>
+                    </div>
+                    <div className="p-3 rounded-lg border bg-card">
+                        <p className="text-xs text-muted-foreground mb-1">Sick Leave</p>
+                        <p className="text-lg font-semibold">{leaves.sick.balance}<span className="text-sm text-muted-foreground">/{leaves.sick.total}</span></p>
+                    </div>
+                    <div className="p-3 rounded-lg border bg-card">
+                        <p className="text-xs text-muted-foreground mb-1">Earned Leave</p>
+                        <p className="text-lg font-semibold">{leaves.earned.balance}<span className="text-sm text-muted-foreground">/{leaves.earned.total}</span></p>
+                    </div>
+                    <div className="p-3 rounded-lg border bg-card">
+                        <p className="text-xs text-muted-foreground mb-1">Maternity Leave</p>
+                        <p className="text-lg font-semibold">{leaves.maternity.balance}<span className="text-sm text-muted-foreground">/{leaves.maternity.total}</span></p>
+                    </div>
+                </div>
+            )}
+
+            {/* Stats Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Card className="border-l-4 border-blue-500">
-                    <CardContent className="pt-6">
-                        <div className="text-center">
-                            <p className="text-sm text-muted-foreground">Total Teachers</p>
-                            <p className="text-3xl font-bold text-blue-600">{summary?.total || 0}</p>
+                <Card>
+                    <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-muted-foreground">Present</p>
+                                <p className="text-2xl font-bold text-green-600">{stats?.totalPresent || 0}</p>
+                            </div>
+                            <CheckCircle className="w-10 h-10 text-green-500/20" />
                         </div>
                     </CardContent>
                 </Card>
 
-                <Card className="border-l-4 border-green-500">
-                    <CardContent className="pt-6">
-                        <div className="text-center">
-                            <p className="text-sm text-muted-foreground">Checked In</p>
-                            <p className="text-3xl font-bold text-green-600">{summary?.checkedIn || 0}</p>
+                <Card>
+                    <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-muted-foreground">Absent</p>
+                                <p className="text-2xl font-bold text-red-600">{stats?.totalAbsent || 0}</p>
+                            </div>
+                            <XCircle className="w-10 h-10 text-red-500/20" />
                         </div>
                     </CardContent>
                 </Card>
 
-                <Card className="border-l-4 border-yellow-500">
-                    <CardContent className="pt-6">
-                        <div className="text-center">
-                            <p className="text-sm text-muted-foreground">Late Check-ins</p>
-                            <p className="text-3xl font-bold text-yellow-600">{summary?.late || 0}</p>
+                <Card>
+                    <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-muted-foreground">Late</p>
+                                <p className="text-2xl font-bold text-yellow-600">{stats?.totalLate || 0}</p>
+                            </div>
+                            <Clock className="w-10 h-10 text-yellow-500/20" />
                         </div>
                     </CardContent>
                 </Card>
 
-                <Card className="border-l-4 border-purple-500">
-                    <CardContent className="pt-6">
-                        <div className="text-center">
-                            <p className="text-sm text-muted-foreground">Avg Hours</p>
-                            <p className="text-3xl font-bold text-purple-600">{summary?.avgWorkingHours || 0}h</p>
+                <Card>
+                    <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-muted-foreground">On Leave</p>
+                                <p className="text-2xl font-bold text-blue-600">{stats?.totalLeaves || 0}</p>
+                            </div>
+                            <AlertCircle className="w-10 h-10 text-blue-500/20" />
                         </div>
                     </CardContent>
                 </Card>
             </div>
 
-            {/* Main Content */}
-            <Tabs defaultValue="list" className="space-y-4">
+            {/* Month Navigation */}
+            <Card>
+                <CardContent className="py-4">
+                    <div className="flex items-center justify-between">
+                        <Button variant="outline" onClick={handlePrevMonth}>
+                            <ChevronLeft className="w-4 h-4 mr-2" />
+                            Previous
+                        </Button>
+                        <h3 className="text-lg font-semibold">
+                            {period?.monthName} {period?.year}
+                        </h3>
+                        <Button
+                            variant="outline"
+                            onClick={handleNextMonth}
+                            disabled={month === new Date().getMonth() + 1 && year === new Date().getFullYear()}
+                        >
+                            Next
+                            <ChevronRight className="w-4 h-4 ml-2" />
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Main Content Tabs */}
+            <Tabs defaultValue="calendar" className="space-y-4">
                 <TabsList>
-                    <TabsTrigger value="list">List View</TabsTrigger>
-                    <TabsTrigger value="map">Map View</TabsTrigger>
-                    <TabsTrigger value="leaderboard">Streak Leaderboard</TabsTrigger>
+                    <TabsTrigger value="calendar">Calendar View</TabsTrigger>
+                    <TabsTrigger value="list">Detailed List</TabsTrigger>
                 </TabsList>
+
+                {/* Calendar View */}
+                <TabsContent value="calendar">
+                    <Card className="border">
+                        <CardHeader className="pb-4">
+                            <CardTitle>Monthly Calendar</CardTitle>
+                            <CardDescription>Color-coded attendance calendar</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {/* Calendar Grid */}
+                            <div className="flex flex-col">
+                                {/* Weekday Headers */}
+                                <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
+                                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                                        <div
+                                            key={day}
+                                            className="text-center text-xs font-medium text-muted-foreground py-2"
+                                        >
+                                            {day}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Calendar Days */}
+                                <div className="grid grid-cols-7 gap-1 sm:gap-2">
+                                    {calendar?.map((day, idx) => {
+                                        const isToday = day.day === today.getDate() &&
+                                            month === today.getMonth() + 1 &&
+                                            year === today.getFullYear();
+
+                                        return (
+                                            <div
+                                                key={idx}
+                                                className={cn(
+                                                    "min-h-[70px] sm:min-h-[90px] p-1.5 sm:p-2 rounded-lg border transition-colors",
+                                                    !day.isWorkingDay && "opacity-40 bg-muted/20",
+                                                    isToday && "bg-primary/10 border-primary",
+                                                    !isToday && day.isWorkingDay && "border-border bg-card hover:bg-muted/50"
+                                                )}
+                                                title={day.marked ? `${day.status}` : 'Not marked'}
+                                            >
+                                                <div className="flex flex-col h-full">
+                                                    <span className={cn(
+                                                        "text-xs font-medium mb-1",
+                                                        isToday && "text-primary font-bold"
+                                                    )}>
+                                                        {day.day}
+                                                    </span>
+                                                    {day.marked && (
+                                                        <div
+                                                            className={cn(
+                                                                "text-[9px] sm:text-xs px-1.5 py-0.5 rounded text-white font-medium flex items-center justify-center",
+                                                                getStatusColor(day.status)
+                                                            )}
+                                                        >
+                                                            <span className="hidden sm:inline">{day.status}</span>
+                                                            <span className="sm:hidden">{day.status?.charAt(0)}</span>
+                                                        </div>
+                                                    )}
+                                                    {day.isLateCheckIn && (
+                                                        <p className="text-[8px] text-yellow-600 mt-0.5">+{day.lateByMinutes}m</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Legend */}
+                            <div className="mt-4 pt-4 border-t flex flex-wrap gap-3 sm:gap-4 justify-center text-xs sm:text-sm">
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-3 h-3 rounded bg-green-500"></div>
+                                    <span>Present</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-3 h-3 rounded bg-red-500"></div>
+                                    <span>Absent</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-3 h-3 rounded bg-yellow-500"></div>
+                                    <span>Late</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-3 h-3 rounded bg-blue-500"></div>
+                                    <span>On Leave</span>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
 
                 {/* List View */}
                 <TabsContent value="list">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Teacher Activity</CardTitle>
-                            <CardDescription>Detailed check-in/out records with location and device info</CardDescription>
+                            <CardTitle>Detailed Records</CardTitle>
+                            <CardDescription>Complete attendance history with check-in details</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-3">
-                                {filteredTeachers.map((teacher) => (
-                                    <Card key={teacher.userId} className="hover:shadow-md transition-shadow">
-                                        <CardContent className="pt-6">
-                                            <div className="flex items-start gap-4">
-                                                {/* Profile */}
-                                                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-xl font-bold text-blue-600">
-                                                    {teacher.name.charAt(0)}
-                                                </div>
-
-                                                {/* Info */}
+                                {records?.map((record, idx) => (
+                                    <Card key={idx} className="border">
+                                        <CardContent className="p-4">
+                                            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                                                 <div className="flex-1">
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <h4 className="font-semibold">{teacher.name}</h4>
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <p className="font-medium">
+                                                            {new Date(record.date).toLocaleDateString('en-IN', {
+                                                                weekday: 'short',
+                                                                day: 'numeric',
+                                                                month: 'short'
+                                                            })}
+                                                        </p>
                                                         <Badge variant={
-                                                            teacher.status === 'PRESENT' ? 'default' :
-                                                                teacher.status === 'LATE' ? 'warning' : 'destructive'
+                                                            record.status === 'PRESENT' ? 'default' :
+                                                                record.status === 'LATE' ? 'warning' :
+                                                                    record.status === 'ABSENT' ? 'destructive' : 'secondary'
                                                         }>
-                                                            {teacher.status}
+                                                            {record.status}
                                                         </Badge>
-                                                    </div>
-                                                    <p className="text-sm text-muted-foreground mb-2">
-                                                        {teacher.employeeId} • {teacher.designation}
-                                                    </p>
-
-                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                                        {/* Check-in */}
-                                                        <div>
-                                                            <p className="text-muted-foreground flex items-center gap-1">
-                                                                <Clock className="w-3 h-3" /> Check-in
-                                                            </p>
-                                                            <p className="font-medium">
-                                                                {teacher.checkInTime ? new Date(teacher.checkInTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}
-                                                            </p>
-                                                            {teacher.isLateCheckIn && (
-                                                                <p className="text-xs text-yellow-600">Late by {teacher.lateByMinutes}m</p>
-                                                            )}
-                                                        </div>
-
-                                                        {/* Check-out */}
-                                                        <div>
-                                                            <p className="text-muted-foreground flex items-center gap-1">
-                                                                <Clock className="w-3 h-3" /> Check-out
-                                                            </p>
-                                                            <p className="font-medium">
-                                                                {teacher.checkOutTime ? new Date(teacher.checkOutTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—'}
-                                                            </p>
-                                                        </div>
-
-                                                        {/* Working Hours */}
-                                                        <div>
-                                                            <p className="text-muted-foreground flex items-center gap-1">
-                                                                <TrendingUp className="w-3 h-3" /> Hours
-                                                            </p>
-                                                            <p className="font-medium">{teacher.workingHours.toFixed(2)}h</p>
-                                                        </div>
-
-                                                        {/* Streak */}
-                                                        <div>
-                                                            <p className="text-muted-foreground flex items-center gap-1">
-                                                                <Award className="w-3 h-3" /> Streak
-                                                            </p>
-                                                            <p className="font-medium text-purple-600">{teacher.consecutiveDays} days</p>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Location & Device */}
-                                                    <div className="mt-3 flex flex-wrap gap-2">
-                                                        {teacher.checkInLocation && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => openInMaps(teacher.checkInLocation.latitude, teacher.checkInLocation.longitude)}
-                                                            >
-                                                                <MapPin className="w-3 h-3 mr-1" />
-                                                                View Location
-                                                            </Button>
-                                                        )}
-                                                        {teacher.deviceInfo && (
-                                                            <Badge variant="secondary" className="flex items-center gap-1">
-                                                                <Smartphone className="w-3 h-3" />
-                                                                {teacher.deviceInfo.platform} • {teacher.deviceInfo.deviceId}
+                                                        {record.isLateCheckIn && (
+                                                            <Badge variant="outline" className="text-yellow-600">
+                                                                Late by {record.lateByMinutes}m
                                                             </Badge>
                                                         )}
                                                     </div>
 
-                                                    {/* Remarks */}
-                                                    {teacher.remarks && (
-                                                        <p className="mt-2 text-sm text-muted-foreground italic">
-                                                            Note: {teacher.remarks}
-                                                        </p>
-                                                    )}
+                                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                                                        <div>
+                                                            <p className="text-muted-foreground">Check-in</p>
+                                                            <p className="font-medium">
+                                                                {record.checkInTime
+                                                                    ? new Date(record.checkInTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+                                                                    : '—'}
+                                                            </p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-muted-foreground">Check-out</p>
+                                                            <p className="font-medium">
+                                                                {record.checkOutTime
+                                                                    ? new Date(record.checkOutTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+                                                                    : '—'}
+                                                            </p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-muted-foreground">Hours</p>
+                                                            <p className="font-medium">
+                                                                {record.workingHours ? `${record.workingHours.toFixed(2)}h` : '—'}
+                                                            </p>
+                                                        </div>
+                                                        {record.deviceInfo && (
+                                                            <div>
+                                                                <p className="text-muted-foreground">Device</p>
+                                                                <p className="font-medium flex items-center gap-1">
+                                                                    <Smartphone className="w-3 h-3" />
+                                                                    {record.deviceInfo.platform || 'Unknown'}
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
+
+                                                {record.checkInLocation && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => openInMaps(record.checkInLocation.latitude, record.checkInLocation.longitude)}
+                                                    >
+                                                        <MapPin className="w-4 h-4 mr-1" />
+                                                        View Location
+                                                    </Button>
+                                                )}
                                             </div>
+
+                                            {record.remarks && (
+                                                <p className="mt-2 text-sm text-muted-foreground italic">
+                                                    Note: {record.remarks}
+                                                </p>
+                                            )}
                                         </CardContent>
                                     </Card>
                                 ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
 
-                {/* Map View */}
-                <TabsContent value="map">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Check-in Locations Map</CardTitle>
-                            <CardDescription>GPS coordinates of all teacher check-ins</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-4">
-                                <div className="bg-gray-100 rounded-lg p-4 text-center h-96 flex items-center justify-center">
-                                    <div className="text-muted-foreground">
-                                        <MapPin className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                                        <p className="mb-2">Interactive Map View</p>
-                                        <p className="text-sm">Integrate Google Maps API here</p>
-                                        <p className="text-xs mt-2">Locations: {locations?.length || 0} teachers</p>
+                                {(!records || records.length === 0) && (
+                                    <div className="text-center py-12 text-muted-foreground">
+                                        <Calendar className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                                        <p>No attendance records for this month</p>
                                     </div>
-                                </div>
-
-                                {/* Location List */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {locations?.map((loc) => (
-                                        <Card key={loc.userId} className="cursor-pointer hover:shadow-md" onClick={() => openInMaps(loc.latitude, loc.longitude)}>
-                                            <CardContent className="pt-4">
-                                                <div className="flex items-center justify-between">
-                                                    <div>
-                                                        <p className="font-medium">{loc.name}</p>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            {new Date(loc.checkInTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                                                        </p>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <Badge variant="outline">
-                                                            {loc.status}
-                                                        </Badge>
-                                                        <p className="text-xs text-muted-foreground mt-1">
-                                                            {loc.latitude.toFixed(4)}, {loc.longitude.toFixed(4)}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                {/* Leaderboard */}
-                <TabsContent value="leaderboard">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Streak Leaderboard</CardTitle>
-                            <CardDescription>Top teachers with consecutive attendance days</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-3">
-                                {[...filteredTeachers]
-                                    .sort((a, b) => b.consecutiveDays - a.consecutiveDays)
-                                    .slice(0, 10)
-                                    .map((teacher, idx) => (
-                                        <div key={teacher.userId} className="flex items-center gap-4 p-4 border rounded-lg">
-                                            <div className={`
-                        w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg
-                        ${idx === 0 ? 'bg-yellow-500 text-white' :
-                                                    idx === 1 ? 'bg-gray-400 text-white' :
-                                                        idx === 2 ? 'bg-orange-600 text-white' :
-                                                            'bg-blue-100 text-blue-600'}
-                      `}>
-                                                {idx + 1}
-                                            </div>
-                                            <div className="flex-1">
-                                                <p className="font-semibold">{teacher.name}</p>
-                                                <p className="text-sm text-muted-foreground">{teacher.employeeId}</p>
-                                            </div>
-                                            <div className="text-right">
-                                                <Badge variant="default" className="flex items-center gap-1">
-                                                    <Award className="w-4 h-4" />
-                                                    {teacher.consecutiveDays} days
-                                                </Badge>
-                                            </div>
-                                        </div>
-                                    ))}
+                                )}
                             </div>
                         </CardContent>
                     </Card>
