@@ -112,22 +112,41 @@ export async function GET(req, props) {
                 targets: event.targets,
             }));
 
-            const transformedGoogleEvents = googleEvents.map(event => ({
-                id: `google-${event.id}`,
-                title: event.summary || 'Untitled Event',
-                description: event.description || '',
-                start: event.start.dateTime || event.start.date,
-                end: event.end.dateTime || event.end.date,
-                allDay: !event.start.dateTime,
-                location: event.location,
-                color: '#EA4335', // Google red
-                eventType: 'CUSTOM',
-                category: 'OTHER',
-                priority: 'NORMAL',
-                status: 'SCHEDULED',
-                source: 'google',
-                htmlLink: event.htmlLink,
-            }));
+            const transformedGoogleEvents = googleEvents.map(event => {
+                // Detect if this is a holiday based on description or title
+                const description = (event.description || '').toLowerCase();
+                const title = (event.summary || '').toLowerCase();
+                const isHoliday = description.includes('holiday') ||
+                    description.includes('observance') ||
+                    title.includes('holiday') ||
+                    // Common Indian holidays that should be marked
+                    title.includes('diwali') ||
+                    title.includes('holi') ||
+                    title.includes('christmas') ||
+                    title.includes('independence day') ||
+                    title.includes('republic day') ||
+                    title.includes('gandhi jayanti') ||
+                    title.includes('dussehra') ||
+                    title.includes('eid');
+
+                return {
+                    id: `google-${event.id}`,
+                    title: event.summary || 'Untitled Event',
+                    description: event.description || '',
+                    start: event.start.dateTime || event.start.date,
+                    end: event.end.dateTime || event.end.date,
+                    startDate: event.start.date || (event.start.dateTime ? event.start.dateTime.split('T')[0] : null),
+                    allDay: !event.start.dateTime,
+                    location: event.location,
+                    color: isHoliday ? '#EF4444' : '#EA4335', // Red for holidays, Google red for others
+                    eventType: isHoliday ? 'HOLIDAY' : 'CUSTOM',
+                    category: 'OTHER',
+                    priority: 'NORMAL',
+                    status: 'SCHEDULED',
+                    source: 'google',
+                    htmlLink: event.htmlLink,
+                };
+            });
 
             const allEvents = [...transformedCustomEvents, ...transformedGoogleEvents];
 
@@ -277,7 +296,6 @@ export async function POST(req, props) {
 }
 
 
-
 // ============================================
 // HELPER: Fetch Google Calendar Events using googleapis
 // ============================================
@@ -318,34 +336,136 @@ async function fetchGoogleCalendarEvents(accessToken, refreshToken, accountId, s
     } catch (error) {
         console.error('Google Calendar API Error:', error);
 
-        // If token expired, try to refresh
-        if (error.code === 401 && refreshToken) {
-            try {
-                const oauth2Client = new google.auth.OAuth2(
-                    process.env.GOOGLE_CLIENT_ID,
-                    process.env.GOOGLE_CLIENT_SECRET
-                );
+        const errorCode = error.code || error.response?.status;
+        const errorMessage = error.message || '';
 
-                oauth2Client.setCredentials({ refresh_token: refreshToken });
-                const { credentials } = await oauth2Client.refreshAccessToken();
+        // Handle invalid_grant (400) or unauthorized (401) - token is expired/revoked
+        if (errorCode === 400 || errorCode === 401 || errorMessage.includes('invalid_grant')) {
+            console.log('Token expired or invalid, attempting refresh for account:', accountId);
 
-                // Update token in database
-                await prisma.gmailAccount.update({
-                    where: { id: accountId },
-                    data: {
-                        accessToken: credentials.access_token,
-                        lastUsedAt: new Date(),
-                    },
-                });
+            if (refreshToken) {
+                try {
+                    const oauth2Client = new google.auth.OAuth2(
+                        process.env.GOOGLE_CLIENT_ID,
+                        process.env.GOOGLE_CLIENT_SECRET
+                    );
 
-                // Retry with new token
-                return fetchGoogleCalendarEvents(credentials.access_token, refreshToken, accountId, startDate, endDate);
-            } catch (refreshError) {
-                console.error('Token refresh failed:', refreshError);
-                throw refreshError;
+                    oauth2Client.setCredentials({ refresh_token: refreshToken });
+                    const { credentials } = await oauth2Client.refreshAccessToken();
+
+                    // Update token in database
+                    await prisma.gmailAccount.update({
+                        where: { id: accountId },
+                        data: {
+                            accessToken: credentials.access_token,
+                            lastUsedAt: new Date(),
+                        },
+                    });
+
+                    console.log('Token refreshed successfully, retrying...');
+
+                    // Retry with new token
+                    return fetchGoogleCalendarEvents(credentials.access_token, refreshToken, accountId, startDate, endDate);
+                } catch (refreshError) {
+                    console.error('Token refresh failed:', refreshError);
+
+                    // Mark the account as needing re-authentication
+                    try {
+                        // Get the gmail account to find the school
+                        const gmailAccount = await prisma.gmailAccount.findUnique({
+                            where: { id: accountId },
+                            include: { user: { select: { schoolId: true } } }
+                        });
+
+                        // Create a notification for admins about the failed token
+                        if (gmailAccount?.user?.schoolId) {
+                            await createAdminNotification(
+                                gmailAccount.user.schoolId,
+                                'Google Calendar Disconnected',
+                                'Your Google Calendar connection has expired. Please reconnect to continue syncing holidays. Go to Settings > School Configuration to reconnect.',
+                                'WARNING'
+                            );
+                        }
+                    } catch (notifyError) {
+                        console.error('Failed to create admin notification:', notifyError);
+                    }
+
+                    // Return empty array instead of throwing to prevent page crash
+                    return [];
+                }
+            } else {
+                console.log('No refresh token available, returning empty events');
+                return [];
             }
         }
 
-        throw error;
+        // Handle rate limiting (403 with specific reason)
+        if (errorCode === 403 || errorMessage.includes('quota') || errorMessage.includes('rate limit')) {
+            console.error('Google API rate limit exceeded');
+
+            try {
+                const gmailAccount = await prisma.gmailAccount.findUnique({
+                    where: { id: accountId },
+                    include: { user: { select: { schoolId: true } } }
+                });
+
+                if (gmailAccount?.user?.schoolId) {
+                    await createAdminNotification(
+                        gmailAccount.user.schoolId,
+                        'Google Calendar Rate Limit',
+                        'Google Calendar API rate limit has been exceeded. Consider using a different Google account or wait 24 hours. Go to Settings > School Configuration to manage your connection.',
+                        'ERROR'
+                    );
+                }
+            } catch (notifyError) {
+                console.error('Failed to create rate limit notification:', notifyError);
+            }
+
+            return [];
+        }
+
+        // For other errors, return empty array to prevent page crash
+        console.error('Unhandled Google Calendar error, returning empty events');
+        return [];
+    }
+}
+
+// Helper function to create admin notifications
+async function createAdminNotification(schoolId, title, message, type = 'INFO') {
+    try {
+        // Find admin users for this school
+        const adminRoles = await prisma.role.findMany({
+            where: {
+                name: { in: ['ADMIN', 'SUPER_ADMIN'] }
+            },
+            select: { id: true }
+        });
+
+        const adminUsers = await prisma.user.findMany({
+            where: {
+                schoolId,
+                roleId: { in: adminRoles.map(r => r.id) },
+                status: 'ACTIVE'
+            },
+            select: { id: true }
+        });
+
+        // Create notifications for each admin
+        if (adminUsers.length > 0) {
+            await prisma.notification.createMany({
+                data: adminUsers.map(admin => ({
+                    userId: admin.id,
+                    title,
+                    message,
+                    type,
+                    category: 'SYSTEM',
+                    isRead: false,
+                })),
+                skipDuplicates: true
+            });
+            console.log(`Created ${type} notification for ${adminUsers.length} admins:`, title);
+        }
+    } catch (error) {
+        console.error('Failed to create admin notification:', error);
     }
 }

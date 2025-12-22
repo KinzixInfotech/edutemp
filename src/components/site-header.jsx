@@ -91,15 +91,18 @@ export function SiteHeader({ fullUser }) {
 
                     {/* User Avatar */}
                     <div className="flex items-center gap-2 pl-2 border-l ml-1">
-                        <Avatar className="h-8 w-8 rounded-full">
-                            <AvatarImage src={fullUser?.profilePicture} alt={fullUser?.name || "User"} />
-                            <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
-                                {fullUser?.name
-                                    ? fullUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
-                                    : "U"}
+                        <div className="group relative">
+                            <div className="absolute inset-0 rounded-full bg-[conic-gradient(from_0deg,#4285F4,#EA4335,#FBBC05,#34A853,#4285F4)] animate-[spin_3s_linear_infinite] opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                            <Avatar className="h-8 w-8 rounded-full border-2 border-blue-500 dark:border-blue-400 group-hover:border-transparent transition-all duration-300 relative z-10">
+                                <AvatarImage src={fullUser?.profilePicture} alt={fullUser?.name || "User"} className="rounded-full" />
+                                <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
+                                    {fullUser?.name
+                                        ? fullUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+                                        : "U"}
 
-                            </AvatarFallback>
-                        </Avatar>
+                                </AvatarFallback>
+                            </Avatar>
+                        </div>
                     </div>
                 </div>
             </div>

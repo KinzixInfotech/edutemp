@@ -2,21 +2,49 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
-// GET - Fetch current attendance config
+// Default attendance config values
+// Note: Fields with schema defaults like autoMarkTime, reminderTime are omitted
+// so Prisma uses the schema-defined defaults
+const DEFAULT_ATTENDANCE_CONFIG = {
+  defaultStartTime: '09:00',
+  defaultEndTime: '17:00',
+  gracePeriodMinutes: 15,
+  halfDayHours: 4,
+  fullDayHours: 8,
+  enableGeoFencing: false,
+  allowedRadiusMeters: 500,
+  autoMarkAbsent: true,
+  autoMarkTime: '10:00',
+  requireApprovalDays: 3,
+  autoApproveLeaves: false,
+  sendDailyReminders: true,
+  reminderTime: '08:30',
+  notifyParents: true,
+  calculateOnWeekends: false,
+  minAttendancePercent: 75,
+};
+
+// GET - Fetch current attendance config (auto-creates if not exists)
 export async function GET(req, props) {
   const params = await props.params;
   const { schoolId } = params;
-console.log(schoolId);
+  console.log('Attendance settings GET for schoolId:', schoolId);
 
   try {
-    const config = await prisma.attendanceConfig.findUnique({
+    let config = await prisma.attendanceConfig.findUnique({
       where: { schoolId }
     });
 
+    // Auto-create default config if not found
     if (!config) {
-      return NextResponse.json({
-        error: 'Attendance config not found. Please populate calendar first.'
-      }, { status: 404 });
+      console.log('No attendance config found, creating defaults for:', schoolId);
+      config = await prisma.attendanceConfig.create({
+        data: {
+          school: { connect: { id: schoolId } },
+          ...DEFAULT_ATTENDANCE_CONFIG,
+        }
+      });
+      console.log('Default attendance config created');
     }
 
     return NextResponse.json({
@@ -50,7 +78,8 @@ console.log(schoolId);
         // Stats
         calculateOnWeekends: config.calculateOnWeekends,
         minAttendancePercent: config.minAttendancePercent
-      }
+      },
+      isNewlyCreated: !config.createdAt || config.createdAt.getTime() === config.updatedAt.getTime()
     });
 
   } catch (error) {

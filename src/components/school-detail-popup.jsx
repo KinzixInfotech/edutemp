@@ -12,10 +12,26 @@ import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Globe, MapPin, Mail, Phone, School, ExternalLink, Calendar, CheckCircle2, Languages } from "lucide-react"
+import { useQuery } from "@tanstack/react-query"
 
 export function SchoolDetailPopup({ school, children }) {
+    // Fetch explorer profile for cover image
+    const { data: explorerProfile } = useQuery({
+        queryKey: ['school-explorer-profile-popup', school?.id],
+        queryFn: async () => {
+            const response = await fetch(`/api/schools/${school.id}/explorer/profile`);
+            if (!response.ok) return null;
+            return response.json();
+        },
+        enabled: !!school?.id,
+        staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    });
+
     if (!school) return children
-    console.log(school)
+
+    // Get cover image from explorer profile media
+    const coverImageUrl = explorerProfile?.coverImage;
+
     const createdDate = school.createdAt ? new Date(school.createdAt).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
@@ -28,34 +44,65 @@ export function SchoolDetailPopup({ school, children }) {
         day: 'numeric'
     }) : null;
 
-
     return (
-        <Dialog>
+        <Dialog >
             <DialogTrigger asChild>
                 {children}
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden border-0 shadow-2xl">
+            <DialogContent showCloseButton={false} className="sm:max-w-[425px] p-0 overflow-hidden border-0 shadow-2xl">
                 {/* Header Banner */}
-                <div className="relative w-full h-32 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 dark:from-indigo-900 dark:via-purple-900 dark:to-pink-900">
-                    <div className="absolute inset-0 bg-black/10 dark:bg-black/30" />
-                    {/* Abstract decorative circles */}
-                    <div className="absolute top-[-20px] right-[-20px] w-24 h-24 bg-white/10 rounded-full blur-xl" />
-                    <div className="absolute bottom-[-10px] left-[-10px] w-16 h-16 bg-white/10 rounded-full blur-lg" />
+                <div
+                    className="relative w-full h-32 bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-600 dark:from-blue-800 dark:via-blue-700 dark:to-indigo-800"
+                    style={coverImageUrl ? {
+                        backgroundImage: `url(${coverImageUrl})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                    } : undefined}
+                >
+                    {/* Overlay for better depth / image readability */}
+                    <div className={`absolute inset-0 ${coverImageUrl ? 'bg-black/30' : 'bg-gradient-to-t from-black/20 to-transparent'}`} />
+
+                    {/* Decorative elements - only show when using gradient (no cover image) */}
+                    {!coverImageUrl && (
+                        <>
+                            {/* Decorative patterns - grid dots */}
+                            <div
+                                className="absolute inset-0 opacity-20"
+                                style={{
+                                    backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.3) 1px, transparent 1px)',
+                                    backgroundSize: '16px 16px'
+                                }}
+                            />
+
+                            {/* Decorative circles */}
+                            <div className="absolute top-4 right-8 w-20 h-20 border-2 border-white/20 rounded-full" />
+                            <div className="absolute top-8 right-4 w-12 h-12 border border-white/15 rounded-full" />
+                            <div className="absolute bottom-4 left-6 w-16 h-16 border border-white/10 rounded-full" />
+
+                            {/* Glow effects */}
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+                            <div className="absolute bottom-0 left-0 w-24 h-24 bg-indigo-400/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
+                        </>
+                    )}
                 </div>
 
                 <div className="px-6 pb-6 relative">
                     {/* Profile Image - Overlapping Header */}
-                    <div className="relative -mt-16 mb-4 flex justify-between items-end">
-                        <div className="p-1.5 bg-background rounded-2xl shadow-xl ring-2 ring-background/50">
-                            <Avatar className="h-24 w-24 rounded-xl border border-border/20">
-                                <AvatarImage src={school.profilePicture} alt={school.name} className="object-cover" />
-                                <AvatarFallback className="bg-primary/5 text-primary text-2xl font-bold rounded-xl">
+                    <div className="relative -mt-14 mb-4 flex justify-between items-end">
+                        <div className="p-1 bg-background rounded-xl shadow-xl ring-2 ring-white/50 dark:ring-white/20">
+                            <Avatar className="h-20 w-20 rounded-lg">
+                                <AvatarImage
+                                    src={school.profilePicture}
+                                    alt={school.name}
+                                    className="object-cover rounded-lg"
+                                />
+                                <AvatarFallback className="bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 text-xl font-bold rounded-lg">
                                     {school.name?.substring(0, 2).toUpperCase() || "SC"}
                                 </AvatarFallback>
                             </Avatar>
                         </div>
                         {school.schoolCode && (
-                            <Badge variant="outline" className="mb-2 bg-background/80 backdrop-blur border-primary/20 text-primary font-mono shadow-sm">
+                            <Badge variant="outline" className="mb-2 bg-background/80 backdrop-blur border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 font-mono shadow-sm">
                                 #{school.schoolCode}
                             </Badge>
                         )}
@@ -65,10 +112,10 @@ export function SchoolDetailPopup({ school, children }) {
                         <DialogTitle className="text-2xl font-bold leading-tight tracking-tight">
                             {school.name}
                         </DialogTitle>
-                        {school.domain && (
+                        {school.id && (
                             <p className="text-sm text-muted-foreground font-medium flex items-center gap-1">
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-                                {school.domain}
+                                {school.id}
                             </p>
                         )}
                     </div>
@@ -80,7 +127,7 @@ export function SchoolDetailPopup({ school, children }) {
                                 <div className="flex flex-col p-3 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors border border-border/40">
                                     <div className="flex items-center gap-2 mb-1">
                                         <Calendar className="h-3.5 w-3.5 text-primary/70" />
-                                        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">With us since</span>
+                                        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Joined On</span>
                                     </div>
                                     <p className="text-sm font-medium">{createdDate}</p>
                                 </div>

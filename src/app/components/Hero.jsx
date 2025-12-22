@@ -104,7 +104,7 @@ const Hero = () => {
                 <div className="relative">
                     <div className="absolute inset-0 rounded-full blur-2xl opacity-30 animate-pulse" style={{ backgroundColor: '#0c65f1' }} />
                     <div className="relative p-4 bg-muted border bg-white! rounded-2xl" >
-                        <Image src='/favicon.ico' width={200} height={200} alt="EduBreezy" priority />
+                        <Image src='/edu.png' width={200} height={200} alt="EduBreezy" priority />
                         {/* <GraduationCap className="w-12 h-12 sm:w-16 sm:h-16 text-white" /> */}
                     </div>
                 </div>

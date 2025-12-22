@@ -55,6 +55,11 @@ export default function SchoolCalendar() {
     const [filterType, setFilterType] = useState('ALL');
     const [searchQuery, setSearchQuery] = useState('');
 
+    // Holiday marking state for event detail dialog
+    const [markAsHoliday, setMarkAsHoliday] = useState(false);
+    const [sendHolidayNotification, setSendHolidayNotification] = useState(false);
+    const [isSavingHoliday, setIsSavingHoliday] = useState(false);
+
     const [formData, setFormData] = useState({
         title: '',
         description: '',
@@ -193,6 +198,45 @@ export default function SchoolCalendar() {
         });
     }, []);
 
+    // Handle marking an event (e.g., Google Calendar event) as school holiday
+    const handleMarkAsHoliday = useCallback(async () => {
+        if (!selectedEvent || !markAsHoliday) return;
+
+        setIsSavingHoliday(true);
+        try {
+            // Create a new holiday event based on the selected event
+            const holidayData = {
+                title: `${selectedEvent.title} (School Holiday)`,
+                description: `Official school holiday: ${selectedEvent.title}`,
+                eventType: 'HOLIDAY',
+                color: '#EF4444', // Red for holidays
+                startDate: selectedEvent.startDate || new Date(selectedEvent.start).toISOString().split('T')[0],
+                endDate: selectedEvent.endDate || selectedEvent.startDate || new Date(selectedEvent.start).toISOString().split('T')[0],
+                isAllDay: true,
+                sendPushNotification: sendHolidayNotification,
+            };
+
+            const res = await fetch(`/api/schools/${schoolId}/calendar/events`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(holidayData),
+            });
+
+            if (!res.ok) throw new Error('Failed to mark as holiday');
+
+            queryClient.invalidateQueries({ queryKey: ['calendar-events'] });
+            queryClient.invalidateQueries({ queryKey: ['upcoming-events'] });
+
+            setIsDetailOpen(false);
+            setMarkAsHoliday(false);
+            setSendHolidayNotification(false);
+        } catch (error) {
+            console.error('Error marking as holiday:', error);
+        } finally {
+            setIsSavingHoliday(false);
+        }
+    }, [selectedEvent, markAsHoliday, sendHolidayNotification, schoolId, queryClient]);
+
     const getDaysInMonth = useCallback(() => {
         const year = currentDate.getFullYear();
         const month = currentDate.getMonth();
@@ -297,15 +341,15 @@ export default function SchoolCalendar() {
     if (!schoolId || !userId) return <LoaderPage />;
 
     return (
-        <div className="h-full flex flex-col gap-6 p-4 md:p-6 bg-gradient-to-br from-background via-background to-muted/20">
-            {/* Enhanced Header with Stats */}
+        <div className="h-full flex flex-col gap-6 p-4 md:p-6">
+            {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="space-y-1">
-                    <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold flex items-center gap-3 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                        <Calendar className="w-7 h-7 sm:w-8 sm:h-8 lg:w-10 lg:h-10 text-primary" />
+                    <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-3 text-primary">
+                        <Calendar className="w-7 h-7 sm:w-8 sm:h-8 text-primary" />
                         <span>Calendar</span>
                     </h1>
-                    <p className="text-sm sm:text-base text-muted-foreground">
+                    <p className="text-sm text-muted-foreground">
                         Manage school events and schedules
                     </p>
                 </div>
@@ -326,7 +370,7 @@ export default function SchoolCalendar() {
             <div className="flex flex-col lg:flex-row gap-6 flex-1">
                 {/* Main Calendar */}
                 <div className="flex-1 flex flex-col">
-                    <Card className="flex-1 flex flex-col shadow-xl border-2 hover:border-primary/20 transition-all">
+                    <Card className="flex-1 flex flex-col border hover:border-border/80 transition-all">
                         <CardContent className="p-4 md:p-6 flex flex-col h-full">
                             {/* Calendar Header */}
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -355,7 +399,7 @@ export default function SchoolCalendar() {
                                     <Button
                                         size="sm"
                                         onClick={() => setIsCreateOpen(true)}
-                                        className="gap-1.5 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                                        className="gap-1.5"
                                     >
                                         <Plus className="h-4 w-4" />
                                         New Event
@@ -427,13 +471,13 @@ export default function SchoolCalendar() {
                                                     key={idx}
                                                     onClick={() => handleDateClick(day)}
                                                     className={cn(
-                                                        "min-h-[60px] sm:min-h-[80px] md:min-h-[100px] p-1 sm:p-2 rounded-lg sm:rounded-xl border sm:border-2 transition-all duration-200",
-                                                        "hover:border-primary hover:shadow-lg sm:hover:scale-[1.02] active:scale-[0.98]",
-                                                        !day.isCurrentMonth && "opacity-30 hover:opacity-50",
-                                                        isToday && "bg-gradient-to-br from-primary/15 to-primary/5 border-primary shadow-md",
-                                                        isSelected && "border-primary shadow-xl ring-2 ring-primary/20",
-                                                        day.isCurrentMonth && !isToday && !isSelected && "border-border bg-card",
-                                                        isWeekend && day.isCurrentMonth && "bg-muted/30"
+                                                        "min-h-[60px] sm:min-h-[80px] md:min-h-[100px] p-1 sm:p-2 rounded-lg border transition-all duration-200",
+                                                        "hover:border-primary/50 hover:bg-muted/50",
+                                                        !day.isCurrentMonth && "opacity-40",
+                                                        isToday && "bg-primary/10 border-primary",
+                                                        isSelected && "border-primary bg-primary/5",
+                                                        day.isCurrentMonth && !isToday && !isSelected && "border-border/50 bg-card",
+                                                        isWeekend && day.isCurrentMonth && !isToday && !isSelected && "bg-muted/20"
                                                     )}
                                                 >
                                                     <div className="flex flex-col h-full">
@@ -478,7 +522,7 @@ export default function SchoolCalendar() {
 
                 {/* Enhanced Sidebar - Collapsible on mobile */}
                 <div className="w-full lg:w-80 xl:w-96">
-                    <Card className="shadow-xl border-2 hover:border-primary/20 transition-all">
+                    <Card className="border transition-all">
                         <CardContent className="p-4 sm:p-6">
                             <div className="flex items-center justify-between mb-4 sm:mb-5">
                                 <h3 className="text-base sm:text-lg font-bold flex items-center gap-2">
@@ -520,9 +564,9 @@ export default function SchoolCalendar() {
                                                     setIsDetailOpen(true);
                                                 }}
                                                 className={cn(
-                                                    "w-full text-left p-4 rounded-xl border-2 transition-all duration-200",
-                                                    "hover:border-primary hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]",
-                                                    "bg-gradient-to-br from-card to-muted/20"
+                                                    "w-full text-left p-4 rounded-lg border transition-all duration-200",
+                                                    "hover:border-primary/50 hover:bg-muted/30",
+                                                    "bg-card"
                                                 )}
                                                 style={{
                                                     animationDelay: `${idx * 50}ms`,
@@ -531,7 +575,7 @@ export default function SchoolCalendar() {
                                             >
                                                 <div className="flex items-start gap-3">
                                                     <div
-                                                        className="w-1.5 h-full rounded-full shadow-lg"
+                                                        className="w-1.5 h-full rounded-full"
                                                         style={{ backgroundColor: event.color || '#3B82F6' }}
                                                     />
                                                     <div className="flex-1 min-w-0 space-y-2">
@@ -1003,6 +1047,69 @@ export default function SchoolCalendar() {
                                             <ExternalLink className="h-4 w-4" />
                                             View in Google Calendar
                                         </a>
+                                    </div>
+                                )}
+
+                                {/* Mark as Holiday Section - Only for Google Calendar events that are NOT already holidays */}
+                                {selectedEvent.source === 'google' && selectedEvent.eventType !== 'HOLIDAY' && (
+                                    <div className="mt-4 p-4 rounded-lg border bg-muted/30 space-y-3">
+                                        <div className="flex items-start gap-3">
+                                            <Checkbox
+                                                id="markHoliday"
+                                                checked={markAsHoliday}
+                                                onCheckedChange={(checked) => {
+                                                    setMarkAsHoliday(checked);
+                                                    if (!checked) setSendHolidayNotification(false);
+                                                }}
+                                            />
+                                            <div className="flex-1">
+                                                <label htmlFor="markHoliday" className="text-sm font-semibold cursor-pointer">
+                                                    Mark this day as Holiday
+                                                </label>
+                                                <p className="text-xs text-muted-foreground mt-0.5">
+                                                    Add this event to school calendar as an official holiday
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {markAsHoliday && (
+                                            <div className="flex items-start gap-3 ml-6 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                                                <Checkbox
+                                                    id="sendNotif"
+                                                    checked={sendHolidayNotification}
+                                                    onCheckedChange={setSendHolidayNotification}
+                                                />
+                                                <div className="flex-1">
+                                                    <label htmlFor="sendNotif" className="text-sm font-medium cursor-pointer flex items-center gap-2">
+                                                        <Bell className="h-4 w-4 text-primary" />
+                                                        Send Push Notification
+                                                    </label>
+                                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                                        Notify all school members about this holiday
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {markAsHoliday && (
+                                            <Button
+                                                onClick={handleMarkAsHoliday}
+                                                disabled={isSavingHoliday}
+                                                className="w-full gap-2 bg-red-600 hover:bg-red-700"
+                                            >
+                                                {isSavingHoliday ? (
+                                                    <>
+                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                        Saving...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Check className="h-4 w-4" />
+                                                        Save as School Holiday
+                                                    </>
+                                                )}
+                                            </Button>
+                                        )}
                                     </div>
                                 )}
                             </div>

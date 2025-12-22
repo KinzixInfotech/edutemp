@@ -82,15 +82,17 @@ export function NavUser({ }) {
                             size="lg"
                             className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                         >
-                            <Avatar className="h-8 w-8  rounded-full` ">
-                                <AvatarImage src={fullUser?.
-                                    profilePicture} alt={fullUser?.name} />
-                                <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
-                                    {fullUser?.name
-                                        ? fullUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
-                                        : "U"}
-                                </AvatarFallback>
-                            </Avatar>
+                            <div className="relative">
+                                <div className="absolute inset-0 rounded-full bg-[conic-gradient(from_0deg,#4285F4,#EA4335,#FBBC05,#34A853,#4285F4)] animate-[spin_3s_linear_infinite] opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                                <Avatar className="h-8 w-8 rounded-full border-2 border-blue-500 dark:border-blue-400 group-hover:border-transparent transition-all duration-300 relative z-10">
+                                    <AvatarImage src={fullUser?.profilePicture} alt={fullUser?.name} className="rounded-full" />
+                                    <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
+                                        {fullUser?.name
+                                            ? fullUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+                                            : "U"}
+                                    </AvatarFallback>
+                                </Avatar>
+                            </div>
                             <div className="grid flex-1 text-left text-sm leading-tight">
                                 <span className="truncate font-medium">{fullUser?.name || 'Add Name'}</span>
                                 <span className="text-muted-foreground truncate text-xs">
@@ -108,8 +110,8 @@ export function NavUser({ }) {
                     >
                         <DropdownMenuLabel className="p-0 font-normal">
                             <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                                <Avatar className="h-8 w-8 rounded-full">
-                                    <AvatarImage src={fullUser?.profilePicture} alt={fullUser?.name} />
+                                <Avatar className="h-8 w-8 rounded-full border-2 border-blue-500 dark:border-blue-400">
+                                    <AvatarImage src={fullUser?.profilePicture} alt={fullUser?.name} className="rounded-full" />
                                     <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
                                         {fullUser?.name
                                             ? fullUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()

@@ -167,6 +167,30 @@ export default function AttendanceSettings() {
                 </Button>
             </div>
 
+            {/* Warning: School Timing Not Configured */}
+            {settings.defaultStartTime === '09:00' && settings.defaultEndTime === '17:00' && (
+                <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-start gap-3">
+                    <div className="bg-amber-100 dark:bg-amber-900/50 p-2 rounded-full shrink-0">
+                        <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="font-semibold text-amber-900 dark:text-amber-100">School Timing Not Configured</h3>
+                        <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                            Your school hours and working days haven't been configured yet. The values shown here are defaults.
+                            Please configure them in <strong>General Settings → School Configuration</strong> for accurate attendance tracking.
+                        </p>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-3 border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-200"
+                            onClick={() => window.location.href = '/dashboard/settings'}
+                        >
+                            Configure School Timing
+                        </Button>
+                    </div>
+                </div>
+            )}
+
             <Tabs defaultValue="working-hours" className="space-y-4">
                 <TabsList>
                     <TabsTrigger value="working-hours">Working Hours</TabsTrigger>

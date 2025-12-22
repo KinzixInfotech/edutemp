@@ -2,12 +2,16 @@
 import ExploreClientWrapper from '@/components/explore/ExploreClientWrapper';
 
 export const metadata = {
+    metadataBase: new URL('https://school.edubreezy.com'),
     title: {
         template: '%s | EduBreezy School Explorer',
         default: 'EduBreezy School Explorer - Find Top Rated Schools',
     },
     description: 'Discover and compare the best schools for your child. Verified reviews, real-time rankings, and detailed insights powered by EduBreezy ERP.',
     keywords: ['school explorer', 'find schools', 'school rankings', 'verified school reviews', 'edubreezy'],
+    alternates: {
+        canonical: '/explore',
+    },
     openGraph: {
         type: 'website',
         locale: 'en_IN',

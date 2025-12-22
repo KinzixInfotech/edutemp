@@ -19,7 +19,7 @@ import { ChartAreaInteractive } from '@/components/chart-area-interactive';
 import { SectionCards } from '@/components/section-cards';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import LoaderPage from '@/components/loader-page';
-import { CalendarClock, Plus, LayoutDashboard } from "lucide-react";
+import { CalendarClock, Plus, LayoutDashboard, Clock } from "lucide-react";
 import { ChartPieLabel } from '@/components/chart-pie';
 import { ChartBarHorizontal, } from '@/components/bar-chart';
 import { ChartLineLabel } from '@/components/line-chart';
@@ -43,6 +43,49 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 
 import OnboardingModal from '@/components/dashboard/OnboardingModal';
+
+// School Timing Warning Component
+const SchoolTimingWarning = ({ schoolId }) => {
+  const { data: config, isLoading } = useQuery({
+    queryKey: ['schoolConfig', schoolId],
+    queryFn: async () => {
+      const res = await fetch(`/api/schools/${schoolId}/attendance/admin/settings`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!schoolId,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Check if config has never been modified (createdAt equals updatedAt)
+  // This means the config was auto-created with defaults and never saved by user
+  const configData = config?.config;
+  const isNeverModified = configData?.createdAt && configData?.updatedAt &&
+    new Date(configData.createdAt).getTime() === new Date(configData.updatedAt).getTime();
+
+  // Only show warning if config exists but was never explicitly saved
+  if (isLoading || !isNeverModified) return null;
+
+  return (
+    <div className="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg p-4 flex items-start gap-3">
+      <div className="bg-purple-100 dark:bg-purple-900/50 p-2 rounded-full">
+        <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+      </div>
+      <div className="flex-1">
+        <h3 className="font-semibold text-purple-900 dark:text-purple-100">Setup Required: School Timing</h3>
+        <p className="text-sm text-purple-700 dark:text-purple-300 mt-1">
+          Configure your school's working days and hours for accurate attendance tracking and reporting.
+        </p>
+        <Link href="/dashboard/settings">
+          <Button variant="outline" size="sm" className="mt-3 border-purple-300 dark:border-purple-700 hover:bg-purple-100 dark:hover:bg-purple-900/50 text-purple-800 dark:text-purple-200">
+            Configure Timing
+          </Button>
+        </Link>
+      </div>
+    </div>
+  );
+};
+
 
 // ... (LatestNotice component remains unchanged) ...
 const LatestNotice = ({ fullUser, queryClient }) => {
@@ -438,6 +481,11 @@ export default function Dashboard() {
                       </Link>
                     </div>
                   </div>
+                )}
+
+                {/* Warning: School Timing Not Configured */}
+                {academicYearsQuery.data?.length > 0 && (
+                  <SchoolTimingWarning schoolId={fullUser?.schoolId} />
                 )}
               </div>
             </div>
