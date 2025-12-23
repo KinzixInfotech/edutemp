@@ -11,7 +11,7 @@ const Hero = () => {
     const [code, setCode] = useState("");
 
     return (
-        <section className="relative mt-11 w-full min-h-screen flex items-center justify-center px-4 sm:px-6 py-8 sm:py-16 bg-gradient-to-br from-blue-50 via-sky-50 to-indigo-50 overflow-hidden">
+        <section className="relative mt-12 w-full min-h-screen flex items-center justify-center px-4 sm:px-6 py-8 sm:py-16 bg-gradient-to-br from-blue-50 via-sky-50 to-indigo-50 overflow-hidden">
             {/* Animated Wave Background */}
             <div className="absolute inset-0 overflow-hidden">
                 <svg

@@ -6,9 +6,7 @@ import {
     CheckCircle, Star, Users, BookOpen, BarChart3,
     Clock, GraduationCap, CreditCard, ArrowRight,
     TrendingUp, PieChart, Calendar, FileText, Play, XIcon, Check,
-    Pencil, BookMarked, Ruler, Calculator, Highlighter as HighlighterIcon, School,
-    Home,
-    Bus
+    Pencil, BookMarked, Ruler, Calculator, Highlighter as HighlighterIcon, School
 } from 'lucide-react';
 import Header from './components/Header';
 import { DotPattern } from '@/components/ui/dot-pattern';
@@ -16,8 +14,6 @@ import { BorderBeam } from '@/components/ui/border-beam';
 import { HyperText } from '@/components/ui/hyper-text';
 import { Highlighter } from '@/components/ui/highlighter';
 import Link from 'next/link';
-import DownloadAppCTA from '@/components/DownloadAppCTA';
-import WebDashboardCTA from '@/components/WebDashboardCTA';
 
 
 
@@ -28,17 +24,12 @@ export default function HomePage() {
             <MarqueeBanner />
             <AboutBriefSection />
             <WhyEduBreezySection />
-
             {/* <TrustedSection /> */}
-            <WebDashboardCTA />
             <FeaturesSection />
             <SchoolExplorerSection />
             <BentoSection />
             <PricingSection />
             <TestimonialsSection />
-            <div className='p-2'>
-                <DownloadAppCTA />
-            </div>
             {/* <Footer /> */}
         </div>
     );
@@ -51,7 +42,7 @@ function HeroSection() {
     const videoSrc = "https://www.youtube.com/embed/dQw4w9WgXcQ"; // Replace with actual video URL
 
     return (
-        <section className="min-h-screen   h-fit pt-[100px] pb-0 bg-[linear-gradient(120deg,#f8fafc_0%,#fff9f0_50%,#f0f7ff_100%)] relative overflow-visible">
+        <section className="min-h-screen h-fit pt-[100px] pb-0 bg-[linear-gradient(120deg,#f8fafc_0%,#fff9f0_50%,#f0f7ff_100%)] relative overflow-visible">
             {/* Mesh Gradient Glow - Left */}
             <div className="absolute top-[10%] -left-[10%] w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(5,105,255,0.25)_0%,transparent_70%)] blur-[80px] rounded-full pointer-events-none" />
 
@@ -139,7 +130,7 @@ function HeroSection() {
 
                     <div className="flex z-10 items-center justify-center gap-6 flex-wrap mb-[50px]">
                         {/* Avatars + Rating */}
-                        {/* <div className="flex flex-col md:flex-col items-center  gap-3">
+                        <div className="flex flex-col md:flex-col items-center  gap-3">
                             <div className="flex">
                                 {[1, 2, 3, 4].map(i => (
                                     <img
@@ -157,19 +148,19 @@ function HeroSection() {
                                     ))}
                                 </div>
                             </div>
-                        </div> */}
+                        </div>
                         <div className="flex flex-wrap gap-4">
-                            <Link href="/contact">
-                                <button className="px-6 py-3 md:py-3.5 bg-white border-2 border-[#0569ff] text-[#0569ff] rounded-full text-[0.95rem] font-semibold hover:bg-[#0569ff] hover:text-white transition-all duration-300 shadow-md hover:shadow-lg">
-                                    Book a Demo
-                                </button>
-                            </Link>
                             <button className="group flex items-center pr-1 gap-2 bg-[#0569ff] justify-center items-center text-white border-0 rounded-full text-[0.95rem] font-semibold cursor-pointer shadow-[0_4px_14px_rgba(5,105,255,0.3)] hover:shadow-[0_6px_20px_rgba(5,105,255,0.4)] transition-all duration-300">
                                 <span className='px-1 pl-4 ml-2 py-3 md:py-3.5'>Get Started</span>
                                 <span className='bg-white p-2.5 md:p-3 shadow-lg rounded-full group-hover:bg-gray-50 transition-colors'>
                                     <ArrowRight size={20} strokeWidth={3} color='black' className='transition-transform duration-300 group-hover:-rotate-45' />
                                 </span>
                             </button>
+                            <Link href="/contact">
+                                <button className="px-6 py-3 md:py-3.5 bg-white border-2 border-[#0569ff] text-[#0569ff] rounded-full text-[0.95rem] font-semibold hover:bg-[#0569ff] hover:text-white transition-all duration-300 shadow-md hover:shadow-lg">
+                                    Book a Demo
+                                </button>
+                            </Link>
                         </div>
                     </div>
                 </div>
@@ -190,6 +181,7 @@ function HeroSection() {
 
                     {/* Dashboard Preview Frame */}
                     <div className="hero-dashboard relative bg-white rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.12)] w-full max-w-[1200px] mx-auto border border-[#e0e0e0] overflow-hidden z-10">
+                        <BorderBeam duration={8} size={100} colorFrom='#0569ff' colorTo='#000' />
 
                         {/* Browser Top Bar */}
                         <div className="flex items-center px-3 py-2.5 bg-[#f8f9fa] border-b border-[#e5e7eb] gap-2">
@@ -226,8 +218,6 @@ function HeroSection() {
                                 </div>
                             </div>
                         </button>
-                        <BorderBeam duration={8} size={100} colorFrom='#0569ff' colorTo='#000' />
-
                     </div>
                 </div>
             </div>
@@ -292,6 +282,7 @@ function MarqueeBanner() {
         "MOBILE APP FOR PARENTS",
         "100% SECURE & CLOUD-BASED",
         "REAL-TIME ANALYTICS DASHBOARD",
+        "TRUSTED BY 600+ SCHOOLS",
         "99.9% UPTIME GUARANTEE",
     ];
 
@@ -385,51 +376,34 @@ function WhyEduBreezySection() {
                         </a>
                     </div>
 
-                    {/* Right - App Cards Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                        {/* School App Card */}
-                        <div className="bg-white p-6 rounded-2xl border border-gray-100 hover:border-[#0569ff]/20 hover:shadow-lg transition-all duration-300">
-                            <div className="w-14 h-14 bg-[#0569ff]/10 rounded-xl flex items-center justify-center mb-4">
-                                <Home size={28} className="text-[#0569ff]" />
+                    {/* Right - Video Preview */}
+                    <div className="relative w-full">
+                        <button
+                            onClick={() => setIsVideoOpen(true)}
+                            className="relative w-full group cursor-pointer block"
+                        >
+                            {/* Video Thumbnail with aspect ratio */}
+                            <div className="relative aspect-video rounded-xl overflow-hidden shadow-xl bg-[#1a1a2e] border border-gray-200">
+                                <img
+                                    src="/dash.png"
+                                    alt="EduBreezy Dashboard Demo"
+                                    className="w-full h-full object-contain opacity-95 group-hover:opacity-100 transition-opacity"
+                                />
+                                {/* Play Button Overlay */}
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/20 transition-all">
+                                    <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                                        <Play size={24} className="text-[#0569ff] ml-0.5" fill="#0569ff" />
+                                    </div>
+                                </div>
+                                {/* Logo Badge */}
+                                <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm px-2.5 py-1 rounded-md shadow-md">
+                                    <span className="font-bold text-[#1a1a2e] text-xs">edubreezy</span>
+                                </div>
                             </div>
-                            <h3 className="text-lg font-bold text-[#1a1a2e] mb-2">School App</h3>
-                            <p className="text-[#666] text-sm leading-relaxed">
-                                Your All-in-One Solution for Easy Management and Communication.
+                            <p className="text-center text-[#888] text-xs mt-3">
+                                Watch how EduBreezy transforms school management
                             </p>
-                        </div>
-
-                        {/* Parent App Card */}
-                        <div className="bg-white p-6 rounded-2xl border border-gray-100 hover:border-[#0569ff]/20 hover:shadow-lg transition-all duration-300">
-                            <div className="w-14 h-14 bg-[#0569ff]/10 rounded-xl flex items-center justify-center mb-4">
-                                <Users size={28} className="text-[#0569ff]" />
-                            </div>
-                            <h3 className="text-lg font-bold text-[#1a1a2e] mb-2">Parent App</h3>
-                            <p className="text-[#666] text-sm leading-relaxed">
-                                Easily track your child's progress, fees, attendance, and other activities effortlessly.
-                            </p>
-                        </div>
-
-                        {/* Teacher App Card */}
-                        <div className="bg-white p-6 rounded-2xl border border-gray-100 hover:border-[#0569ff]/20 hover:shadow-lg transition-all duration-300">
-                            <div className="w-14 h-14 bg-[#0569ff]/10 rounded-xl flex items-center justify-center mb-4">
-                                <GraduationCap size={28} className="text-[#0569ff]" />
-                            </div>
-                            <h3 className="text-lg font-bold text-[#1a1a2e] mb-2">Teacher App</h3>
-                            <p className="text-[#666] text-sm leading-relaxed">
-                                The Teacher App helps teachers manage classrooms and connect with parents easily.
-                            </p>
-                        </div>
-
-                        {/* Driver App Card */}
-                        <div className="bg-white p-6 rounded-2xl border border-gray-100 hover:border-[#0569ff]/20 hover:shadow-lg transition-all duration-300">
-                            <div className="w-14 h-14 bg-[#0569ff]/10 rounded-xl flex items-center justify-center mb-4">
-                                <Bus size={28} className="text-[#0569ff]" />
-                            </div>
-                            <h3 className="text-lg font-bold text-[#1a1a2e] mb-2">Driver App</h3>
-                            <p className="text-[#666] text-sm leading-relaxed">
-                                Easily find your child routes & communicate with drivers in real time.
-                            </p>
-                        </div>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -455,7 +429,6 @@ function TrustedSection() {
             </div>
         </section>
     );
-
 }
 
 // Features Grid Section
@@ -505,13 +478,13 @@ function FeaturesSection() {
 
                 {/* View All Button */}
                 <div className="text-center">
-                    <Link
+                    <a
                         href="/features"
                         className="inline-flex items-center gap-2 text-[#0569ff] font-semibold hover:underline transition-all"
                     >
                         View All Features
                         <ArrowRight size={18} />
-                    </Link>
+                    </a>
                 </div>
             </div>
         </section>

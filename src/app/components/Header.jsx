@@ -160,8 +160,8 @@ export default function Header() {
 
     // Dynamic classes for header
     const headerClasses = isHomePage
-        ? `fixed w-full left-0 right-0 top-0 z-50 transition-all duration-300 backdrop-blur-lg bg-[#ffffffc2] border-b border-gray-200 shadow-none`
-        : 'fixed w-full left-0 right-0 top-0 z-50 bg-white border-b border-gray-200';
+        ? `fixed w-full left-0 right-0 top-0 z-[100] transition-all duration-300 backdrop-blur-lg bg-[#ffffffc2] border-b border-gray-200 shadow-none`
+        : 'fixed w-full left-0 right-0 top-0 z-[100] bg-white border-b border-gray-200';
 
     return (
         <div className={headerClasses}>
