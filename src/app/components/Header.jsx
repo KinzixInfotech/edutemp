@@ -19,6 +19,12 @@ const menuConfig = {
             target: "_self"
         },
         {
+            name: "Features",
+            type: "link",
+            link: "/features",
+            target: "_self"
+        },
+        {
             name: "About",
             type: "submenu",
             submenus: [

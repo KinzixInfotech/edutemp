@@ -773,9 +773,9 @@ function Sidebar({ activeSection, setActiveSection, isMobileMenuOpen, setMobileM
 
     return (
         <aside className={`
-            fixed lg:sticky top-0 left-0 z-40 h-screen lg:h-[calc(100vh-80px)] lg:top-20
+            fixed lg:sticky top-0 left-0 z-50 h-screen lg:h-[calc(100vh-80px)] lg:top-20
             w-72 bg-white lg:bg-transparent border-r border-gray-200 lg:border-0
-            transform transition-transform duration-300 ease-in-out
+            transform transition-transform duration-300 ease-in-out shadow-xl lg:shadow-none
             ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
             overflow-y-auto
         `}>
@@ -943,25 +943,28 @@ export default function FeaturesPage() {
         <div className="min-h-screen bg-white">
             <Header />
 
-            {/* Mobile Menu Toggle */}
-            <div className="lg:hidden fixed bottom-6 right-6 z-50">
+            {/* Mobile Top Bar with Menu Button */}
+            <div className="lg:hidden fixed top-16 left-0 right-0 z-50  bg-[#ffffffbf] backdrop-blur-md border-b border-gray-200 px-4 py-3 flex items-center gap-3">
                 <button
                     onClick={() => setMobileMenuOpen(true)}
-                    className="w-14 h-14 bg-[#0569ff] text-white rounded-full shadow-xl flex items-center justify-center"
+                    className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                 >
-                    <Menu size={24} />
+                    <Menu size={20} />
                 </button>
+                <span className="font-semibold text-[#1a1a2e] text-sm truncate">
+                    {featureContent[activeSection]?.title || 'Features'}
+                </span>
             </div>
 
             {/* Overlay for mobile */}
             {isMobileMenuOpen && (
                 <div
-                    className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+                    className="fixed inset-0 bg-black/50 z-40 lg:hidden"
                     onClick={() => setMobileMenuOpen(false)}
                 />
             )}
 
-            <div className="flex pt-20">
+            <div className="flex pt-32 lg:pt-20">
                 {/* Sidebar */}
                 <Sidebar
                     activeSection={activeSection}
@@ -971,7 +974,7 @@ export default function FeaturesPage() {
                 />
 
                 {/* Main Content */}
-                <main className="flex-1 min-w-0 px-6 py-10 lg:px-12">
+                <main className="flex-1 min-w-0 px-5 py-8 lg:px-12 lg:py-10">
                     <div className="flex gap-12">
                         <FeatureContent sectionId={activeSection} />
                         <OnThisPage content={featureContent[activeSection]} />
