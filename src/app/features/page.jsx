@@ -135,34 +135,34 @@ export default function FeaturesIntroPage() {
                 <div className="mesh-1 absolute -bottom-[80px] right-[15%] w-[420px] h-[420px] bg-[radial-gradient(circle,rgba(255,122,0,0.2)_0%,transparent_70%)] blur-[75px] rounded-full pointer-events-none" />
 
                 {/* Floating Icons - Better Spacing */}
-                <div className="floating-icon absolute top-[22%] left-[15%] w-12 h-12 bg-gradient-to-br from-orange-500/10 to-orange-500/5 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-orange-500/20 pointer-events-none">
+                <div className="floating-icon hidden md:flex absolute top-[22%] left-[15%] w-12 h-12 bg-gradient-to-br from-orange-500/10 to-orange-500/5 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-orange-500/20 pointer-events-none">
                     <Bus size={24} className="text-orange-500/60" />
                 </div>
-                <div className="floating-icon absolute top-[28%] left-[25%] w-10 h-10 bg-gradient-to-br from-pink-500/10 to-pink-500/5 backdrop-blur-sm rounded-xl flex items-center justify-center border border-pink-500/20 pointer-events-none">
+                <div className="floating-icon hidden md:flex  absolute top-[28%] left-[23%] w-10 h-10 bg-gradient-to-br from-pink-500/10 to-pink-500/5 backdrop-blur-sm rounded-xl flex items-center justify-center border border-pink-500/20 pointer-events-none">
                     <Award size={20} className="text-pink-500/60" />
                 </div>
-                <div className="floating-icon absolute top-[25%] right-[20%] w-14 h-14 bg-gradient-to-br from-purple-500/10 to-purple-500/5 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-purple-500/20 pointer-events-none">
+                <div className="floating-icon hidden md:flex  absolute top-[25%] right-[20%] w-14 h-14 bg-gradient-to-br from-purple-500/10 to-purple-500/5 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-purple-500/20 pointer-events-none">
                     <GraduationCap size={28} className="text-purple-500/60" />
                 </div>
-                <div className="floating-icon absolute top-[32%] right-[8%] w-12 h-12 bg-gradient-to-br from-pink-500/10 to-pink-500/5 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-pink-500/20 pointer-events-none">
+                <div className="floating-icon hidden md:flex  absolute top-[32%] right-[8%] w-12 h-12 bg-gradient-to-br from-pink-500/10 to-pink-500/5 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-pink-500/20 pointer-events-none">
                     <Sparkles size={24} className="text-pink-500/60" />
                 </div>
-                <div className="floating-icon absolute bottom-[28%] right-[18%] w-12 h-12 bg-gradient-to-br from-green-500/10 to-green-500/5 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-green-500/20 pointer-events-none">
+                <div className="floating-icon hidden md:flex  absolute bottom-[28%] right-[18%] w-12 h-12 bg-gradient-to-br from-green-500/10 to-green-500/5 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-green-500/20 pointer-events-none">
                     <Bell size={24} className="text-green-500/60" />
                 </div>
-                <div className="floating-icon absolute bottom-[18%] right-[25%] w-10 h-10 bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 backdrop-blur-sm rounded-xl flex items-center justify-center border border-yellow-500/20 pointer-events-none">
+                <div className="floating-icon hidden md:flex  absolute bottom-[18%] right-[25%] w-10 h-10 bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 backdrop-blur-sm rounded-xl flex items-center justify-center border border-yellow-500/20 pointer-events-none">
                     <Wallet size={20} className="text-yellow-500/60" />
                 </div>
                 <div className="floating-icon absolute bottom-[25%] left-[20%] w-12 h-12 bg-gradient-to-br from-[#0569ff]/10 to-[#0569ff]/5 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-[#0569ff]/20 pointer-events-none">
                     <Users size={24} className="text-[#0569ff]/60" />
                 </div>
-                <div className="floating-icon absolute bottom-[15%] left-[12%] w-12 h-12 bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-cyan-500/20 pointer-events-none">
+                <div className="floating-icon hidden md:flex  absolute bottom-[15%] left-[12%] w-12 h-12 bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-cyan-500/20 pointer-events-none">
                     <Globe size={24} className="text-cyan-500/60" />
                 </div>
 
                 <div className="max-w-6xl mx-auto relative z-10">
                     <div className="text-center">
-                        <span className="inline-block px-4 py-2 bg-gradient-to-r from-[#0569ff]/10 to-[#ff7a00]/10 border border-[#0569ff]/20 rounded-full text-sm font-medium mb-6 text-[#0569ff]">
+                        <span className="inline-flex px-4 py-2 bg-gradient-to-r from-[#0569ff]/10 to-[#ff7a00]/10 border border-[#0569ff]/20 rounded-full text-sm font-medium mb-6 text-[#0569ff]">
                             Complete Feature Documentation
                         </span>
                         <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-[1.1] text-[#1a1a2e]">
