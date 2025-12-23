@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button"
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from "next/navigation";
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronRight, Menu, X } from 'lucide-react';
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { HiOutlineMenuAlt3 } from "react-icons/hi";
 // Menu Configuration - Easy to modify
 const menuConfig = {
     menus: [
@@ -111,9 +113,10 @@ const menuConfig = {
 };
 
 export default function Header() {
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [AlreadyLoggedIn, setAlreadyLoggedIn] = useState(false);
     const [activeSubmenu, setActiveSubmenu] = useState(null);
+    const [mobileExpandedMenu, setMobileExpandedMenu] = useState(null);
     const [isScrolled, setIsScrolled] = useState(false);
     const pathname = usePathname();
 
@@ -142,12 +145,8 @@ export default function Header() {
         setActiveSubmenu(null);
     };
 
-    const handleMenuClick = (menuName) => {
-        setActiveSubmenu(activeSubmenu === menuName ? null : menuName);
-    };
-
-    const handleCloseMenu = () => {
-        setActiveSubmenu(null);
+    const toggleMobileSubmenu = (menuName) => {
+        setMobileExpandedMenu(mobileExpandedMenu === menuName ? null : menuName);
     };
 
     // Check if we're on the homepage
@@ -155,22 +154,18 @@ export default function Header() {
 
     // Dynamic classes for header
     const headerClasses = isHomePage
-        ? `fixed w-full left-0 right-0 top-0 z-50 transition-all duration-300 ${isScrolled
-            ? 'bg-white/80 backdrop-blur-md border-b border-gray-200 shadow-none border-b'
-            : 'bg-transparent border-b-0'
-        }`
+        ? `fixed w-full left-0 right-0 top-0 z-50 transition-all duration-300 backdrop-blur-lg bg-[#ffffffc2] border-b border-gray-200 shadow-none`
         : 'fixed w-full left-0 right-0 top-0 z-50 bg-white border-b border-gray-200';
 
     return (
         <div className={headerClasses}>
-            <nav className="px-6 lg:px-16 py-1">
+            <nav className="px-4 lg:px-16 py-1">
                 <div className="max-w-7xl mx-auto flex h-16 items-center justify-between gap-4">
                     {/* Logo - Left side */}
-                    <div className="flex items-center gap-2 flex-row justify-center">
+                    <div className="flex items-center gap-2 flex-row justify-center shrink-0">
                         <Link href="/" className="text-primary hover:text-primary/90">
-                            <Image src='/edu.png' width={200} height={200} alt="EduBreezy" priority />
+                            <Image src='/edu.png' width={150} height={150} alt="EduBreezy" priority className="w-[120px] md:w-[200px]" />
                         </Link>
-
                     </div>
 
                     {/* Desktop Navigation - Middle */}
@@ -186,25 +181,24 @@ export default function Header() {
                                     <Link
                                         href={menu.link}
                                         target={menu.target}
-                                        className="text-gray-700 hover:text-[#026df3] transition-colors font-medium"
+                                        className="text-gray-700 hover:text-[#026df3] transition-colors font-medium py-4"
                                     >
                                         {menu.name}
                                     </Link>
                                 ) : (
                                     <>
                                         <button
-                                            className="text-gray-700 hover:text-[#026df3] transition-colors font-medium flex items-center"
+                                            className="text-gray-700 hover:text-[#026df3] transition-colors font-medium flex items-center py-4"
                                         >
                                             {menu.name}
                                             <ChevronDown
-                                                className={`ml-1 w-4 h-4 transition-transform duration-300 ${activeSubmenu === menu.name ? 'rotate-180' : ''
-                                                    }`}
+                                                className={`ml-1 w-4 h-4 transition-transform duration-300 ${activeSubmenu === menu.name ? 'rotate-180' : ''}`}
                                             />
                                         </button>
 
                                         {/* Mega Menu Dropdown */}
                                         {activeSubmenu === menu.name && (
-                                            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-screen max-w-4xl">
+                                            <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 w-screen max-w-4xl">
                                                 <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 p-8 animate-in fade-in slide-in-from-top-4 duration-300">
                                                     <div className="grid grid-cols-2 gap-8">
                                                         {menu.submenus.map((submenu, subIndex) => (
@@ -219,6 +213,7 @@ export default function Header() {
                                                                             href={item.link}
                                                                             target={item.target}
                                                                             className="block group p-3 rounded-lg hover:bg-[#026df3]/5 transition-all duration-200"
+                                                                            onClick={() => setActiveSubmenu(null)}
                                                                         >
                                                                             <div className="font-semibold text-gray-900 group-hover:text-[#026df3] transition-colors mb-1">
                                                                                 {item.name}
@@ -241,38 +236,124 @@ export default function Header() {
                         ))}
                     </div>
 
-                    {/* Right side - Login/Dashboard Button */}
-                    <div className="items-center flex gap-2">
-                        {AlreadyLoggedIn ? (
-                            <Link href="/dashboard">
-                                <Button
-                                    size="lg"
-                                    className="font-bold transition-all bg-primary rounded-full text-white hover:bg-transparent cursor-pointer border lg:py-6 border-black hover:text-black"
-                                >
-                                    <span className="lg:text-lg">Go To Dashboard</span>
-                                </Button>
-                            </Link>
-                        ) : (
-                            pathname !== "/schoollogin" && (
-                                <Link href="/schoollogin">
+                    {/* Right side - Login/Dashboard Button + Mobile Menu */}
+                    <div className="items-center flex gap-2 shrink-0">
+                        {/* Desktop Login/Dashboard Button */}
+                        <div className="hidden lg:flex">
+                            {AlreadyLoggedIn ? (
+                                <Link href="/dashboard">
                                     <Button
                                         size="lg"
-                                        className="font-bold lg:py-6 transition-all bg-primary rounded-full text-white hover:bg-transparent cursor-pointer border border-black hover:text-black"
+                                        className="font-bold transition-all duration-300 bg-gradient-to-r from-[#0569ff] to-[#0450d4] hover:from-[#0450d4] hover:to-[#0338a8] rounded-full text-white cursor-pointer shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 lg:py-6 lg:px-8"
                                     >
-                                        <span className="lg:text-lg">Login</span>
+                                        <span className="lg:text-base">Go To Dashboard</span>
                                     </Button>
                                 </Link>
-                            )
-                        )}
+                            ) : (
+                                pathname !== "/schoollogin" && (
+                                    <Link href="/schoollogin">
+                                        <Button
+                                            size="lg"
+                                            className="font-bold transition-all duration-300 bg-gradient-to-r from-[#0569ff] to-[#0450d4] hover:from-[#0450d4] hover:to-[#0338a8] rounded-full text-white cursor-pointer shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 lg:py-6 lg:px-8"
+                                        >
+                                            <span className="lg:text-base">Login</span>
+                                        </Button>
+                                    </Link>
+                                )
+                            )}
+                        </div>
 
+                        {/* Mobile Menu Button */}
+                        <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                            <SheetTrigger asChild className="lg:hidden">
+                                <Button variant="ghost" size="icon" className="h-10 w-10">
+                                    <HiOutlineMenuAlt3 className="h-20 w-20" />
+                                    <span className="sr-only">Toggle menu</span>
+                                </Button>
+                            </SheetTrigger>
+                            <SheetContent side="right" className="w-[300px] sm:w-[340px] p-0 flex flex-col">
+                                {/* Header */}
+                                <div className="flex items-center h-16 px-6 border-b shrink-0">
+                                    <Link href="/" onClick={() => setMobileMenuOpen(false)}>
+                                        <Image src='/edu.png' width={120} height={36} alt="EduBreezy" priority />
+                                    </Link>
+                                </div>
+
+                                {/* Navigation Links */}
+                                <nav className="flex-1 py-4 overflow-y-auto">
+                                    {menuConfig.menus.map((menu, index) => (
+                                        <div key={index}>
+                                            {menu.type === 'link' ? (
+                                                <Link
+                                                    href={menu.link}
+                                                    className="flex items-center justify-between h-12 px-6 text-base font-medium border-b text-foreground/80 hover:text-primary hover:bg-muted/50 transition-colors"
+                                                    onClick={() => setMobileMenuOpen(false)}
+                                                >
+                                                    {menu.name}
+                                                    <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
+                                                </Link>
+                                            ) : (
+                                                <>
+                                                    <button
+                                                        onClick={() => toggleMobileSubmenu(menu.name)}
+                                                        className="flex items-center justify-between w-full h-12 px-6 text-base font-medium border-b text-foreground/80 hover:text-primary hover:bg-muted/50 transition-colors"
+                                                    >
+                                                        {menu.name}
+                                                        <ChevronDown className={`h-4 w-4 text-muted-foreground/50 transition-transform duration-200 ${mobileExpandedMenu === menu.name ? 'rotate-180' : ''}`} />
+                                                    </button>
+                                                    {mobileExpandedMenu === menu.name && (
+                                                        <div className="bg-muted/30 py-2">
+                                                            {menu.submenus.map((submenu, subIndex) => (
+                                                                <div key={subIndex} className="px-6 py-2">
+                                                                    <p className="text-xs font-bold text-primary uppercase tracking-wide mb-2">
+                                                                        {submenu.category}
+                                                                    </p>
+                                                                    {submenu.items.map((item, itemIndex) => (
+                                                                        <Link
+                                                                            key={itemIndex}
+                                                                            href={item.link}
+                                                                            className="block py-2 pl-3 text-sm text-foreground/70 hover:text-primary transition-colors"
+                                                                            onClick={() => setMobileMenuOpen(false)}
+                                                                        >
+                                                                            {item.name}
+                                                                        </Link>
+                                                                    ))}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    ))}
+                                </nav>
+
+                                {/* Bottom Section - Buttons */}
+                                <div className="shrink-0 border-t border-gray-100 p-6 space-y-3 bg-gray-50/50">
+                                    {AlreadyLoggedIn ? (
+                                        <Link href="/dashboard" className="block" onClick={() => setMobileMenuOpen(false)}>
+                                            <Button className="w-full h-12 gap-2 text-sm font-semibold rounded-full bg-gradient-to-r from-[#0569ff] to-[#0450d4] hover:from-[#0450d4] hover:to-[#0338a8] shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-300">
+                                                Go To Dashboard
+                                            </Button>
+                                        </Link>
+                                    ) : (
+                                        <Link href="/schoollogin" className="block" onClick={() => setMobileMenuOpen(false)}>
+                                            <Button className="w-full h-12 gap-2 text-sm font-semibold rounded-full bg-gradient-to-r from-[#0569ff] to-[#0450d4] hover:from-[#0450d4] hover:to-[#0338a8] shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-300">
+                                                Login
+                                            </Button>
+                                        </Link>
+                                    )}
+                                </div>
+                            </SheetContent>
+                        </Sheet>
                     </div>
                 </div>
             </nav>
 
-            {/* Backdrop overlay when menu is open */}
+            {/* Backdrop overlay when menu is open (Desktop only) */}
             {activeSubmenu && (
                 <div
-                    className="fixed inset-0 bg-black/20 backdrop-blur-sm -z-10"
+                    className="hidden lg:block fixed inset-0 bg-black/20 backdrop-blur-sm -z-10"
                     onMouseEnter={handleMouseLeave}
                 ></div>
             )}
