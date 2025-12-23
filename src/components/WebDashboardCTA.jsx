@@ -15,11 +15,9 @@ export default function WebDashboardCTA() {
                             <br />
                             For Complete Control
                         </h2>
-
                         <p className="text-lg text-gray-600 mb-8 leading-relaxed">
                             Access comprehensive analytics, manage students & staff, track attendance, and oversee every aspect of your school from one beautiful dashboard.
                         </p>
-
                         {/* CTA Buttons */}
                         <div className="flex flex-wrap gap-4">
                             <Link href="/contact">
@@ -40,7 +38,6 @@ export default function WebDashboardCTA() {
                             </Link>
                         </div>
                     </div>
-
                     {/* Right - Dashboard Preview with Mac Browser Frame */}
                     <div className="relative hidden lg:block">
                         {/* Glow Effect */}
