@@ -994,11 +994,8 @@ function PricingSection() {
     );
 }
 
-// Testimonials Section - Smooth Marquee Scroll with Working Dots
+// Testimonials Section - Infinite Marquee Scroll
 function TestimonialsSection() {
-    const [activeIndex, setActiveIndex] = React.useState(0);
-    const containerRef = React.useRef(null);
-
     const testimonials = [
         {
             text: "This school software has revolutionized our school management. The School ERP Software effortlessly lightens the workload on our dedicated staff, replacing manual efforts.",
@@ -1041,29 +1038,39 @@ function TestimonialsSection() {
     // Duplicate for seamless infinite loop
     const allTestimonials = [...testimonials, ...testimonials];
 
-    // Smooth scroll to specific testimonial when dot is clicked
-    const scrollToIndex = (index) => {
-        if (containerRef.current) {
-            const cardWidth = 370; // 350px card + 20px gap
-            containerRef.current.scrollTo({
-                left: index * cardWidth,
-                behavior: 'smooth'
-            });
-        }
-        setActiveIndex(index);
-        setIsPaused(true);
-        setTimeout(() => setIsPaused(false), 8000);
+    // Drag to scroll state
+    const containerRef = React.useRef(null);
+    const [isDragging, setIsDragging] = React.useState(false);
+    const [startX, setStartX] = React.useState(0);
+    const [scrollLeft, setScrollLeft] = React.useState(0);
+
+    const handleMouseDown = (e) => {
+        if (!containerRef.current) return;
+        setIsDragging(true);
+        setStartX(e.pageX - containerRef.current.offsetLeft);
+        setScrollLeft(containerRef.current.scrollLeft);
+        containerRef.current.style.cursor = 'grabbing';
     };
 
-    // Update active index based on scroll position
-    const handleScroll = () => {
+    const handleMouseUp = () => {
+        setIsDragging(false);
         if (containerRef.current) {
-            const scrollLeft = containerRef.current.scrollLeft;
-            const cardWidth = 370;
-            const newIndex = Math.round(scrollLeft / cardWidth) % testimonials.length;
-            if (newIndex !== activeIndex) {
-                setActiveIndex(newIndex);
-            }
+            containerRef.current.style.cursor = 'grab';
+        }
+    };
+
+    const handleMouseMove = (e) => {
+        if (!isDragging || !containerRef.current) return;
+        e.preventDefault();
+        const x = e.pageX - containerRef.current.offsetLeft;
+        const walk = (x - startX) * 2;
+        containerRef.current.scrollLeft = scrollLeft - walk;
+    };
+
+    const handleMouseLeave = () => {
+        setIsDragging(false);
+        if (containerRef.current) {
+            containerRef.current.style.cursor = 'grab';
         }
     };
 
@@ -1071,8 +1078,8 @@ function TestimonialsSection() {
         <section className="py-20 bg-[#f8fafc] overflow-hidden">
             <div className="max-w-[1200px] mx-auto px-5">
                 <div className="text-center mb-12">
-                    <h2 className="text-3xl md:text-4xl font-bold text-[#1a1a2e] mb-3">
-                        Read what <span className="text-[#0569ff]">our users</span> have to say about us
+                    <h2 className="text-3xl  md:text-4xl font-bold text-[#1a1a2e] mb-3">
+                        Read What <span className="text-[#0569ff]">Our Users</span> Have To Say About Us
                     </h2>
                     <p className="text-gray-600 max-w-2xl mx-auto">
                         We firmly believe that our client's success is our success. Here's a glimpse of our client's experience with us.
@@ -1088,20 +1095,22 @@ function TestimonialsSection() {
                 {/* Gradient Fade Right */}
                 <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-[#f8fafc] to-transparent z-10 pointer-events-none" />
 
-                {/* Scrolling Testimonials - Continuous Marquee */}
+                {/* Scrollable Container with Drag Support */}
                 <div
                     ref={containerRef}
-                    className="testimonials-scroll-container flex gap-5 px-8"
-                    onScroll={handleScroll}
+                    className={`testimonials-scroll-container flex overflow-x-auto ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
                     style={{
-                        overflowX: 'auto',
                         scrollbarWidth: 'none',
                         msOverflowStyle: 'none',
-                        WebkitOverflowScrolling: 'touch',
-                        scrollBehavior: 'smooth'
+                        WebkitOverflowScrolling: 'touch'
                     }}
+                    onMouseDown={handleMouseDown}
+                    onMouseUp={handleMouseUp}
+                    onMouseMove={handleMouseMove}
+                    onMouseLeave={handleMouseLeave}
                 >
-                    <div className="testimonials-marquee-track flex gap-5">
+                    {/* Scrolling Testimonials - Continuous Marquee */}
+                    <div className={`testimonials-marquee-track flex gap-5 ${isDragging ? 'animation-paused' : ''}`}>
                         {allTestimonials.map((t, i) => (
                             <div
                                 key={i}
@@ -1146,22 +1155,6 @@ function TestimonialsSection() {
                 </div>
             </div>
 
-            {/* Pagination Dots */}
-            <div className="flex justify-center gap-3 mt-10">
-                {testimonials.map((_, i) => (
-                    <button
-                        key={i}
-                        onClick={() => scrollToIndex(i)}
-                        className={`w-3 h-3 rounded-full transition-all duration-300 cursor-pointer border-none outline-none ${activeIndex === i
-                            ? 'bg-[#0569ff] scale-125'
-                            : 'bg-[#d1d5db] hover:bg-[#9ca3af]'
-                            }`}
-                        aria-label={`Go to testimonial ${i + 1}`}
-                        type="button"
-                    />
-                ))}
-            </div>
-
             {/* CSS for marquee animation and hiding scrollbar */}
             <style>{`
                 .testimonials-scroll-container::-webkit-scrollbar {
@@ -1170,7 +1163,8 @@ function TestimonialsSection() {
                 .testimonials-marquee-track {
                     animation: marquee 35s linear infinite;
                 }
-                .testimonials-marquee-wrapper:hover .testimonials-marquee-track {
+                .testimonials-marquee-wrapper:hover .testimonials-marquee-track,
+                .testimonials-marquee-track.animation-paused {
                     animation-play-state: paused;
                 }
                 @keyframes marquee {
@@ -1184,6 +1178,7 @@ function TestimonialsSection() {
             `}</style>
         </section>
     );
+
 }
 
 // Footer
