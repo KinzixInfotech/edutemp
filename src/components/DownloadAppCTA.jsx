@@ -9,8 +9,8 @@ export default function DownloadAppCTA() {
         <section className="relative rounded-2xl bg-gradient-to-b from-[#0569ff] to-[#0041a8] overflow-hidden">
             {/* Interactive Grid Pattern Background - Full Width */}
             <InteractiveGridPattern
-                width={50}
-                height={50}
+                width={80}
+                height={80}
                 className="absolute inset-0 w-full h-full z-0 opacity-40 [mask-image:radial-gradient(ellipse_100%_80%_at_50%_30%,white_20%,transparent_80%)]"
             />
 
@@ -87,20 +87,20 @@ export default function DownloadAppCTA() {
 
             {/* Phone Mockups Container */}
             <div className="relative z-10 max-w-3xl mx-auto">
-                {/* White Glow */}
-                <div className="absolute inset-0 flex justify-center">
-                    <div className="w-[400px] h-[300px] bg-white/15 blur-[80px] rounded-full mt-20" />
+                {/* Large White Circle Glow - Behind Both Mockups */}
+                <div className="absolute inset-0 flex justify-center items-center pointer-events-none">
+                    <div className="w-[500px] h-[500px] md:w-[600px] md:h-[600px] lg:w-[700px] lg:h-[700px] bg-white/25 blur-[100px] rounded-full" />
                 </div>
 
                 {/* Phones */}
                 <div className="relative flex justify-center">
                     {/* Phone 1 - Left */}
-                    <div className="w-[220px] md:w-[280px] lg:w-[320px] object-contain -mr-16 md:-mr-20 z-20">
+                    <div className="w-[220px] md:w-[280px] hover:scale-[1.05] transtion-all duration-300 cursor-pointer lg:w-[320px] object-contain -mr-16 md:-mr-20 z-20">
                         <Android src={'./ss.png'} className='object-contain' />
                     </div>
 
                     {/* Phone 2 - Right */}
-                    <div className="w-[200px] md:w-[260px] lg:w-[300px] -ml-16 md:-ml-20 mt-8 z-10 opacity-90">
+                    <div className="w-[200px] md:w-[260px] hover:scale-[1.05] transtion-all duration-300 cursor-pointer lg:w-[300px] -ml-16 md:-ml-20 mt-8 z-10 opacity-90">
                         <Android src={'./ss3.png'} className='object-contain' />
                     </div>
                 </div>

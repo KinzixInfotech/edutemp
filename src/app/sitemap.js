@@ -47,8 +47,14 @@ export default async function sitemap() {
         },
     ];
 
-    // School Explorer pages
+    // School Explorer pages (school.edubreezy.com subdomain)
     const explorerPages = [
+        {
+            url: schoolBaseUrl, // Root of subdomain - this is important for indexing
+            lastModified: new Date(),
+            changeFrequency: 'daily',
+            priority: 1.0,
+        },
         {
             url: `${schoolBaseUrl}/explore`,
             lastModified: new Date(),

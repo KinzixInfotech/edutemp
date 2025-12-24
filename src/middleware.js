@@ -38,16 +38,17 @@ export async function middleware(request) {
     if (!skipDomainRouting) {
         // Handle school.edubreezy.com subdomain
         if (isSchoolDomain) {
-            // Redirect root to /explore with 301 permanent redirect for SEO
+            // For root path, REWRITE to /explore (not redirect) - prevents redirect loop for SEO
             if (pathname === '/') {
                 const exploreUrl = new URL('/explore', request.url);
-                return NextResponse.redirect(exploreUrl, { status: 301 });
+                return NextResponse.rewrite(exploreUrl);
             }
 
             // Only allow /explore routes on school subdomain
+            // Use rewrite for non-explore paths to avoid redirect chains
             if (!pathname.startsWith('/explore')) {
                 const exploreUrl = new URL('/explore', request.url);
-                return NextResponse.redirect(exploreUrl, { status: 301 });
+                return NextResponse.rewrite(exploreUrl);
             }
 
             // Public routes don't need auth - continue to next middleware section
@@ -58,7 +59,7 @@ export async function middleware(request) {
         if (!isSchoolDomain && pathname.startsWith('/explore')) {
             const schoolUrl = new URL(request.url);
             schoolUrl.hostname = 'school.edubreezy.com';
-            return NextResponse.redirect(schoolUrl);
+            return NextResponse.redirect(schoolUrl, { status: 301 });
         }
     }
 

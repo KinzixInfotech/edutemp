@@ -7,7 +7,8 @@ import {
     Clock, GraduationCap, CreditCard, ArrowRight,
     TrendingUp, PieChart, Calendar, FileText, Play, XIcon, Check,
     Pencil, BookMarked, Ruler, Calculator, Highlighter as HighlighterIcon, School,
-    Home, Bus, Smartphone, MapPin, Plane, Globe, MessageCircle, Laptop, Wifi
+    Home, Bus, Smartphone, MapPin, Plane, Globe, MessageCircle, Laptop, Wifi,
+    UserPlus, Building2, MessageSquare, Sparkles
 } from 'lucide-react';
 import Header from './components/Header';
 import { DotPattern } from '@/components/ui/dot-pattern';
@@ -18,6 +19,7 @@ import Link from 'next/link';
 import DownloadAppCTA from '@/components/DownloadAppCTA';
 import WebDashboardCTA from '@/components/WebDashboardCTA';
 import { OrbitingCircles } from '@/components/ui/orbiting-circles';
+import { NumberTicker } from '@/components/ui/number-ticker';
 
 
 
@@ -34,8 +36,9 @@ export default function HomePage() {
             <FeaturesSection />
             <SchoolExplorerSection />
             <CommunicatingSeamlesslySection />
-            <BentoSection />
-            <PricingSection />
+            <HowWeWorkSection />
+            {/* <BentoSection /> */}
+            {/* <PricingSection /> */}
             <TestimonialsSection />
             <div className='p-2'>
                 <DownloadAppCTA />
@@ -74,13 +77,13 @@ function HeroSection() {
             />
 
             {/* Floating School Icons - Left Side */}
-            <div className="absolute top-[8%] left-[10%] opacity-[0.10] pointer-events-none animate-[float_6s_ease-in-out_infinite]">
+            <div className="absolute top-[12%] md:top-[8%] left-[10%] opacity-[0.10] pointer-events-none animate-[float_6s_ease-in-out_infinite]">
                 <GraduationCap className="text-black rotate-[-15deg] w-10 h-10 md:w-20 md:h-20" />
             </div>
             <div className="hidden md:block absolute top-[18%] left-[18%] opacity-[0.08] pointer-events-none animate-[float_8s_ease-in-out_infinite_1s]">
                 <Pencil size={50} className="text-black rotate-[25deg]" />
             </div>
-            <div className="absolute top-[32%] left-[8%] opacity-[0.09] pointer-events-none animate-[float_7s_ease-in-out_infinite_0.5s]">
+            <div className="absolute top-[35%] md:top-[32%] left-[8%] opacity-[0.09] pointer-events-none animate-[float_7s_ease-in-out_infinite_0.5s]">
                 <BookMarked className="text-black rotate-[-8deg] w-8 h-8 md:w-14 md:h-14" />
             </div>
             <div className="hidden md:block absolute top-[48%] left-[15%] opacity-[0.07] pointer-events-none animate-[float_9s_ease-in-out_infinite_2s]">
@@ -97,7 +100,7 @@ function HeroSection() {
             </div>
 
             {/* Floating School Icons - Right Side */}
-            <div className="absolute top-[6%] right-[10%] opacity-[0.09] pointer-events-none animate-[float_7s_ease-in-out_infinite_2s]">
+            <div className="absolute top-[11%] md:top-[6%] right-[10%] opacity-[0.09] pointer-events-none animate-[float_7s_ease-in-out_infinite_2s]">
                 <School className="text-black rotate-[10deg] w-10 h-10 md:w-[75px] md:h-[75px]" />
             </div>
             <div className="hidden md:block absolute top-[20%] right-[8%] opacity-[0.08] pointer-events-none animate-[float_8s_ease-in-out_infinite_0.5s]">
@@ -106,7 +109,7 @@ function HeroSection() {
             <div className="hidden md:block absolute top-[35%] right-[16%] opacity-[0.10] pointer-events-none animate-[float_6s_ease-in-out_infinite_1.5s]">
                 <Pencil size={60} className="text-black rotate-[30deg]" />
             </div>
-            <div className="absolute top-[50%] right-[10%] opacity-[0.07] pointer-events-none animate-[float_9s_ease-in-out_infinite_3s]">
+            <div className="absolute top-[52%] md:top-[50%] right-[10%] opacity-[0.07] pointer-events-none animate-[float_9s_ease-in-out_infinite_3s]">
                 <GraduationCap className="text-black rotate-[15deg] w-9 h-9 md:w-16 md:h-16" />
             </div>
             <div className="hidden md:block absolute top-[65%] right-[18%] opacity-[0.08] pointer-events-none animate-[float_7s_ease-in-out_infinite_2.5s]">
@@ -389,49 +392,65 @@ function WhyEduBreezySection() {
 
                     {/* Right - App Cards Grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                        {/* School App Card */}
-                        <div className="bg-white p-6 rounded-2xl border border-gray-100 hover:border-[#0569ff]/20 hover:shadow-lg transition-all duration-300">
-                            <div className="w-14 h-14 bg-[#0569ff]/10 rounded-xl flex items-center justify-center mb-4">
-                                <Home size={28} className="text-[#0569ff]" />
-                            </div>
-                            <h3 className="text-lg font-bold text-[#1a1a2e] mb-2">School App</h3>
-                            <p className="text-[#666] text-sm leading-relaxed">
-                                Your All-in-One Solution for Easy Management and Communication.
-                            </p>
-                        </div>
+                        {[
+                            {
+                                icon: Home,
+                                title: "School App",
+                                desc: "All-in-one solution for easy management and communication.",
+                                color: "#0569ff",
+                                gradient: "from-blue-500/10 to-blue-600/5"
+                            },
+                            {
+                                icon: Users,
+                                title: "Parent App",
+                                desc: "Track your child's progress, fees, and attendance effortlessly.",
+                                color: "#10B981",
+                                gradient: "from-emerald-500/10 to-emerald-600/5"
+                            },
+                            {
+                                icon: GraduationCap,
+                                title: "Teacher App",
+                                desc: "Manage classrooms and connect with parents easily.",
+                                color: "#F59E0B",
+                                gradient: "from-amber-500/10 to-amber-600/5"
+                            },
+                            {
+                                icon: Bus,
+                                title: "Driver App",
+                                desc: "Find routes & communicate with parents in real time.",
+                                color: "#8B5CF6",
+                                gradient: "from-violet-500/10 to-violet-600/5"
+                            }
+                        ].map((app, index) => {
+                            const IconComponent = app.icon;
+                            return (
+                                <div
+                                    key={index}
+                                    className={`group relative bg-gradient-to-br ${app.gradient} p-6 rounded-2xl border border-gray-100 hover:border-transparent hover:shadow-xl transition-all duration-300 overflow-hidden`}
+                                >
+                                    {/* Hover glow */}
+                                    <div
+                                        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl"
+                                        style={{ boxShadow: `inset 0 0 0 1px ${app.color}30` }}
+                                    />
 
-                        {/* Parent App Card */}
-                        <div className="bg-white p-6 rounded-2xl border border-gray-100 hover:border-[#0569ff]/20 hover:shadow-lg transition-all duration-300">
-                            <div className="w-14 h-14 bg-[#0569ff]/10 rounded-xl flex items-center justify-center mb-4">
-                                <Users size={28} className="text-[#0569ff]" />
-                            </div>
-                            <h3 className="text-lg font-bold text-[#1a1a2e] mb-2">Parent App</h3>
-                            <p className="text-[#666] text-sm leading-relaxed">
-                                Easily track your child's progress, fees, attendance, and other activities effortlessly.
-                            </p>
-                        </div>
-
-                        {/* Teacher App Card */}
-                        <div className="bg-white p-6 rounded-2xl border border-gray-100 hover:border-[#0569ff]/20 hover:shadow-lg transition-all duration-300">
-                            <div className="w-14 h-14 bg-[#0569ff]/10 rounded-xl flex items-center justify-center mb-4">
-                                <GraduationCap size={28} className="text-[#0569ff]" />
-                            </div>
-                            <h3 className="text-lg font-bold text-[#1a1a2e] mb-2">Teacher App</h3>
-                            <p className="text-[#666] text-sm leading-relaxed">
-                                The Teacher App helps teachers manage classrooms and connect with parents easily.
-                            </p>
-                        </div>
-
-                        {/* Driver App Card */}
-                        <div className="bg-white p-6 rounded-2xl border border-gray-100 hover:border-[#0569ff]/20 hover:shadow-lg transition-all duration-300">
-                            <div className="w-14 h-14 bg-[#0569ff]/10 rounded-xl flex items-center justify-center mb-4">
-                                <Bus size={28} className="text-[#0569ff]" />
-                            </div>
-                            <h3 className="text-lg font-bold text-[#1a1a2e] mb-2">Driver App</h3>
-                            <p className="text-[#666] text-sm leading-relaxed">
-                                Easily find your child routes & communicate with drivers in real time.
-                            </p>
-                        </div>
+                                    <div className="relative z-10">
+                                        <div
+                                            className="w-14 h-14 rounded-xl flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110"
+                                            style={{ backgroundColor: `${app.color}15` }}
+                                        >
+                                            <IconComponent size={28} style={{ color: app.color }} />
+                                        </div>
+                                        <h3 className="text-lg font-bold text-[#1a1a2e] mb-2 group-hover:text-[#0569ff] transition-colors">
+                                            {app.title}
+                                        </h3>
+                                        <p className="text-[#666] text-sm leading-relaxed">
+                                            {app.desc}
+                                        </p>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             </div>
@@ -445,20 +464,20 @@ function CommunicatingSeamlesslySection() {
         <section className="bg-[#f5f7fa] py-16 md:py-20 lg:py-28 px-4 md:px-5 overflow-hidden">
             <div className="max-w-[1400px] 2xl:max-w-[1600px] mx-auto">
                 {/* Section Header */}
-                <div className="text-center mb-8 md:mb-12 lg:mb-16">
+                <div className="text-center mb-8 md:mb-12 lg:mb-2">
                     {/* <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-[#0569ff] leading-tight mb-2 md:mb-3">
                         Communicating Seamlessly
                     </h2>
                    */}
                     <span className="inline-block bg-[#0569ff]/10 text-[#0569ff] px-4 py-1.5 rounded-full text-sm font-semibold mb-4">
-                        📱 Our Mobile Apps
+                        Our Mobile App
                     </span>
                     <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a1a2e] leading-tight mb-4">
-                        Modern Apps for
-                        <span className="text-[#0569ff]"> Modern Schools</span>
+                        <Highlighter action="underline" color="#FF9800">Modern App</Highlighter> for
+                        <span className="text-[#0569ff]">                 <Highlighter isView={true} action="underline" color="#FF9800"> Modern Schools</Highlighter></span>
                     </h2>
                     <p className="text-base sm:text-lg md:text-xl text-[#666] max-w-2xl mx-auto leading-relaxed">
-                        Beautifully designed, intuitive mobile apps that bring schools, parents, teachers, and students together on one powerful platform.
+                        Beautifully designed, intuitive mobile app that bring schools, parents, director, principal, teachers, and students together on one powerful platform.
                     </p>
                 </div>
 
@@ -466,30 +485,30 @@ function CommunicatingSeamlesslySection() {
                 <div className="relative flex h-[450px] sm:h-[550px] md:h-[650px] lg:h-[750px] 2xl:h-[850px] w-full items-center justify-center">
 
                     {/* Floating Decorative Icons - Left Side */}
-                    <div className="absolute top-[8%] left-[5%] opacity-10 pointer-events-none animate-[float_6s_ease-in-out_infinite]">
+                    <div className="absolute top-[8%] left-[5%] opacity-20 pointer-events-none animate-[float_6s_ease-in-out_infinite]">
                         <Globe className="w-8 h-8 md:w-12 md:h-12 text-[#0569ff] rotate-[-15deg]" />
                     </div>
-                    <div className="absolute top-[25%] left-[3%] opacity-10 pointer-events-none animate-[float_8s_ease-in-out_infinite_1s]">
+                    <div className="absolute top-[25%] left-[3%] opacity-20 pointer-events-none animate-[float_8s_ease-in-out_infinite_1s]">
                         <Smartphone className="w-6 h-6 md:w-10 md:h-10 text-[#0569ff] rotate-[15deg]" />
                     </div>
-                    <div className="absolute top-[50%] left-[2%] opacity-10 pointer-events-none animate-[float_7s_ease-in-out_infinite_2s]">
+                    <div className="absolute top-[50%] left-[2%] opacity-20 pointer-events-none animate-[float_7s_ease-in-out_infinite_2s]">
                         <MapPin className="w-7 h-7 md:w-11 md:h-11 text-[#F97316] rotate-[-10deg]" />
                     </div>
-                    <div className="absolute top-[75%] left-[4%] opacity-10 pointer-events-none animate-[float_9s_ease-in-out_infinite_0.5s]">
+                    <div className="absolute top-[75%] left-[4%] opacity-20 pointer-events-none animate-[float_9s_ease-in-out_infinite_0.5s]">
                         <MessageCircle className="w-6 h-6 md:w-10 md:h-10 text-[#10B981] rotate-[20deg]" />
                     </div>
 
                     {/* Floating Decorative Icons - Right Side */}
-                    <div className="absolute top-[10%] right-[5%] opacity-10 pointer-events-none animate-[float_7s_ease-in-out_infinite_1.5s]">
+                    <div className="absolute top-[10%] right-[5%] opacity-20 pointer-events-none animate-[float_7s_ease-in-out_infinite_1.5s]">
                         <Wifi className="w-7 h-7 md:w-11 md:h-11 text-[#10B981] rotate-[10deg]" />
                     </div>
-                    <div className="absolute top-[30%] right-[3%] opacity-10 pointer-events-none animate-[float_6s_ease-in-out_infinite_2.5s]">
+                    <div className="absolute top-[30%] right-[3%] opacity-20 pointer-events-none animate-[float_6s_ease-in-out_infinite_2.5s]">
                         <Laptop className="w-8 h-8 md:w-12 md:h-12 text-[#0569ff] rotate-[-12deg]" />
                     </div>
-                    <div className="absolute top-[55%] right-[2%] opacity-10 pointer-events-none animate-[float_8s_ease-in-out_infinite_3s]">
+                    <div className="absolute top-[55%] right-[2%] opacity-20 pointer-events-none animate-[float_8s_ease-in-out_infinite_3s]">
                         <Plane className="w-6 h-6 md:w-10 md:h-10 text-[#F97316] rotate-[25deg]" />
                     </div>
-                    <div className="absolute top-[80%] right-[4%] opacity-10 pointer-events-none animate-[float_7s_ease-in-out_infinite_1s]">
+                    <div className="absolute top-[80%] right-[4%] opacity-20 pointer-events-none animate-[float_7s_ease-in-out_infinite_1s]">
                         <Bus className="w-7 h-7 md:w-11 md:h-11 text-[#0569ff] rotate-[-8deg]" />
                     </div>
 
@@ -497,7 +516,7 @@ function CommunicatingSeamlesslySection() {
                     <div className="absolute inset-0 flex items-center justify-center transform scale-[0.55] sm:scale-[0.65] md:scale-[0.8] lg:scale-100 2xl:scale-110">
 
                         {/* Center Phone Mockup */}
-                        <div className="z-20 flex flex-col items-center justify-center absolute">
+                        <div className="z-20 flex flex-col items-center hover:scale-[1.05] transtion-all duration-300 cursor-pointer justify-center absolute">
                             {(() => {
                                 const showNotch = false; // Toggle to show/hide the Dynamic Island notch
                                 return (
@@ -552,7 +571,26 @@ function CommunicatingSeamlesslySection() {
                         </OrbitingCircles>
                     </div>
                 </div>
+
             </div>
+            {/* <div className='w-full flex items-center justify-center '>
+                <div className="flex flex-wrap gap-4 justify-center pb-16">
+                    <a href="#" className="hover:scale-105 transition-transform duration-300 opacity-50 cursor-not-allowed">
+                        <img
+                            src="https://upload.wikimedia.org/wikipedia/commons/3/3c/Download_on_the_App_Store_Badge.svg"
+                            alt="Download on the App Store"
+                            className="h-12 md:h-14"
+                        />
+                    </a>
+                    <a href="#" className="hover:scale-105 transition-transform duration-300">
+                        <img
+                            src="https://upload.wikimedia.org/wikipedia/commons/7/78/Google_Play_Store_badge_EN.svg"
+                            alt="Get it on Google Play"
+                            className="h-12 md:h-14"
+                        />
+                    </a>
+                </div>
+            </div> */}
         </section>
     );
 }
@@ -582,7 +620,7 @@ function RoleBadge({ label, icon, color, bg }) {
 // Helper component for feature badges - modern pill style
 function FeatureBadge({ label }) {
     return (
-        <div className="flex items-center justify-center px-4 py-2 bg-white rounded-full shadow-md border border-gray-100">
+        <div className="flex items-center hover:scale-[1.05] transtion-all duration-300 cursor-pointer  justify-center px-4 py-2 bg-white rounded-full shadow-sm  border  ">
             <span className="text-[12px] md:text-sm font-medium text-gray-700 whitespace-nowrap">
                 {label}
             </span>
@@ -615,20 +653,40 @@ function TrustedSection() {
 function FeaturesSection() {
     const features = [
         {
-            title: 'Student Information System',
-            desc: 'Centrally manage all student data including admissions, profiles, academic records, and document management in one secure place.'
+            title: 'Admission Management',
+            icon: <FileText size={22} className="text-[#0569ff]" />
         },
         {
-            title: 'Fee Management & Billing',
-            desc: 'Streamline fee collection with automated invoicing, online payments, receipt generation, and comprehensive financial reporting.'
+            title: 'Certificate Creator',
+            icon: <GraduationCap size={22} className="text-[#0569ff]" />
         },
         {
-            title: 'Attendance & Tracking',
-            desc: 'Monitor student and staff attendance in real-time with biometric integration, GPS tracking, and instant parent notifications.'
+            title: 'Attendance Manager',
+            icon: <Calendar size={22} className="text-[#0569ff]" />
         },
         {
-            title: 'Academic Management',
-            desc: 'Handle timetables, examinations, grade books, report cards, and curriculum planning with intelligent scheduling tools.'
+            title: 'Homework Manager',
+            icon: <BookOpen size={22} className="text-[#0569ff]" />
+        },
+        {
+            title: 'Live Classes',
+            icon: <Users size={22} className="text-[#0569ff]" />
+        },
+        {
+            title: 'Smart Gatepass',
+            icon: <CreditCard size={22} className="text-[#0569ff]" />
+        },
+        {
+            title: 'Institute Setup',
+            icon: <School size={22} className="text-[#0569ff]" />
+        },
+        {
+            title: 'Academic Portal',
+            icon: <BarChart3 size={22} className="text-[#0569ff]" />
+        },
+        {
+            title: 'Fee Management',
+            icon: <CreditCard size={22} className="text-[#0569ff]" />
         },
     ];
 
@@ -637,21 +695,28 @@ function FeaturesSection() {
             <div className="max-w-[1200px] mx-auto">
                 {/* Section Header */}
                 <div className="text-center mb-16">
-                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a1a2e] leading-tight">
-                        Powerful features for modern schools
+                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a1a2e] leading-tight mb-4">
+                        <Highlighter action="underline" color="#FF9800">Powerful Features</Highlighter> For
+                        <span className="text-[#0569ff]"> <Highlighter isView={true} action="underline" color="#FF9800">Modern Schools</Highlighter></span>
                     </h2>
+                    <p className="text-[#666] text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+                        Everything you need to manage admissions, academics, attendance, fees, and more — all in one intelligent platform.
+                    </p>
                 </div>
 
                 {/* Features Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 mb-12 md:mb-14">
                     {features.map((feature, index) => (
-                        <div key={index} className="space-y-3">
-                            <h3 className="text-lg font-semibold text-[#1a1a2e]">
+                        <div
+                            key={index}
+                            className="flex items-center gap-4 bg-white px-5 py-4 rounded-xl border border-[#e8ecf0] hover:border-[#0569ff]/30 hover:shadow-md transition-all duration-300 cursor-pointer group"
+                        >
+                            <div className="w-11 h-11 bg-[#0569ff]/10 rounded-lg flex items-center justify-center shrink-0 group-hover:bg-[#0569ff]/20 transition-colors duration-300">
+                                {feature.icon}
+                            </div>
+                            <h3 className="text-[15px] md:text-base font-semibold text-[#1a1a2e] group-hover:text-[#0569ff] transition-colors duration-300">
                                 {feature.title}
                             </h3>
-                            <p className="text-[#666] text-sm leading-relaxed">
-                                {feature.desc}
-                            </p>
                         </div>
                     ))}
                 </div>
@@ -660,11 +725,161 @@ function FeaturesSection() {
                 <div className="text-center">
                     <Link
                         href="/features"
-                        className="inline-flex items-center gap-2 text-[#0569ff] font-semibold hover:underline transition-all"
+                        className="inline-flex items-center gap-2 px-8 py-3 border-2 border-[#1a1a2e] text-[#1a1a2e] rounded-full font-semibold text-sm hover:bg-[#1a1a2e] hover:text-white transition-all duration-300"
                     >
-                        View All Features
-                        <ArrowRight size={18} />
+                        View all Features
                     </Link>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+// How We Make Your School Smarter Section
+function HowWeWorkSection() {
+    const steps = [
+        {
+            number: "01",
+            icon: Laptop,
+            title: "Easy Onboarding",
+            desc: "Get started in minutes with our guided setup. Import your school data seamlessly and configure everything without technical expertise.",
+            color: "#0569ff"
+        },
+        {
+            number: "02",
+            icon: Users,
+            title: "Connect Everyone",
+            desc: "Link students, parents, teachers, and staff on one unified platform. Real-time communication and instant notifications keep everyone in sync.",
+            color: "#10B981"
+        },
+        {
+            number: "03",
+            icon: BarChart3,
+            title: "Automate Operations",
+            desc: "From attendance tracking to fee management, automate repetitive tasks. Save hours every day and reduce human errors.",
+            color: "#F59E0B"
+        },
+        {
+            number: "04",
+            icon: FileText,
+            title: "Generate Reports",
+            desc: "Get comprehensive analytics and reports at your fingertips. Make data-driven decisions with real-time insights and trends.",
+            color: "#8B5CF6"
+        },
+        {
+            number: "05",
+            icon: Smartphone,
+            title: "Mobile Access",
+            desc: "Access everything on-the-go with our mobile apps. Parents track progress, teachers manage classes, drivers navigate routes.",
+            color: "#EC4899"
+        },
+        {
+            number: "06",
+            icon: TrendingUp,
+            title: "Grow & Scale",
+            desc: "As your school grows, we grow with you. Expand to multiple branches, add more features, and scale without limits.",
+            color: "#14B8A6"
+        }
+    ];
+
+    return (
+        <section className="py-20 md:py-28 px-5 bg-white">
+            <div className="max-w-[1200px] mx-auto">
+                {/* Section Header */}
+                <div className="text-center mb-16">
+                    <span className="inline-flex items-center gap-2 bg-[#0569ff]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-4">
+                        <Sparkles size={16} />
+                        Our Process
+                    </span>
+                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a1a2e] mb-4">
+                        Here's How We Make Your <br className="hidden md:block" />
+                        <span className="text-[#0569ff]">School Smarter</span>
+                    </h2>
+                    <p className="text-[#666] text-lg max-w-2xl mx-auto">
+                        A simple, step-by-step approach to transform your school management from chaos to clarity.
+                    </p>
+                </div>
+
+                {/* Steps Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {steps.map((step, index) => {
+                        const IconComponent = step.icon;
+                        return (
+                            <div
+                                key={index}
+                                className="group relative bg-white p-6 rounded-2xl border border-gray-100 hover:border-transparent hover:shadow-2xl transition-all duration-500 overflow-hidden"
+                            >
+                                {/* Background gradient on hover */}
+                                <div
+                                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                                    style={{
+                                        background: `linear-gradient(135deg, ${step.color}08 0%, ${step.color}03 100%)`
+                                    }}
+                                />
+
+                                {/* Step number */}
+                                <div
+                                    className="absolute top-4 right-4 text-5xl font-black opacity-10 group-hover:opacity-20 transition-opacity"
+                                    style={{ color: step.color }}
+                                >
+                                    {step.number}
+                                </div>
+
+                                {/* Content */}
+                                <div className="relative z-10">
+                                    {/* Icon */}
+                                    <div
+                                        className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5 transition-all duration-500 group-hover:scale-110 group-hover:rotate-3"
+                                        style={{ backgroundColor: `${step.color}15` }}
+                                    >
+                                        <IconComponent size={26} style={{ color: step.color }} />
+                                    </div>
+
+                                    {/* Title */}
+                                    <h3 className="text-xl font-bold text-[#1a1a2e] mb-3 group-hover:text-[#0569ff] transition-colors">
+                                        {step.title}
+                                    </h3>
+
+                                    {/* Description */}
+                                    <p className="text-[#666] text-sm leading-relaxed">
+                                        {step.desc}
+                                    </p>
+
+                                    {/* Arrow indicator */}
+                                    <div className="mt-5 flex items-center gap-2 text-sm font-semibold opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-[-10px] group-hover:translate-x-0" style={{ color: step.color }}>
+                                        Learn more
+                                        <ArrowRight size={14} />
+                                    </div>
+                                </div>
+
+                                {/* Bottom accent line */}
+                                <div
+                                    className="absolute bottom-0 left-0 h-1 w-0 group-hover:w-full transition-all duration-500"
+                                    style={{ backgroundColor: step.color }}
+                                />
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* Bottom CTA */}
+                <div className="text-center mt-14">
+                    <p className="text-[#666] mb-6">Ready to transform your school?</p>
+                    <div className="flex flex-wrap justify-center gap-4">
+                        <Link
+                            href="/contact"
+                            className="inline-flex items-center gap-2 bg-[#0569ff] text-white px-8 py-4 rounded-full font-bold text-sm hover:bg-[#0569ff]/90 transition-all duration-300 shadow-lg hover:shadow-xl"
+                        >
+                            Get Started Today
+                            <ArrowRight size={18} />
+                        </Link>
+                        <Link
+                            href="/contact"
+                            className="inline-flex items-center gap-2 px-8 py-4 border-2 border-[#1a1a2e] text-[#1a1a2e] rounded-full font-bold text-sm hover:bg-[#1a1a2e] hover:text-white transition-all duration-300"
+                        >
+                            Schedule Demo
+                        </Link>
+                    </div>
                 </div>
             </div>
         </section>
@@ -680,109 +895,204 @@ function SchoolExplorerSection() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center mb-20">
                     {/* Left Content */}
                     <div>
-                        <span className="inline-block bg-[#0569ff]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-6">
-                            🌐 school.edubreezy.com
+                        <span className="inline-flex items-center gap-2 bg-[#0569ff]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-4">
+                            <Globe size={16} />
+                            school.edubreezy.com
                         </span>
-                        <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a1a2e] leading-tight mb-6">
+                        <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a1a2e] leading-tight mb-2">
                             School Explorer — <br />
                             <span className="text-[#0569ff]">Your School, Discovered</span>
                         </h2>
-                        <p className="text-[#555] text-lg leading-relaxed mb-8">
-                            Create a stunning public profile for your school at{" "}
-                            <strong className="text-[#1a1a2e]">school.edubreezy.com</strong>.
-                            Parents across India can find you, explore your facilities,
-                            read reviews, and send admission inquiries — all in one place.
+                        <p className="text-base md:text-lg font-medium text-[#F97316] mb-3">
+                            Increase Admissions with Proven Strategies
+                        </p>
+                        <p className="text-[#555] text-base leading-relaxed mb-5">
+                            Get discovered by parents at <strong className="text-[#1a1a2e]">school.edubreezy.com</strong>.
+                            Showcase your strengths, receive inquiries, and convert leads into admissions.
                         </p>
 
                         {/* Key Benefits */}
-                        <div className="space-y-4 mb-8">
+                        <div className="space-y-3 mb-6">
                             {[
-                                "Free public school profile with custom URL",
-                                "Receive admission inquiries directly in dashboard",
-                                "Showcase achievements, galleries & fee structure",
-                                "Get verified parent reviews & ratings"
+                                "Reach 50,000+ parents searching for schools",
+                                "Convert visitors into admission inquiries",
+                                "Build trust with reviews & achievements"
                             ].map((benefit, index) => (
                                 <div key={index} className="flex items-center gap-3">
-                                    <div className="w-5 h-5 rounded-full bg-[#0569ff]/10 flex items-center justify-center shrink-0">
-                                        <Check size={12} className="text-[#0569ff]" />
+                                    <div className="w-5 h-5 rounded-full bg-[#10B981]/10 flex items-center justify-center shrink-0">
+                                        <Check size={12} className="text-[#10B981]" />
                                     </div>
-                                    <span className="text-[#444] text-base">{benefit}</span>
+                                    <span className="text-[#444] text-sm">{benefit}</span>
                                 </div>
                             ))}
                         </div>
-
                         <a
                             href="https://school.edubreezy.com/explore"
                             target="_blank"
-                            className="inline-flex items-center gap-2 md:gap-3 bg-[#0569ff] text-white px-5 py-3 md:px-8 md:py-4 rounded-full font-bold text-sm md:text-base hover:bg-[#0569ff]/90 transition-all duration-300 shadow-lg hover:shadow-xl"
+                            className="inline-flex items-center gap-2 bg-[#0569ff] text-white px-5 py-2.5 rounded-full font-bold text-sm hover:bg-[#0569ff]/90 transition-all duration-300 shadow-lg hover:shadow-xl"
                         >
-                            Visit School Explorer
-                            <ArrowRight size={16} className="md:w-[18px] md:h-[18px]" />
+                            List Your School
+                            <ArrowRight size={16} />
                         </a>
-                        <a
-                            href="#"
-                            className="inline-flex items-center gap-2 text-[#0569ff] font-semibold text-sm md:text-base hover:underline transition-all ml-4 md:ml-6"
+                        <Link
+                            href="/features"
+                            className="inline-flex items-center gap-2 text-[#0569ff] font-semibold text-sm hover:underline transition-all ml-4"
                         >
                             Learn More
-                            <ArrowRight size={14} className="md:w-4 md:h-4" />
-                        </a>
+                            <ArrowRight size={14} />
+                        </Link>
                     </div>
 
-                    {/* Right - Feature Cards Stack */}
-                    <div className="space-y-5">
-                        {[
+                    {/* Right - Feature Cards with Expanding Animation */}
+                    {(() => {
+                        const [activeIndex, setActiveIndex] = React.useState(0);
+                        const features = [
                             {
-                                icon: "🏫",
-                                title: "Public School Profiles",
-                                desc: "Beautiful, SEO-optimized profiles that help parents find and choose your school."
+                                icon: Globe,
+                                iconColor: "#0569ff",
+                                title: "SEO-Optimized School Profile",
+                                desc: "Beautiful, search-friendly profiles that rank on Google and help parents discover your school."
                             },
                             {
-                                icon: "📩",
-                                title: "Admission Inquiries",
-                                desc: "Receive inquiries directly. Track leads, schedule visits, convert to admissions."
+                                icon: UserPlus,
+                                iconColor: "#10B981",
+                                title: "Direct Admission Inquiries",
+                                desc: "Capture leads instantly. Parents can inquire, schedule visits, and apply directly from your profile."
                             },
                             {
-                                icon: "⭐",
-                                title: "Parent Reviews & Ratings",
-                                desc: "Build trust with verified reviews. Let your reputation attract more families."
+                                icon: Star,
+                                iconColor: "#F59E0B",
+                                title: "Reviews & Social Proof",
+                                desc: "Build credibility with verified parent reviews. Great ratings attract more families to your school."
                             },
                             {
-                                icon: "📊",
-                                title: "Analytics Dashboard",
-                                desc: "Track profile views, inquiry trends, and engagement metrics in real-time."
+                                icon: BarChart3,
+                                iconColor: "#8B5CF6",
+                                title: "Admission Analytics",
+                                desc: "Track profile views, inquiry sources, and conversion rates. Make data-driven decisions."
                             }
-                        ].map((feature, index) => (
-                            <div
-                                key={index}
-                                className="flex gap-5 p-5 rounded-xl bg-[#f8fafc] border border-[#e5e7eb] hover:border-[#0569ff]/30 hover:shadow-md transition-all duration-300"
-                            >
-                                <div className="text-3xl shrink-0">{feature.icon}</div>
-                                <div>
-                                    <h3 className="font-bold text-[#1a1a2e] text-lg mb-1">{feature.title}</h3>
-                                    <p className="text-[#666] text-sm leading-relaxed">{feature.desc}</p>
+                        ];
+
+                        return (
+                            <div className="relative">
+                                {/* Vertical connecting line */}
+                                <div className="absolute left-6 top-8 bottom-8 w-[2px] bg-gradient-to-b from-[#0569ff] via-[#10B981] via-[#F59E0B] to-[#8B5CF6] opacity-30" />
+
+                                <div className="space-y-4">
+                                    {features.map((feature, index) => {
+                                        const IconComponent = feature.icon;
+                                        const isActive = activeIndex === index;
+
+                                        return (
+                                            <div
+                                                key={index}
+                                                onClick={() => setActiveIndex(index)}
+                                                className={`relative cursor-pointer transition-all duration-500 ease-out ${isActive ? 'z-10' : 'z-0'
+                                                    }`}
+                                            >
+                                                {/* Main card */}
+                                                <div
+                                                    className={`flex items-center gap-4 p-4 rounded-2xl border transition-all duration-500 ${isActive
+                                                        ? 'bg-white shadow-lg border-transparent'
+                                                        : 'bg-[#f8fafc] border-[#e5e7eb] hover:border-[#d1d5db]'
+                                                        }`}
+                                                    style={{
+                                                        boxShadow: isActive ? `0 8px 30px ${feature.iconColor}20` : 'none'
+                                                    }}
+                                                >
+                                                    {/* Dot indicator */}
+                                                    <div className="relative z-10">
+                                                        <div
+                                                            className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-500 ${isActive ? 'scale-110' : 'scale-100'
+                                                                }`}
+                                                            style={{
+                                                                backgroundColor: isActive ? feature.iconColor : `${feature.iconColor}15`,
+                                                            }}
+                                                        >
+                                                            <IconComponent
+                                                                size={22}
+                                                                style={{ color: isActive ? '#fff' : feature.iconColor }}
+                                                                className="transition-all duration-300"
+                                                            />
+                                                        </div>
+                                                        {/* Pulse ring for active */}
+                                                        {isActive && (
+                                                            <div
+                                                                className="absolute inset-0 rounded-full animate-ping opacity-30"
+                                                                style={{ backgroundColor: feature.iconColor }}
+                                                            />
+                                                        )}
+                                                    </div>
+
+                                                    {/* Content */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <h3 className={`font-bold text-lg transition-colors duration-300 ${isActive ? 'text-[#1a1a2e]' : 'text-[#444]'
+                                                                }`}>
+                                                                {feature.title}
+                                                            </h3>
+                                                            <ArrowRight
+                                                                size={16}
+                                                                className={`transition-all duration-300 ${isActive ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'
+                                                                    }`}
+                                                                style={{ color: feature.iconColor }}
+                                                            />
+                                                        </div>
+
+                                                        {/* Expandable description */}
+                                                        <div
+                                                            className={`overflow-hidden transition-all duration-500 ease-out ${isActive ? 'max-h-24 opacity-100 mt-2' : 'max-h-0 opacity-0 mt-0'
+                                                                }`}
+                                                        >
+                                                            <p className="text-[#666] text-sm leading-relaxed">
+                                                                {feature.desc}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Active indicator bar */}
+                                                    <div
+                                                        className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-full transition-all duration-500 ${isActive ? 'h-12 opacity-100' : 'h-0 opacity-0'
+                                                            }`}
+                                                        style={{ backgroundColor: feature.iconColor }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
-                        ))}
-                    </div>
+                        );
+                    })()}
                 </div>
 
                 {/* Bottom Stats Bar */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-8 px-8 bg-[#f8fafc] rounded-2xl">
+                <div className="grid grid-cols-3 gap-6 py-8 px-8 bg-gradient-to-r from-[#0569ff]/5 to-[#10B981]/5 rounded-2xl border border-[#e5e7eb]">
                     {[
-                        { number: "600+", label: "Schools Listed" },
-                        { number: "50,000+", label: "Profile Views" },
-                        { number: "10,000+", label: "Inquiries Received" },
-                        { number: "Free", label: "To Get Started" }
-                    ].map((stat, index) => (
-                        <div key={index} className="text-center">
-                            <div className="text-2xl md:text-3xl font-bold text-[#0569ff] mb-1">
-                                {stat.number}
+                        { value: 50000, suffix: "+", label: "Monthly Visitors", icon: Users },
+                        { value: 10000, suffix: "+", label: "Inquiries Generated", icon: MessageSquare },
+                        { value: 95, suffix: "%", label: "Satisfaction Rate", icon: Star }
+                    ].map((stat, index) => {
+                        const IconComponent = stat.icon;
+                        return (
+                            <div key={index} className="text-center">
+                                <div className="flex justify-center mb-2">
+                                    <IconComponent size={20} className="text-[#0569ff]" />
+                                </div>
+                                <div className="text-2xl md:text-3xl font-bold text-[#0569ff] mb-1 flex items-center justify-center">
+                                    <NumberTicker
+                                        value={stat.value}
+                                        delay={0.2 * index}
+                                        className="text-[#0569ff]"
+                                    />
+                                    <span>{stat.suffix}</span>
+                                </div>
+                                <div className="text-[#666] text-sm">
+                                    {stat.label}
+                                </div>
                             </div>
-                            <div className="text-[#666] text-sm">
-                                {stat.label}
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
         </section>
@@ -1117,7 +1427,7 @@ function TestimonialsSection() {
                                 className="flex-shrink-0 w-[350px] h-[280px] p-8 rounded-xl bg-white border border-[#e8e8e8] relative overflow-hidden flex flex-col transition-transform duration-300 hover:scale-[1.02]"
                             >
                                 {/* Quote Icon */}
-                                <div className="absolute top-4 left-4 opacity-100 pointer-events-none">
+                                <div className="absolute top-4 left-4 opacity-200 pointer-events-none">
                                     <svg width="48" height="38" viewBox="0 0 32 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                         <path d="M0 24V14.4C0 11.7333 0.4 9.33333 1.2 7.2C2.06667 5.06667 3.26667 3.26667 4.8 1.8C6.4 0.333333 8.26667 -0.266667 10.4 0.133333V5.4C9.06667 5.66667 7.96667 6.26667 7.1 7.2C6.3 8.13333 5.9 9.26667 5.9 10.6V10.8H12V24H0ZM20 24V14.4C20 11.7333 20.4 9.33333 21.2 7.2C22.0667 5.06667 23.2667 3.26667 24.8 1.8C26.4 0.333333 28.2667 -0.266667 30.4 0.133333V5.4C29.0667 5.66667 27.9667 6.26667 27.1 7.2C26.3 8.13333 25.9 9.26667 25.9 10.6V10.8H32V24H20Z" fill="#E8E8E8" />
                                     </svg>

@@ -99,6 +99,10 @@ export default function FeaturesIntroPage() {
                         from { transform: rotate(0deg); }
                         to { transform: rotate(360deg); }
                     }
+                    @keyframes shimmer {
+                        0% { transform: translateX(-100%); }
+                        100% { transform: translateX(100%); }
+                    }
                     .mesh-1 {
                         animation: float 8s ease-in-out infinite, pulse 4s ease-in-out infinite;
                     }
@@ -122,6 +126,20 @@ export default function FeaturesIntroPage() {
                     }
                     .floating-icon:nth-child(4) {
                         animation-delay: 3s;
+                    }
+                    .shimmer-text {
+                        position: relative;
+                        overflow: hidden;
+                    }
+                    .shimmer-text::after {
+                        content: '';
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+                        animation: shimmer 2.5s infinite;
                     }
                 `}</style>
 
@@ -168,7 +186,7 @@ export default function FeaturesIntroPage() {
                         <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-[1.1] text-[#1a1a2e]">
                             Everything Your School Needs,
                             <br />
-                            <span className="bg-gradient-to-r from-[#0569ff] via-[#0450d4] to-[#ff7a00] bg-clip-text text-transparent">
+                            <span className="shimmer-text bg-gradient-to-r from-[#0569ff] via-[#0450d4] to-[#ff7a00] bg-clip-text text-transparent inline-block">
                                 In One Platform
                             </span>
                         </h1>

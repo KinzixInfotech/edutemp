@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from "next/navigation";
-import { ChevronDown, ChevronRight, Menu, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Menu, X, ArrowRight } from 'lucide-react';
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -114,6 +114,12 @@ const menuConfig = {
                     ]
                 },
             ]
+        },
+        {
+            name: "Contact",
+            type: "link",
+            link: "/contact",
+            target: "_self"
         }
     ]
 };
@@ -159,9 +165,7 @@ export default function Header() {
     const isHomePage = pathname === '/';
 
     // Dynamic classes for header
-    const headerClasses = isHomePage
-        ? `fixed w-full left-0 right-0 top-0 z-[100] transition-all duration-300 backdrop-blur-lg bg-[#ffffffc2] border-b border-gray-200 shadow-none`
-        : 'fixed w-full left-0 right-0 top-0 z-[100] bg-white border-b border-gray-200';
+    const headerClasses = 'fixed w-full left-0 right-0 top-0 z-[100] transition-all duration-300 bg-white border-b border-gray-200';
 
     return (
         <div className={headerClasses}>
@@ -248,22 +252,22 @@ export default function Header() {
                         <div className="hidden lg:flex">
                             {AlreadyLoggedIn ? (
                                 <Link href="/dashboard">
-                                    <Button
-                                        size="lg"
-                                        className="font-bold transition-all duration-300 bg-gradient-to-r from-[#0569ff] to-[#0450d4] hover:from-[#0450d4] hover:to-[#0338a8] rounded-full text-white cursor-pointer shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 lg:py-6 lg:px-8"
-                                    >
-                                        <span className="lg:text-base">Go To Dashboard</span>
-                                    </Button>
+                                    <button className="group  border border-black  flex items-center pr-1.5 gap-2 bg-[#0569ff] text-white border-0 rounded-full text-[0.95rem] font-semibold cursor-pointer transition-all duration-300 hover:bg-[#0450d4]">
+                                        <span className='px-1 pl-6 py-3'>Go To Dashboard</span>
+                                        <span className='bg-white p-2.5 rounded-full group-hover:bg-gray-50 transition-colors'>
+                                            <ArrowRight size={18} strokeWidth={3} color='#0569ff' className='transition-transform duration-300 group-hover:-rotate-45' />
+                                        </span>
+                                    </button>
                                 </Link>
                             ) : (
                                 pathname !== "/schoollogin" && (
                                     <Link href="/schoollogin">
-                                        <Button
-                                            size="lg"
-                                            className="font-bold transition-all duration-300 bg-gradient-to-r from-[#0569ff] to-[#0450d4] hover:from-[#0450d4] hover:to-[#0338a8] rounded-full text-white cursor-pointer shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 lg:py-6 lg:px-8"
-                                        >
-                                            <span className="lg:text-base">Login</span>
-                                        </Button>
+                                        <button className="group border border-black flex items-center pr-1.5 gap-2 bg-[#0569ff] text-white border-0 rounded-full text-[0.95rem] font-semibold cursor-pointer transition-all duration-300 hover:bg-[#0450d4]">
+                                            <span className='px-1 pl-6 py-3'>Login</span>
+                                            <span className='bg-white p-2.5 rounded-full group-hover:bg-gray-50 transition-colors'>
+                                                <ArrowRight size={18} strokeWidth={3} color='#0569ff' className='transition-transform duration-300 group-hover:-rotate-45' />
+                                            </span>
+                                        </button>
                                     </Link>
                                 )
                             )}
@@ -273,7 +277,7 @@ export default function Header() {
                         <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
                             <SheetTrigger asChild className="lg:hidden">
                                 <Button variant="ghost" size="icon" className="h-10 w-10">
-                                    <HiOutlineMenuAlt3 className="h-20 w-20" />
+                                    <HiOutlineMenuAlt3 strokeWidth={3} size={30} />
                                     <span className="sr-only">Toggle menu</span>
                                 </Button>
                             </SheetTrigger>
@@ -338,15 +342,21 @@ export default function Header() {
                                 <div className="shrink-0 border-t border-gray-100 p-6 space-y-3 bg-gray-50/50">
                                     {AlreadyLoggedIn ? (
                                         <Link href="/dashboard" className="block" onClick={() => setMobileMenuOpen(false)}>
-                                            <Button className="w-full h-12 gap-2 text-sm font-semibold rounded-full bg-gradient-to-r from-[#0569ff] to-[#0450d4] hover:from-[#0450d4] hover:to-[#0338a8] shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-300">
-                                                Go To Dashboard
-                                            </Button>
+                                            <button className="group w-full flex items-center justify-center pr-1 gap-2 bg-[#0569ff] text-white rounded-full text-sm font-semibold cursor-pointer transition-all duration-300 hover:bg-[#0450d4]">
+                                                <span className='px-1 pl-5 py-2.5'>Go To Dashboard</span>
+                                                <span className='bg-white p-1.5 rounded-full group-hover:bg-gray-50 transition-colors'>
+                                                    <ArrowRight size={14} strokeWidth={3} color='#0569ff' className='transition-transform duration-300 group-hover:-rotate-45' />
+                                                </span>
+                                            </button>
                                         </Link>
                                     ) : (
                                         <Link href="/schoollogin" className="block" onClick={() => setMobileMenuOpen(false)}>
-                                            <Button className="w-full h-12 gap-2 text-sm font-semibold rounded-full bg-gradient-to-r from-[#0569ff] to-[#0450d4] hover:from-[#0450d4] hover:to-[#0338a8] shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30 transition-all duration-300">
-                                                Login
-                                            </Button>
+                                            <button className="group w-full flex items-center justify-center pr-1 gap-2 bg-[#0569ff] text-white rounded-full text-sm font-semibold cursor-pointer transition-all duration-300 hover:bg-[#0450d4]">
+                                                <span className='px-1 pl-5 py-2.5'>Login</span>
+                                                <span className='bg-white p-1.5 rounded-full group-hover:bg-gray-50 transition-colors'>
+                                                    <ArrowRight size={14} strokeWidth={3} color='#0569ff' className='transition-transform duration-300 group-hover:-rotate-45' />
+                                                </span>
+                                            </button>
                                         </Link>
                                     )}
                                 </div>

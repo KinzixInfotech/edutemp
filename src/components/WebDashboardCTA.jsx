@@ -41,7 +41,7 @@ export default function WebDashboardCTA() {
                     {/* Right - Dashboard Preview with Mac Browser Frame */}
                     <div className="relative hidden lg:block">
                         {/* Glow Effect */}
-                        <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/20 to-purple-500/20 blur-3xl rounded-3xl" />
+                        <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 blur-2xl rounded-3xl" />
 
                         {/* Mac Browser Window */}
                         <div className="relative bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200/50 transform hover:scale-105 transition-transform duration-500">

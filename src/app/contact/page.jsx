@@ -1,0 +1,460 @@
+'use client'
+import React, { useState } from 'react';
+import {
+    Mail, Phone, Clock, Send, ArrowRight,
+    MessageCircle, Users, CheckCircle,
+    Sparkles, Calendar, GraduationCap, BarChart3, Star
+} from 'lucide-react';
+import Header from '../components/Header';
+import Link from 'next/link';
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from "@/components/ui/accordion";
+import QuoteSection from '@/components/QuoteSection';
+
+export default function ContactPage() {
+    const [formData, setFormData] = useState({
+        name: '',
+        email: '',
+        phone: '',
+        schoolName: '',
+        role: '',
+        studentCount: '',
+        message: '',
+        demoPreferred: ''
+    });
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isSubmitted, setIsSubmitted] = useState(false);
+
+    const handleChange = (e) => {
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        setIsSubmitting(false);
+        setIsSubmitted(true);
+    };
+
+    const faqs = [
+        {
+            q: "How long is the demo session?",
+            a: "Our personalized demo sessions typically last 30-45 minutes, depending on your questions and requirements."
+        },
+        {
+            q: "Is the demo free?",
+            a: "Yes, the demo is completely free with no strings attached. We believe in showing value before asking for commitment."
+        },
+        {
+            q: "Can I invite my team to the demo?",
+            a: "Absolutely! We encourage you to invite key decision-makers and stakeholders to get a comprehensive view of how EduBreezy can help."
+        },
+        {
+            q: "What happens after the demo?",
+            a: "After the demo, we'll send you a detailed proposal based on your requirements. You can take your time to decide — no pressure!"
+        }
+    ];
+
+    return (
+        <div className="bg-white min-h-screen">
+            <Header />
+
+            {/* Hero Section - Full Width with Floating Icons */}
+            <section className="min-h-[70vh] pt-32 pb-20 px-5 bg-[linear-gradient(135deg,#f8fafc_0%,#fff9f0_50%,#f0f7ff_100%)] relative overflow-hidden flex items-center">
+                {/* Mesh Gradient Glows */}
+                <div className="absolute top-[10%] -left-[10%] w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(5,105,255,0.2)_0%,transparent_70%)] blur-[80px] rounded-full pointer-events-none" />
+                <div className="absolute bottom-[10%] -right-[10%] w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(249,115,22,0.15)_0%,transparent_70%)] blur-[80px] rounded-full pointer-events-none" />
+                <div className="absolute top-[50%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[radial-gradient(circle,rgba(16,185,129,0.1)_0%,transparent_70%)] blur-[100px] rounded-full pointer-events-none" />
+
+                {/* Floating Icons */}
+                <div className="absolute hidden md:flex top-32 left-[10%] w-14 h-14 bg-white rounded-2xl shadow-lg flex items-center justify-center animate-bounce" style={{ animationDuration: '3s' }}>
+                    <Calendar size={28} className="text-[#0569ff]" />
+                </div>
+                <div className="absolute hidden md:flex top-40 right-[15%] w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center animate-bounce" style={{ animationDuration: '2.5s', animationDelay: '0.5s' }}>
+                    <MessageCircle size={24} className="text-[#10B981]" />
+                </div>
+                <div className="absolute hidden md:flex bottom-32 left-[15%] w-11 h-11 bg-white rounded-xl shadow-lg flex items-center justify-center animate-bounce" style={{ animationDuration: '3.5s', animationDelay: '1s' }}>
+                    <GraduationCap size={22} className="text-[#F59E0B]" />
+                </div>
+                <div className="absolute hidden md:flex bottom-40 right-[10%] w-14 h-14 bg-white rounded-2xl shadow-lg flex items-center justify-center animate-bounce" style={{ animationDuration: '2.8s', animationDelay: '0.3s' }}>
+                    <Users size={28} className="text-[#8B5CF6]" />
+                </div>
+                <div className="absolute hidden md:flex top-[55%] left-[5%] w-10 h-10 bg-white rounded-lg shadow-lg flex items-center justify-center animate-bounce" style={{ animationDuration: '4s', animationDelay: '0.7s' }}>
+                    <Star size={20} className="text-[#EC4899]" />
+                </div>
+                <div className="absolute hidden md:flex top-[45%] right-[5%] w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center animate-bounce" style={{ animationDuration: '3.2s', animationDelay: '1.2s' }}>
+                    <BarChart3 size={24} className="text-[#14B8A6]" />
+                </div>
+
+                <div className="max-w-[1200px] mx-auto text-center relative z-10 w-full">
+                    <span className="inline-flex items-center gap-2 bg-[#0569ff]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-6">
+                        <MessageCircle size={16} />
+                        Get In Touch
+                    </span>
+                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-[#1a1a2e] mb-6">
+                        Let's Transform Your <br className="hidden md:block" />
+                        <span className="text-[#0569ff]">School Together</span>
+                    </h1>
+                    <p className="text-[#666] text-lg md:text-xl max-w-2xl mx-auto mb-10">
+                        Book a free demo, ask questions, or get personalized guidance.
+                        We're here to help you modernize your school management.
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-6">
+                        <div className="flex items-center gap-2 text-[#555]">
+                            <div className="w-8 h-8 bg-[#10B981]/10 rounded-full flex items-center justify-center">
+                                <CheckCircle size={16} className="text-[#10B981]" />
+                            </div>
+                            <span className="text-sm font-medium">Free Demo</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[#555]">
+                            <div className="w-8 h-8 bg-[#10B981]/10 rounded-full flex items-center justify-center">
+                                <CheckCircle size={16} className="text-[#10B981]" />
+                            </div>
+                            <span className="text-sm font-medium">No Commitment</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[#555]">
+                            <div className="w-8 h-8 bg-[#10B981]/10 rounded-full flex items-center justify-center">
+                                <CheckCircle size={16} className="text-[#10B981]" />
+                            </div>
+                            <span className="text-sm font-medium">24hr Response</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* Main Content */}
+            <section className="py-16 md:py-24 px-5">
+                <div className="max-w-[1200px] mx-auto">
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-12 lg:gap-16">
+
+                        {/* Left Side - Contact Info */}
+                        <div className="lg:col-span-2 space-y-8">
+                            <div>
+                                <h2 className="text-2xl md:text-3xl font-bold text-[#1a1a2e] mb-4">
+                                    Contact Information
+                                </h2>
+                                <p className="text-[#666]">
+                                    Have questions? Reach out to us through any of these channels.
+                                </p>
+                            </div>
+
+                            {/* Contact Cards */}
+                            <div className="space-y-4">
+                                {[
+                                    {
+                                        icon: Phone,
+                                        title: "Phone",
+                                        value: "+91 98765 43210",
+                                        subtext: "Mon-Sat, 9AM-6PM IST",
+                                        color: "#0569ff"
+                                    },
+                                    {
+                                        icon: Mail,
+                                        title: "Email",
+                                        value: "hello@edubreezy.com",
+                                        subtext: "We reply within 24 hours",
+                                        color: "#10B981"
+                                    }
+                                ].map((item, index) => {
+                                    const IconComponent = item.icon;
+                                    return (
+                                        <div
+                                            key={index}
+                                            className="flex items-start gap-4 p-5 rounded-2xl bg-[#f8fafc] border border-gray-100 hover:border-[#0569ff]/20 transition-all duration-300"
+                                        >
+                                            <div
+                                                className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+                                                style={{ backgroundColor: `${item.color}15` }}
+                                            >
+                                                <IconComponent size={22} style={{ color: item.color }} />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm text-[#888] mb-1">{item.title}</p>
+                                                <p className="font-semibold text-[#1a1a2e]">{item.value}</p>
+                                                <p className="text-sm text-[#666]">{item.subtext}</p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Why Book a Demo */}
+                            <div className="bg-gradient-to-br from-[#0569ff]/5 to-[#0569ff]/10 p-6 rounded-2xl">
+                                <h3 className="font-bold text-[#1a1a2e] mb-4 flex items-center gap-2">
+                                    <Sparkles size={18} className="text-[#0569ff]" />
+                                    Why Book a Demo?
+                                </h3>
+                                <ul className="space-y-3">
+                                    {[
+                                        "See all features in action",
+                                        "Get answers to your questions",
+                                        "Learn about custom pricing",
+                                        "No commitment required"
+                                    ].map((item, index) => (
+                                        <li key={index} className="flex items-center gap-3 text-sm text-[#555]">
+                                            <CheckCircle size={16} className="text-[#10B981] shrink-0" />
+                                            {item}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        </div>
+
+                        {/* Right Side - Form */}
+                        <div className="lg:col-span-3">
+                            {!isSubmitted ? (
+                                <div className="bg-[#f8fafc] p-8 md:p-10 rounded-3xl border border-gray-100">
+                                    <h2 className="text-2xl font-bold text-[#1a1a2e] mb-2">
+                                        Book a Free Demo
+                                    </h2>
+                                    <p className="text-[#666] mb-8">
+                                        Fill out the form and we'll get back to you within 24 hours.
+                                    </p>
+
+                                    <form onSubmit={handleSubmit} className="space-y-5">
+                                        {/* Name & Email Row */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-[#1a1a2e] mb-2">
+                                                    Your Name *
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    name="name"
+                                                    value={formData.name}
+                                                    onChange={handleChange}
+                                                    required
+                                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:border-[#0569ff] focus:ring-2 focus:ring-[#0569ff]/20 outline-none transition-all"
+                                                    placeholder="John Doe"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-[#1a1a2e] mb-2">
+                                                    Email Address *
+                                                </label>
+                                                <input
+                                                    type="email"
+                                                    name="email"
+                                                    value={formData.email}
+                                                    onChange={handleChange}
+                                                    required
+                                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:border-[#0569ff] focus:ring-2 focus:ring-[#0569ff]/20 outline-none transition-all"
+                                                    placeholder="john@school.com"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Phone & School Name Row */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-[#1a1a2e] mb-2">
+                                                    Phone Number *
+                                                </label>
+                                                <input
+                                                    type="tel"
+                                                    name="phone"
+                                                    value={formData.phone}
+                                                    onChange={handleChange}
+                                                    required
+                                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:border-[#0569ff] focus:ring-2 focus:ring-[#0569ff]/20 outline-none transition-all"
+                                                    placeholder="+91 98765 43210"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-[#1a1a2e] mb-2">
+                                                    School Name *
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    name="schoolName"
+                                                    value={formData.schoolName}
+                                                    onChange={handleChange}
+                                                    required
+                                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:border-[#0569ff] focus:ring-2 focus:ring-[#0569ff]/20 outline-none transition-all"
+                                                    placeholder="ABC Public School"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Role & Student Count Row */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-[#1a1a2e] mb-2">
+                                                    Your Role
+                                                </label>
+                                                <select
+                                                    name="role"
+                                                    value={formData.role}
+                                                    onChange={handleChange}
+                                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:border-[#0569ff] focus:ring-2 focus:ring-[#0569ff]/20 outline-none transition-all"
+                                                >
+                                                    <option value="">Select your role</option>
+                                                    <option value="owner">School Owner</option>
+                                                    <option value="principal">Principal</option>
+                                                    <option value="administrator">Administrator</option>
+                                                    <option value="teacher">Teacher</option>
+                                                    <option value="other">Other</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-[#1a1a2e] mb-2">
+                                                    Number of Students
+                                                </label>
+                                                <select
+                                                    name="studentCount"
+                                                    value={formData.studentCount}
+                                                    onChange={handleChange}
+                                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:border-[#0569ff] focus:ring-2 focus:ring-[#0569ff]/20 outline-none transition-all"
+                                                >
+                                                    <option value="">Select range</option>
+                                                    <option value="0-100">0 - 100</option>
+                                                    <option value="100-500">100 - 500</option>
+                                                    <option value="500-1000">500 - 1,000</option>
+                                                    <option value="1000-5000">1,000 - 5,000</option>
+                                                    <option value="5000+">5,000+</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        {/* Preferred Demo Time */}
+                                        <div>
+                                            <label className="block text-sm font-medium text-[#1a1a2e] mb-2">
+                                                Preferred Demo Time
+                                            </label>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                {['Morning', 'Afternoon', 'Evening', 'Anytime'].map((time) => (
+                                                    <label
+                                                        key={time}
+                                                        className={`flex items-center justify-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${formData.demoPreferred === time
+                                                            ? 'border-[#0569ff] bg-[#0569ff]/10 text-[#0569ff]'
+                                                            : 'border-gray-200 bg-white hover:border-[#0569ff]/50'
+                                                            }`}
+                                                    >
+                                                        <input
+                                                            type="radio"
+                                                            name="demoPreferred"
+                                                            value={time}
+                                                            checked={formData.demoPreferred === time}
+                                                            onChange={handleChange}
+                                                            className="sr-only"
+                                                        />
+                                                        <Clock size={16} />
+                                                        <span className="text-sm font-medium">{time}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Message */}
+                                        <div>
+                                            <label className="block text-sm font-medium text-[#1a1a2e] mb-2">
+                                                Message (Optional)
+                                            </label>
+                                            <textarea
+                                                name="message"
+                                                value={formData.message}
+                                                onChange={handleChange}
+                                                rows={4}
+                                                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:border-[#0569ff] focus:ring-2 focus:ring-[#0569ff]/20 outline-none transition-all resize-none"
+                                                placeholder="Tell us about your requirements..."
+                                            />
+                                        </div>
+
+                                        {/* Submit Button */}
+                                        <button
+                                            type="submit"
+                                            disabled={isSubmitting}
+                                            className="w-full flex items-center justify-center gap-3 bg-[#0569ff] text-white px-8 py-4 rounded-full font-bold text-base hover:bg-[#0569ff]/90 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed"
+                                        >
+                                            {isSubmitting ? (
+                                                <>
+                                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                    Submitting...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    Book Free Demo
+                                                    <Send size={18} />
+                                                </>
+                                            )}
+                                        </button>
+
+                                        <p className="text-center text-sm text-[#888]">
+                                            By submitting, you agree to our{' '}
+                                            <Link href="/privacy" className="text-[#0569ff] hover:underline">Privacy Policy</Link>
+                                        </p>
+                                    </form>
+                                </div>
+                            ) : (
+                                /* Success State */
+                                <div className="bg-[#f8fafc] p-10 md:p-16 rounded-3xl border border-gray-100 text-center">
+                                    <div className="w-20 h-20 bg-[#10B981]/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                                        <CheckCircle size={40} className="text-[#10B981]" />
+                                    </div>
+                                    <h2 className="text-2xl md:text-3xl font-bold text-[#1a1a2e] mb-4">
+                                        Thank You! 🎉
+                                    </h2>
+                                    <p className="text-[#666] max-w-md mx-auto mb-8">
+                                        Your demo request has been submitted successfully.
+                                        Our team will contact you within 24 hours to schedule your personalized demo.
+                                    </p>
+                                    <Link
+                                        href="/"
+                                        className="inline-flex items-center gap-2 bg-[#0569ff] text-white px-8 py-4 rounded-full font-bold hover:bg-[#0569ff]/90 transition-all"
+                                    >
+                                        Back to Home
+                                        <ArrowRight size={18} />
+                                    </Link>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* FAQ Section with Accordion */}
+            <section className="py-16 px-5 bg-white">
+                <div className="max-w-[800px] mx-auto">
+                    <div className="text-center mb-10">
+                        <span className="inline-flex items-center gap-2 bg-[#0569ff]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-4">
+                            <MessageCircle size={16} />
+                            FAQs
+                        </span>
+                        <h2 className="text-2xl md:text-3xl font-bold text-[#1a1a2e]">
+                            Frequently Asked Questions
+                        </h2>
+                    </div>
+
+                    <Accordion type="single" collapsible className="space-y-3">
+                        {faqs.map((faq, index) => (
+                            <AccordionItem
+                                key={index}
+                                value={`item-${index}`}
+                                className="bg-[#f8fafc] border border-gray-100 rounded-2xl px-6 data-[state=open]:bg-[#0569ff]/5 data-[state=open]:border-[#0569ff]/20 transition-all"
+                            >
+                                <AccordionTrigger className="text-left font-bold text-[#1a1a2e] hover:no-underline py-5">
+                                    {faq.q}
+                                </AccordionTrigger>
+                                <AccordionContent className="text-[#666] pb-5">
+                                    {faq.a}
+                                </AccordionContent>
+                            </AccordionItem>
+                        ))}
+                    </Accordion>
+                </div>
+            </section>
+
+            {/* Motivational Quote */}
+            <QuoteSection
+                quote="We're not just building software. We're building the future of how schools connect, communicate, and create impact."
+                author="Co-Founder, EduBreezy"
+                variant="gradient"
+            />
+        </div>
+    );
+}
