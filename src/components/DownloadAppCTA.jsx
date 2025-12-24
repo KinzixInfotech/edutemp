@@ -95,13 +95,13 @@ export default function DownloadAppCTA() {
                 {/* Phones */}
                 <div className="relative flex justify-center">
                     {/* Phone 1 - Left */}
-                    <div className="w-[220px] md:w-[280px] lg:w-[320px] -mr-16 md:-mr-20 z-20">
-                        <Android />
+                    <div className="w-[220px] md:w-[280px] lg:w-[320px] object-contain -mr-16 md:-mr-20 z-20">
+                        <Android src={'./ss.png'} className='object-contain' />
                     </div>
 
                     {/* Phone 2 - Right */}
                     <div className="w-[200px] md:w-[260px] lg:w-[300px] -ml-16 md:-ml-20 mt-8 z-10 opacity-90">
-                        <Android />
+                        <Android src={'./ss.png'} className='object-contain' />
                     </div>
                 </div>
             </div>

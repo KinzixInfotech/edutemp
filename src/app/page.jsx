@@ -7,8 +7,7 @@ import {
     Clock, GraduationCap, CreditCard, ArrowRight,
     TrendingUp, PieChart, Calendar, FileText, Play, XIcon, Check,
     Pencil, BookMarked, Ruler, Calculator, Highlighter as HighlighterIcon, School,
-    Home,
-    Bus
+    Home, Bus, Smartphone, MapPin, Plane, Globe, MessageCircle, Laptop, Wifi
 } from 'lucide-react';
 import Header from './components/Header';
 import { DotPattern } from '@/components/ui/dot-pattern';
@@ -18,6 +17,7 @@ import { Highlighter } from '@/components/ui/highlighter';
 import Link from 'next/link';
 import DownloadAppCTA from '@/components/DownloadAppCTA';
 import WebDashboardCTA from '@/components/WebDashboardCTA';
+import { OrbitingCircles } from '@/components/ui/orbiting-circles';
 
 
 
@@ -33,6 +33,7 @@ export default function HomePage() {
             <WebDashboardCTA />
             <FeaturesSection />
             <SchoolExplorerSection />
+            <CommunicatingSeamlesslySection />
             <BentoSection />
             <PricingSection />
             <TestimonialsSection />
@@ -192,16 +193,17 @@ function HeroSection() {
                     <div className="hero-dashboard relative bg-white rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.12)] w-full max-w-[1200px] mx-auto border border-[#e0e0e0] overflow-hidden z-10">
 
                         {/* Browser Top Bar */}
-                        <div className="flex items-center px-3 py-2.5 bg-[#f8f9fa] border-b border-[#e5e7eb] gap-2">
-                            {/* Window Controls */}
-                            <div className="flex gap-1.5 shrink-0">
-                                <div className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]" />
-                                <div className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]" />
-                                <div className="w-2.5 h-2.5 rounded-full bg-[#28c840]" />
+                        {/* Mac-style Dark Top Bar */}
+                        <div className="flex items-center gap-3 px-4 py-3 bg-[#2d2d2d] border-b border-black/20">
+                            <div className="flex gap-2">
+                                <div className="w-3 h-3 rounded-full bg-[#ff5f56]" />
+                                <div className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
+                                <div className="w-3 h-3 rounded-full bg-[#27c93f]" />
                             </div>
-                            {/* URL Bar */}
-                            <div className="flex-1 ml-2 bg-white rounded-md px-2.5 py-1.5 text-[11px] text-[#666] border border-[#e5e7eb] whitespace-nowrap overflow-hidden text-ellipsis">
-                                www.edubreezy.com/dashboard
+                            <div className="flex-1 mx-4">
+                                <div className="bg-[#3f3f3f] rounded-md px-3 py-1.5 text-xs text-gray-300 text-center">
+                                    www.edubreezy.com/dashboard
+                                </div>
                             </div>
                         </div>
 
@@ -437,6 +439,145 @@ function WhyEduBreezySection() {
     );
 }
 
+// Communicating Seamlessly Section with Orbiting Circles
+function CommunicatingSeamlesslySection() {
+    return (
+        <section className="bg-[#f5f7fa] py-16 md:py-20 lg:py-28 px-4 md:px-5 overflow-hidden">
+            <div className="max-w-[1400px] 2xl:max-w-[1600px] mx-auto">
+                {/* Section Header */}
+                <div className="text-center mb-8 md:mb-12 lg:mb-16">
+                    {/* <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-[#0569ff] leading-tight mb-2 md:mb-3">
+                        Communicating Seamlessly
+                    </h2>
+                   */}
+                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a1a2e] leading-tight mb-6">
+                        Communicating
+                        <span className="text-[#0569ff]"> Seamlessly</span>
+                    </h2>
+                    <p className="text-lg sm:text-xl md:text-2xl text-[#F97316] font-medium italic">
+                        Together on a Platform
+                    </p>
+                </div>
+
+                {/* Orbiting Circles Container - Responsive scaling */}
+                <div className="relative flex h-[450px] sm:h-[550px] md:h-[650px] lg:h-[750px] 2xl:h-[850px] w-full items-center justify-center">
+
+                    {/* Floating Decorative Icons - Left Side */}
+                    <div className="absolute top-[8%] left-[5%] opacity-10 pointer-events-none animate-[float_6s_ease-in-out_infinite]">
+                        <Globe className="w-8 h-8 md:w-12 md:h-12 text-[#0569ff] rotate-[-15deg]" />
+                    </div>
+                    <div className="absolute top-[25%] left-[3%] opacity-10 pointer-events-none animate-[float_8s_ease-in-out_infinite_1s]">
+                        <Smartphone className="w-6 h-6 md:w-10 md:h-10 text-[#0569ff] rotate-[15deg]" />
+                    </div>
+                    <div className="absolute top-[50%] left-[2%] opacity-10 pointer-events-none animate-[float_7s_ease-in-out_infinite_2s]">
+                        <MapPin className="w-7 h-7 md:w-11 md:h-11 text-[#F97316] rotate-[-10deg]" />
+                    </div>
+                    <div className="absolute top-[75%] left-[4%] opacity-10 pointer-events-none animate-[float_9s_ease-in-out_infinite_0.5s]">
+                        <MessageCircle className="w-6 h-6 md:w-10 md:h-10 text-[#10B981] rotate-[20deg]" />
+                    </div>
+
+                    {/* Floating Decorative Icons - Right Side */}
+                    <div className="absolute top-[10%] right-[5%] opacity-10 pointer-events-none animate-[float_7s_ease-in-out_infinite_1.5s]">
+                        <Wifi className="w-7 h-7 md:w-11 md:h-11 text-[#10B981] rotate-[10deg]" />
+                    </div>
+                    <div className="absolute top-[30%] right-[3%] opacity-10 pointer-events-none animate-[float_6s_ease-in-out_infinite_2.5s]">
+                        <Laptop className="w-8 h-8 md:w-12 md:h-12 text-[#0569ff] rotate-[-12deg]" />
+                    </div>
+                    <div className="absolute top-[55%] right-[2%] opacity-10 pointer-events-none animate-[float_8s_ease-in-out_infinite_3s]">
+                        <Plane className="w-6 h-6 md:w-10 md:h-10 text-[#F97316] rotate-[25deg]" />
+                    </div>
+                    <div className="absolute top-[80%] right-[4%] opacity-10 pointer-events-none animate-[float_7s_ease-in-out_infinite_1s]">
+                        <Bus className="w-7 h-7 md:w-11 md:h-11 text-[#0569ff] rotate-[-8deg]" />
+                    </div>
+
+                    {/* Scaling wrapper for smaller screens */}
+                    <div className="absolute inset-0 flex items-center justify-center transform scale-[0.55] sm:scale-[0.65] md:scale-[0.8] lg:scale-100 2xl:scale-110">
+
+                        {/* Center Phone Mockup */}
+                        <div className="z-20 flex flex-col items-center justify-center absolute">
+                            <div className="w-[200px] lg:w-[220px] 2xl:w-[250px] h-[400px] lg:h-[440px] 2xl:h-[500px] bg-[#1a1a2e] rounded-[2.5rem] border-4 border-[#1a1a2e] shadow-2xl overflow-hidden relative">
+
+                                {/* Dynamic Island Notch */}
+                                <div className="absolute top-2 left-1/2 -translate-x-1/2 w-[80px] h-[24px] bg-black rounded-full z-20 flex items-center justify-center">
+                                    {/* Camera dot */}
+                                    <div className="absolute right-3 w-2 h-2 rounded-full bg-[#1a1a2e] ring-1 ring-gray-700" />
+                                </div>
+
+                                {/* Phone Screen - Image */}
+                                <div className="h-full w-full">
+                                    <img
+                                        src="https://placehold.co/250x500/0569ff/white?text=App"
+                                        alt="EduBreezy App"
+                                        className="w-full h-full object-cover rounded-[2rem]"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Inner Circle - Roles */}
+                        <OrbitingCircles radius={160} duration={35} iconSize={75}>
+                            <RoleBadge label="Admin" icon="👤" color="#10B981" bg="#D1FAE5" />
+                            <RoleBadge label="Teachers" icon="👩‍🏫" color="#0569ff" bg="#DBEAFE" />
+                            <RoleBadge label="Schools" icon="🏫" color="#0569ff" bg="#DBEAFE" />
+                            <RoleBadge label="Parents" icon="👨‍👩‍👧" color="#F97316" bg="#FED7AA" />
+                            <RoleBadge label="Students" icon="🎓" color="#10B981" bg="#D1FAE5" />
+                        </OrbitingCircles>
+
+                        {/* Outer Circle - Features */}
+                        <OrbitingCircles radius={300} duration={60} reverse iconSize={85}>
+                            <FeatureBadge label="Transport" />
+                            <FeatureBadge label="Library" />
+                            <FeatureBadge label="Attendance" />
+                            <FeatureBadge label="Registration" />
+                            <FeatureBadge label="LMS" />
+                            <FeatureBadge label="Digital" />
+                            <FeatureBadge label="Report Card" />
+                            <FeatureBadge label="Admission" />
+                            <FeatureBadge label="Fee" />
+                            <FeatureBadge label="Time Table" />
+                            <FeatureBadge label="Exam" />
+                            <FeatureBadge label="Result" />
+                        </OrbitingCircles>
+                    </div>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+// Helper component for role badges - circular icon with label
+function RoleBadge({ label, icon, color, bg }) {
+    return (
+        <div className="flex flex-col items-center gap-1">
+            {/* Circular icon container */}
+            <div
+                className="w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center shadow-lg border-2"
+                style={{ backgroundColor: bg, borderColor: color }}
+            >
+                <span className="text-xl md:text-2xl">{icon}</span>
+            </div>
+            {/* Label below */}
+            <span
+                className="text-[11px] md:text-xs font-bold whitespace-nowrap"
+                style={{ color }}
+            >
+                {label}
+            </span>
+        </div>
+    );
+}
+
+// Helper component for feature badges - modern pill style
+function FeatureBadge({ label }) {
+    return (
+        <div className="flex items-center justify-center px-4 py-2 bg-white rounded-full shadow-md border border-gray-100">
+            <span className="text-[12px] md:text-sm font-medium text-gray-700 whitespace-nowrap">
+                {label}
+            </span>
+        </div>
+    );
+}
+
 // Trusted By Section
 function TrustedSection() {
     return (
@@ -639,7 +780,7 @@ function SchoolExplorerSection() {
 // Bento Section - Different sized cards
 function BentoSection() {
     return (
-        <section className="py-20 px-5 bg-[#f8fafc]">
+        <section className="py-20 px-5 bg-white">
             <div className="max-w-[1100px] mx-auto">
                 {/* Section header */}
                 <div className="text-center mb-4">
@@ -841,69 +982,112 @@ function PricingSection() {
     );
 }
 
-// Testimonials Section
+// Testimonials Section - Marquee Style
 function TestimonialsSection() {
     const testimonials = [
         {
-            text: "Keep track of what they've achieved, when, and through which channel. Quotes, orders, invoices listed here.",
-            author: "Cameron Williamson",
-            role: "Product Developer",
-            avatar: "https://i.pravatar.cc/48?img=1"
+            text: "This school software has revolutionized our school management. The School ERP Software effortlessly lightens the workload on our dedicated staff, replacing manual efforts.",
+            author: "Lakhvir Singh",
+            role: "Manager",
+            school: "Kalgidhar Academy, Ludhiana",
+            avatar: "https://i.pravatar.cc/48?img=11"
         },
         {
-            text: "Since adopting this platform, our admission time dropped by 60%. The unified real-time tracking has significantly improved trust.",
+            text: "As the President of the Federation of Private Schools and Associations of Punjab, I understand the technical challenges faced by schools. Until now, I haven't come across a single solution that addresses all needs.",
+            author: "Dr. Jagjit Singh Dhuri",
+            role: "Director",
+            school: "Group Of Modern Secular Public School",
+            avatar: "https://i.pravatar.cc/48?img=12"
+        },
+        {
+            text: "I used to face a lot of difficulties in fee collection. I started using Class ON's school fee software, and within 2-3 days, my staff's efficiency increased, and fee recovery became faster.",
+            author: "Aarti Sobit",
+            role: "Principal",
+            school: "Shree Hanumat International Public School",
+            avatar: "https://i.pravatar.cc/48?img=5"
+        },
+        {
+            text: "Since adopting this platform, our admission time dropped by 60%. The unified real-time tracking has significantly improved trust with parents.",
             author: "Danny Russell",
             role: "School Principal",
+            school: "Ryan International School",
             avatar: "https://i.pravatar.cc/48?img=2"
         },
         {
-            text: "Telehealth and automated workflows saved us hours every day. Highly recommended for school management.",
+            text: "The automated workflows saved us hours every day. Highly recommended for any school looking to modernize their management system.",
             author: "Brooklyn Simmons",
             role: "School Owner",
+            school: "Modern Public School",
             avatar: "https://i.pravatar.cc/48?img=3"
+        },
+        {
+            text: "Parent communication has never been easier. The app notifications keep everyone informed instantly about fees, attendance, and events.",
+            author: "Cameron Williamson",
+            role: "Administrator",
+            school: "Delhi Public School",
+            avatar: "https://i.pravatar.cc/48?img=1"
         }
     ];
 
-    return (
-        <section className="py-20 px-5 bg-[#f8fafc]">
-            <div className="max-w-[1100px] mx-auto">
-                <div className="text-center mb-[50px]">
-                    <span className="inline-block bg-[#e8f4ff] text-[#0569ff] px-3.5 py-1.5 rounded-[20px] text-[13px] font-medium mb-4">
-                        Testimonials
-                    </span>
-                    <h2 className="text-[clamp(2rem,4vw,2.5rem)] font-bold text-[#1a1a2e]">
-                        What Our Happy Clients Say!
-                    </h2>
-                </div>
+    // Duplicate for seamless loop
+    const allTestimonials = [...testimonials, ...testimonials];
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {testimonials.map((t, i) => (
-                        <div key={i} className="testimonial-card p-7 rounded-2xl bg-white border border-[#e5e7eb]">
-                            <div className="flex gap-[3px] mb-4">
-                                {[1, 2, 3, 4, 5].map(s => (
-                                    <Star key={s} size={14} fill="#fbbf24" color="#fbbf24" />
-                                ))}
+    return (
+        <section className="py-20 bg-[#f8fafc] overflow-hidden">
+            <div className="max-w-[1200px] mx-auto px-5">
+                <div className="text-center mb-12">
+                    <h2 className="text-3xl md:text-4xl font-bold text-[#1a1a2e] mb-3">
+                        Read what <span className="text-[#0569ff]">our users</span> have to say about us
+                    </h2>
+                    <p className="text-gray-600 max-w-2xl mx-auto">
+                        We firmly believe that our client's success is our success. Here's a glimpse of our client's experience with us.
+                    </p>
+                </div>
+            </div>
+
+            {/* Marquee Container */}
+            <div className="relative">
+                {/* Gradient Fade Left */}
+                <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-[#f8fafc] to-transparent z-10 pointer-events-none" />
+
+                {/* Gradient Fade Right */}
+                <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-[#f8fafc] to-transparent z-10 pointer-events-none" />
+
+                {/* Scrolling Testimonials */}
+                <div className="flex gap-6 animate-[marquee_40s_linear_infinite] hover:[animation-play-state:paused]">
+                    {allTestimonials.map((t, i) => (
+                        <div
+                            key={i}
+                            className="flex-shrink-0 w-[350px] p-8 rounded-xl bg-white border border-[#e8e8e8] relative overflow-hidden"
+                        >
+                            {/* Quote Icon - Behind Text */}
+                            <div className="absolute top-4 left-4 opacity-100 pointer-events-none">
+                                <svg width="48" height="38" viewBox="0 0 32 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M0 24V14.4C0 11.7333 0.4 9.33333 1.2 7.2C2.06667 5.06667 3.26667 3.26667 4.8 1.8C6.4 0.333333 8.26667 -0.266667 10.4 0.133333V5.4C9.06667 5.66667 7.96667 6.26667 7.1 7.2C6.3 8.13333 5.9 9.26667 5.9 10.6V10.8H12V24H0ZM20 24V14.4C20 11.7333 20.4 9.33333 21.2 7.2C22.0667 5.06667 23.2667 3.26667 24.8 1.8C26.4 0.333333 28.2667 -0.266667 30.4 0.133333V5.4C29.0667 5.66667 27.9667 6.26667 27.1 7.2C26.3 8.13333 25.9 9.26667 25.9 10.6V10.8H32V24H20Z" fill="#E8E8E8" />
+                                </svg>
                             </div>
-                            <p className="text-[0.95rem] text-[#444] leading-[1.7] mb-6">
-                                "{t.text}"
+
+                            <p className="text-[0.95rem] text-[#444] leading-relaxed mb-6 text-justify relative z-10 pt-10" style={{ textAlignLast: 'left' }}>
+                                {t.text}
                             </p>
-                            <div className="flex items-center gap-3">
-                                <img
-                                    src={t.avatar}
-                                    alt={t.author}
-                                    className="w-11 h-11 rounded-full"
-                                    objectFit="cover"
-                                />
-                                <div>
-                                    <div className="font-semibold text-[#1a1a2e] text-[0.95rem]">
-                                        {t.author}
-                                    </div>
-                                    <div className="text-[13px] text-[#888]">{t.role}</div>
+
+                            <div className="relative z-10">
+                                <div className="font-bold text-[#0569ff] text-sm tracking-wide">
+                                    {t.author.toUpperCase()}
                                 </div>
+                                <div className="text-[13px] text-[#1a1a2e] font-medium underline decoration-1">{t.role}</div>
+                                <div className="text-[12px] text-[#666]">{t.school}</div>
                             </div>
                         </div>
                     ))}
                 </div>
+            </div>
+
+            {/* Pagination Dots */}
+            <div className="flex justify-center gap-4 mt-10">
+                <div className="w-[10px] h-[10px] rounded-full bg-[#0569ff]" />
+                <div className="w-[10px] h-[10px] rounded-full bg-[#d1d5db]" />
+                <div className="w-[10px] h-[10px] rounded-full bg-[#d1d5db]" />
             </div>
         </section>
     );

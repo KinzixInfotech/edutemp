@@ -2,9 +2,11 @@
 import { useEffect, useRef } from "react"
 import { useInView } from "motion/react"
 import { annotate } from "rough-notation"
+import { cn } from "@/lib/utils";
 
 export function Highlighter({
   children,
+  className,
   action = "highlight",
   color = "#ffd1dc",
   strokeWidth = 1.5,
@@ -72,7 +74,7 @@ export function Highlighter({
   ])
 
   return (
-    <span ref={elementRef} className="relative inline-block bg-transparent">
+    <span ref={elementRef} className={cn("relative inline-block bg-transparent", className)}>
       {children}
     </span>
   );
