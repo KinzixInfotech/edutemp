@@ -101,7 +101,7 @@ export default function DownloadAppCTA() {
 
                     {/* Phone 2 - Right */}
                     <div className="w-[200px] md:w-[260px] lg:w-[300px] -ml-16 md:-ml-20 mt-8 z-10 opacity-90">
-                        <Android src={'./ss.png'} className='object-contain' />
+                        <Android src={'./ss3.png'} className='object-contain' />
                     </div>
                 </div>
             </div>

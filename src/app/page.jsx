@@ -450,12 +450,15 @@ function CommunicatingSeamlesslySection() {
                         Communicating Seamlessly
                     </h2>
                    */}
-                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a1a2e] leading-tight mb-6">
-                        Communicating
-                        <span className="text-[#0569ff]"> Seamlessly</span>
+                    <span className="inline-block bg-[#0569ff]/10 text-[#0569ff] px-4 py-1.5 rounded-full text-sm font-semibold mb-4">
+                        📱 Our Mobile Apps
+                    </span>
+                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a1a2e] leading-tight mb-4">
+                        Modern Apps for
+                        <span className="text-[#0569ff]"> Modern Schools</span>
                     </h2>
-                    <p className="text-lg sm:text-xl md:text-2xl text-[#F97316] font-medium italic">
-                        Together on a Platform
+                    <p className="text-base sm:text-lg md:text-xl text-[#666] max-w-2xl mx-auto leading-relaxed">
+                        Beautifully designed, intuitive mobile apps that bring schools, parents, teachers, and students together on one powerful platform.
                     </p>
                 </div>
 
@@ -495,23 +498,32 @@ function CommunicatingSeamlesslySection() {
 
                         {/* Center Phone Mockup */}
                         <div className="z-20 flex flex-col items-center justify-center absolute">
-                            <div className="w-[200px] lg:w-[220px] 2xl:w-[250px] h-[400px] lg:h-[440px] 2xl:h-[500px] bg-[#1a1a2e] rounded-[2.5rem] border-4 border-[#1a1a2e] shadow-2xl overflow-hidden relative">
+                            {(() => {
+                                const showNotch = false; // Toggle to show/hide the Dynamic Island notch
+                                return (
+                                    <div
+                                        className="w-[180px] lg:w-[200px] 2xl:w-[220px] h-[400px] lg:h-[445px] 2xl:h-[490px] rounded-[2rem] overflow-hidden relative"
+                                        style={{
+                                            boxShadow: '0 0 0 3px #1a1a2e, 0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                                        }}
+                                    >
+                                        {/* Dynamic Island Notch - Conditionally rendered */}
+                                        {showNotch && (
+                                            <div className="absolute top-2 left-1/2 -translate-x-1/2 w-[70px] h-[22px] bg-black rounded-full z-20 flex items-center justify-center">
+                                                {/* Camera dot */}
+                                                <div className="absolute right-3 w-2 h-2 rounded-full bg-[#1a1a2e] ring-1 ring-gray-700" />
+                                            </div>
+                                        )}
 
-                                {/* Dynamic Island Notch */}
-                                <div className="absolute top-2 left-1/2 -translate-x-1/2 w-[80px] h-[24px] bg-black rounded-full z-20 flex items-center justify-center">
-                                    {/* Camera dot */}
-                                    <div className="absolute right-3 w-2 h-2 rounded-full bg-[#1a1a2e] ring-1 ring-gray-700" />
-                                </div>
-
-                                {/* Phone Screen - Image */}
-                                <div className="h-full w-full">
-                                    <img
-                                        src="https://placehold.co/250x500/0569ff/white?text=App"
-                                        alt="EduBreezy App"
-                                        className="w-full h-full object-cover rounded-[2rem]"
-                                    />
-                                </div>
-                            </div>
+                                        {/* Phone Screen - Image */}
+                                        <img
+                                            src="ss2.png"
+                                            alt="EduBreezy App"
+                                            className="w-full h-full object-contain bg-white"
+                                        />
+                                    </div>
+                                );
+                            })()}
                         </div>
 
                         {/* Inner Circle - Roles */}
@@ -982,55 +994,78 @@ function PricingSection() {
     );
 }
 
-// Testimonials Section - Marquee Style
+// Testimonials Section - Smooth Marquee Scroll with Working Dots
 function TestimonialsSection() {
+    const [activeIndex, setActiveIndex] = React.useState(0);
+    const containerRef = React.useRef(null);
+
     const testimonials = [
         {
             text: "This school software has revolutionized our school management. The School ERP Software effortlessly lightens the workload on our dedicated staff, replacing manual efforts.",
             author: "Lakhvir Singh",
             role: "Manager",
-            school: "Kalgidhar Academy, Ludhiana",
-            avatar: "https://i.pravatar.cc/48?img=11"
+            school: "Kalgidhar Academy, Ludhiana"
         },
         {
             text: "As the President of the Federation of Private Schools and Associations of Punjab, I understand the technical challenges faced by schools. Until now, I haven't come across a single solution that addresses all needs.",
             author: "Dr. Jagjit Singh Dhuri",
             role: "Director",
-            school: "Group Of Modern Secular Public School",
-            avatar: "https://i.pravatar.cc/48?img=12"
+            school: "Group Of Modern Secular Public School"
         },
         {
             text: "I used to face a lot of difficulties in fee collection. I started using Class ON's school fee software, and within 2-3 days, my staff's efficiency increased, and fee recovery became faster.",
             author: "Aarti Sobit",
             role: "Principal",
-            school: "Shree Hanumat International Public School",
-            avatar: "https://i.pravatar.cc/48?img=5"
+            school: "Shree Hanumat International Public School"
         },
         {
             text: "Since adopting this platform, our admission time dropped by 60%. The unified real-time tracking has significantly improved trust with parents.",
             author: "Danny Russell",
             role: "School Principal",
-            school: "Ryan International School",
-            avatar: "https://i.pravatar.cc/48?img=2"
+            school: "Ryan International School"
         },
         {
             text: "The automated workflows saved us hours every day. Highly recommended for any school looking to modernize their management system.",
             author: "Brooklyn Simmons",
             role: "School Owner",
-            school: "Modern Public School",
-            avatar: "https://i.pravatar.cc/48?img=3"
+            school: "Modern Public School"
         },
         {
             text: "Parent communication has never been easier. The app notifications keep everyone informed instantly about fees, attendance, and events.",
             author: "Cameron Williamson",
             role: "Administrator",
-            school: "Delhi Public School",
-            avatar: "https://i.pravatar.cc/48?img=1"
+            school: "Delhi Public School"
         }
     ];
 
-    // Duplicate for seamless loop
+    // Duplicate for seamless infinite loop
     const allTestimonials = [...testimonials, ...testimonials];
+
+    // Smooth scroll to specific testimonial when dot is clicked
+    const scrollToIndex = (index) => {
+        if (containerRef.current) {
+            const cardWidth = 370; // 350px card + 20px gap
+            containerRef.current.scrollTo({
+                left: index * cardWidth,
+                behavior: 'smooth'
+            });
+        }
+        setActiveIndex(index);
+        setIsPaused(true);
+        setTimeout(() => setIsPaused(false), 8000);
+    };
+
+    // Update active index based on scroll position
+    const handleScroll = () => {
+        if (containerRef.current) {
+            const scrollLeft = containerRef.current.scrollLeft;
+            const cardWidth = 370;
+            const newIndex = Math.round(scrollLeft / cardWidth) % testimonials.length;
+            if (newIndex !== activeIndex) {
+                setActiveIndex(newIndex);
+            }
+        }
+    };
 
     return (
         <section className="py-20 bg-[#f8fafc] overflow-hidden">
@@ -1046,49 +1081,107 @@ function TestimonialsSection() {
             </div>
 
             {/* Marquee Container */}
-            <div className="relative">
+            <div className="relative testimonials-marquee-wrapper">
                 {/* Gradient Fade Left */}
                 <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-[#f8fafc] to-transparent z-10 pointer-events-none" />
 
                 {/* Gradient Fade Right */}
                 <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-[#f8fafc] to-transparent z-10 pointer-events-none" />
 
-                {/* Scrolling Testimonials */}
-                <div className="flex gap-6 animate-[marquee_40s_linear_infinite] hover:[animation-play-state:paused]">
-                    {allTestimonials.map((t, i) => (
-                        <div
-                            key={i}
-                            className="flex-shrink-0 w-[350px] p-8 rounded-xl bg-white border border-[#e8e8e8] relative overflow-hidden"
-                        >
-                            {/* Quote Icon - Behind Text */}
-                            <div className="absolute top-4 left-4 opacity-100 pointer-events-none">
-                                <svg width="48" height="38" viewBox="0 0 32 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M0 24V14.4C0 11.7333 0.4 9.33333 1.2 7.2C2.06667 5.06667 3.26667 3.26667 4.8 1.8C6.4 0.333333 8.26667 -0.266667 10.4 0.133333V5.4C9.06667 5.66667 7.96667 6.26667 7.1 7.2C6.3 8.13333 5.9 9.26667 5.9 10.6V10.8H12V24H0ZM20 24V14.4C20 11.7333 20.4 9.33333 21.2 7.2C22.0667 5.06667 23.2667 3.26667 24.8 1.8C26.4 0.333333 28.2667 -0.266667 30.4 0.133333V5.4C29.0667 5.66667 27.9667 6.26667 27.1 7.2C26.3 8.13333 25.9 9.26667 25.9 10.6V10.8H32V24H20Z" fill="#E8E8E8" />
-                                </svg>
-                            </div>
-
-                            <p className="text-[0.95rem] text-[#444] leading-relaxed mb-6 text-justify relative z-10 pt-10" style={{ textAlignLast: 'left' }}>
-                                {t.text}
-                            </p>
-
-                            <div className="relative z-10">
-                                <div className="font-bold text-[#0569ff] text-sm tracking-wide">
-                                    {t.author.toUpperCase()}
+                {/* Scrolling Testimonials - Continuous Marquee */}
+                <div
+                    ref={containerRef}
+                    className="testimonials-scroll-container flex gap-5 px-8"
+                    onScroll={handleScroll}
+                    style={{
+                        overflowX: 'auto',
+                        scrollbarWidth: 'none',
+                        msOverflowStyle: 'none',
+                        WebkitOverflowScrolling: 'touch',
+                        scrollBehavior: 'smooth'
+                    }}
+                >
+                    <div className="testimonials-marquee-track flex gap-5">
+                        {allTestimonials.map((t, i) => (
+                            <div
+                                key={i}
+                                className="flex-shrink-0 w-[350px] h-[280px] p-8 rounded-xl bg-white border border-[#e8e8e8] relative overflow-hidden flex flex-col transition-transform duration-300 hover:scale-[1.02]"
+                            >
+                                {/* Quote Icon */}
+                                <div className="absolute top-4 left-4 opacity-100 pointer-events-none">
+                                    <svg width="48" height="38" viewBox="0 0 32 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M0 24V14.4C0 11.7333 0.4 9.33333 1.2 7.2C2.06667 5.06667 3.26667 3.26667 4.8 1.8C6.4 0.333333 8.26667 -0.266667 10.4 0.133333V5.4C9.06667 5.66667 7.96667 6.26667 7.1 7.2C6.3 8.13333 5.9 9.26667 5.9 10.6V10.8H12V24H0ZM20 24V14.4C20 11.7333 20.4 9.33333 21.2 7.2C22.0667 5.06667 23.2667 3.26667 24.8 1.8C26.4 0.333333 28.2667 -0.266667 30.4 0.133333V5.4C29.0667 5.66667 27.9667 6.26667 27.1 7.2C26.3 8.13333 25.9 9.26667 25.9 10.6V10.8H32V24H20Z" fill="#E8E8E8" />
+                                    </svg>
                                 </div>
-                                <div className="text-[13px] text-[#1a1a2e] font-medium underline decoration-1">{t.role}</div>
-                                <div className="text-[12px] text-[#666]">{t.school}</div>
+
+                                {/* Testimonial Text */}
+                                <p
+                                    className="text-[0.95rem] text-[#444] leading-relaxed mb-auto text-justify relative z-10 pt-10"
+                                    style={{
+                                        textAlignLast: 'left',
+                                        display: '-webkit-box',
+                                        WebkitLineClamp: 4,
+                                        WebkitBoxOrient: 'vertical',
+                                        overflow: 'hidden'
+                                    }}
+                                >
+                                    {t.text}
+                                </p>
+
+                                {/* Author Info */}
+                                <div className="relative z-10 mt-4 pt-4 border-t border-[#f0f0f0]">
+                                    <div className="font-bold text-[#0569ff] text-sm tracking-wide truncate">
+                                        {t.author.toUpperCase()}
+                                    </div>
+                                    <div className="text-[13px] text-[#1a1a2e] font-medium underline decoration-1 truncate">
+                                        {t.role}
+                                    </div>
+                                    <div className="text-[12px] text-[#666] truncate">
+                                        {t.school}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
             </div>
 
             {/* Pagination Dots */}
-            <div className="flex justify-center gap-4 mt-10">
-                <div className="w-[10px] h-[10px] rounded-full bg-[#0569ff]" />
-                <div className="w-[10px] h-[10px] rounded-full bg-[#d1d5db]" />
-                <div className="w-[10px] h-[10px] rounded-full bg-[#d1d5db]" />
+            <div className="flex justify-center gap-3 mt-10">
+                {testimonials.map((_, i) => (
+                    <button
+                        key={i}
+                        onClick={() => scrollToIndex(i)}
+                        className={`w-3 h-3 rounded-full transition-all duration-300 cursor-pointer border-none outline-none ${activeIndex === i
+                            ? 'bg-[#0569ff] scale-125'
+                            : 'bg-[#d1d5db] hover:bg-[#9ca3af]'
+                            }`}
+                        aria-label={`Go to testimonial ${i + 1}`}
+                        type="button"
+                    />
+                ))}
             </div>
+
+            {/* CSS for marquee animation and hiding scrollbar */}
+            <style>{`
+                .testimonials-scroll-container::-webkit-scrollbar {
+                    display: none;
+                }
+                .testimonials-marquee-track {
+                    animation: marquee 35s linear infinite;
+                }
+                .testimonials-marquee-wrapper:hover .testimonials-marquee-track {
+                    animation-play-state: paused;
+                }
+                @keyframes marquee {
+                    0% {
+                        transform: translateX(0);
+                    }
+                    100% {
+                        transform: translateX(-50%);
+                    }
+                }
+            `}</style>
         </section>
     );
 }

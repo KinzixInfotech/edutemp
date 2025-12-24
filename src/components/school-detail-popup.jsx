@@ -61,7 +61,6 @@ export function SchoolDetailPopup({ school, children }) {
                 >
                     {/* Overlay for better depth / image readability */}
                     <div className={`absolute inset-0 ${coverImageUrl ? 'bg-black/30' : 'bg-gradient-to-t from-black/20 to-transparent'}`} />
-
                     {/* Decorative elements - only show when using gradient (no cover image) */}
                     {!coverImageUrl && (
                         <>
@@ -78,7 +77,6 @@ export function SchoolDetailPopup({ school, children }) {
                             <div className="absolute top-4 right-8 w-20 h-20 border-2 border-white/20 rounded-full" />
                             <div className="absolute top-8 right-4 w-12 h-12 border border-white/15 rounded-full" />
                             <div className="absolute bottom-4 left-6 w-16 h-16 border border-white/10 rounded-full" />
-
                             {/* Glow effects */}
                             <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
                             <div className="absolute bottom-0 left-0 w-24 h-24 bg-indigo-400/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
