@@ -80,6 +80,7 @@ export async function GET(req) {
                     select: {
                         id: true,
                         schoolId: true,
+                        slug: true,
                         tagline: true,
                         description: true,
                         coverImage: true,

@@ -309,7 +309,7 @@ export default function FeaturesIntroPage() {
                     className="absolute inset-0 w-full h-full z-0 opacity-40 [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,white_0%,transparent_70%)]"
                 />
 
-                <div className="max-w-4xl mx-auto text-center">
+                <div className="max-w-4xl mx-auto text-center relative z-10">
                     <h2 className="text-3xl md:text-4xl font-bold mb-4">
                         Ready to Transform Your School?
                     </h2>
@@ -318,12 +318,12 @@ export default function FeaturesIntroPage() {
                     </p>
                     <div className="flex flex-wrap gap-4 justify-center">
                         <Link href="/contact">
-                            <button className="px-8 py-4 bg-[#0569ff] text-white rounded-full font-bold text-lg hover:bg-[#0450d4] transition-all duration-300 shadow-xl">
+                            <button className="min-w-[200px] px-8 py-4 bg-[#0569ff] text-white rounded-full font-bold text-lg hover:bg-[#0450d4] transition-all duration-300 shadow-xl">
                                 Book a Demo
                             </button>
                         </Link>
                         <Link href="/features/docs">
-                            <button className="px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-white text-white rounded-full font-bold text-lg hover:bg-white/20 transition-all duration-300">
+                            <button className="min-w-[200px] px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-white text-white rounded-full font-bold text-lg hover:bg-white/20 transition-all duration-300">
                                 View Documentation
                             </button>
                         </Link>

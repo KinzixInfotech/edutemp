@@ -24,7 +24,7 @@ export default function ClientProduct({ children }) {
         pathname === "/login" ||
         pathname.startsWith("/exam") ||
         pathname.startsWith("/forms") ||
-        (isSchoolDomain && pathname.startsWith("/explore"))
+        (isSchoolDomain || pathname.startsWith("/explore"))
 
     const hidefooter =
         pathname.startsWith("/dashboard") ||

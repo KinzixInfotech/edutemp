@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 export default function SchoolCard({ school }) {
     const {
         schoolId,
+        slug,
         tagline,
 
         minFee,
@@ -23,6 +24,9 @@ export default function SchoolCard({ school }) {
         badges,
         _count,
     } = school;
+
+    // Use slug for SEO-friendly URLs, fallback to schoolId
+    const urlIdentifier = slug || schoolId;
 
     const formatFee = (fee) => {
         if (!fee) return 'N/A';
@@ -126,12 +130,12 @@ export default function SchoolCard({ school }) {
 
                 {/* Actions */}
                 <div className="flex gap-2 pt-3">
-                    <Link href={`/explore/schools/${schoolId}`} className="flex-1">
+                    <Link href={`/explore/schools/${urlIdentifier}`} className="flex-1">
                         <Button variant="outline" className="w-full">
                             View Profile
                         </Button>
                     </Link>
-                    <Link href={`/explore/schools/${schoolId}#apply`} className="flex-1">
+                    <Link href={`/explore/schools/${urlIdentifier}#apply`} className="flex-1">
                         <Button className="w-full">
                             Apply Now
                         </Button>

@@ -112,6 +112,9 @@ model SchoolPublicProfile {
   schoolId String @unique @db.Uuid
   school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
+  // SEO-friendly URL slug (e.g., "dav-public-school-hazaribagh")
+  slug String? @unique
+
   // Visibility
   isPubliclyVisible Boolean @default(false)
   isFeatured        Boolean @default(false)
@@ -167,6 +170,7 @@ model SchoolPublicProfile {
   @@index([isPubliclyVisible])
   @@index([isFeatured])
   @@index([overallRating])
+  @@index([slug])
 }
 
 model SchoolAchievement {

@@ -1,6 +1,7 @@
 'use client'
 import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
+import Script from 'next/script';
 
 import {
     CheckCircle, Star, Users, BookOpen, BarChart3,
@@ -21,11 +22,43 @@ import WebDashboardCTA from '@/components/WebDashboardCTA';
 import { OrbitingCircles } from '@/components/ui/orbiting-circles';
 import { NumberTicker } from '@/components/ui/number-ticker';
 
-
+// Organization Schema for SEO
+const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "EduBreezy",
+    "alternateName": "Edu Breezy",
+    "url": "https://edubreezy.com",
+    "logo": "https://edubreezy.com/favicon.ico",
+    "description": "India's leading school management ERP and school explorer platform. Find and compare schools, manage admissions, fees, attendance, and more.",
+    "foundingDate": "2020",
+    "founder": {
+        "@type": "Organization",
+        "name": "Kinzix Infotech"
+    },
+    "sameAs": [
+        "https://kinzix.com"
+    ],
+    "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+            "@type": "EntryPoint",
+            "urlTemplate": "https://school.edubreezy.com/explore/schools?search={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+    }
+};
 
 export default function HomePage() {
     return (
         <div className="bg-white overflow-x-hidden">
+            {/* Organization Schema for better sitelinks */}
+            <Script
+                id="organization-schema"
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+            />
+
             <HeroSection />
             <MarqueeBanner />
             <AboutBriefSection />

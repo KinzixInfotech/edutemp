@@ -580,7 +580,7 @@ export default function PublicProfileSettings() {
                             variant="outline"
                             asChild
                         >
-                            <a href={`http://school.edubreezy.com/explore/schools/${formData.schoolId}`} target="_blank" className="gap-2">
+                            <a href={`http://school.edubreezy.com/explore/schools/${formData.slug || formData.schoolId}`} target="_blank" className="gap-2">
                                 {formData.isPubliclyVisible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                                 {formData.isPubliclyVisible ? 'View Public Profile' : 'Preview (Hidden)'}
                             </a>

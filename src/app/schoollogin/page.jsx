@@ -3,6 +3,13 @@ import Image from "next/image";
 // import './product.css';
 import Hero from "../components/Hero";
 
+export const metadata = {
+    robots: {
+        index: false,
+        follow: false,
+    },
+};
+
 export default function Home() {
     return (
         <div className="">

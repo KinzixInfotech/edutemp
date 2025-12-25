@@ -26,26 +26,9 @@ const menuConfig = {
         },
         {
             name: "About",
-            type: "submenu",
-            submenus: [
-                {
-                    category: "Company",
-                    items: [
-                        { name: "About Us", link: "/about", target: "_self", description: "Learn about our mission" },
-                        { name: "Our Team", link: "/team", target: "_self", description: "Meet the people behind EduBreezy" },
-                        { name: "Careers", link: "/careers", target: "_self", description: "Join our growing team" },
-                        { name: "Press & Media", link: "/press", target: "_self", description: "Latest news and updates" }
-                    ]
-                },
-                {
-                    category: "Resources",
-                    items: [
-                        { name: "Blog", link: "/blog", target: "_self", description: "Educational insights" },
-                        { name: "Case Studies", link: "/case-studies", target: "_self", description: "Success stories" },
-                        { name: "Testimonials", link: "/testimonials", target: "_self", description: "What our clients say" }
-                    ]
-                }
-            ]
+            type: "link",
+            link: "/about",
+            target: "_self"
         },
         {
             name: "Apps",

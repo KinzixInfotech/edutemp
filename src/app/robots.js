@@ -58,6 +58,7 @@ export default async function robots() {
                     '/auth/',
                     '/login',
                     '/signup',
+                    '/schoollogin',
                     '/reset-password',
                     '/verify/',
                     '/explore/', // Redirect to school subdomain
