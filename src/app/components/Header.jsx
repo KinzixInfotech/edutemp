@@ -48,30 +48,6 @@ const menuConfig = {
             ]
         },
         {
-            name: "Solutions",
-            type: "submenu",
-            submenus: [
-                {
-                    category: "By Institution",
-                    items: [
-                        { name: "K-12 Schools", link: "/solutions/k12", target: "_self", description: "Complete management for schools" },
-                        { name: "Colleges & Universities", link: "/solutions/college", target: "_self", description: "Higher education solutions" },
-                        { name: "Training Centers", link: "/solutions/training", target: "_self", description: "Professional training management" },
-                        { name: "Online Learning", link: "/solutions/online", target: "_self", description: "Virtual education platform" }
-                    ]
-                },
-                {
-                    category: "By Feature",
-                    items: [
-                        { name: "Student Management", link: "/features/students", target: "_self", description: "Track student progress" },
-                        { name: "Attendance System", link: "/features/attendance", target: "_self", description: "Automated attendance" },
-                        { name: "Fee Management", link: "/features/fees", target: "_self", description: "Streamlined payments" },
-                        { name: "Grade Management", link: "/features/grades", target: "_self", description: "Digital grade books" }
-                    ]
-                }
-            ]
-        },
-        {
             name: "Apps",
             type: "submenu",
             submenus: [
@@ -83,15 +59,6 @@ const menuConfig = {
                         { name: "Student App", link: "/apps/student", target: "_self", description: "Access learning materials anytime" }
                     ]
                 },
-                {
-                    category: "Integrations",
-                    items: [
-                        { name: "Google Workspace", link: "/integrations/google", target: "_self", description: "Seamless Google integration" },
-                        { name: "Microsoft 365", link: "/integrations/microsoft", target: "_self", description: "Connect with Microsoft tools" },
-                        { name: "Zoom", link: "/integrations/zoom", target: "_self", description: "Virtual classroom integration" },
-                        { name: "API Access", link: "/integrations/api", target: "_self", description: "Build custom integrations" }
-                    ]
-                }
             ]
         },
         {

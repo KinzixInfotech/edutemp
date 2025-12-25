@@ -1345,50 +1345,17 @@ function TestimonialsSection() {
         }
     ];
 
-    // Duplicate for seamless infinite loop
-    const allTestimonials = [...testimonials, ...testimonials];
-
-    // Drag to scroll state
-    const containerRef = React.useRef(null);
-    const [isDragging, setIsDragging] = React.useState(false);
-    const [startX, setStartX] = React.useState(0);
-    const [scrollLeft, setScrollLeft] = React.useState(0);
-
-    const handleMouseDown = (e) => {
-        if (!containerRef.current) return;
-        setIsDragging(true);
-        setStartX(e.pageX - containerRef.current.offsetLeft);
-        setScrollLeft(containerRef.current.scrollLeft);
-        containerRef.current.style.cursor = 'grabbing';
-    };
-
-    const handleMouseUp = () => {
-        setIsDragging(false);
-        if (containerRef.current) {
-            containerRef.current.style.cursor = 'grab';
-        }
-    };
-
-    const handleMouseMove = (e) => {
-        if (!isDragging || !containerRef.current) return;
-        e.preventDefault();
-        const x = e.pageX - containerRef.current.offsetLeft;
-        const walk = (x - startX) * 2;
-        containerRef.current.scrollLeft = scrollLeft - walk;
-    };
-
-    const handleMouseLeave = () => {
-        setIsDragging(false);
-        if (containerRef.current) {
-            containerRef.current.style.cursor = 'grab';
-        }
-    };
+    // Card width (350px) + gap (20px) = 370px per card
+    // 6 testimonials = 2220px per set
+    const cardWidth = 350;
+    const gap = 20;
+    const totalWidth = testimonials.length * (cardWidth + gap);
 
     return (
         <section className="py-20 bg-[#f8fafc] overflow-hidden">
             <div className="max-w-[1200px] mx-auto px-5">
                 <div className="text-center mb-12">
-                    <h2 className="text-3xl  md:text-4xl font-bold text-[#1a1a2e] mb-3">
+                    <h2 className="text-3xl md:text-4xl font-bold text-[#1a1a2e] mb-3">
                         Read What <span className="text-[#0569ff]">Our Users</span> Have To Say About Us
                     </h2>
                     <p className="text-gray-600 max-w-2xl mx-auto">
@@ -1405,29 +1372,60 @@ function TestimonialsSection() {
                 {/* Gradient Fade Right */}
                 <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-[#f8fafc] to-transparent z-10 pointer-events-none" />
 
-                {/* Scrollable Container with Drag Support */}
-                <div
-                    ref={containerRef}
-                    className={`testimonials-scroll-container flex overflow-x-auto ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-                    style={{
-                        scrollbarWidth: 'none',
-                        msOverflowStyle: 'none',
-                        WebkitOverflowScrolling: 'touch'
-                    }}
-                    onMouseDown={handleMouseDown}
-                    onMouseUp={handleMouseUp}
-                    onMouseMove={handleMouseMove}
-                    onMouseLeave={handleMouseLeave}
-                >
-                    {/* Scrolling Testimonials - Continuous Marquee */}
-                    <div className={`testimonials-marquee-track flex gap-5 ${isDragging ? 'animation-paused' : ''}`}>
-                        {allTestimonials.map((t, i) => (
+                {/* Infinite Marquee Track */}
+                <div className="testimonials-marquee-track flex">
+                    {/* First set of testimonials */}
+                    <div className="flex gap-5 pr-5">
+                        {testimonials.map((t, i) => (
                             <div
-                                key={i}
+                                key={`set1-${i}`}
                                 className="flex-shrink-0 w-[350px] h-[280px] p-8 rounded-xl bg-white border border-[#e8e8e8] relative overflow-hidden flex flex-col transition-transform duration-300 hover:scale-[1.02]"
                             >
                                 {/* Quote Icon */}
-                                <div className="absolute top-4 left-4 opacity-200 pointer-events-none">
+                                <div className="absolute top-4 left-4 pointer-events-none">
+                                    <svg width="48" height="38" viewBox="0 0 32 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M0 24V14.4C0 11.7333 0.4 9.33333 1.2 7.2C2.06667 5.06667 3.26667 3.26667 4.8 1.8C6.4 0.333333 8.26667 -0.266667 10.4 0.133333V5.4C9.06667 5.66667 7.96667 6.26667 7.1 7.2C6.3 8.13333 5.9 9.26667 5.9 10.6V10.8H12V24H0ZM20 24V14.4C20 11.7333 20.4 9.33333 21.2 7.2C22.0667 5.06667 23.2667 3.26667 24.8 1.8C26.4 0.333333 28.2667 -0.266667 30.4 0.133333V5.4C29.0667 5.66667 27.9667 6.26667 27.1 7.2C26.3 8.13333 25.9 9.26667 25.9 10.6V10.8H32V24H20Z" fill="#E8E8E8" />
+                                    </svg>
+                                </div>
+
+                                {/* Testimonial Text */}
+                                <p
+                                    className="text-[0.95rem] text-[#444] leading-relaxed mb-auto text-justify relative z-10 pt-10"
+                                    style={{
+                                        textAlignLast: 'left',
+                                        display: '-webkit-box',
+                                        WebkitLineClamp: 4,
+                                        WebkitBoxOrient: 'vertical',
+                                        overflow: 'hidden'
+                                    }}
+                                >
+                                    {t.text}
+                                </p>
+
+                                {/* Author Info */}
+                                <div className="relative z-10 mt-4 pt-4 border-t border-[#f0f0f0]">
+                                    <div className="font-bold text-[#0569ff] text-sm tracking-wide truncate">
+                                        {t.author.toUpperCase()}
+                                    </div>
+                                    <div className="text-[13px] text-[#1a1a2e] font-medium underline decoration-1 truncate">
+                                        {t.role}
+                                    </div>
+                                    <div className="text-[12px] text-[#666] truncate">
+                                        {t.school}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    {/* Second set of testimonials (clone for seamless loop) */}
+                    <div className="flex gap-5 pr-5">
+                        {testimonials.map((t, i) => (
+                            <div
+                                key={`set2-${i}`}
+                                className="flex-shrink-0 w-[350px] h-[280px] p-8 rounded-xl bg-white border border-[#e8e8e8] relative overflow-hidden flex flex-col transition-transform duration-300 hover:scale-[1.02]"
+                            >
+                                {/* Quote Icon */}
+                                <div className="absolute top-4 left-4 pointer-events-none">
                                     <svg width="48" height="38" viewBox="0 0 32 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                         <path d="M0 24V14.4C0 11.7333 0.4 9.33333 1.2 7.2C2.06667 5.06667 3.26667 3.26667 4.8 1.8C6.4 0.333333 8.26667 -0.266667 10.4 0.133333V5.4C9.06667 5.66667 7.96667 6.26667 7.1 7.2C6.3 8.13333 5.9 9.26667 5.9 10.6V10.8H12V24H0ZM20 24V14.4C20 11.7333 20.4 9.33333 21.2 7.2C22.0667 5.06667 23.2667 3.26667 24.8 1.8C26.4 0.333333 28.2667 -0.266667 30.4 0.133333V5.4C29.0667 5.66667 27.9667 6.26667 27.1 7.2C26.3 8.13333 25.9 9.26667 25.9 10.6V10.8H32V24H20Z" fill="#E8E8E8" />
                                     </svg>
@@ -1465,24 +1463,20 @@ function TestimonialsSection() {
                 </div>
             </div>
 
-            {/* CSS for marquee animation and hiding scrollbar */}
+            {/* CSS for infinite marquee animation */}
             <style>{`
-                .testimonials-scroll-container::-webkit-scrollbar {
-                    display: none;
-                }
                 .testimonials-marquee-track {
-                    animation: marquee 35s linear infinite;
+                    animation: testimonials-scroll 30s linear infinite;
                 }
-                .testimonials-marquee-wrapper:hover .testimonials-marquee-track,
-                .testimonials-marquee-track.animation-paused {
+                .testimonials-marquee-wrapper:hover .testimonials-marquee-track {
                     animation-play-state: paused;
                 }
-                @keyframes marquee {
+                @keyframes testimonials-scroll {
                     0% {
                         transform: translateX(0);
                     }
                     100% {
-                        transform: translateX(-50%);
+                        transform: translateX(-${totalWidth}px);
                     }
                 }
             `}</style>

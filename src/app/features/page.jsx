@@ -8,6 +8,7 @@ import {
     Search, Zap, Shield, Cloud, Layout
 } from 'lucide-react';
 import Header from '../components/Header';
+import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
 
 export default function FeaturesIntroPage() {
     const stats = [
@@ -301,7 +302,13 @@ export default function FeaturesIntroPage() {
             </section>
 
             {/* Final CTA */}
-            <section className="py-16 px-5 bg-[#1a1a2e] text-white">
+            <section className="relative py-16 px-5 bg-[#1a1a2e] text-white overflow-hidden">
+                <InteractiveGridPattern
+                    width={80}
+                    height={80}
+                    className="absolute inset-0 w-full h-full z-0 opacity-40 [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,white_0%,transparent_70%)]"
+                />
+
                 <div className="max-w-4xl mx-auto text-center">
                     <h2 className="text-3xl md:text-4xl font-bold mb-4">
                         Ready to Transform Your School?

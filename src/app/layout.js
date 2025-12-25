@@ -14,7 +14,7 @@ const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://edubreezy.com';
 export const metadata = {
   // Core metadata
   title: {
-    default: "EduBreezy - School Management & Explorer Platform",
+    default: "EduBreezy – India’s Leading School Management ERP & Explorer Platform",
     template: "%s | EduBreezy"
   },
   description: "EduBreezy is India's leading school management platform. Find and compare schools, read verified parent reviews, manage admissions, fees, attendance, and more. Edu Breezy simplifies education.",
