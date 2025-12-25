@@ -9,6 +9,14 @@ export const metadata = {
     },
     description: 'Discover and compare the best schools for your child. Verified reviews, real-time rankings, and detailed insights powered by EduBreezy ERP.',
     keywords: ['school explorer', 'find schools', 'school rankings', 'verified school reviews', 'edubreezy'],
+    icons: {
+        icon: [
+            { url: "/favicon.ico", sizes: "any" },
+            { url: "/favicon.ico", sizes: "192x192" },
+        ],
+        shortcut: "/favicon.ico",
+        apple: "/favicon.ico",
+    },
     alternates: {
         canonical: '/explore',
     },
