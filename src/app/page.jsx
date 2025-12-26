@@ -21,7 +21,6 @@ import DownloadAppCTA from '@/components/DownloadAppCTA';
 import WebDashboardCTA from '@/components/WebDashboardCTA';
 import { OrbitingCircles } from '@/components/ui/orbiting-circles';
 import { NumberTicker } from '@/components/ui/number-ticker';
-
 // Organization Schema for SEO
 const organizationSchema = {
     "@context": "https://schema.org",

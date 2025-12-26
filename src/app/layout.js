@@ -56,12 +56,19 @@ export const metadata = {
     description: "Find and compare schools, read verified reviews, manage school operations seamlessly. India's trusted education platform.",
     images: [
       {
-        url: `${baseUrl}/thumbnail.png`,
+        url: `${baseUrl}/by.png`,
+        secureUrl: `${baseUrl}/by.png`,
         width: 1200,
         height: 630,
         alt: "EduBreezy - School Management Platform",
+        type: "image/png",
       },
     ],
+  },
+
+  // Facebook App ID (optional but recommended for better insights)
+  other: {
+    'fb:app_id': process.env.NEXT_PUBLIC_FB_APP_ID || '',
   },
 
   // Twitter Card
@@ -69,7 +76,7 @@ export const metadata = {
     card: "summary_large_image",
     title: "EduBreezy - School Management & Explorer Platform",
     description: "Find schools, read reviews, manage admissions & fees. India's trusted education platform.",
-    images: [`${baseUrl}/thumbnail.png`],
+    images: [`${baseUrl}/by.png`],
     creator: "@edubreezy",
   },
 
