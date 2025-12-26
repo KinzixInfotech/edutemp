@@ -38,64 +38,99 @@ export async function POST(req) {
       return NextResponse.json({ error: "User not found in database" }, { status: 404 });
     }
 
-    // Step 3️⃣: Decide based on schoolCode presence
-    const isSchoolLogin = Boolean(schoolCode?.trim());
+    // check the user's role
+    const userRole = user.role?.name;
+    console.log(`User role: ${userRole}`);
 
-    // ✅ If school login — only allow school roles
-    const schoolRoles = ["ADMIN", "TEACHING_STAFF", "NON_TEACHING_STAFF", "STUDENT", "PARENT", "LIBRARIAN", "ACCOUNTANT", "DRIVER", "CONDUCTOR"];
-    if (isSchoolLogin && !schoolRoles.includes(user.role.name)) {
-      await supabase.auth.signOut();
-      return NextResponse.json({ error: "Only school users can login here" }, { status: 403 });
+    // If SUPER_ADMIN - only allow without school code
+    if (userRole === "SUPER_ADMIN") {
+      if (loginSchoolCode) {
+        return NextResponse.json({ error: "Super admins should not use school code." }, { status: 403 });
+      }
+      console.log("Super Admin login successful.");
+      // For SUPER_ADMIN, schoolId is null
+      return NextResponse.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          schoolId: null,
+        },
+      });
     }
 
-    // ✅ If no schoolCode — only SUPER_ADMIN can login
-    if (!isSchoolLogin && user.role.name !== "SUPER_ADMIN") {
+    // For school-specific roles, schoolCode is required
+    // Permitted roles: ADMIN, TEACHING_STAFF, NON_TEACHING_STAFF, STUDENT, PARENT, LIBRARIAN, ACCOUNTANT, DIRECTOR, PRINCIPAL, DRIVER, CONDUCTOR
+    const permittedRoles = [
+      "ADMIN",
+      "TEACHING_STAFF",
+      "NON_TEACHING_STAFF",
+      "STUDENT",
+      "PARENT",
+      "LIBRARIAN",
+      "ACCOUNTANT",
+      "DIRECTOR",
+      "PRINCIPAL",
+      "DRIVER",
+      "CONDUCTOR",
+    ];
+    if (!permittedRoles.includes(userRole)) {
       await supabase.auth.signOut();
-      return NextResponse.json({ error: "Only super admins can login without school code" }, { status: 403 });
+      return NextResponse.json({ error: "Role not permitted for school login." }, { status: 403 });
+    }
+    if (!loginSchoolCode) {
+      await supabase.auth.signOut();
+      return NextResponse.json({ error: "School code required for this role." }, { status: 400 });
     }
 
-    // Step 4️⃣: Set user ACTIVE
+    // Step 3️⃣: Set user ACTIVE
     await prisma.user.update({
       where: { id: userId },
       data: { status: "ACTIVE" },
     });
 
-    // Step 5️⃣: Resolve schoolId (if school user)
-    let schoolId = null;
+    // Step 4️⃣: Resolve schoolId based on user role
+    let userSchoolId = null;
 
-    switch (user.role.name) {
+    switch (userRole) {
       case "ADMIN":
-        schoolId = (await prisma.admin.findUnique({ where: { userId } }))?.schoolId;
+        userSchoolId = (await prisma.admin.findUnique({ where: { userId: user.id } }))?.schoolId;
         break;
       case "TEACHING_STAFF":
-        schoolId = (await prisma.teachingStaff.findUnique({ where: { userId } }))?.schoolId;
+        userSchoolId = (await prisma.teachingStaff.findUnique({ where: { userId: user.id } }))?.schoolId;
         break;
       case "NON_TEACHING_STAFF":
-        schoolId = (await prisma.nonTeachingStaff.findUnique({ where: { userId } }))?.schoolId;
+        userSchoolId = (await prisma.nonTeachingStaff.findUnique({ where: { userId: user.id } }))?.schoolId;
         break;
       case "STUDENT":
-        schoolId = (await prisma.student.findFirst({ where: { userId } }))?.schoolId;
+        userSchoolId = (await prisma.student.findFirst({ where: { userId: user.id } }))?.schoolId;
         break;
       case "PARENT":
         const parent = await prisma.parent.findUnique({
-          where: { userId },
+          where: { userId: user.id },
           include: { studentLinks: { select: { student: { select: { schoolId: true } } }, take: 1 } },
         });
-        schoolId = parent?.studentLinks?.[0]?.student?.schoolId || null;
+        userSchoolId = parent?.studentLinks?.[0]?.student?.schoolId || null;
         break;
       case "LIBRARIAN":
-        schoolId = (await prisma.librarian.findUnique({ where: { userId } }))?.schoolId;
+        userSchoolId = (await prisma.librarian.findUnique({ where: { userId: user.id } }))?.schoolId;
         break;
       case "ACCOUNTANT":
-        schoolId = (await prisma.accountant.findUnique({ where: { userId } }))?.schoolId;
+        userSchoolId = (await prisma.accountant.findUnique({ where: { userId: user.id } }))?.schoolId;
+        break;
+      case "DIRECTOR":
+        userSchoolId = (await prisma.director.findUnique({ where: { userId: user.id } }))?.schoolId;
+        break;
+      case "PRINCIPAL":
+        userSchoolId = (await prisma.principal.findUnique({ where: { userId: user.id } }))?.schoolId;
         break;
       case "DRIVER":
       case "CONDUCTOR":
-        schoolId = (await prisma.transportStaff.findUnique({ where: { userId } }))?.schoolId;
+        userSchoolId = (await prisma.transportStaff.findUnique({ where: { userId: user.id } }))?.schoolId;
         break;
     }
 
-    if (isSchoolLogin && !schoolId) {
+    if (!userSchoolId) {
       await supabase.auth.signOut();
       return NextResponse.json({ error: "School not linked to user" }, { status: 400 });
     }

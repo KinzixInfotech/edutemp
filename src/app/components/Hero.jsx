@@ -14,7 +14,7 @@ const Hero = () => {
     const [code, setCode] = useState("");
 
     return (
-        <section className="relative min-h-screen h-fit pt-[100px] pb-10 bg-[linear-gradient(120deg,#f8fafc_0%,#fff9f0_50%,#f0f7ff_100%)] overflow-visible">
+        <section className="relative min-h-screen h-fit pt-[100px] pb-10 bg-[linear-gradient(120deg,#f8fafc_0%,#fff9f0_50%,#f0f7ff_100%)] overflow-x-hidden">
             {/* Mesh Gradient Glow - Left */}
             <div className="absolute top-[10%] -left-[10%] w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(5,105,255,0.25)_0%,transparent_70%)] blur-[80px] rounded-full pointer-events-none" />
 

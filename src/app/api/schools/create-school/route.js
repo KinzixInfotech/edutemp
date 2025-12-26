@@ -17,10 +17,23 @@ const schoolSchema = z.object({
   domainMode: z.enum(["tenant", "custom"]),
   tenantName: z.string().optional(),
   customDomain: z.string().optional().nullable(),
+
+  // Admin
+  adminName: z.string().min(1),
   adminem: z.string().email(),
-  masteradminemail: z.string().email(),
-  masteradminpassword: z.string().min(6),
   adminPassword: z.string().min(6),
+
+  // Director
+  directorName: z.string().min(1),
+  directorEmail: z.string().email(),
+  directorPassword: z.string().min(6),
+
+  //Principal (optional)
+  createPrincipal: z.boolean(),
+  principalName: z.string().optional(),
+  principalEmail: z.string().email().optional().or(z.literal('')),
+  principalPassword: z.string().min(6).optional(),
+
   generateWebsite: z.boolean().optional(),
 }).superRefine((data, ctx) => {
   if (data.domainMode === "tenant" && !data.tenantName) {
@@ -37,11 +50,36 @@ const schoolSchema = z.object({
       message: "Custom domain is required when using custom mode",
     });
   }
+  // Validate Principal fields if createPrincipal is true
+  if (data.createPrincipal) {
+    if (!data.principalName || data.principalName.trim() === '') {
+      ctx.addIssue({
+        path: ['principalName'],
+        code: 'custom',
+        message: 'Principal name is required',
+      });
+    }
+    if (!data.principalEmail || data.principalEmail.trim() === '') {
+      ctx.addIssue({
+        path: ['principalEmail'],
+        code: 'custom',
+        message: 'Principal email is required',
+      });
+    }
+    if (!data.principalPassword || data.principalPassword.length < 6) {
+      ctx.addIssue({
+        path: ['principalPassword'],
+        code: 'custom',
+        message: 'Principal password must be at least 6 characters',
+      });
+    }
+  }
 });
 
 export async function POST(req) {
   let createdAdminId = null;
-  let createdMasterId = null;
+  let createdDirectorId = null;
+  let createdPrincipalId = null;
 
   try {
     const body = await req.json();
@@ -62,26 +100,46 @@ export async function POST(req) {
     if (adminError || !adminData?.user?.id) {
       throw new Error(`Admin Supabase error: ${adminError?.message || "Missing user ID"}`);
     }
-    const createdAdminId = adminData.user.id;
+    createdAdminId = adminData.user.id;
 
-    // --- Create MasterAdmin User ---
-    const { data: masterData, error: masterError } = await supabaseAdmin.auth.admin.createUser({
-      email: parsed.masteradminemail,
-      password: parsed.masteradminpassword,
+    // --- Create Director User ---
+    const { data: directorData, error: directorError } = await supabaseAdmin.auth.admin.createUser({
+      email: parsed.directorEmail,
+      password: parsed.directorPassword,
       email_confirm: true,
     });
 
-    if (masterError || !masterData?.user?.id) {
-      // Optional: clean up admin user if master fails
+    if (directorError || !directorData?.user?.id) {
+      // Rollback admin user
       try {
         await supabaseAdmin.auth.admin.deleteUser(createdAdminId);
       } catch (cleanupErr) {
         console.error("Failed to rollback admin user:", cleanupErr);
       }
-
-      throw new Error(`MasterAdmin Supabase error: ${masterError?.message || "Missing user ID"}`);
+      throw new Error(`Director Supabase error: ${directorError?.message || "Missing user ID"}`);
     }
-    createdMasterId = masterData.user.id;
+    createdDirectorId = directorData.user.id;
+
+    // --- Create Principal User (if requested) ---
+    if (parsed.createPrincipal) {
+      const { data: principalData, error: principalError } = await supabaseAdmin.auth.admin.createUser({
+        email: parsed.principalEmail,
+        password: parsed.principalPassword,
+        email_confirm: true,
+      });
+
+      if (principalError || !principalData?.user?.id) {
+        // Rollback admin and director
+        try {
+          await supabaseAdmin.auth.admin.deleteUser(createdAdminId);
+          await supabaseAdmin.auth.admin.deleteUser(createdDirectorId);
+        } catch (cleanupErr) {
+          console.error("Failed to rollback users:", cleanupErr);
+        }
+        throw new Error(`Principal Supabase error: ${principalError?.message || "Missing user ID"}`);
+      }
+      createdPrincipalId = principalData.user.id;
+    }
 
 
     // Step 2: Prisma transaction
@@ -146,16 +204,21 @@ export async function POST(req) {
       });
 
       // Upsert roles
-      const [adminRole, masterRole] = await Promise.all([
+      const [adminRole, directorRole, principalRole] = await Promise.all([
         tx.role.upsert({
           where: { name: "ADMIN" },
           update: {},
           create: { name: "ADMIN" },
         }),
         tx.role.upsert({
-          where: { name: "MASTER_ADMIN" },
+          where: { name: "DIRECTOR" },
           update: {},
-          create: { name: "MASTER_ADMIN" },
+          create: { name: "DIRECTOR" },
+        }),
+        tx.role.upsert({
+          where: { name: "PRINCIPAL" },
+          update: {},
+          create: { name: "PRINCIPAL" },
         }),
       ]);
 
@@ -163,6 +226,7 @@ export async function POST(req) {
       const adminUser = await tx.user.create({
         data: {
           id: createdAdminId,
+          name: parsed.adminName,
           email: parsed.adminem,
           password: parsed.adminPassword,
           school: { connect: { id: school.id } },
@@ -173,25 +237,38 @@ export async function POST(req) {
         },
       });
 
-      // Create MasterAdmin user
-      const masterAdminUser = await tx.user.create({
+      // Create Director user
+      const directorUser = await tx.user.create({
         data: {
-          id: createdMasterId,
-          email: parsed.masteradminemail,
-          password: parsed.masteradminpassword,
-          // roleId: masterRole.id,
-          // schoolId: school.id,
+          id: createdDirectorId,
+          name: parsed.directorName,
+          email: parsed.directorEmail,
+          password: parsed.directorPassword,
           school: { connect: { id: school.id } },
-          role: { connect: { id: masterRole.id } },
-          MasterAdmin: {
-            create: {
-              school: {
-                connect: { id: school.id }, // Link to existing school
-              },
-            },
+          role: { connect: { id: directorRole.id } },
+          Director: {
+            create: { schoolId: school.id },
           },
         },
       });
+
+      // Create Principal user (if requested)
+      let principalUser = null;
+      if (parsed.createPrincipal && createdPrincipalId) {
+        principalUser = await tx.user.create({
+          data: {
+            id: createdPrincipalId,
+            name: parsed.principalName,
+            email: parsed.principalEmail,
+            password: parsed.principalPassword,
+            school: { connect: { id: school.id } },
+            role: { connect: { id: principalRole.id } },
+            Principal: {
+              create: { schoolId: school.id },
+            },
+          },
+        });
+      }
 
       // Audit log
       await tx.auditLog.create({
@@ -204,12 +281,13 @@ export async function POST(req) {
             name: parsed.name,
             domain: resolvedDomain,
             adminEmail: parsed.adminem,
-            masterAdminEmail: parsed.masteradminemail,
+            directorEmail: parsed.directorEmail,
+            principalEmail: parsed.createPrincipal ? parsed.principalEmail : null,
           },
         },
       });
 
-      return { school, adminUser, masterAdminUser };
+      return { school, adminUser, directorUser, principalUser };
     });
 
     return NextResponse.json({ success: true, result });

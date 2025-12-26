@@ -451,6 +451,37 @@ export async function GET(req) {
                 response.accountantData = accountant;
                 break;
             }
+            case "DIRECTOR": {
+                const director = await prisma.director.findUnique({
+                    where: { userId },
+                    include: { school: true },
+                });
+                console.log("✅ [API] Director details fetched:", director ? "Found" : "Not Found");
+                response.schoolId = director?.schoolId;
+                response.school = director?.school;
+                response.directorData = director;
+                break;
+            }
+            case "PRINCIPAL": {
+                const principal = await prisma.principal.findUnique({
+                    where: { userId },
+                    include: { school: true },
+                });
+                console.log("✅ [API] Principal details fetched:", principal ? "Found" : "Not Found");
+                response.schoolId = principal?.schoolId;
+                response.school = principal?.school;
+                response.principalData = principal;
+                break;
+            }
+            case "PARTNER": {
+                const partner = await prisma.partner.findUnique({
+                    where: { userId },
+                    include: { user: true },
+                });
+                console.log("✅ [API] Partner details fetched:", partner ? "Found" : "Not Found");
+                response.partner = partner;
+                break;
+            }
             case "DRIVER":
             case "CONDUCTOR": {
                 const transportStaff = await prisma.transportStaff.findUnique({
