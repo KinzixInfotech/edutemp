@@ -585,6 +585,7 @@ export const SidebarData = [
                 submenu: [
                     { label: "General Settings", url: "/dashboard/settings", roles: ["ADMIN"] },
                     { label: "Role Management", url: "/dashboard/settings/roles", roles: ["ADMIN"] },
+                    { label: "Import / Export Data", url: "/dashboard/schools/settings/import-data", roles: ["ADMIN"] },
                 ],
             },
         ],

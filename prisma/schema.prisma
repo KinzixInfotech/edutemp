@@ -101,8 +101,34 @@ model School {
   transportFees    TransportFee[]
   busRequests      BusRequest[]
   routeAssignments RouteAssignment[]
+  importHistory    ImportHistory[]
 
   @@index([name])
+}
+
+// ============================================
+// IMPORT HISTORY - TRACK BULK IMPORTS
+// ============================================
+
+model ImportHistory {
+  id              String   @id @default(cuid())
+  schoolId        String   @db.Uuid
+  module          String // students, teachers, etc.
+  fileName        String
+  totalRows       Int
+  success         Int
+  failed          Int
+  importedBy      String   @db.Uuid
+  createdAt       DateTime @default(now())
+  errors          Json? // Store error details as JSON
+  accountsCreated Int      @default(0)
+  accountsFailed  Int      @default(0)
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [importedBy], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([createdAt])
 }
 
 // ============================================
@@ -1552,8 +1578,9 @@ model User {
   securityEvents SecurityEvent[]
 
   // Payroll Management
-  payrollProfile EmployeePayrollProfile?
-  transportStaff TransportStaff?
+  payrollProfile  EmployeePayrollProfile?
+  transportStaff  TransportStaff?
+  importHistories ImportHistory[]
 
   @@index([schoolId])
   @@index([roleId])

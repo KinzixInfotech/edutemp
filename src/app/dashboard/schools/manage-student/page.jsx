@@ -23,7 +23,9 @@ import {
     Link as LinkIcon,
     ChevronLeft,
     ChevronRight,
-    UserX
+    UserX,
+    GraduationCap,
+    BookOpen
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
@@ -43,6 +45,7 @@ export default function StudentListPage() {
     const [selectedParentId, setSelectedParentId] = useState(null);
     const [classFilter, setClassFilter] = useState('ALL');
     const [sectionFilter, setSectionFilter] = useState('ALL');
+    const [sortBy, setSortBy] = useState('newest');
     const [page, setPage] = useState(1);
     const itemsPerPage = 10;
 
@@ -54,7 +57,7 @@ export default function StudentListPage() {
             return res.data || [];
         },
         enabled: !!schoolId,
-        staleTime: 5 * 60 * 1000, // 5 minutes
+        staleTime: 5 * 60 * 1000,
     });
 
     // Derive sections dynamically based on selected class
@@ -64,18 +67,20 @@ export default function StudentListPage() {
 
     // Fetch students with optimized query
     const { data: studentData = {}, isLoading: studentsLoading, isFetching } = useQuery({
-        queryKey: ['students', schoolId, page, search, classFilter, sectionFilter],
+        queryKey: ['students', schoolId, page, search, classFilter, sectionFilter, sortBy],
         queryFn: async () => {
-            const classId = classFilter === 'ALL' ? '' : allClasses.find(c => c.className === classFilter)?.classId || '';
-            const sectionId = sectionFilter === 'ALL' ? '' : allSections.find(s => s.name === sectionFilter)?.sectionId || '';
+            const selectedClass = allClasses.find(c => c.className === classFilter);
+            const classId = classFilter === 'ALL' ? '' : selectedClass?.id || '';
+            const selectedSection = allSections.find(s => s.name === sectionFilter);
+            const sectionId = sectionFilter === 'ALL' ? '' : selectedSection?.id || '';
             const res = await axios.get(`/api/schools/${schoolId}/students`, {
-                params: { page, limit: itemsPerPage, classId, sectionId, search }
+                params: { page, limit: itemsPerPage, classId, sectionId, search, sortBy }
             });
             return res.data || {};
         },
         enabled: !!schoolId,
         keepPreviousData: true,
-        staleTime: 30 * 1000, // 30 seconds
+        staleTime: 30 * 1000,
     });
 
     const students = studentData.students || [];
@@ -178,6 +183,10 @@ export default function StudentListPage() {
         }
     };
 
+    // Calculate stats
+    const activeCount = students.filter(s => s.user?.status === 'ACTIVE').length;
+    const uniqueClasses = [...new Set(students.map(s => s.class?.className).filter(Boolean))].length;
+
     if (!schoolId) {
         return (
             <div className="flex items-center justify-center min-h-screen">
@@ -192,11 +201,11 @@ export default function StudentListPage() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-1">
                     <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold flex items-center gap-2">
-                        <Users className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 flex-shrink-0" />
+                        <GraduationCap className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 flex-shrink-0" />
                         <span>Student Management</span>
                     </h1>
                     <p className="text-xs sm:text-sm text-muted-foreground">
-                        {total} {total === 1 ? 'student' : 'students'} registered
+                        Manage your students and their information
                     </p>
                 </div>
                 <Link href={`/dashboard/schools/${schoolId}/profiles/students/new`}>
@@ -207,10 +216,47 @@ export default function StudentListPage() {
                 </Link>
             </div>
 
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
+                    <CardContent className="p-4 flex items-center justify-between">
+                        <div>
+                            <p className="text-sm text-muted-foreground">Total Students</p>
+                            <p className="text-2xl font-bold">{total}</p>
+                        </div>
+                        <div className="p-3 rounded-full bg-blue-500/20">
+                            <Users className="h-6 w-6 text-blue-500" />
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+                    <CardContent className="p-4 flex items-center justify-between">
+                        <div>
+                            <p className="text-sm text-muted-foreground">Active Students</p>
+                            <p className="text-2xl font-bold">{activeCount}</p>
+                        </div>
+                        <div className="p-3 rounded-full bg-green-500/20">
+                            <Users className="h-6 w-6 text-green-500" />
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-amber-500/10 to-amber-600/5 border-amber-500/20">
+                    <CardContent className="p-4 flex items-center justify-between">
+                        <div>
+                            <p className="text-sm text-muted-foreground">Classes</p>
+                            <p className="text-2xl font-bold">{allClasses.length}</p>
+                        </div>
+                        <div className="p-3 rounded-full bg-amber-500/20">
+                            <BookOpen className="h-6 w-6 text-amber-500" />
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
             {/* Filters Card */}
             <Card>
                 <CardContent className="pt-4 sm:pt-6">
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:gap-4">
                         <div className="relative lg:col-span-2">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
@@ -243,25 +289,40 @@ export default function StudentListPage() {
                             </SelectContent>
                         </Select>
 
+                        <Select
+                            value={sectionFilter}
+                            onValueChange={(val) => {
+                                setSectionFilter(val);
+                                setPage(1);
+                            }}
+                            disabled={!allSections.length}
+                        >
+                            <SelectTrigger className="bg-muted text-sm">
+                                <SelectValue placeholder="Section" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="ALL">All Sections</SelectItem>
+                                {allSections.map(sec => (
+                                    <SelectItem key={sec.id} value={sec.name}>
+                                        {sec.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+
                         <div className="flex gap-2">
-                            <Select
-                                value={sectionFilter}
-                                onValueChange={(val) => {
-                                    setSectionFilter(val);
-                                    setPage(1);
-                                }}
-                                disabled={!allSections.length}
-                            >
+                            <Select value={sortBy} onValueChange={(val) => {
+                                setSortBy(val);
+                                setPage(1);
+                            }}>
                                 <SelectTrigger className="bg-muted text-sm flex-1">
-                                    <SelectValue placeholder="Section" />
+                                    <SelectValue placeholder="Sort by" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="ALL">All Sections</SelectItem>
-                                    {allSections.map(sec => (
-                                        <SelectItem key={sec.id} value={sec.name}>
-                                            {sec.name}
-                                        </SelectItem>
-                                    ))}
+                                    <SelectItem value="newest">Newest First</SelectItem>
+                                    <SelectItem value="oldest">Oldest First</SelectItem>
+                                    <SelectItem value="name_asc">Name A-Z</SelectItem>
+                                    <SelectItem value="name_desc">Name Z-A</SelectItem>
                                 </SelectContent>
                             </Select>
 

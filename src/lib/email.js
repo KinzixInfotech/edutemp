@@ -513,6 +513,164 @@ export function getAdmitCardEmailTemplate({ studentName, examName, examDate, sea
     };
 }
 
+/**
+ * Account Credentials email template (for bulk import)
+ */
+export function getAccountCredentialsEmailTemplate({ userName, email, password, userType, schoolName, loginUrl }) {
+    const typeLabels = {
+        student: 'Student',
+        teacher: 'Teacher',
+        staff: 'Staff Member',
+        parent: 'Parent'
+    };
+
+    return {
+        subject: `Welcome to ${schoolName} - Your Account Details`,
+        html: `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        line-height: 1.6;
+                        color: #333;
+                        max-width: 600px;
+                        margin: 0 auto;
+                        padding: 20px;
+                    }
+                    .header {
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        color: white;
+                        padding: 30px;
+                        text-align: center;
+                        border-radius: 10px 10px 0 0;
+                    }
+                    .content {
+                        background: #f9f9f9;
+                        padding: 30px;
+                        border: 1px solid #e0e0e0;
+                    }
+                    .credentials-box {
+                        background: white;
+                        padding: 20px;
+                        border-radius: 8px;
+                        margin: 20px 0;
+                        border-left: 4px solid #10b981;
+                    }
+                    .credential-item {
+                        padding: 10px 0;
+                        border-bottom: 1px solid #eee;
+                    }
+                    .credential-item:last-child {
+                        border-bottom: none;
+                    }
+                    .label {
+                        font-weight: bold;
+                        color: #555;
+                        font-size: 12px;
+                        text-transform: uppercase;
+                    }
+                    .value {
+                        font-size: 16px;
+                        color: #333;
+                        font-family: monospace;
+                        background: #f0f0f0;
+                        padding: 8px 12px;
+                        border-radius: 4px;
+                        margin-top: 4px;
+                        display: inline-block;
+                    }
+                    .alert {
+                        background: #fef3c7;
+                        border-left: 4px solid #f59e0b;
+                        padding: 15px;
+                        margin: 20px 0;
+                        border-radius: 4px;
+                        font-size: 13px;
+                    }
+                    .button {
+                        display: inline-block;
+                        padding: 14px 40px;
+                        background: #667eea;
+                        color: white;
+                        text-decoration: none;
+                        border-radius: 5px;
+                        font-weight: bold;
+                    }
+                    .footer {
+                        text-align: center;
+                        padding: 20px;
+                        color: #777;
+                        font-size: 12px;
+                        border-top: 1px solid #e0e0e0;
+                        margin-top: 20px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1 style="margin: 0;">🎓 Welcome to ${schoolName}</h1>
+                    <p style="margin: 10px 0 0 0;">Your account has been created</p>
+                </div>
+                
+                <div class="content">
+                    <h2>Hello ${userName}!</h2>
+                    
+                    <p>Your <strong>${typeLabels[userType] || 'User'}</strong> account has been created on ${schoolName}'s school management system. Below are your login credentials:</p>
+                    
+                    <div class="credentials-box">
+                        <h3 style="margin-top: 0; color: #10b981;">🔐 Your Login Credentials</h3>
+                        <div class="credential-item">
+                            <div class="label">Email</div>
+                            <div class="value">${email}</div>
+                        </div>
+                        <div class="credential-item">
+                            <div class="label">Password</div>
+                            <div class="value">${password}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert">
+                        <strong>⚠️ Important:</strong> For security reasons, we recommend changing your password after your first login.
+                    </div>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="${loginUrl || '#'}" class="button">Login to Your Account</a>
+                    </div>
+                    
+                    <p>If you have any questions or need assistance, please contact the school administration.</p>
+                </div>
+                
+                <div class="footer">
+                    <p><strong>${schoolName}</strong></p>
+                    <p>This is an automated email. Please do not reply.</p>
+                    <p>&copy; ${new Date().getFullYear()} ${schoolName}. All rights reserved.</p>
+                </div>
+            </body>
+            </html>
+        `,
+        text: `
+Welcome to ${schoolName}!
+
+Hello ${userName},
+
+Your ${typeLabels[userType] || 'User'} account has been created.
+
+Login Credentials:
+- Email: ${email}
+- Password: ${password}
+
+Please change your password after your first login.
+
+Login URL: ${loginUrl || 'Contact your school for the login link'}
+
+Best regards,
+${schoolName}
+        `.trim(),
+    };
+}
+
 // ==================== BULK EMAIL SENDING ====================
 
 /**

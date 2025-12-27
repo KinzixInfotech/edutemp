@@ -5,39 +5,58 @@ export async function GET(req, props) {
     const params = await props.params;
     const { schoolId } = params;
     const searchParams = Object.fromEntries(req.nextUrl.searchParams);
-    console.log(schoolId);
+
     let {
         classId,
         sectionId,
         page = "1",
         limit = "10",
-        search = ""
+        search = "",
+        sortBy = "newest" // newest, oldest, name_asc, name_desc
     } = searchParams;
 
     if (!schoolId) {
         return NextResponse.json({ error: "School ID is required" }, { status: 400 });
     }
 
-    // ✅ Proper numeric conversion with fallback
     const pageNum = Number(page) > 0 ? Number(page) : 1;
     const limitNum = Number(limit) > 0 ? Number(limit) : 10;
     const skip = (pageNum - 1) * limitNum;
 
-    // ✅ Handle ALL / undefined filters
+    // Handle ALL / undefined filters
     const parsedClassId =
-        classId && classId !== "ALL" ? Number(classId) : undefined;
+        classId && classId !== "ALL" && classId !== "" ? Number(classId) : undefined;
     const parsedSectionId =
-        sectionId && sectionId !== "ALL" ? Number(sectionId) : undefined;
+        sectionId && sectionId !== "ALL" && sectionId !== "" ? Number(sectionId) : undefined;
+
+    // Determine sort order
+    let orderBy = {};
+    switch (sortBy) {
+        case "oldest":
+            orderBy = { admissionDate: "asc" };
+            break;
+        case "name_asc":
+            orderBy = { name: "asc" };
+            break;
+        case "name_desc":
+            orderBy = { name: "desc" };
+            break;
+        case "newest":
+        default:
+            orderBy = { admissionDate: "desc" };
+            break;
+    }
 
     try {
         const whereClause = {
-            schoolId, // ✅ ensure correct type (Int in Prisma)
+            schoolId,
             ...(parsedClassId ? { classId: parsedClassId } : {}),
             ...(parsedSectionId ? { sectionId: parsedSectionId } : {}),
             ...(search
                 ? {
                     OR: [
-                        { studentName: { contains: search, mode: "insensitive" } },
+                        { name: { contains: search, mode: "insensitive" } },
+                        { email: { contains: search, mode: "insensitive" } },
                         { admissionNo: { contains: search, mode: "insensitive" } }
                     ]
                 }
@@ -60,6 +79,7 @@ export async function GET(req, props) {
                     }
                 }
             },
+            orderBy,
             skip,
             take: limitNum
         });
@@ -77,3 +97,4 @@ export async function GET(req, props) {
         );
     }
 }
+
