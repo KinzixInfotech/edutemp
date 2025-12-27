@@ -21,6 +21,7 @@ import DownloadAppCTA from '@/components/DownloadAppCTA';
 import WebDashboardCTA from '@/components/WebDashboardCTA';
 import { OrbitingCircles } from '@/components/ui/orbiting-circles';
 import { NumberTicker } from '@/components/ui/number-ticker';
+import ScrollMouse from '@/components/ScrollMouse';
 // Organization Schema for SEO
 const organizationSchema = {
     "@context": "https://schema.org",
@@ -87,18 +88,12 @@ function HeroSection() {
     const videoSrc = "https://www.youtube.com/embed/dQw4w9WgXcQ"; // Replace with actual video URL
 
     return (
-        <section className="min-h-screen   h-fit pt-[100px] pb-0 bg-[linear-gradient(120deg,#f8fafc_0%,#fff9f0_50%,#f0f7ff_100%)] relative overflow-visible">
-            {/* Mesh Gradient Glow - Left */}
-            <div className="absolute top-[10%] -left-[10%] w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(5,105,255,0.25)_0%,transparent_70%)] blur-[80px] rounded-full pointer-events-none" />
-
-            {/* Mesh Gradient Glow - Right */}
-            <div className="absolute top-[20%] -right-[10%] w-[600px] h-[600px] bg-[radial-gradient(circle,rgba(255,150,50,0.2)_0%,transparent_70%)] blur-[100px] rounded-full pointer-events-none" />
-
-            {/* Mesh Gradient Glow - Bottom */}
-            <div className="absolute bottom-[10%] left-[30%] w-[400px] h-[400px] bg-[radial-gradient(circle,rgba(100,200,255,0.15)_0%,transparent_70%)] blur-[80px] rounded-full pointer-events-none" />
+        <section className="min-h-screen h-fit pt-[100px] pb-0 bg-gradient-to-b from-white via-[#f8fafc] to-[#f0f4f8] relative overflow-visible">
+            {/* Subtle gradient accent - top */}
+            <div className="absolute top-0 left-0 right-0 h-[300px] bg-gradient-to-b from-[#f8fafc] to-transparent pointer-events-none" />
 
             {/* Noise Overlay */}
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg_viewBox=%270_0_256_256%27_xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cfilter_id=%27noise%27%3E%3CfeTurbulence_type=%27fractalNoise%27_baseFrequency=%270.9%27_numOctaves=%274%27_stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect_width=%27100%25%27_height=%27100%25%27_filter=%27url(%23noise)%27/%3E%3C/svg%3E')] opacity-[0.03] pointer-events-none" />
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg_viewBox=%270_0_256_256%27_xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cfilter_id=%27noise%27%3E%3CfeTurbulence_type=%27fractalNoise%27_baseFrequency=%270.9%27_numOctaves=%274%27_stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect_width=%27100%25%27_height=%27100%25%27_filter=%27url(%23noise)%27/%3E%3C/svg%3E')] opacity-[0.02] pointer-events-none" />
 
             {/* Dot Pattern Background */}
             <DotPattern
@@ -211,18 +206,9 @@ function HeroSection() {
                 </div>
 
                 {/* Dashboard Image */}
-                {/* Mesh Glow Behind Frame */}
                 <div className="relative">
-                    {/* Blue Glow - Left */}
-                    <div className="absolute -top-[80px] -left-[100px] w-[400px] h-[400px] bg-[radial-gradient(circle,rgba(5,105,255,0.35)_0%,transparent_70%)] blur-[60px] rounded-full pointer-events-none" />
-                    {/* Orange Glow - Right */}
-                    <div className="absolute -top-[60px] -right-[80px] w-[350px] h-[350px] bg-[radial-gradient(circle,rgba(255,150,50,0.3)_0%,transparent_70%)] blur-[60px] rounded-full pointer-events-none" />
-                    {/* Blue Glow - Bottom Left */}
-                    <div className="absolute -bottom-[100px] -left-[60px] w-[300px] h-[300px] bg-[radial-gradient(circle,rgba(5,105,255,0.25)_0%,transparent_70%)] blur-[50px] rounded-full pointer-events-none" />
-                    {/* Orange Glow - Bottom Right */}
-                    <div className="absolute -bottom-[80px] -right-[100px] w-[350px] h-[350px] bg-[radial-gradient(circle,rgba(255,150,50,0.25)_0%,transparent_70%)] blur-[50px] rounded-full pointer-events-none" />
-                    {/* Cyan Glow - Center Bottom */}
-                    <div className="absolute -bottom-[120px] left-[30%] w-[300px] h-[300px] bg-[radial-gradient(circle,rgba(100,200,255,0.2)_0%,transparent_70%)] blur-[60px] rounded-full pointer-events-none" />
+                    {/* Subtle shadow glow behind frame */}
+                    <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#e0e7ef]/30 to-[#e0e7ef]/50 blur-[40px] rounded-3xl transform scale-105 pointer-events-none" />
 
                     {/* Dashboard Preview Frame */}
                     <div className="hero-dashboard relative bg-white rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.12)] w-full max-w-[1200px] mx-auto border border-[#e0e0e0] overflow-hidden z-10">
@@ -365,7 +351,7 @@ function MarqueeBanner() {
 // About Brief Section
 function AboutBriefSection() {
     return (
-        <section className="bg-[#f5f7fa] py-16 md:py-24 px-5">
+        <section className="bg-[#f5f7fa] py-16 md:py-24 px-5 relative">
             <div className="max-w-[1200px] mx-auto">
                 <p className="text-[#1a1a2e]/80 text-lg md:text-xl lg:text-2xl leading-relaxed font-light text-left max-w-[900px]">
                     EduBreezy is a next-generation school management platform blending
@@ -374,6 +360,9 @@ function AboutBriefSection() {
                     engage parents effectively, and unlock the full potential of
                     modern education management.
                 </p>
+            </div>
+            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 z-10">
+                <ScrollMouse />
             </div>
         </section>
     );
@@ -390,10 +379,10 @@ function WhyEduBreezySection() {
                     <div>
                         <span className="text-sm text-[#0569ff] font-medium mb-4 block">_Why us</span>
                         <h2 className="text-3xl md:text-4xl lg:text-[3.2rem] font-bold text-[#1a1a2e] leading-[1.1] mb-3">
-                            Schools need smart systems
+                            Schools need  <Highlighter action="underline" color="#FF9800">smart</Highlighter> systems
                         </h2>
                         <h3 className="text-2xl md:text-3xl lg:text-[2.5rem] font-light text-[#999] leading-tight mb-10">
-                            not complex software.
+                            not  <Highlighter action="underline" color="red"> complex </Highlighter> software.
                         </h3>
 
                         <div className="space-y-5 text-[#555] text-base leading-relaxed">
@@ -492,6 +481,15 @@ function WhyEduBreezySection() {
 
 // Communicating Seamlessly Section with Orbiting Circles
 function CommunicatingSeamlesslySection() {
+    const [isMobile, setIsMobile] = useState(false);
+
+    React.useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 640);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
     return (
         <section className="bg-[#f5f7fa] py-16 md:py-20 lg:py-28 px-4 md:px-5 overflow-hidden">
             <div className="max-w-[1400px] 2xl:max-w-[1600px] mx-auto">
@@ -553,7 +551,7 @@ function CommunicatingSeamlesslySection() {
                                 const showNotch = false; // Toggle to show/hide the Dynamic Island notch
                                 return (
                                     <div
-                                        className="w-[180px] lg:w-[200px] 2xl:w-[220px] h-[400px] lg:h-[445px] 2xl:h-[490px] rounded-[2rem] overflow-hidden relative"
+                                        className="w-[210px] sm:w-[180px] lg:w-[200px] 2xl:w-[220px] h-[460px] sm:h-[400px] lg:h-[445px] 2xl:h-[490px] rounded-[2rem] overflow-hidden relative"
                                         style={{
                                             boxShadow: '0 0 0 3px #1a1a2e, 0 25px 50px -12px rgba(0, 0, 0, 0.25)'
                                         }}
@@ -587,7 +585,7 @@ function CommunicatingSeamlesslySection() {
                         </OrbitingCircles>
 
                         {/* Outer Circle - Features */}
-                        <OrbitingCircles radius={300} duration={60} reverse iconSize={85}>
+                        <OrbitingCircles radius={isMobile ? 280 : 300} duration={60} reverse iconSize={85}>
                             <FeatureBadge label="Transport" />
                             <FeatureBadge label="Library" />
                             <FeatureBadge label="Attendance" />
@@ -823,9 +821,10 @@ function HowWeWorkSection() {
                         <Sparkles size={16} />
                         Our Process
                     </span>
-                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a1a2e] mb-4">
-                        Here's How We Make Your <br className="hidden md:block" />
-                        <span className="text-[#0569ff]">School Smarter</span>
+                    <h2 className="text-3xl md:text-4xl leading-[1.2] lg:text-5xl font-bold text-[#1a1a2e] mb-4">
+                        <Highlighter action="underline" color="#FF9800">Here's How We Make Your <br className="hidden md:block" /></Highlighter><br />
+                        <Highlighter action="underline" color="#FF9800"><span className="text-[#0569ff]">School Smarter</span></Highlighter>
+
                     </h2>
                     <p className="text-[#666] text-lg max-w-2xl mx-auto">
                         A simple, step-by-step approach to transform your school management from chaos to clarity.
@@ -932,14 +931,14 @@ function SchoolExplorerSection() {
                             school.edubreezy.com
                         </span>
                         <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a1a2e] leading-tight mb-2">
-                            School Explorer — <br />
+                            <Highlighter action="underline" color="#FF9800">School Explorer</Highlighter> — <br />
                             <span className="text-[#0569ff]">Your School, Discovered</span>
                         </h2>
                         <p className="text-base md:text-lg font-medium text-[#F97316] mb-3">
                             Increase Admissions with Proven Strategies
                         </p>
                         <p className="text-[#555] text-base leading-relaxed mb-5">
-                            Get discovered by parents at <strong className="text-[#1a1a2e]">school.edubreezy.com</strong>.
+                            Get discovered by parents at  <strong className="text-[#1a1a2e]">school.edubreezy.com</strong>.
                             Showcase your strengths, receive inquiries, and convert leads into admissions.
                         </p>
 
@@ -1097,9 +1096,8 @@ function SchoolExplorerSection() {
                         );
                     })()}
                 </div>
-
                 {/* Bottom Stats Bar */}
-                <div className="grid grid-cols-3 gap-6 py-8 px-8 bg-gradient-to-r from-[#0569ff]/5 to-[#10B981]/5 rounded-2xl border border-[#e5e7eb]">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-6 py-8 px-4 md:px-8 bg-gradient-to-r from-[#0569ff]/5 to-[#10B981]/5 rounded-2xl border border-[#e5e7eb]">
                     {[
                         { value: 50000, suffix: "+", label: "Monthly Visitors", icon: Users },
                         { value: 10000, suffix: "+", label: "Inquiries Generated", icon: MessageSquare },
@@ -1388,7 +1386,11 @@ function TestimonialsSection() {
             <div className="max-w-[1200px] mx-auto px-5">
                 <div className="text-center mb-12">
                     <h2 className="text-3xl md:text-4xl font-bold text-[#1a1a2e] mb-3">
-                        Read What <span className="text-[#0569ff]">Our Users</span> Have To Say About Us
+                        Read What <span className="text-[#0569ff]">
+                            <Highlighter action='underline' isView={true} color='#FF9800' >
+                                Our Users
+                            </Highlighter>
+                        </span> Have To Say About Us
                     </h2>
                     <p className="text-gray-600 max-w-2xl mx-auto">
                         We firmly believe that our client's success is our success. Here's a glimpse of our client's experience with us.

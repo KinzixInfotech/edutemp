@@ -17,37 +17,37 @@ export default function DownloadAppCTA() {
             {/* Floating Icons */}
             <div className="absolute inset-0 z-[5] pointer-events-none overflow-hidden">
                 {/* Top Left */}
-                <div className="absolute top-[15%] left-[8%] hidden md:flex animate-[float_6s_ease-in-out_infinite]">
+                <div className="absolute top-[20%] left-[20%] hidden md:flex animate-[float_6s_ease-in-out_infinite]">
                     <div className="bg-white/10 backdrop-blur-sm p-3 rounded-xl border border-white/20">
                         <Users className="w-6 h-6 text-white/80" />
                     </div>
                 </div>
                 {/* Top Right */}
-                <div className="absolute top-[12%] right-[10%] hidden md:flex animate-[float_7s_ease-in-out_infinite_0.5s]">
+                <div className="absolute top-[18%] right-[20%] hidden md:flex animate-[float_7s_ease-in-out_infinite_0.5s]">
                     <div className="bg-white/10 backdrop-blur-sm p-3 rounded-xl border border-white/20">
                         <GraduationCap className="w-6 h-6 text-white/80" />
                     </div>
                 </div>
                 {/* Middle Left */}
-                <div className="absolute top-[40%] left-[5%] hidden md:flex animate-[float_5s_ease-in-out_infinite_1s]">
+                <div className="absolute top-[45%] left-[15%] hidden md:flex animate-[float_5s_ease-in-out_infinite_1s]">
                     <div className="bg-white/10 backdrop-blur-sm p-3 rounded-xl border border-white/20">
                         <Bell className="w-5 h-5 text-white/80" />
                     </div>
                 </div>
                 {/* Middle Right */}
-                <div className="absolute top-[35%] right-[6%] hidden md:flex animate-[float_6s_ease-in-out_infinite_0.3s]">
+                <div className="absolute top-[40%] right-[15%] hidden md:flex animate-[float_6s_ease-in-out_infinite_0.3s]">
                     <div className="bg-white/10 backdrop-blur-sm p-3 rounded-xl border border-white/20">
                         <CreditCard className="w-5 h-5 text-white/80" />
                     </div>
                 </div>
                 {/* Bottom Left */}
-                <div className="absolute top-[65%] left-[12%] hidden md:flex animate-[float_7s_ease-in-out_infinite_0.8s]">
+                <div className="absolute top-[70%] left-[25%] hidden md:flex animate-[float_7s_ease-in-out_infinite_0.8s]">
                     <div className="bg-white/10 backdrop-blur-sm p-3 rounded-xl border border-white/20">
                         <Calendar className="w-5 h-5 text-white/80" />
                     </div>
                 </div>
                 {/* Bottom Right */}
-                <div className="absolute top-[60%] right-[8%] hidden md:flex animate-[float_5s_ease-in-out_infinite_0.2s]">
+                <div className="absolute top-[65%] right-[22%] hidden md:flex animate-[float_5s_ease-in-out_infinite_0.2s]">
                     <div className="bg-white/10 backdrop-blur-sm p-3 rounded-xl border border-white/20">
                         <Bus className="w-5 h-5 text-white/80" />
                     </div>

@@ -12,6 +12,7 @@ import Header from '../components/Header';
 import { DotPattern } from '@/components/ui/dot-pattern';
 import { NumberTicker } from '@/components/ui/number-ticker';
 import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
+import { Highlighter } from '@/components/ui/highlighter';
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 30 },
@@ -123,8 +124,9 @@ export default function AboutPage() {
             >
               Transforming Education,{' '}
               <span className="relative inline-block">
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0569ff] to-[#0450d4]">One School</span>
-                <span className="absolute bottom-1 left-0 w-full h-3 bg-[#FF9800]/30 -rotate-1 rounded -z-10"></span>
+                <Highlighter action="underline" color="#FF9800"><span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0569ff] to-[#0450d4]">One School</span></Highlighter>
+
+                {/* <span className="absolute bottom-1 left-0 w-full h-3 bg-[#FF9800]/30 -rotate-1 rounded -z-10"></span> */}
               </span>{' '}
               at a Time
             </motion.h1>
@@ -225,14 +227,14 @@ export default function AboutPage() {
               <p className="text-gray-600 text-lg leading-relaxed mb-8">
                 So we built EduBreezy — a fresh, simple, and beautiful platform that anyone can understand and use. No complicated menus, no endless training sessions. Just a clean, modern system that helps schools save time and work smarter.
               </p>
-              <ul className="space-y-3">
+              {/* <ul className="space-y-3">
                 {['Easy to learn, even easier to use', 'Modern design that everyone loves', 'Built by listening to real schools'].map((item, i) => (
                   <li key={i} className="flex items-center gap-3 text-gray-700">
                     <CheckCircle className="w-5 h-5 text-[#0569ff] flex-shrink-0" />
                     {item}
                   </li>
                 ))}
-              </ul>
+              </ul> */}
             </motion.div>
           </div>
         </div>
