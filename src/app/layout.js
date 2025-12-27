@@ -111,6 +111,28 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
+  // JSON-LD structured data for Google site name
+  const websiteSchema = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "EduBreezy",
+    "alternateName": ["Edu Breezy", "EduBreezy School Management"],
+    "url": "https://www.edubreezy.com"
+  };
+
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "EduBreezy",
+    "alternateName": "Edu Breezy",
+    "url": "https://www.edubreezy.com",
+    "logo": "https://edubreezy.com/favicon.ico",
+    "sameAs": [
+      "https://twitter.com/edubreezy",
+      "https://facebook.com/edubreezy"
+    ],
+    "description": "India's leading school management platform"
+  };
 
   return (
     <Provider>
@@ -119,6 +141,15 @@ export default function RootLayout({ children }) {
           <link rel="preconnect" href="https://fonts.googleapis.com" />
           <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
           <link href="https://fonts.googleapis.com/css2?family=Cedarville+Cursive&family=Edu+NSW+ACT+Cursive:wght@400..700&display=swap" rel="stylesheet" />
+          {/* JSON-LD for site name in Google */}
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
+          />
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+          />
         </head>
         <body className="min-h-screen flex flex-col">
           <ClientProduct>{children}</ClientProduct>

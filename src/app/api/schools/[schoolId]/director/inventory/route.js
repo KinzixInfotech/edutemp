@@ -5,26 +5,45 @@ import { remember, generateKey } from '@/lib/cache';
 export async function GET(req, { params }) {
     try {
         const { schoolId } = await params;
+
+        if (!schoolId || schoolId === 'null') {
+            return NextResponse.json({ error: 'Invalid schoolId' }, { status: 400 });
+        }
+
         const { searchParams } = new URL(req.url);
         const categoryId = searchParams.get('categoryId');
+        const search = searchParams.get('search') || '';
 
-        const cacheKey = generateKey('director:inventory', { schoolId, categoryId });
+        // Use shorter cache or no cache for this endpoint
+        const cacheKey = generateKey('director:inventory', { schoolId, categoryId, search });
 
         const data = await remember(cacheKey, async () => {
+            const searchWhere = search ? {
+                OR: [
+                    { name: { contains: search, mode: 'insensitive' } },
+                    { category: { contains: search, mode: 'insensitive' } }
+                ]
+            } : {};
+
             const where = {
                 schoolId,
-                ...(categoryId && { categoryId: parseInt(categoryId) })
+                ...(categoryId && { categoryId }),
+                ...searchWhere
             };
 
-            const [items, categories, lowStockItems, totalValue] = await Promise.all([
+            const [items, categories, lowStockCount, totalCount] = await Promise.all([
                 prisma.inventoryItem.findMany({
                     where,
                     include: {
-                        category: { select: { name: true } }
+                        // Use correct relation name
+                        InventoryCategory: { select: { name: true } }
                     },
                     orderBy: { name: 'asc' },
                     take: 100
-                }).catch(() => []),
+                }).catch((e) => {
+                    console.log('Items fetch error:', e.message);
+                    return [];
+                }),
                 prisma.inventoryCategory.findMany({
                     where: { schoolId },
                     include: {
@@ -36,40 +55,45 @@ export async function GET(req, { params }) {
                 prisma.inventoryItem.count({
                     where: {
                         schoolId,
-                        quantity: { lte: 10 }
+                        quantity: { lte: prisma.inventoryItem.fields?.minimumQuantity || 10 }
                     }
                 }).catch(() => 0),
-                prisma.inventoryItem.aggregate({
-                    where: { schoolId },
-                    _sum: {
-                        quantity: true
-                    }
-                }).catch(() => ({ _sum: { quantity: 0 } }))
+                prisma.inventoryItem.count({ where: { schoolId } }).catch(() => 0)
             ]);
+
+            // Calculate in-stock count
+            const inStockCount = items.filter(i => i.quantity > (i.minimumQuantity || 10)).length;
 
             return {
                 summary: {
-                    totalItems: items.length,
-                    totalQuantity: totalValue._sum.quantity || 0,
-                    lowStockItems,
+                    totalItems: totalCount,
+                    inStock: inStockCount,
+                    lowStock: lowStockCount,
                     categories: categories.length
                 },
                 categories: categories.map(c => ({
                     id: c.id,
                     name: c.name,
-                    itemCount: c._count.items
+                    itemCount: c._count?.items || 0
                 })),
                 items: items.map(item => ({
                     id: item.id,
                     name: item.name,
-                    category: item.category?.name || 'Uncategorized',
+                    // Use legacy category field or relation
+                    category: item.InventoryCategory?.name || item.category || 'Uncategorized',
+                    categoryId: item.categoryId,
                     quantity: item.quantity,
+                    minQuantity: item.minimumQuantity,
                     unit: item.unit,
-                    isLowStock: item.quantity <= 10,
-                    lastUpdated: item.updatedAt.toISOString()
+                    status: item.status,
+                    costPerUnit: item.costPerUnit,
+                    sellingPrice: item.sellingPrice,
+                    isLowStock: item.quantity <= (item.minimumQuantity || 10),
+                    location: item.location,
+                    lastUpdated: item.updatedAt?.toISOString?.() || null
                 }))
             };
-        }, 120);
+        }, 30); // Shorter cache
 
         return NextResponse.json(data);
     } catch (error) {

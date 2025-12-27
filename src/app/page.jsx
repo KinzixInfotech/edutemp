@@ -28,7 +28,7 @@ const organizationSchema = {
     "@type": "Organization",
     "name": "EduBreezy",
     "alternateName": "Edu Breezy",
-    "url": "https://edubreezy.com",
+    "url": "https://www.edubreezy.com",
     "logo": "https://edubreezy.com/favicon.ico",
     "description": "India's leading school management ERP and school explorer platform. Find and compare schools, manage admissions, fees, attendance, and more.",
     "foundingDate": "2020",

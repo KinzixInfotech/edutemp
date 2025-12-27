@@ -5,12 +5,13 @@ import { remember, generateKey } from '@/lib/cache';
 export async function GET(req, { params }) {
     try {
         const { schoolId } = await params;
+
+        if (!schoolId || schoolId === 'null') {
+            return NextResponse.json({ error: 'Invalid schoolId' }, { status: 400 });
+        }
+
         const { searchParams } = new URL(req.url);
         const academicYearId = searchParams.get('academicYearId');
-
-        if (!academicYearId) {
-            return NextResponse.json({ error: 'academicYearId required' }, { status: 400 });
-        }
 
         const cacheKey = generateKey('director:fees-collected', { schoolId, academicYearId });
 
@@ -19,22 +20,25 @@ export async function GET(req, { params }) {
             const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
             const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
+            // Build where clause - academic year is optional
+            const where = {
+                schoolId,
+                status: 'SUCCESS',
+                paymentDate: {
+                    gte: firstDayOfMonth,
+                    lte: lastDayOfMonth
+                },
+                ...(academicYearId && { academicYearId })
+            };
+
             const [monthlyPayments, totalCollected, paymentMethods] = await Promise.all([
                 prisma.feePayment.findMany({
-                    where: {
-                        schoolId,
-                        academicYearId,
-                        status: 'SUCCESS',
-                        paymentDate: {
-                            gte: firstDayOfMonth,
-                            lte: lastDayOfMonth
-                        }
-                    },
+                    where,
                     include: {
                         student: {
                             select: {
                                 admissionNo: true,
-                                user: { select: { name: true } }
+                                name: true
                             }
                         }
                     },
@@ -42,29 +46,13 @@ export async function GET(req, { params }) {
                     take: 50
                 }),
                 prisma.feePayment.aggregate({
-                    where: {
-                        schoolId,
-                        academicYearId,
-                        status: 'SUCCESS',
-                        paymentDate: {
-                            gte: firstDayOfMonth,
-                            lte: lastDayOfMonth
-                        }
-                    },
+                    where,
                     _sum: { amount: true },
                     _count: true
                 }),
                 prisma.feePayment.groupBy({
                     by: ['paymentMode'],
-                    where: {
-                        schoolId,
-                        academicYearId,
-                        status: 'SUCCESS',
-                        paymentDate: {
-                            gte: firstDayOfMonth,
-                            lte: lastDayOfMonth
-                        }
-                    },
+                    where,
                     _sum: { amount: true },
                     _count: true
                 })
@@ -83,12 +71,12 @@ export async function GET(req, { params }) {
                 })),
                 recentPayments: monthlyPayments.map(p => ({
                     id: p.id,
-                    admissionNo: p.student.admissionNo,
-                    studentName: p.student.user.name,
+                    admissionNo: p.student?.admissionNo || 'N/A',
+                    studentName: p.student?.name || 'Unknown',
                     amount: p.amount,
                     paymentMode: p.paymentMode,
                     transactionId: p.transactionId,
-                    paymentDate: p.paymentDate.toISOString()
+                    paymentDate: p.paymentDate?.toISOString()
                 }))
             };
         }, 60);

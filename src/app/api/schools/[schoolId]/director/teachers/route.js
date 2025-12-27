@@ -5,17 +5,32 @@ import { remember, generateKey } from '@/lib/cache';
 export async function GET(req, { params }) {
     try {
         const { schoolId } = await params;
+
+        // Validate schoolId
+        if (!schoolId || schoolId === 'null' || schoolId === 'undefined') {
+            return NextResponse.json(
+                { error: 'Invalid schoolId', staff: [], summary: { total: 0, teaching: 0, nonTeaching: 0 } },
+                { status: 400 }
+            );
+        }
+
         const { searchParams } = new URL(req.url);
         const search = searchParams.get('search') || '';
-        const type = searchParams.get('type'); // TEACHING_STAFF, NON_TEACHING_STAFF
+        const type = searchParams.get('type'); // teaching, non-teaching
         const status = searchParams.get('status') || 'ACTIVE';
 
         const cacheKey = generateKey('director:teachers', { schoolId, search, type, status });
 
         const data = await remember(cacheKey, async () => {
-            const roleFilter = type
-                ? { name: type }
-                : { name: { in: ['TEACHING_STAFF', 'NON_TEACHING_STAFF'] } };
+            // Map frontend type to role name
+            let roleFilter;
+            if (type === 'teaching') {
+                roleFilter = { name: 'TEACHING_STAFF' };
+            } else if (type === 'non-teaching') {
+                roleFilter = { name: 'NON_TEACHING_STAFF' };
+            } else {
+                roleFilter = { name: { in: ['TEACHING_STAFF', 'NON_TEACHING_STAFF'] } };
+            }
 
             const where = {
                 schoolId,
@@ -44,18 +59,19 @@ export async function GET(req, { params }) {
                                 name: true
                             }
                         },
-                        teachingStaff: {
+                        // Use correct relation names from User model
+                        teacher: {
                             select: {
                                 employeeId: true,
-                                department: true,
-                                designation: true
+                                designation: true,
+                                departmentId: true
                             }
                         },
                         nonTeachingStaff: {
                             select: {
                                 employeeId: true,
-                                department: true,
-                                designation: true
+                                designation: true,
+                                departmentId: true
                             }
                         }
                     },
@@ -94,16 +110,17 @@ export async function GET(req, { params }) {
                     teaching: teachingCount,
                     nonTeaching: nonTeachingCount
                 },
-                teachers: teachers.map(t => ({
+                staff: teachers.map(t => ({
                     id: t.id,
-                    name: t.name,
+                    name: t.name || '',
+                    firstName: t.name?.split(' ')[0] || '',
+                    lastName: t.name?.split(' ').slice(1).join(' ') || '',
                     email: t.email,
                     profilePicture: t.profilePicture,
-                    employeeId: t.teachingStaff?.employeeId || t.nonTeachingStaff?.employeeId,
-                    department: t.teachingStaff?.department || t.nonTeachingStaff?.department,
-                    designation: t.teachingStaff?.designation || t.nonTeachingStaff?.designation,
-                    type: t.role.name,
-                    status: t.status
+                    employeeId: t.teacher?.employeeId || t.nonTeachingStaff?.employeeId || '',
+                    designation: t.teacher?.designation || t.nonTeachingStaff?.designation || '',
+                    type: t.role.name === 'TEACHING_STAFF' ? 'teaching' : 'non-teaching',
+                    status: t.status?.toLowerCase() || 'active'
                 }))
             };
         }, 120);

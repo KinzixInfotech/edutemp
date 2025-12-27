@@ -6,6 +6,10 @@ export async function GET(req, { params }) {
     try {
         const { schoolId } = await params;
 
+        if (!schoolId || schoolId === 'null') {
+            return NextResponse.json({ error: 'Invalid schoolId' }, { status: 400 });
+        }
+
         const cacheKey = generateKey('director:transport', { schoolId });
 
         const data = await remember(cacheKey, async () => {
@@ -39,15 +43,17 @@ export async function GET(req, { params }) {
                 }).catch(() => 0)
             ]);
 
+            // Fixed: use routes instead of route
             const vehicles = await prisma.vehicle.findMany({
                 where: { schoolId },
                 include: {
-                    route: {
+                    routes: {
                         select: {
                             name: true,
                             startPoint: true,
                             endPoint: true
-                        }
+                        },
+                        take: 1
                     }
                 },
                 orderBy: { licensePlate: 'asc' }
@@ -67,8 +73,8 @@ export async function GET(req, { params }) {
                     model: v.model,
                     capacity: v.capacity,
                     status: v.status,
-                    routeName: v.route?.name,
-                    routeDetails: v.route ? `${v.route.startPoint} → ${v.route.endPoint}` : null
+                    routeName: v.routes?.[0]?.name,
+                    routeDetails: v.routes?.[0] ? `${v.routes[0].startPoint} → ${v.routes[0].endPoint}` : null
                 }))
             };
         }, 120);
