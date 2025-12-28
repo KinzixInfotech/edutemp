@@ -27,6 +27,7 @@ import {
     Package,
     ClipboardList,
     ChevronRight,
+    ChevronLeft,
     Loader2,
     Info,
     Bus,
@@ -101,6 +102,8 @@ export default function ImportDataPage() {
     const [skipDuplicates, setSkipDuplicates] = useState(true);
     const [activeTab, setActiveTab] = useState("import"); // "import", "history", or "export"
     const [uploadedFile, setUploadedFile] = useState(null);
+    const [previewPage, setPreviewPage] = useState(1);
+    const previewPageSize = 10;
 
     // Export states
     const [selectedExportModules, setSelectedExportModules] = useState([]);
@@ -230,6 +233,7 @@ export default function ImportDataPage() {
         setUploadedFile(file);
         setIsPreviewing(true);
         setPreviewData(null);
+        setPreviewPage(1);
         setImportResults(null);
 
         try {
@@ -676,6 +680,7 @@ export default function ImportDataPage() {
                                                 </div>
                                                 <CardTitle className="flex items-center justify-between">
                                                     {module.name}
+
                                                     <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
                                                 </CardTitle>
                                                 <CardDescription>{module.description}</CardDescription>
@@ -810,7 +815,7 @@ export default function ImportDataPage() {
                                             Upload your filled Excel file
                                         </CardDescription>
                                     </CardHeader>
-                                    <CardContent className="space-y-4 relative flex-1 flex flex-col">
+                                    <CardContent className="space-y-4 relative flex-1 flex flex-col overflow-hidden">
                                         {/* Upload Area */}
                                         <label className="relative block group flex-1">
                                             <div className={`relative border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all duration-300 h-full min-h-[300px] flex flex-col items-center justify-center ${isUploading
@@ -884,7 +889,7 @@ export default function ImportDataPage() {
 
                                         {/* Preview Data */}
                                         {previewData && !previewData.error && (
-                                            <div className="space-y-4">
+                                            <div className="space-y-4 overflow-hidden">
                                                 {/* Preview Summary */}
                                                 <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
                                                     <div className="flex-1">
@@ -911,7 +916,7 @@ export default function ImportDataPage() {
                                                 </div>
 
                                                 {/* Preview Table */}
-                                                <div className="border rounded-lg overflow-hidden max-h-64 overflow-y-auto">
+                                                <div className="border rounded-lg overflow-hidden max-h-80 overflow-y-auto">
                                                     <Table>
                                                         <TableHeader>
                                                             <TableRow>
@@ -923,7 +928,7 @@ export default function ImportDataPage() {
                                                             </TableRow>
                                                         </TableHeader>
                                                         <TableBody>
-                                                            {previewData.rows?.slice(0, 10).map((row) => (
+                                                            {previewData.rows?.slice((previewPage - 1) * previewPageSize, previewPage * previewPageSize).map((row) => (
                                                                 <TableRow key={row.rowNumber} className={row.isDuplicate ? 'bg-yellow-50 dark:bg-yellow-950/20' : ''}>
                                                                     <TableCell>{row.rowNumber}</TableCell>
                                                                     <TableCell>
@@ -947,10 +952,37 @@ export default function ImportDataPage() {
                                                         </TableBody>
                                                     </Table>
                                                 </div>
-                                                {previewData.rows?.length > 10 && (
-                                                    <p className="text-xs text-muted-foreground text-center">
-                                                        Showing first 10 of {previewData.rows.length} records
-                                                    </p>
+
+                                                {/* Pagination Controls */}
+                                                {previewData.rows?.length > previewPageSize && (
+                                                    <div className="flex items-center justify-between pt-2">
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Showing {((previewPage - 1) * previewPageSize) + 1} - {Math.min(previewPage * previewPageSize, previewData.rows.length)} of {previewData.rows.length} records
+                                                        </p>
+                                                        <div className="flex items-center gap-2">
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => setPreviewPage(p => Math.max(1, p - 1))}
+                                                                disabled={previewPage === 1}
+                                                            >
+                                                                <ChevronLeft className="h-4 w-4" />
+                                                                Previous
+                                                            </Button>
+                                                            <span className="text-sm text-muted-foreground">
+                                                                Page {previewPage} of {Math.ceil(previewData.rows.length / previewPageSize)}
+                                                            </span>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => setPreviewPage(p => Math.min(Math.ceil(previewData.rows.length / previewPageSize), p + 1))}
+                                                                disabled={previewPage >= Math.ceil(previewData.rows.length / previewPageSize)}
+                                                            >
+                                                                Next
+                                                                <ChevronRight className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
+                                                    </div>
                                                 )}
 
                                                 {/* Import Options */}
@@ -1017,11 +1049,11 @@ export default function ImportDataPage() {
 
                                         {/* Preview Error */}
                                         {previewData?.error && (
-                                            <Alert variant="destructive">
-                                                <AlertTriangle className="h-4 w-4" />
+                                            <Alert variant="destructive" className="overflow-hidden">
+                                                <AlertTriangle className="h-4 w-4 flex-shrink-0" />
                                                 <AlertTitle>Preview Failed</AlertTitle>
-                                                <AlertDescription className="space-y-3">
-                                                    <p>{previewData.error}</p>
+                                                <AlertDescription className="space-y-3 overflow-hidden">
+                                                    <p className="break-words">{previewData.error}</p>
 
                                                     {/* Show detailed column information if available */}
                                                     {previewData.details && (

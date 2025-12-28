@@ -268,7 +268,6 @@ export async function POST(req, { params }) {
                 );
 
                 // Create worksheet
-                const worksheet = XLSX.utils.aoa_to_array([headers, ...rows]);
                 const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
 
                 // Add to workbook

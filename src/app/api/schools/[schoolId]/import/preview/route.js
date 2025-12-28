@@ -201,7 +201,23 @@ export async function POST(req, { params }) {
 
     } catch (error) {
         console.error('[PREVIEW ERROR]', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+
+        // Sanitize error message for users - don't expose internal details
+        let userFriendlyError = 'An error occurred while processing your file. Please try again.';
+
+        if (error.message?.includes('No data found')) {
+            userFriendlyError = 'The uploaded file appears to be empty. Please check your data.';
+        } else if (error.message?.includes('not supported')) {
+            userFriendlyError = error.message;
+        } else if (error.message?.includes('Template mapping')) {
+            userFriendlyError = error.message;
+        } else if (error.code === 'P2002') {
+            userFriendlyError = 'Duplicate entry found in database.';
+        } else if (error.name === 'PrismaClientValidationError') {
+            userFriendlyError = 'There was an issue processing your data. Please ensure the template format is correct.';
+        }
+
+        return NextResponse.json({ error: userFriendlyError }, { status: 500 });
     }
 }
 
@@ -268,7 +284,7 @@ async function checkForDuplicates(module, data, schoolId, fieldMap) {
             case 'library':
                 if (mappedData.isbn) {
                     existingRecord = await prisma.libraryBook.findFirst({
-                        where: { schoolId, isbn: mappedData.isbn }
+                        where: { schoolId, ISBN: mappedData.isbn }
                     });
                     if (existingRecord) reason = `Book with ISBN already exists: ${mappedData.isbn}`;
                 }

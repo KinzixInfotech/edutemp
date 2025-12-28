@@ -869,34 +869,23 @@ async function importLibraryBook(data, schoolId) {
     }
 
     const existing = await prisma.libraryBook.findFirst({
-        where: { schoolId, isbn }
+        where: { schoolId, ISBN: isbn }
     });
 
     if (existing) {
         throw new Error(`Book with ISBN '${isbn}' already exists.`);
     }
 
-    let bookCategory = await prisma.libraryBookCategory.findFirst({
-        where: { schoolId, name: category }
-    });
-
-    if (!bookCategory) {
-        bookCategory = await prisma.libraryBookCategory.create({
-            data: { schoolId, name: category }
-        });
-    }
-
     await prisma.libraryBook.create({
         data: {
             title,
             author,
-            isbn,
-            categoryId: bookCategory.id,
+            ISBN: isbn,
+            category,
             schoolId,
             publisher: rest.publisher || '',
-            publishedYear: rest.publishedYear ? parseInt(rest.publishedYear) : null,
-            totalCopies: rest.copies ? parseInt(rest.copies) : 1,
-            availableCopies: rest.copies ? parseInt(rest.copies) : 1,
+            edition: rest.edition || null,
+            description: rest.description || null,
         }
     });
 
