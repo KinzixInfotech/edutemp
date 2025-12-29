@@ -30,7 +30,7 @@ export const metadata = {
   ],
 
   // Authors and publisher
-  authors: [{ name: "Kinzix Infotech", url: "https://kinzix.com" }],
+  authors: [{ name: "Kinzix Infotech", url: "https://www.kinzix.com" }],
   creator: "Kinzix Infotech",
   publisher: "EduBreezy",
 
@@ -54,7 +54,7 @@ export const metadata = {
     url: baseUrl,
     siteName: "EduBreezy",
     title: "EduBreezy - School Management & Explorer Platform",
-    description: "Find and compare schools, read verified reviews, manage school operations seamlessly. India's trusted education platform.",
+    description: "EduBreezy is India's leading school management platform. Find and compare schools, read verified parent reviews, manage admissions, fees, attendance, and more. Edu Breezy simplifies education",
     images: [
       {
         url: `${baseUrl}/by.png`,
@@ -76,7 +76,7 @@ export const metadata = {
   twitter: {
     card: "summary_large_image",
     title: "EduBreezy - School Management & Explorer Platform",
-    description: "Find schools, read reviews, manage admissions & fees. India's trusted education platform.",
+    description: "EduBreezy is India's leading school management platform. Find and compare schools, read verified parent reviews, manage admissions, fees, attendance, and more. Edu Breezy simplifies education",
     images: [`${baseUrl}/by.png`],
     creator: "@edubreezy",
   },

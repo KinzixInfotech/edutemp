@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import Header from '../components/Header';
 import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
+import { Highlighter } from '@/components/ui/highlighter';
 
 export default function FeaturesIntroPage() {
     const stats = [
@@ -180,23 +181,23 @@ export default function FeaturesIntroPage() {
                 </div>
 
                 <div className="max-w-6xl mx-auto relative z-10">
-                    <div className="text-center">
+                    <div className="text-left md:text-center">
                         <span className="inline-flex px-4 py-2 bg-gradient-to-r from-[#0569ff]/10 to-[#ff7a00]/10 border border-[#0569ff]/20 rounded-full text-sm font-medium mb-6 text-[#0569ff]">
                             Complete Feature Documentation
                         </span>
                         <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-[1.1] text-[#1a1a2e]">
-                            Everything Your School Needs,
+                            <Highlighter action="underline" color="#FF9800">Everything</Highlighter> Your School Needs,
                             <br />
                             <span className="shimmer-text bg-gradient-to-r from-[#0569ff] via-[#0450d4] to-[#ff7a00] bg-clip-text text-transparent inline-block">
                                 In One Platform
                             </span>
                         </h1>
-                        <p className="text-lg md:text-xl text-gray-600 mb-12 max-w-3xl mx-auto leading-relaxed">
+                        <p className="text-lg md:text-xl text-gray-600 mb-12 max-w-3xl md:mx-auto leading-relaxed">
                             Discover our comprehensive suite of 20+ modules designed to streamline every aspect of school management—from admissions to alumni.
                         </p>
 
                         {/* CTA Buttons */}
-                        <div className="flex flex-wrap gap-4 justify-center mb-16">
+                        <div className="flex flex-wrap gap-4 md:justify-center mb-16">
                             <Link href="/features/docs">
                                 <button className="group flex items-center pr-1 gap-2 bg-[#0569ff] text-white border-0 rounded-full text-[0.95rem] font-semibold cursor-pointer shadow-[0_4px_14px_rgba(5,105,255,0.3)] hover:shadow-[0_6px_20px_rgba(5,105,255,0.4)] transition-all duration-300">
                                     <span className='px-1 pl-6 py-3 md:py-3.5'>Browse All Features</span>
@@ -213,7 +214,7 @@ export default function FeaturesIntroPage() {
                         </div>
 
                         {/* Stats Grid */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-4xl mx-auto">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-4xl md:mx-auto">
                             {stats.map((stat, index) => (
                                 <div key={index} className="relative group">
                                     <div className="absolute inset-0 bg-gradient-to-br from-[#0569ff]/5 to-transparent rounded-2xl blur-xl group-hover:blur-2xl transition-all" />

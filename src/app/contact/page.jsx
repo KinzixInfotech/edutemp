@@ -14,6 +14,8 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion";
 import QuoteSection from '@/components/QuoteSection';
+import { Highlighter } from '@/components/ui/highlighter';
+import CalEmbed from '@/components/cal';
 
 export default function ContactPage() {
     const [formData, setFormData] = useState({
@@ -91,20 +93,19 @@ export default function ContactPage() {
                     <BarChart3 size={24} className="text-[#14B8A6]" />
                 </div>
 
-                <div className="max-w-[1200px] mx-auto text-center relative z-10 w-full">
+                <div className="max-w-[1200px] mx-auto text-left md:text-center relative z-10 w-full">
                     <span className="inline-flex items-center gap-2 bg-[#0569ff]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-6">
                         <MessageCircle size={16} />
                         Get In Touch
                     </span>
-                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-[#1a1a2e] mb-6">
-                        Let's Transform Your <br className="hidden md:block" />
-                        <span className="text-[#0569ff]">School Together</span>
+                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-[#1a1a2e] mb-6 leading-tight">
+                        Let's Transform Your <br className="md:hidden" /><Highlighter action="underline" color="#FF9800"><span className="text-[#0569ff]">School Together</span></Highlighter>
                     </h1>
-                    <p className="text-[#666] text-lg md:text-xl max-w-2xl mx-auto mb-10">
+                    <p className="text-[#666] text-lg md:text-xl max-w-2xl md:mx-auto mb-10">
                         Book a free demo, ask questions, or get personalized guidance.
                         We're here to help you modernize your school management.
                     </p>
-                    <div className="flex flex-wrap justify-center gap-6">
+                    <div className="flex flex-wrap md:justify-center gap-6">
                         <div className="flex items-center gap-2 text-[#555]">
                             <div className="w-8 h-8 bg-[#10B981]/10 rounded-full flex items-center justify-center">
                                 <CheckCircle size={16} className="text-[#10B981]" />
@@ -446,6 +447,51 @@ export default function ContactPage() {
                             </AccordionItem>
                         ))}
                     </Accordion>
+                </div>
+            </section>
+
+            {/* Book a Meeting Section */}
+            <section className="py-16 md:py-24 px-5 bg-gradient-to-b from-white to-[#f8fafc]">
+                <div className="max-w-[1200px] mx-auto">
+                    <div className="text-left md:text-center mb-10">
+                        <span className="inline-flex items-center gap-2 bg-[#10B981]/10 text-[#10B981] px-4 py-2 rounded-full text-sm font-semibold mb-4">
+                            <MessageCircle size={16} />
+                            Have Questions?
+                        </span>
+                        <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-[#1a1a2e] mb-4">
+                            Schedule a <Highlighter action="underline" color="#FF9800"><span className="text-[#0569ff]">Quick Call</span></Highlighter>
+                        </h2>
+                        <p className="text-[#666] text-lg max-w-2xl md:mx-auto">
+                            Got questions? Book a quick 30-minute call with our team to get all your answers.
+                        </p>
+                    </div>
+
+                    <div className="relative">
+                        {/* Gradient glow behind */}
+                        <div className="absolute -inset-1 bg-gradient-to-r from-[#0569ff]/20 via-[#FF9800]/20 to-[#0569ff]/20 rounded-[2rem] blur-xl opacity-70" />
+
+                        {/* Main container */}
+                        <div className="relative bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl border border-gray-200/50 overflow-hidden">
+                            {/* Mac-style dark header bar */}
+                            <div className="bg-[#2d2d2d] px-4 py-3 flex items-center gap-3">
+                                <div className="flex gap-2">
+                                    <div className="w-3 h-3 rounded-full bg-[#ff5f56]" />
+                                    <div className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
+                                    <div className="w-3 h-3 rounded-full bg-[#27c93f]" />
+                                </div>
+                                <div className="flex-1 mx-4">
+                                    <div className="bg-[#3f3f3f] rounded-md px-3 py-1.5 text-xs text-gray-300 text-center">
+                                        cal.com/edubreezy-meet
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Calendar embed */}
+                            <div className="h-[550px] md:h-[650px]">
+                                <CalEmbed />
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 

@@ -106,7 +106,7 @@ export default function AboutPage() {
 
         <div className="max-w-7xl mx-auto px-5 relative z-10">
           <motion.div
-            className="text-center max-w-4xl mx-auto"
+            className="text-left md:text-center max-w-4xl md:mx-auto"
             initial="hidden"
             animate="visible"
             variants={staggerContainer}
@@ -133,12 +133,12 @@ export default function AboutPage() {
 
             <motion.p
               variants={fadeInUp}
-              className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto mb-10 leading-relaxed"
+              className="text-lg md:text-xl text-gray-600 max-w-2xl md:mx-auto mb-10 leading-relaxed"
             >
               We're on a mission to simplify school management and empower educators with modern technology that just works.
             </motion.p>
 
-            <motion.div variants={fadeInUp} className="flex flex-wrap gap-4 justify-center">
+            <motion.div variants={fadeInUp} className="flex flex-wrap gap-4 md:justify-center">
               <Link href="/contact">
                 <button className="group flex items-center pr-1 gap-2 bg-[#0569ff] text-white border-0 rounded-full text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-300">
                   <span className='px-1 pl-6 py-3'>Get Started</span>

@@ -16,6 +16,7 @@ import {
     AccordionTrigger,
 } from "@/components/ui/accordion";
 import QuoteSection from '@/components/QuoteSection';
+import { Highlighter } from '@/components/ui/highlighter';
 
 export default function SupportPage() {
     const [formData, setFormData] = useState({
@@ -99,20 +100,19 @@ export default function SupportPage() {
                     <MessageCircle size={28} className="text-[#8B5CF6]" />
                 </div>
 
-                <div className="max-w-[1200px] mx-auto text-center relative z-10 w-full">
+                <div className="max-w-[1200px] mx-auto text-left md:text-center relative z-10 w-full">
                     <span className="inline-flex items-center gap-2 bg-[#0569ff]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-6">
                         <LifeBuoy size={16} />
                         Support Center
                     </span>
-                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-[#1a1a2e] mb-6">
-                        We're Here To <br className="hidden md:block" />
-                        <span className="text-[#0569ff]">Help You</span>
+                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-[#1a1a2e] mb-6 leading-tight">
+                        We're Here To <Highlighter action="underline" color="#FF9800"><span className="text-[#0569ff]">Help You</span></Highlighter>
                     </h1>
-                    <p className="text-[#666] text-lg md:text-xl max-w-2xl mx-auto mb-10">
+                    <p className="text-[#666] text-lg md:text-xl max-w-2xl md:mx-auto mb-10">
                         Raise a support ticket and our dedicated team will assist you.
                         We're committed to resolving your issues quickly.
                     </p>
-                    <div className="flex flex-wrap justify-center gap-6">
+                    <div className="flex flex-wrap md:justify-center gap-6">
                         <div className="flex items-center gap-2 text-[#555]">
                             <div className="w-8 h-8 bg-[#10B981]/10 rounded-full flex items-center justify-center">
                                 <CheckCircle size={16} className="text-[#10B981]" />
