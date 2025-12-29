@@ -59,7 +59,7 @@ export default function DeveloperLoginPage() {
             }
 
             // Success - redirect to dashboard
-            toast.success('Welcome back, Admin!');
+            toast.success('Welcome back,', userData?.name);
             router.push('/dashboard');
 
         } catch (error) {

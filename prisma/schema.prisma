@@ -102,6 +102,7 @@ model School {
   busRequests      BusRequest[]
   routeAssignments RouteAssignment[]
   importHistory    ImportHistory[]
+  smsWallet        SmsWallet?
 
   @@index([name])
 }
@@ -4893,4 +4894,125 @@ model SchoolSettings {
   updatedAt         DateTime @updatedAt
 
   @@index([schoolId])
+}
+
+// ==================== SMS MODULE ====================
+
+model SmsTemplate {
+  id             String              @id @default(uuid()) @db.Uuid
+  name           String // Friendly name e.g., "Attendance Absent"
+  dltTemplateId  String              @unique // DLT registered template ID
+  content        String // Template content with {VAR} placeholders
+  variables      String[] // Allowed variable names
+  category       SmsTemplateCategory
+  isActive       Boolean             @default(true)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  smsLogs        SmsLog[]
+  triggerConfigs SmsTriggerConfig[]
+}
+
+model SmsWallet {
+  id           String                 @id @default(uuid()) @db.Uuid
+  schoolId     String                 @unique @db.Uuid
+  school       School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  balance      Float                  @default(0) // Credits remaining
+  totalCredits Float                  @default(0) // Total purchased
+  usedCredits  Float                  @default(0) // Total used
+  isFrozen     Boolean                @default(false)
+  frozenReason String?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  transactions SmsWalletTransaction[]
+
+  @@index([schoolId])
+}
+
+model SmsWalletTransaction {
+  id          String             @id @default(uuid()) @db.Uuid
+  walletId    String             @db.Uuid
+  wallet      SmsWallet          @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  type        SmsTransactionType
+  amount      Float // Credits (positive for recharge, negative for usage)
+  description String?
+  referenceId String? // Payment gateway reference
+  createdAt   DateTime           @default(now())
+
+  @@index([walletId])
+  @@index([createdAt])
+}
+
+model SmsLog {
+  id           String          @id @default(uuid()) @db.Uuid
+  schoolId     String          @db.Uuid
+  templateId   String?         @db.Uuid
+  template     SmsTemplate?    @relation(fields: [templateId], references: [id])
+  recipients   String[] // Phone numbers
+  message      String // Final rendered message
+  status       SmsStatus
+  cost         Float // Credits used
+  fast2smsId   String? // API response ID
+  errorMessage String?
+  sentBy       String?         @db.Uuid // User who triggered
+  trigger      SmsTriggerType? // If auto-triggered
+  createdAt    DateTime        @default(now())
+
+  @@index([schoolId, createdAt])
+  @@index([status])
+}
+
+model SmsTriggerConfig {
+  id          String         @id @default(uuid()) @db.Uuid
+  schoolId    String         @db.Uuid
+  triggerType SmsTriggerType
+  templateId  String?        @db.Uuid
+  template    SmsTemplate?   @relation(fields: [templateId], references: [id])
+  isEnabled   Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([schoolId, triggerType])
+  @@index([schoolId])
+}
+
+enum SmsTemplateCategory {
+  ATTENDANCE
+  FEE_REMINDER
+  OTP
+  NOTICE
+  HOLIDAY
+  GENERAL
+}
+
+enum SmsTransactionType {
+  RECHARGE
+  USAGE
+  REFUND
+  ADJUSTMENT
+}
+
+enum SmsStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+}
+
+enum SmsTriggerType {
+  ATTENDANCE_ABSENT
+  FEE_DUE_REMINDER
+  FEE_OVERDUE
+  OTP_LOGIN
+  NOTICE_BROADCAST
+  HOLIDAY_ANNOUNCEMENT
+}
+
+model SmsSettings {
+  id                  String   @id @default("default")
+  costPerSms          Float    @default(0.20)
+  minPurchase         Int      @default(100)
+  creditPacks         Json     @default("[]")
+  whitelistedDomains  Json     @default("[]")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }

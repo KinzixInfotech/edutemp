@@ -159,15 +159,12 @@ function HeroSection() {
                             fontOpticalSizing: 'auto',
                         }} className="font-semibold italic text-[#1a1a2e] text-[1em] block sm:inline mt-2 sm:mt-0"> Every Day</span>
                     </h1>
-
                     {/* Subtitle */}
                     <p className="text-[1.05rem] text-[#666] max-w-[550px] mx-auto mb-7 leading-relaxed">
                         Transform the way schools operate and deliver education with our
                         intelligent, cloud-based management platform.
                     </p>
-
                     {/* CTA Row */}
-
                     <div className="flex z-10 items-center justify-center gap-6 flex-wrap mb-[50px]">
                         {/* Avatars + Rating */}
                         {/* <div className="flex flex-col md:flex-col items-center  gap-3">

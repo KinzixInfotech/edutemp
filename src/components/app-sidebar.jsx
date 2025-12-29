@@ -59,6 +59,7 @@ import {
     Wallet,
     Receipt,
     HandCoins,
+    FileText,
 } from "lucide-react"
 import { useCommandMenu } from "./CommandMenuContext"
 import { cn } from "@/lib/utils"
@@ -495,6 +496,23 @@ export const SidebarData = [
         ],
     },
     {
+        title: "SMS Module",
+        items: [
+            {
+                label: "SMS Management",
+                icon: Send,
+                roles: ["ADMIN"],
+                submenu: [
+                    { label: "Templates", url: "/dashboard/schools/sms/templates", roles: ["ADMIN"] },
+                    { label: "Send SMS", url: "/dashboard/schools/sms/send", roles: ["ADMIN"] },
+                    { label: "Wallet & Credits", url: "/dashboard/schools/sms/wallet", roles: ["ADMIN"] },
+                    { label: "SMS Logs", url: "/dashboard/schools/sms/logs", roles: ["ADMIN"] },
+                    { label: "Triggers", url: "/dashboard/schools/sms/triggers", roles: ["ADMIN"] },
+                ],
+            },
+        ],
+    },
+    {
         title: "Librarian Dashboard",
         items: [
             { label: "Home", url: "/dashboard", icon: House, roles: ["LIBRARIAN"] },
@@ -567,6 +585,17 @@ export const SidebarData = [
 
             { label: "All Employees", url: "/dashboard/edubreezy/employees", icon: IconDatabase, roles: ['SUPER_ADMIN'] },
             { label: "Add Employee", url: "#", icon: IconReport, roles: ['SUPER_ADMIN'] },
+        ],
+    },
+    {
+        title: "SMS Administration",
+        items: [
+            { label: "SMS Dashboard", url: "/dashboard/edubreezy/sms/dashboard", icon: TrendingUp, roles: ["SUPER_ADMIN"] },
+            { label: "DLT Settings", url: "/dashboard/edubreezy/sms/dlt-settings", icon: Settings, roles: ["SUPER_ADMIN"] },
+            { label: "Manage Templates", url: "/dashboard/edubreezy/sms/templates", icon: Send, roles: ["SUPER_ADMIN"] },
+            { label: "Pricing & Packs", url: "/dashboard/edubreezy/sms/pricing", icon: CreditCard, roles: ["SUPER_ADMIN"] },
+            { label: "School Wallets", url: "/dashboard/edubreezy/sms/wallets", icon: Wallet, roles: ["SUPER_ADMIN"] },
+            { label: "SMS Logs", url: "/dashboard/edubreezy/sms/logs", icon: FileText, roles: ["SUPER_ADMIN"] },
         ],
     },
     {

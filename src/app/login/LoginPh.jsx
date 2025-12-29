@@ -156,7 +156,7 @@ export default function LoginPhoto() {
                 })
             }).catch(err => console.error("Session record failed", err));
 
-            toast.success("Welcome back!");
+            toast.success("Welcome back, " + result?.name || "User");
             router.push("/dashboard");
 
         } catch (err) {

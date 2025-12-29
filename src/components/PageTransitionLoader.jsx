@@ -157,7 +157,6 @@ export default function PageTransitionLoader() {
                                 priority
                             />
                         </motion.div>
-
                         {/* Loading Animation */}
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
