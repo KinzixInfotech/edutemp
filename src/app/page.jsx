@@ -822,7 +822,7 @@ function HowWeWorkSection() {
                         Our Process
                     </span>
                     <h2 className="text-3xl md:text-4xl leading-[1.2] lg:text-5xl font-bold text-[#1a1a2e] mb-4">
-                        <Highlighter action="underline" color="#FF9800">Here's How We Make Your <br className="hidden md:block" /></Highlighter><br />
+                        Here's How We Make Your <br className="hidden md:block" />
                         <Highlighter action="underline" color="#FF9800"><span className="text-[#0569ff]">School Smarter</span></Highlighter>
 
                     </h2>

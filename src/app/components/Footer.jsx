@@ -202,7 +202,7 @@ export default function Footer() {
                                 </a>
                             </p>
                             <span className="inline-block px-2 py-1.5  bg-amber-100 border text-amber-800 rounded-full">
-                                🚧 Under Development
+                                🚧 In Development
                             </span>
 
                         </div>

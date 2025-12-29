@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/sonner"
 import LoaderPage from "@/components/loader-page";
 import Provider from "./Provider";
 import NavigationProgress from "./components/NavigationProgress";
+import PageTransitionLoader from "@/components/PageTransitionLoader";
 import { Suspense } from "react";
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://edubreezy.com';
@@ -155,6 +156,7 @@ export default function RootLayout({ children }) {
           <ClientProduct>{children}</ClientProduct>
           <Suspense fallback={<div />}>
             <NavigationProgress />
+            <PageTransitionLoader />
           </Suspense>
           <Toaster
             theme="system"

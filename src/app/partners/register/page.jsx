@@ -95,7 +95,7 @@ export default function PartnerRegistrationPage() {
     const prevStep = () => setStep(step - 1);
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-sky-50 to-indigo-50 flex items-center justify-center p-4 sm:p-6 lg:p-8 overflow-hidden relative">
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-sky-50 to-indigo-50 flex items-center justify-center p-4 lg:pt-0 pt-20 sm:p-6 lg:p-8 overflow-hidden relative">
 
             {/* Background Elements */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">

@@ -3,12 +3,13 @@
 import { Button } from "@/components/ui/button"
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, Menu, X, ArrowRight } from 'lucide-react';
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { HiOutlineMenuAlt3 } from "react-icons/hi";
+import { triggerPageTransition } from "@/components/PageTransitionLoader";
 // Menu Configuration - Easy to modify
 const menuConfig = {
     menus: [
@@ -31,44 +32,21 @@ const menuConfig = {
             target: "_self"
         },
         {
-            name: "Apps",
-            type: "submenu",
-            submenus: [
-                {
-                    category: "Mobile Apps",
-                    items: [
-                        { name: "Parent App", link: "/apps/parent", target: "_self", description: "Stay connected with your child's education" },
-                        { name: "Teacher App", link: "/apps/teacher", target: "_self", description: "Manage classes on the go" },
-                        { name: "Student App", link: "/apps/student", target: "_self", description: "Access learning materials anytime" }
-                    ]
-                },
-            ]
-        },
-        {
-            name: "Partner",
-            type: "submenu",
-            submenus: [
-                {
-                    category: "Become A EduBreezy Partner",
-                    items: [
-                        { name: "Register", link: "/partners/register", target: "_self", description: "Earn With Edubreezy" },
-                    ]
-                },
-                {
-                    category: "Learn",
-                    items: [
-                        { name: "Documentation", link: "/docs", target: "_self", description: "Complete guides and tutorials" },
-                        { name: "Video Tutorials", link: "/tutorials", target: "_self", description: "Step-by-step video guides" },
-                        { name: "Webinars", link: "/webinars", target: "_self", description: "Live training sessions" },
-                        { name: "FAQ", link: "/faq", target: "_self", description: "Frequently asked questions" }
-                    ]
-                },
-            ]
+            name: "Grow With Us",
+            type: "link",
+            link: "/partners",
+            target: "_self"
         },
         {
             name: "Contact",
             type: "link",
             link: "/contact",
+            target: "_self"
+        },
+        {
+            name: "Support",
+            type: "link",
+            link: "/support",
             target: "_self"
         }
     ]
@@ -81,6 +59,7 @@ export default function Header() {
     const [mobileExpandedMenu, setMobileExpandedMenu] = useState(null);
     const [isScrolled, setIsScrolled] = useState(false);
     const pathname = usePathname();
+    const router = useRouter();
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data }) => {
@@ -109,6 +88,18 @@ export default function Header() {
 
     const toggleMobileSubmenu = (menuName) => {
         setMobileExpandedMenu(mobileExpandedMenu === menuName ? null : menuName);
+    };
+
+    // Handle navigation with page transition
+    const handleNavClick = (e, link) => {
+        // Only trigger transition if navigating to a different page
+        if (link !== pathname) {
+            e.preventDefault();
+            triggerPageTransition();
+            setTimeout(() => {
+                router.push(link);
+            }, 100);
+        }
     };
 
     // Check if we're on the homepage
@@ -142,6 +133,7 @@ export default function Header() {
                                         href={menu.link}
                                         target={menu.target}
                                         className="text-gray-700 hover:text-[#026df3] transition-colors font-medium py-4"
+                                        onClick={(e) => handleNavClick(e, menu.link)}
                                     >
                                         {menu.name}
                                     </Link>
@@ -247,7 +239,10 @@ export default function Header() {
                                                 <Link
                                                     href={menu.link}
                                                     className="flex items-center justify-between h-12 px-6 text-base font-medium border-b text-foreground/80 hover:text-primary hover:bg-muted/50 transition-colors"
-                                                    onClick={() => setMobileMenuOpen(false)}
+                                                    onClick={(e) => {
+                                                        setMobileMenuOpen(false);
+                                                        handleNavClick(e, menu.link);
+                                                    }}
                                                 >
                                                     {menu.name}
                                                     <ChevronRight className="h-4 w-4 text-muted-foreground/50" />

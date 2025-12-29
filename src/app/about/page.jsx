@@ -104,7 +104,7 @@ export default function AboutPage() {
           <Award size={60} className="text-black" />
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 md:px-6 relative z-10">
+        <div className="max-w-7xl mx-auto px-5 relative z-10">
           <motion.div
             className="text-center max-w-4xl mx-auto"
             initial="hidden"
@@ -159,7 +159,7 @@ export default function AboutPage() {
 
       {/* Stats Section */}
       <section className="py-16 bg-white border-y border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 md:px-6">
+        <div className="max-w-7xl mx-auto px-5">
           <motion.div
             className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8"
             initial="hidden"
@@ -187,8 +187,8 @@ export default function AboutPage() {
       </section>
 
       {/* Story Section - Image Left, Text Right */}
-      <section className="py-20 md:py-28 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 md:px-6">
+      <section className="py-20 md:py-28 bg-gray-50 px-5">
+        <div className="max-w-7xl mx-auto">
           <div className="grid md:grid-cols-2 gap-12 md:gap-16 items-center">
             {/* Image */}
             <motion.div
@@ -241,8 +241,8 @@ export default function AboutPage() {
       </section>
 
       {/* Mission Section - Text Left, Image Right */}
-      <section className="py-20 md:py-28 bg-white">
-        <div className="max-w-7xl mx-auto px-4 md:px-6">
+      <section className="py-20 md:py-28 bg-white px-5">
+        <div className="max-w-7xl mx-auto">
           <div className="grid md:grid-cols-2 gap-12 md:gap-16 items-center">
             {/* Text */}
             <motion.div
@@ -311,8 +311,8 @@ export default function AboutPage() {
       </section>
 
       {/* Values Section */}
-      <section className="py-20 md:py-28 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 md:px-6">
+      <section className="py-20 md:py-28 bg-gray-50 px-5">
+        <div className="max-w-7xl mx-auto">
           <motion.div
             initial="hidden"
             whileInView="visible"
