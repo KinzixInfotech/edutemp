@@ -29,7 +29,7 @@ export const metadata = {
         description: 'Discover and compare the best schools for your child. Verified reviews, real-time rankings, and detailed insights.',
         images: [
             {
-                url: '/edu_ex.png',
+                url: '/by.png',
                 width: 1200,
                 height: 630,
                 alt: 'EduBreezy School Explorer',
@@ -40,7 +40,7 @@ export const metadata = {
         card: 'summary_large_image',
         title: 'EduBreezy School Explorer',
         description: 'Find the perfect school for your child with verified reviews and rankings.',
-        images: ['/edu_ex.png'],
+        images: ['/by.png'],
     },
     robots: {
         index: true,
