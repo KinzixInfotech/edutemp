@@ -114,7 +114,6 @@ export default function DeveloperLoginPage() {
                         </div>
                     </div>
                 </div>
-
                 {/* Right Side - Form */}
                 <div className="w-full lg:w-[45%] flex flex-col justify-center px-12 sm:px-16 py-12 relative bg-white">
                     <div className="max-w-[360px] mx-auto w-full">
@@ -167,15 +166,11 @@ export default function DeveloperLoginPage() {
                                     </button>
                                 </div>
                             </div>
-
                             <div className="flex items-center justify-end pt-1">
                                 <Link href="/forgot-password" className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors">
                                     Forgot password?
                                 </Link>
                             </div>
-
-
-
                             <Button
                                 type="submit"
                                 disabled={loading}
@@ -192,7 +187,6 @@ export default function DeveloperLoginPage() {
                                 />
                             </div>
                         </form>
-
                         {/* Footer Links */}
                         <div className="mt-8 pt-6 border-t border-gray-100">
                             <div className="flex items-center justify-center gap-2 text-xs">

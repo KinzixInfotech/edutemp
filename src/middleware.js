@@ -23,12 +23,16 @@ export async function middleware(request) {
     }
 
     // ============================================
-    // DOMAIN-BASED ROUTING (School Explorer)
+    // DOMAIN-BASED ROUTING (School Explorer & Fee Payment)
     // ============================================
 
     // Check if request is for school subdomain
     const isSchoolDomain = hostname.includes('school.edubreezy.com') ||
         hostname.includes('school.localhost');
+
+    // Check if request is for pay subdomain
+    const isPayDomain = hostname.includes('pay.edubreezy.com') ||
+        hostname.includes('pay.localhost');
 
     // Skip domain routing for static files and API routes
     const skipDomainRouting = pathname.startsWith('/_next') ||
@@ -54,12 +58,37 @@ export async function middleware(request) {
             // Public routes don't need auth - continue to next middleware section
         }
 
+        // Handle pay.edubreezy.com subdomain
+        if (isPayDomain) {
+            // For root path, REWRITE to /pay
+            if (pathname === '/') {
+                const payUrl = new URL('/pay', request.url);
+                return NextResponse.rewrite(payUrl);
+            }
+
+            // Only allow /pay routes on pay subdomain
+            if (!pathname.startsWith('/pay')) {
+                const payUrl = new URL('/pay', request.url);
+                return NextResponse.rewrite(payUrl);
+            }
+
+            // Pay portal doesn't need Supabase auth - uses session tokens
+            return NextResponse.next();
+        }
+
         // Handle main domain (edubreezy.com)
         // Redirect /explore routes to school subdomain
-        if (!isSchoolDomain && pathname.startsWith('/explore')) {
+        if (!isSchoolDomain && !isPayDomain && pathname.startsWith('/explore')) {
             const schoolUrl = new URL(request.url);
             schoolUrl.hostname = 'school.edubreezy.com';
             return NextResponse.redirect(schoolUrl, { status: 301 });
+        }
+
+        // Redirect /pay routes to pay subdomain
+        if (!isPayDomain && !isSchoolDomain && pathname.startsWith('/pay')) {
+            const payUrl = new URL(request.url);
+            payUrl.hostname = 'pay.edubreezy.com';
+            return NextResponse.redirect(payUrl, { status: 301 });
         }
     }
 
@@ -226,8 +255,9 @@ export const config = {
         '/login',
         '/signup',
         '/api/auth/:path*',
-        '/explore/:path*',  // Add for school subdomain routing
-        '/',                 // Add for root subdomain redirect
+        '/explore/:path*',  // For school subdomain routing
+        '/pay/:path*',       // For pay subdomain routing
+        '/',                 // For root subdomain redirect
         '/reset-password',   // Check auth for reset password
     ],
 };
