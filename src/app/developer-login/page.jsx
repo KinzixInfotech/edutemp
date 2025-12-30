@@ -10,6 +10,7 @@ import { Code, Eye, EyeOff, Loader2, AlertCircle, ArrowRight, Shield, Terminal }
 import { toast } from 'sonner';
 import Link from 'next/link';
 import Image from 'next/image';
+import Turnstile from 'react-turnstile';
 
 export default function DeveloperLoginPage() {
     const router = useRouter();
@@ -18,10 +19,17 @@ export default function DeveloperLoginPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [turnstileToken, setTurnstileToken] = useState('');
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+
+        if (!turnstileToken) {
+            setError('Please complete the security check');
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -29,6 +37,7 @@ export default function DeveloperLoginPage() {
             const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
                 email,
                 password,
+                options: { captchaToken: turnstileToken }
             });
 
             if (authError || !authData.user) {
@@ -165,6 +174,8 @@ export default function DeveloperLoginPage() {
                                 </Link>
                             </div>
 
+
+
                             <Button
                                 type="submit"
                                 disabled={loading}
@@ -172,6 +183,14 @@ export default function DeveloperLoginPage() {
                             >
                                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Authenticate"}
                             </Button>
+                            {/* Turnstile Widget */}
+                            <div className="flex justify-center">
+                                <Turnstile
+                                    sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+                                    onVerify={(token) => setTurnstileToken(token)}
+                                    theme="light"
+                                />
+                            </div>
                         </form>
 
                         {/* Footer Links */}

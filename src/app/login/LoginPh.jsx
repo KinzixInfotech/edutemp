@@ -12,6 +12,7 @@ import { Loader2, Eye, EyeOff, Mail, Lock, CheckCircle2, AlertCircle, ArrowLeft 
 import axios from "axios"
 import Link from "next/link"
 import Image from "next/image"
+import Turnstile from 'react-turnstile';
 
 export default function LoginPhoto() {
     const router = useRouter()
@@ -22,6 +23,7 @@ export default function LoginPhoto() {
     const [loading, setLoading] = useState(false)
     const [loadingl, setLoadingl] = useState(true)
     const [alreadyLoggedIn, setAlreadyLoggedIn] = useState(false)
+    const [turnstileToken, setTurnstileToken] = useState('');
 
     // School data state
     const searchParams = useSearchParams()
@@ -66,6 +68,12 @@ export default function LoginPhoto() {
         e.preventDefault();
         setLoading(true);
 
+        if (!turnstileToken) {
+            toast.error("Security Check", { description: "Please complete the captcha verification" });
+            setLoading(false);
+            return;
+        }
+
         try {
             // Check rate limit
             const rateLimitCheck = await axios.get('/api/auth/check-rate-limit');
@@ -81,6 +89,7 @@ export default function LoginPhoto() {
             const { data, error } = await supabase.auth.signInWithPassword({
                 email,
                 password,
+                options: { captchaToken: turnstileToken }
             });
 
             if (error || !data.user) {
@@ -331,6 +340,8 @@ export default function LoginPhoto() {
                                 </Link>
                             </div>
 
+
+
                             <Button
                                 type="submit"
                                 disabled={loading || alreadyLoggedIn}
@@ -338,6 +349,14 @@ export default function LoginPhoto() {
                             >
                                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sign in"}
                             </Button>
+                            {/* Turnstile Widget */}
+                            <div className="flex justify-center pt-2">
+                                <Turnstile
+                                    sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+                                    onVerify={(token) => setTurnstileToken(token)}
+                                    theme="light"
+                                />
+                            </div>
                         </form>
                     </div>
 
