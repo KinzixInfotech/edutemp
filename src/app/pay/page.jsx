@@ -14,22 +14,17 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import {
-    Dialog,
-    DialogContent,
-} from '@/components/ui/dialog';
-import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
 import { toast } from 'sonner';
-import { Loader2, Eye, EyeOff, AlertCircle, Shield, Wallet } from 'lucide-react';
+import { Loader2, Eye, EyeOff, AlertCircle, Shield, RefreshCw, Building2, MapPin, Phone, Mail } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import Turnstile from 'react-turnstile';
+import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
 
 export default function PayPage() {
     const router = useRouter();
 
-    // School code dialog state
-    const [showSchoolDialog, setShowSchoolDialog] = useState(true);
+    // School code state
     const [schoolCodeInput, setSchoolCodeInput] = useState('');
     const [schoolCodeError, setSchoolCodeError] = useState('');
     const [schoolCodeLoading, setSchoolCodeLoading] = useState(false);
@@ -80,23 +75,17 @@ export default function PayPage() {
         setSchoolCodeError('');
 
         try {
-            // Add EB- prefix if not already present
-            let fullCode = schoolCodeInput.trim().toUpperCase();
-            if (!fullCode.startsWith('EB-')) {
-                fullCode = `EB-${fullCode}`;
-            }
-
-            const res = await fetch(`/api/schools/by-code?schoolcode=${fullCode}`);
+            const code = `EB-${schoolCodeInput.trim().toUpperCase()}`;
+            const res = await fetch(`/api/schools/by-code?schoolcode=${encodeURIComponent(code)}`);
             const data = await res.json();
 
-            if (!res.ok) {
-                setSchoolCodeError(data.error || 'Invalid School Code. Please check and try again.');
+            if (!res.ok || !data.school) {
+                setSchoolCodeError(data.error || 'School not found. Please check your code.');
                 setSchoolCodeLoading(false);
                 return;
             }
 
             setSchool(data.school);
-            setShowSchoolDialog(false);
         } catch (err) {
             setSchoolCodeError('Something went wrong. Please try again.');
         } finally {
@@ -107,24 +96,18 @@ export default function PayPage() {
     // Handle login
     const handleLogin = async (e) => {
         e.preventDefault();
-        setError('');
-
-        if (!admissionNo.trim()) {
-            setError('Please enter your User Id/Admission Number');
-            return;
-        }
-
-        if (!academicYearId) {
-            setError('Please select a session');
+        if (!admissionNo.trim() || !password) {
+            setError('Please fill in all fields');
             return;
         }
 
         if (!turnstileToken) {
-            toast.error('Please complete the security check');
+            setError('Please complete the captcha verification');
             return;
         }
 
         setLoading(true);
+        setError('');
 
         try {
             const res = await fetch('/api/pay/student-login', {
@@ -133,7 +116,7 @@ export default function PayPage() {
                 body: JSON.stringify({
                     schoolId: school.id,
                     admissionNo: admissionNo.trim(),
-                    password: password || undefined,
+                    password,
                     academicYearId,
                     turnstileToken,
                 }),
@@ -142,261 +125,294 @@ export default function PayPage() {
             const data = await res.json();
 
             if (!res.ok) {
-                setError(data.error || 'Login failed. Please check your details.');
+                setError(data.error || 'Invalid credentials');
                 setLoading(false);
                 setTurnstileKey(Date.now());
                 setTurnstileToken('');
                 return;
             }
 
-            // Store session token and redirect
+            // Store session
             sessionStorage.setItem('paySession', JSON.stringify({
                 token: data.token,
-                studentId: data.student.userId,
-                schoolId: school.id,
-                academicYearId,
+                student: data.student,
+                school: data.school,
+                academicYear: data.academicYear,
                 expiresAt: data.expiresAt,
             }));
 
-            toast.success(`Welcome, ${data.student.name}!`);
+            toast.success('Login successful!');
             router.push('/pay/dashboard');
 
         } catch (err) {
             setError('Something went wrong. Please try again.');
             setLoading(false);
-            // Reset Turnstile on error
             setTurnstileKey(Date.now());
             setTurnstileToken('');
         }
     };
 
+    // Change school handler
+    const handleChangeSchool = () => {
+        setSchool(null);
+        setSchoolCodeInput('');
+        setAdmissionNo('');
+        setPassword('');
+        setAcademicYearId('');
+        setError('');
+    };
+
     return (
-        <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4 font-sans relative overflow-hidden">
-            {/* Top Left Logo */}
-            <div className="absolute top-6 left-6 z-20">
-                <Image src="/pay.png" alt="Pay" width={180} height={60} className="h-12 w-auto" />
-            </div>
+        <div className="min-h-screen flex flex-col">
+            <div className="flex-1 flex flex-col lg:flex-row">
+                {/* Left Side - Visual/School Branding - Hidden on mobile */}
+                <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-slate-50 to-blue-50 relative flex-col">
+                    {/* Top Logo */}
+                    <div className="p-6 lg:p-8">
+                        <Image src="/pay.png" alt="EduBreezy Pay" width={180} height={60} className="h-10 lg:h-12 w-auto" />
+                    </div>
 
-            {/* Bottom Right Logo */}
-            <div className="absolute bottom-6 right-6 z-20">
-                <Image src="/kinzix-black.webp" alt="Kinzix" width={280} height={80} className="h-20 w-auto opacity-50" />
-            </div>
-
-            {/* Interactive Grid Pattern Background */}
-            <InteractiveGridPattern
-                width={50}
-                height={50}
-                squares={[40, 20]}
-                className="opacity-30 [mask-image:radial-gradient(600px_circle_at_center,white,transparent)]"
-                squaresClassName="stroke-gray-300/50 hover:fill-blue-100/40"
-            />
-
-            <div className="w-full max-w-[1100px] h-[650px] bg-white rounded-[32px] shadow-2xl shadow-gray-200/50 overflow-hidden flex relative z-10">
-
-                {/* Left Side - Visual Branding */}
-                <div className="w-[55%] relative hidden lg:flex flex-col justify-between p-12 overflow-hidden bg-blue-600">
-                    {/* Background Image / Overlay */}
-                    {school?.profilePicture ? (
-                        <>
-                            <Image
-                                src={school.profilePicture}
-                                alt={school.name}
-                                fill
-                                className="object-cover"
-                                priority
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-blue-900/90 via-blue-900/40 to-black/30 mix-blend-multiply" />
-                            <div className="absolute inset-0 bg-blue-600/20 mix-blend-color" />
-                        </>
-                    ) : (
-                        <>
-                            {/* Default gradient background */}
-                            <div className="absolute inset-0 bg-gradient-to-br from-[#0569ff] to-[#0246b5]" />
-                            <div className="absolute inset-0 opacity-10">
-                                <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff12_1px,transparent_1px),linear-gradient(to_bottom,#ffffff12_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+                    {/* Center Content - Illustration or School Info */}
+                    <div className="flex-1  flex items-center justify-center p-6 lg:p-12">
+                        <InteractiveGridPattern
+                            width={80}
+                            height={80}
+                            className="absolute inset-0 w-full h-full z-0 opacity-40 [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,white_0%,transparent_70%)]"
+                        />
+                        {school ? (
+                            // Show school branding when school is selected
+                            <div className="text-center max-w-md z-10">
+                                {school.profilePicture && (
+                                    <img
+                                        src={school.profilePicture}
+                                        alt={school.name}
+                                        className="w-24 h-24 lg:w-32 lg:h-32 rounded-2xl mx-auto mb-6 object-cover shadow-lg border-4 border-white"
+                                    />
+                                )}
+                                <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">{school.name}</h2>
+                                {school.location && (
+                                    <p className="text-gray-500 flex items-center justify-center gap-2 mb-4">
+                                        <MapPin className="w-4 h-4" />
+                                        {school.location}
+                                    </p>
+                                )}
+                                {school.contactNumber && (
+                                    <p className="text-gray-500 flex items-center justify-center gap-2">
+                                        <Phone className="w-4 h-4" />
+                                        {school.contactNumber}
+                                    </p>
+                                )}
                             </div>
-                        </>
-                    )}
+                        ) : (
+                            // Show default visual when no school selected
+                            <div className="text-center">
 
-                    {/* Branding Content */}
-                    <div className="relative z-10 h-full flex flex-col justify-between">
-                        <div className="pt-8">
-                            {/* School Logo */}
-                            {(school?.publicProfile?.logoImage || school?.profilePicture) ? (
-                                <img
-                                    src={school?.publicProfile?.logoImage || school?.profilePicture}
-                                    alt="Logo"
-                                    className="h-16 w-auto mb-6 bg-white/10 backdrop-blur-md rounded-xl p-2 object-contain"
-                                />
-                            ) : (
-                                <div className="w-14 h-14 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center mb-6">
-                                    <Wallet className="w-8 h-8 text-white" />
-                                </div>
-                            )}
 
-                            {/* School Name or Default */}
-                            <h1 className="text-4xl font-bold text-white leading-tight mb-4 drop-shadow-sm">
-                                {school?.name || "Fee Payment Portal"}
-                            </h1>
-
-                            {/* Tagline or Description */}
-                            {school?.publicProfile?.tagline ? (
-                                <p className="text-blue-100 text-lg italic max-w-md border-l-4 border-white/30 pl-4 py-1">
-                                    "{school.publicProfile.tagline}"
-                                </p>
-                            ) : school?.location ? (
-                                <p className="text-blue-100 text-base max-w-md">
-                                    {school.location}
-                                </p>
-                            ) : (
-                                <p className="text-blue-100 text-lg max-w-md">
-                                    Pay your school fees securely online.
-                                </p>
-                            )}
-                        </div>
-
-                        <div className="space-y-4">
-                            {/* Description if available */}
-                            {school?.publicProfile?.description ? (
-                                <p className="text-white/80 leading-relaxed line-clamp-3 text-sm">
-                                    {school.publicProfile.description}
-                                </p>
-                            ) : (
-                                <p className="text-white/80 text-sm">
-                                    Welcome to the fee payment portal. Pay securely with UPI, Cards, Net Banking or Wallets.
-                                </p>
-                            )}
-
-                            {/* Contact Info */}
-                            {(school?.contactNumber || school?.publicProfile?.publicPhone) && (
-                                <div className="flex flex-wrap gap-4 text-xs text-blue-200 border-t border-white/10 pt-4">
-                                    {school?.contactNumber && <span>📞 {school.contactNumber}</span>}
-                                    {school?.publicProfile?.publicEmail && <span>✉️ {school.publicProfile.publicEmail}</span>}
-                                </div>
-                            )}
-
-                            {/* Security badges */}
-                            <div className="flex items-center gap-3 text-sm text-white/90 bg-white/10 p-3 rounded-xl border border-white/10 backdrop-blur-sm">
-                                <Shield className="w-5 h-5 text-white flex-shrink-0" />
-                                <p>100% Secure Payments</p>
+                                {/* <div className="w-32 h-32 lg:w-40 lg:h-40 bg-gradient-to-br from-[#0569ff] to-indigo-600 rounded-3xl mx-auto mb-6 flex items-center justify-center shadow-xl">
+                                <svg className="w-16 h-16 lg:w-20 lg:h-20 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                </svg>
+                            </div> */}
+                                <h2 className="text-xl lg:text-2xl font-bold text-gray-900 mb-2">Secure Fee Payment Portal</h2>
+                                <p className="text-gray-500">Pay your school fees online with ease</p>
                             </div>
+                        )}
+                    </div>
+
+                    {/* Bottom - Security Badge */}
+                    <div className="p-6 lg:p-8">
+                        <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+                            <Shield className="w-4 h-4" />
+                            <span>100% Secure Payments</span>
                         </div>
                     </div>
                 </div>
 
                 {/* Right Side - Form */}
-                <div className="w-full lg:w-[45%] flex flex-col justify-center px-12 sm:px-16 py-12 relative bg-white">
-                    <div className="max-w-[360px] mx-auto w-full">
+                <div className="w-full lg:w-1/2 bg-gradient-to-br from-slate-100 to-blue-50 lg:bg-white lg:bg-none flex flex-col justify-center items-center min-h-[calc(100vh-40px)] lg:min-h-0 p-4 sm:p-8 lg:p-12 xl:p-16">
+                    {/* Mobile Logo - Outside card */}
+                    <div className="lg:hidden mb-4 flex justify-center">
+                        <Image src="/pay.png" alt="EduBreezy Pay" width={140} height={45} className="h-9 w-auto" />
+                    </div>
 
-                        {school ? (
+                    {/* Card Container for Mobile */}
+                    <div className="max-w-md mx-auto w-full bg-white lg:bg-transparent rounded-2xl lg:rounded-none border lg:border-none p-6 lg:p-0">
+
+                        {!school ? (
+                            // School Code Entry
                             <>
-                                {/* Login Form Header */}
-                                <div className="mb-8">
-                                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Fee Payment Portal 👋</h2>
-                                    <p className="text-gray-500 text-sm">Please enter your details to login.</p>
+                                <div className="mb-6 text-center lg:text-left">
+                                    <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-1">Welcome to EduBreezy Pay 👋</h1>
+                                    <p className="text-gray-500 text-sm">Enter your school code to get started</p>
+                                </div>
+
+                                <form onSubmit={handleSchoolCodeSubmit} className="space-y-5">
+                                    <div>
+                                        <Label className="text-sm font-medium text-gray-700 mb-2 block">School Code *</Label>
+                                        <div className={`flex items-center border-2 rounded-xl overflow-hidden bg-gray-50 transition-all ${schoolCodeError ? 'border-red-300' : 'border-gray-200 focus-within:border-[#0569ff]'}`}>
+                                            <span className="px-4 py-3.5 bg-[#0569ff] text-white font-bold text-sm min-w-[60px] text-center">
+                                                EB-
+                                            </span>
+                                            <Input
+                                                placeholder="Enter code (e.g., 0001)"
+                                                value={schoolCodeInput}
+                                                onChange={(e) => {
+                                                    setSchoolCodeInput(e.target.value.toUpperCase());
+                                                    setSchoolCodeError('');
+                                                }}
+                                                className="border-0 bg-transparent h-12 focus-visible:ring-0 uppercase font-semibold tracking-wider text-gray-900 placeholder:text-gray-400 placeholder:font-normal placeholder:tracking-normal placeholder:normal-case"
+                                                autoFocus
+                                                disabled={schoolCodeLoading}
+                                            />
+                                        </div>
+                                        {schoolCodeError && (
+                                            <div className="flex items-center gap-2 mt-2 text-red-500">
+                                                <AlertCircle className="w-4 h-4" />
+                                                <p className="text-sm font-medium">{schoolCodeError}</p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <Button
+                                        type="submit"
+                                        className="w-full h-12 bg-[#0569ff] hover:bg-[#0451cc] text-white font-semibold rounded-xl transition-all"
+                                        disabled={schoolCodeLoading || !schoolCodeInput.trim()}
+                                    >
+                                        {schoolCodeLoading ? (
+                                            <>
+                                                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                                                Verifying...
+                                            </>
+                                        ) : (
+                                            'Continue'
+                                        )}
+                                    </Button>
+
+                                    <p className="text-sm text-gray-400 text-center">
+                                        Don&apos;t know your code? Contact your school administration.
+                                    </p>
+                                </form>
+                            </>
+                        ) : (
+                            // Login Form
+                            <>
+                                {/* School Header with Change Option */}
+                                <div className="mb-6 p-4 bg-gray-50 rounded-xl flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        {school.profilePicture ? (
+                                            <img src={school.profilePicture} alt="" className="w-10 h-10 rounded-lg object-cover" />
+                                        ) : (
+                                            <div className="w-10 h-10 bg-[#0569ff] rounded-lg flex items-center justify-center">
+                                                <Building2 className="w-5 h-5 text-white" />
+                                            </div>
+                                        )}
+                                        <div>
+                                            <p className="font-semibold text-gray-900 text-sm">{school.name}</p>
+                                            <Badge variant="outline" className="text-xs mt-0.5">{school.schoolCode}</Badge>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={handleChangeSchool}
+                                        className="text-gray-500 hover:text-gray-700"
+                                    >
+                                        <RefreshCw className="w-4 h-4 mr-1" />
+                                        Change
+                                    </Button>
+                                </div>
+
+                                <div className="mb-6">
+                                    <h1 className="text-2xl font-bold text-gray-900 mb-1">Fee Payment Portal 👋</h1>
+                                    <p className="text-gray-500 text-sm">Please enter your details to login</p>
                                 </div>
 
                                 {error && (
                                     <div className="mb-5 p-3 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3">
                                         <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                                        <p className="text-xs text-red-600 font-medium">{error}</p>
+                                        <p className="text-sm text-red-600 font-medium">{error}</p>
                                     </div>
                                 )}
 
                                 <form onSubmit={handleLogin} className="space-y-4">
-                                    <div className="space-y-1.5">
-                                        <Label className="text-xs font-semibold uppercase tracking-wider text-gray-500 ml-1">
-                                            User Id/Admn. No. *
-                                        </Label>
+                                    <div>
+                                        <Label className="text-sm font-medium text-gray-700 mb-2 block">User Id/Admn. No. *</Label>
                                         <Input
-                                            type="text"
                                             placeholder="Your User Id/Admn. No."
-                                            className="h-12 bg-gray-50 border-gray-100 focus:bg-white focus:border-[#0569ff] focus:ring-4 focus:ring-[#0569ff]/10 rounded-xl transition-all font-medium"
                                             value={admissionNo}
-                                            onChange={(e) => {
-                                                setAdmissionNo(e.target.value);
-                                                setError('');
-                                            }}
-                                            required
-                                            autoFocus
+                                            onChange={(e) => setAdmissionNo(e.target.value)}
+                                            className="h-12 rounded-xl border-gray-200 focus:border-[#0569ff]"
+                                            disabled={loading}
                                         />
                                     </div>
 
-                                    <div className="space-y-1.5">
-                                        <Label className="text-xs font-semibold uppercase tracking-wider text-gray-500 ml-1">
-                                            Password *
-                                        </Label>
+                                    <div>
+                                        <Label className="text-sm font-medium text-gray-700 mb-2 block">Password *</Label>
                                         <div className="relative">
                                             <Input
                                                 type={showPassword ? 'text' : 'password'}
                                                 placeholder="Your Password"
-                                                className="h-12 bg-gray-50 border-gray-100 focus:bg-white focus:border-[#0569ff] focus:ring-4 focus:ring-[#0569ff]/10 rounded-xl transition-all font-medium pr-10"
                                                 value={password}
                                                 onChange={(e) => setPassword(e.target.value)}
+                                                className="h-12 rounded-xl border-gray-200 focus:border-[#0569ff] pr-12"
+                                                disabled={loading}
                                             />
                                             <button
                                                 type="button"
                                                 onClick={() => setShowPassword(!showPassword)}
-                                                className="absolute right-4 top-3.5 text-gray-400 hover:text-gray-600 transition-colors"
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                                             >
-                                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                                             </button>
                                         </div>
                                     </div>
 
-                                    <div className="space-y-1.5">
-                                        <Label className="text-xs font-semibold uppercase tracking-wider text-gray-500 ml-1">
-                                            Session *
-                                        </Label>
-                                        <Select value={academicYearId} onValueChange={setAcademicYearId}>
-                                            <SelectTrigger className="h-12 bg-gray-50 border-gray-100 focus:bg-white focus:border-[#0569ff] focus:ring-4 focus:ring-[#0569ff]/10 rounded-xl">
-                                                <SelectValue placeholder="Select Session" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {academicYears?.map((year) => (
-                                                    <SelectItem key={year.id} value={year.id}>
-                                                        {year.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                    {academicYears?.length > 0 && (
+                                        <div>
+                                            <Label className="text-sm font-medium text-gray-700 mb-2 block">Session *</Label>
+                                            <Select value={academicYearId} onValueChange={setAcademicYearId}>
+                                                <SelectTrigger className="h-12 rounded-xl border-gray-200">
+                                                    <SelectValue placeholder="Select session" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {academicYears.map((ay) => (
+                                                        <SelectItem key={ay.id} value={ay.id}>
+                                                            {ay.name} {ay.isCurrent && '(Current)'}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    )}
 
-
-
-                                    <Button
-                                        type="submit"
-                                        disabled={loading}
-                                        className="w-full h-12 bg-[#0569ff] hover:bg-[#0451cc] text-white font-medium rounded-xl shadow-lg shadow-[#0569ff]/20 active:scale-[0.98] transition-all duration-300"
-                                    >
-                                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Login to Pay Fees'}
-                                    </Button>
                                     {/* Turnstile Captcha */}
-                                    <div className="flex justify-center pt-2">
+                                    <div className="flex justify-center">
                                         <Turnstile
                                             key={turnstileKey}
                                             sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
                                             onVerify={(token) => setTurnstileToken(token)}
+                                            onError={() => {
+                                                setTurnstileToken('');
+                                                toast.error('Captcha failed. Please try again.');
+                                            }}
                                             theme="light"
                                         />
                                     </div>
+
+                                    <Button
+                                        type="submit"
+                                        disabled={loading}
+                                        className="w-full h-12 bg-[#0569ff] hover:bg-[#0451cc] text-white font-medium rounded-xl transition-all"
+                                    >
+                                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Login to Pay Fees'}
+                                    </Button>
                                 </form>
                             </>
-                        ) : (
-                            // Placeholder when no school selected
-                            <div className="text-center py-12">
-                                <div className="w-16 h-16 bg-[#0569ff]/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                    <Wallet className="w-8 h-8 text-[#0569ff]" />
-                                </div>
-                                <h3 className="text-xl font-bold text-gray-900 mb-2">Fee Payment Portal</h3>
-                                <p className="text-gray-500 text-sm">Please enter your school code to continue</p>
-                            </div>
                         )}
 
-                        {/* Footer */}
-                        <div className="mt-8 pt-6 border-t border-gray-100 text-center">
+                        {/* Footer - Hidden on mobile */}
+                        <div className="hidden lg:block mt-8 pt-6 border-t border-gray-100 text-center">
                             <div className="flex items-center justify-center gap-2">
-                                <Image src="/by.png" alt="EduBreezy" width={20} height={20} className="rounded" />
                                 <span className="text-xs text-gray-500">Powered by EduBreezy</span>
                             </div>
                         </div>
@@ -404,82 +420,20 @@ export default function PayPage() {
                 </div>
             </div>
 
-            {/* School Code Dialog */}
-            <Dialog open={showSchoolDialog} onOpenChange={() => { }}>
-                <DialogContent className="sm:max-w-md bg-white rounded-3xl [&>button]:hidden p-0 overflow-hidden">
-                    <div className="p-8">
-                        {/* Icon */}
-                        <div className="w-16 h-16 bg-gradient-to-br from-[#0569ff] to-[#0246b5] rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg shadow-[#0569ff]/30">
-                            <Wallet className="w-8 h-8 text-white" />
-                        </div>
-
-                        {/* Title */}
-                        <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">Welcome to EduBreezy Pay</h2>
-                        <p className="text-sm text-gray-500 text-center mb-8">
-                            Enter your school&apos;s unique code to continue
-                        </p>
-
-                        <form onSubmit={handleSchoolCodeSubmit} className="space-y-5">
-                            {/* Input with EB- prefix */}
-                            <div>
-                                <div className={`flex items-center border-2 rounded-xl overflow-hidden bg-gray-50 transition-all ${schoolCodeError ? 'border-red-300' : 'border-gray-200 focus-within:border-[#0569ff]'}`}>
-                                    <span className="px-4 py-3.5 bg-[#0569ff] text-white font-bold text-sm min-w-[60px] text-center">
-                                        EB-
-                                    </span>
-                                    <Input
-                                        placeholder="Enter code (e.g., 0001)"
-                                        value={schoolCodeInput}
-                                        onChange={(e) => {
-                                            setSchoolCodeInput(e.target.value.toUpperCase());
-                                            setSchoolCodeError('');
-                                        }}
-                                        className="border-0 bg-transparent h-12 focus-visible:ring-0 uppercase font-semibold tracking-wider text-gray-900 placeholder:text-gray-400 placeholder:font-normal placeholder:tracking-normal placeholder:normal-case"
-                                        autoFocus
-                                        disabled={schoolCodeLoading}
-                                    />
-                                </div>
-
-                                {/* Error message */}
-                                {schoolCodeError && (
-                                    <div className="flex items-center gap-2 mt-2 text-red-500">
-                                        <AlertCircle className="w-4 h-4" />
-                                        <p className="text-sm font-medium">{schoolCodeError}</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Submit Button - Only loader here */}
-                            <Button
-                                type="submit"
-                                className="w-full h-12 bg-[#0569ff] hover:bg-[#0451cc] text-white font-semibold rounded-xl shadow-lg shadow-[#0569ff]/20 active:scale-[0.98] transition-all duration-300"
-                                disabled={schoolCodeLoading || !schoolCodeInput.trim()}
-                            >
-                                {schoolCodeLoading ? (
-                                    <>
-                                        <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                                        Verifying...
-                                    </>
-                                ) : (
-                                    'Continue'
-                                )}
-                            </Button>
-
-                            {/* Help text */}
-                            <p className="text-xs text-gray-400 text-center">
-                                Don&apos;t know your code? Contact your school administration.
-                            </p>
-                        </form>
-                    </div>
-
-                    {/* Footer */}
-                    <div className="bg-gray-50 px-8 py-4 border-t border-gray-100">
-                        <div className="flex items-center justify-center gap-2">
-                            <Image src="/by.png" alt="EduBreezy" width={18} height={18} className="rounded" />
-                            <span className="text-xs text-gray-500">Secure Payment Portal by EduBreezy</span>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
+            {/* Bottom Footer Links */}
+            <div className="w-full bg-slate-800 py-2 lg:py-3 px-4">
+                <div className="flex flex-wrap items-center justify-center gap-x-3 lg:gap-x-4 gap-y-0.5 text-[10px] lg:text-xs text-slate-300">
+                    <Link href="https://www.edubreezy.com/about" target='_blank' className="hover:text-white transition-colors">About Us</Link>
+                    <span className="text-slate-600 hidden sm:inline">|</span>
+                    <Link href="https://www.edubreezy.com/contact" target='_blank' className="hover:text-white transition-colors">Contact Us</Link>
+                    <span className="text-slate-600 hidden sm:inline">|</span>
+                    <Link href="/terms" target='_blank' className="hover:text-white transition-colors">Terms & Conditions</Link>
+                    <span className="text-slate-600 hidden sm:inline">|</span>
+                    <Link href="/privacy" target='_blank' className="hover:text-white transition-colors">Privacy Policy</Link>
+                    <span className="text-slate-600 hidden sm:inline">|</span>
+                    <Link href="/refund" className="hover:text-white transition-colors">Refund Policy</Link>
+                </div>
+            </div>
         </div>
     );
 }

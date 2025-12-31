@@ -73,10 +73,24 @@ export default async function sitemap() {
         },
     ];
 
+    // Pay portal pages (pay.edubreezy.com subdomain)
+    const payBaseUrl = process.env.NODE_ENV === 'development'
+        ? 'http://pay.localhost:3000'
+        : 'https://pay.edubreezy.com';
+
+    const payPages = [
+        {
+            url: payBaseUrl,
+            lastModified: new Date(),
+            changeFrequency: 'weekly',
+            priority: 1.0,
+        },
+    ];
+
     // Skip database query during build time
     if (process.env.NEXT_PHASE === 'phase-production-build') {
         console.log('[Sitemap] Skipping database query during build');
-        return [...staticPages, ...explorerPages];
+        return [...staticPages, ...explorerPages, ...payPages];
     }
 
     // Dynamic school pages - fetch in batches for large databases
@@ -128,5 +142,5 @@ export default async function sitemap() {
         // Return static pages only if database fails
     }
 
-    return [...staticPages, ...explorerPages, ...schoolPages];
+    return [...staticPages, ...explorerPages, ...payPages, ...schoolPages];
 }
