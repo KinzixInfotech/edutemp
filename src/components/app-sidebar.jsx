@@ -804,6 +804,7 @@ export function AppSidebar({ ...props }) {
                 onConfirm={confirmSessionSwitch}
                 fromSession={activeYear?.name || 'Current Session'}
                 toSession={academicYears.find(y => y.id === pendingYearId)?.name || 'New Session'}
+                toSessionData={academicYears.find(y => y.id === pendingYearId)}
             />
 
             {/* Session Switch Loader */}

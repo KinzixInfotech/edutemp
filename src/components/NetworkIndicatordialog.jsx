@@ -1,18 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogDescription,
-} from "@/components/ui/dialog";
+import { useState, useEffect, createContext, useContext } from "react";
+import { WifiOff } from "lucide-react";
 
-export default function NetworkStatusDialog() {
-    const [isOffline, setIsOffline] = useState(!navigator.onLine);
+// Create context to share offline state
+const NetworkContext = createContext({ isOffline: false });
+
+export const useNetworkStatus = () => useContext(NetworkContext);
+
+export function NetworkStatusProvider({ children }) {
+    const [isOffline, setIsOffline] = useState(false);
 
     useEffect(() => {
+        setIsOffline(!navigator.onLine);
+
         const handleOnline = () => setIsOffline(false);
         const handleOffline = () => setIsOffline(true);
 
@@ -25,27 +26,36 @@ export default function NetworkStatusDialog() {
         };
     }, []);
 
-    return (
-        <Dialog open={isOffline} onOpenChange={() => { }}>
-            <DialogContent  showCloseButton={false} className=" flex items-center justify-center bg-red-100 border-red-300 dark:border-red-950 border-2 dark:bg-red-900 hover:cursor-not-allowed">
-                <div className="text-center">
-                    <DialogHeader>
-                        <DialogTitle className="text-4xl font-bold text-red-600 dark:text-red-400">
-                            No Internet Connection 
-                        </DialogTitle>
-                        <DialogDescription className="mt-4 text-lg text-red-700 dark:text-red-300">
-                            Please check your network connection. This popup will disappear
-                            automatically once your internet is back.
-                        </DialogDescription>
-                    </DialogHeader>
+    const bannerHeight = isOffline ? "44px" : "0px";
 
-                    <div className="mt-6">
-                        <div className="inline-block px-6 py-3 bg-red-600 text-white font-semibold rounded-xs shadow-lg animate-pulse">
-                            Waiting for connection...
+    return (
+        <NetworkContext.Provider value={{ isOffline }}>
+            {/* Set CSS variable for the entire app */}
+            <div style={{ "--network-banner-height": bannerHeight }}>
+                {/* Fixed banner at top */}
+                <div
+                    className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-300 ease-in-out ${isOffline ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0 pointer-events-none"
+                        }`}
+                    style={{ height: "44px" }}
+                >
+                    <div className="w-full h-full bg-red-500/10 dark:bg-red-900/30 border-b border-red-500/30 backdrop-blur-sm">
+                        <div className="max-w-7xl mx-auto px-4 h-full flex items-center justify-center gap-3">
+                            <WifiOff className="h-5 w-5 text-red-500 dark:text-red-400 animate-pulse" />
+                            <span className="text-sm font-medium text-red-600 dark:text-red-400">
+                                No internet connection. Please check your network.
+                            </span>
+                            <div className="h-2 w-2 rounded-full bg-red-500 dark:bg-red-400 animate-pulse" />
                         </div>
                     </div>
                 </div>
-            </DialogContent>
-        </Dialog>
+
+                {children}
+            </div>
+        </NetworkContext.Provider>
     );
+}
+
+// For backwards compatibility
+export default function NetworkStatusBanner() {
+    return null;
 }

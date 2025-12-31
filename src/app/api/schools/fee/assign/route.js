@@ -26,187 +26,216 @@ export async function POST(req) {
       );
     }
 
-    const result = await prisma.$transaction(async (tx) => {
-      // Fetch global structure
-      const globalStructure = await tx.globalFeeStructure.findUnique({
-        where: { id: globalFeeStructureId },
-        include: {
-          particulars: { orderBy: { displayOrder: 'asc' } },
-          installmentRules: { orderBy: { installmentNumber: 'asc' } },
+    // 1. Fetch Global Structure (No TX)
+    const globalStructure = await prisma.globalFeeStructure.findUnique({
+      where: { id: globalFeeStructureId },
+      include: {
+        particulars: { orderBy: { displayOrder: 'asc' } },
+        installmentRules: { orderBy: { installmentNumber: 'asc' } },
+      },
+    });
+
+    if (!globalStructure) {
+      throw new Error("Fee structure not found");
+    }
+
+    // Block assignment to ARCHIVED structures
+    if (globalStructure.status === 'ARCHIVED') {
+      throw new Error("Cannot assign students to an ARCHIVED fee structure");
+    }
+
+    // 2. Fetch Students (No TX)
+    let studentsToAssign = [];
+    if (applyToClass && classId) {
+      const where = {
+        schoolId,
+        // academicYearId, // Removed to match frontend list which shows all students in class
+        classId: parseInt(classId),
+        ...(sectionId && !isNaN(parseInt(sectionId)) && { sectionId: parseInt(sectionId) }),
+      };
+      studentsToAssign = await prisma.student.findMany({ where });
+    } else if (studentIds && studentIds.length > 0) {
+      studentsToAssign = await prisma.student.findMany({
+        where: {
+          userId: { in: studentIds },
+          schoolId,
+          // academicYearId, // Removed here too for consistency
         },
       });
+    } else {
+      throw new Error("No students specified");
+    }
 
-      if (!globalStructure) {
-        throw new Error("Fee structure not found");
-      }
+    if (studentsToAssign.length === 0) {
+      throw new Error("No eligible students found");
+    }
 
-      // Determine students
-      let studentsToAssign = [];
-      if (applyToClass && classId) {
-        const where = {
-          schoolId,
-          academicYearId,
-          classId: parseInt(classId),
-          ...(sectionId && { sectionId: parseInt(sectionId) }),
-        };
-        studentsToAssign = await tx.student.findMany({ where });
-      } else if (studentIds && studentIds.length > 0) {
-        studentsToAssign = await tx.student.findMany({
-          where: {
-            userId: { in: studentIds },
-            schoolId,
-            academicYearId,
-          },
-        });
-      } else {
-        throw new Error("No students specified");
-      }
+    // 3. Auto-transition DRAFT to ACTIVE
+    if (globalStructure.status === 'DRAFT') {
+      await prisma.globalFeeStructure.update({
+        where: { id: globalFeeStructureId },
+        data: { status: 'ACTIVE' },
+      });
+    }
 
-      if (studentsToAssign.length === 0) {
-        throw new Error("No eligible students found");
-      }
+    const assignedStudents = [];
+    const skippedStudents = [];
 
-      const assignedStudents = [];
-      const skippedStudents = [];
-
-      for (const student of studentsToAssign) {
-        // Check existing
-        const existing = await tx.studentFee.findUnique({
-          where: {
-            studentId_academicYearId: {
+    // 4. Assign Loop with Per-Student Transaction
+    for (const student of studentsToAssign) {
+      try {
+        await prisma.$transaction(async (tx) => {
+          // Check existing
+          const existing = await tx.studentFee.findFirst({
+            where: {
               studentId: student.userId,
               academicYearId,
             },
-          },
-        });
-
-        if (existing) {
-          skippedStudents.push({
-            studentId: student.userId,
-            name: student.name,
-            reason: "Already assigned",
           });
-          continue;
-        }
 
-        // ===================================
-        // STEP 1: Create StudentFee
-        // ===================================
-        const studentFee = await tx.studentFee.create({
-          data: {
-            studentId: student.userId,
-            schoolId,
-            academicYearId,
-            globalFeeStructureId: globalStructure.id,
-            originalAmount: globalStructure.totalAmount,
-            finalAmount: globalStructure.totalAmount,
-            balanceAmount: globalStructure.totalAmount,
-            status: "UNPAID",
-          },
-        });
+          if (existing) {
+            skippedStudents.push({
+              studentId: student.userId,
+              name: student.name,
+              reason: "Already assigned",
+            });
+            return;
+          }
 
-        // ===================================
-        // STEP 2: Create StudentFeeParticulars
-        // ===================================
-        const createdParticulars = [];
-        for (const particular of globalStructure.particulars) {
-          const particularRecord = await tx.studentFeeParticular.create({
+          // ===================================
+          // STEP 1: Create StudentFee
+          // ===================================
+          const studentFee = await tx.studentFee.create({
             data: {
-              studentFeeId: studentFee.id,
-              globalParticularId: particular.id,
-              name: particular.name,
-              amount: particular.amount,
+              studentId: student.userId,
+              schoolId,
+              academicYearId,
+              globalFeeStructureId: globalStructure.id,
+              originalAmount: globalStructure.totalAmount,
+              finalAmount: globalStructure.totalAmount,
+              balanceAmount: globalStructure.totalAmount,
               status: "UNPAID",
             },
           });
-          createdParticulars.push(particularRecord);
-        }
 
-        // ===================================
-        // STEP 3: Create Installments
-        // ===================================
-        
-        // CHECK: Does global structure have installment rules?
-        if (globalStructure.installmentRules && globalStructure.installmentRules.length > 0) {
-          // USE EXISTING RULES
-          for (const rule of globalStructure.installmentRules) {
-            const installment = await tx.studentFeeInstallment.create({
+          // ===================================
+          // STEP 2: Create StudentFeeParticulars
+          // ===================================
+          const createdParticulars = [];
+          for (const particular of globalStructure.particulars) {
+            const particularRecord = await tx.studentFeeParticular.create({
               data: {
                 studentFeeId: studentFee.id,
-                installmentRuleId: rule.id,
-                installmentNumber: rule.installmentNumber,
-                dueDate: rule.dueDate,
-                amount: rule.amount, // Amount from rule
-                status: "PENDING",
+                globalParticularId: particular.id,
+                name: particular.name,
+                amount: particular.amount,
+                status: "UNPAID",
               },
             });
+            createdParticulars.push(particularRecord);
+          }
 
-            // Create InstallmentParticular breakdown
-            const percentage = rule.percentage / 100;
-            for (const particular of createdParticulars) {
-              await tx.installmentParticular.create({
+          // ===================================
+          // STEP 3: Create Installments
+          // ===================================
+
+          // CHECK: Does global structure have installment rules?
+          if (globalStructure.installmentRules && globalStructure.installmentRules.length > 0) {
+            // USE EXISTING RULES
+            for (const rule of globalStructure.installmentRules) {
+              const installment = await tx.studentFeeInstallment.create({
                 data: {
-                  installmentId: installment.id,
-                  particularId: particular.id,
-                  amount: particular.amount * percentage,
-                  paidAmount: 0,
+                  studentFeeId: studentFee.id,
+                  installmentRuleId: rule.id,
+                  installmentNumber: rule.installmentNumber,
+                  dueDate: rule.dueDate,
+                  amount: rule.amount, // Amount from rule
+                  status: "PENDING",
                 },
               });
+
+              // Create InstallmentParticular breakdown
+              const percentage = rule.percentage / 100;
+              for (const particular of createdParticulars) {
+                await tx.installmentParticular.create({
+                  data: {
+                    installmentId: installment.id,
+                    particularId: particular.id,
+                    amount: particular.amount * percentage,
+                    paidAmount: 0,
+                  },
+                });
+              }
             }
-          }
-        } else {
-          // NO RULES: AUTO-GENERATE based on mode
-          const installmentsToCreate = getInstallmentsByMode(
-            globalStructure.mode,
-            globalStructure.totalAmount,
-            new Date()
-          );
+          } else {
+            // NO RULES: AUTO-GENERATE based on mode
+            const installmentsToCreate = getInstallmentsByMode(
+              globalStructure.mode,
+              globalStructure.totalAmount,
+              new Date()
+            );
 
-          for (let i = 0; i < installmentsToCreate.length; i++) {
-            const inst = installmentsToCreate[i];
-            
-            const installment = await tx.studentFeeInstallment.create({
-              data: {
-                studentFeeId: studentFee.id,
-                installmentNumber: i + 1,
-                dueDate: inst.dueDate,
-                amount: inst.amount,
-                status: "PENDING",
-              },
-            });
+            for (let i = 0; i < installmentsToCreate.length; i++) {
+              const inst = installmentsToCreate[i];
 
-            // Create InstallmentParticular breakdown
-            const percentage = inst.percentage / 100;
-            for (const particular of createdParticulars) {
-              await tx.installmentParticular.create({
+              const installment = await tx.studentFeeInstallment.create({
                 data: {
-                  installmentId: installment.id,
-                  particularId: particular.id,
-                  amount: particular.amount * percentage,
-                  paidAmount: 0,
+                  studentFeeId: studentFee.id,
+                  installmentNumber: i + 1,
+                  dueDate: inst.dueDate,
+                  amount: inst.amount,
+                  status: "PENDING",
                 },
               });
+
+              // Create InstallmentParticular breakdown
+              const percentage = inst.percentage / 100;
+              for (const particular of createdParticulars) {
+                await tx.installmentParticular.create({
+                  data: {
+                    installmentId: installment.id,
+                    particularId: particular.id,
+                    amount: particular.amount * percentage,
+                    paidAmount: 0,
+                  },
+                });
+              }
             }
           }
-        }
 
-        assignedStudents.push({
-          studentId: student.userId,
-          name: student.name,
+          assignedStudents.push({
+            studentId: student.userId,
+            name: student.name,
+          });
+        }, {
+          maxWait: 5000,
+          timeout: 10000
         });
-      }
 
-      return {
-        assigned: assignedStudents.length,
-        skipped: skippedStudents.length,
-        assignedStudents,
-        skippedStudents,
-      };
-    });
+      } catch (err) {
+        if (err.code === 'P2002') {
+          skippedStudents.push({
+            studentId: student.userId,
+            name: student.name,
+            reason: "Already assigned (Constraint)",
+          });
+        } else {
+          console.error(`Assignment failed for student ${student.userId}:`, err);
+          skippedStudents.push({
+            studentId: student.userId,
+            name: student.name,
+            reason: "Processing Error: " + err.message
+          });
+        }
+      }
+    }
 
     return NextResponse.json({
       message: "Fee assignment completed",
-      ...result,
+      assigned: assignedStudents.length,
+      skipped: skippedStudents.length,
+      assignedStudents,
+      skippedStudents,
     });
   } catch (error) {
     console.error("Assign Fee Error:", error);
@@ -243,13 +272,18 @@ function getInstallmentsByMode(mode, totalAmount, startDate) {
       numberOfInstallments = 1;
   }
 
-  const amountPerInstallment = totalAmount / numberOfInstallments;
+  // FIX: Proper rounding - round down, add remainder to last installment
+  const baseAmount = Math.floor((totalAmount / numberOfInstallments) * 100) / 100; // Round to 2 decimals
   const percentagePerInstallment = 100 / numberOfInstallments;
+
+  // Calculate total of all base amounts to find remainder
+  const totalBaseAmount = baseAmount * (numberOfInstallments - 1);
+  const lastInstallmentAmount = Math.round((totalAmount - totalBaseAmount) * 100) / 100;
 
   for (let i = 0; i < numberOfInstallments; i++) {
     // Calculate due date
     let dueDate = new Date(currentDate);
-    
+
     if (mode === "MONTHLY") {
       dueDate.setMonth(currentDate.getMonth() + i);
       dueDate.setDate(10); // Due on 10th of each month
@@ -264,48 +298,17 @@ function getInstallmentsByMode(mode, totalAmount, startDate) {
       dueDate.setDate(15);
     }
 
+    // FIX: Last installment gets the remainder to ensure exact total
+    const isLastInstallment = i === numberOfInstallments - 1;
+    const installmentAmount = isLastInstallment ? lastInstallmentAmount : baseAmount;
+
     installments.push({
       installmentNumber: i + 1,
       dueDate,
-      amount: amountPerInstallment,
+      amount: installmentAmount,
       percentage: percentagePerInstallment,
     });
   }
 
   return installments;
 }
-
-// ===================================
-// EXAMPLE OUTPUT for MONTHLY mode:
-// ===================================
-/*
-Total: ₹1,04,000
-Particulars:
-  - Bus fees: ₹50,000
-  - Other fees: ₹54,000
-
-Generated Installments:
-[
-  {
-    installmentNumber: 1,
-    dueDate: "2025-12-10",
-    amount: 8666.67,  // ₹1,04,000 ÷ 12
-    percentage: 8.33,
-    particularBreakdowns: [
-      { name: "Bus fees", amount: 4166.67 },    // ₹50,000 ÷ 12
-      { name: "Other fees", amount: 4500 }       // ₹54,000 ÷ 12
-    ]
-  },
-  {
-    installmentNumber: 2,
-    dueDate: "2026-01-10",
-    amount: 8666.67,
-    percentage: 8.33,
-    particularBreakdowns: [
-      { name: "Bus fees", amount: 4166.67 },
-      { name: "Other fees", amount: 4500 }
-    ]
-  },
-  // ... 10 more installments
-]
-*/

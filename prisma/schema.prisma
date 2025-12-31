@@ -103,6 +103,20 @@ model School {
   routeAssignments RouteAssignment[]
   importHistory    ImportHistory[]
   smsWallet        SmsWallet?
+  feeSettings      FeeSettings?
+
+  // Razorpay Route - Linked Account
+  razorpayAccountId       String? // Linked account ID (acc_xxxxx)
+  razorpayAccountStatus   String?   @default("not_created") // not_created, created, activated, suspended
+  razorpayKycStatus       String?   @default("not_started") // not_started, pending, verified, rejected
+  razorpaySettlementReady Boolean   @default(false)
+  razorpayOnboardedAt     DateTime?
+
+  // Platform commission settings
+  platformCommissionType  String @default("PERCENTAGE") // PERCENTAGE or FLAT
+  platformCommissionValue Float  @default(5) // 5% or flat amount in rupees
+
+  razorpayOnboarding RazorpayOnboarding?
 
   @@index([name])
 }
@@ -2373,6 +2387,13 @@ model AcademicYear {
   startDate              DateTime
   endDate                DateTime
   isActive               Boolean              @default(false)
+  // Setup tracking for year rollover
+  setupComplete          Boolean              @default(false)
+  studentsPromoted       Boolean              @default(false)
+  feesConfigured         Boolean              @default(false)
+  classesConfigured      Boolean              @default(false)
+  timetableConfigured    Boolean              @default(false)
+  subjectsConfigured     Boolean              @default(false)
   createdAt              DateTime             @default(now())
   schoolId               String               @db.Uuid
   school                 School               @relation(fields: [schoolId], references: [id])
@@ -3606,17 +3627,24 @@ enum DocumentType {
 
 // Global Fee Structure (Template by Class)
 model GlobalFeeStructure {
-  id             String   @id @default(uuid()) @db.Uuid
-  schoolId       String   @db.Uuid
-  academicYearId String   @db.Uuid
+  id             String  @id @default(uuid()) @db.Uuid
+  schoolId       String  @db.Uuid
+  academicYearId String  @db.Uuid
   classId        Int
   name           String // e.g., "Class 10 Annual Fees 2024-25"
   description    String?
-  mode           FeeMode  @default(YEARLY)
+  mode           FeeMode @default(YEARLY)
   totalAmount    Float // Total calculated amount
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  isActive       Boolean @default(true)
+
+  // 3-State Workflow: DRAFT, ACTIVE, ARCHIVED
+  status             String  @default("DRAFT")
+  version            Int     @default(1)
+  clonedFromId       String? @db.Uuid
+  enableInstallments Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
   school           School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
@@ -3629,6 +3657,7 @@ model GlobalFeeStructure {
   @@unique([schoolId, academicYearId, classId])
   @@index([schoolId, academicYearId])
   @@index([classId])
+  @@index([status])
 }
 
 // Fee Components (Tuition, Books, Transport, etc.)
@@ -3794,6 +3823,17 @@ model FeePayment {
   gatewayPaymentId String?
   gatewayResponse  Json? // Store full gateway response
 
+  // Razorpay Route - Split Settlement
+  razorpayTransferId String? // Transfer ID to linked account
+  settlementId       String? // Razorpay settlement ID
+  settlementStatus   String? // pending, processed, failed
+  schoolAmount       Float? // Amount transferred to school
+  platformAmount     Float? // Commission kept by platform
+
+  // Webhook reconciliation
+  webhookVerified Boolean   @default(false)
+  reconciledAt    DateTime?
+
   // Status
   status        PaymentStatus @default(PENDING)
   failureReason String?
@@ -3829,6 +3869,8 @@ model FeePayment {
   @@index([status])
   @@index([paymentDate])
   @@index([receiptNumber])
+  @@index([gatewayOrderId])
+  @@index([settlementStatus])
 }
 
 // Link Payments to Installments
@@ -4896,6 +4938,172 @@ model SchoolSettings {
   @@index([schoolId])
 }
 
+// ==================== FEE SETTINGS ====================
+
+model FeeSettings {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @unique @db.Uuid
+
+  // General Settings
+  currency            String  @default("INR")
+  defaultFeeMode      String  @default("YEARLY") // MONTHLY, QUARTERLY, HALF_YEARLY, YEARLY
+  allowPartialPayment Boolean @default(true)
+  allowAdvancePayment Boolean @default(true)
+  installmentFlexible Boolean @default(true) // If false, full payment only
+
+  // Late Fee Settings
+  lateFeeEnabled    Boolean @default(false)
+  lateFeeType       String  @default("FIXED") // FIXED or PERCENTAGE
+  lateFeeAmount     Float   @default(0)
+  lateFeePercentage Float   @default(0)
+  gracePeriodDays   Int     @default(15)
+  autoApplyLateFee  Boolean @default(false)
+
+  // Online Payment Settings
+  onlinePaymentEnabled Boolean @default(false)
+  paymentGateway       String? // RAZORPAY, PAYU, CASHFREE
+  sandboxMode          Boolean @default(true)
+  razorpayKeyId        String?
+  razorpayKeySecret    String? // Should be encrypted
+  payuMerchantKey      String?
+  payuMerchantSalt     String?
+
+  // Bank Account Details (for offline payments reference)
+  showBankDetails   Boolean @default(false)
+  bankName          String?
+  accountNumber     String?
+  ifscCode          String?
+  accountHolderName String?
+  branchName        String?
+  upiId             String?
+  bankQrCodeUrl     String? // URL to QR image
+
+  // Receipt Settings
+  receiptPrefix       String  @default("REC")
+  receiptTemplate     String  @default("default") // default, detailed, minimal
+  autoGenerateReceipt Boolean @default(true)
+  showSchoolLogo      Boolean @default(true)
+  receiptFooterText   String?
+
+  // Notification Settings
+  emailReminders          Boolean @default(true)
+  smsReminders            Boolean @default(false)
+  pushReminders           Boolean @default(false)
+  reminderDaysBefore      Int     @default(7)
+  overdueReminders        Boolean @default(true)
+  overdueReminderInterval Int     @default(7) // Days between overdue reminders
+
+  // Discount Settings
+  siblingDiscountEnabled         Boolean @default(false)
+  siblingDiscountPercentage      Float   @default(0)
+  earlyPaymentDiscountEnabled    Boolean @default(false)
+  earlyPaymentDiscountPercentage Float   @default(0)
+  earlyPaymentDays               Int     @default(10) // Days before due date
+  staffWardDiscountEnabled       Boolean @default(false)
+  staffWardDiscountPercentage    Float   @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+}
+
+// ==================== RAZORPAY ROUTE ONBOARDING ====================
+
+model RazorpayOnboarding {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @unique @db.Uuid
+
+  // State Machine: CREATED → KYC_SUBMITTED → KYC_VERIFIED → PAYMENTS_ENABLED
+  status String @default("CREATED")
+
+  // Razorpay Linked Account Details
+  linkedAccountId String? // acc_xxxxx
+  productId       String? // Razorpay product config ID
+
+  // Business Information
+  businessName  String?
+  businessType  String? // partnership, proprietorship, private_limited, etc.
+  businessEmail String?
+  businessPhone String?
+
+  // Legal Information (PAN, GST, etc.)
+  legalInfo Json?
+
+  // Bank Details (encrypted in production)
+  bankAccountName   String?
+  bankAccountNumber String?
+  bankIfscCode      String?
+  bankName          String?
+
+  // Contact Person
+  contactName  String?
+  contactEmail String?
+  contactPhone String?
+
+  // Stakeholder (for Route)
+  stakeholderName  String?
+  stakeholderEmail String?
+
+  // Status tracking
+  kycSubmittedAt DateTime?
+  kycVerifiedAt  DateTime?
+  activatedAt    DateTime?
+
+  // Error tracking
+  lastError    String?
+  errorDetails Json?
+  retryCount   Int     @default(0)
+
+  // Razorpay webhook data
+  webhookData Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([linkedAccountId])
+}
+
+// ==================== FEE AUDIT LOG ====================
+
+model FeeAuditLog {
+  id           String  @id @default(uuid()) @db.Uuid
+  schoolId     String  @db.Uuid
+  studentFeeId String? @db.Uuid
+  studentId    String? @db.Uuid
+
+  action      String // FEE_ASSIGNED, PAYMENT_RECEIVED, REFUND_PROCESSED, DISCOUNT_APPLIED, LATE_FEE_APPLIED, FEE_MODIFIED, INSTALLMENT_MODIFIED
+  description String
+
+  // Value tracking
+  previousValue Json? // Previous state
+  newValue      Json? // New state
+  amount        Float? // Amount involved (if applicable)
+
+  // User tracking
+  performedBy     String? @db.Uuid
+  performedByName String?
+  performedByRole String?
+
+  // Additional context
+  metadata  Json?
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([schoolId])
+  @@index([studentFeeId])
+  @@index([studentId])
+  @@index([action])
+  @@index([createdAt])
+}
+
 // ==================== SMS MODULE ====================
 
 model SmsTemplate {
@@ -5008,11 +5216,11 @@ enum SmsTriggerType {
 }
 
 model SmsSettings {
-  id                  String   @id @default("default")
-  costPerSms          Float    @default(0.20)
-  minPurchase         Int      @default(100)
-  creditPacks         Json     @default("[]")
-  whitelistedDomains  Json     @default("[]")
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                 String   @id @default("default")
+  costPerSms         Float    @default(0.20)
+  minPurchase        Int      @default(100)
+  creditPacks        Json     @default("[]")
+  whitelistedDomains Json     @default("[]")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }

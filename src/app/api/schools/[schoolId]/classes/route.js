@@ -88,6 +88,7 @@ export async function GET(req, props) {
             subjectTeachers: {
               include: { teacher: true, subject: true },
             },
+            teachingStaff: true, // properties: id, name, etc.
             _count: {
               select: {
                 students: true

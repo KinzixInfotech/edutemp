@@ -17,6 +17,72 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command"
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
+import { Check, ChevronsUpDown } from "lucide-react"
+
+function TeacherCombobox({ teachers, value, onChange, disabled }) {
+    const [open, setOpen] = useState(false)
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={open}
+                    className="w-full justify-between font-normal"
+                    disabled={disabled}
+                >
+                    {value
+                        ? teachers.find((teacher) => teacher.userId === value)?.name
+                        : "Assign Class Teacher"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[300px] p-0">
+                <Command>
+                    <CommandInput placeholder="Search teacher..." className="h-9" />
+                    <CommandList>
+                        <CommandEmpty>No teacher found.</CommandEmpty>
+                        <CommandGroup>
+                            {teachers.map((teacher) => (
+                                <CommandItem
+                                    key={teacher.userId}
+                                    value={teacher.name}
+                                    onSelect={() => {
+                                        onChange(teacher.userId)
+                                        setOpen(false)
+                                    }}
+                                >
+                                    {teacher.name}
+                                    <Check
+                                        className={cn(
+                                            "ml-auto h-4 w-4",
+                                            value === teacher.userId ? "opacity-100" : "opacity-0"
+                                        )}
+                                    />
+                                </CommandItem>
+                            ))}
+                        </CommandGroup>
+                    </CommandList>
+                </Command>
+            </PopoverContent>
+        </Popover>
+    )
+}
 
 export default function ManageClassSectionPage() {
     const { fullUser } = useAuth()
@@ -98,7 +164,7 @@ export default function ManageClassSectionPage() {
             return Array.isArray(data) ? data : []
         },
         enabled: !!schoolId,
-        staleTime: 1000 * 60 * 3, // 3 minutes
+        staleTime: 0, // Always fetch fresh data to show latest assignments
     })
 
     // Create class mutation
@@ -390,27 +456,12 @@ export default function ManageClassSectionPage() {
                                                         </span>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <Select
-                                                            value={sec.teachingStaffUserId || ""}
-                                                            onValueChange={(teacherId) =>
-                                                                handleSupervisorChange(sec.id, teacherId)
-                                                            }
-                                                        >
-                                                            <SelectTrigger className="w-full">
-                                                                <SelectValue placeholder="Assign Class Teacher" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                {teachers.length > 0 ? (
-                                                                    teachers.map((t) => (
-                                                                        <SelectItem key={t.userId} value={t.userId}>
-                                                                            {t.name}
-                                                                        </SelectItem>
-                                                                    ))
-                                                                ) : (
-                                                                    <div className="px-2 text-muted-foreground">No Teachers Found</div>
-                                                                )}
-                                                            </SelectContent>
-                                                        </Select>
+                                                        <TeacherCombobox
+                                                            teachers={teachers}
+                                                            value={sec.teachingStaffUserId}
+                                                            onChange={(teacherId) => handleSupervisorChange(sec.id, teacherId)}
+                                                            disabled={false}
+                                                        />
                                                     </TableCell>
                                                     <TableCell>
                                                         <Button

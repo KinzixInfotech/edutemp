@@ -154,6 +154,33 @@ export default function RootLayout({ children }) {
           />
         </head>
         <body className="min-h-screen flex flex-col">
+          {/* JavaScript disabled warning */}
+          <noscript>
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              zIndex: 9999,
+              backgroundColor: 'rgba(251, 191, 36, 0.15)',
+              borderBottom: '1px solid rgba(251, 191, 36, 0.3)',
+              backdropFilter: 'blur(4px)'
+            }}>
+              <div style={{
+                maxWidth: '80rem',
+                margin: '0 auto',
+                padding: '0.75rem 1rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.75rem'
+              }}>
+                <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#b45309' }}>
+                  ⚠️ JavaScript is disabled. Please enable JavaScript to use EduBreezy.
+                </span>
+              </div>
+            </div>
+          </noscript>
           <Analytics />
           <ClientProduct>{children}</ClientProduct>
           <Suspense fallback={<div />}>
@@ -167,6 +194,7 @@ export default function RootLayout({ children }) {
                 description: "text-sm mt-1 !text-black dark:!text-white",
               },
             }}
+            richColors
           />
         </body>
       </html>

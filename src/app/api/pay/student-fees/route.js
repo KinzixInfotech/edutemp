@@ -96,6 +96,25 @@ export async function GET(req) {
                 return null;
             }
 
+            // Fetch fee settings for this school
+            const feeSettings = await prisma.feeSettings.findUnique({
+                where: { schoolId },
+                select: {
+                    onlinePaymentEnabled: true,
+                    paymentGateway: true,
+                    sandboxMode: true,
+                    showBankDetails: true,
+                    bankName: true,
+                    accountNumber: true,
+                    ifscCode: true,
+                    accountHolderName: true,
+                    branchName: true,
+                    upiId: true,
+                    allowPartialPayment: true,
+                    allowAdvancePayment: true,
+                },
+            });
+
             const fee = student.studentFees[0];
 
             if (!fee) {
@@ -183,6 +202,19 @@ export async function GET(req) {
                     overdueCount: enrichedInstallments.filter(i => i.isOverdue && i.status !== 'PAID').length,
                     pendingCount: enrichedInstallments.filter(i => i.status === 'PENDING').length,
                 },
+                paymentOptions: {
+                    onlineEnabled: feeSettings?.onlinePaymentEnabled ?? false,
+                    allowPartialPayment: feeSettings?.allowPartialPayment ?? true,
+                    allowAdvancePayment: feeSettings?.allowAdvancePayment ?? true,
+                },
+                bankDetails: feeSettings?.showBankDetails ? {
+                    bankName: feeSettings.bankName,
+                    accountNumber: feeSettings.accountNumber,
+                    ifscCode: feeSettings.ifscCode,
+                    accountHolderName: feeSettings.accountHolderName,
+                    branchName: feeSettings.branchName,
+                    upiId: feeSettings.upiId,
+                } : null,
             };
         }, 60); // Cache for 1 minute
 

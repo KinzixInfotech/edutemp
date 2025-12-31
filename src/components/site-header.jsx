@@ -40,7 +40,10 @@ export function SiteHeader({ fullUser }) {
         .filter((p) => pathname.startsWith(p.url))
         .sort((a, b) => b.url.length - a.url.length)[0]
     return (
-        <header className="flex sticky top-0 z-50 h-[var(--header-height)] shrink-0 items-center gap-2 border-b bg-[#ffffffa3] dark:bg-[#09090b94] backdrop-blur-sm transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-[var(--header-height)]">
+        <header
+            className="flex sticky z-50 h-[var(--header-height)] shrink-0 items-center gap-2 border-b bg-[#ffffffa3] dark:bg-[#09090b94] backdrop-blur-sm transition-[width,height,top] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-[var(--header-height)]"
+            style={{ top: "calc(var(--network-banner-height, 0px) + var(--setup-banner-height, 0px))" }}
+        >
             <div className="flex w-full items-center gap-2 px-4 lg:gap-3 lg:px-6 relative">
                 <SidebarTrigger className="-ml-1" />
                 <Separator
@@ -48,9 +51,11 @@ export function SiteHeader({ fullUser }) {
                     className="mx-2 data-[orientation=vertical]:h-4"
                 />
                 <SchoolDetailPopup school={fullUser?.school}>
-                    <div className="text-base font-bold  text-sm border gap-1 inline-flex  font-medium capitalize bg-muted px-2 py-1 rounded-lg text-center w-fit max-w-[200px] flex flex-col overflow-hidden whitespace-nowrap truncate cursor-pointer hover:bg-muted/80 transition-colors">
-                        <div className="flex items-center gap-1"> <School size={16} />
-                            {fullUser?.school?.name || 'Dashboard'}</div>
+                    <div className="text-sm border gap-1 inline-flex font-medium capitalize bg-muted px-2 py-1 rounded-lg text-center max-w-[120px] sm:max-w-[200px] cursor-pointer hover:bg-muted/80 transition-colors">
+                        <div className="flex items-center gap-1 truncate">
+                            <School size={16} className="flex-shrink-0" />
+                            <span className="truncate">{fullUser?.school?.name || 'Dashboard'}</span>
+                        </div>
                     </div>
                 </SchoolDetailPopup>
 

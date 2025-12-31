@@ -384,7 +384,7 @@ export default function AssignFeesToStudents() {
                                 <div className="space-y-2 max-h-[600px] overflow-y-auto">
                                     {filteredStudents?.map((student) => {
                                         const isSelected = selectedStudents.includes(student.userId);
-                                        const hasExistingFee = student.StudentFeeStructure?.length > 0;
+                                        const hasExistingFee = student.studentFees?.some(f => f.academicYearId === academicYearId);
 
                                         return (
                                             <div

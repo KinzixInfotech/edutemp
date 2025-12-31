@@ -62,6 +62,9 @@ export async function GET(req) {
             return await prisma.academicYear.findMany({
                 orderBy: { createdAt: "desc" },
                 where: { schoolId },
+                include: {
+                    _count: true
+                }
             })
         }, 3600 * 24); // Cache for 24 hours as this rarely changes
 

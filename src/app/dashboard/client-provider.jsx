@@ -17,22 +17,23 @@ export default function ClientProviders({ children }) {
 
     return (
         // <QueryClientProvider client={queryClient}>
-            <AuthProvider>
-                <SettingsDialogProvider>
-                    <LoaderProvider>
-                        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-                            <ClientLayout>{children}</ClientLayout>
-                            <Toaster
-                                theme="system"
-                                toastOptions={{
-                                    classNames: { description: 'text-black dark:text-white' },
-                                }}
-                            />
-                        </ThemeProvider>
-                    </LoaderProvider>
-                    <SettingsDialog />
-                </SettingsDialogProvider>
-            </AuthProvider>
+        <AuthProvider>
+            <SettingsDialogProvider>
+                <LoaderProvider>
+                    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+                        <ClientLayout>{children}</ClientLayout>
+                        {/* <Toaster
+                            theme="system"
+                            toastOptions={{
+                                classNames: { description: 'text-black dark:text-white' },
+                            }}
+                            richColors
+                        /> */}
+                    </ThemeProvider>
+                </LoaderProvider>
+                <SettingsDialog />
+            </SettingsDialogProvider>
+        </AuthProvider>
         // </QueryClientProvider>
     )
 }

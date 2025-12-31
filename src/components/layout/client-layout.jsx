@@ -17,11 +17,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/lib/supabase";
 import LoaderPage from "../loader-page";
 import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from "@tanstack/react-query";
-import NetworkStatusDialog from "../NetworkIndicatordialog";
+import { NetworkStatusProvider } from "../NetworkIndicatordialog";
 import { DatabaseErrorDialog } from "../database-error-dialog";
 import Link from "next/link";
 import { DynamicBreadcrumb } from "../dynamic-breadcrumb";
 import { BreadcrumbHeader } from "../breadcrumb-header";
+import { AcademicYearSetupBannerProvider } from "../AcademicYearSetupBanner";
 import axios from "axios";
 import { toast } from "sonner";
 
@@ -181,49 +182,50 @@ export default function ClientLayout({ children }) {
     const hideUI = ["/dashboard/login"].includes(pathname);
 
     return (
+        <NetworkStatusProvider>
+            <AcademicYearSetupBannerProvider>
+                <QueryClientProvider client={queryClient}>
+                    <SidebarProvider
+                        style={{
+                            "--sidebar-width": "calc(var(--spacing) * 72)",
+                            "--header-height": "calc(var(--spacing) * 16)",
+                        }}
+                    >
 
-        <QueryClientProvider client={queryClient}>
-            <SidebarProvider
-                style={{
-                    "--sidebar-width": "calc(var(--spacing) * 72)",
-                    "--header-height": "calc(var(--spacing) * 16)",
-                }}
-            >
+                        <OnboardingDialog />
+                        {!hideUI && <AppSidebar />}
+                        <TopProgressBar />
 
-                <OnboardingDialog />
-                {!hideUI && <AppSidebar />}
-                <TopProgressBar />
+                        <SidebarInset className={'bg-[#f9fafb] dark:bg-black'}>
+                            {!hideUI && <SiteHeader fullUser={fullUser} />}
 
-                <SidebarInset className={'bg-[#f9fafb] dark:bg-black'}>
-                    {!hideUI && <SiteHeader fullUser={fullUser} />}
+                            {!hideUI && <BreadcrumbHeader />}
 
-                    {!hideUI && <BreadcrumbHeader />}
-
-                    <main className="w-full h-full relative ">
-                        {/* {!hideUI && <DynamicBreadcrumb />} */}
-                        {loading ? (
-                            <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-50">
-                                <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                            </div>
-                        ) : (
-                            children
-                        )}
-                    </main>
-                    <footer className="w-full border-t bg-white dark:bg-muted/30 rounded-b-lg  text-xs text-muted-foreground mt-8">
-                        <div className="max-w-7xl mx-auto px-4 py-3  flex flex-col md:flex-row justify-between items-center gap-2">
-                            <StatusIndicator />
-                            <div className="flex items-center gap-4">
-                                <span>Dashboard Version: <strong>v{pkg.version}</strong></span>
-                                <span className="text-muted-foreground">A Kinzix Product</span>
-                            </div>
-                        </div>
-                    </footer>
-                </SidebarInset>
-            </SidebarProvider>
-            <NetworkStatusDialog />
-            {/* <DatabaseErrorDialog open={isDbDown} /> */}
-        </QueryClientProvider>
-
+                            <main className="w-full h-full relative ">
+                                {/* {!hideUI && <DynamicBreadcrumb />} */}
+                                {loading ? (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-50">
+                                        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                                    </div>
+                                ) : (
+                                    children
+                                )}
+                            </main>
+                            <footer className="w-full border-t bg-white dark:bg-muted/30 rounded-b-lg  text-xs text-muted-foreground mt-8">
+                                <div className="max-w-7xl mx-auto px-4 py-3  flex flex-col md:flex-row justify-between items-center gap-2">
+                                    <StatusIndicator />
+                                    <div className="flex items-center gap-4">
+                                        <span>Dashboard Version: <strong>v{pkg.version}</strong></span>
+                                        <span className="text-muted-foreground">A Kinzix Product</span>
+                                    </div>
+                                </div>
+                            </footer>
+                        </SidebarInset>
+                    </SidebarProvider>
+                    {/* <DatabaseErrorDialog open={isDbDown} /> */}
+                </QueryClientProvider>
+            </AcademicYearSetupBannerProvider>
+        </NetworkStatusProvider>
     );
 }
 

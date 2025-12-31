@@ -89,7 +89,12 @@ export async function GET(req) {
                             sections: { select: { id: true, name: true } },
                         },
                     },
-                    StudentFeeStructure: true,
+                    studentFees: {
+                        select: {
+                            id: true,
+                            academicYearId: true
+                        }
+                    },
                 },
                 orderBy: { user: { name: "asc" } },
             }, page, limit);

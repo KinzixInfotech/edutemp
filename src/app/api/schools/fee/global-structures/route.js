@@ -43,13 +43,15 @@ export async function GET(req) {
         const schoolId = searchParams.get("schoolId");
         const academicYearId = searchParams.get("academicYearId");
         const classId = searchParams.get("classId");
+        const status = searchParams.get("status"); // DRAFT, ACTIVE, ARCHIVED, or 'all'
+        const includeArchived = searchParams.get("includeArchived") === "true";
 
         if (!schoolId) {
             return errorResponse("schoolId required", 400);
         }
 
         const { page, limit, skip } = getPagination(req);
-        const cacheKey = generateKey('fee-structures', { schoolId, academicYearId, classId, page, limit });
+        const cacheKey = generateKey('fee-structures', { schoolId, academicYearId, classId, status, includeArchived, page, limit });
 
         const result = await remember(cacheKey, async () => {
             const where = {
@@ -57,6 +59,10 @@ export async function GET(req) {
                 ...(academicYearId && { academicYearId }),
                 ...(classId && { classId: parseInt(classId) }),
                 isActive: true,
+                // Filter by status
+                ...(status && status !== 'all' && { status }),
+                // Exclude archived unless explicitly requested
+                ...(!includeArchived && !status && { status: { not: 'ARCHIVED' } }),
             };
 
             return await paginate(prisma.globalFeeStructure, {
@@ -68,11 +74,11 @@ export async function GET(req) {
                     installmentRules: { orderBy: { installmentNumber: "asc" } },
                     _count: {
                         select: {
-                            studentFees: { where: { academicYearId } }
+                            studentFees: true
                         }
                     },
                 },
-                orderBy: { createdAt: "desc" },
+                orderBy: [{ status: 'asc' }, { createdAt: "desc" }], // DRAFT first, then ACTIVE, then ARCHIVED
             }, page, limit);
         }, 300);
 
@@ -187,26 +193,130 @@ export async function GET(req) {
 //     }
 // }
 
-// PATCH: Update global fee structure
+// PATCH: Update global fee structure (respects status rules)
 export async function PATCH(req) {
     try {
         const body = await req.json();
-        const { id, name, description, particulars, installmentRules } = body;
+        const { id, action, name, description, particulars, installmentRules, targetAcademicYearId, newName } = body;
 
         if (!id) {
             return NextResponse.json({ error: "id required" }, { status: 400 });
         }
 
-        const result = await prisma.$transaction(async (tx) => {
-            const structure = await tx.globalFeeStructure.findUnique({
-                where: { id },
-                include: { particulars: true, installmentRules: true },
-            });
+        // Fetch current structure
+        const structure = await prisma.globalFeeStructure.findUnique({
+            where: { id },
+            include: { particulars: true, installmentRules: true },
+        });
 
-            if (!structure) {
-                throw new Error("Fee structure not found");
+        if (!structure) {
+            return NextResponse.json({ error: "Fee structure not found" }, { status: 404 });
+        }
+
+        // Handle special actions
+        if (action === 'archive') {
+            // Only ACTIVE structures can be archived
+            if (structure.status !== 'ACTIVE') {
+                return NextResponse.json({ error: "Only ACTIVE structures can be archived" }, { status: 400 });
+            }
+            const updated = await prisma.globalFeeStructure.update({
+                where: { id },
+                data: { status: 'ARCHIVED' },
+            });
+            await invalidatePattern(`fee-structures:${structure.schoolId}*`);
+            return NextResponse.json({ message: "Fee structure archived", structure: updated });
+        }
+
+        if (action === 'unarchive') {
+            // Only ARCHIVED structures can be unarchived
+            if (structure.status !== 'ARCHIVED') {
+                return NextResponse.json({ error: "Only ARCHIVED structures can be restored" }, { status: 400 });
+            }
+            const updated = await prisma.globalFeeStructure.update({
+                where: { id },
+                data: { status: 'ACTIVE' },
+            });
+            await invalidatePattern(`fee-structures:${structure.schoolId}*`);
+            return NextResponse.json({ message: "Fee structure restored to ACTIVE", structure: updated });
+        }
+
+        if (action === 'clone') {
+            // Clone to a new structure
+            const cloneName = newName || `${structure.name} (Copy)`;
+            const cloneYearId = targetAcademicYearId || structure.academicYearId;
+
+            // Check if clone already exists for target class/year
+            const existing = await prisma.globalFeeStructure.findUnique({
+                where: {
+                    schoolId_academicYearId_classId: {
+                        schoolId: structure.schoolId,
+                        academicYearId: cloneYearId,
+                        classId: structure.classId,
+                    }
+                }
+            });
+            if (existing) {
+                return NextResponse.json({ error: "Fee structure already exists for this class in target year" }, { status: 400 });
             }
 
+            const cloned = await prisma.$transaction(async (tx) => {
+                // Create new structure
+                const newStructure = await tx.globalFeeStructure.create({
+                    data: {
+                        schoolId: structure.schoolId,
+                        academicYearId: cloneYearId,
+                        classId: structure.classId,
+                        name: cloneName,
+                        description: structure.description,
+                        mode: structure.mode,
+                        totalAmount: structure.totalAmount,
+                        status: 'DRAFT',
+                        version: structure.version + 1,
+                        clonedFromId: structure.id,
+                        enableInstallments: structure.enableInstallments,
+                        particulars: {
+                            create: structure.particulars.map(p => ({
+                                name: p.name,
+                                amount: p.amount,
+                                category: p.category,
+                                isOptional: p.isOptional,
+                                displayOrder: p.displayOrder,
+                            })),
+                        },
+                    },
+                    include: { particulars: true },
+                });
+
+                // Clone installment rules if enableInstallments
+                if (structure.enableInstallments && structure.installmentRules.length > 0) {
+                    await tx.feeInstallmentRule.createMany({
+                        data: structure.installmentRules.map(rule => ({
+                            globalFeeStructureId: newStructure.id,
+                            installmentNumber: rule.installmentNumber,
+                            dueDate: rule.dueDate,
+                            percentage: rule.percentage,
+                            amount: rule.amount,
+                            lateFeeAmount: rule.lateFeeAmount,
+                            lateFeeAfterDays: rule.lateFeeAfterDays,
+                        })),
+                    });
+                }
+
+                return newStructure;
+            });
+
+            await invalidatePattern(`fee-structures:${structure.schoolId}*`);
+            return NextResponse.json({ message: "Fee structure cloned", structure: cloned }, { status: 201 });
+        }
+
+        // Regular update - only allowed for DRAFT status
+        if (structure.status !== 'DRAFT') {
+            return NextResponse.json({
+                error: `Cannot edit ${structure.status} structure. Only DRAFT structures can be modified.`
+            }, { status: 400 });
+        }
+
+        const result = await prisma.$transaction(async (tx) => {
             // Update basic info
             const updated = await tx.globalFeeStructure.update({
                 where: { id },
@@ -218,12 +328,10 @@ export async function PATCH(req) {
 
             // Update particulars if provided
             if (particulars) {
-                // Delete old particulars
                 await tx.globalFeeParticular.deleteMany({
                     where: { globalFeeStructureId: id },
                 });
 
-                // Create new particulars
                 const totalAmount = particulars.reduce((sum, p) => sum + p.amount, 0);
 
                 await tx.globalFeeParticular.createMany({
@@ -237,7 +345,6 @@ export async function PATCH(req) {
                     })),
                 });
 
-                // Update total amount
                 await tx.globalFeeStructure.update({
                     where: { id },
                     data: { totalAmount },
@@ -269,15 +376,7 @@ export async function PATCH(req) {
             return updated;
         });
 
-        // Invalidate cache (we need schoolId, but it's not in body, fetch from structure)
-        // Since we are inside transaction, we can't easily get schoolId outside unless we fetch it before.
-        // But we fetched structure inside transaction.
-        // Let's just invalidate all fee structures for now or try to get schoolId.
-        // Actually, we can fetch schoolId from the structure we updated.
-        const updatedStructure = result;
-        if (updatedStructure && updatedStructure.schoolId) {
-            await invalidatePattern(`fee-structures:${updatedStructure.schoolId}*`);
-        }
+        await invalidatePattern(`fee-structures:${structure.schoolId}*`);
 
         return NextResponse.json({
             message: "Fee structure updated successfully",
@@ -292,7 +391,7 @@ export async function PATCH(req) {
     }
 }
 
-// DELETE: Delete global fee structure
+// DELETE: Delete global fee structure (only DRAFT allowed)
 export async function DELETE(req) {
     try {
         const { searchParams } = new URL(req.url);
@@ -302,16 +401,45 @@ export async function DELETE(req) {
             return NextResponse.json({ error: "id required" }, { status: 400 });
         }
 
-        // Check if assigned to any students
+        // Fetch structure to check status
+        const structure = await prisma.globalFeeStructure.findUnique({
+            where: { id },
+        });
+
+        if (!structure) {
+            return NextResponse.json({ error: "Fee structure not found" }, { status: 404 });
+        }
+
+        // Check status - only DRAFT can be deleted
+        if (structure.status === 'ACTIVE') {
+            return NextResponse.json({
+                error: "Cannot delete ACTIVE structure. Use Archive instead.",
+                suggestion: "archive",
+                assignedCount: await prisma.studentFee.count({ where: { globalFeeStructureId: id } }),
+            }, { status: 400 });
+        }
+
+        if (structure.status === 'ARCHIVED') {
+            return NextResponse.json({
+                error: "Cannot delete ARCHIVED structure. It is kept for historical reference.",
+            }, { status: 400 });
+        }
+
+        // Double-check - ensure no students assigned (even for DRAFT)
         const assignedCount = await prisma.studentFee.count({
             where: { globalFeeStructureId: id },
         });
 
         if (assignedCount > 0) {
-            return NextResponse.json(
-                { error: `Cannot delete: Assigned to ${assignedCount} students` },
-                { status: 400 }
-            );
+            // Auto-transition to ACTIVE and block delete
+            await prisma.globalFeeStructure.update({
+                where: { id },
+                data: { status: 'ACTIVE' },
+            });
+            return NextResponse.json({
+                error: `Cannot delete: Structure has ${assignedCount} students assigned. Status updated to ACTIVE.`,
+                suggestion: "archive",
+            }, { status: 400 });
         }
 
         const deleted = await prisma.globalFeeStructure.delete({ where: { id } });
@@ -346,6 +474,7 @@ export async function POST(req) {
             description,
             mode, // MONTHLY, QUARTERLY, HALF_YEARLY, YEARLY, ONE_TIME
             particulars,
+            enableInstallments = true, // New field
             // installmentRules is now OPTIONAL - will auto-generate if not provided
             installmentRules
         } = body;
@@ -370,13 +499,16 @@ export async function POST(req) {
             });
 
             if (existing) {
-                throw new Error("Fee structure already exists for this class");
+                const statusMsg = existing.status === 'ARCHIVED'
+                    ? "Structure is ARCHIVED. Please restore it from the list."
+                    : `Structure already exists (Status: ${existing.status}).`;
+                throw new Error(`Fee structure already exists for this class. ${statusMsg}`);
             }
 
             // Calculate total
             const totalAmount = particulars.reduce((sum, p) => sum + p.amount, 0);
 
-            // Create structure
+            // Create structure with DRAFT status
             const structure = await tx.globalFeeStructure.create({
                 data: {
                     schoolId,
@@ -386,6 +518,8 @@ export async function POST(req) {
                     description,
                     mode,
                     totalAmount,
+                    status: "DRAFT", // New structures start as DRAFT
+                    enableInstallments,
                     particulars: {
                         create: particulars.map((p, index) => ({
                             name: p.name,

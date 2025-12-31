@@ -13,11 +13,11 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { AlertTriangle, Calendar, Database, FileText, IndianRupee } from 'lucide-react';
+import { AlertTriangle, Calendar, Clock, Database, FileText, IndianRupee } from 'lucide-react';
 
 const STORAGE_KEY = 'hideSessionSwitchWarning';
 
-export function SessionSwitchDialog({ isOpen, onClose, onConfirm, fromSession, toSession }) {
+export function SessionSwitchDialog({ isOpen, onClose, onConfirm, fromSession, toSession, toSessionData }) {
     const [dontShowAgain, setDontShowAgain] = useState(false);
 
     const handleConfirm = () => {
@@ -27,13 +27,28 @@ export function SessionSwitchDialog({ isOpen, onClose, onConfirm, fromSession, t
         onConfirm();
     };
 
+    // Check if the target year hasn't started yet
+    const isPreStart = toSessionData?.startDate && new Date(toSessionData.startDate) > new Date();
+    const formatDate = (date) => {
+        return new Date(date).toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+        });
+    };
+
     return (
         <AlertDialog open={isOpen} onOpenChange={onClose}>
             <AlertDialogContent className="max-w-md">
                 <AlertDialogHeader>
                     <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 rounded-full bg-amber-500/10 flex items-center justify-center">
-                            <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-500" />
+                        <div className={`h-12 w-12 rounded-full flex items-center justify-center ${isPreStart ? "bg-blue-500/10" : "bg-amber-500/10"
+                            }`}>
+                            {isPreStart ? (
+                                <Clock className="h-6 w-6 text-blue-600 dark:text-blue-500" />
+                            ) : (
+                                <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-500" />
+                            )}
                         </div>
                         <div>
                             <AlertDialogTitle className="text-xl">Switch Academic Session?</AlertDialogTitle>
@@ -46,6 +61,18 @@ export function SessionSwitchDialog({ isOpen, onClose, onConfirm, fromSession, t
 
                 <AlertDialogDescription asChild>
                     <div className="space-y-4 py-4">
+                        {/* Pre-start warning */}
+                        {isPreStart && (
+                            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                                <p className="text-sm text-blue-700 dark:text-blue-400">
+                                    <span className="font-semibold">⏳ Note:</span> This academic year hasn't started yet. It will officially begin on <strong>{formatDate(toSessionData.startDate)}</strong>.
+                                </p>
+                                <p className="text-xs text-blue-600 dark:text-blue-500 mt-1">
+                                    You'll be in <strong>configuration mode</strong> — attendance and some operational features will be restricted until the start date.
+                                </p>
+                            </div>
+                        )}
+
                         <p className="text-sm text-foreground">
                             Switching academic sessions will reload all data from the selected session. This affects:
                         </p>
@@ -84,6 +111,12 @@ export function SessionSwitchDialog({ isOpen, onClose, onConfirm, fromSession, t
                             </div>
                         </div>
 
+                        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                            <p className="text-xs text-red-700 dark:text-red-400">
+                                <span className="font-semibold">⚠️ Important:</span> If switching to a new academic year, you will need to complete the setup process including student promotion, fee configuration, and class/subject mapping. The previous year will become read-only.
+                            </p>
+                        </div>
+
                         <div className="bg-muted/50 border border-border rounded-lg p-3">
                             <p className="text-xs text-muted-foreground">
                                 <span className="font-medium text-foreground">Note:</span> The page will reload automatically after switching sessions.
@@ -112,7 +145,7 @@ export function SessionSwitchDialog({ isOpen, onClose, onConfirm, fromSession, t
                         onClick={handleConfirm}
                         className="bg-primary hover:bg-primary/90"
                     >
-                        Switch Session
+                        {isPreStart ? "Switch to Configuration Mode" : "Switch Session"}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
