@@ -9,6 +9,7 @@ import Provider from "./Provider";
 import NavigationProgress from "./components/NavigationProgress";
 import PageTransitionLoader from "@/components/PageTransitionLoader";
 import { Suspense } from "react";
+import { Analytics } from "@vercel/analytics/next"
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://edubreezy.com';
 
@@ -153,6 +154,7 @@ export default function RootLayout({ children }) {
           />
         </head>
         <body className="min-h-screen flex flex-col">
+          <Analytics />
           <ClientProduct>{children}</ClientProduct>
           <Suspense fallback={<div />}>
             <NavigationProgress />

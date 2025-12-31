@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,23 @@ import Link from 'next/link';
 import Turnstile from 'react-turnstile';
 import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
 
+// Wrapper component to handle Suspense for useSearchParams
 export default function PayPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50">
+                <div className="text-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-[#0569ff] mx-auto mb-4" />
+                    <p className="text-gray-500">Loading...</p>
+                </div>
+            </div>
+        }>
+            <PayPageContent />
+        </Suspense>
+    );
+}
+
+function PayPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
 
