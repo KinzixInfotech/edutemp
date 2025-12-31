@@ -57,10 +57,11 @@ export const metadata = {
         description: 'Pay your school fees online instantly. Secure payment with UPI, Cards & Net Banking. Download receipts and track payment history.',
         images: [
             {
-                url: '/og-pay.png',
-                width: 1200,
-                height: 630,
+                url: 'https://pay.edubreezy.com/by.png',
+                width: 512,
+                height: 512,
                 alt: 'EduBreezy Pay - School Fee Payment Portal',
+                type: 'image/png',
             },
         ],
     },
@@ -70,7 +71,7 @@ export const metadata = {
         creator: '@edubreezy',
         title: 'EduBreezy Pay - Online School Fee Payment Portal',
         description: 'Pay your school fees online securely. UPI, Cards, Net Banking accepted.',
-        images: ['/og-pay.png'],
+        images: ['https://pay.edubreezy.com/by.png'],
     },
     robots: {
         index: true,
@@ -133,7 +134,7 @@ const jsonLd = {
         'Card Payments',
         'Net Banking'
     ],
-    screenshot: 'https://pay.edubreezy.com/og-pay.png',
+    screenshot: 'https://pay.edubreezy.com/by.png',
     aggregateRating: {
         '@type': 'AggregateRating',
         ratingValue: '4.8',
