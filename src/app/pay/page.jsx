@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Loader2, Eye, EyeOff, AlertCircle, Shield, RefreshCw, Building2, MapPin, Phone, Mail } from 'lucide-react';
+import { Loader2, Eye, EyeOff, AlertCircle, Shield, RefreshCw, Building2, MapPin, Phone, CreditCard, Wallet, ShieldCheck, Banknote, Receipt, Smartphone } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import Turnstile from 'react-turnstile';
@@ -23,11 +23,13 @@ import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern
 
 export default function PayPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
 
     // School code state
     const [schoolCodeInput, setSchoolCodeInput] = useState('');
     const [schoolCodeError, setSchoolCodeError] = useState('');
     const [schoolCodeLoading, setSchoolCodeLoading] = useState(false);
+    const [initialLoading, setInitialLoading] = useState(true);
 
     // School data
     const [school, setSchool] = useState(null);
@@ -41,6 +43,38 @@ export default function PayPage() {
     const [turnstileKey, setTurnstileKey] = useState(Date.now());
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+
+    // Auto-load school from URL entry parameter
+    useEffect(() => {
+        const entryCode = searchParams.get('entry');
+        if (entryCode) {
+            // Auto-fetch school data
+            const fetchSchool = async () => {
+                try {
+                    const code = entryCode.toUpperCase().startsWith('EB-')
+                        ? entryCode.toUpperCase()
+                        : `EB-${entryCode.toUpperCase()}`;
+
+                    const res = await fetch(`/api/schools/by-code?schoolcode=${encodeURIComponent(code)}`);
+                    const data = await res.json();
+
+                    if (res.ok && data.school) {
+                        setSchool(data.school);
+                        toast.success(`Welcome to ${data.school.name}`);
+                    } else {
+                        toast.error('Invalid school code in URL');
+                    }
+                } catch (err) {
+                    console.error('Error loading school from URL:', err);
+                } finally {
+                    setInitialLoading(false);
+                }
+            };
+            fetchSchool();
+        } else {
+            setInitialLoading(false);
+        }
+    }, [searchParams]);
 
     // Fetch academic years when school is set
     const { data: academicYears } = useQuery({
@@ -166,14 +200,62 @@ export default function PayPage() {
         <div className="min-h-screen flex flex-col">
             <div className="flex-1 flex flex-col lg:flex-row">
                 {/* Left Side - Visual/School Branding - Hidden on mobile */}
-                <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-slate-50 to-blue-50 relative flex-col">
+                <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-slate-50 to-blue-50 relative flex-col overflow-hidden">
+                    {/* Floating Icons - Positioned around center content */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="relative w-[400px] h-[300px]">
+                            {/* Top Left - Shield Check */}
+                            <div className="absolute -top-8 -left-4 animate-bounce" style={{ animationDelay: '0s', animationDuration: '4s' }}>
+                                <div className="bg-green-50 p-2.5 rounded-xl shadow-sm">
+                                    <ShieldCheck className="w-5 h-5 text-green-500/70" />
+                                </div>
+                            </div>
+                            {/* Top Left 2 - Credit Card */}
+                            <div className="absolute top-4 left-12 animate-bounce" style={{ animationDelay: '0.5s', animationDuration: '3.5s' }}>
+                                <div className="bg-blue-50 p-2 rounded-xl shadow-sm">
+                                    <CreditCard className="w-4 h-4 text-[#0569ff]/60" />
+                                </div>
+                            </div>
+                            {/* Top Right - Wallet */}
+                            <div className="absolute -top-6 right-8 animate-bounce" style={{ animationDelay: '0.8s', animationDuration: '3.8s' }}>
+                                <div className="bg-indigo-50 p-2.5 rounded-xl shadow-sm">
+                                    <Wallet className="w-5 h-5 text-indigo-500/60" />
+                                </div>
+                            </div>
+                            {/* Left Middle - Shield */}
+                            <div className="absolute top-1/2 -left-12 -translate-y-1/2 animate-bounce" style={{ animationDelay: '1s', animationDuration: '4.5s' }}>
+                                <div className="bg-red-50 p-2.5 rounded-xl shadow-sm">
+                                    <Shield className="w-5 h-5 text-red-400/60" />
+                                </div>
+                            </div>
+                            {/* Right Middle - Receipt */}
+                            <div className="absolute top-1/2 -right-8 -translate-y-1/2 animate-bounce" style={{ animationDelay: '0.3s', animationDuration: '3.2s' }}>
+                                <div className="bg-slate-100 p-2.5 rounded-xl shadow-sm">
+                                    <Receipt className="w-5 h-5 text-slate-500/60" />
+                                </div>
+                            </div>
+                            {/* Bottom Left - Banknote */}
+                            <div className="absolute -bottom-4 left-8 animate-bounce" style={{ animationDelay: '1.5s', animationDuration: '4s' }}>
+                                <div className="bg-orange-50 p-2 rounded-xl shadow-sm">
+                                    <Banknote className="w-4 h-4 text-orange-500/60" />
+                                </div>
+                            </div>
+                            {/* Bottom Right - Building */}
+                            <div className="absolute -bottom-6 right-4 animate-bounce" style={{ animationDelay: '0.6s', animationDuration: '3.6s' }}>
+                                <div className="bg-cyan-50 p-2.5 rounded-xl shadow-sm">
+                                    <Building2 className="w-5 h-5 text-cyan-500/60" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Top Logo */}
-                    <div className="p-6 lg:p-8">
+                    <div className="p-6 lg:p-8 relative z-20">
                         <Image src="/pay.png" alt="EduBreezy Pay" width={180} height={60} className="h-10 lg:h-12 w-auto" />
                     </div>
 
                     {/* Center Content - Illustration or School Info */}
-                    <div className="flex-1  flex items-center justify-center p-6 lg:p-12">
+                    <div className="flex-1 flex items-center justify-center p-6 lg:p-12 relative z-20">
                         <InteractiveGridPattern
                             width={80}
                             height={80}
@@ -205,14 +287,7 @@ export default function PayPage() {
                             </div>
                         ) : (
                             // Show default visual when no school selected
-                            <div className="text-center">
-
-
-                                {/* <div className="w-32 h-32 lg:w-40 lg:h-40 bg-gradient-to-br from-[#0569ff] to-indigo-600 rounded-3xl mx-auto mb-6 flex items-center justify-center shadow-xl">
-                                <svg className="w-16 h-16 lg:w-20 lg:h-20 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                                </svg>
-                            </div> */}
+                            <div className="text-center z-10">
                                 <h2 className="text-xl lg:text-2xl font-bold text-gray-900 mb-2">Secure Fee Payment Portal</h2>
                                 <p className="text-gray-500">Pay your school fees online with ease</p>
                             </div>
@@ -220,7 +295,7 @@ export default function PayPage() {
                     </div>
 
                     {/* Bottom - Security Badge */}
-                    <div className="p-6 lg:p-8">
+                    <div className="p-6 lg:p-8 relative z-20">
                         <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
                             <Shield className="w-4 h-4" />
                             <span>100% Secure Payments</span>
