@@ -193,42 +193,80 @@ export default function PayDashboardPage() {
 
             <main className="container mx-auto px-4 py-8 max-w-6xl">
                 {/* Student Info Card */}
-                <Card className="mb-6 bg-gradient-to-r from-[#0168fb] to-indigo-600 text-white border-0 shadow-lg">
-                    <CardContent className="p-6">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div className="flex items-center gap-4">
-                                {student?.profilePicture && student.profilePicture !== 'default.png' ? (
-                                    <img
-                                        src={student.profilePicture}
-                                        alt={student.name}
-                                        className="w-20 h-20 rounded-full object-cover border-4 border-white/30 shadow-lg"
-                                    />
-                                ) : (
-                                    <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm border-4 border-white/30 shadow-lg">
-                                        <span className="text-2xl font-bold text-white">
-                                            {student?.name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'ST'}
+                <Card className="mb-6 bg-gradient-to-br from-[#0168fb] via-[#0855d4] to-indigo-600 text-white border-0 shadow-xl overflow-hidden relative">
+                    {/* Decorative circles */}
+                    <div className="absolute -top-20 -right-20 w-40 h-40 bg-white/5 rounded-full" />
+                    <div className="absolute -bottom-16 -left-16 w-32 h-32 bg-white/5 rounded-full" />
+
+                    <CardContent className="p-5 sm:p-6 relative z-10">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            {/* Profile Section - Centered on mobile */}
+                            <div className="flex flex-col sm:flex-row items-center sm:items-center gap-4 text-center sm:text-left">
+                                {/* Profile Picture */}
+                                <div className="relative">
+                                    {student?.profilePicture && student.profilePicture !== 'default.png' ? (
+                                        <img
+                                            src={student.profilePicture}
+                                            alt={student.name}
+                                            className="w-24 h-24 sm:w-20 sm:h-20 rounded-full object-cover border-4 border-white/40 shadow-xl ring-4 ring-white/10"
+                                        />
+                                    ) : (
+                                        <div className="w-24 h-24 sm:w-20 sm:h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border-4 border-white/40 shadow-xl ring-4 ring-white/10">
+                                            <span className="text-3xl sm:text-2xl font-bold text-white">
+                                                {student?.name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'ST'}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {/* Online indicator */}
+                                    <div className="absolute bottom-1 right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white" />
+                                </div>
+
+                                {/* Student Details */}
+                                <div className="pr-16 sm:pr-0">
+                                    <h2 className="text-2xl sm:text-xl font-bold">{student?.name}</h2>
+                                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-2 text-blue-100 text-sm">
+                                        <span className="bg-white/10 px-2.5 py-1 rounded-full backdrop-blur-sm">
+                                            Adm. No: {student?.admissionNo}
+                                        </span>
+                                        <span className="bg-white/10 px-2.5 py-1 rounded-full backdrop-blur-sm">
+                                            Class: {student?.class} - {student?.section}
                                         </span>
                                     </div>
-                                )}
-                                <div>
-                                    <h2 className="text-2xl font-bold">{student?.name}</h2>
-                                    <div className="flex flex-wrap gap-3 mt-1 text-blue-100 text-sm">
-                                        <span>Adm. No: {student?.admissionNo}</span>
-                                        <span>•</span>
-                                        <span>Class: {student?.class} - {student?.section}</span>
-                                    </div>
                                     {student?.fatherName && (
-                                        <p className="text-blue-100 text-sm mt-1">Father: {student.fatherName}</p>
+                                        <p className="text-blue-100 text-sm mt-2">
+                                            Father: {student.fatherName}
+                                        </p>
                                     )}
                                 </div>
                             </div>
-                            <div className="text-right">
-                                {school?.profilePicture && (
-                                    <img src={school.profilePicture} alt="" className="h-12 w-auto ml-auto mb-2 bg-white/10 rounded-lg p-1" />
-                                )}
-                            </div>
+
+                            {/* School Logo - Desktop only in flow */}
+                            {school?.profilePicture && (
+                                <div className="hidden sm:block">
+                                    <div className="bg-white rounded-xl p-1.5 shadow-lg">
+                                        <img
+                                            src={school.profilePicture}
+                                            alt={school.name}
+                                            className="h-12 w-12 object-contain rounded-lg"
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </CardContent>
+
+                    {/* School Logo - Mobile only, absolute positioned */}
+                    {school?.profilePicture && (
+                        <div className="sm:hidden absolute bottom-3 right-3 z-20">
+                            <div className="bg-white rounded-xl p-1.5 shadow-lg">
+                                <img
+                                    src={school.profilePicture}
+                                    alt={school.name}
+                                    className="h-10 w-10 object-contain rounded-lg"
+                                />
+                            </div>
+                        </div>
+                    )}
                 </Card>
 
                 {/* Progress Bar */}
