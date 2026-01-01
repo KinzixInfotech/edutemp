@@ -29,6 +29,7 @@ export default function PayDashboardPage() {
     const router = useRouter();
     const [session, setSession] = useState(null);
     const [selectedInstallments, setSelectedInstallments] = useState([]);
+    const [upiId, setUpiId] = useState(''); // For ICICI UPI collection
 
     // Check session on mount
     useEffect(() => {
@@ -116,13 +117,16 @@ export default function PayDashboardPage() {
                     studentId: student.id,
                     schoolId: school.id,
                     amount: amountToPay,
-                    itemType: 'INSTALLMENT', // Context for backend
+                    itemType: 'INSTALLMENT',
                     installments: installmentPayload,
-                    paymentMode: 'ONLINE'
+                    paymentMode: 'ONLINE',
+                    upiId: upiId // For ICICI UPI collection
                 })
             });
 
             const result = await res.json();
+
+            console.log('🔍 Payment Initiate Response:', result);
 
             if (!res.ok) {
                 toast.error(result.error || 'Failed to initiate payment');
@@ -130,10 +134,67 @@ export default function PayDashboardPage() {
                 return;
             }
 
-            if (result.success && result.redirectUrl) {
-                toast.success('Redirecting to secure payment gateway...');
-                // Redirect to Bank / Gateway
-                window.location.href = result.redirectUrl;
+            if (result.success) {
+                // Check payment flow type
+                if (result.type === 'UPI_COLLECT') {
+                    // UPI Collection Flow (ICICI)
+                    toast.success(result.message || 'Payment request sent to your UPI app');
+                    console.log('📱 UPI Collection:', result);
+
+                    // Show message and user needs to approve in UPI app
+                    setTimeout(() => {
+                        toast.info('Please approve the payment in your UPI app', {
+                            duration: 10000
+                        });
+                        // TODO: Show polling UI or redirect to status page
+                        setProcessingPayment(false);
+                    }, 2000);
+
+                } else if (result.redirectUrl) {
+                    // Redirect-based payment flow (SBI, HDFC, etc)
+                    toast.success('Redirecting to secure payment gateway...');
+
+                    console.log('📋 Params to send:', result.params);
+                    console.log('🔗 Redirect URL:', result.redirectUrl);
+                    console.log('📮 Method:', result.method);
+
+                    const method = result.method || 'POST';
+
+                    if (method === 'GET') {
+                        // For GET, append params to URL and redirect
+                        const params = new URLSearchParams(result.params);
+                        const fullUrl = `${result.redirectUrl}?${params.toString()}`;
+                        console.log('🚀 Redirecting via GET to:', fullUrl);
+                        window.location.href = fullUrl;
+                    } else {
+                        // For POST, create and auto-submit form
+                        const form = document.createElement('form');
+                        form.method = 'POST';
+                        form.action = result.redirectUrl;
+
+                        // Add all parameters as hidden inputs
+                        if (result.params) {
+                            Object.entries(result.params).forEach(([key, value]) => {
+                                console.log(`  ➕ Adding param: ${key} = ${value?.substring(0, 50)}...`);
+                                const input = document.createElement('input');
+                                input.type = 'hidden';
+                                input.name = key;
+                                input.value = value;
+                                form.appendChild(input);
+                            });
+                        } else {
+                            console.error('❌ No params returned from API!');
+                        }
+
+                        // Add form to body and submit
+                        document.body.appendChild(form);
+                        console.log('✅ Form created, submitting...');
+                        form.submit();
+                    }
+                } else {
+                    toast.error('Invalid response from gateway');
+                    setProcessingPayment(false);
+                }
             } else {
                 toast.error('Invalid response from gateway');
                 setProcessingPayment(false);
@@ -567,6 +628,23 @@ export default function PayDashboardPage() {
                                                 ₹{getSelectedTotal().toLocaleString()}
                                             </span>
                                         </div>
+                                    </div>
+
+                                    {/* UPI ID Input for ICICI */}
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            UPI ID (for ICICI payments)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="yourname@paytm"
+                                            value={upiId}
+                                            onChange={(e) => setUpiId(e.target.value)}
+                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#0168fb] focus:border-transparent bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                                        />
+                                        <p className="text-xs text-gray-500">
+                                            Enter your UPI ID (e.g., name@paytm, name@phonepe)
+                                        </p>
                                     </div>
 
                                     <Button

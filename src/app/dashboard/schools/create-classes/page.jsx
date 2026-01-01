@@ -89,7 +89,7 @@ export default function ManageClassSectionPage() {
     const schoolId = fullUser?.schoolId
     const router = useRouter()
     const queryClient = useQueryClient()
-
+ 
     const [className, setClassName] = useState("")
     const [sectionName, setSectionName] = useState("")
     const [selectedClassId, setSelectedClassId] = useState("")

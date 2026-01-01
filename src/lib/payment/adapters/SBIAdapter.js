@@ -17,8 +17,8 @@ export class SBIAdapter {
         this.merchantId = config.merchantId;
         this.encryptionKey = config.secretKey;
 
-        // SBI Collect production URL
-        this.gatewayUrl = 'https://www.onlinesbi.com/prelogin/icollect_payment.htm';
+        // SBI Collect production URL (updated to new domain)
+        this.gatewayUrl = 'https://onlinesbi.sbi.bank.in/sbicollect/icollecthome.htm';
     }
 
     /**

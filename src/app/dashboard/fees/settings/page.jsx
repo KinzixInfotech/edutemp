@@ -890,8 +890,8 @@ export default function FeeSettings() {
                                 <div className="space-y-6 animate-in fade-in slide-in-from-top-2">
                                     {/* Test Mode Toggle */}
                                     <div className={`flex justify-between items-center p-4 rounded-lg border-2 ${testMode
-                                            ? 'bg-yellow-50 dark:bg-yellow-950/30 border-yellow-300 dark:border-yellow-700'
-                                            : 'bg-green-50 dark:bg-green-950/30 border-green-300 dark:border-green-700'
+                                        ? 'bg-yellow-50 dark:bg-yellow-950/30 border-yellow-300 dark:border-yellow-700'
+                                        : 'bg-green-50 dark:bg-green-950/30 border-green-300 dark:border-green-700'
                                         }`}>
                                         <div>
                                             <Label className="font-medium flex items-center gap-2">
@@ -950,9 +950,10 @@ export default function FeeSettings() {
                                             <SelectTrigger><SelectValue /></SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="ICICI_EAZYPAY">ICICI Eazypay</SelectItem>
-                                                <SelectItem value="SBI_COLLECT">SBI Collect</SelectItem>
-                                                <SelectItem value="HDFC_SMARTHUB">HDFC SmartHub</SelectItem>
-                                                <SelectItem value="AXIS_EASYPAY">Axis EasyPay</SelectItem>
+                                                {/* Other banks - Coming soon */}
+                                                {/* <SelectItem value="SBI_COLLECT">SBI Collect</SelectItem> */}
+                                                {/* <SelectItem value="HDFC_SMARTHUB">HDFC SmartHub</SelectItem> */}
+                                                {/* <SelectItem value="AXIS_EASYPAY">Axis EasyPay</SelectItem> */}
                                             </SelectContent>
                                         </Select>
                                         <p className="text-xs text-muted-foreground mt-1 text-blue-600 flex items-center gap-1">

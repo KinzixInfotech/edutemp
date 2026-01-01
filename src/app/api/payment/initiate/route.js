@@ -60,22 +60,40 @@ export async function POST(req) {
             : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
         const returnUrl = `${baseUrl}/api/payment/callback/${provider}`; // Callback to our API
 
-        const { url, params, method } = await adapter.initiatePayment({
+        const result = await adapter.initiatePayment({
             amount: parseFloat(amount),
             orderId: orderId, // Our internal ID
             studentName: "Student", // Fetch real name if needed
             email: "parent@example.com", // Fetch if needed
             phone: "9999999999", // Fetch if needed
+            upiId: body.upiId, // For ICICI UPI collection
             returnUrl: returnUrl
         });
 
-        return NextResponse.json({
-            success: true,
-            redirectUrl: url,
-            params,
-            method,
-            orderId // Internal reference
-        });
+        // Check if this is a redirect-based flow (old adapters) or API-based flow (ICICI)
+        if (result.type === 'UPI_COLLECT') {
+            // UPI Collection Flow (ICICI Collect Pay)
+            // Payment request sent to UPI app, no browser redirect needed
+            return NextResponse.json({
+                success: true,
+                type: 'UPI_COLLECT',
+                orderId: orderId,
+                merchantTranId: result.merchantTranId,
+                message: result.statusMessage,
+                // Frontend should show message and poll for status or wait for webhook
+            });
+        } else {
+            // Redirect-based flow (form POST to bank page)
+            const { url, params, method } = result;
+            return NextResponse.json({
+                success: true,
+                type: 'REDIRECT',
+                redirectUrl: url,
+                params,
+                method,
+                orderId // Internal reference
+            });
+        }
 
     } catch (error) {
         console.error("Payment initiation error:", error);

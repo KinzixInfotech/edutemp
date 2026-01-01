@@ -13,6 +13,7 @@ NProgress.configure({
   minimum: 0.08,
   easing: 'ease',
   speed: 500
+
 });
 
 export default function NavigationProgress() {

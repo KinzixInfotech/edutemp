@@ -79,7 +79,7 @@ export async function POST(req, { params }) {
                         paidDate: isPaidInFull ? new Date() : undefined,
                     }
                 });
-            }
+            } 
 
             // Update the parent StudentFee record
             const studentFee = await prisma.studentFee.findUnique({

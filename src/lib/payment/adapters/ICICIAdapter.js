@@ -1,12 +1,14 @@
 /**
- * ICICI Eazypay Payment Adapter
+ * ICICI Eazypay Payment Gateway Adapter
  * 
- * Integration with ICICI Bank's Eazypay payment gateway.
+ * This is the PAYMENT GATEWAY (supports Cards/NetBanking/UPI)
+ * NOT the Collect Pay API (which is UPI-only)
+ * 
  * Production URL: https://eazypay.icicibank.com/EazyPG
  * 
- * Required credentials (from SchoolPaymentSettings):
+ * Required credentials:
  * - merchantId: ICICI Merchant ID
- * - secretKey: ICICI Encryption Key
+ * - secretKey: ICICI Encryption Key (16 bytes for AES-128-CBC)
  */
 
 import crypto from 'crypto';
@@ -17,24 +19,36 @@ export class ICICIAdapter {
         this.merchantId = config.merchantId;
         this.encryptionKey = config.secretKey;
 
-        // Production URL for ICICI Eazypay
+        // ICICI Eazypay Payment Gateway URL
+        // This is the correct URL for full payment gateway (not just UPI)
         this.gatewayUrl = 'https://eazypay.icicibank.com/EazyPG';
-
-        // Test/Sandbox URL (if ICICI provides one)
-        // this.gatewayUrl = 'https://eazypaypg.icicibank.com/EazyPG';
     }
 
     /**
-     * Encrypt data using ICICI's encryption algorithm (typically AES-128-CBC)
+     * Encrypt data using AES-128-CBC (ICICI standard)
      */
     encrypt(plainText) {
         if (!this.encryptionKey) {
-            throw new Error('ICICI Encryption Key not configured');
+            throw new Error('ICICI Encryption Key not configured. Please add it in Fee Settings or switch to Test Mode.');
         }
 
-        // ICICI typically uses AES-128-CBC encryption
-        const key = Buffer.from(this.encryptionKey, 'utf8').slice(0, 16);
-        const iv = Buffer.alloc(16, 0); // Zero IV (check ICICI docs for actual IV requirement)
+        // Prepare key (must be exactly 16 bytes for AES-128)
+        let key;
+        try {
+            const keyBuffer = Buffer.from(this.encryptionKey, 'utf8');
+            if (keyBuffer.length < 16) {
+                // Pad with zeros if too short
+                key = Buffer.concat([keyBuffer, Buffer.alloc(16 - keyBuffer.length, 0)]);
+            } else {
+                // Trim to 16 bytes if too long
+                key = keyBuffer.slice(0, 16);
+            }
+        } catch (error) {
+            throw new Error('Invalid ICICI Encryption Key format');
+        }
+
+        // Zero IV (check ICICI docs for actual IV requirement)
+        const iv = Buffer.alloc(16, 0);
 
         const cipher = crypto.createCipheriv('aes-128-cbc', key, iv);
         let encrypted = cipher.update(plainText, 'utf8', 'base64');
@@ -51,7 +65,15 @@ export class ICICIAdapter {
             throw new Error('ICICI Encryption Key not configured');
         }
 
-        const key = Buffer.from(this.encryptionKey, 'utf8').slice(0, 16);
+        // Use same key handling as encrypt
+        let key;
+        const keyBuffer = Buffer.from(this.encryptionKey, 'utf8');
+        if (keyBuffer.length < 16) {
+            key = Buffer.concat([keyBuffer, Buffer.alloc(16 - keyBuffer.length, 0)]);
+        } else {
+            key = keyBuffer.slice(0, 16);
+        }
+
         const iv = Buffer.alloc(16, 0);
 
         const decipher = crypto.createDecipheriv('aes-128-cbc', key, iv);
@@ -63,13 +85,14 @@ export class ICICIAdapter {
 
     /**
      * Initiate payment - returns form data for browser auto-submit
+     * This creates a payment gateway redirect (like the Angels High School screenshot)
      */
     async initiatePayment({ amount, orderId, studentName, email, phone, returnUrl }) {
         if (!this.merchantId || !this.encryptionKey) {
-            throw new Error('ICICI credentials not configured. Please add Merchant ID and Encryption Key in Fee Settings.');
+            throw new Error('ICICI credentials not configured. Please add Merchant ID and Encryption Key in Fee Settings or switch to Test Mode.');
         }
 
-        // Prepare mandatory fields (pipe-delimited as per ICICI spec)
+        // Prepare mandatory fields (pipe-delimited as per ICICI Eazypay spec)
         const mandatoryFields = [
             `referenceNo=${orderId}`,
             `submerchantId=${this.merchantId}`,
@@ -86,8 +109,9 @@ export class ICICIAdapter {
         // Encrypt the data
         const encryptedMandatory = this.encrypt(mandatoryFields);
         const encryptedOptional = this.encrypt(optionalFields);
+        const encryptedReturnUrl = this.encrypt(returnUrl);
 
-        // Return redirect data
+        // Return redirect data for form POST
         return {
             url: this.gatewayUrl,
             method: 'POST',
@@ -95,7 +119,7 @@ export class ICICIAdapter {
                 merchantid: this.merchantId,
                 'mandatory fields': encryptedMandatory,
                 'optional fields': encryptedOptional,
-                returnurl: returnUrl,
+                returnurl: encryptedReturnUrl,
             }
         };
     }
