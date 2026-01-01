@@ -31,9 +31,14 @@ export async function GET(req) {
             // Single parallel query for all stats - highly optimized
             const [
                 studentAttendance,
-                teacherAttendance,
+                teachingStaffAttendance,
+                nonTeachingStaffAttendance,
+                totalStudents,
+                totalTeachingStaff,
+                totalNonTeachingStaff,
                 todayPayments,
-                totalCollected
+                totalCollected,
+                recentPayments
             ] = await Promise.all([
                 // Students present today
                 prisma.attendance.count({
@@ -47,16 +52,43 @@ export async function GET(req) {
                     }
                 }),
 
-                // Teachers present today
+                // Teaching staff present today
                 prisma.attendance.count({
                     where: {
                         schoolId,
                         date: { gte: today, lt: tomorrow },
                         status: 'PRESENT',
                         user: {
-                            role: { name: { in: ['TEACHING_STAFF', 'NON_TEACHING_STAFF'] } }
+                            role: { name: 'TEACHING_STAFF' }
                         }
                     }
+                }),
+
+                // Non-Teaching staff present today
+                prisma.attendance.count({
+                    where: {
+                        schoolId,
+                        date: { gte: today, lt: tomorrow },
+                        status: 'PRESENT',
+                        user: {
+                            role: { name: 'NON_TEACHING_STAFF' }
+                        }
+                    }
+                }),
+
+                // Total students in school
+                prisma.student.count({
+                    where: { schoolId }
+                }),
+
+                // Total teaching staff in school
+                prisma.user.count({
+                    where: { schoolId, role: { name: 'TEACHING_STAFF' } }
+                }),
+
+                // Total non-teaching staff in school
+                prisma.user.count({
+                    where: { schoolId, role: { name: 'NON_TEACHING_STAFF' } }
                 }),
 
                 // Payments received today
@@ -79,17 +111,49 @@ export async function GET(req) {
                         status: 'SUCCESS'
                     },
                     _sum: { amount: true }
-                }) : { _sum: { amount: null } }
+                }) : { _sum: { amount: null } },
+
+                // Recent payments for display
+                academicYearId ? prisma.feePayment.findMany({
+                    where: {
+                        schoolId,
+                        academicYearId,
+                        status: 'SUCCESS'
+                    },
+                    orderBy: { paymentDate: 'desc' },
+                    take: 5,
+                    select: {
+                        id: true,
+                        amount: true,
+                        paymentDate: true,
+                        paymentMethod: true,
+                        receiptNumber: true,
+                        student: {
+                            select: {
+                                user: { select: { name: true } },
+                                admissionNo: true,
+                                class: { select: { className: true } },
+                                section: { select: { name: true } }
+                            }
+                        }
+                    }
+                }) : []
             ]);
 
             return {
                 studentsPresent: studentAttendance,
-                teachersPresent: teacherAttendance,
+                totalStudents: totalStudents,
+                teachingStaffPresent: teachingStaffAttendance,
+                nonTeachingStaffPresent: nonTeachingStaffAttendance,
+                teachersPresent: teachingStaffAttendance + nonTeachingStaffAttendance, // Backward compat
+                totalTeachingStaff: totalTeachingStaff,
+                totalNonTeachingStaff: totalNonTeachingStaff,
                 paymentsToday: {
                     amount: todayPayments._sum.amount || 0,
                     count: todayPayments._count || 0
                 },
                 totalCollected: totalCollected._sum.amount || 0,
+                recentPayments: recentPayments,
                 date: today.toISOString()
             };
         }, 60); // Cache for 1 minute

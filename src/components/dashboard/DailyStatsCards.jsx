@@ -25,7 +25,8 @@ export default function DailyStatsCards({ schoolId, academicYearId }) {
     const stats = [
         {
             title: 'Students Present',
-            value: data?.studentsPresent ?? 0,
+            value: `${data?.studentsPresent ?? 0}`,
+            subtitle: `out of ${data?.totalStudents ?? 0} students`,
             icon: Users,
             color: 'text-blue-600 dark:text-blue-400',
             bgColor: 'bg-blue-500/10',
@@ -37,7 +38,11 @@ export default function DailyStatsCards({ schoolId, academicYearId }) {
             icon: UserCheck,
             color: 'text-green-600 dark:text-green-400',
             bgColor: 'bg-green-500/10',
-            description: 'Teaching & Non-Teaching'
+            description: 'Teaching & Non-Teaching',
+            indicators: [
+                { label: 'Teaching', value: data?.teachingStaffPresent ?? 0, total: data?.totalTeachingStaff ?? 0, color: 'text-emerald-600' },
+                { label: 'Non-Teaching', value: data?.nonTeachingStaffPresent ?? 0, total: data?.totalNonTeachingStaff ?? 0, color: 'text-teal-600' }
+            ]
         },
         {
             title: 'Collected Today',
@@ -92,6 +97,18 @@ export default function DailyStatsCards({ schoolId, academicYearId }) {
                                     <p className="text-xs text-muted-foreground mt-1">
                                         {stat.subtitle}
                                     </p>
+                                )}
+                                {stat.indicators && (
+                                    <div className="flex gap-3 mt-2">
+                                        {stat.indicators.map((ind, i) => (
+                                            <div key={i} className="flex items-center gap-1">
+                                                <span className={`w-2 h-2 rounded-full ${ind.color === 'text-emerald-600' ? 'bg-emerald-500' : 'bg-teal-500'}`}></span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {ind.label}: <span className="font-medium text-foreground">{ind.value}/{ind.total}</span>
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 )}
                             </div>
                             <div className={`p-2.5 rounded-lg ${stat.bgColor}`}>

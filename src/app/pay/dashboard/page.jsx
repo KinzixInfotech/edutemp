@@ -8,23 +8,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Accordion,
-    AccordionContent,
-    AccordionItem,
-    AccordionTrigger,
-} from '@/components/ui/accordion';
 import { toast } from 'sonner';
 import {
     Loader2,
-    User,
     GraduationCap,
     CreditCard,
     Calendar,
     CheckCircle,
     AlertCircle,
     Clock,
-    IndianRupee,
     Download,
     LogOut,
     ChevronRight,
@@ -32,7 +24,6 @@ import {
     Wallet,
     FileText,
 } from 'lucide-react';
-import Image from 'next/image';
 
 export default function PayDashboardPage() {
     const router = useRouter();
@@ -97,13 +88,62 @@ export default function PayDashboardPage() {
             .reduce((sum, i) => sum + (i.amount - i.paidAmount + (i.lateFee || 0)), 0);
     };
 
-    const handleProceedToCheckout = () => {
+    const [processingPayment, setProcessingPayment] = useState(false);
+
+    const handleProceedToCheckout = async () => {
         if (selectedInstallments.length === 0) {
             toast.error('Please select at least one installment to pay');
             return;
         }
-        // TODO: Implement payment gateway integration
-        toast.info('Payment gateway integration coming soon!');
+
+        try {
+            setProcessingPayment(true);
+            const amountToPay = getSelectedTotal();
+
+            // Map selected installments to format expected by API
+            const installmentPayload = data.installments
+                .filter(i => selectedInstallments.includes(i.id))
+                .map(i => ({
+                    id: i.id,
+                    amount: (i.amount - i.paidAmount + (i.lateFee || 0))
+                }));
+
+            const res = await fetch('/api/payment/initiate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    studentFeeId: fee.id,
+                    studentId: student.id,
+                    schoolId: school.id,
+                    amount: amountToPay,
+                    itemType: 'INSTALLMENT', // Context for backend
+                    installments: installmentPayload,
+                    paymentMode: 'ONLINE'
+                })
+            });
+
+            const result = await res.json();
+
+            if (!res.ok) {
+                toast.error(result.error || 'Failed to initiate payment');
+                setProcessingPayment(false);
+                return;
+            }
+
+            if (result.success && result.redirectUrl) {
+                toast.success('Redirecting to secure payment gateway...');
+                // Redirect to Bank / Gateway
+                window.location.href = result.redirectUrl;
+            } else {
+                toast.error('Invalid response from gateway');
+                setProcessingPayment(false);
+            }
+
+        } catch (error) {
+            console.error(error);
+            toast.error('An error occurred. Please try again.');
+            setProcessingPayment(false);
+        }
     };
 
     // Get relative due date text
@@ -194,15 +234,12 @@ export default function PayDashboardPage() {
             <main className="container mx-auto px-4 py-8 max-w-6xl">
                 {/* Student Info Card */}
                 <Card className="mb-6 bg-gradient-to-br from-[#0168fb] via-[#0855d4] to-indigo-600 text-white border-0 shadow-xl overflow-hidden relative">
-                    {/* Decorative circles */}
                     <div className="absolute -top-20 -right-20 w-40 h-40 bg-white/5 rounded-full" />
                     <div className="absolute -bottom-16 -left-16 w-32 h-32 bg-white/5 rounded-full" />
 
                     <CardContent className="p-5 sm:p-6 relative z-10">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            {/* Profile Section - Centered on mobile */}
                             <div className="flex flex-col sm:flex-row items-center sm:items-center gap-4 text-center sm:text-left">
-                                {/* Profile Picture */}
                                 <div className="relative">
                                     {student?.profilePicture && student.profilePicture !== 'default.png' ? (
                                         <img
@@ -217,11 +254,9 @@ export default function PayDashboardPage() {
                                             </span>
                                         </div>
                                     )}
-                                    {/* Online indicator */}
                                     <div className="absolute bottom-1 right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white" />
                                 </div>
 
-                                {/* Student Details */}
                                 <div className="pr-16 sm:pr-0">
                                     <h2 className="text-2xl sm:text-xl font-bold">{student?.name}</h2>
                                     <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-2 text-blue-100 text-sm">
@@ -240,7 +275,6 @@ export default function PayDashboardPage() {
                                 </div>
                             </div>
 
-                            {/* School Logo - Desktop only in flow */}
                             {school?.profilePicture && (
                                 <div className="hidden sm:block">
                                     <div className="bg-white rounded-xl p-1.5 shadow-lg">
@@ -255,7 +289,6 @@ export default function PayDashboardPage() {
                         </div>
                     </CardContent>
 
-                    {/* School Logo - Mobile only, absolute positioned */}
                     {school?.profilePicture && (
                         <div className="sm:hidden absolute bottom-3 right-3 z-20">
                             <div className="bg-white rounded-xl p-1.5 shadow-lg">
@@ -538,17 +571,26 @@ export default function PayDashboardPage() {
 
                                     <Button
                                         onClick={handleProceedToCheckout}
-                                        disabled={selectedInstallments.length === 0}
+                                        disabled={selectedInstallments.length === 0 || processingPayment}
                                         className="w-full h-12 bg-[#0168fb] hover:bg-blue-700 text-white font-medium shadow-lg shadow-blue-500/25"
                                     >
-                                        <CreditCard className="w-4 h-4 mr-2" />
-                                        Proceed to Checkout
-                                        <ChevronRight className="w-4 h-4 ml-2" />
+                                        {processingPayment ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                Processing...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CreditCard className="w-4 h-4 mr-2" />
+                                                Proceed to Pay
+                                                <ChevronRight className="w-4 h-4 ml-2" />
+                                            </>
+                                        )}
                                     </Button>
 
                                     <div className="text-center">
                                         <p className="text-xs text-gray-400">
-                                            Secure payment powered by Razorpay
+                                            Secure Banking Gateway
                                         </p>
                                     </div>
 

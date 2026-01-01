@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
 export async function GET(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     const { schoolId } = params;
     const { searchParams } = new URL(req.url);
     const classId = parseInt(searchParams.get("classId"));
@@ -13,11 +13,14 @@ export async function GET(req, props) {
     }
 
     try {
+        // Query students by classId - students may not have academicYearId set directly
+        // They inherit the year via their class assignment
         const students = await prisma.student.findMany({
             where: {
                 schoolId,
                 classId,
-                academicYearId
+                isAlumni: false, // Only active students
+                DateOfLeaving: null // Exclude students who have left
             },
             include: {
                 examResults: {

@@ -7,6 +7,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { remember, generateKey } from "@/lib/cache";
 
 export async function GET(req) {
   try {
@@ -43,195 +44,204 @@ export async function GET(req) {
       );
     }
 
-    const where = {
+    // Generate cache key
+    const cacheKey = generateKey('fee-dashboard', {
       schoolId,
       academicYearId,
-      ...(classId && classId !== 'all' && { student: { classId: parseInt(classId) } }),
-    };
+      classId: classId || 'all',
+      startDate: startDate || 'none',
+      endDate: endDate || 'none'
+    });
 
-    // Debug: Check if any StudentFee records exist
-    const totalRecords = await prisma.studentFee.count({ where: { schoolId, academicYearId } });
-    console.log(`📊 [FEE DASHBOARD] Total StudentFee records: ${totalRecords}`);
+    // Use Redis caching with 60 second TTL
+    const stats = await remember(cacheKey, async () => {
+      const where = {
+        schoolId,
+        academicYearId,
+        ...(classId && classId !== 'all' && { student: { classId: parseInt(classId) } }),
+      };
 
-    // Parallel queries for performance
-    const [
-      totalExpected,
-      totalCollected,
-      totalDiscount,
-      totalBalance,
-      paidCount,
-      partialCount,
-      unpaidCount,
-      overdueCount,
-      recentPayments,
-      overdueStudents,
-      classWiseStats,
-      paymentMethodStats,
-      monthlyCollection,
-    ] = await Promise.all([
-      // Total Expected
-      prisma.studentFee.aggregate({
-        where,
-        _sum: { originalAmount: true },
-      }),
+      // Debug: Check if any StudentFee records exist
+      const totalRecords = await prisma.studentFee.count({ where: { schoolId, academicYearId } });
+      console.log(`📊 [FEE DASHBOARD] Total StudentFee records: ${totalRecords}`);
 
-      // Total Collected
-      prisma.studentFee.aggregate({
-        where,
-        _sum: { paidAmount: true },
-      }),
+      // Parallel queries for performance
+      const [
+        totalExpected,
+        totalCollected,
+        totalDiscount,
+        totalBalance,
+        paidCount,
+        partialCount,
+        unpaidCount,
+        overdueCount,
+        recentPayments,
+        overdueStudents,
+        classWiseStats,
+        paymentMethodStats,
+        monthlyCollection,
+      ] = await Promise.all([
+        // Total Expected
+        prisma.studentFee.aggregate({
+          where,
+          _sum: { originalAmount: true },
+        }),
 
-      // Total Discount
-      prisma.studentFee.aggregate({
-        where,
-        _sum: { discountAmount: true },
-      }),
+        // Total Collected
+        prisma.studentFee.aggregate({
+          where,
+          _sum: { paidAmount: true },
+        }),
 
-      // Total Balance
-      prisma.studentFee.aggregate({
-        where,
-        _sum: { balanceAmount: true },
-      }),
+        // Total Discount
+        prisma.studentFee.aggregate({
+          where,
+          _sum: { discountAmount: true },
+        }),
 
-      // Status Counts
-      prisma.studentFee.count({ where: { ...where, status: "PAID" } }),
-      prisma.studentFee.count({ where: { ...where, status: "PARTIAL" } }),
-      prisma.studentFee.count({ where: { ...where, status: "UNPAID" } }),
-      prisma.studentFee.count({ where: { ...where, status: "OVERDUE" } }),
+        // Total Balance
+        prisma.studentFee.aggregate({
+          where,
+          _sum: { balanceAmount: true },
+        }),
 
-      // Recent Payments (last 10)
-      prisma.feePayment.findMany({
-        where: {
-          schoolId,
-          academicYearId,
-          status: "SUCCESS",
-          ...(startDate && endDate
-            ? {
+        // Status Counts
+        prisma.studentFee.count({ where: { ...where, status: "PAID" } }),
+        prisma.studentFee.count({ where: { ...where, status: "PARTIAL" } }),
+        prisma.studentFee.count({ where: { ...where, status: "UNPAID" } }),
+        prisma.studentFee.count({ where: { ...where, status: "OVERDUE" } }),
+
+        // Recent Payments (last 10)
+        prisma.feePayment.findMany({
+          where: {
+            schoolId,
+            academicYearId,
+            status: "SUCCESS",
+            ...(startDate && endDate
+              ? {
+                paymentDate: {
+                  gte: new Date(`${startDate}T00:00:00.000Z`),
+                  lte: new Date(`${endDate}T23:59:59.999Z`),
+                },
+              }
+              : {})
+          },
+          include: {
+            student: {
+              select: {
+                name: true,
+                // user: { select: { name: true } },
+                admissionNo: true,
+                class: { select: { className: true } },
+              },
+            },
+          },
+          orderBy: { paymentDate: "desc" },
+          take: 10,
+        }),
+        // Overdue Students
+        prisma.studentFee.findMany({
+          where: {
+            ...where,
+            status: { in: ["UNPAID", "PARTIAL", "OVERDUE"] },
+            installments: {
+              some: {
+                isOverdue: true,
+                status: { not: "PAID" },
+              },
+            },
+          },
+          include: {
+            student: {
+              select: {
+                userId: true,
+                name: true,
+                admissionNo: true,
+                class: { select: { className: true } },
+                section: { select: { name: true } },
+              },
+            },
+            installments: {
+              where: { isOverdue: true, status: { not: "PAID" } },
+              orderBy: { dueDate: "asc" },
+            },
+          },
+          take: 20,
+        }),
+
+        // Class-wise collection stats
+        prisma.studentFee
+          .groupBy({
+            by: ["studentId"],
+            where,
+            _sum: {
+              originalAmount: true,
+              paidAmount: true,
+              balanceAmount: true,
+            },
+          })
+          .then(async (results) => {
+            const studentIds = results.map((r) => r.studentId);
+            const students = await prisma.student.findMany({
+              where: { userId: { in: studentIds } },
+              select: { userId: true, classId: true },
+            });
+
+            const classMap = {};
+            students.forEach((s) => {
+              if (!classMap[s.classId]) {
+                classMap[s.classId] = {
+                  expected: 0,
+                  collected: 0,
+                  balance: 0,
+                  count: 0,
+                };
+              }
+            });
+
+            results.forEach((r) => {
+              const student = students.find((s) => s.userId === r.studentId);
+              if (student) {
+                const stats = classMap[student.classId];
+                stats.expected += r._sum.originalAmount || 0;
+                stats.collected += r._sum.paidAmount || 0;
+                stats.balance += r._sum.balanceAmount || 0;
+                stats.count += 1;
+              }
+            });
+
+            const classes = await prisma.class.findMany({
+              where: { id: { in: Object.keys(classMap).map(Number) } },
+              select: { id: true, className: true },
+            });
+
+            return classes.map((c) => ({
+              classId: c.id,
+              className: c.className,
+              ...classMap[c.id],
+            }));
+          }),
+
+        // Payment method distribution
+        prisma.feePayment.groupBy({
+          by: ["paymentMethod"],
+          where: {
+            schoolId,
+            academicYearId,
+            status: "SUCCESS",
+            ...(startDate && endDate && {
               paymentDate: {
                 gte: new Date(`${startDate}T00:00:00.000Z`),
                 lte: new Date(`${endDate}T23:59:59.999Z`),
               },
-            }
-            : {})
-        },
-        include: {
-          student: {
-            select: {
-              name: true,
-              admissionNo: true,
-              class: { select: { className: true } },
-            },
+            }),
           },
-        },
-        orderBy: { paymentDate: "desc" },
-        take: 10,
-      }),
-
-
-
-      // Overdue Students
-      prisma.studentFee.findMany({
-        where: {
-          ...where,
-          status: { in: ["UNPAID", "PARTIAL", "OVERDUE"] },
-          installments: {
-            some: {
-              isOverdue: true,
-              status: { not: "PAID" },
-            },
-          },
-        },
-        include: {
-          student: {
-            select: {
-              userId: true,
-              name: true,
-              admissionNo: true,
-              class: { select: { className: true } },
-              section: { select: { name: true } },
-            },
-          },
-          installments: {
-            where: { isOverdue: true, status: { not: "PAID" } },
-            orderBy: { dueDate: "asc" },
-          },
-        },
-        take: 20,
-      }),
-
-      // Class-wise collection stats
-      prisma.studentFee
-        .groupBy({
-          by: ["studentId"],
-          where,
-          _sum: {
-            originalAmount: true,
-            paidAmount: true,
-            balanceAmount: true,
-          },
-        })
-        .then(async (results) => {
-          const studentIds = results.map((r) => r.studentId);
-          const students = await prisma.student.findMany({
-            where: { userId: { in: studentIds } },
-            select: { userId: true, classId: true },
-          });
-
-          const classMap = {};
-          students.forEach((s) => {
-            if (!classMap[s.classId]) {
-              classMap[s.classId] = {
-                expected: 0,
-                collected: 0,
-                balance: 0,
-                count: 0,
-              };
-            }
-          });
-
-          results.forEach((r) => {
-            const student = students.find((s) => s.userId === r.studentId);
-            if (student) {
-              const stats = classMap[student.classId];
-              stats.expected += r._sum.originalAmount || 0;
-              stats.collected += r._sum.paidAmount || 0;
-              stats.balance += r._sum.balanceAmount || 0;
-              stats.count += 1;
-            }
-          });
-
-          const classes = await prisma.class.findMany({
-            where: { id: { in: Object.keys(classMap).map(Number) } },
-            select: { id: true, className: true },
-          });
-
-          return classes.map((c) => ({
-            classId: c.id,
-            className: c.className,
-            ...classMap[c.id],
-          }));
+          _sum: { amount: true },
+          _count: true,
         }),
 
-      // Payment method distribution
-      prisma.feePayment.groupBy({
-        by: ["paymentMethod"],
-        where: {
-          schoolId,
-          academicYearId,
-          status: "SUCCESS",
-          ...(startDate && endDate && {
-            paymentDate: {
-              gte: new Date(`${startDate}T00:00:00.000Z`),
-              lte: new Date(`${endDate}T23:59:59.999Z`),
-            },
-          }),
-        },
-        _sum: { amount: true },
-        _count: true,
-      }),
-
-      // Monthly collection trend (✅ FIXED)
-      prisma.$queryRaw`
+        // Monthly collection trend (✅ FIXED)
+        prisma.$queryRaw`
   SELECT 
     DATE_TRUNC('month', "paymentDate") AS month,
     SUM("amount") AS total,
@@ -241,20 +251,18 @@ export async function GET(req) {
     AND "academicYearId" = ${academicYearId}::uuid
     AND "status" = 'SUCCESS'
     ${startDate && endDate
-          ? Prisma.sql`AND "paymentDate" BETWEEN ${new Date(`${startDate}T00:00:00.000Z`)} AND ${new Date(`${endDate}T23:59:59.999Z`)}`
-          : Prisma.empty}
+            ? Prisma.sql`AND "paymentDate" BETWEEN ${new Date(`${startDate}T00:00:00.000Z`)} AND ${new Date(`${endDate}T23:59:59.999Z`)}`
+            : Prisma.empty}
   GROUP BY month
   ORDER BY month DESC
   LIMIT 12;
 `,
 
-    ]);
-    // console.log("recentPayments found:", recentPayments.length, recentPayments?.[0]);
+      ]);
 
+      console.log('📊 [FEE DASHBOARD] Recent payments found:', recentPayments?.length, recentPayments?.[0]?.id);
 
-
-    return NextResponse.json(
-      safeJSON({
+      return safeJSON({
         summary: {
           totalExpected: totalExpected._sum.originalAmount || 0,
           totalCollected: totalCollected._sum.paidAmount || 0,
@@ -284,8 +292,10 @@ export async function GET(req) {
         classWiseStats,
         paymentMethodStats,
         monthlyCollection,
-      })
-    );
+      });
+    }, 60); // Cache for 60 seconds
+
+    return NextResponse.json(stats);
   } catch (error) {
     console.error("Dashboard Stats Error:", error);
     return NextResponse.json(
@@ -294,6 +304,7 @@ export async function GET(req) {
     );
   }
 }
+
 // Convert BigInt safely
 const safeJSON = (obj) =>
   JSON.parse(

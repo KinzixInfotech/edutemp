@@ -28,6 +28,17 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useAcademicYear, formatAcademicDate } from "@/hooks/useAcademicYear";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 const setupSteps = [
     {
@@ -50,16 +61,16 @@ const setupSteps = [
         href: "/dashboard/schools/academic/promotion",
         color: "text-green-600 dark:text-green-400",
         bgColor: "bg-green-500/10",
-        cloneSupported: false, // Promotion is not a clone, it's a specific action
+        cloneSupported: false,
     },
     {
         id: "feesConfigured",
-        title: "Fee Structures",
-        description: "Set up fee structures for this academic year",
+        title: "Fee Structure",
+        description: "Set up fee structures, particulars, and installment plans",
         icon: IndianRupee,
         href: "/dashboard/fees/manage-fee-structure",
-        color: "text-purple-600 dark:text-purple-400",
-        bgColor: "bg-purple-500/10",
+        color: "text-amber-600 dark:text-amber-400",
+        bgColor: "bg-amber-500/10",
         cloneSupported: true,
         cloneEndpoint: "/api/schools/academic-years/clone/fees",
         cloneLabel: "Clone Fee Structures",
@@ -69,24 +80,22 @@ const setupSteps = [
         title: "Subjects & Teachers",
         description: "Map subjects and assign teachers to classes",
         icon: BookOpen,
-        href: "/dashboard/subjects/manage",
-        color: "text-orange-600 dark:text-orange-400",
-        bgColor: "bg-orange-500/10",
+        href: "/dashboard/schools/academic/subjects",
+        color: "text-purple-600 dark:text-purple-400",
+        bgColor: "bg-purple-500/10",
         cloneSupported: true,
         cloneEndpoint: "/api/schools/academic-years/clone/subjects",
-        cloneLabel: "Clone Subject Mappings",
+        cloneLabel: "Clone Subjects & Teachers",
     },
     {
         id: "timetableConfigured",
-        title: "Timetable Setup",
-        description: "Configure class timetables for this year",
+        title: "Timetable",
+        description: "Create weekly timetables for all classes",
         icon: Calendar,
-        href: "/dashboard/timetable/manage",
-        color: "text-pink-600 dark:text-pink-400",
-        bgColor: "bg-pink-500/10",
-        cloneSupported: true,
-        cloneEndpoint: "/api/schools/academic-years/clone/timetable",
-        cloneLabel: "Clone Timetable",
+        href: "/dashboard/schools/timetable",
+        color: "text-cyan-600 dark:text-cyan-400",
+        bgColor: "bg-cyan-500/10",
+        cloneSupported: false, // Timetable cloning is complex, usually better to start fresh or separate tool
     },
 ];
 
@@ -97,14 +106,26 @@ export default function AcademicYearSetupPage() {
     const { activeYear, runningYear, previousYear, isPreStart, yearsDiffer, isLoading: contextLoading } = useAcademicYear();
 
     const [cloningStep, setCloningStep] = useState(null);
+    const [selectedCloneYear, setSelectedCloneYear] = useState(null);
+    const [showCloneDialog, setShowCloneDialog] = useState(false);
+    const [includeTeachers, setIncludeTeachers] = useState(false);
 
-    // Redirect if active year is same as running year (no setup needed)
-    useEffect(() => {
-        if (!contextLoading && activeYear && runningYear && activeYear.id === runningYear.id) {
-            toast.info("Setup is only for configuring future academic years");
-            router.push("/dashboard/schools/academic-years");
-        }
-    }, [contextLoading, activeYear, runningYear, router]);
+    // Fetch all academic years for selection
+    const { data: allYears = [] } = useQuery({
+        queryKey: ["academicYears", fullUser?.schoolId],
+        queryFn: async () => {
+            const res = await fetch(`/api/schools/academic-years?schoolId=${fullUser?.schoolId}`);
+            if (!res.ok) throw new Error("Failed to fetch years");
+            return res.json();
+        },
+        enabled: !!fullUser?.schoolId,
+    });
+
+    // Filter potential source years (exclude active year, and generally only look at past years)
+    const cloneSourceYears = allYears.filter(y =>
+        y.id !== activeYear?.id &&
+        new Date(y.startDate) < new Date(activeYear?.startDate)
+    );
 
     const markStepCompleteMutation = useMutation({
         mutationFn: async ({ stepId, value }) => {
@@ -114,28 +135,32 @@ export default function AcademicYearSetupPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ [stepId]: value }),
             });
-            if (!res.ok) throw new Error("Failed to update");
+            if (!res.ok) throw new Error("Failed to update status");
             return res.json();
         },
         onSuccess: () => {
             queryClient.invalidateQueries(["academic-years-context"]);
             queryClient.invalidateQueries(["active-academic-year"]);
+            toast.success("Progress updated");
         },
     });
 
     const cloneMutation = useMutation({
-        mutationFn: async ({ endpoint, stepId }) => {
-            if (!activeYear?.id || !previousYear?.id) {
-                throw new Error("Both active and previous year required");
+        mutationFn: async ({ endpoint, stepId, extraBody = {} }) => {
+            // Use selected year or fallback to previous year
+            const sourceYear = selectedCloneYear || previousYear;
+            if (!activeYear?.id || !sourceYear?.id) {
+                throw new Error("Please select a source year to clone from");
             }
             setCloningStep(stepId);
             const res = await fetch(endpoint, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    fromYearId: previousYear.id,
+                    fromYearId: sourceYear.id,
                     toYearId: activeYear.id,
-                    schoolId: fullUser?.schoolId
+                    schoolId: fullUser?.schoolId,
+                    ...extraBody
                 }),
             });
             if (!res.ok) {
@@ -145,10 +170,11 @@ export default function AcademicYearSetupPage() {
             return res.json();
         },
         onSuccess: (data, { stepId }) => {
-            toast.success(`Successfully cloned! ${data.count || ''} items copied.`);
+            toast.success(`Successfully cloned! ${data.message || ''}`);
             // Mark step as complete
             markStepCompleteMutation.mutate({ stepId, value: true });
             setCloningStep(null);
+            setShowCloneDialog(false);
         },
         onError: (error) => {
             toast.error(error.message || "Clone failed");
@@ -214,6 +240,17 @@ export default function AcademicYearSetupPage() {
             </div>
         );
     }
+
+    const handleCloneClick = (step) => {
+        if (step.id === 'subjectsConfigured') {
+            setShowCloneDialog(true);
+        } else {
+            cloneMutation.mutate({
+                endpoint: step.cloneEndpoint,
+                stepId: step.id
+            });
+        }
+    };
 
     return (
         <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-4xl mx-auto">
@@ -324,6 +361,45 @@ export default function AcademicYearSetupPage() {
                 </CardContent>
             </Card>
 
+            {/* Clone Source Selector */}
+            <Card className="border-blue-500/30 bg-blue-500/5">
+                <CardContent className="p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <Copy className="w-5 h-5 text-blue-600" />
+                            <div>
+                                <p className="font-medium text-sm">Clone From Year</p>
+                                <p className="text-xs text-muted-foreground">
+                                    Select which academic year to copy settings from
+                                </p>
+                            </div>
+                        </div>
+                        {cloneSourceYears.length > 0 ? (
+                            <Select
+                                value={selectedCloneYear?.id || previousYear?.id || ""}
+                                onValueChange={(val) => {
+                                    const year = cloneSourceYears.find(y => y.id === val);
+                                    setSelectedCloneYear(year);
+                                }}
+                            >
+                                <SelectTrigger className="w-[200px]">
+                                    <SelectValue placeholder="Select source year..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {cloneSourceYears.map(year => (
+                                        <SelectItem key={year.id} value={year.id}>
+                                            {year.name} {year.id === previousYear?.id && "(Previous)"}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        ) : (
+                            <Badge variant="secondary">No other years available</Badge>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+
             {/* Setup Steps */}
             <div className="space-y-3">
                 {setupSteps.map((step, index) => {
@@ -369,14 +445,11 @@ export default function AcademicYearSetupPage() {
 
                                     <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
                                         {/* Clone Button */}
-                                        {step.cloneSupported && previousYear && !isComplete && (
+                                        {step.cloneSupported && cloneSourceYears.length > 0 && !isComplete && (
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() => cloneMutation.mutate({
-                                                    endpoint: step.cloneEndpoint,
-                                                    stepId: step.id
-                                                })}
+                                                onClick={() => handleCloneClick(step)}
                                                 disabled={isCloning || cloneMutation.isPending}
                                                 className="text-xs"
                                             >
@@ -389,25 +462,9 @@ export default function AcademicYearSetupPage() {
                                             </Button>
                                         )}
 
-                                        {/* Mark Complete Button */}
-                                        <Button
-                                            variant={isComplete ? "outline" : "ghost"}
-                                            size="sm"
-                                            onClick={() => markStepCompleteMutation.mutate({
-                                                stepId: step.id,
-                                                value: !isComplete
-                                            })}
-                                            disabled={markStepCompleteMutation.isPending}
-                                            className="text-xs"
-                                        >
-                                            {isComplete ? "Undo" : "Mark Done"}
-                                        </Button>
-
-                                        {/* Configure Button */}
                                         <Link href={step.href}>
-                                            <Button size="sm">
-                                                Configure
-                                                <ArrowRight className="ml-1 h-4 w-4" />
+                                            <Button size="sm" className="gap-2">
+                                                Configure <ArrowRight className="h-4 w-4" />
                                             </Button>
                                         </Link>
                                     </div>
@@ -418,30 +475,72 @@ export default function AcademicYearSetupPage() {
                 })}
             </div>
 
-            {/* Complete All Button */}
-            <Card className="border-primary/30 bg-primary/5">
-                <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h3 className="font-semibold">Ready to complete setup?</h3>
-                            <p className="text-sm text-muted-foreground">
-                                Mark all steps as complete to dismiss the setup banner.
-                            </p>
+            {/* Complete Button */}
+            <div className="flex justify-end pt-6">
+                <Button
+                    size="lg"
+                    onClick={() => markAllCompleteMutation.mutate()}
+                    disabled={activeYear.setupComplete || completedSteps < totalSteps}
+                    className={cn(
+                        "w-full sm:w-auto",
+                        activeYear.setupComplete && "bg-green-600 hover:bg-green-700"
+                    )}
+                >
+                    {activeYear.setupComplete ? (
+                        <>
+                            <CheckCircle className="mr-2 h-5 w-5" />
+                            Configuration Complete
+                        </>
+                    ) : (
+                        <>
+                            Complete Setup <ArrowRight className="ml-2 h-5 w-5" />
+                        </>
+                    )}
+                </Button>
+            </div>
+
+            {/* Dialog for Subject Cloning Options */}
+            <Dialog open={showCloneDialog} onOpenChange={setShowCloneDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Clone Options</DialogTitle>
+                        <DialogDescription>
+                            Choose what you want to clone from the previous year.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4">
+                        <div className="flex items-center space-x-2">
+                            <Checkbox
+                                id="subjects"
+                                checked={true}
+                                disabled={true}
+                            />
+                            <Label htmlFor="subjects">Subjects (Required)</Label>
                         </div>
-                        <Button
-                            onClick={() => markAllCompleteMutation.mutate()}
-                            disabled={markAllCompleteMutation.isPending}
-                        >
-                            {markAllCompleteMutation.isPending ? (
-                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                            ) : (
-                                <CheckCircle className="h-4 w-4 mr-2" />
-                            )}
-                            Mark Setup Complete
-                        </Button>
+                        <div className="flex items-center space-x-2">
+                            <Checkbox
+                                id="teachers"
+                                checked={includeTeachers}
+                                onCheckedChange={setIncludeTeachers}
+                            />
+                            <Label htmlFor="teachers">Teacher Assignments</Label>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                            Note: Subjects will be mapped to new classes by name. Teacher assignments will only be copied if the teacher accounts still exist.
+                        </p>
                     </div>
-                </CardContent>
-            </Card>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowCloneDialog(false)}>Cancel</Button>
+                        <Button onClick={() => cloneMutation.mutate({
+                            endpoint: '/api/schools/academic-years/clone/subjects',
+                            stepId: 'subjectsConfigured',
+                            extraBody: { includeTeachers }
+                        })}>
+                            Clone Selected
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

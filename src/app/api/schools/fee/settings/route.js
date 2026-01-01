@@ -1,165 +1,178 @@
-import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import prisma from "@/lib/prisma";
+import { NextResponse } from "next/server";
 
-// GET - Fetch fee settings for a school
+// Helper to get or create settings
+async function getSettings(schoolId) {
+    let settings = await prisma.feeSettings.findFirst({
+        where: { schoolId },
+    });
+
+    if (!settings) {
+        settings = await prisma.feeSettings.create({
+            data: { schoolId },
+        });
+    }
+
+    // Also get payment settings
+    let paymentSettings = await prisma.schoolPaymentSettings.findUnique({
+        where: { schoolId },
+    });
+
+    if (!paymentSettings) {
+        paymentSettings = await prisma.schoolPaymentSettings.create({
+            data: { schoolId },
+        });
+    }
+
+    return {
+        ...settings,
+        // Merge payment settings into response structure
+        paymentGateway: paymentSettings.provider,
+        onlinePaymentEnabled: paymentSettings.isEnabled,
+        testMode: paymentSettings.testMode,
+        merchantId: paymentSettings.merchantId,
+        accessCode: paymentSettings.accessCode,
+        secretKey: paymentSettings.secretKey,
+        workingKey: paymentSettings.workingKey,
+        successUrl: paymentSettings.successUrl,
+        failureUrl: paymentSettings.failureUrl,
+    };
+}
+
 export async function GET(req) {
     try {
         const { searchParams } = new URL(req.url);
-        const schoolId = searchParams.get('schoolId');
+        const schoolId = searchParams.get("schoolId");
 
         if (!schoolId) {
-            return NextResponse.json(
-                { error: 'School ID is required' },
-                { status: 400 }
-            );
+            return NextResponse.json({ error: "School ID required" }, { status: 400 });
         }
 
-        // Get or create fee settings
-        let settings = await prisma.feeSettings.findUnique({
-            where: { schoolId },
-        });
-
-        // If no settings exist, create default settings
-        if (!settings) {
-            settings = await prisma.feeSettings.create({
-                data: { schoolId },
-            });
-        }
-
+        const settings = await getSettings(schoolId);
         return NextResponse.json({ settings });
-
     } catch (error) {
-        console.error('[FEE SETTINGS GET ERROR]', error);
-        return NextResponse.json(
-            { error: 'Failed to fetch fee settings' },
-            { status: 500 }
-        );
+        console.error("Fetch settings error:", error);
+        return NextResponse.json({ error: "Failed to fetch settings" }, { status: 500 });
     }
 }
 
-// POST - Create or update fee settings
 export async function POST(req) {
     try {
         const body = await req.json();
-        const { schoolId, type, settings: settingsData } = body;
+        const { schoolId, type, settings } = body;
 
         if (!schoolId) {
-            return NextResponse.json(
-                { error: 'School ID is required' },
-                { status: 400 }
-            );
+            return NextResponse.json({ error: "School ID required" }, { status: 400 });
         }
-
-        // Build update data based on type
-        let updateData = {};
 
         switch (type) {
-            case 'general':
-                updateData = {
-                    currency: settingsData.currency,
-                    defaultFeeMode: settingsData.defaultMode,
-                    lateFeeEnabled: settingsData.lateFeeEnabled,
-                    lateFeeAmount: settingsData.lateFeeAmount || 0,
-                    gracePeriodDays: settingsData.lateFeeDays || 15,
-                    allowPartialPayment: settingsData.allowPartialPayment ?? true,
-                    allowAdvancePayment: settingsData.allowAdvancePayment ?? true,
-                    installmentFlexible: settingsData.installmentFlexible ?? true,
-                    autoApplyLateFee: settingsData.autoApplyLateFee ?? false,
-                    lateFeeType: settingsData.lateFeeType || 'FIXED',
-                    lateFeePercentage: settingsData.lateFeePercentage || 0,
-                };
+            case "general":
+                await prisma.feeSettings.updateMany({
+                    where: { schoolId },
+                    data: {
+                        currency: settings.currency,
+                        defaultFeeMode: settings.defaultMode,
+                        allowPartialPayment: settings.allowPartialPayment,
+                        allowAdvancePayment: settings.allowAdvancePayment,
+                        lateFeeEnabled: settings.lateFeeEnabled,
+                        lateFeeType: settings.lateFeeType,
+                        lateFeeAmount: settings.lateFeeAmount,
+                        lateFeePercentage: settings.lateFeePercentage,
+                        gracePeriodDays: settings.lateFeeDays,
+                        autoApplyLateFee: settings.autoApplyLateFee,
+                    },
+                });
                 break;
 
-            case 'payment_gateway':
-                updateData = {
-                    onlinePaymentEnabled: settingsData.onlinePaymentEnabled ?? false,
-                    paymentGateway: settingsData.paymentGateway,
-                    sandboxMode: settingsData.sandboxMode ?? true,
-                    razorpayKeyId: settingsData.razorpayKeyId,
-                    razorpayKeySecret: settingsData.razorpayKeySecret,
-                    payuMerchantKey: settingsData.payuMerchantKey,
-                    payuMerchantSalt: settingsData.payuMerchantSalt,
-                };
+            case "payment_gateway":
+                await prisma.schoolPaymentSettings.upsert({
+                    where: { schoolId },
+                    create: {
+                        schoolId,
+                        provider: settings.paymentGateway,
+                        isEnabled: settings.onlinePaymentEnabled,
+                        testMode: settings.testMode ?? true,
+                        merchantId: settings.merchantId,
+                        accessCode: settings.accessCode,
+                        secretKey: settings.secretKey,
+                        workingKey: settings.workingKey,
+                        successUrl: settings.successUrl,
+                        failureUrl: settings.failureUrl,
+                    },
+                    update: {
+                        provider: settings.paymentGateway,
+                        isEnabled: settings.onlinePaymentEnabled,
+                        testMode: settings.testMode ?? true,
+                        merchantId: settings.merchantId,
+                        accessCode: settings.accessCode,
+                        secretKey: settings.secretKey,
+                        workingKey: settings.workingKey,
+                        successUrl: settings.successUrl,
+                        failureUrl: settings.failureUrl,
+                    },
+                });
                 break;
 
-            case 'bank_details':
-                updateData = {
-                    showBankDetails: settingsData.showBankDetails ?? false,
-                    bankName: settingsData.bankName,
-                    accountNumber: settingsData.accountNumber,
-                    ifscCode: settingsData.ifscCode,
-                    accountHolderName: settingsData.accountHolderName,
-                    branchName: settingsData.branchName,
-                    upiId: settingsData.upiId,
-                    bankQrCodeUrl: settingsData.bankQrCodeUrl,
-                };
+            case "bank_details":
+                await prisma.feeSettings.updateMany({
+                    where: { schoolId },
+                    data: {
+                        showBankDetails: settings.showBankDetails,
+                        bankName: settings.bankName,
+                        accountNumber: settings.accountNumber,
+                        ifscCode: settings.ifscCode,
+                        accountHolderName: settings.accountHolderName,
+                        branchName: settings.branchName,
+                        upiId: settings.upiId,
+                    },
+                });
                 break;
 
-            case 'notifications':
-                updateData = {
-                    emailReminders: settingsData.emailReminders ?? true,
-                    smsReminders: settingsData.smsReminders ?? false,
-                    pushReminders: settingsData.pushReminders ?? false,
-                    reminderDaysBefore: settingsData.reminderDays || 7,
-                    overdueReminders: settingsData.overdueReminders ?? true,
-                    overdueReminderInterval: settingsData.overdueReminderInterval || 7,
-                };
+            case "receipts":
+                await prisma.feeSettings.updateMany({
+                    where: { schoolId },
+                    data: {
+                        receiptPrefix: settings.receiptPrefix,
+                        receiptTemplate: settings.receiptTemplate,
+                        autoGenerateReceipt: settings.autoGenerate,
+                        showSchoolLogo: settings.showSchoolLogo,
+                        receiptFooterText: settings.receiptFooterText,
+                    },
+                });
                 break;
 
-            case 'receipts':
-                updateData = {
-                    receiptPrefix: settingsData.receiptPrefix || 'REC',
-                    receiptTemplate: settingsData.receiptTemplate || 'default',
-                    autoGenerateReceipt: settingsData.autoGenerate ?? true,
-                    showSchoolLogo: settingsData.showSchoolLogo ?? true,
-                    receiptFooterText: settingsData.receiptFooterText,
-                };
+            case "notifications":
+                await prisma.feeSettings.updateMany({
+                    where: { schoolId },
+                    data: {
+                        emailReminders: settings.emailReminders,
+                        smsReminders: settings.smsReminders,
+                        pushReminders: settings.pushReminders,
+                        reminderDaysBefore: settings.reminderDays,
+                        overdueReminders: settings.overdueReminders,
+                    },
+                });
                 break;
 
-            case 'discounts':
-                updateData = {
-                    siblingDiscountEnabled: settingsData.siblingDiscountEnabled ?? false,
-                    siblingDiscountPercentage: settingsData.siblingDiscountPercentage || 0,
-                    earlyPaymentDiscountEnabled: settingsData.earlyPaymentDiscountEnabled ?? false,
-                    earlyPaymentDiscountPercentage: settingsData.earlyPaymentDiscountPercentage || 0,
-                    earlyPaymentDays: settingsData.earlyPaymentDays || 10,
-                    staffWardDiscountEnabled: settingsData.staffWardDiscountEnabled ?? false,
-                    staffWardDiscountPercentage: settingsData.staffWardDiscountPercentage || 0,
-                };
+            case "discounts":
+                await prisma.feeSettings.updateMany({
+                    where: { schoolId },
+                    data: {
+                        siblingDiscountEnabled: settings.siblingDiscountEnabled,
+                        siblingDiscountPercentage: settings.siblingDiscountPercentage,
+                        earlyPaymentDiscountEnabled: settings.earlyPaymentDiscountEnabled,
+                        earlyPaymentDiscountPercentage: settings.earlyPaymentDiscountPercentage,
+                        earlyPaymentDays: settings.earlyPaymentDays,
+                        staffWardDiscountEnabled: settings.staffWardDiscountEnabled,
+                        staffWardDiscountPercentage: settings.staffWardDiscountPercentage,
+                    },
+                });
                 break;
-
-            case 'all':
-                // Update all settings at once
-                updateData = { ...settingsData };
-                break;
-
-            default:
-                return NextResponse.json(
-                    { error: 'Invalid settings type' },
-                    { status: 400 }
-                );
         }
 
-        // Upsert fee settings
-        const settings = await prisma.feeSettings.upsert({
-            where: { schoolId },
-            update: updateData,
-            create: {
-                schoolId,
-                ...updateData,
-            },
-        });
-
-        return NextResponse.json({
-            message: 'Settings saved successfully',
-            settings,
-        });
-
+        return NextResponse.json({ success: true });
     } catch (error) {
-        console.error('[FEE SETTINGS POST ERROR]', error);
-        return NextResponse.json(
-            { error: 'Failed to save fee settings' },
-            { status: 500 }
-        );
+        console.error("Update settings error:", error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

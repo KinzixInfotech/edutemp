@@ -21,7 +21,10 @@ import {
     Globe,
     QrCode,
     Eye,
-    EyeOff
+    EyeOff,
+    ShieldCheck,
+    CheckCircle2,
+    XCircle
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -59,10 +62,18 @@ export default function FeeSettings() {
 
     // Online Payment Settings
     const [onlinePaymentEnabled, setOnlinePaymentEnabled] = useState(false);
-    const [paymentGateway, setPaymentGateway] = useState('RAZORPAY');
-    const [sandboxMode, setSandboxMode] = useState(true);
-    const [razorpayKeyId, setRazorpayKeyId] = useState('');
-    const [razorpayKeySecret, setRazorpayKeySecret] = useState('');
+    const [testMode, setTestMode] = useState(true); // Default to test mode
+    const [paymentGateway, setPaymentGateway] = useState('ICICI_EAZYPAY');
+    const [merchantId, setMerchantId] = useState('');
+    const [accessCode, setAccessCode] = useState('');
+    const [secretKey, setSecretKey] = useState('');
+    const [workingKey, setWorkingKey] = useState('');
+    const [successUrl, setSuccessUrl] = useState('');
+    const [failureUrl, setFailureUrl] = useState('');
+
+    // Verification State
+    const [isVerifying, setIsVerifying] = useState(false);
+    const [verificationStatus, setVerificationStatus] = useState(null); // 'success', 'error', null
 
     // Bank Details
     const [showBankDetails, setShowBankDetails] = useState(false);
@@ -99,6 +110,8 @@ export default function FeeSettings() {
     // Onboarding form state (kept at parent level to persist across tabs)
     const [showOnboardingForm, setShowOnboardingForm] = useState(false);
 
+
+
     // ====== FETCH SETTINGS ======
     const { data: settingsData, isLoading } = useQuery({
         queryKey: ['fee-settings', schoolId],
@@ -129,10 +142,14 @@ export default function FeeSettings() {
             setAutoApplyLateFee(s.autoApplyLateFee ?? false);
             // Online Payments
             setOnlinePaymentEnabled(s.onlinePaymentEnabled ?? false);
-            setPaymentGateway(s.paymentGateway || 'RAZORPAY');
-            setSandboxMode(s.sandboxMode ?? true);
-            setRazorpayKeyId(s.razorpayKeyId || '');
-            setRazorpayKeySecret(s.razorpayKeySecret || '');
+            setTestMode(s.testMode ?? true);
+            setPaymentGateway(s.paymentGateway === 'MANUAL' ? 'ICICI_EAZYPAY' : (s.paymentGateway || 'ICICI_EAZYPAY'));
+            setMerchantId(s.merchantId || '');
+            setAccessCode(s.accessCode || '');
+            setSecretKey(s.secretKey || '');
+            setWorkingKey(s.workingKey || '');
+            setSuccessUrl(s.successUrl || '');
+            setFailureUrl(s.failureUrl || '');
             // Bank Details
             setShowBankDetails(s.showBankDetails ?? false);
             setBankName(s.bankName || '');
@@ -181,10 +198,47 @@ export default function FeeSettings() {
         onSuccess: () => {
             toast.success('Settings saved successfully');
             queryClient.invalidateQueries(['fee-settings']);
+            setVerificationStatus(null);
         },
         onError: (error) => {
             toast.error(error.message);
         },
+    });
+
+    // ====== SAVE HANDLERS ======
+    // ====== VERIFY MUTATION ======
+    const verifyGatewayMutation = useMutation({
+        mutationFn: async () => {
+            const res = await fetch(`/api/payment/verify-config`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    provider: paymentGateway,
+                    merchantId,
+                    accessCode,
+                    secretKey,
+                    workingKey
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Verification failed');
+            return data;
+        },
+        onMutate: () => setIsVerifying(true),
+        onSettled: () => setIsVerifying(false),
+        onSuccess: (data) => {
+            if (data.valid) {
+                setVerificationStatus('success');
+                toast.success('Gateway configuration verified successfully!');
+            } else {
+                setVerificationStatus('error');
+                toast.error(`Verification Failed: ${data.message}`);
+            }
+        },
+        onError: (err) => {
+            setVerificationStatus('error');
+            toast.error(err.message);
+        }
     });
 
     // ====== SAVE HANDLERS ======
@@ -212,10 +266,50 @@ export default function FeeSettings() {
             type: 'payment_gateway',
             settings: {
                 onlinePaymentEnabled,
-                paymentGateway: 'RAZORPAY', // Always Razorpay Route
+                testMode,
+                paymentGateway,
+                merchantId,
+                accessCode,
+                secretKey,
+                workingKey,
+                successUrl,
+                failureUrl,
             },
         });
     };
+
+    // Helper: Determine visible fields
+    const getGatewayFields = (provider) => {
+        switch (provider) {
+            case 'ICICI_EAZYPAY':
+                return {
+                    merchantId: true, secretKey: true, accessCode: false, workingKey: false,
+                    labels: { merchantId: 'Merchant ID (Provided by ICICI Bank)', secretKey: 'Encryption Key (Provided by ICICI Bank)' }
+                };
+            case 'SBI_COLLECT':
+                return {
+                    merchantId: true, secretKey: true, accessCode: false, workingKey: false,
+                    labels: { merchantId: 'Merchant Code (Provided by SBI)', secretKey: 'Checksum Key (Provided by SBI)' }
+                };
+            case 'HDFC_SMARTHUB':
+                return {
+                    merchantId: true, secretKey: false, accessCode: false, workingKey: true,
+                    labels: { merchantId: 'Merchant ID (Provided by HDFC)', workingKey: 'Working Key (Provided by HDFC)' }
+                };
+            case 'AXIS_EASYPAY':
+                return {
+                    merchantId: true, secretKey: true, accessCode: false, workingKey: false,
+                    labels: { merchantId: 'Merchant ID (Provided by Axis Bank)', secretKey: 'Secret Key (Provided by Axis Bank)' }
+                };
+            default:
+                return {
+                    merchantId: true, secretKey: true, accessCode: true, workingKey: true,
+                    labels: { merchantId: 'Merchant ID', secretKey: 'Secret Key' }
+                };
+        }
+    };
+
+    const activeFields = getGatewayFields(paymentGateway);
 
     const handleSaveBankDetails = () => {
         saveSettingsMutation.mutate({
@@ -769,82 +863,226 @@ export default function FeeSettings() {
                 <TabsContent value="payments">
                     <Card>
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Globe className="w-5 h-5" />
-                                Online Payment Settings
-                            </CardTitle>
-                            <CardDescription>
-                                Enable online payments via Razorpay. Payments go directly to your school's bank account.
-                            </CardDescription>
+                            <CardTitle className="flex items-center gap-2"><Globe className="w-5 h-5" /> Online Payment Gateway</CardTitle>
+                            <CardDescription>Configure the bank gateway for direct school settlements.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                            {/* Enable Online Payments Toggle */}
-                            <div className="flex items-center justify-between p-4 border rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-                                        <CreditCard className="w-6 h-6 text-blue-600" />
-                                    </div>
-                                    <div>
-                                        <Label className="text-base font-medium">Enable Online Payments</Label>
-                                        <p className="text-xs text-muted-foreground">
-                                            Allow students/parents to pay fees online
-                                        </p>
-                                    </div>
+                            <div className="flex justify-between items-center p-4 bg-muted/30 rounded-lg">
+                                <div>
+                                    <Label className="font-medium">Enable Online Payments</Label>
+                                    <p className="text-xs text-muted-foreground">Allows parents to pay via the configured bank gateway</p>
                                 </div>
                                 <Switch checked={onlinePaymentEnabled} onCheckedChange={setOnlinePaymentEnabled} />
                             </div>
 
+                            <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200">
+                                <AlertCircle className="w-4 h-4 text-blue-600" />
+                                <AlertDescription className="text-blue-700 dark:text-blue-300">
+                                    <strong>Important:</strong>
+                                    <p className="text-sm mt-1">
+                                        Online payments are processed directly by the school’s bank through the selected payment gateway.
+                                        EduBreezy does not collect, hold, or process funds. All payments are settled directly into the school’s bank account.
+                                    </p>
+                                </AlertDescription>
+                            </Alert>
+
                             {onlinePaymentEnabled && (
-                                <>
-                                    {/* Platform Info */}
-                                    <Alert className="bg-green-50 dark:bg-green-950 border-green-200">
-                                        <Check className="w-4 h-4 text-green-600" />
-                                        <AlertDescription className="text-green-700 dark:text-green-300">
-                                            <strong>Powered by Razorpay Route</strong>
-                                            <p className="text-sm mt-1">
-                                                Payments are processed securely through EduBreezy's platform. Funds are settled directly to your registered bank account.
+                                <div className="space-y-6 animate-in fade-in slide-in-from-top-2">
+                                    {/* Test Mode Toggle */}
+                                    <div className={`flex justify-between items-center p-4 rounded-lg border-2 ${testMode
+                                            ? 'bg-yellow-50 dark:bg-yellow-950/30 border-yellow-300 dark:border-yellow-700'
+                                            : 'bg-green-50 dark:bg-green-950/30 border-green-300 dark:border-green-700'
+                                        }`}>
+                                        <div>
+                                            <Label className="font-medium flex items-center gap-2">
+                                                {testMode ? (
+                                                    <>
+                                                        <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
+                                                        Test Mode (Simulation)
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                                                        Live Mode (Real Bank)
+                                                    </>
+                                                )}
+                                            </Label>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                {testMode
+                                                    ? 'Payments are simulated using the mock bank page. No real money is transferred.'
+                                                    : 'Payments are processed through the real bank gateway. Ensure credentials are correct.'}
                                             </p>
-                                        </AlertDescription>
-                                    </Alert>
-
-                                    {/* Onboarding Status - Would be fetched from API */}
-                                    <OnboardingStatusCard schoolId={schoolId} showForm={showOnboardingForm} setShowForm={setShowOnboardingForm} />
-
-                                    {/* How it works */}
-                                    <div className="p-4 border rounded-lg bg-gray-50 dark:bg-gray-900">
-                                        <h4 className="font-medium mb-3">How it works:</h4>
-                                        <ol className="text-sm text-muted-foreground space-y-2">
-                                            <li className="flex items-start gap-2">
-                                                <span className="w-5 h-5 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-xs font-medium text-blue-600">1</span>
-                                                Parent initiates payment from the payment portal
-                                            </li>
-                                            <li className="flex items-start gap-2">
-                                                <span className="w-5 h-5 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-xs font-medium text-blue-600">2</span>
-                                                Payment is processed securely via Razorpay
-                                            </li>
-                                            <li className="flex items-start gap-2">
-                                                <span className="w-5 h-5 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-xs font-medium text-blue-600">3</span>
-                                                Funds are settled to your bank account (T+2 days)
-                                            </li>
-                                            <li className="flex items-start gap-2">
-                                                <span className="w-5 h-5 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center text-xs font-medium text-orange-600">4</span>
-                                                <div>
-                                                    <span className="font-medium text-foreground">3% fee deducted</span>
-                                                    <span className="text-xs ml-1">(2% Razorpay + 1% Platform)</span>
-                                                </div>
-                                            </li>
-                                        </ol>
+                                        </div>
+                                        <Switch checked={!testMode} onCheckedChange={(checked) => setTestMode(!checked)} />
                                     </div>
-                                </>
-                            )}
 
-                            <Button onClick={handleSavePaymentGateway} disabled={saveSettingsMutation.isPending}>
-                                {saveSettingsMutation.isPending ? (
-                                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</>
-                                ) : (
-                                    <><Save className="w-4 h-4 mr-2" />Save Changes</>
-                                )}
-                            </Button>
+                                    {!testMode && (
+                                        <Alert variant="destructive" className="bg-red-50 dark:bg-red-950/30 border-red-300">
+                                            <AlertCircle className="w-4 h-4" />
+                                            <AlertDescription>
+                                                <strong>Warning:</strong> Live mode is enabled. Real payments will be processed through the bank.
+                                            </AlertDescription>
+                                        </Alert>
+                                    )}
+
+                                    <div className="space-y-2">
+                                        <Label className="text-base">School&apos;s Payment Gateway</Label>
+                                        <Select value={paymentGateway} onValueChange={(v) => {
+                                            setPaymentGateway(v);
+                                            setVerificationStatus(null);
+
+                                            // Check if we are switching back to the saved provider to restore values
+                                            // Otherwise clear fields to avoid confusion (as keys are unique per bank)
+                                            const savedSettings = settingsData?.settings;
+                                            if (savedSettings && savedSettings.provider === v) {
+                                                setMerchantId(savedSettings.merchantId || '');
+                                                setSecretKey(savedSettings.secretKey || '');
+                                                setAccessCode(savedSettings.accessCode || '');
+                                                setWorkingKey(savedSettings.workingKey || '');
+                                            } else {
+                                                // New provider selected -> Clear fields
+                                                setMerchantId('');
+                                                setSecretKey('');
+                                                setAccessCode('');
+                                                setWorkingKey('');
+                                            }
+                                        }}>
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="ICICI_EAZYPAY">ICICI Eazypay</SelectItem>
+                                                <SelectItem value="SBI_COLLECT">SBI Collect</SelectItem>
+                                                <SelectItem value="HDFC_SMARTHUB">HDFC SmartHub</SelectItem>
+                                                <SelectItem value="AXIS_EASYPAY">Axis EasyPay</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <p className="text-xs text-muted-foreground mt-1 text-blue-600 flex items-center gap-1">
+                                            <ShieldCheck className="w-3 h-3" />
+                                            This gateway is provided by your bank and settles payments directly into the school’s account.
+                                        </p>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 border rounded-xl bg-slate-50 dark:bg-slate-900/50">
+                                        {activeFields.merchantId && (
+                                            <div className="space-y-2">
+                                                <Label>{activeFields.labels.merchantId || 'Merchant ID'}</Label>
+                                                <Input
+                                                    value={merchantId}
+                                                    onChange={e => { setMerchantId(e.target.value); setVerificationStatus(null); }}
+                                                    placeholder="Enter ID provided by bank"
+                                                />
+                                            </div>
+                                        )}
+
+                                        {activeFields.secretKey && (
+                                            <div className="space-y-2">
+                                                <Label>{activeFields.labels.secretKey || 'Secret Key'}</Label>
+                                                <div className="relative">
+                                                    <Input
+                                                        value={secretKey}
+                                                        onChange={e => { setSecretKey(e.target.value); setVerificationStatus(null); }}
+                                                        type={showSecrets ? "text" : "password"}
+                                                        placeholder="••••••••••••••••"
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 text-gray-400"
+                                                        onClick={() => setShowSecrets(!showSecrets)}
+                                                    >
+                                                        {showSecrets ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {activeFields.workingKey && (
+                                            <div className="space-y-2">
+                                                <Label>{activeFields.labels.workingKey || 'Working Key'}</Label>
+                                                <div className="relative">
+                                                    <Input
+                                                        value={workingKey}
+                                                        onChange={e => { setWorkingKey(e.target.value); setVerificationStatus(null); }}
+                                                        type={showSecrets ? "text" : "password"}
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 text-gray-400"
+                                                        onClick={() => setShowSecrets(!showSecrets)}
+                                                    >
+                                                        {showSecrets ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {activeFields.accessCode && (
+                                            <div className="space-y-2">
+                                                <Label>Access Code</Label>
+                                                <Input value={accessCode} onChange={e => setAccessCode(e.target.value)} />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="flex items-center gap-3">
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => verifyGatewayMutation.mutate()}
+                                            disabled={isVerifying}
+                                            className={`${verificationStatus === 'success' ? 'border-green-500 text-green-600 bg-green-50' : ''}`}
+                                        >
+                                            {isVerifying ? (
+                                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                            ) : verificationStatus === 'success' ? (
+                                                <CheckCircle2 className="w-4 h-4 mr-2" />
+                                            ) : verificationStatus === 'error' ? (
+                                                <XCircle className="w-4 h-4 mr-2" />
+                                            ) : (
+                                                <ShieldCheck className="w-4 h-4 mr-2" />
+                                            )}
+                                            {isVerifying ? 'Verifying...' : verificationStatus === 'success' ? 'Verified' : 'Verify Configuration'}
+                                        </Button>
+
+                                        <Button onClick={handleSavePaymentGateway} disabled={saveSettingsMutation.isPending}>
+                                            {saveSettingsMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                                            Save Gateway Settings
+                                        </Button>
+                                    </div>
+
+                                    {/* Developer Tool Link (Only in Development) */}
+                                    {process.env.NODE_ENV === 'development' && (
+                                        <div className="mt-6 p-4 border border-dashed border-yellow-300 bg-yellow-50 dark:bg-yellow-950/30 rounded-lg flex items-start gap-3">
+                                            <div className="p-2 bg-yellow-100 dark:bg-yellow-900 rounded-md text-yellow-600">
+                                                {/* Requires importing Zap if not already available, checking imports separately or assuming it's okay since used in other components */}
+                                                <AlertCircle className="w-5 h-5" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-medium text-yellow-800 dark:text-yellow-200">Developer Testing Mode</h4>
+                                                <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1 mb-2">
+                                                    Since you are running in functionality development mode, you can verify the entire payment flow (callback handling) using the simulator.
+                                                </p>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="border-yellow-200 hover:bg-yellow-100 text-yellow-700"
+                                                    onClick={() => window.open('/dashboard/fees/dev-tools', '_blank')}
+                                                >
+                                                    Open Callback Simulator
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {verificationStatus === 'success' && (
+                                        <div className="text-sm text-green-600 flex items-center gap-2 bg-green-50 p-3 rounded-lg border border-green-100">
+                                            <CheckCircle2 className="w-4 h-4" />
+                                            Configuration looks good! Checksum generation validated.
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>

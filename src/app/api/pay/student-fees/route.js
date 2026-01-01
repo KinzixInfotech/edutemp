@@ -36,7 +36,7 @@ export async function GET(req) {
             const student = await prisma.student.findUnique({
                 where: { userId: studentId },
                 select: {
-                    userId: true,
+                    userId: true, // Primary Key
                     name: true,
                     admissionNo: true,
                     rollNumber: true,
@@ -48,6 +48,7 @@ export async function GET(req) {
                     section: { select: { name: true } },
                     school: {
                         select: {
+                            id: true, // Required for payment
                             name: true,
                             profilePicture: true,
                             schoolCode: true,
@@ -162,6 +163,7 @@ export async function GET(req) {
 
             return {
                 student: {
+                    id: student.userId, // Map userId to id for frontend compatibility
                     userId: student.userId,
                     name: student.name,
                     admissionNo: student.admissionNo,

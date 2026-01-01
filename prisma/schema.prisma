@@ -105,18 +105,8 @@ model School {
   smsWallet        SmsWallet?
   feeSettings      FeeSettings?
 
-  // Razorpay Route - Linked Account
-  razorpayAccountId       String? // Linked account ID (acc_xxxxx)
-  razorpayAccountStatus   String?   @default("not_created") // not_created, created, activated, suspended
-  razorpayKycStatus       String?   @default("not_started") // not_started, pending, verified, rejected
-  razorpaySettlementReady Boolean   @default(false)
-  razorpayOnboardedAt     DateTime?
-
-  // Platform commission settings
-  platformCommissionType  String @default("PERCENTAGE") // PERCENTAGE or FLAT
-  platformCommissionValue Float  @default(5) // 5% or flat amount in rupees
-
-  razorpayOnboarding RazorpayOnboarding?
+  // Payment Gateway Settings (Generic)
+  paymentSettings SchoolPaymentSettings?
 
   @@index([name])
 }
@@ -2018,19 +2008,21 @@ model Section {
   teachingStaffUserId String? @db.Uuid
 
   // Relations
-  class                 Class                   @relation(fields: [classId], references: [id])
-  teachingStaff         TeachingStaff?          @relation("Section_Teacher", fields: [teachingStaffUserId], references: [userId])
-  NoticeTarget          NoticeTarget[]
-  subjectTeachers       SectionSubjectTeacher[]
-  students              Student[]
-  timetables            Timetable[]
-  calendarEventTargets  CalendarEventTarget[]
-  bulkAttendance        BulkAttendance[]
-  attendanceDelegations AttendanceDelegation[]
-  homework              Homework[]
-  timetableEntries      TimetableEntry[]
-  teacherShifts         TeacherShift[]
-  alumni                Alumni[]
+  class                  Class                   @relation(fields: [classId], references: [id])
+  teachingStaff          TeachingStaff?          @relation("Section_Teacher", fields: [teachingStaffUserId], references: [userId])
+  NoticeTarget           NoticeTarget[]
+  subjectTeachers        SectionSubjectTeacher[]
+  students               Student[]
+  timetables             Timetable[]
+  calendarEventTargets   CalendarEventTarget[]
+  bulkAttendance         BulkAttendance[]
+  attendanceDelegations  AttendanceDelegation[]
+  homework               Homework[]
+  timetableEntries       TimetableEntry[]
+  teacherShifts          TeacherShift[]
+  alumni                 Alumni[]
+  promotionHistoriesFrom PromotionHistory[]      @relation("PromotionFromSection")
+  promotionHistoriesTo   PromotionHistory[]      @relation("PromotionToSection")
 
   @@unique([classId, name])
   @@index([classId])
@@ -3823,12 +3815,9 @@ model FeePayment {
   gatewayPaymentId String?
   gatewayResponse  Json? // Store full gateway response
 
-  // Razorpay Route - Split Settlement
-  razorpayTransferId String? // Transfer ID to linked account
-  settlementId       String? // Razorpay settlement ID
-  settlementStatus   String? // pending, processed, failed
-  schoolAmount       Float? // Amount transferred to school
-  platformAmount     Float? // Commission kept by platform
+  // Gateway Settlement Details
+  settlementStatus String? // pending, processed, failed
+  bankReference    String? // RRN sent by bank
 
   // Webhook reconciliation
   webhookVerified Boolean   @default(false)
@@ -4223,8 +4212,10 @@ model PromotionHistory {
   id        String @id @default(uuid()) @db.Uuid
   studentId String @db.Uuid
 
-  fromClassId Int
-  toClassId   Int
+  fromClassId   Int
+  toClassId     Int
+  fromSectionId Int?
+  toSectionId   Int?
 
   fromYearId String @db.Uuid
   toYearId   String @db.Uuid
@@ -4234,18 +4225,28 @@ model PromotionHistory {
 
   promotedAt DateTime @default(now())
   promotedBy String   @db.Uuid // User ID of Admin
+  batchId    String?  @db.Uuid // Group promotions done together
 
-  student   Student      @relation(fields: [studentId], references: [userId])
-  fromClass Class        @relation("PromotionFromClass", fields: [fromClassId], references: [id])
-  toClass   Class        @relation("PromotionToClass", fields: [toClassId], references: [id])
-  fromYear  AcademicYear @relation("PromotionFromYear", fields: [fromYearId], references: [id])
-  toYear    AcademicYear @relation("PromotionToYear", fields: [toYearId], references: [id])
-  promoter  User         @relation(fields: [promotedBy], references: [id])
+  // Rollback tracking
+  isRolledBack   Boolean   @default(false)
+  rolledBackAt   DateTime?
+  rolledBackBy   String?   @db.Uuid
+  rollbackReason String?
+
+  student     Student      @relation(fields: [studentId], references: [userId])
+  fromClass   Class        @relation("PromotionFromClass", fields: [fromClassId], references: [id])
+  toClass     Class        @relation("PromotionToClass", fields: [toClassId], references: [id])
+  fromSection Section?     @relation("PromotionFromSection", fields: [fromSectionId], references: [id])
+  toSection   Section?     @relation("PromotionToSection", fields: [toSectionId], references: [id])
+  fromYear    AcademicYear @relation("PromotionFromYear", fields: [fromYearId], references: [id])
+  toYear      AcademicYear @relation("PromotionToYear", fields: [toYearId], references: [id])
+  promoter    User         @relation(fields: [promotedBy], references: [id])
 
   @@index([studentId])
   @@index([fromClassId])
   @@index([toClassId])
   @@index([fromYearId])
+  @@index([batchId])
 }
 
 // ============================================
@@ -4961,12 +4962,8 @@ model FeeSettings {
 
   // Online Payment Settings
   onlinePaymentEnabled Boolean @default(false)
-  paymentGateway       String? // RAZORPAY, PAYU, CASHFREE
+  paymentGateway       String? // Deprecated in favor of SchoolPaymentSettings provider
   sandboxMode          Boolean @default(true)
-  razorpayKeyId        String?
-  razorpayKeySecret    String? // Should be encrypted
-  payuMerchantKey      String?
-  payuMerchantSalt     String?
 
   // Bank Account Details (for offline payments reference)
   showBankDetails   Boolean @default(false)
@@ -5010,63 +5007,46 @@ model FeeSettings {
   @@index([schoolId])
 }
 
-// ==================== RAZORPAY ROUTE ONBOARDING ====================
+// ==================== PAYMENT GATEWAY SETTINGS ====================
 
-model RazorpayOnboarding {
+model SchoolPaymentSettings {
   id       String @id @default(uuid()) @db.Uuid
   schoolId String @unique @db.Uuid
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
-  // State Machine: CREATED → KYC_SUBMITTED → KYC_VERIFIED → PAYMENTS_ENABLED
-  status String @default("CREATED")
+  // Gateway Provider
+  provider PaymentGatewayProvider @default(MANUAL)
 
-  // Razorpay Linked Account Details
-  linkedAccountId String? // acc_xxxxx
-  productId       String? // Razorpay product config ID
+  // Credentials (Encrypted/Stored safely)
+  merchantId String? // e.g., MID for PayU/ICICI
+  accessCode String? // e.g., Access Code for CCAvenue
+  secretKey  String? // e.g., Hashing key/Salt
+  workingKey String?
 
-  // Business Information
-  businessName  String?
-  businessType  String? // partnership, proprietorship, private_limited, etc.
-  businessEmail String?
-  businessPhone String?
+  // Configuration
+  isEnabled Boolean @default(false)
+  testMode  Boolean @default(false)
 
-  // Legal Information (PAN, GST, etc.)
-  legalInfo Json?
-
-  // Bank Details (encrypted in production)
-  bankAccountName   String?
-  bankAccountNumber String?
-  bankIfscCode      String?
-  bankName          String?
-
-  // Contact Person
-  contactName  String?
-  contactEmail String?
-  contactPhone String?
-
-  // Stakeholder (for Route)
-  stakeholderName  String?
-  stakeholderEmail String?
-
-  // Status tracking
-  kycSubmittedAt DateTime?
-  kycVerifiedAt  DateTime?
-  activatedAt    DateTime?
-
-  // Error tracking
-  lastError    String?
-  errorDetails Json?
-  retryCount   Int     @default(0)
-
-  // Razorpay webhook data
-  webhookData Json?
+  // URLs (if custom, otherwise auto-generated)
+  successUrl String?
+  failureUrl String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  @@index([schoolId])
+}
 
-  @@index([status])
-  @@index([linkedAccountId])
+enum PaymentGatewayProvider {
+  MANUAL // Cash/Cheque/DD logged manually
+  ICICI_EAZYPAY
+  SBI_COLLECT
+  HDFC_SMARTHUB
+  AXIS_EASYPAY
+  BILLDESK
+  PAYU
+  RAZORPAY // Optional future re-addition
+  CASHFREE // Optional future re-addition
 }
 
 // ==================== FEE AUDIT LOG ====================

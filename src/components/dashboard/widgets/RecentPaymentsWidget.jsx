@@ -23,13 +23,28 @@ const fetchRecentPayments = async ({ schoolId, academicYearId }) => {
 };
 
 export default function RecentPaymentsWidget({ fullUser, onRemove }) {
-    const { data: payments, isLoading } = useQuery({
-        queryKey: ['recentPayments', fullUser?.schoolId, fullUser?.academicYearId],
+    // 1. Fetch active academic year first (like FeeStatsWidget does)
+    const { data: academicYears } = useQuery({
+        queryKey: ['academic-years', fullUser?.schoolId],
+        queryFn: async () => {
+            if (!fullUser?.schoolId) return [];
+            const res = await fetch(`/api/schools/academic-years?schoolId=${fullUser.schoolId}`);
+            if (!res.ok) throw new Error('Failed to fetch academic years');
+            return res.json();
+        },
+        enabled: !!fullUser?.schoolId,
+    });
+
+    const activeAcademicYearId = academicYears?.find(y => y.isActive)?.id;
+
+    // 2. Fetch payments using the active academic year
+    const { data: payments, isLoading, error } = useQuery({
+        queryKey: ['recentPayments', fullUser?.schoolId, activeAcademicYearId],
         queryFn: () => fetchRecentPayments({
             schoolId: fullUser?.schoolId,
-            academicYearId: fullUser?.academicYear?.id
+            academicYearId: activeAcademicYearId
         }),
-        enabled: !!fullUser?.schoolId && !!fullUser?.academicYear?.id,
+        enabled: !!fullUser?.schoolId && !!activeAcademicYearId,
     });
 
     if (isLoading) {
@@ -59,22 +74,37 @@ export default function RecentPaymentsWidget({ fullUser, onRemove }) {
                     </TableHeader>
                     <TableBody>
                         {payments && payments.length > 0 ? (
-                            payments.map((payment) => (
-                                <TableRow key={payment.id}>
-                                    <TableCell className="font-medium">
-                                        {payment.student?.name}
-                                        <div className="text-xs text-muted-foreground">{payment.student?.admissionNo}</div>
-                                    </TableCell>
-                                    <TableCell>{payment.student?.class?.className}</TableCell>
-                                    <TableCell>₹{payment.amount.toLocaleString('en-IN')}</TableCell>
-                                    <TableCell>{format(new Date(payment.paymentDate), 'MMM dd, yyyy')}</TableCell>
-                                    <TableCell>
-                                        <Badge variant={payment.status === 'SUCCESS' ? 'default' : 'destructive'} className="text-[10px]">
-                                            {payment.status}
-                                        </Badge>
-                                    </TableCell>
-                                </TableRow>
-                            ))
+                            payments.map((payment) => {
+                                const studentName = payment.student?.name || payment.student?.admissionNo || 'Unknown';
+                                const isSuccess = payment.status === 'SUCCESS';
+                                const isFailed = payment.status === 'FAILED';
+
+                                return (
+                                    <TableRow key={payment.id}>
+                                        <TableCell className="font-medium">
+                                            {studentName}
+                                            {payment.student?.name && (
+                                                <div className="text-xs text-muted-foreground">{payment.student?.admissionNo}</div>
+                                            )}
+                                        </TableCell>
+                                        <TableCell>{payment.student?.class?.className}</TableCell>
+                                        <TableCell className="font-semibold">₹{payment.amount?.toLocaleString('en-IN')}</TableCell>
+                                        <TableCell className="text-muted-foreground">{format(new Date(payment.paymentDate), 'MMM dd, yyyy')}</TableCell>
+                                        <TableCell>
+                                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold ${isSuccess
+                                                ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400'
+                                                : isFailed
+                                                    ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'
+                                                    : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400'
+                                                }`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full ${isSuccess ? 'bg-green-500' : isFailed ? 'bg-red-500' : 'bg-yellow-500'
+                                                    }`}></span>
+                                                {payment.status}
+                                            </span>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })
                         ) : (
                             <TableRow>
                                 <TableCell colSpan={5} className="text-center text-muted-foreground h-24">
