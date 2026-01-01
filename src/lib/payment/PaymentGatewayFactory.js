@@ -1,8 +1,9 @@
 import { MockAdapter } from './adapters/MockAdapter';
 import { ICICIAdapter } from './adapters/ICICIAdapter';
-import { SBIAdapter } from './adapters/SBIAdapter';
+
 import { HDFCAdapter } from './adapters/HDFCAdapter';
 import { AxisAdapter } from './adapters/AxisAdapter';
+import { SBIAdapter } from './adapters/SBIAdapter';
 
 export class PaymentGatewayFactory {
     static getAdapter(provider, config) {
