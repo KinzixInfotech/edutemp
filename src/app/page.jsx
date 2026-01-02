@@ -9,7 +9,8 @@ import {
     TrendingUp, PieChart, Calendar, FileText, Play, XIcon, Check,
     Pencil, BookMarked, Ruler, Calculator, Highlighter as HighlighterIcon, School,
     Home, Bus, Smartphone, MapPin, Plane, Globe, MessageCircle, Laptop, Wifi,
-    UserPlus, Building2, MessageSquare, Sparkles
+    UserPlus, Building2, MessageSquare, Sparkles, Library, Award, Trophy,
+    Microscope, Clipboard, Bell, Zap
 } from 'lucide-react';
 import Header from './components/Header';
 import { DotPattern } from '@/components/ui/dot-pattern';
@@ -19,10 +20,12 @@ import { Highlighter } from '@/components/ui/highlighter';
 import Link from 'next/link';
 import DownloadAppCTA from '@/components/DownloadAppCTA';
 import WebDashboardCTA from '@/components/WebDashboardCTA';
+import FinalCTA from '@/components/FinalCTA';
 import { OrbitingCircles } from '@/components/ui/orbiting-circles';
 import { NumberTicker } from '@/components/ui/number-ticker';
 import ScrollMouse from '@/components/ScrollMouse';
 import dynamic from 'next/dynamic';
+import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
 
 
 // Organization Schema for SEO
@@ -77,9 +80,10 @@ export default function HomePage() {
             {/* <BentoSection /> */}
             {/* <PricingSection /> */}
             <TestimonialsSection />
-            <div className='p-2'>
-                <DownloadAppCTA />
-            </div>
+            {/* <div className='p-2'> */}
+            <DownloadAppCTA />
+            {/* </div> */}
+            <FinalCTA />
             {/* <Footer /> */}
         </div>
     );
@@ -93,18 +97,55 @@ function HeroSection() {
 
     return (
         <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-white">
-            {/* Three.js 3D Background */}
+            {/* Interactive Grid Pattern Background */}
+            <InteractiveGridPattern
+                className="absolute opacity-80 inset-0 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,white_40%,transparent_70%)]"
+                squares={[60, 60]}
+            />
 
-            {/* Background Grid Pattern */}
-            {/* <div className="absolute inset-0 bg-[linear-gradient(to_right,#e5e7eb_1px,transparent_1px),linear-gradient(to_bottom,#e5e7eb_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)]" /> */}
+            {/* Large Background Text "ERP" */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
+                <span className="text-[clamp(12rem,35vw,28rem)] font-black text-gray-100/30 leading-none tracking-tighter">
+                    ERP
+                </span>
+            </div>
 
-            {/* Gradient Orb - Top Left */}
-            {/* <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-[#0469ff]/10 rounded-full blur-3xl" /> */}
+            {/* Floating School Icons - Left Side (Reduced Quantity) */}
+            <div className="absolute top-[12%] left-[5%] md:left-[8%] opacity-[0.05] pointer-events-none animate-float-slow">
+                <GraduationCap className="w-10 h-10 md:w-16 md:h-16 text-black rotate-[-15deg]" strokeWidth={1} />
+            </div>
+            <div className="absolute top-[68%] left-[6%] md:left-[10%] opacity-[0.06] pointer-events-none animate-float-slow" style={{ animationDelay: '2s' }}>
+                <Calculator className="w-9 h-9 md:w-14 md:h-14 text-black rotate-[-8deg]" strokeWidth={1} />
+            </div>
+            <div className="absolute top-[85%] left-[5%] md:left-[7%] opacity-[0.04] pointer-events-none animate-float-slower" style={{ animationDelay: '0.5s' }}>
+                <Pencil className="w-7 h-7 md:w-11 md:h-11 text-black rotate-[20deg]" strokeWidth={1} />
+            </div>
+            <div className="absolute top-[45%] left-[4%] md:left-[6%] opacity-[0.05] pointer-events-none animate-float-slower" style={{ animationDelay: '2.5s' }}>
+                <Library className="w-8 h-8 md:w-13 md:h-13 text-black rotate-[15deg]" strokeWidth={1} />
+            </div>
+            <div className="absolute top-[28%] left-[5%] md:left-[7%] opacity-[0.06] pointer-events-none animate-float-slower" style={{ animationDelay: '1s' }}>
+                <BookOpen className="w-8 h-8 md:w-12 md:h-12 text-black rotate-[12deg]" strokeWidth={1} />
+            </div>
+
+            {/* Floating School Icons - Right Side (Reduced Quantity) */}
+            <div className="absolute top-[10%] right-[5%] md:right-[8%] opacity-[0.05] pointer-events-none animate-float-slower" style={{ animationDelay: '0.8s' }}>
+                <BookMarked className="w-9 h-9 md:w-14 md:h-14 text-black rotate-[18deg]" strokeWidth={1} />
+            </div>
+            <div className="absolute top-[70%] right-[6%] md:right-[10%] opacity-[0.06] pointer-events-none animate-float-slower" style={{ animationDelay: '2.2s' }}>
+                <Trophy className="w-10 h-10 md:w-15 md:h-15 text-black rotate-[10deg]" strokeWidth={1} />
+            </div>
+            <div className="absolute top-[88%] right-[5%] md:right-[7%] opacity-[0.05] pointer-events-none animate-float-slow" style={{ animationDelay: '0.3s' }}>
+                <Microscope className="w-9 h-9 md:w-14 md:h-14 text-black rotate-[-15deg]" strokeWidth={1} />
+            </div>
+            <div className="absolute top-[50%] right-[4%] md:right-[6%] opacity-[0.04] pointer-events-none animate-float-slow" style={{ animationDelay: '2.8s' }}>
+                <Bell className="w-7 h-7 md:w-11 md:h-11 text-black rotate-[-8deg]" strokeWidth={1} />
+            </div>
+            <div className="absolute top-[25%] right-[5%] md:right-[7%] opacity-[0.06] pointer-events-none animate-float-slow" style={{ animationDelay: '1.8s' }}>
+                <Ruler className="w-8 h-8 md:w-12 md:h-12 text-black rotate-[-12deg]" strokeWidth={1} />
+            </div>
 
             {/* Gradient Orb - Top Right */}
             <div className="absolute top-20 right-0 w-[400px] h-[400px] bg-[#0469ff]/5 rounded-full blur-3xl" />
-
-            {/* Floating 3D Grid Cards */}
 
             <div className="relative max-w-[1400px] mx-auto px-6 py-20 z-10 w-full">
                 {/* Hero Content */}
@@ -329,7 +370,7 @@ function WhyEduBreezySection() {
                     <div>
                         <span className="text-sm text-[#0569ff] font-medium mb-4 block">_Why us</span>
                         <h2 className="text-3xl md:text-4xl lg:text-[3.2rem] font-bold text-[#1a1a2e] leading-[1.1] mb-3">
-                            Schools need smart systems
+                            Schools need <span className='text-[#0569ff] font-bold'>smart systems</span>
                         </h2>
                         <h3 className="text-2xl md:text-3xl lg:text-[2.5rem] font-light text-[#999] leading-tight mb-10">
                             not  <Highlighter action="underline" color="red"> complex </Highlighter> software.
@@ -453,8 +494,8 @@ function CommunicatingSeamlesslySection() {
                         Our Mobile App
                     </span>
                     <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a1a2e] leading-tight mb-4">
-                        <Highlighter action="underline" color="#FF9800">Modern App</Highlighter> for
-                        <span className="text-[#0569ff]">                 <Highlighter isView={true} action="underline" color="#FF9800"> Modern Schools</Highlighter></span>
+                        <Highlighter action="underline" color="black">Modern App</Highlighter> for
+                        <span className="text-[#0569ff]">                 <Highlighter isView={true} action="underline" color="black"> Modern Schools</Highlighter></span>
                     </h2>
                     <p className="text-base sm:text-lg md:text-xl text-[#666] max-w-2xl mx-auto leading-relaxed">
                         Beautifully designed, intuitive mobile app that bring schools, parents, director, principal, teachers, and students together on one powerful platform.
@@ -706,22 +747,14 @@ function FeaturesSection() {
 
             <div className="max-w-[1240px] mx-auto">
                 {/* Section Header */}
-                <div className="text-center mb-20 md:mb-28">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 border border-blue-100 mb-6">
-                        <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600"></span>
-                        </span>
-                        <span className="text-blue-700 text-xs font-black uppercase tracking-widest">Platform Modules</span>
-                    </div>
-
-                    <h2 className="text-4xl md:text-6xl font-black text-slate-900 leading-[1em] mb-8 tracking-tight">
+                <div className="text-left md:text-center mb-16 md:mb-20">
+                    <span className="inline-flex items-center gap-2 bg-[#0569ff]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-5">
+                        <span className="w-2 h-2 bg-[#0569ff] rounded-full"></span>
+                        PLATFORM MODULES
+                    </span>
+                    <h2 className="text-3xl md:text-4xl lg:text-[3.2rem] font-bold text-[#1a1a2e] leading-[1.1] mb-3">
                         Powerful Features For{' '}
-                        <br className="hidden md:block" />
-                        <span className="relative inline-block mt-2">
-                            <span className="relative z-10 text-blue-600">Modern Schools</span>
-                            <span className="absolute bottom-2 left-0 w-full h-3 md:h-5 bg-orange-200/60 -rotate-1 -z-10 rounded-lg"></span>
-                        </span>
+                        <span className="text-[#0569ff] font-bold">Modern Schools</span>
                     </h2>
 
                     <p className="text-slate-500 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed font-medium">
@@ -841,20 +874,24 @@ function HowWeWorkSection() {
     ];
 
     return (
-        <section className="py-20 md:py-28 px-5 bg-white">
+        <section className="py-20 md:py-28 px-5 bg-[#f6f7fa]">
             <div className="max-w-[1200px] mx-auto">
                 {/* Section Header */}
-                <div className="text-center mb-16">
+                <div className="text-left md:text-center mb-16">
                     <span className="inline-flex items-center gap-2 bg-[#0569ff]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-4">
                         <Sparkles size={16} />
                         Our Process
                     </span>
-                    <h2 className="text-3xl md:text-4xl leading-[1.2] lg:text-5xl font-bold text-[#1a1a2e] mb-4">
-                        Here's How We Make Your <br className="hidden md:block" />
-                        <Highlighter action="underline" color="#FF9800"><span className="text-[#0569ff]">School Smarter</span></Highlighter>
-
+                    <h2 className="text-3xl md:text-4xl lg:text-[3.2rem] font-bold text-[#1a1a2e] leading-[1.1] mb-3">
+                        Here's How We Make Your{' '}
+                        <br className="hidden md:block" />
+                        <span className="relative inline-block mt-2">
+                            <span className="relative z-10 text-blue-600 font-bold">
+                                School{" "}
+                                <Highlighter action="underline" color="black"><span className="text-[#0569ff]"> Smarter</span></Highlighter></span>
+                        </span>
                     </h2>
-                    <p className="text-[#666] text-lg max-w-2xl mx-auto">
+                    <p className="text-slate-500 text-lg mt-4 max-w-2xl mx-auto leading-relaxed font-medium">
                         A simple, step-by-step approach to transform your school management from chaos to clarity.
                     </p>
                 </div>
@@ -924,19 +961,23 @@ function HowWeWorkSection() {
                 {/* Bottom CTA */}
                 <div className="text-center mt-14">
                     <p className="text-[#666] mb-6">Ready to transform your school?</p>
-                    <div className="flex flex-wrap justify-center gap-4">
-                        <Link
-                            href="/contact"
-                            className="inline-flex items-center gap-2 bg-[#0569ff] text-white px-8 py-4 rounded-full font-bold text-sm hover:bg-[#0569ff]/90 transition-all duration-300 shadow-lg hover:shadow-xl"
-                        >
-                            Get Started Today
-                            <ArrowRight size={18} />
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                        <Link href="/schoollogin">
+                            <button className="group w-full flex items-center justify-center px-2 gap-3 bg-[#0166f6] text-white rounded-full text-lg font-semibold cursor-pointer transition-all duration-300 hover:bg-[#0152d9] hover:scale-105 ">
+                                <span className='px-6 py-4'>Get Started Now</span>
+                                <span className='bg-white/20 p-3 rounded-full group-hover:bg-white/30 transition-all'>
+                                    <ArrowRight size={20} strokeWidth={3} color='white' className='transition-transform duration-300 group-hover:-rotate-45' />
+                                </span>
+                            </button>
                         </Link>
-                        <Link
-                            href="/contact"
-                            className="inline-flex items-center gap-2 px-8 py-4 border-2 border-[#1a1a2e] text-[#1a1a2e] rounded-full font-bold text-sm hover:bg-[#1a1a2e] hover:text-white transition-all duration-300"
-                        >
-                            Schedule Demo
+
+                        <Link href="/contact">
+                            <button className="group w-full flex items-center justify-center px-2 gap-3 border-2 border-gray-300 text-gray-700 bg-white rounded-full text-lg font-semibold cursor-pointer transition-all duration-300 hover:border-gray-400 hover:bg-gray-50 hover:scale-105 ">
+                                <span className='px-6 py-4'>Request a Demo</span>
+                                <span className='bg-gray-200 p-3 rounded-full group-hover:bg-gray-300 transition-all'>
+                                    <ArrowRight size={20} strokeWidth={3} color='black' className='transition-transform duration-300 group-hover:-rotate-45' />
+                                </span>
+                            </button>
                         </Link>
                     </div>
                 </div>
@@ -958,9 +999,17 @@ function SchoolExplorerSection() {
                             <Globe size={16} />
                             school.edubreezy.com
                         </span>
-                        <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a1a2e] leading-tight mb-2">
-                            <Highlighter action="underline" color="#FF9800">School Explorer</Highlighter> — <br />
+                        {/* <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a1a2e] leading-tight mb-2">
+                            <Highlighter action="underline" color="black">School Explorer</Highlighter> — <br />
                             <span className="text-[#0569ff]">Your School, Discovered</span>
+                        </h2> */}
+                        <h2 className="text-3xl md:text-4xl lg:text-[3.2rem] font-bold text-[#1a1a2e] leading-[1.1] mb-3">
+                            School Explorer
+                            {" — "}
+                            <span className="relative inline-block whitespace-nowrap">
+                                <span className="relative z-10 text-blue-600 font-bold">Your School, Discovered</span>
+                                <span className="absolute bottom-2 left-0 w-[100%] h-3 md:h-5 bg-orange-200/60 -rotate-1 -z-10 rounded-lg"></span>
+                            </span>
                         </h2>
                         <p className="text-base md:text-lg font-medium text-[#F97316] mb-3">
                             Increase Admissions with Proven Strategies
@@ -1125,7 +1174,7 @@ function SchoolExplorerSection() {
                     })()}
                 </div>
                 {/* Bottom Stats Bar */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-6 py-8 px-4 md:px-8 bg-gradient-to-r from-[#0569ff]/5 to-[#10B981]/5 rounded-2xl border border-[#e5e7eb]">
+                {/* <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-6 py-8 px-4 md:px-8 bg-gradient-to-r from-[#0569ff]/5 to-[#10B981]/5 rounded-2xl border border-[#e5e7eb]">
                     {[
                         { value: 50000, suffix: "+", label: "Monthly Visitors", icon: Users },
                         { value: 10000, suffix: "+", label: "Inquiries Generated", icon: MessageSquare },
@@ -1151,7 +1200,7 @@ function SchoolExplorerSection() {
                             </div>
                         );
                     })}
-                </div>
+                </div> */}
             </div>
         </section>
     );
@@ -1432,8 +1481,8 @@ function TestimonialsSection() {
                 <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6">
                     <div className="max-w-2xl">
                         <h2 className="text-blue-600 font-bold text-sm uppercase tracking-[0.2em] mb-4">Success Stories</h2>
-                        <h3 className="text-4xl md:text-5xl font-black text-slate-900 mb-4 tracking-tight">
-                            What our <span className="text-[#0166f6] italic">Partners</span> say.
+                        <h3 className="text-3xl md:text-4xl lg:text-[3.2rem] font-bold text-[#1a1a2e] leading-[1.1] mb-3">
+                            What our <span className="text-[#0166f6] font-bold italic">  <Highlighter action="underline" color="black">Partners</Highlighter></span> say.
                         </h3>
                         <p className="text-slate-500 text-lg font-medium">
                             Join over 2,500+ educational institutions that have revolutionized their administration.
@@ -1536,15 +1585,12 @@ function Footer() {
     return (
         <footer className="bg-[#0a2540] text-white pt-[60px] px-5 pb-[30px]">
             <div className="max-w-[1100px] mx-auto">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-10 mb-10">
-                    <div className="md:col-span-2 lg:col-span-1">
-                        <div className="flex items-center gap-2 mb-4 text-xl font-bold">
-                            <GraduationCap size={28} />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 mb-10">
+                    {/* Full width large branding */}
+                    <div className="text-center mb-20 w-full col-span-full">
+                        <h1 className="text-[clamp(5rem,20vw,18rem)] font-black leading-none tracking-tighter text-white w-full">
                             EduBreezy
-                        </div>
-                        <p className="text-white/70 text-sm leading-[1.6]">
-                            Making school management simple and efficient for educators worldwide.
-                        </p>
+                        </h1>
                     </div>
 
                     {[

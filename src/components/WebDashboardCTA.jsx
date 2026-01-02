@@ -1,11 +1,22 @@
 // Mobile App CTA Section Component
 import React from 'react';
 import Link from 'next/link';
+import { DotPattern } from '@/components/ui/dot-pattern';
 
 export default function WebDashboardCTA() {
     return (
         <section className="relative py-16 md:py-24 px-5 overflow-visible">
-            <div className="max-w-7xl mx-auto">
+            {/* Dot Pattern Background */}
+            <DotPattern
+                className="absolute inset-0 opacity-30 [mask-image:radial-gradient(ellipse_at_center,white,transparent_80%)]"
+                width={20}
+                height={20}
+                cx={1}
+                cy={1}
+                cr={1}
+            />
+
+            <div className="max-w-7xl mx-auto relative z-10">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
 
                     {/* Right - Phone Mockup */}
@@ -50,12 +61,12 @@ export default function WebDashboardCTA() {
 
                     {/* Left Content */}
                     <div className="lg:pr-8">
-                        <h2 className="text-4xl md:text-6xl font-black text-slate-900 leading-[1em] mb-8 tracking-tight">
+                        <h2 className="text-4xl  md:text-5xl  2xl:text-6xl font-black text-slate-900 leading-[1em] mb-8 tracking-tight">
                             Modern App For
                             <br className="hidden md:block" />
                             <span className="relative inline-block mt-2">
                                 <span className="relative z-10 text-blue-600">Modern Schools</span>
-                                <span className="absolute bottom-2 left-0 w-full h-3 md:h-5 bg-orange-200/60 -rotate-1 -z-10 rounded-lg"></span>
+                                {/* . <span className="absolute bottom-2 left-0 w-full h-3 md:h-5 bg-orange-200/60 -rotate-1 -z-10 rounded-lg"></span> */}
                             </span>
                         </h2>
 

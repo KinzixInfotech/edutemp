@@ -159,7 +159,38 @@ export default function DownloadAppCTA() {
                         </div>
 
                         {/* Right Mockup Area: 3D "Pop-out" Effect */}
-                        <div className="lg:w-2/5 relative flex justify-center items-center py-20 lg:py-0">
+                        <div
+                            className="lg:w-2/5 relative flex justify-center items-center py-20 lg:py-0"
+                            onMouseMove={(e) => {
+                                const phoneElement = e.currentTarget.querySelector('.phone-mockup');
+                                if (!phoneElement) return;
+
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const x = e.clientX - rect.left;
+                                const y = e.clientY - rect.top;
+                                const centerX = rect.width / 2;
+                                const centerY = rect.height / 2;
+
+                                const rotateX = ((y - centerY) / centerY) * -15;
+                                const rotateY = ((x - centerX) / centerX) * 15;
+
+                                requestAnimationFrame(() => {
+                                    phoneElement.style.transform = `rotateY(${rotateY}deg) rotateX(${rotateX}deg) rotateZ(0deg)`;
+                                });
+                            }}
+                            onMouseLeave={(e) => {
+                                const phoneElement = e.currentTarget.querySelector('.phone-mockup');
+                                if (!phoneElement) return;
+
+                                requestAnimationFrame(() => {
+                                    phoneElement.style.transition = 'transform 0.5s ease-out';
+                                    phoneElement.style.transform = 'rotateY(-25deg) rotateX(12deg) rotateZ(3deg)';
+                                    setTimeout(() => {
+                                        phoneElement.style.transition = 'transform 0.1s ease-out';
+                                    }, 500);
+                                });
+                            }}
+                        >
                             <style dangerouslySetInnerHTML={{
                                 __html: `
                                 .grid-bg {
@@ -171,7 +202,7 @@ export default function DownloadAppCTA() {
                                 }
                             ` }} />
                             <div
-                                className="relative z-20 transition-all duration-1000 hover:scale-[1.03] group"
+                                className="relative z-20 transition-all duration-300 hover:scale-[1.03] group"
                                 style={{
                                     perspective: '2000px',
                                     transformStyle: 'preserve-3d'
@@ -179,11 +210,13 @@ export default function DownloadAppCTA() {
                             >
                                 {/* The Mockup - 3D Black Device */}
                                 <div
-                                    className="w-[300px] sm:w-[340px] h-[620px] sm:h-[700px] bg-[#0A0A0A] rounded-[3.8rem] p-3 shadow-[0_80px_150px_-30px_rgba(0,0,0,0.8)] border border-white/10 relative"
+                                    className="phone-mockup w-[300px] sm:w-[340px] h-[620px] sm:h-[700px] bg-[#0A0A0A] rounded-[3.8rem] p-3 shadow-[0_80px_150px_-30px_rgba(0,0,0,0.8)] border border-white/10 relative"
                                     style={{
                                         transform: 'rotateY(-25deg) rotateX(12deg) rotateZ(3deg)',
-                                        marginTop: '-120px', // Large negative margin for "Pop out" effect
-                                        marginBottom: '-120px'
+                                        marginTop: '-120px',
+                                        marginBottom: '-120px',
+                                        transition: 'transform 0.1s ease-out',
+                                        willChange: 'transform'
                                     }}
                                 >
                                     {/* Dynamic Gloss Overlay */}
