@@ -1,63 +1,72 @@
-// Web Dashboard CTA Section Component
+// Mobile App CTA Section Component
 import React from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 
 export default function WebDashboardCTA() {
     return (
-        <section className="relative py-16 md:py-24 px-5 bg-gradient-to-br from-blue-50 via-white to-purple-50 overflow-visible">
+        <section className="relative py-16 md:py-24 px-5 overflow-visible">
             <div className="max-w-7xl mx-auto">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
 
-                    {/* Right - Dashboard Preview with Mac Browser Frame */}
-                    <div className="relative hidden lg:block">
-                        {/* Glow Effect */}
-                        <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 blur-2xl rounded-3xl" />
+                    {/* Right - Phone Mockup */}
+                    <div className="relative hidden lg:flex justify-center items-center py-20 lg:py-0">
+                        <style dangerouslySetInnerHTML={{
+                            __html: `
+                            .grid-bg {
+                                background-image: radial-gradient(circle at 2px 2px, rgba(255,255,255,0.1) 1px, transparent 0);
+                                background-size: 40px 40px;
+                            }
+                        ` }} />
 
-                        {/* Mac Browser Window */}
-                        <div className="relative bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200/50 transform hover:scale-105 transition-transform duration-500">
-                            {/* Mac-style Dark Top Bar */}
-                            <div className="flex items-center gap-3 px-4 py-3 bg-[#2d2d2d] border-b border-black/20">
-                                <div className="flex gap-2">
-                                    <div className="w-3 h-3 rounded-full bg-[#ff5f56]" />
-                                    <div className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
-                                    <div className="w-3 h-3 rounded-full bg-[#27c93f]" />
+                        {/* Glow Effect */}
+                        <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 blur-3xl rounded-3xl" />
+
+                        <div
+                            className="relative z-20 transition-all duration-1000 hover:scale-[1.03] group"
+                        >
+                            {/* The Mockup - 3D Black Device */}
+                            <div
+                                className="w-[330px] sm:w-[370px] h-[670px] sm:h-[760px] bg-[#0A0A0A] rounded-[3.8rem] p-2 shadow-[0_80px_150px_-30px_rgba(0,0,0,0.8)] border border-white/10 relative"
+                            >
+                                {/* Screen Content Container */}
+                                <div className="w-full h-full bg-slate-900 rounded-[3rem] overflow-hidden relative shadow-inner">
+                                    <img
+                                        src="./ss2.png"
+                                        alt="App Screenshot"
+                                        className="w-full h-full object-contain"
+                                    />
                                 </div>
-                                <div className="flex-1 mx-4">
-                                    <div className="bg-[#3f3f3f] rounded-md px-3 py-1.5 text-xs text-gray-300 text-center">
-                                        dashboard.edubreezy.com
-                                    </div>
-                                </div>
-                            </div>
-                            {/* Dashboard Screenshot Placeholder */}
-                            <div className="bg-gray-100 aspect-[16/10] flex items-center justify-center">
-                                {/* Add your dashboard screenshot image here */}
-                                <img
-                                    src="https://placehold.co/600x400"
-                                    alt="EduBreezy Dashboard"
-                                    width={800}
-                                    height={500}
-                                    className="w-full h-full object-cover"
-                                />
+
+                                {/* Physical Buttons (Side) */}
+                                <div className="absolute top-32 -left-[2px] w-1 h-12 bg-slate-800 rounded-r-md border-r border-white/10"></div>
+                                <div className="absolute top-48 -left-[2px] w-1 h-20 bg-slate-800 rounded-r-md border-r border-white/10"></div>
+                                <div className="absolute top-40 -right-[2px] w-1 h-24 bg-slate-800 rounded-l-md border-l border-white/10"></div>
                             </div>
                         </div>
-                    </div>
-                    {/* Left Content */}
 
+                        {/* Background ambient lighting */}
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[100%] h-[100%] bg-blue-400/5 rounded-full blur-[80px] -z-0"></div>
+                    </div>
+
+                    {/* Left Content */}
                     <div className="lg:pr-8">
-                        <h2 className="text-4xl md:text-5xl font-bold text-[#1a1a2e] mb-6 leading-tight">
-                            Powerful Web Dashboard
-                            <br />
-                            For Complete Control
+                        <h2 className="text-4xl md:text-6xl font-black text-slate-900 leading-[1em] mb-8 tracking-tight">
+                            Modern App For
+                            <br className="hidden md:block" />
+                            <span className="relative inline-block mt-2">
+                                <span className="relative z-10 text-blue-600">Modern Schools</span>
+                                <span className="absolute bottom-2 left-0 w-full h-3 md:h-5 bg-orange-200/60 -rotate-1 -z-10 rounded-lg"></span>
+                            </span>
                         </h2>
+
                         <p className="text-lg text-gray-600 mb-8 leading-relaxed">
-                            Access comprehensive analytics, manage students & staff, track attendance, and oversee every aspect of your school from one beautiful dashboard.
+                            Experience seamless school management on mobile. Access student data, track attendance, manage fees, and communicate with parents—all from your smartphone.
                         </p>
                         {/* CTA Buttons */}
                         <div className="flex flex-wrap gap-4">
                             <Link href="/contact">
                                 <button className="group flex items-center pr-1 gap-2 bg-[#0569ff] text-white border-0 rounded-full text-base font-semibold cursor-pointer shadow-[0_4px_14px_rgba(5,105,255,0.3)] hover:shadow-[0_6px_20px_rgba(5,105,255,0.4)] transition-all duration-300">
-                                    <span className='px-1 pl-6 py-3.5'>Get it now</span>
+                                    <span className='px-1 pl-6 py-3.5'>Download Now</span>
                                     <span className='bg-white p-3 shadow-lg rounded-full group-hover:bg-gray-50 transition-colors'>
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0569ff" strokeWidth="3">
                                             <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
@@ -65,9 +74,9 @@ export default function WebDashboardCTA() {
                                     </span>
                                 </button>
                             </Link>
-                            <Link href="/features/docs">
+                            <Link href="/features">
                                 <button className="px-6 py-3.5 bg-white border-2 border-[#0569ff] text-[#0569ff] rounded-full text-base font-semibold hover:bg-[#0569ff] hover:text-white transition-all duration-300 shadow-sm">
-                                    Learn more
+                                    View Features
                                 </button>
                             </Link>
                         </div>

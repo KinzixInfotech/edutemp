@@ -1,5 +1,5 @@
 'use client'
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import Script from 'next/script';
 
@@ -22,6 +22,9 @@ import WebDashboardCTA from '@/components/WebDashboardCTA';
 import { OrbitingCircles } from '@/components/ui/orbiting-circles';
 import { NumberTicker } from '@/components/ui/number-ticker';
 import ScrollMouse from '@/components/ScrollMouse';
+import dynamic from 'next/dynamic';
+
+
 // Organization Schema for SEO
 const organizationSchema = {
     "@context": "https://schema.org",
@@ -65,10 +68,11 @@ export default function HomePage() {
             <WhyEduBreezySection />
 
             {/* <TrustedSection /> */}
-            <WebDashboardCTA />
             <FeaturesSection />
+            <WebDashboardCTA />
+
             <SchoolExplorerSection />
-            <CommunicatingSeamlesslySection />
+            {/* <CommunicatingSeamlesslySection /> */}
             <HowWeWorkSection />
             {/* <BentoSection /> */}
             {/* <PricingSection /> */}
@@ -85,170 +89,97 @@ export default function HomePage() {
 // Hero Section - Matching the design exactly
 function HeroSection() {
     const [isVideoOpen, setIsVideoOpen] = useState(false);
-    const videoSrc = "https://www.youtube.com/embed/dQw4w9WgXcQ"; // Replace with actual video URL
+    const videoSrc = "https://www.youtube.com/embed/dQw4w9WgXcQ";
 
     return (
-        <section className="min-h-screen h-fit pt-[100px] pb-0 bg-gradient-to-b from-white via-[#f8fafc] to-[#f0f4f8] relative overflow-visible">
-            {/* Subtle gradient accent - top */}
-            <div className="absolute top-0 left-0 right-0 h-[300px] bg-gradient-to-b from-[#f8fafc] to-transparent pointer-events-none" />
+        <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-white">
+            {/* Three.js 3D Background */}
 
-            {/* Noise Overlay */}
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg_viewBox=%270_0_256_256%27_xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cfilter_id=%27noise%27%3E%3CfeTurbulence_type=%27fractalNoise%27_baseFrequency=%270.9%27_numOctaves=%274%27_stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect_width=%27100%25%27_height=%27100%25%27_filter=%27url(%23noise)%27/%3E%3C/svg%3E')] opacity-[0.02] pointer-events-none" />
+            {/* Background Grid Pattern */}
+            {/* <div className="absolute inset-0 bg-[linear-gradient(to_right,#e5e7eb_1px,transparent_1px),linear-gradient(to_bottom,#e5e7eb_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)]" /> */}
 
-            {/* Dot Pattern Background */}
-            <DotPattern
-                width={24}
-                height={24}
-                cr={1}
-                className="absolute inset-0 w-full h-full opacity-20"
-            />
+            {/* Gradient Orb - Top Left */}
+            {/* <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-[#0469ff]/10 rounded-full blur-3xl" /> */}
 
-            {/* Floating School Icons - Left Side */}
-            <div className="absolute top-[12%] md:top-[8%] left-[10%] opacity-[0.10] pointer-events-none animate-[float_6s_ease-in-out_infinite]">
-                <GraduationCap className="text-black rotate-[-15deg] w-10 h-10 md:w-20 md:h-20" />
-            </div>
-            <div className="hidden md:block absolute top-[18%] left-[18%] opacity-[0.08] pointer-events-none animate-[float_8s_ease-in-out_infinite_1s]">
-                <Pencil size={50} className="text-black rotate-[25deg]" />
-            </div>
-            <div className="absolute top-[35%] md:top-[32%] left-[8%] opacity-[0.09] pointer-events-none animate-[float_7s_ease-in-out_infinite_0.5s]">
-                <BookMarked className="text-black rotate-[-8deg] w-8 h-8 md:w-14 md:h-14" />
-            </div>
-            <div className="hidden md:block absolute top-[48%] left-[15%] opacity-[0.07] pointer-events-none animate-[float_9s_ease-in-out_infinite_2s]">
-                <Ruler size={55} className="text-black rotate-[45deg]" />
-            </div>
-            <div className="hidden md:block absolute top-[62%] left-[10%] opacity-[0.08] pointer-events-none animate-[float_7s_ease-in-out_infinite_1.5s]">
-                <Calculator size={45} className="text-black rotate-[-10deg]" />
-            </div>
-            <div className="hidden md:block absolute top-[78%] left-[14%] opacity-[0.09] pointer-events-none animate-[float_6s_ease-in-out_infinite_3s]">
-                <BookOpen size={50} className="text-black rotate-[12deg]" />
-            </div>
-            <div className="hidden md:block absolute top-[55%] left-[22%] opacity-[0.06] pointer-events-none animate-[float_8s_ease-in-out_infinite_2.5s]">
-                <School size={40} className="text-black rotate-[-20deg]" />
-            </div>
+            {/* Gradient Orb - Top Right */}
+            <div className="absolute top-20 right-0 w-[400px] h-[400px] bg-[#0469ff]/5 rounded-full blur-3xl" />
 
-            {/* Floating School Icons - Right Side */}
-            <div className="absolute top-[11%] md:top-[6%] right-[10%] opacity-[0.09] pointer-events-none animate-[float_7s_ease-in-out_infinite_2s]">
-                <School className="text-black rotate-[10deg] w-10 h-10 md:w-[75px] md:h-[75px]" />
-            </div>
-            <div className="hidden md:block absolute top-[20%] right-[8%] opacity-[0.08] pointer-events-none animate-[float_8s_ease-in-out_infinite_0.5s]">
-                <BookOpen size={55} className="text-black rotate-[-15deg]" />
-            </div>
-            <div className="hidden md:block absolute top-[35%] right-[16%] opacity-[0.10] pointer-events-none animate-[float_6s_ease-in-out_infinite_1.5s]">
-                <Pencil size={60} className="text-black rotate-[30deg]" />
-            </div>
-            <div className="absolute top-[52%] md:top-[50%] right-[10%] opacity-[0.07] pointer-events-none animate-[float_9s_ease-in-out_infinite_3s]">
-                <GraduationCap className="text-black rotate-[15deg] w-9 h-9 md:w-16 md:h-16" />
-            </div>
-            <div className="hidden md:block absolute top-[65%] right-[18%] opacity-[0.08] pointer-events-none animate-[float_7s_ease-in-out_infinite_2.5s]">
-                <Ruler size={50} className="text-black rotate-[-30deg]" />
-            </div>
-            <div className="hidden md:block absolute top-[80%] right-[12%] opacity-[0.09] pointer-events-none animate-[float_8s_ease-in-out_infinite_1s]">
-                <Calculator size={45} className="text-black rotate-[20deg]" />
-            </div>
-            <div className="hidden md:block absolute top-[42%] right-[22%] opacity-[0.06] pointer-events-none animate-[float_6s_ease-in-out_infinite_4s]">
-                <BookMarked size={40} className="text-black rotate-[-5deg]" />
-            </div>
+            {/* Floating 3D Grid Cards */}
 
-            <div className="max-w-[1200px] mx-auto px-5 pt-[60px] pb-10 text-center">
-                <div className="hero-text">
-                    {/* Main Title */}
-                    <h1 className="text-[clamp(2.2rem,6vw,3.8rem)] font-bold text-[#1a1a2e] leading-[1.15] mb-5 max-w-[750px] mx-auto px-4">
-                        <Highlighter action="underline" color="#FF9800">Simplify</Highlighter> School Management And       <Highlighter action="highlight" color="#87CEFA">Thrive </Highlighter>{' '}
-                        <span style={{
-                            fontFamily: '"Edu NSW ACT Cursive", cursive',
-                            fontOpticalSizing: 'auto',
-                        }} className="font-semibold italic text-[#1a1a2e] text-[1em] block sm:inline mt-2 sm:mt-0"> Every Day</span>
+            <div className="relative max-w-[1400px] mx-auto px-6 py-20 z-10 w-full">
+                {/* Hero Content */}
+                <div className="text-center space-y-8">
+                    {/* Badge */}
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 border-[#0469ff]/20 bg-[#0469ff]/5">
+                        <div className="w-2 h-2 rounded-full bg-[#0469ff] animate-pulse" />
+                        <span className="text-sm font-semibold text-[#0469ff]">Next-Generation School ERP</span>
+                    </div>
+
+                    {/* Main Heading */}
+                    <h1 className="text-[clamp(2.8rem,8vw,6.5rem)] font-bold leading-[1.05] tracking-tight">
+                        <span className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent">
+                            Transform Education
+                        </span>
+                        <br />
+                        <span className="relative inline-block mt-2">
+                            <span className="text-[#0469ff]">
+                                With Intelligent Systems
+                            </span>
+                            {/* Underline Effect */}
+                            <svg className="absolute -bottom-4 left-0 w-full" height="12" viewBox="0 0 300 12" fill="none">
+                                <path d="M2 8C70 3 150 1 298 8" stroke="#0469ff" strokeWidth="3" strokeLinecap="round" />
+                            </svg>
+                        </span>
                     </h1>
+
                     {/* Subtitle */}
-                    <p className="text-[1.05rem] text-[#666] max-w-[550px] mx-auto mb-7 leading-relaxed">
-                        Transform the way schools operate and deliver education with our
-                        intelligent, cloud-based management platform.
+                    <p className="text-xl md:text-2xl text-gray-600 max-w-[800px] mx-auto leading-relaxed font-medium">
+                        An all-in-one school ERP with intelligent systems and a modern UI/UX that simplifies administration and enhances learning outcomes.
                     </p>
-                    {/* CTA Row */}
-                    <div className="flex z-10 items-center justify-center gap-6 flex-wrap mb-[50px]">
-                        {/* Avatars + Rating */}
-                        {/* <div className="flex flex-col md:flex-col items-center  gap-3">
-                            <div className="flex">
-                                {[1, 2, 3, 4].map(i => (
-                                    <img
-                                        key={i}
-                                        src={`https://i.pravatar.cc/40?img=${i + 10}`}
-                                        alt=""
-                                        className={`w-9 h-9 rounded-full border-2 border-white ${i > 1 ? '-ml-2.5' : ''}`}
-                                    />
-                                ))}
-                            </div>
-                            <div className="flex flex-col md:flex-col items-center gap-1.5 text-center md:text-left">
-                                <div className="flex">
-                                    {[1, 2, 3, 4, 5].map(i => (
-                                        <Star key={i} size={14} fill="#fbbf24" color="#fbbf24" />
-                                    ))}
-                                </div>
-                            </div>
-                        </div> */}
-                        <div className="flex flex-wrap gap-4">
-                            <Link href="/contact">
-                                <button className="px-6 py-3 md:py-3.5 bg-white border-2 border-[#0569ff] text-[#0569ff] rounded-full text-[0.95rem] font-semibold hover:bg-[#0569ff] hover:text-white transition-all duration-300 shadow-md hover:shadow-lg">
-                                    Book a Demo
-                                </button>
-                            </Link>
-                            <button className="group flex items-center pr-1 gap-2 bg-[#0569ff] justify-center items-center text-white border-0 rounded-full text-[0.95rem] font-semibold cursor-pointer shadow-[0_4px_14px_rgba(5,105,255,0.3)] hover:shadow-[0_6px_20px_rgba(5,105,255,0.4)] transition-all duration-300">
-                                <span className='px-1 pl-4 ml-2 py-3 md:py-3.5'>Get Started</span>
-                                <span className='bg-white p-2.5 md:p-3 shadow-lg rounded-full group-hover:bg-gray-50 transition-colors'>
-                                    <ArrowRight size={20} strokeWidth={3} color='black' className='transition-transform duration-300 group-hover:-rotate-45' />
+
+                    {/* CTA Buttons */}
+                    <div className="flex items-center justify-center gap-5 flex-wrap pt-6">
+                        <Link href="/contact">
+                            <button className="group relative px-10 py-4 rounded-full font-bold text-lg text-white bg-[#0469ff]  hover:shadow-2xl transition-all duration-300 overflow-hidden">
+                                <span className="absolute inset-0 bg-[#0358dd] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                <span className="relative flex items-center gap-3">
+                                    Start Free Trial
+                                    <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center">
+                                        <ArrowRight className="w-5 h-5 text-[#0469ff] transition-transform duration-300 group-hover:translate-x-0.5" />
+                                    </div>
                                 </span>
                             </button>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Dashboard Image */}
-                <div className="relative">
-                    {/* Subtle shadow glow behind frame */}
-                    <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#e0e7ef]/30 to-[#e0e7ef]/50 blur-[40px] rounded-3xl transform scale-105 pointer-events-none" />
-
-                    {/* Dashboard Preview Frame */}
-                    <div className="hero-dashboard relative bg-white rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.12)] w-full max-w-[1200px] mx-auto border border-[#e0e0e0] overflow-hidden z-10">
-
-                        {/* Browser Top Bar */}
-                        {/* Mac-style Dark Top Bar */}
-                        <div className="flex items-center gap-3 px-4 py-3 bg-[#2d2d2d] border-b border-black/20">
-                            <div className="flex gap-2">
-                                <div className="w-3 h-3 rounded-full bg-[#ff5f56]" />
-                                <div className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
-                                <div className="w-3 h-3 rounded-full bg-[#27c93f]" />
-                            </div>
-                            <div className="flex-1 mx-4">
-                                <div className="bg-[#3f3f3f] rounded-md px-3 py-1.5 text-xs text-gray-300 text-center">
-                                    www.edubreezy.com/dashboard
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Dashboard Content Area with Play Button */}
+                        </Link>
                         <button
-                            type="button"
-                            aria-label="Play video"
-                            className="relative w-full cursor-pointer border-0 bg-transparent p-0 group block"
                             onClick={() => setIsVideoOpen(true)}
+                            className="group px-10 hover:shadow-lg py-4 rounded-full font-bold text-lg text-[#0469ff] bg-[#f8f9fb] border transition-all duration-300 flex items-center gap-3"
                         >
-                            <div className="bg-[#f5f7fa] overflow-hidden relative flex">
-                                <img src="/dash.png" alt="EduBreezy Dashboard" className="w-full h-auto block object-cover transition-all duration-300 group-hover:opacity-80" />
-                                {/* Opacity Overlay */}
-                                <div className="absolute inset-0 bg-black/5 backdrop-blur-[0.8px] group-hover:bg-black/10 transition-all duration-300" />
-                                {/* Play Button */}
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                    <div className="bg-white/90 backdrop-blur-sm flex items-center justify-center w-20 h-20 md:w-24 md:h-24 rounded-full shadow-xl transition-all duration-300 group-hover:scale-110 group-hover:bg-white">
-                                        <div className="bg-[#0569ff] flex items-center justify-center w-14 h-14 md:w-16 md:h-16 rounded-full shadow-lg">
-                                            <Play className="w-6 h-6 md:w-8 md:h-8 fill-white text-white ml-1" />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            Watch Demo
+                            <Play className="w-5 h-5" />
                         </button>
-                        <BorderBeam duration={8} size={100} colorFrom='#0569ff' colorTo='#000' />
-
                     </div>
+
+                    {/* Stats Row */}
+                    {/* <div className="flex items-center justify-center gap-12 flex-wrap pt-16">
+                        <div className="text-center">
+                            <div className="text-3xl font-bold text-[#0469ff]">10K+</div>
+                            <div className="text-sm text-gray-600 font-medium mt-1">Active Schools</div>
+                        </div>
+                        <div className="w-px h-12 bg-gray-200" />
+                        <div className="text-center">
+                            <div className="text-3xl font-bold text-[#0469ff]">5M+</div>
+                            <div className="text-sm text-gray-600 font-medium mt-1">Students Managed</div>
+                        </div>
+                        <div className="w-px h-12 bg-gray-200" />
+                        <div className="text-center">
+                            <div className="flex items-center gap-1 justify-center mb-1">
+                                {[1, 2, 3, 4, 5].map(i => (
+                                    <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                                ))}
+                            </div>
+                            <div className="text-sm text-gray-600 font-medium">4.9/5 Rating</div>
+                        </div>
+                    </div> */}
                 </div>
             </div>
 
@@ -259,43 +190,61 @@ function HeroSection() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                            if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
-                                setIsVideoOpen(false);
-                            }
-                        }}
                         onClick={() => setIsVideoOpen(false)}
-                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md"
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
                     >
                         <motion.div
-                            initial={{ scale: 0.5, opacity: 0 }}
+                            initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.5, opacity: 0 }}
-                            transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                            className="relative mx-4 aspect-video w-full max-w-4xl md:mx-0"
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="relative mx-4 aspect-video w-full max-w-5xl"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <motion.button
+                            <button
                                 onClick={() => setIsVideoOpen(false)}
-                                className="absolute -top-16 right-0 rounded-full bg-neutral-900/50 p-2 text-xl text-white ring-1 ring-white/20 backdrop-blur-md hover:bg-neutral-900/70 transition-colors cursor-pointer"
+                                className="absolute -top-14 right-0 p-3 rounded-full bg-white text-gray-700 hover:bg-gray-100 transition-colors shadow-lg"
                             >
-                                <XIcon className="w-5 h-5" />
-                            </motion.button>
-                            <div className="relative isolate z-[1] size-full overflow-hidden rounded-2xl border-2 border-white">
+                                <XIcon className="w-6 h-6" />
+                            </button>
+                            <div className="relative overflow-hidden rounded-2xl border-4 border-white shadow-2xl">
                                 <iframe
                                     src={videoSrc}
-                                    title="Hero Video player"
-                                    className="w-full h-full rounded-2xl"
+                                    className="w-full h-full"
                                     allowFullScreen
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                 />
                             </div>
                         </motion.div>
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            <style jsx>{`
+                @keyframes float-slow {
+                    0%, 100% { transform: translateY(0px); }
+                    50% { transform: translateY(-25px); }
+                }
+                @keyframes float-slower {
+                    0%, 100% { transform: translateY(0px); }
+                    50% { transform: translateY(-20px); }
+                }
+                .animate-float-slow {
+                    animation: float-slow 7s ease-in-out infinite;
+                }
+                .animate-float-slower {
+                    animation: float-slower 9s ease-in-out infinite;
+                }
+                .perspective-1000 {
+                    perspective: 1000px;
+                }
+                .scrollbar-hide {
+                    -ms-overflow-style: none;
+                    scrollbar-width: none;
+                }
+                .scrollbar-hide::-webkit-scrollbar {
+                    display: none;
+                }
+            `}</style>
         </section>
     );
 }
@@ -304,7 +253,7 @@ function HeroSection() {
 function MarqueeBanner() {
     // JSON-based content for easy editing
     const marqueeItems = [
-        "NO 1 SCHOOL ERP IN INDIA",
+        "LEADING SCHOOL ERP IN INDIA",
         "COMPLETE FEE MANAGEMENT SYSTEM",
         "SMART ATTENDANCE TRACKING",
         "PAYROLL & HR AUTOMATION",
@@ -316,27 +265,31 @@ function MarqueeBanner() {
     ];
 
     return (
-        <div className="w-full bg-[#0a2540] py-3 md:py-4 overflow-hidden">
+        <div className="w-full bg-gray-50 py-4 md:py-8 overflow-hidden border-y border-gray-200">
             <div className="relative flex">
                 {/* First marquee group */}
-                <div className="animate-marquee flex shrink-0 items-center gap-4 md:gap-6">
+                <div className="animate-marquee flex shrink-0 items-center gap-6 md:gap-8">
                     {marqueeItems.map((item, index) => (
-                        <div key={index} className="flex items-center gap-4 md:gap-6">
-                            <span className="text-white font-bold text-sm md:text-base whitespace-nowrap tracking-wide">
+                        <div key={index} className="flex items-center gap-6 md:gap-8">
+                            <span className="text-gray-600 font-bold text-sm md:text-lg whitespace-nowrap">
                                 {item}
                             </span>
-                            <span className="text-white/80 text-base md:text-lg">✦</span>
+                            <span className="text-gray-600 font-bold text-sm md:text-lg whitespace-nowrap">
+                                ✦
+                            </span>
                         </div>
                     ))}
                 </div>
                 {/* Duplicate for seamless loop */}
-                <div className="animate-marquee flex shrink-0 items-center gap-4 md:gap-6" aria-hidden="true">
+                <div className="animate-marquee flex shrink-0 items-center gap-6 md:gap-8" aria-hidden="true">
                     {marqueeItems.map((item, index) => (
-                        <div key={`dup-${index}`} className="flex items-center gap-4 md:gap-6">
-                            <span className="text-white font-bold text-sm md:text-base whitespace-nowrap tracking-wide">
+                        <div key={`dup-${index}`} className="flex items-center gap-6 md:gap-8">
+                            <span className="text-gray-600 font-bold text-sm md:text-lg whitespace-nowrap">
                                 {item}
                             </span>
-                            <span className="text-white/80 text-base md:text-lg">✦</span>
+                            <span className="text-gray-600 font-bold text-sm md:text-lg whitespace-nowrap">
+                                ✦
+                            </span>
                         </div>
                     ))}
                 </div>
@@ -348,7 +301,7 @@ function MarqueeBanner() {
 // About Brief Section
 function AboutBriefSection() {
     return (
-        <section className="bg-[#f5f7fa] py-16 md:py-24 px-5 relative">
+        <section className=" py-16 md:py-24 px-5 relative">
             <div className="max-w-[1200px] mx-auto">
                 <p className="text-[#1a1a2e]/80 text-lg md:text-xl lg:text-2xl leading-relaxed font-light text-left max-w-[900px]">
                     EduBreezy is a next-generation school management platform blending
@@ -369,14 +322,14 @@ function AboutBriefSection() {
 function WhyEduBreezySection() {
 
     return (
-        <section className="py-20 md:py-28 px-5 bg-white">
+        <section className="py-20 bg-[#f5f7fa] md:py-28 px-5 ">
             <div className="max-w-[1200px] mx-auto">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
                     {/* Left Content */}
                     <div>
                         <span className="text-sm text-[#0569ff] font-medium mb-4 block">_Why us</span>
                         <h2 className="text-3xl md:text-4xl lg:text-[3.2rem] font-bold text-[#1a1a2e] leading-[1.1] mb-3">
-                            Schools need  <Highlighter action="underline" color="#FF9800">smart</Highlighter> systems
+                            Schools need smart systems
                         </h2>
                         <h3 className="text-2xl md:text-3xl lg:text-[2.5rem] font-light text-[#999] leading-tight mb-10">
                             not  <Highlighter action="underline" color="red"> complex </Highlighter> software.
@@ -678,84 +631,162 @@ function TrustedSection() {
 
 // Features Grid Section
 function FeaturesSection() {
-    const features = [
+
+    const featuredItems = [
         {
-            title: 'Admission Management',
-            icon: <FileText size={22} className="text-[#0569ff]" />
+            title: "Student Admission",
+            desc: "Complete digital onboarding pipeline for new enrollments.",
+            icon: (
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                </svg>
+            ),
+            color: "blue"
         },
         {
-            title: 'Certificate Creator',
-            icon: <GraduationCap size={22} className="text-[#0569ff]" />
+            title: "Fees Collection",
+            desc: "Automated invoicing with multiple secure payment gateways.",
+            icon: (
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            ),
+            color: "indigo"
         },
         {
-            title: 'Attendance Manager',
-            icon: <Calendar size={22} className="text-[#0569ff]" />
+            title: "Student Attendance",
+            desc: "Real-time tracking with instant notifications to parents.",
+            icon: (
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+            ),
+            color: "purple"
         },
         {
-            title: 'Homework Manager',
-            icon: <BookOpen size={22} className="text-[#0569ff]" />
+            title: "Examinations",
+            desc: "Efficient grading systems and automated report generation.",
+            icon: (
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            ),
+            color: "pink"
         },
         {
-            title: 'Live Classes',
-            icon: <Users size={22} className="text-[#0569ff]" />
+            title: "Academics",
+            desc: "Smart timetable planning and lesson management tools.",
+            icon: (
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+            ),
+            color: "orange"
         },
         {
-            title: 'Smart Gatepass',
-            icon: <CreditCard size={22} className="text-[#0569ff]" />
-        },
-        {
-            title: 'Institute Setup',
-            icon: <School size={22} className="text-[#0569ff]" />
-        },
-        {
-            title: 'Academic Portal',
-            icon: <BarChart3 size={22} className="text-[#0569ff]" />
-        },
-        {
-            title: 'Fee Management',
-            icon: <CreditCard size={22} className="text-[#0569ff]" />
-        },
+            title: "Communication",
+            desc: "Seamless connectivity between teachers, students & parents.",
+            icon: (
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+            ),
+            color: "teal"
+        }
     ];
 
+
     return (
-        <section className="py-20 md:py-28 px-5 bg-[#f8fafc]">
-            <div className="max-w-[1200px] mx-auto">
+        <section className="py-24 md:py-32 px-5 bg-white relative overflow-hidden" id="features">
+            {/* Decorative blurred accents */}
+            <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden -z-10">
+                <div className="absolute top-[-10%] right-[-5%] w-[40%] h-[40%] bg-blue-50 rounded-full blur-[100px] opacity-70"></div>
+                <div className="absolute bottom-[-10%] left-[-5%] w-[40%] h-[40%] bg-indigo-50 rounded-full blur-[100px] opacity-70"></div>
+            </div>
+
+            <div className="max-w-[1240px] mx-auto">
                 {/* Section Header */}
-                <div className="text-center mb-16">
-                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a1a2e] leading-tight mb-4">
-                        <Highlighter action="underline" color="#FF9800">Powerful Features</Highlighter> For
-                        <span className="text-[#0569ff]"> <Highlighter isView={true} action="underline" color="#FF9800">Modern Schools</Highlighter></span>
+                <div className="text-center mb-20 md:mb-28">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 border border-blue-100 mb-6">
+                        <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600"></span>
+                        </span>
+                        <span className="text-blue-700 text-xs font-black uppercase tracking-widest">Platform Modules</span>
+                    </div>
+
+                    <h2 className="text-4xl md:text-6xl font-black text-slate-900 leading-[1em] mb-8 tracking-tight">
+                        Powerful Features For{' '}
+                        <br className="hidden md:block" />
+                        <span className="relative inline-block mt-2">
+                            <span className="relative z-10 text-blue-600">Modern Schools</span>
+                            <span className="absolute bottom-2 left-0 w-full h-3 md:h-5 bg-orange-200/60 -rotate-1 -z-10 rounded-lg"></span>
+                        </span>
                     </h2>
-                    <p className="text-[#666] text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+
+                    <p className="text-slate-500 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed font-medium">
                         Everything you need to manage admissions, academics, attendance, fees, and more — all in one intelligent platform.
                     </p>
                 </div>
 
-                {/* Features Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 mb-12 md:mb-14">
-                    {features.map((feature, index) => (
+                {/* Features Grid - Limited to 6 Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 mb-16 md:mb-24">
+                    {featuredItems.map((feature, index) => (
                         <div
                             key={index}
-                            className="flex items-center gap-4 bg-white px-5 py-4 rounded-xl border border-[#e8ecf0] hover:border-[#0569ff]/30 hover:shadow-md transition-all duration-300 cursor-pointer group"
+                            className="group relative bg-slate-50/50 p-10 rounded-[3rem] border border-slate-100 transition-all duration-500 hover:bg-white hover:shadow-[0_40px_80px_-20px_rgba(0,0,0,0.08)] hover:-translate-y-2 overflow-hidden flex flex-col"
                         >
-                            <div className="w-11 h-11 bg-[#0569ff]/10 rounded-lg flex items-center justify-center shrink-0 group-hover:bg-[#0569ff]/20 transition-colors duration-300">
-                                {feature.icon}
+                            {/* Feature Icon with Dynamic Colors */}
+                            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-8 transition-all duration-500 group-hover:scale-110 group-hover:rotate-3 shadow-sm border border-slate-100 bg-white group-hover:border-blue-100`}>
+                                <span className="text-blue-600 group-hover:text-blue-700 transition-colors duration-500">
+                                    {feature.icon}
+                                </span>
                             </div>
-                            <h3 className="text-[15px] md:text-base font-semibold text-[#1a1a2e] group-hover:text-[#0569ff] transition-colors duration-300">
+
+                            <h3 className="text-2xl font-black text-slate-900 mb-4 group-hover:text-blue-600 transition-colors duration-300">
                                 {feature.title}
                             </h3>
+
+                            <p className="text-slate-500 text-base leading-relaxed font-medium mb-8">
+                                {feature.desc}
+                            </p>
+
+                            {/* Action Link */}
+                            <div className="mt-auto flex items-center gap-2 text-xs font-black uppercase tracking-widest text-blue-600 group-hover:gap-4 transition-all duration-300">
+                                <span>View Details</span>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                </svg>
+                            </div>
+
+                            {/* Bottom Decorative Bar */}
+                            <div className="absolute bottom-0 left-0 w-full h-1.5 bg-gradient-to-r from-transparent via-blue-600/0 to-transparent group-hover:via-blue-600/20 transition-all duration-500"></div>
                         </div>
                     ))}
                 </div>
 
-                {/* View All Button */}
+                {/* View All Features CTA */}
                 <div className="text-center">
                     <Link
                         href="/features"
-                        className="inline-flex items-center gap-2 px-8 py-3 border-2 border-[#1a1a2e] text-[#1a1a2e] rounded-full font-semibold text-sm hover:bg-[#1a1a2e] hover:text-white transition-all duration-300"
+                        className="group relative inline-flex items-center gap-2 md:gap-3 px-6 md:px-10 py-3 md:py-5 bg-slate-900 text-white rounded-full font-black text-xs md:text-sm uppercase tracking-widest hover:bg-black transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 overflow-hidden"
                     >
-                        View all Features
+                        <span className="relative z-10">Explore All Features</span>
+                        <div className="relative z-10 w-5 h-5 md:w-6 md:h-6 bg-white/10 rounded-full flex items-center justify-center group-hover:translate-x-1 transition-transform">
+                            <svg className="w-3 h-3 md:w-3.5 md:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                            </svg>
+                        </div>
+
+                        {/* Hover Glow Effect */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/0 via-white/10 to-blue-600/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
                     </Link>
+
+                    <div className="mt-8 flex items-center justify-center gap-8 opacity-40 grayscale group hover:grayscale-0 hover:opacity-100 transition-all duration-500">
+                        <div className="h-6 w-px bg-slate-300 mx-4 hidden md:block"></div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-500">Trust by 2000+ Schools</p>
+                        <div className="h-6 w-px bg-slate-300 mx-4 hidden md:block"></div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -917,7 +948,7 @@ function HowWeWorkSection() {
 // School Explorer Section
 function SchoolExplorerSection() {
     return (
-        <section className="py-20 md:py-28 px-5 bg-white">
+        <section className="py-20  bg-white  md:py-28 px-5">
             <div className="max-w-[1200px] mx-auto">
                 {/* Main Content - Two Column Layout */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center mb-20">
@@ -1335,183 +1366,167 @@ function PricingSection() {
 function TestimonialsSection() {
     const testimonials = [
         {
-            text: "This school software has revolutionized our school management. The School ERP Software effortlessly lightens the workload on our dedicated staff, replacing manual efforts.",
-            author: "Lakhvir Singh",
-            role: "Manager",
-            school: "Kalgidhar Academy, Ludhiana"
-        },
-        {
-            text: "As the President of the Federation of Private Schools and Associations of Punjab, I understand the technical challenges faced by schools. Until now, I haven't come across a single solution that addresses all needs.",
-            author: "Dr. Jagjit Singh Dhuri",
-            role: "Director",
-            school: "Group Of Modern Secular Public School"
-        },
-        {
-            text: "I used to face a lot of difficulties in fee collection. I started using Class ON's school fee software, and within 2-3 days, my staff's efficiency increased, and fee recovery became faster.",
-            author: "Aarti Sobit",
+            name: "Dr. Sarah Jenkins",
             role: "Principal",
-            school: "Shree Hanumat International Public School"
+            institution: "St. Mary's Academy",
+            content: "EduBreezy has completely transformed how we manage our daily operations. The automated fee collection alone saved our staff over 20 hours a week.",
+            avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=150&auto=format&fit=crop",
+            rating: 5
         },
         {
-            text: "Since adopting this platform, our admission time dropped by 60%. The unified real-time tracking has significantly improved trust with parents.",
-            author: "Danny Russell",
-            role: "School Principal",
-            school: "Ryan International School"
+            name: "Marcus Thorne",
+            role: "IT Coordinator",
+            institution: "Global International School",
+            content: "The implementation was seamless. Our teachers love the mobile app, and the data security features give us peace of mind that we never had with our old system.",
+            avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=150&auto=format&fit=crop",
+            rating: 5
         },
         {
-            text: "The automated workflows saved us hours every day. Highly recommended for any school looking to modernize their management system.",
-            author: "Brooklyn Simmons",
-            role: "School Owner",
-            school: "Modern Public School"
+            name: "Elena Rodriguez",
+            role: "Head of Admissions",
+            institution: "Oakwood Preparatory",
+            content: "Parents have praised the transparency and ease of communication. The result management module is particularly impressive and easy to use.",
+            avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=150&auto=format&fit=crop",
+            rating: 5
         },
         {
-            text: "Parent communication has never been easier. The app notifications keep everyone informed instantly about fees, attendance, and events.",
-            author: "Cameron Williamson",
-            role: "Administrator",
-            school: "Delhi Public School"
+            name: "David Chen",
+            role: "Administrative Director",
+            institution: "Horizon International",
+            content: "Switching to EduBreezy was the best decision for our digital transformation. The analytics dashboard provides insights that help us optimize school resources effectively.",
+            avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=150&auto=format&fit=crop",
+            rating: 5
+        },
+        {
+            name: "Amina Khalid",
+            role: "Academic Dean",
+            institution: "Crescent School of Arts",
+            content: "The multi-campus support is robust. Managing three different locations from a single dashboard has never been this simple and intuitive.",
+            avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=150&auto=format&fit=crop",
+            rating: 5
         }
     ];
 
-    // Card width (350px) + gap (20px) = 370px per card
-    // 6 testimonials = 2220px per set
-    const cardWidth = 350;
-    const gap = 20;
-    const totalWidth = testimonials.length * (cardWidth + gap);
+    const scrollRef = useRef(null);
+
+    const scroll = (direction) => {
+        if (scrollRef.current) {
+            const { scrollLeft, clientWidth } = scrollRef.current;
+            const scrollTo = direction === 'left' ? scrollLeft - clientWidth : scrollLeft + clientWidth;
+            scrollRef.current.scrollTo({ left: scrollTo, behavior: 'smooth' });
+        }
+    };
+
 
     return (
-        <section className="py-20 bg-[#f8fafc] overflow-hidden">
-            <div className="max-w-[1200px] mx-auto px-5">
-                <div className="text-center mb-12">
-                    <h2 className="text-3xl md:text-4xl font-bold text-[#1a1a2e] mb-3">
-                        Read What <span className="text-[#0569ff]">
-                            <Highlighter action='underline' isView={true} color='#FF9800' >
-                                Our Users
-                            </Highlighter>
-                        </span> Have To Say About Us
-                    </h2>
-                    <p className="text-gray-600 max-w-2xl mx-auto">
-                        We firmly believe that our client's success is our success. Here's a glimpse of our client's experience with us.
-                    </p>
+        <section className="py-24 bg-white relative overflow-hidden">
+            {/* Background Decorative Element */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-full opacity-[0.03] pointer-events-none">
+                <svg viewBox="0 0 100 100" className="w-full h-full">
+                    <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="0.1" />
+                    <circle cx="50" cy="50" r="30" fill="none" stroke="currentColor" strokeWidth="0.1" />
+                </svg>
+            </div>
+
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+                <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6">
+                    <div className="max-w-2xl">
+                        <h2 className="text-blue-600 font-bold text-sm uppercase tracking-[0.2em] mb-4">Success Stories</h2>
+                        <h3 className="text-4xl md:text-5xl font-black text-slate-900 mb-4 tracking-tight">
+                            What our <span className="text-[#0166f6] italic">Partners</span> say.
+                        </h3>
+                        <p className="text-slate-500 text-lg font-medium">
+                            Join over 2,500+ educational institutions that have revolutionized their administration.
+                        </p>
+                    </div>
+
+                    {/* Scroll Controls */}
+                    <div className="flex gap-4">
+                        <button
+                            onClick={() => scroll('left')}
+                            className="w-14 h-14 rounded-full border border-slate-200 flex items-center justify-center hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-90"
+                            aria-label="Scroll left"
+                        >
+                            <svg className="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                        </button>
+                        <button
+                            onClick={() => scroll('right')}
+                            className="w-14 h-14 rounded-full bg-slate-900 flex items-center justify-center hover:bg-slate-800 transition-all active:scale-90 shadow-lg shadow-slate-200"
+                            aria-label="Scroll right"
+                        >
+                            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Scrollable Container */}
+                <div
+                    ref={scrollRef}
+                    className="flex overflow-x-auto gap-8 pb-12 snap-x snap-mandatory no-scrollbar"
+                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                >
+                    {testimonials.map((t, i) => (
+                        <div
+                            key={i}
+                            className="flex-shrink-0 w-[90%] sm:w-[450px] snap-center group bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 transition-all duration-500 hover:bg-white hover:shadow-[0_40px_80px_-20px_rgba(0,0,0,0.08)]"
+                        >
+                            {/* Stars */}
+                            <div className="flex gap-1 mb-6">
+                                {[...Array(t.rating)].map((_, idx) => (
+                                    <svg key={idx} className="w-4 h-4 text-orange-400 fill-current" viewBox="0 0 20 20">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                    </svg>
+                                ))}
+                            </div>
+
+                            {/* Quote Icon */}
+                            <div className="mb-6">
+                                <svg className="w-10 h-10 text-blue-100 group-hover:text-blue-200 transition-colors" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M14.017 21L14.017 18C14.017 16.8954 14.9124 16 16.017 16H19.017C19.5693 16 20.017 15.5523 20.017 15V9C20.017 8.44772 19.5693 8 19.017 8H15.017C14.4647 8 14.017 8.44772 14.017 9V11C14.017 11.5523 13.5693 12 13.017 12H12.017V4H22.017V15C22.017 18.3137 19.3307 21 16.017 21H14.017ZM2.017 21L2.017 18C2.017 16.8954 2.91243 16 4.017 16H7.017C7.56928 16 8.017 15.5523 8.017 15V9C8.017 8.44772 7.56928 8 7.017 8H3.017C2.46472 8 2.017 8.44772 2.017 9V11C2.017 11.5523 1.56928 12 1.017 12H0.017V4H10.017V15C10.017 18.3137 7.33071 21 4.017 21H2.017Z" />
+                                </svg>
+                            </div>
+
+                            <p className="text-slate-700 text-xl font-medium leading-relaxed mb-8 italic">
+                                "{t.content}"
+                            </p>
+
+                            <div className="flex items-center gap-4 mt-auto">
+                                <img
+                                    src={t.avatar}
+                                    alt={t.name}
+                                    className="w-16 h-16 rounded-2xl border-2 border-white shadow-md object-cover"
+                                />
+                                <div>
+                                    <h4 className="text-slate-900 font-bold text-lg leading-tight">{t.name}</h4>
+                                    <p className="text-blue-600 text-xs font-bold uppercase tracking-wider mb-1">{t.role}</p>
+                                    <p className="text-slate-400 text-xs font-medium">{t.institution}</p>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Brand Logos Strip */}
+                <div className="mt-12 flex flex-wrap justify-center items-center gap-12 opacity-20 grayscale hover:grayscale-0 transition-all duration-700">
+                    <div className="text-2xl font-black text-slate-800 tracking-tighter">SCHOOLS.co</div>
+                    <div className="text-2xl font-black text-slate-800 tracking-tighter">ACADEMY_PRO</div>
+                    <div className="text-2xl font-black text-slate-800 tracking-tighter">LEARN_HUB</div>
+                    <div className="text-2xl font-black text-slate-800 tracking-tighter">EDU_MATIC</div>
+                    <div className="text-2xl font-black text-slate-800 tracking-tighter">CAMPUS_LIFE</div>
                 </div>
             </div>
 
-            {/* Marquee Container */}
-            <div className="relative testimonials-marquee-wrapper">
-                {/* Gradient Fade Left */}
-                <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-[#f8fafc] to-transparent z-10 pointer-events-none" />
-
-                {/* Gradient Fade Right */}
-                <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-[#f8fafc] to-transparent z-10 pointer-events-none" />
-
-                {/* Infinite Marquee Track */}
-                <div className="testimonials-marquee-track flex">
-                    {/* First set of testimonials */}
-                    <div className="flex gap-5 pr-5">
-                        {testimonials.map((t, i) => (
-                            <div
-                                key={`set1-${i}`}
-                                className="flex-shrink-0 w-[350px] h-[280px] p-8 rounded-xl bg-white border border-[#e8e8e8] relative overflow-hidden flex flex-col transition-transform duration-300 hover:scale-[1.02]"
-                            >
-                                {/* Quote Icon */}
-                                <div className="absolute top-4 left-4 pointer-events-none">
-                                    <svg width="48" height="38" viewBox="0 0 32 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M0 24V14.4C0 11.7333 0.4 9.33333 1.2 7.2C2.06667 5.06667 3.26667 3.26667 4.8 1.8C6.4 0.333333 8.26667 -0.266667 10.4 0.133333V5.4C9.06667 5.66667 7.96667 6.26667 7.1 7.2C6.3 8.13333 5.9 9.26667 5.9 10.6V10.8H12V24H0ZM20 24V14.4C20 11.7333 20.4 9.33333 21.2 7.2C22.0667 5.06667 23.2667 3.26667 24.8 1.8C26.4 0.333333 28.2667 -0.266667 30.4 0.133333V5.4C29.0667 5.66667 27.9667 6.26667 27.1 7.2C26.3 8.13333 25.9 9.26667 25.9 10.6V10.8H32V24H20Z" fill="#E8E8E8" />
-                                    </svg>
-                                </div>
-
-                                {/* Testimonial Text */}
-                                <p
-                                    className="text-[0.95rem] text-[#444] leading-relaxed mb-auto text-justify relative z-10 pt-10"
-                                    style={{
-                                        textAlignLast: 'left',
-                                        display: '-webkit-box',
-                                        WebkitLineClamp: 4,
-                                        WebkitBoxOrient: 'vertical',
-                                        overflow: 'hidden'
-                                    }}
-                                >
-                                    {t.text}
-                                </p>
-
-                                {/* Author Info */}
-                                <div className="relative z-10 mt-4 pt-4 border-t border-[#f0f0f0]">
-                                    <div className="font-bold text-[#0569ff] text-sm tracking-wide truncate">
-                                        {t.author.toUpperCase()}
-                                    </div>
-                                    <div className="text-[13px] text-[#1a1a2e] font-medium underline decoration-1 truncate">
-                                        {t.role}
-                                    </div>
-                                    <div className="text-[12px] text-[#666] truncate">
-                                        {t.school}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                    {/* Second set of testimonials (clone for seamless loop) */}
-                    <div className="flex gap-5 pr-5">
-                        {testimonials.map((t, i) => (
-                            <div
-                                key={`set2-${i}`}
-                                className="flex-shrink-0 w-[350px] h-[280px] p-8 rounded-xl bg-white border border-[#e8e8e8] relative overflow-hidden flex flex-col transition-transform duration-300 hover:scale-[1.02]"
-                            >
-                                {/* Quote Icon */}
-                                <div className="absolute top-4 left-4 pointer-events-none">
-                                    <svg width="48" height="38" viewBox="0 0 32 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M0 24V14.4C0 11.7333 0.4 9.33333 1.2 7.2C2.06667 5.06667 3.26667 3.26667 4.8 1.8C6.4 0.333333 8.26667 -0.266667 10.4 0.133333V5.4C9.06667 5.66667 7.96667 6.26667 7.1 7.2C6.3 8.13333 5.9 9.26667 5.9 10.6V10.8H12V24H0ZM20 24V14.4C20 11.7333 20.4 9.33333 21.2 7.2C22.0667 5.06667 23.2667 3.26667 24.8 1.8C26.4 0.333333 28.2667 -0.266667 30.4 0.133333V5.4C29.0667 5.66667 27.9667 6.26667 27.1 7.2C26.3 8.13333 25.9 9.26667 25.9 10.6V10.8H32V24H20Z" fill="#E8E8E8" />
-                                    </svg>
-                                </div>
-
-                                {/* Testimonial Text */}
-                                <p
-                                    className="text-[0.95rem] text-[#444] leading-relaxed mb-auto text-justify relative z-10 pt-10"
-                                    style={{
-                                        textAlignLast: 'left',
-                                        display: '-webkit-box',
-                                        WebkitLineClamp: 4,
-                                        WebkitBoxOrient: 'vertical',
-                                        overflow: 'hidden'
-                                    }}
-                                >
-                                    {t.text}
-                                </p>
-
-                                {/* Author Info */}
-                                <div className="relative z-10 mt-4 pt-4 border-t border-[#f0f0f0]">
-                                    <div className="font-bold text-[#0569ff] text-sm tracking-wide truncate">
-                                        {t.author.toUpperCase()}
-                                    </div>
-                                    <div className="text-[13px] text-[#1a1a2e] font-medium underline decoration-1 truncate">
-                                        {t.role}
-                                    </div>
-                                    <div className="text-[12px] text-[#666] truncate">
-                                        {t.school}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            {/* CSS for infinite marquee animation */}
             <style>{`
-                .testimonials-marquee-track {
-                    animation: testimonials-scroll 30s linear infinite;
-                }
-                .testimonials-marquee-wrapper:hover .testimonials-marquee-track {
-                    animation-play-state: paused;
-                }
-                @keyframes testimonials-scroll {
-                    0% {
-                        transform: translateX(0);
-                    }
-                    100% {
-                        transform: translateX(-${totalWidth}px);
-                    }
-                }
-            `}</style>
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
         </section>
+
     );
 
 }
