@@ -24,7 +24,9 @@ import {
     EyeOff,
     ShieldCheck,
     CheckCircle2,
-    XCircle
+    XCircle,
+    HelpCircle,
+    ChevronRight
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -681,6 +683,7 @@ export default function FeeSettings() {
 
     return (
         <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+
             {/* Header */}
             <div>
                 <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
@@ -692,8 +695,93 @@ export default function FeeSettings() {
                 </p>
             </div>
 
+            {/* How to Get ICICI Credentials Guide - Top Level */}
+            {onlinePaymentEnabled && paymentGateway === 'ICICI_EAZYPAY' && (
+                <details className="group border rounded-lg overflow-hidden">
+                    <summary className="flex items-center justify-between p-4 cursor-pointer bg-blue-50 dark:bg-blue-950/20 hover:bg-blue-100 dark:hover:bg-blue-950/30 transition-colors">
+                        <div className="flex items-center gap-2">
+                            <HelpCircle className="w-5 h-5 text-blue-600" />
+                            <span className="font-medium text-blue-900 dark:text-blue-100">How to Get ICICI Eazypay Credentials?</span>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-blue-600 transition-transform group-open:rotate-90" />
+                    </summary>
+                    <div className="p-6 bg-white dark:bg-slate-900 space-y-4">
+                        <div className="space-y-3">
+                            <h4 className="font-semibold text-sm flex items-center gap-2">
+                                <span className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-700 dark:text-blue-300 text-xs">1</span>
+                                Contact ICICI Bank
+                            </h4>
+                            <p className="text-sm text-muted-foreground pl-8">
+                                Reach out to your ICICI Bank relationship manager or visit the nearest ICICI Bank branch.
+                                Request to enroll for <strong>"ICICI Eazypay Payment Gateway"</strong> service.
+                            </p>
+                        </div>
+
+                        <div className="space-y-3">
+                            <h4 className="font-semibold text-sm flex items-center gap-2">
+                                <span className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-700 dark:text-blue-300 text-xs">2</span>
+                                Submit Required Documents
+                            </h4>
+                            <ul className="text-sm text-muted-foreground pl-8 space-y-1 list-disc">
+                                <li>School registration certificate</li>
+                                <li>PAN card of the institution</li>
+                                <li>Current bank account details with ICICI</li>
+                                <li>Website/portal URL (if available)</li>
+                                <li>Authorized signatory documents</li>
+                            </ul>
+                        </div>
+
+                        <div className="space-y-3">
+                            <h4 className="font-semibold text-sm flex items-center gap-2">
+                                <span className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-700 dark:text-blue-300 text-xs">3</span>
+                                Complete Registration Form
+                            </h4>
+                            <p className="text-sm text-muted-foreground pl-8">
+                                ICICI will provide a merchant registration form. Fill it with school details, expected transaction volume,
+                                and settlement preferences.
+                            </p>
+                        </div>
+
+                        <div className="space-y-3">
+                            <h4 className="font-semibold text-sm flex items-center gap-2">
+                                <span className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-700 dark:text-blue-300 text-xs">4</span>
+                                Receive Credentials
+                            </h4>
+                            <p className="text-sm text-muted-foreground pl-8">
+                                After approval (usually 3-5 business days), ICICI will provide:
+                            </p>
+                            <ul className="text-sm text-muted-foreground pl-8 space-y-1 list-disc">
+                                <li><strong>Merchant ID:</strong> Your unique merchant identification number</li>
+                                <li><strong>Encryption Key:</strong> Secret key for secure payment encryption (16-character key)</li>
+                                <li>Access to merchant portal for transaction monitoring</li>
+                            </ul>
+                        </div>
+
+                        <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                            <p className="text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2">
+                                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                                <span>
+                                    <strong>Important:</strong> Until you receive live credentials, keep <strong>Test Mode enabled</strong> to simulate payments
+                                    safely during development.
+                                </span>
+                            </p>
+                        </div>
+
+                        <div className="pt-3 border-t">
+                            <p className="text-xs text-muted-foreground">
+                                <strong>Need help?</strong> Contact ICICI API Banking Support:
+                                <a href="mailto:apibankingsupport@icicibank.com" className="text-blue-600 hover:underline ml-1">
+                                    apibankingsupport@icicibank.com
+                                </a>
+                            </p>
+                        </div>
+                    </div>
+                </details>
+            )}
+
+
             <Tabs defaultValue="general" className="space-y-4">
-                <TabsList className="grid bg-muted/20 grid-cols-2 lg:grid-cols-5 gap-1">
+                <TabsList className="grid bg-[#eef1f3] dark:bg-muted border grid-cols-2 lg:grid-cols-5 gap-1">
                     <TabsTrigger value="general">General</TabsTrigger>
                     <TabsTrigger value="payments">Payments</TabsTrigger>
                     <TabsTrigger value="notifications">Notifications</TabsTrigger>
@@ -704,7 +792,7 @@ export default function FeeSettings() {
                 {/* ====== GENERAL SETTINGS ====== */}
                 <TabsContent value="general">
                     <Card>
-                        <CardHeader>
+                        <CardHeader className={'border-b'}>
                             <CardTitle className="flex items-center gap-2">
                                 <DollarSign className="w-5 h-5" />
                                 General Fee Settings
@@ -862,29 +950,41 @@ export default function FeeSettings() {
                 {/* ====== PAYMENT GATEWAY (RAZORPAY ROUTE) ====== */}
                 <TabsContent value="payments">
                     <Card>
-                        <CardHeader>
+                        <CardHeader className={'border-b'}>
                             <CardTitle className="flex items-center gap-2"><Globe className="w-5 h-5" /> Online Payment Gateway</CardTitle>
                             <CardDescription>Configure the bank gateway for direct school settlements.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                            <div className="flex justify-between items-center p-4 bg-muted/30 rounded-lg">
+                            <div className="flex justify-between items-center p- bg-muted/30 rounded-lg">
                                 <div>
                                     <Label className="font-medium">Enable Online Payments</Label>
                                     <p className="text-xs text-muted-foreground">Allows parents to pay via the configured bank gateway</p>
                                 </div>
-                                <Switch checked={onlinePaymentEnabled} onCheckedChange={setOnlinePaymentEnabled} />
+                                <Switch
+                                    checked={onlinePaymentEnabled}
+                                    disabled={saveSettingsMutation.isPending}
+                                    onCheckedChange={(checked) => {
+                                        setOnlinePaymentEnabled(checked);
+                                        // Auto-save immediately
+                                        saveSettingsMutation.mutate({
+                                            type: 'payment_gateway',
+                                            settings: {
+                                                onlinePaymentEnabled: checked,
+                                                testMode,
+                                                paymentGateway,
+                                                merchantId,
+                                                accessCode,
+                                                secretKey,
+                                                workingKey,
+                                                successUrl,
+                                                failureUrl,
+                                            },
+                                        });
+                                    }}
+                                    className={saveSettingsMutation.isPending ? 'opacity-50 cursor-wait' : ''}
+                                />
                             </div>
 
-                            <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200">
-                                <AlertCircle className="w-4 h-4 text-blue-600" />
-                                <AlertDescription className="text-blue-700 dark:text-blue-300">
-                                    <strong>Important:</strong>
-                                    <p className="text-sm mt-1">
-                                        Online payments are processed directly by the school’s bank through the selected payment gateway.
-                                        EduBreezy does not collect, hold, or process funds. All payments are settled directly into the school’s bank account.
-                                    </p>
-                                </AlertDescription>
-                            </Alert>
 
                             {onlinePaymentEnabled && (
                                 <div className="space-y-6 animate-in fade-in slide-in-from-top-2">
@@ -913,7 +1013,30 @@ export default function FeeSettings() {
                                                     : 'Payments are processed through the real bank gateway. Ensure credentials are correct.'}
                                             </p>
                                         </div>
-                                        <Switch checked={!testMode} onCheckedChange={(checked) => setTestMode(!checked)} />
+                                        <Switch
+                                            checked={!testMode}
+                                            disabled={saveSettingsMutation.isPending}
+                                            onCheckedChange={(checked) => {
+                                                const newTestMode = !checked;
+                                                setTestMode(newTestMode);
+                                                // Auto-save immediately
+                                                saveSettingsMutation.mutate({
+                                                    type: 'payment_gateway',
+                                                    settings: {
+                                                        onlinePaymentEnabled,
+                                                        testMode: newTestMode,
+                                                        paymentGateway,
+                                                        merchantId,
+                                                        accessCode,
+                                                        secretKey,
+                                                        workingKey,
+                                                        successUrl,
+                                                        failureUrl,
+                                                    },
+                                                });
+                                            }}
+                                            className={saveSettingsMutation.isPending ? 'opacity-50 cursor-wait' : ''}
+                                        />
                                     </div>
 
                                     {!testMode && (
@@ -1092,7 +1215,7 @@ export default function FeeSettings() {
                 {/* ====== NOTIFICATIONS ====== */}
                 <TabsContent value="notifications">
                     <Card>
-                        <CardHeader>
+                        <CardHeader className={'border-b'}>
                             <CardTitle className="flex items-center gap-2">
                                 <Bell className="w-5 h-5" />
                                 Notification Settings
@@ -1166,7 +1289,7 @@ export default function FeeSettings() {
                 {/* ====== RECEIPTS ====== */}
                 <TabsContent value="receipts">
                     <Card>
-                        <CardHeader>
+                        <CardHeader className={'border-b'}>
                             <CardTitle className="flex items-center gap-2">
                                 <FileText className="w-5 h-5" />
                                 Receipt Settings
@@ -1250,7 +1373,7 @@ export default function FeeSettings() {
                 {/* ====== DISCOUNTS ====== */}
                 <TabsContent value="discounts">
                     <Card>
-                        <CardHeader>
+                        <CardHeader className={'border-b'}>
                             <CardTitle className="flex items-center gap-2">
                                 <Percent className="w-5 h-5" />
                                 Discount Settings
@@ -1348,6 +1471,16 @@ export default function FeeSettings() {
                     </Card>
                 </TabsContent>
             </Tabs>
+            <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200">
+                <AlertCircle className="w-4 h-4 text-blue-600" />
+                <AlertDescription className="text-blue-700 dark:text-blue-300">
+                    <strong>Important:</strong>
+                    <p className="text-sm mt-1">
+                        Online payments are processed directly by the school’s bank through the selected payment gateway.
+                        EduBreezy does not collect, hold, or process funds. All payments are settled directly into the school’s bank account.
+                    </p>
+                </AlertDescription>
+            </Alert>
         </div>
     );
 }

@@ -62,7 +62,10 @@ export default function PayDashboardPage() {
                 const err = await res.json();
                 throw new Error(err.error || 'Failed to fetch');
             }
-            return res.json();
+            const data = await res.json();
+            console.log('🔍 Payment Portal Data:', data);
+            console.log('🔍 Payment Options:', data?.paymentOptions);
+            return data;
         },
         enabled: !!session?.token,
         staleTime: 60 * 1000, // 1 minute
@@ -269,6 +272,7 @@ export default function PayDashboardPage() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+
             {/* Header */}
             <header className="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 sticky top-0 z-50">
                 <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -292,7 +296,9 @@ export default function PayDashboardPage() {
                 </div>
             </header>
 
-            <main className="container mx-auto px-4 py-8 max-w-6xl">
+
+            <main className="container mx-auto px-4 py-8  max-w-6xl">
+
                 {/* Student Info Card */}
                 <Card className="mb-6 bg-gradient-to-br from-[#0168fb] via-[#0855d4] to-indigo-600 text-white border-0 shadow-xl overflow-hidden relative">
                     <div className="absolute -top-20 -right-20 w-40 h-40 bg-white/5 rounded-full" />
@@ -362,7 +368,17 @@ export default function PayDashboardPage() {
                         </div>
                     )}
                 </Card>
-
+                {data?.paymentOptions && !data.paymentOptions.onlineEnabled && (
+                    <div className="p-3 mb-5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                        <div className="flex items-start gap-2">
+                            <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                            <div className="text-xs text-amber-800 dark:text-amber-200">
+                                <p className="font-semibold mb-1">Online Payment Not Enabled</p>
+                                <p>You can pay fees by visiting the school directly. Contact the school office for payment.</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 {/* Progress Bar */}
                 {fee && (
                     <Card className="mb-6 bg-white dark:bg-slate-900 overflow-hidden">
@@ -511,13 +527,13 @@ export default function PayDashboardPage() {
                                         return (
                                             <div
                                                 key={installment.id}
-                                                className={`p-4 rounded-xl border-2 transition-all ${isPaid
+                                                className={`p-4 rounded-xl border-1 transition-all ${isPaid
                                                     ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800'
                                                     : selectedInstallments.includes(installment.id)
-                                                        ? 'bg-blue-50 dark:bg-blue-900/10 border-[#0168fb] shadow-md'
+                                                        ? 'bg-blue-50 dark:bg-blue-900/10 border-[#0168fb] '
                                                         : installment.isOverdue
                                                             ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
-                                                            : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 hover:border-gray-300 hover:shadow-sm'
+                                                            : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 hover:border-gray-300 '
                                                     } cursor-pointer`}
                                                 onClick={() => !isPaid && toggleInstallment(installment.id)}
                                             >
@@ -616,6 +632,8 @@ export default function PayDashboardPage() {
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
+                                    {/* Online Payment Disabled Notice */}
+
                                     <div className="space-y-2">
                                         <div className="flex justify-between text-sm">
                                             <span className="text-gray-500">Selected Installments</span>
@@ -630,29 +648,36 @@ export default function PayDashboardPage() {
                                         </div>
                                     </div>
 
-                                    {/* UPI ID Input for ICICI */}
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                            UPI ID (for ICICI payments)
-                                        </label>
-                                        <input
-                                            type="text"
-                                            placeholder="yourname@paytm"
-                                            value={upiId}
-                                            onChange={(e) => setUpiId(e.target.value)}
-                                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#0168fb] focus:border-transparent bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
-                                        />
-                                        <p className="text-xs text-gray-500">
-                                            Enter your UPI ID (e.g., name@paytm, name@phonepe)
-                                        </p>
-                                    </div>
+                                    {/* UPI ID Input for ICICI - Only show if online payments enabled */}
+                                    {data?.paymentOptions?.onlineEnabled && (
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                UPI ID (for ICICI payments)
+                                            </label>
+                                            <input
+                                                type="text"
+                                                placeholder="yourname@paytm"
+                                                value={upiId}
+                                                onChange={(e) => setUpiId(e.target.value)}
+                                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#0168fb] focus:border-transparent bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                                            />
+                                            <p className="text-xs text-gray-500">
+                                                Enter your UPI ID (e.g., name@paytm, name@phonepe)
+                                            </p>
+                                        </div>
+                                    )}
 
                                     <Button
                                         onClick={handleProceedToCheckout}
-                                        disabled={selectedInstallments.length === 0 || processingPayment}
-                                        className="w-full h-12 bg-[#0168fb] hover:bg-blue-700 text-white font-medium shadow-lg shadow-blue-500/25"
+                                        disabled={selectedInstallments.length === 0 || processingPayment || !data?.paymentOptions?.onlineEnabled}
+                                        className="w-full h-12 bg-[#0168fb] hover:bg-blue-700 text-white font-medium rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                        {processingPayment ? (
+                                        {!data?.paymentOptions?.onlineEnabled ? (
+                                            <>
+                                                <AlertCircle className="w-4 h-4 mr-2" />
+                                                Payment Not Enabled
+                                            </>
+                                        ) : processingPayment ? (
                                             <>
                                                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                                                 Processing...

@@ -84,7 +84,9 @@ export async function POST(req) {
                 });
                 break;
 
+
             case "payment_gateway":
+                // Update schoolPaymentSettings table
                 await prisma.schoolPaymentSettings.upsert({
                     where: { schoolId },
                     create: {
@@ -109,6 +111,16 @@ export async function POST(req) {
                         workingKey: settings.workingKey,
                         successUrl: settings.successUrl,
                         failureUrl: settings.failureUrl,
+                    },
+                });
+
+                // ALSO update feeSettings table (used by payment portal)
+                await prisma.feeSettings.updateMany({
+                    where: { schoolId },
+                    data: {
+                        onlinePaymentEnabled: settings.onlinePaymentEnabled,
+                        paymentGateway: settings.paymentGateway,
+                        sandboxMode: settings.testMode ?? true,
                     },
                 });
                 break;
@@ -168,6 +180,23 @@ export async function POST(req) {
                     },
                 });
                 break;
+        }
+
+        // Invalidate cache for payment portal when payment gateway settings change
+        if (type === 'payment_gateway') {
+            try {
+                // Clear all student fee caches for this school
+                const redis = (await import('@/lib/redis')).default;
+                // Delete pattern: pay:student-fees:*
+                const keys = await redis.keys('pay:student-fees:*');
+                if (keys.length > 0) {
+                    await redis.del(...keys);
+                    console.log(`✅ Invalidated ${keys.length} payment cache keys`);
+                }
+            } catch (cacheError) {
+                console.error('Cache invalidation error:', cacheError);
+                // Don't fail the request if cache invalidation fails
+            }
         }
 
         return NextResponse.json({ success: true });

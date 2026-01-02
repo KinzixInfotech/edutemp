@@ -83,7 +83,17 @@ export default function PayPageContent() {
             const res = await fetch(`/api/schools/${school.id}/academic-years`);
             if (!res.ok) throw new Error('Failed to fetch');
             const data = await res.json();
-            return data.academicYears || data;
+            const years = data.academicYears || data;
+
+            // Filter to show only past and current years (not future years)
+            const currentYear = new Date().getFullYear();
+            return years.filter(ay => {
+                // Extract start year from name (e.g., "2025-26" -> 2025)
+                const match = ay.name.match(/^(\d{4})/);
+                if (!match) return true; // If format doesn't match, include it
+                const startYear = parseInt(match[1]);
+                return startYear <= currentYear; // Only current or past years
+            });
         },
         enabled: !!school?.id,
         staleTime: 5 * 60 * 1000,
