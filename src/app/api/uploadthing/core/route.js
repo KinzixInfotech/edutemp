@@ -171,4 +171,26 @@ export const ourFileRouter = {
             console.log("Bulk Certificate ZIP uploaded for school:", metadata.schoolId)
             return { url: file.ufsUrl }
         }),
+
+    // Broadcast/Notice image uploader for mobile app
+    broadcastImage: f({ image: { maxFileSize: "8MB", maxFileCount: 1 } })
+        .input(z.object({ schoolId: z.string(), userId: z.string() }))
+        .onUploadComplete(async ({ metadata, file }) => {
+            console.log("Broadcast image uploaded for school:", metadata.schoolId)
+            console.log("File URL:", file.ufsUrl)
+
+            // Save to Upload table for tracking
+            await prisma.upload.create({
+                data: {
+                    schoolId: metadata.schoolId,
+                    userId: metadata.userId,
+                    fileUrl: file.ufsUrl,
+                    fileName: file.name,
+                    mimeType: file.type,
+                    size: file.size,
+                },
+            });
+
+            return { url: file.ufsUrl }
+        }),
 }

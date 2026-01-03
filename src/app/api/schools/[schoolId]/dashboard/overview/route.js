@@ -122,16 +122,17 @@ export async function GET(req, { params }) {
                     _sum: { amount: true }
                 }).catch(() => ({ _sum: { amount: 0 } })) : { _sum: { amount: 0 } },
 
-                // 8. Fees pending (total)
+                // 8. Fees pending (total) - using StudentFee table
                 academicYearId ? prisma.$queryRaw`
                     SELECT 
-                        COUNT(DISTINCT fs."studentId") as "pendingCount",
-                        COALESCE(SUM(fs."totalAmount" - COALESCE(fs."paidAmount", 0)), 0) as "pendingAmount"
-                    FROM "FeeStructure" fs
-                    WHERE fs."schoolId" = ${schoolId}::uuid
-                    AND fs."academicYearId" = ${academicYearId}::uuid
-                    AND fs."totalAmount" > COALESCE(fs."paidAmount", 0)
+                        COUNT(DISTINCT sf."studentId") as "pendingCount",
+                        COALESCE(SUM(sf."balanceAmount"), 0) as "pendingAmount"
+                    FROM "StudentFee" sf
+                    WHERE sf."schoolId" = ${schoolId}::uuid
+                    AND sf."academicYearId" = ${academicYearId}::uuid
+                    AND sf."balanceAmount" > 0
                 `.catch(() => [{ pendingCount: 0, pendingAmount: 0 }]) : [{ pendingCount: 0, pendingAmount: 0 }],
+
 
                 // 9. Payroll pending (current month)
                 prisma.payrollPeriod.aggregate({

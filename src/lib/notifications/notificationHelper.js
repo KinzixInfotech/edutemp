@@ -457,11 +457,15 @@ async function getTargetUserIds(schoolId, targetOptions) {
                     break;
 
                 case 'ADMIN':
-                    const admins = await prisma.admin.findMany({
-                        where: { schoolId },
-                        select: { userId: true }
+                    // Query User table directly for ADMIN role
+                    const admins = await prisma.user.findMany({
+                        where: {
+                            schoolId,
+                            role: { name: 'ADMIN' }
+                        },
+                        select: { id: true }
                     });
-                    admins.forEach(a => userIdSet.add(a.userId));
+                    admins.forEach(a => userIdSet.add(a.id));
                     break;
             }
         }
@@ -501,10 +505,11 @@ async function sendPushNotifications({ userIds, title, message, data = {} }) {
                 id: { in: userIds },
                 fcmToken: { not: null }
             },
-            select: { fcmToken: true }
+            select: { id: true, fcmToken: true }
         });
 
-        const tokens = users.map(u => u.fcmToken).filter(Boolean);
+        const validUsers = users.filter(u => u.fcmToken);
+        const tokens = validUsers.map(u => u.fcmToken);
 
         if (tokens.length === 0) {
             console.log('No FCM tokens found for push notification');
@@ -521,6 +526,7 @@ async function sendPushNotifications({ userIds, title, message, data = {} }) {
 
         // Send to Firebase Cloud Messaging
         console.log(`Sending push notification to ${tokens.length} devices`);
+        console.log(`Targeting User IDs:`, validUsers.map(u => u.id));
         console.log(`Payload Title: ${title}`);
 
         const response = await messaging.sendEachForMulticast({
@@ -548,12 +554,31 @@ async function sendPushNotifications({ userIds, title, message, data = {} }) {
         });
 
         console.log(`Sent notification to ${response.successCount} parents (Failed: ${response.failureCount})`);
+
+        // Handle failed tokens (Cleanup invalid tokens)
         if (response.failureCount > 0) {
+            const invalidConfigs = [];
             response.responses.forEach((resp, idx) => {
                 if (!resp.success) {
-                    console.error(`Token ${tokens[idx]} failed:`, resp.error);
+                    const errorCode = resp.error?.code;
+                    const errorMsg = resp.error?.message;
+                    console.error(`Token for user ${validUsers[idx].id} failed:`, errorCode || errorMsg);
+
+                    if (errorCode === 'messaging/registration-token-not-registered' ||
+                        errorCode === 'messaging/invalid-registration-token' ||
+                        errorMsg?.includes('NotRegistered')) {
+                        invalidConfigs.push(validUsers[idx].id);
+                    }
                 }
             });
+
+            if (invalidConfigs.length > 0) {
+                console.log(`Removing ${invalidConfigs.length} invalid/expired tokens...`);
+                await prisma.user.updateMany({
+                    where: { id: { in: invalidConfigs } },
+                    data: { fcmToken: null }
+                });
+            }
         }
     } catch (error) {
         console.error('Push notification error:', error);

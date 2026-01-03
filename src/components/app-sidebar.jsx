@@ -72,7 +72,15 @@ export const SidebarData = [
             { label: "Home", url: "/dashboard/", icon: House, roles: ["SUPER_ADMIN", "STUDENT", "ADMIN", "MASTER_ADMIN", "TEACHER", "STAFF"] },
             { label: "Self Attendance", url: "/dashboard/markattendance", icon: Newspaper, roles: ["SUPER_ADMIN", "STUDENT", "ADMIN", "MASTER_ADMIN", "TEACHER", "STAFF"] },
             // { label: "Inbox", url: "/dashboard/schools/mail/inbox", icon: Inbox, roles: ["ADMIN"] },
-            { label: "Noticeboard", url: "/dashboard/schools/noticeboard", icon: Flag, roles: ["ADMIN"] },
+            {
+                label: "Notice & Circulars",
+                icon: BookCopy,
+                roles: ["ADMIN"],
+                submenu: [
+                    { label: "All Notices", url: "/dashboard/schools/noticeboard", roles: ["ADMIN"] },
+                    { label: "Send Notice", url: "/dashboard/schools/manage-notice", roles: ["ADMIN"] },
+                ],
+            },
             { label: "School Calendar", url: "/dashboard/calendar", icon: Calendar, roles: ["ADMIN"] },
 
         ],
@@ -339,7 +347,7 @@ export const SidebarData = [
             { label: "Student Promotion", url: "/dashboard/schools/academic/promotion", icon: TrendingUp, roles: ["ADMIN"] },
             { label: "Manage Parent", url: "/dashboard/schools/manage-parent", icon: User, roles: ["ADMIN"] },
             { label: "Manage Academic Year", url: "/dashboard/schools/academic-years", icon: CalendarCog, roles: ["ADMIN"] },
-            { label: "Notices & Circulars", url: "/dashboard/schools/manage-notice", icon: Flag, roles: ["ADMIN"] },
+            // { label: "Notices & Circulars", url: "/dashboard/schools/manage-notice", icon: Flag, roles: ["ADMIN"] },
         ]
     },
     {

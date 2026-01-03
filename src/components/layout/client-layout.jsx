@@ -25,6 +25,7 @@ import { BreadcrumbHeader } from "../breadcrumb-header";
 import { AcademicYearSetupBannerProvider } from "../AcademicYearSetupBanner";
 import axios from "axios";
 import { toast } from "sonner";
+import { WebPushListener } from "@/components/web-push-listener";
 
 const TopProgressBar = dynamic(() => import("@/app/components/TopProgressBar"), {
     ssr: false,
@@ -32,6 +33,7 @@ const TopProgressBar = dynamic(() => import("@/app/components/TopProgressBar"), 
 
 export default function ClientLayout({ children }) {
     const { loadingMsg, fullUser } = useAuth();
+
 
     const [isDbDown, setIsDbDown] = useState(false);
 
@@ -208,7 +210,10 @@ export default function ClientLayout({ children }) {
                                         <Loader2 className="h-10 w-10 animate-spin text-primary" />
                                     </div>
                                 ) : (
-                                    children
+                                    <>
+                                        <WebPushListener />
+                                        {children}
+                                    </>
                                 )}
                             </main>
                             <footer className="w-full border-t bg-white dark:bg-muted/30 rounded-b-lg  text-xs text-muted-foreground mt-8">

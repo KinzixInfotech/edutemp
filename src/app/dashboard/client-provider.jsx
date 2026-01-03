@@ -27,7 +27,7 @@ export default function ClientProviders({ children }) {
                             toastOptions={{
                                 classNames: { description: 'text-black dark:text-white' },
                             }}
-                            richColors
+                            
                         /> */}
                     </ThemeProvider>
                 </LoaderProvider>

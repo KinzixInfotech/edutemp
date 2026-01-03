@@ -50,14 +50,14 @@ export function NavUser({ }) {
         const user = await supabase.auth.getUser();
         const userId = user.data?.user?.id;
 
-        if (userId) {
-            //  Update status via backend
-            await fetch("/api/logout-status", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ userId }),
-            });
-        }
+        // if (userId) {
+        //     //  Update status via backend
+        //     await fetch("/api/logout-status", {
+        //         method: "POST",
+        //         headers: { "Content-Type": "application/json" },
+        //         body: JSON.stringify({ userId }),
+        //     });
+        // }
 
         const { error } = await supabase.auth.signOut();
 

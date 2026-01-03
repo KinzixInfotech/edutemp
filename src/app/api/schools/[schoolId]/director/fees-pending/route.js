@@ -36,35 +36,37 @@ export async function GET(req, { params }) {
             const pendingFees = await prisma.$queryRaw`
                 SELECT 
                     s."admissionNo",
-                    s."name" as "studentName",
-                    s.email,
-                    fs."totalAmount",
-                    COALESCE(fs."paidAmount", 0) as "paidAmount",
-                    (fs."totalAmount" - COALESCE(fs."paidAmount", 0)) as "pendingAmount",
-                    fs."dueDate",
+                    u."name" as "studentName",
+                    u.email,
+                    sf."finalAmount" as "totalAmount",
+                    sf."paidAmount",
+                    sf."balanceAmount" as "pendingAmount",
+                    sf."assignedDate" as "dueDate",
                     CASE 
-                        WHEN fs."dueDate" < CURRENT_DATE THEN true
+                        WHEN sf."status" = 'OVERDUE' THEN true
                         ELSE false
                     END as "isOverdue"
-                FROM "FeeStructure" fs
-                INNER JOIN "Student" s ON fs."studentId" = s."userId"
-                WHERE fs."schoolId" = ${schoolId}::uuid
-                AND fs."academicYearId" = ${yearId}::uuid
-                AND fs."totalAmount" > COALESCE(fs."paidAmount", 0)
-                ORDER BY fs."dueDate" ASC, "pendingAmount" DESC
+                FROM "StudentFee" sf
+                INNER JOIN "Student" s ON sf."studentId" = s."userId"
+                INNER JOIN "User" u ON s."userId" = u."id"
+                WHERE sf."schoolId" = ${schoolId}::uuid
+                AND sf."academicYearId" = ${yearId}::uuid
+                AND sf."balanceAmount" > 0
+                ORDER BY sf."balanceAmount" DESC
                 LIMIT 100
             `;
 
             const summary = await prisma.$queryRaw`
                 SELECT 
-                    COUNT(DISTINCT fs."studentId") as "studentCount",
-                    COALESCE(SUM(fs."totalAmount" - COALESCE(fs."paidAmount", 0)), 0) as "totalPending",
-                    COUNT(CASE WHEN fs."dueDate" < CURRENT_DATE THEN 1 END) as "overdueCount"
-                FROM "FeeStructure" fs
-                WHERE fs."schoolId" = ${schoolId}::uuid
-                AND fs."academicYearId" = ${yearId}::uuid
-                AND fs."totalAmount" > COALESCE(fs."paidAmount", 0)
+                    COUNT(DISTINCT sf."studentId") as "studentCount",
+                    COALESCE(SUM(sf."balanceAmount"), 0) as "totalPending",
+                    COUNT(CASE WHEN sf."status" = 'OVERDUE' THEN 1 END) as "overdueCount"
+                FROM "StudentFee" sf
+                WHERE sf."schoolId" = ${schoolId}::uuid
+                AND sf."academicYearId" = ${yearId}::uuid
+                AND sf."balanceAmount" > 0
             `;
+
 
             return {
                 summary: {

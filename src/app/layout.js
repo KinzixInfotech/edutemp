@@ -194,7 +194,7 @@ export default function RootLayout({ children }) {
                 description: "text-sm mt-1 !text-black dark:!text-white",
               },
             }}
-            richColors
+
           />
         </body>
       </html>

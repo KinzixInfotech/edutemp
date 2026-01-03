@@ -595,6 +595,20 @@ export async function PUT(req) {
                     data: updates,
                 });
                 break;
+            case "DIRECTOR":
+                // Director's name is on User table, not Director table
+                updatedUser = await prisma.user.update({
+                    where: { id },
+                    data: updates,
+                });
+                break;
+            case "PRINCIPAL":
+                // Principal's name is on User table, not Principal table
+                updatedUser = await prisma.user.update({
+                    where: { id },
+                    data: updates,
+                });
+                break;
             case "SUPER_ADMIN":
                 updatedUser = await prisma.user.update({
                     where: { id },

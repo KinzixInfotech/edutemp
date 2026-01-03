@@ -132,14 +132,15 @@ export async function HEAD(req) {
 export async function PUT(req) {
     try {
         const body = await req.json();
-        const { notificationIds, markAllAsRead, userId } = body;
+        const { notificationIds, markAllAsRead, userId, type } = body;
 
         if (markAllAsRead && userId) {
-            // Mark all as read for a user
+            // Mark all as read for a user (optionally filtered by type)
             await prisma.notification.updateMany({
                 where: {
                     receiverId: userId,
                     isRead: false,
+                    ...(type && { type }),
                 },
                 data: {
                     isRead: true,

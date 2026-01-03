@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/tooltip"
 import { useLibraryNotifications } from "@/context/LibraryNotificationContext"
 import { Badge } from "@/components/ui/badge"
+import { useAuth } from "@/context/AuthContext" // Added
+import { useQuery } from "@tanstack/react-query" // Added
 
 export function NavSidebarSections({ sections, userRole, activePath }) {
     const { setLoading } = useLoader()
@@ -35,6 +37,22 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
     const isManualToggle = useRef(false)
     const hasInitialized = useRef(false)
     const { unseenRequestsCount } = useLibraryNotifications()
+    const { fullUser } = useAuth() // Added
+
+    // Fetch unread notices count // Added
+    const { data: noticesData } = useQuery({
+        queryKey: ['unread-notices-count', fullUser?.id],
+        queryFn: async () => {
+            if (!fullUser?.id) return { unreadCount: 0 }
+            const res = await fetch(`/api/notifications?userId=${fullUser.id}&type=NOTICE&unreadOnly=true&limit=1`) // Limit 1 just to get count header or metadata
+            if (!res.ok) return { unreadCount: 0 }
+            return res.json()
+        },
+        enabled: !!fullUser?.id,
+        refetchInterval: 60000
+    })
+
+    const unreadNoticesCount = noticesData?.unreadCount || 0
 
     const handleClick = () => setLoading(true)
 
@@ -256,9 +274,17 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                 ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" : ""
                                                 }`}
                                         >
-                                            <Link href={item.url} onClick={handleClick}>
-                                                {item.icon && <item.icon className="w-4 h-4" />}
-                                                <span>{item.label}</span>
+                                            <Link href={item.url} onClick={handleClick} className="flex items-center justify-between w-full">
+                                                <div className="flex items-center gap-2">
+                                                    {item.icon && <item.icon className="w-4 h-4" />}
+                                                    <span>{item.label}</span>
+                                                </div>
+                                                {/* Badge for Noticeboard */}
+                                                {item.label === "Noticeboard" && unreadNoticesCount > 0 && (
+                                                    <Badge variant="destructive" className="h-5 min-w-[20px] px-1.5 flex items-center justify-center rounded-full text-[10px]">
+                                                        {unreadNoticesCount}
+                                                    </Badge>
+                                                )}
                                             </Link>
                                         </SidebarMenuButton>
                                     </SidebarMenuItem>

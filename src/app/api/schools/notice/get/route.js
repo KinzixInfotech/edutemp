@@ -71,34 +71,45 @@ export async function GET(request) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        // if (user.role === 'ADMIN') {
-        //     return NextResponse.json({ error: 'Use admin endpoint for admins' }, { status: 403 });
-        // }
-
         const now = new Date();
+        // Determine allowed audiences based on user role
+        const roleName = user.role?.name;
+        let allowedAudiences = ['ALL'];
+
+        if (roleName === 'ADMIN' || roleName === 'SUPER_ADMIN' || roleName === 'MASTER_ADMIN') {
+            allowedAudiences = ['ALL', 'STAFF', 'TEACHERS', 'STUDENTS', 'PARENTS'];
+        } else if (roleName === 'TEACHER' || roleName === 'TEACHING_STAFF') {
+            allowedAudiences = ['ALL', 'STAFF', 'TEACHERS'];
+        } else if (roleName === 'STUDENT') {
+            allowedAudiences = ['ALL', 'STUDENTS'];
+        } else if (roleName === 'PARENT') {
+            allowedAudiences = ['ALL', 'PARENTS'];
+        } else {
+            // Default for other staff
+            allowedAudiences = ['ALL', 'STAFF'];
+        }
+
         const where = {
             schoolId: schoolId || user.schoolId,
             status: status || 'PUBLISHED',
-            audience: audience
-                ? { in: ['ALL', audience, "ALL" || ""] }
-                : { in: ['ALL', "ALL"|| ""] },
-
-            priority,
-            // publishedAt: publishedAtStart && publishedAtEnd
-            //     ? { gte: new Date(publishedAtStart), lte: new Date(publishedAtEnd) }
-            //     : { lte: now },
-            // OR: [
-            //     { expiryDate: { gte: now } },
-            //     { expiryDate: null },
-            // ],
             ...(search && {
                 OR: [
                     { title: { contains: search, mode: 'insensitive' } },
                     { description: { contains: search, mode: 'insensitive' } },
                 ],
             }),
-            ...(category && { category }), // Assuming category field exists in Notice model
+            ...(category && { category }),
+            ...(priority && { priority }),
         };
+
+        if (audience) {
+            where.audience = audience;
+        } else {
+            where.OR = [
+                { audience: { in: allowedAudiences } },
+                { createdById: userId }
+            ];
+        }
 
         const [notices, total] = await Promise.all([
             prisma.notice.findMany({

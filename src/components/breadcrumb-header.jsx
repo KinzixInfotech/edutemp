@@ -8,9 +8,8 @@ import { cn } from "@/lib/utils"
 export function BreadcrumbHeader({ className, schoolName }) {
     const pathname = usePathname()
 
-    if (pathname === "/dashboard") {
-        document.title = "Dashboard - " + schoolName;
-        return null
+    if (pathname === "/dashboard" && typeof document !== 'undefined') {
+        document.title = "Dashboard - " + (schoolName || 'EduBreezy');
     }
 
 

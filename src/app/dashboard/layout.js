@@ -29,7 +29,7 @@ export default async function RootLayout({ children }) {
                                             description: "text-black dark:text-white"
                                         }
                                     }}
-                                    richColors
+
                                 />
                                 <SecurityAlertBanner />
                                 <CommandMenu />
