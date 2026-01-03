@@ -12,36 +12,66 @@ export async function GET(req) {
             return NextResponse.json({ error: 'Missing schoolId' }, { status: 400 });
         }
 
+        // Build filter - only filter by schoolId and classId if provided
         const filters = {
             schoolId,
         };
 
-        if (classId) filters.classId = classId;
+        if (classId) filters.classId = parseInt(classId, 10);
         if (academicYearId) filters.academicYearId = academicYearId;
 
-        // Fetch all students with their related user info
+        // Fetch all students with their related info and fee data
         const students = await prisma.student.findMany({
             where: filters,
             select: {
-                userId: true, // the actual unique identifier for user/student
+                userId: true,
                 admissionNo: true,
                 rollNumber: true,
-                name:true,
+                name: true,
                 classId: true,
                 academicYearId: true,
-                class:true,
-                // user: {
-                //     select: {
-                //         // name: true,
-                //         email: true,
-                //         // phone: true,
-                //         // gender: true,
-                //     },
-                // },
+                class: {
+                    select: {
+                        id: true,
+                        className: true,
+                    }
+                },
+                section: {
+                    select: {
+                        id: true,
+                        name: true,
+                    }
+                },
+                // Include fee data
+                studentFees: {
+                    select: {
+                        id: true,
+                        finalAmount: true,
+                        paidAmount: true,
+                        balanceAmount: true,
+                        status: true,
+                    },
+                    take: 1,
+                    orderBy: {
+                        assignedDate: 'desc'
+                    }
+                },
             },
+            orderBy: [
+                { class: { className: 'asc' } },
+                { section: { name: 'asc' } },
+                { rollNumber: 'asc' },
+            ],
         });
 
-        return NextResponse.json(students);
+        // Transform the data to include fee as a single object
+        const transformedStudents = students.map(student => ({
+            ...student,
+            fee: student.studentFees?.[0] || null,
+            studentFees: undefined,
+        }));
+
+        return NextResponse.json(transformedStudents);
     } catch (error) {
         console.error('Error fetching students list:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

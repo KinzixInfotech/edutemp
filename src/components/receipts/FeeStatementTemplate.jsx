@@ -23,7 +23,7 @@ const FeeStatementTemplate = forwardRef(({
     } = schoolData;
 
     const {
-        name: studentName = '',
+        studentName = '',
         admissionNo = '',
         className = '',
         sectionName = '',

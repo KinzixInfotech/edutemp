@@ -199,7 +199,7 @@ export default function ClientLayout({ children }) {
                         <SidebarInset className={'bg-[#f9fafb] dark:bg-black'}>
                             {!hideUI && <SiteHeader fullUser={fullUser} />}
 
-                            {!hideUI && <BreadcrumbHeader />}
+                            {!hideUI && <BreadcrumbHeader schoolName={fullUser?.school?.name} />}
 
                             <main className="w-full h-full relative ">
                                 {/* {!hideUI && <DynamicBreadcrumb />} */}

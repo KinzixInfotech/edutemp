@@ -22,27 +22,27 @@ const nextConfig = {
   },
 
   // 🔥 Prisma + Turbopack fix
-  experimental: {
-    serverMinification: false,
-  },
+  // experimental: {
+  //   serverMinification: false,
+  // },
 
-  webpack: (config) => {
-    // 🔥 Fix pg / pg-native errors in Turbopack
-    config.resolve = config.resolve || {};
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      "pg-native": false,
-    };
+  // webpack: (config) => {
+  //   // 🔥 Fix pg / pg-native errors in Turbopack
+  //   config.resolve = config.resolve || {};
+  //   config.resolve.alias = {
+  //     ...config.resolve.alias,
+  //     "pg-native": false,
+  //   };
 
-    // Your existing externals
-    config.externals.push({
-      "utf-8-validate": "commonjs utf-8-validate",
-      bufferutil: "commonjs bufferutil",
-      canvas: "commonjs canvas",
-    });
+  //   // Your existing externals
+  //   config.externals.push({
+  //     "utf-8-validate": "commonjs utf-8-validate",
+  //     bufferutil: "commonjs bufferutil",
+  //     canvas: "commonjs canvas",
+  //   });
 
-    return config;
-  },
+  //   return config;
+  // },
 };
 
 export default nextConfig;

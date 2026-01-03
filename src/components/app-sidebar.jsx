@@ -438,7 +438,7 @@ export const SidebarData = [
                 roles: ["ADMIN"],
             },
             {
-                label: "Track Payments",
+                label: "Student Fees",
                 icon: CreditCard,
                 url: "/dashboard/fees/payments",
                 roles: ["ADMIN"],

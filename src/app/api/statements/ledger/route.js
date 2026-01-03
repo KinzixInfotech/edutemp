@@ -1,32 +1,25 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import redis from '@/lib/redis';
+import { createClient } from '@supabase/supabase-js';
+
+// Initialize Supabase client for token verification
+const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 /**
  * Ledger Statement API
  * Fetches comprehensive fee data for "Fee Statement" PDF
  * GET /api/statements/ledger?studentId={id}&schoolId={id}
+ * 
+ * Supports two authentication modes:
+ * 1. Parent portal token (Redis pay:session)
+ * 2. Admin dashboard token (Supabase JWT)
  */
 export async function GET(request) {
     try {
-        // Validate Student Session (Redis)
-        const token = request.headers.get('authorization')?.replace('Bearer ', '');
-        if (!token) {
-            return NextResponse.json({ error: 'Unauthorized: No token provided' }, { status: 401 });
-        }
-
-        const sessionData = await redis.get(`pay:session:${token}`);
-        if (!sessionData) {
-            return NextResponse.json({ error: 'Unauthorized: Session invalid' }, { status: 401 });
-        }
-
-        const session = typeof sessionData === 'string' ? JSON.parse(sessionData) : sessionData;
-
-        // Check expiry
-        if (new Date(session.expiresAt) < new Date()) {
-            return NextResponse.json({ error: 'Unauthorized: Session expired' }, { status: 401 });
-        }
-
         const { searchParams } = new URL(request.url);
         const studentId = searchParams.get('studentId');
         const schoolId = searchParams.get('schoolId');
@@ -35,9 +28,52 @@ export async function GET(request) {
             return NextResponse.json({ error: 'Missing studentId or schoolId' }, { status: 400 });
         }
 
-        // Verify that the requested data belongs to the logged-in student
-        if (session.studentId !== studentId || session.schoolId !== schoolId) {
-            return NextResponse.json({ error: 'Forbidden: Access denied' }, { status: 403 });
+        // Get the token from Authorization header
+        const token = request.headers.get('authorization')?.replace('Bearer ', '');
+        if (!token) {
+            return NextResponse.json({ error: 'Unauthorized: No token provided' }, { status: 401 });
+        }
+
+        let isAuthorized = false;
+
+        // Method 1: Try parent portal Redis session
+        const sessionData = await redis.get(`pay:session:${token}`);
+        if (sessionData) {
+            const session = typeof sessionData === 'string' ? JSON.parse(sessionData) : sessionData;
+
+            // Check expiry
+            if (new Date(session.expiresAt) >= new Date()) {
+                // Verify that the requested data belongs to the logged-in student
+                if (session.studentId === studentId && session.schoolId === schoolId) {
+                    isAuthorized = true;
+                }
+            }
+        }
+
+        // Method 2: Try Supabase JWT (admin dashboard)
+        if (!isAuthorized) {
+            try {
+                const { data: { user }, error } = await supabase.auth.getUser(token);
+
+                if (!error && user) {
+                    // Verify the user has access to this school
+                    const adminUser = await prisma.user.findUnique({
+                        where: { id: user.id },
+                        select: { schoolId: true, role: true }
+                    });
+                    if (adminUser && adminUser.schoolId === schoolId &&
+                        ['ADMIN', 'SUPER_ADMIN', 'TEACHER', 'ACCOUNTANT'].includes(adminUser.role.name)) {
+                        isAuthorized = true;
+                    }
+                }
+            } catch (supabaseError) {
+                // Supabase token verification failed, continue
+                console.log('Supabase auth failed:', supabaseError.message);
+            }
+        }
+
+        if (!isAuthorized) {
+            return NextResponse.json({ error: 'Unauthorized: Session invalid' }, { status: 401 });
         }
 
         // 1. Fetch Student Details
@@ -58,7 +94,6 @@ export async function GET(request) {
         });
 
         // 3. Fetch Fee Structure & Installments Assigned to Student
-        // (Assuming active fee assignment)
         const studentFee = await prisma.studentFee.findFirst({
             where: { studentId, },
             include: {
@@ -81,18 +116,13 @@ export async function GET(request) {
         });
 
         // 5. Construct "Ledger Data" (Mode Adaptive)
-        const mode = studentFee.globalFeeStructure.mode; // MONTHLY, QUARTERLY, etc.
+        const mode = studentFee.globalFeeStructure.mode;
         const installments = studentFee.installments;
 
         const ledgerRows = installments.map(inst => {
-            // Find payments related to this installment
-            // NOTE: In a real complex ledger, payments might be split. 
-            // Here we assume simpler direct mapping or check total paid against installment amount.
-
             const isPaid = inst.status === 'PAID';
             const isPartial = inst.status === 'PARTIAL';
 
-            // Format Descriptor based on Mode
             let descriptor = `Installment ${inst.installmentNumber}`;
             let subDescriptor = '';
 
@@ -114,14 +144,8 @@ export async function GET(request) {
                 subDescriptor = `${year}-${year + 1}`;
             }
 
-            // Find receipt if paid (Approximate logic: find latest receipt that covered this installment date range or simplistic 1-1 check if exists)
-            // For comprehensive ledger, we might need a relation Installment -> Payment. 
-            // If not, we just show Paid status.
-
-            // Calculating discount (if any)
             const due = inst.amount + (inst.lateFee || 0);
             const paid = inst.paidAmount;
-            const discount = (due - paid > 0) && isPaid ? (due - paid) : 0; // Rough logic, or fetch actual discount from payment record if linked
 
             return {
                 descriptor,
@@ -129,8 +153,8 @@ export async function GET(request) {
                 dueDate: new Date(inst.dueDate).toLocaleDateString('en-IN'),
                 amount: inst.amount,
                 paidDate: inst.paidDate ? new Date(inst.paidDate).toLocaleDateString('en-IN') : null,
-                receiptNo: '—', // Would need payment relation to get exact receipt no per installment
-                discount: 0, // Placeholder, populate if we track discount per installment
+                receiptNo: '—',
+                discount: 0,
                 status: isPaid ? 'Paid' : isPartial ? 'Partial' : 'Pending'
             };
         });
@@ -143,17 +167,17 @@ export async function GET(request) {
         return NextResponse.json({
             schoolData: school,
             studentData: {
-                studentName: student.user.name,
+                studentName: student?.name,
                 admissionNo: student.admissionNo,
-                className: student.class?.name,
+                className: student.class?.className || student.class?.name,
                 sectionName: student.section?.name,
-                rollNo: student.rollNo,
+                rollNo: student.rollNumber || student.rollNo,
                 feeStructureName: studentFee.globalFeeStructure.name,
             },
             feeSummary: {
                 totalFee,
                 totalPaid,
-                totalDiscount: 0, // Calculate if available
+                totalDiscount: 0,
                 balanceDue
             },
             ledgerData: ledgerRows,
@@ -174,9 +198,7 @@ export async function GET(request) {
 // Helper for quarters
 function getQuarterPeriod(dateObj) {
     const d = new Date(dateObj);
-    const month = d.getMonth(); // 0-11
-    // Simple logic assuming standard quarters Jan-Mar, Apr-Jun, etc.
-    // Adjust based on Academic Year start if needed.
+    const month = d.getMonth();
     if (month >= 3 && month <= 5) return 'Apr-Jun';
     if (month >= 6 && month <= 8) return 'Jul-Sep';
     if (month >= 9 && month <= 11) return 'Oct-Dec';

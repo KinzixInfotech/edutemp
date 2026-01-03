@@ -5,10 +5,11 @@ import { usePathname } from "next/navigation"
 import { DynamicBreadcrumb } from "./dynamic-breadcrumb"
 import { cn } from "@/lib/utils"
 
-export function BreadcrumbHeader({ className }) {
+export function BreadcrumbHeader({ className, schoolName }) {
     const pathname = usePathname()
 
     if (pathname === "/dashboard") {
+        document.title = "Dashboard - " + schoolName;
         return null
     }
 

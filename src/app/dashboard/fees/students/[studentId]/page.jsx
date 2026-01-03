@@ -5,6 +5,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import jsPDF from 'jspdf';
+import { toJpeg } from 'html-to-image';
+import { createRoot } from 'react-dom/client';
+
 import {
     ArrowLeft,
     Download,
@@ -28,9 +32,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
+import FeeStatementTemplate from '@/components/receipts/FeeStatementTemplate';
+import { supabase } from '@/lib/supabase';
 
 export default function StudentFeeDetails({ params }) {
+
     const { fullUser } = useAuth();
+    const [token, setToken] = useState('');
+    supabase.auth.onAuthStateChange((_event, session) => {
+        const token = session?.access_token;
+        setToken(token);
+    });
+
     const router = useRouter();
     const queryClient = useQueryClient();
     const schoolId = fullUser?.schoolId;
@@ -68,6 +81,7 @@ export default function StudentFeeDetails({ params }) {
         },
         enabled: !!studentId && !!academicYearId,
     });
+
 
     // Apply discount mutation
     const applyDiscountMutation = useMutation({
@@ -177,9 +191,79 @@ export default function StudentFeeDetails({ params }) {
                         <Send className="w-4 h-4 mr-2" />
                         Send Reminder
                     </Button>
-                    <Button>
-                        <Download className="w-4 h-4 mr-2" />
-                        Download Report
+                    <Button
+                        disabled={!token}
+                        onClick={async () => {
+                            const loadingToast = toast.loading("Generating Fee Statement...");
+
+                            try {
+                                // 1. Fetch Data
+                                const res = await fetch(`/api/statements/ledger?studentId=${studentId}&schoolId=${schoolId}`, {
+                                    headers: {
+                                        'Authorization': `Bearer ${token}`,
+                                    },
+                                });
+                                if (!res.ok) throw new Error('Failed to fetch ledger');
+                                const statementData = await res.json();
+
+                                // 2. Create Hidden Container
+                                const container = document.createElement('div');
+                                container.id = 'pdf-gen-container';
+                                container.style.position = 'fixed';
+                                container.style.top = '0';
+                                container.style.left = '0';
+                                container.style.width = '8.5in';
+                                container.style.zIndex = '-9999';
+                                container.style.background = '#ffffff';
+                                container.style.color = '#000000';
+
+                                document.body.appendChild(container);
+
+                                // 3. Render Template
+
+                                const root = createRoot(container);
+                                root.render(<FeeStatementTemplate {...statementData} />);
+
+                                // 4. Wait for Render
+                                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                                // 5. Capture with html-to-image
+                                const imgData = await toJpeg(container, {
+                                    quality: 0.98,
+                                    pixelRatio: 2,
+                                    backgroundColor: '#ffffff',
+                                    style: { background: 'white' },
+                                    fontEmbedCSS: '',
+                                });
+
+                                // 6. Generate PDF
+                                const pdf = new jsPDF('p', 'pt', 'letter');
+                                const pdfWidth = pdf.internal.pageSize.getWidth();
+                                const imgProps = pdf.getImageProperties(imgData);
+                                const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+                                pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, imgHeight);
+
+                                // 7. Save File
+                                const fileName = `Fee_Statement_${studentFee.student.name || 'Student'}.pdf`;
+                                pdf.save(fileName);
+
+                                // 8. Cleanup
+                                root.unmount();
+                                document.body.removeChild(container);
+
+                                toast.dismiss(loadingToast);
+                                toast.success("Statement downloaded successfully!");
+
+                            } catch (err) {
+                                console.log(err);
+                                toast.dismiss(loadingToast);
+                                toast.error("Failed to generate statement. Please try again.");
+                            }
+                        }}
+                    >
+                        <FileText className="w-4 h-4 mr-2" />
+                        Download Fee Statement
                     </Button>
                 </div>
             </div>
