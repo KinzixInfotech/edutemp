@@ -470,6 +470,38 @@ export default function ImportDataPage() {
                 </div>
             </div>
 
+            {/* Trust Banner */}
+            {activeTab === "import" && !selectedModule && (
+                <Alert className="border-green-200 bg-green-50 dark:bg-green-950/30 dark:border-green-800">
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <AlertTitle className="text-green-800 dark:text-green-300">Safe Migration</AlertTitle>
+                    <AlertDescription className="text-green-700 dark:text-green-400">
+                        Your existing system remains untouched. You can verify data before finalizing import.
+                    </AlertDescription>
+                </Alert>
+            )}
+
+            {/* Migration Guidance - Only show on import tab */}
+            {activeTab === "import" && !selectedModule && (
+                <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800">
+                    <Info className="h-4 w-4 text-blue-600" />
+                    <AlertTitle className="text-blue-800 dark:text-blue-300">📋 Recommended Import Order</AlertTitle>
+                    <AlertDescription className="text-blue-700 dark:text-blue-400">
+                        <div className="mt-2 flex flex-wrap gap-2 items-center">
+                            <Badge variant="outline" className="bg-orange-100 text-orange-700 dark:bg-orange-900/50">1. Classes & Sections</Badge>
+                            <span className="text-blue-400">→</span>
+                            <Badge variant="outline" className="bg-blue-100 text-blue-700 dark:bg-blue-900/50">2. Students</Badge>
+                            <span className="text-blue-400">→</span>
+                            <Badge variant="outline" className="bg-green-100 text-green-700 dark:bg-green-900/50">3. Parents</Badge>
+                            <span className="text-blue-400">→</span>
+                            <Badge variant="outline" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50">4. Fee Structure</Badge>
+                            <span className="text-blue-400">→</span>
+                            <Badge variant="outline" className="bg-purple-100 text-purple-700 dark:bg-purple-900/50">5. Staff</Badge>
+                        </div>
+                    </AlertDescription>
+                </Alert>
+            )}
+
             {/* Export Tab */}
             {activeTab === "export" ? (
                 <Card>
@@ -478,11 +510,24 @@ export default function ImportDataPage() {
                             <Download className="h-5 w-5" />
                             Export Data
                         </CardTitle>
-                        <CardDescription>
+                        <CardDescription className="flex items-center gap-2">
                             Select modules to export to Excel file
+                            <Badge variant="secondary" className="font-mono text-xs">
+                                <FileSpreadsheet className="h-3 w-3 mr-1" />
+                                .xlsx
+                            </Badge>
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
+                        {/* Export Info Alert */}
+                        <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800">
+                            <AlertTriangle className="h-4 w-4 text-amber-600" />
+                            <AlertTitle className="text-amber-800 dark:text-amber-300">Before Exporting</AlertTitle>
+                            <AlertDescription className="text-amber-700 dark:text-amber-400">
+                                Exports will include data from the current academic year. Make sure you've selected the correct year in settings.
+                            </AlertDescription>
+                        </Alert>
+
                         {/* Select All */}
                         <div className="flex items-center justify-between pb-4 border-b">
                             <div className="flex items-center gap-2">
@@ -686,7 +731,7 @@ export default function ImportDataPage() {
                                                 <CardDescription>{module.description}</CardDescription>
                                             </CardHeader>
                                             <CardContent className="relative z-10">
-                                                <div className="flex gap-2">
+                                                <div className="flex flex-wrap gap-2">
                                                     <Badge variant="secondary">
                                                         {module.fieldCount} fields
                                                     </Badge>
@@ -694,6 +739,15 @@ export default function ImportDataPage() {
                                                         {module.requiredCount} required
                                                     </Badge>
                                                 </div>
+                                                {/* Fee Structure Special Note */}
+                                                {(module.id === 'feeStructure' || module.id === 'fees') && (
+                                                    <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-950/30 rounded-md border border-amber-200 dark:border-amber-800">
+                                                        <p className="text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1">
+                                                            <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                                                            We recommend importing opening balance only, not old receipts.
+                                                        </p>
+                                                    </div>
+                                                )}
                                             </CardContent>
                                         </Card>
                                     );
@@ -1312,7 +1366,8 @@ export default function ImportDataPage() {
                         </div>
                     )}
                 </>
-            )}
-        </div>
+            )
+            }
+        </div >
     );
 }
