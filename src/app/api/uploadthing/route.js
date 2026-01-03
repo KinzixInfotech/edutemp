@@ -56,12 +56,33 @@ export const ourFileRouter = {
     .input(z.object({
       paymentId: z.string(),
       schoolId: z.string(),
+      receiptId: z.string().optional(),
     }))
+    .middleware(async ({ input }) => {
+      return {
+        paymentId: input.paymentId,
+        schoolId: input.schoolId,
+        receiptId: input.receiptId,
+      };
+    })
     .onUploadComplete(async ({ metadata, file }) => {
+      // Update FeePayment with receipt URL
       await prisma.feePayment.update({
         where: { id: metadata.paymentId },
         data: { receiptUrl: file.ufsUrl },
       });
+
+      // Update Receipt record if provided
+      if (metadata.receiptId) {
+        await prisma.receipt.update({
+          where: { id: metadata.receiptId },
+          data: {
+            pdfUrl: file.ufsUrl,
+            pdfGenerated: true,
+          },
+        });
+      }
+
       return { url: file.ufsUrl };
     }),
 

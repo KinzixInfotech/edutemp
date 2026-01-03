@@ -24,6 +24,12 @@ import {
     Wallet,
     FileText,
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import FeeStatementTemplate from '@/components/receipts/FeeStatementTemplate';
+import { createRoot } from 'react-dom/client';
+import { toJpeg } from 'html-to-image';
+
+import jsPDF from 'jspdf';
 
 export default function PayDashboardPage() {
     const router = useRouter();
@@ -223,7 +229,9 @@ export default function PayDashboardPage() {
         if (diffDays === 1) return { text: 'Due tomorrow', color: 'text-orange-500', urgent: true };
         if (diffDays <= 7) return { text: `Due in ${diffDays} days`, color: 'text-yellow-600', urgent: false };
         if (diffDays <= 30) return { text: `Due in ${diffDays} days`, color: 'text-gray-500', urgent: false };
-        return { text: `Due in ${Math.floor(diffDays / 30)} months`, color: 'text-gray-400', urgent: false };
+
+        const dateStr = due.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        return { text: `Due on ${dateStr} (~${Math.floor(diffDays / 30)} months left)`, color: 'text-gray-400', urgent: false };
     };
 
     const getStatusBadge = (status, isOverdue) => {
@@ -567,8 +575,22 @@ export default function PayDashboardPage() {
                                                         </div>
                                                     </div>
                                                     <div className="text-right">
-                                                        <div className="flex items-center gap-2">
+                                                        <div className="flex items-center gap-2 justify-end flex-wrap">
                                                             {getStatusBadge(installment.status, installment.isOverdue)}
+                                                            {installment.isEarlyPaymentEligible && data?.discountSettings?.earlyPaymentDiscount?.enabled && (
+                                                                <div className="flex flex-col items-end">
+                                                                    <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 text-xs">
+                                                                        🌱 Early Pay -{data.discountSettings.earlyPaymentDiscount.percentage}%
+                                                                    </Badge>
+                                                                    <span className="text-[10px] text-green-600 mt-0.5">
+                                                                        Valid until {(() => {
+                                                                            const d = new Date(installment.dueDate);
+                                                                            d.setDate(d.getDate() - (installment.earlyPaymentDays || 10));
+                                                                            return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                                                                        })()}
+                                                                    </span>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                         <p className={`text-lg font-bold mt-1 ${isPaid ? 'text-green-600' : 'text-gray-900 dark:text-white'}`}>
                                                             ₹{isPaid ? installment.paidAmount?.toLocaleString() : totalDue?.toLocaleString()}
@@ -632,6 +654,89 @@ export default function PayDashboardPage() {
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
+                                    {/* Fee Statement Download */}
+                                    <Button
+                                        variant="outline"
+                                        className="w-full flex items-center gap-2 border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800 mb-2"
+                                        disabled={!data?.student?.id || !data?.school?.id}
+                                        onClick={async () => {
+                                            // Show loading toast
+                                            const loadingToast = toast.loading("Generating Fee Statement...");
+
+                                            try {
+                                                // 1. Fetch Data
+                                                const res = await fetch(`/api/statements/ledger?studentId=${data.student.id}&schoolId=${data.school.id}`, {
+                                                    headers: {
+                                                        'Authorization': `Bearer ${session.token}`,
+                                                    },
+                                                });
+                                                if (!res.ok) throw new Error('Failed to fetch ledger');
+                                                const statementData = await res.json();
+
+                                                // 2. Create Hidden Container
+                                                const container = document.createElement('div');
+                                                container.id = 'pdf-gen-container';
+                                                container.style.position = 'fixed';
+                                                container.style.top = '0';
+                                                container.style.left = '0'; // Move to visible area but behind content
+                                                container.style.width = '8.5in';
+                                                container.style.zIndex = '-9999';
+                                                container.style.background = '#ffffff'; // Ensure white background
+                                                container.style.color = '#000000';
+
+                                                document.body.appendChild(container);
+
+                                                // 3. Render Template
+                                                const root = createRoot(container);
+                                                root.render(<FeeStatementTemplate {...statementData} />);
+
+                                                // 4. Wait for Render (Need sufficient time for styles/images)
+                                                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                                                // 5. Capture with html-to-image (Use JPEG for strictly opaque background)
+                                                // Note: fontEmbedCSS: '' prevents the SecurityError from external Google Fonts
+                                                const imgData = await toJpeg(container, {
+                                                    quality: 0.98,
+                                                    pixelRatio: 2, // Higher resolution
+                                                    backgroundColor: '#ffffff',
+                                                    style: { background: 'white' },
+                                                    fontEmbedCSS: '', // DISABLE FONT INLINING TO FIX CRASH
+                                                });
+
+                                                // 6. Generate PDF
+                                                // 'p', 'pt', 'letter' -> points, letter size
+                                                const pdf = new jsPDF('p', 'pt', 'letter');
+
+                                                const pdfWidth = pdf.internal.pageSize.getWidth();
+                                                const pdfHeight = pdf.internal.pageSize.getHeight();
+
+                                                const imgProps = pdf.getImageProperties(imgData);
+                                                const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+                                                pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, imgHeight);
+
+                                                // 7. Save File
+                                                const fileName = `Fee_Statement_${statementData.studentData?.studentName || 'Student'}.pdf`;
+                                                pdf.save(fileName);
+
+                                                // 8. Cleanup
+                                                root.unmount();
+                                                document.body.removeChild(container);
+
+                                                toast.dismiss(loadingToast);
+                                                toast.success("Statement downloaded successfully!");
+
+                                            } catch (err) {
+                                                console.error(err);
+                                                toast.dismiss(loadingToast);
+                                                toast.error("Failed to generate statement. Please try again.");
+                                            }
+                                        }}
+                                    >
+                                        <FileText className="w-4 h-4" />
+                                        Download Fee Statement (PDF)
+                                    </Button>
+
                                     {/* Online Payment Disabled Notice */}
 
                                     <div className="space-y-2">
@@ -639,13 +744,91 @@ export default function PayDashboardPage() {
                                             <span className="text-gray-500">Selected Installments</span>
                                             <span className="font-medium">{selectedInstallments.length}</span>
                                         </div>
-                                        <Separator />
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-900 dark:text-white font-medium">Total Amount</span>
-                                            <span className="text-2xl font-bold text-[#0168fb]">
-                                                ₹{getSelectedTotal().toLocaleString()}
-                                            </span>
+
+                                        {/* Subtotal before discounts */}
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-500">Subtotal</span>
+                                            <span className="font-medium">₹{getSelectedTotal().toLocaleString()}</span>
                                         </div>
+
+                                        {/* Display Applicable Discounts - only show for selected installments */}
+                                        {(() => {
+                                            // Calculate early payment discount ONLY for selected installments that are eligible
+                                            const selectedEligibleForEarlyPay = data?.installments?.filter(i =>
+                                                selectedInstallments.includes(i.id) && i.isEarlyPaymentEligible
+                                            ) || [];
+
+                                            const earlyPaymentEnabled = data?.discountSettings?.earlyPaymentDiscount?.enabled;
+                                            const earlyPaymentPercentage = data?.discountSettings?.earlyPaymentDiscount?.percentage || 0;
+
+                                            // Calculate discount only on eligible selected installments
+                                            const eligibleAmount = selectedEligibleForEarlyPay.reduce((sum, i) =>
+                                                sum + (i.amount - i.paidAmount + (i.lateFee || 0)), 0
+                                            );
+                                            const earlyPaymentDiscount = earlyPaymentEnabled && selectedEligibleForEarlyPay.length > 0
+                                                ? Math.round(eligibleAmount * (earlyPaymentPercentage / 100))
+                                                : 0;
+
+                                            // Other discounts (sibling, staff ward) apply to total
+                                            const otherDiscounts = data?.applicableDiscounts?.filter(d => d.type !== 'EARLY_PAYMENT') || [];
+                                            const otherDiscountPercentage = otherDiscounts.reduce((sum, d) => sum + (d.percentage || 0), 0);
+                                            const subtotal = getSelectedTotal();
+                                            const otherDiscountAmount = Math.round(subtotal * (otherDiscountPercentage / 100));
+
+                                            const totalDiscount = earlyPaymentDiscount + otherDiscountAmount;
+                                            const finalAmount = subtotal - totalDiscount;
+
+                                            const hasDiscounts = totalDiscount > 0;
+
+                                            return (
+                                                <>
+                                                    {/* Show other discounts (sibling, staff ward) */}
+                                                    {otherDiscounts.map((discount, idx) => (
+                                                        <div key={idx} className="flex justify-between text-sm">
+                                                            <span className="text-green-600 flex items-center gap-1">
+                                                                <CheckCircle className="w-3 h-3" />
+                                                                {discount.name} ({discount.percentage}%)
+                                                            </span>
+                                                            <span className="text-green-600 font-medium">
+                                                                -₹{Math.round(subtotal * (discount.percentage / 100)).toLocaleString()}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+
+                                                    {/* Show early payment discount ONLY if selected installments qualify */}
+                                                    {earlyPaymentEnabled && selectedEligibleForEarlyPay.length > 0 && (
+                                                        <div className="flex justify-between text-sm">
+                                                            <span className="text-green-600 flex items-center gap-1">
+                                                                <CheckCircle className="w-3 h-3" />
+                                                                Early Payment Discount ({earlyPaymentPercentage}%)
+                                                            </span>
+                                                            <span className="text-green-600 font-medium">
+                                                                -₹{earlyPaymentDiscount.toLocaleString()}
+                                                            </span>
+                                                        </div>
+                                                    )}
+
+                                                    <Separator />
+
+                                                    {/* Final Total with Discounts */}
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-900 dark:text-white font-medium">
+                                                            {hasDiscounts ? 'Final Amount' : 'Total Amount'}
+                                                        </span>
+                                                        <span className="text-2xl font-bold text-[#0168fb]">
+                                                            ₹{finalAmount.toLocaleString()}
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Show savings if discounts applied */}
+                                                    {hasDiscounts && (
+                                                        <div className="text-center text-sm text-green-600 font-medium">
+                                                            You save ₹{totalDiscount.toLocaleString()}!
+                                                        </div>
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
                                     </div>
 
                                     {/* UPI ID Input for ICICI - Only show if online payments enabled */}
@@ -777,7 +960,7 @@ export default function PayDashboardPage() {
 
             {/* Footer */}
             <footer className="border-t border-gray-200 dark:border-gray-800 py-6 mt-8">
-                <div className="container mx-auto px-4 text-center">
+                <div className="container mx-4 px-4 text-center">
                     <p className="text-sm text-gray-500">
                         © {new Date().getFullYear()} EduBreezy. Secure Fee Payment Portal.
                     </p>
@@ -786,3 +969,4 @@ export default function PayDashboardPage() {
         </div>
     );
 }
+

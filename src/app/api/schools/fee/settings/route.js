@@ -49,7 +49,20 @@ export async function GET(req) {
         }
 
         const settings = await getSettings(schoolId);
-        return NextResponse.json({ settings });
+
+        // Fetch school data for receipt preview
+        const school = await prisma.school.findUnique({
+            where: { id: schoolId },
+            select: {
+                id: true,
+                name: true,
+                contactNumber: true,
+                profilePicture: true,
+                location: true,
+            },
+        });
+
+        return NextResponse.json({ settings, school });
     } catch (error) {
         console.error("Fetch settings error:", error);
         return NextResponse.json({ error: "Failed to fetch settings" }, { status: 500 });
@@ -174,7 +187,11 @@ export async function POST(req) {
                         siblingDiscountPercentage: settings.siblingDiscountPercentage,
                         earlyPaymentDiscountEnabled: settings.earlyPaymentDiscountEnabled,
                         earlyPaymentDiscountPercentage: settings.earlyPaymentDiscountPercentage,
-                        earlyPaymentDays: settings.earlyPaymentDays,
+                        earlyPaymentDays: settings.earlyPaymentDays || 10,
+                        earlyPaymentDaysMonthly: settings.earlyPaymentDaysMonthly || 7,
+                        earlyPaymentDaysQuarterly: settings.earlyPaymentDaysQuarterly || 15,
+                        earlyPaymentDaysHalfYearly: settings.earlyPaymentDaysHalfYearly || 30,
+                        earlyPaymentDaysYearly: settings.earlyPaymentDaysYearly || 60,
                         staffWardDiscountEnabled: settings.staffWardDiscountEnabled,
                         staffWardDiscountPercentage: settings.staffWardDiscountPercentage,
                     },

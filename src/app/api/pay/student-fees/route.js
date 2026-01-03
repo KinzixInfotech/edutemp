@@ -43,6 +43,7 @@ export async function GET(req) {
                     FatherName: true,
                     MotherName: true,
                     contactNumber: true,
+                    parentId: true, // For sibling discount check
                     user: { select: { profilePicture: true } },
                     class: { select: { className: true } },
                     section: { select: { name: true } },
@@ -97,7 +98,7 @@ export async function GET(req) {
                 return null;
             }
 
-            // Fetch fee settings for this school
+            // Fetch fee settings for this school (including discount settings)
             const feeSettings = await prisma.feeSettings.findUnique({
                 where: { schoolId },
                 select: {
@@ -113,6 +114,18 @@ export async function GET(req) {
                     upiId: true,
                     allowPartialPayment: true,
                     allowAdvancePayment: true,
+                    // Discount settings
+                    siblingDiscountEnabled: true,
+                    siblingDiscountPercentage: true,
+                    earlyPaymentDiscountEnabled: true,
+                    earlyPaymentDiscountPercentage: true,
+                    earlyPaymentDays: true,
+                    earlyPaymentDaysMonthly: true,
+                    earlyPaymentDaysQuarterly: true,
+                    earlyPaymentDaysHalfYearly: true,
+                    earlyPaymentDaysYearly: true,
+                    staffWardDiscountEnabled: true,
+                    staffWardDiscountPercentage: true,
                 },
             });
 
@@ -137,12 +150,67 @@ export async function GET(req) {
                 };
             }
 
-            // Enrich installments
+            // Enrich installments with early payment discount check
+            const today = new Date();
             const enrichedInstallments = fee.installments.map(installment => {
                 const rule = fee.globalFeeStructure?.installmentRules?.find(
                     r => r.installmentNumber === installment.installmentNumber
                 );
                 const percentage = rule?.percentage || 100;
+
+                // Check if eligible for early payment discount
+                // Determine early payment days based on fee structure mode (installments frequency)
+                // Default to global if no specific match
+                let earlyPaymentDays = feeSettings?.earlyPaymentDays || 10;
+
+                // You can determine frequency from fee structure mode or number of installments
+                // You can determine frequency from fee structure mode or number of installments
+                const mode = fee.globalFeeStructure?.mode || 'YEARLY'; // 'MONTHLY', 'QUARTERLY', 'HALF_YEARLY', 'YEARLY'
+                console.log(`Debug Mode: ${mode} for Fee ID: ${fee.id}`);
+
+
+                if (feeSettings) {
+                    if (mode === 'MONTHLY' || mode === 'COMPOSITE_MONTHLY') {
+                        earlyPaymentDays = feeSettings.earlyPaymentDaysMonthly || 7;
+                    } else if (mode === 'QUARTERLY') {
+                        earlyPaymentDays = feeSettings.earlyPaymentDaysQuarterly || 15;
+                    } else if (mode === 'HALF_YEARLY') {
+                        earlyPaymentDays = feeSettings.earlyPaymentDaysHalfYearly || 30;
+                    } else if (mode === 'YEARLY') {
+                        earlyPaymentDays = feeSettings.earlyPaymentDaysYearly || 60;
+                    }
+                }
+
+                // "X days before due date" means: payment date (today) must be <= DueDate - X days
+
+                // Normalize dates to start of day to avoid time-based off-by-one errors
+                const normalizeDate = (d) => {
+                    const date = new Date(d);
+                    date.setHours(0, 0, 0, 0);
+                    return date;
+                };
+
+                const dueDate = normalizeDate(installment.dueDate);
+                const todayNormalized = normalizeDate(today);
+
+                // Calculate days until due date strictly based on dates
+                const msPerDay = 24 * 60 * 60 * 1000;
+                const daysUntilDue = Math.floor((dueDate - todayNormalized) / msPerDay);
+
+                // Strict Eligibility Check:
+                // 1. Not Paid
+                // 2. Not Overdue
+                // 3. Today is BEFORE or ON the cutoff date (DueDate - EarlyDays)
+                const cutoffDate = new Date(dueDate);
+                cutoffDate.setDate(cutoffDate.getDate() - earlyPaymentDays);
+
+                const isEarlyPaymentEligible =
+                    installment.status !== 'PAID' &&
+                    !installment.isOverdue &&
+                    todayNormalized <= cutoffDate;
+
+                // Debug logging
+                console.log(`📅 Installment ${installment.installmentNumber}: dueDate=${installment.dueDate}, daysUntilDue=${daysUntilDue}, earlyPaymentDays=${earlyPaymentDays}, eligible=${isEarlyPaymentEligible}`);
 
                 return {
                     id: installment.id,
@@ -158,8 +226,77 @@ export async function GET(req) {
                     lateFee: installment.lateFee,
                     canPayNow: installment.status !== 'PAID' && installment.paidAmount < installment.amount,
                     percentage,
+                    isEarlyPaymentEligible,
+                    daysUntilDue, // Add for debugging/display
                 };
             });
+
+            // ========== DISCOUNT CALCULATION ==========
+            const applicableDiscounts = [];
+
+            // 1. Sibling Discount - Check if parent has other children in this school
+            if (feeSettings?.siblingDiscountEnabled && student.parentId) {
+                const siblingCount = await prisma.student.count({
+                    where: {
+                        parentId: student.parentId,
+                        schoolId: schoolId,
+                        userId: { not: student.userId }, // Exclude current student
+                    }
+                });
+
+                if (siblingCount > 0) {
+                    applicableDiscounts.push({
+                        type: 'SIBLING',
+                        name: 'Sibling Discount',
+                        description: `${siblingCount} sibling(s) in school`,
+                        percentage: feeSettings.siblingDiscountPercentage || 0,
+                        isApplied: true,
+                    });
+                }
+            }
+
+            // 2. Early Payment Discount - Check if any unpaid installment is eligible
+            const hasEarlyPaymentEligible = enrichedInstallments.some(i => i.isEarlyPaymentEligible);
+            if (feeSettings?.earlyPaymentDiscountEnabled && hasEarlyPaymentEligible) {
+                applicableDiscounts.push({
+                    type: 'EARLY_PAYMENT',
+                    name: 'Early Payment Discount',
+                    description: `Pay ${feeSettings.earlyPaymentDays || 10}+ days before due date`,
+                    percentage: feeSettings.earlyPaymentDiscountPercentage || 0,
+                    isApplied: false, // Applied at payment time
+                    applicableToInstallments: enrichedInstallments
+                        .filter(i => i.isEarlyPaymentEligible)
+                        .map(i => i.id),
+                });
+            }
+
+            // 3. Staff Ward Discount - Check if parent is school staff
+            if (feeSettings?.staffWardDiscountEnabled && student.parentId) {
+                // Check in TeachingStaff and NonTeachingStaff tables
+                const [teachingStaff, nonTeachingStaff] = await Promise.all([
+                    prisma.teachingStaff.findFirst({
+                        where: { userId: student.parentId, schoolId: schoolId }
+                    }),
+                    prisma.nonTeachingStaff.findFirst({
+                        where: { userId: student.parentId, schoolId: schoolId }
+                    })
+                ]);
+
+                if (teachingStaff || nonTeachingStaff) {
+                    applicableDiscounts.push({
+                        type: 'STAFF_WARD',
+                        name: 'Staff Ward Discount',
+                        description: teachingStaff ? 'Teaching Staff' : 'Non-Teaching Staff',
+                        percentage: feeSettings.staffWardDiscountPercentage || 0,
+                        isApplied: true,
+                    });
+                }
+            }
+
+            // Calculate total discount percentage (sum of all applicable)
+            const totalDiscountPercentage = applicableDiscounts
+                .filter(d => d.isApplied)
+                .reduce((sum, d) => sum + (d.percentage || 0), 0);
 
             return {
                 student: {
@@ -197,6 +334,23 @@ export async function GET(req) {
                 installments: enrichedInstallments,
                 payments: fee.payments,
                 discounts: fee.discounts,
+                applicableDiscounts, // New: calculated discounts
+                discountSettings: {
+                    siblingDiscount: {
+                        enabled: feeSettings?.siblingDiscountEnabled || false,
+                        percentage: feeSettings?.siblingDiscountPercentage || 0,
+                    },
+                    earlyPaymentDiscount: {
+                        enabled: feeSettings?.earlyPaymentDiscountEnabled || false,
+                        percentage: feeSettings?.earlyPaymentDiscountPercentage || 0,
+                        days: feeSettings?.earlyPaymentDays || 10,
+                    },
+                    staffWardDiscount: {
+                        enabled: feeSettings?.staffWardDiscountEnabled || false,
+                        percentage: feeSettings?.staffWardDiscountPercentage || 0,
+                    },
+                    totalDiscountPercentage,
+                },
                 summary: {
                     totalDue: fee.finalAmount,
                     totalPaid: fee.paidAmount,
@@ -218,7 +372,7 @@ export async function GET(req) {
                     upiId: feeSettings.upiId,
                 } : null,
             };
-        }, 60); // Cache for 1 minute
+        }, 5); // Cache for 5 seconds (reduce for testing)
 
         if (!data) {
             return NextResponse.json(

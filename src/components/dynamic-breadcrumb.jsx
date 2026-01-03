@@ -3,7 +3,7 @@
 
 import { usePathname } from "next/navigation"
 import Link from "next/link"
-import { Fragment } from "react"
+import { Fragment, useEffect } from "react"
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -24,9 +24,21 @@ export function DynamicBreadcrumb() {
             .replace(/^\w/, (c) => c.toUpperCase())
     }
 
-    // if (pathname === "/dashboard") {
-    //   return null
-    // }
+    // Update document title based on current path
+    useEffect(() => {
+        if (paths.length > 0) {
+            // Skip 'dashboard' from the title for cleaner display
+            const titlePaths = paths.filter(p => p.toLowerCase() !== 'dashboard')
+
+            // Build breadcrumb trail for title (e.g., "Fees > Settings")
+            const breadcrumbTrail = titlePaths.map(getLabel).join(' > ')
+
+            // Update document title
+            document.title = breadcrumbTrail ? `${breadcrumbTrail} | EduBreezy` : 'Dashboard | EduBreezy'
+        } else {
+            document.title = 'EduBreezy – India\'s Leading School Management Platform'
+        }
+    }, [pathname, paths])
 
     // Define paths that are just containers and shouldn't be clickable
     const NON_ROUTABLE_PATHS = new Set([
@@ -48,17 +60,6 @@ export function DynamicBreadcrumb() {
     return (
         <Breadcrumb className="flex">
             <BreadcrumbList className="flex-nowrap whitespace-nowrap">
-                {/* Always show Dashboard as home if we are in dashboard routes? 
-            Assuming /dashboard is the root for this app's context */}
-                {/* <BreadcrumbItem>
-          <BreadcrumbLink asChild>
-            <Link href="/dashboard">Dashboard</Link>
-          </BreadcrumbLink>
-        </BreadcrumbItem> */}
-
-                {/* Actually, let's just generate from paths. 
-            If path starts with dashboard, the first item will be dashboard. */}
-
                 {paths.map((path, index) => {
                     const href = `/${paths.slice(0, index + 1).join("/")}`
                     const isLast = index === paths.length - 1
@@ -67,9 +68,6 @@ export function DynamicBreadcrumb() {
 
                     return (
                         <Fragment key={path}>
-                            {/* Separator before item (except first one if we wanted that, but usually separator is between items)
-                   Wait, Shadcn breadcrumb usually goes Item -> Separator -> Item.
-               */}
                             {index > 0 && <BreadcrumbSeparator />}
 
                             <BreadcrumbItem>

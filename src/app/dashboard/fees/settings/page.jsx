@@ -38,7 +38,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-
+import ReceiptPreview from '@/components/receipts/ReceiptPreview';
+import FeeStatementTemplate from '@/components/receipts/FeeStatementTemplate';
+import FileUploadButton from '@/components/fileupload';
+import { useUploadThing } from '@/lib/uploadthing';
 export default function FeeSettings() {
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;
@@ -99,6 +102,9 @@ export default function FeeSettings() {
     const [autoGenerate, setAutoGenerate] = useState(true);
     const [showSchoolLogo, setShowSchoolLogo] = useState(true);
     const [receiptFooterText, setReceiptFooterText] = useState('');
+    const [customReceiptLogo, setCustomReceiptLogo] = useState(''); // Custom logo URL or uploaded image
+    const [customReceiptEmail, setCustomReceiptEmail] = useState(''); // Custom email for receipts
+    const [customReceiptPhone, setCustomReceiptPhone] = useState(''); // Custom phone for receipts
 
     // Discount Settings
     const [siblingDiscountEnabled, setSiblingDiscountEnabled] = useState(false);
@@ -106,6 +112,13 @@ export default function FeeSettings() {
     const [earlyPaymentDiscountEnabled, setEarlyPaymentDiscountEnabled] = useState(false);
     const [earlyPaymentDiscountPercentage, setEarlyPaymentDiscountPercentage] = useState('0');
     const [earlyPaymentDays, setEarlyPaymentDays] = useState('10');
+    const [earlyPaymentDaysMonthly, setEarlyPaymentDaysMonthly] = useState(7);
+    const [earlyPaymentDaysQuarterly, setEarlyPaymentDaysQuarterly] = useState(15);
+    const [earlyPaymentDaysHalfYearly, setEarlyPaymentDaysHalfYearly] = useState(30);
+    // const [earlyPaymentDaysHalfYearly, setEarlyPaymentDaysHalfYearly] = useState(30);
+    const [earlyPaymentDaysYearly, setEarlyPaymentDaysYearly] = useState(60);
+
+    const [previewType, setPreviewType] = useState('receipt'); // 'receipt' or 'statement'
     const [staffWardDiscountEnabled, setStaffWardDiscountEnabled] = useState(false);
     const [staffWardDiscountPercentage, setStaffWardDiscountPercentage] = useState('0');
 
@@ -178,6 +191,10 @@ export default function FeeSettings() {
             setEarlyPaymentDiscountEnabled(s.earlyPaymentDiscountEnabled ?? false);
             setEarlyPaymentDiscountPercentage(String(s.earlyPaymentDiscountPercentage || 0));
             setEarlyPaymentDays(String(s.earlyPaymentDays || 10));
+            setEarlyPaymentDaysMonthly(s.earlyPaymentDaysMonthly || 7);
+            setEarlyPaymentDaysQuarterly(s.earlyPaymentDaysQuarterly || 15);
+            setEarlyPaymentDaysHalfYearly(s.earlyPaymentDaysHalfYearly || 30);
+            setEarlyPaymentDaysYearly(s.earlyPaymentDaysYearly || 60);
             setStaffWardDiscountEnabled(s.staffWardDiscountEnabled ?? false);
             setStaffWardDiscountPercentage(String(s.staffWardDiscountPercentage || 0));
         }
@@ -363,6 +380,10 @@ export default function FeeSettings() {
                 earlyPaymentDiscountEnabled,
                 earlyPaymentDiscountPercentage: parseFloat(earlyPaymentDiscountPercentage),
                 earlyPaymentDays: parseInt(earlyPaymentDays),
+                earlyPaymentDaysMonthly: parseInt(earlyPaymentDaysMonthly),
+                earlyPaymentDaysQuarterly: parseInt(earlyPaymentDaysQuarterly),
+                earlyPaymentDaysHalfYearly: parseInt(earlyPaymentDaysHalfYearly),
+                earlyPaymentDaysYearly: parseInt(earlyPaymentDaysYearly),
                 staffWardDiscountEnabled,
                 staffWardDiscountPercentage: parseFloat(staffWardDiscountPercentage),
             },
@@ -1348,6 +1369,54 @@ export default function FeeSettings() {
                                 <Switch checked={showSchoolLogo} onCheckedChange={setShowSchoolLogo} />
                             </div>
 
+                            {/* Custom Logo Upload - Only shown when logo is enabled */}
+                            {showSchoolLogo && (
+                                <div className="space-y-2 p-4 border rounded-lg bg-gray-50 dark:bg-gray-900">
+                                    <Label>Custom Receipt Logo (Optional)</Label>
+                                    <p className="text-xs text-muted-foreground mb-2">
+                                        Upload a custom logo for receipts, or leave empty to use school logo
+                                    </p>
+                                    <FileUploadButton
+                                        field="Receipt Logo"
+                                        onChange={setCustomReceiptLogo}
+                                        saveToLibrary={false}
+                                    />
+                                    {customReceiptLogo && (
+                                        <div className="mt-2">
+                                            <p className="text-xs text-green-600">✓ Custom logo uploaded</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Custom Email */}
+                            <div className="space-y-2">
+                                <Label>Receipt Email (Optional)</Label>
+                                <Input
+                                    type="email"
+                                    value={customReceiptEmail}
+                                    onChange={(e) => setCustomReceiptEmail(e.target.value)}
+                                    placeholder={settingsData?.school?.email || "e.g., fees@yourschool.com"}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Leave empty to use school email{settingsData?.school?.email ? `: ${settingsData.school.email}` : ''}. This will be displayed on receipts.
+                                </p>
+                            </div>
+
+                            {/* Custom Phone */}
+                            <div className="space-y-2">
+                                <Label>Receipt Phone Number (Optional)</Label>
+                                <Input
+                                    type="tel"
+                                    value={customReceiptPhone}
+                                    onChange={(e) => setCustomReceiptPhone(e.target.value)}
+                                    placeholder={settingsData?.school?.contactNumber || "e.g., +91 9876543210"}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Leave empty to use school contact number{settingsData?.school?.contactNumber ? `: ${settingsData.school.contactNumber}` : ''}. This will be displayed on receipts.
+                                </p>
+                            </div>
+
                             {/* Footer Text */}
                             <div className="space-y-2">
                                 <Label>Receipt Footer Text</Label>
@@ -1358,6 +1427,87 @@ export default function FeeSettings() {
                                     rows={3}
                                 />
                             </div>
+
+                            {/* Receipt Preview */}
+                            {/* Document Preview */}
+                            <div className="border-t pt-6">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-lg font-medium">Document Preview</h3>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            variant={previewType === 'receipt' ? 'default' : 'outline'}
+                                            size="sm"
+                                            onClick={() => setPreviewType('receipt')}
+                                        >
+                                            Receipt
+                                        </Button>
+                                        <Button
+                                            variant={previewType === 'statement' ? 'default' : 'outline'}
+                                            size="sm"
+                                            onClick={() => setPreviewType('statement')}
+                                        >
+                                            Fee Statement
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                {previewType === 'receipt' ? (
+                                    <ReceiptPreview
+                                        schoolData={{
+                                            ...(settingsData?.school || {}),
+                                            // Override with custom values if provided
+                                            profilePicture: customReceiptLogo || settingsData?.school?.profilePicture,
+                                            email: customReceiptEmail || settingsData?.school?.email,
+                                            contactNumber: customReceiptPhone || settingsData?.school?.contactNumber,
+                                        }}
+                                        settings={{
+                                            showSchoolLogo,
+                                            receiptFooterText,
+                                            receiptPrefix,
+                                        }}
+                                    />
+                                ) : (
+                                    <div className="w-full overflow-x-auto bg-gray-50 p-4 border rounded-lg flex justify-center">
+                                        <div className="transform scale-[0.65] origin-top h-[950px] w-[8.5in] min-w-[8.5in] border shadow-lg bg-white mx-auto">
+                                            <FeeStatementTemplate
+                                                schoolData={{
+                                                    ...(settingsData?.school || {}),
+                                                    profilePicture: customReceiptLogo || settingsData?.school?.profilePicture,
+                                                    name: settingsData?.school?.name || 'School Name',
+                                                    location: settingsData?.school?.location || 'School Address',
+                                                    contactNumber: customReceiptPhone || settingsData?.school?.contactNumber,
+                                                    email: customReceiptEmail || settingsData?.school?.email,
+                                                }}
+                                                studentData={{
+                                                    studentName: 'John Doe',
+                                                    admissionNo: 'AD001',
+                                                    className: '10th',
+                                                    sectionName: 'A',
+                                                    rollNo: '12',
+                                                    feeStructureName: 'Class 10 Fee Structure',
+                                                    academicYear: '2025-26',
+                                                }}
+                                                feeSummary={{
+                                                    totalFee: 24000,
+                                                    totalPaid: 6000,
+                                                    totalDiscount: 3600,
+                                                    balanceDue: 14400,
+                                                }}
+                                                ledgerData={[
+                                                    { descriptor: 'Q1 (Apr-Jun)', subDescriptor: '2025', dueDate: '15 Jan 2026', amount: 6000, paidDate: '02 Jan 2026', receiptNo: 'R-221', discount: 0, status: 'Paid' },
+                                                    { descriptor: 'Q2 (Jul-Sep)', subDescriptor: '2025', dueDate: '15 May 2026', amount: 6000, paidDate: null, receiptNo: '—', discount: 1200, status: 'Pending' },
+                                                    { descriptor: 'Q3 (Oct-Dec)', subDescriptor: '2025', dueDate: '15 Jul 2026', amount: 6000, paidDate: null, receiptNo: '—', discount: 1200, status: 'Pending' },
+                                                    { descriptor: 'Q4 (Jan-Mar)', subDescriptor: '2026', dueDate: '15 Oct 2026', amount: 6000, paidDate: null, receiptNo: '—', discount: 1200, status: 'Pending' },
+                                                ]}
+                                                receiptsList={[
+                                                    { number: 'R-221', date: '02 Jan 2026', amount: 6000, mode: 'Net Banking' }
+                                                ]}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
 
                             <Button onClick={handleSaveReceipts} disabled={saveSettingsMutation.isPending}>
                                 {saveSettingsMutation.isPending ? (
@@ -1417,21 +1567,74 @@ export default function FeeSettings() {
                                     <Switch checked={earlyPaymentDiscountEnabled} onCheckedChange={setEarlyPaymentDiscountEnabled} />
                                 </div>
                                 {earlyPaymentDiscountEnabled && (
-                                    <div className="flex items-center gap-4 flex-wrap">
-                                        <Input
-                                            type="number"
-                                            value={earlyPaymentDiscountPercentage}
-                                            onChange={(e) => setEarlyPaymentDiscountPercentage(e.target.value)}
-                                            className="max-w-[100px]"
-                                        />
-                                        <span className="text-sm">% discount if paid</span>
-                                        <Input
-                                            type="number"
-                                            value={earlyPaymentDays}
-                                            onChange={(e) => setEarlyPaymentDays(e.target.value)}
-                                            className="max-w-[80px]"
-                                        />
-                                        <span className="text-sm">days before due date</span>
+                                    <div className="space-y-4 w-full">
+                                        <div className="flex items-center gap-4 flex-wrap pb-2 border-b">
+                                            <Input
+                                                type="number"
+                                                value={earlyPaymentDiscountPercentage}
+                                                onChange={(e) => setEarlyPaymentDiscountPercentage(e.target.value)}
+                                                className="max-w-[100px]"
+                                            />
+                                            <span className="text-sm font-medium">% discount if paid using below rules:</span>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                                            {/* Monthly */}
+                                            <div className="flex flex-col gap-1">
+                                                <Label className="text-xs text-muted-foreground">Monthly Installments</Label>
+                                                <div className="flex items-center gap-2">
+                                                    <Input
+                                                        type="number"
+                                                        value={earlyPaymentDaysMonthly}
+                                                        onChange={(e) => setEarlyPaymentDaysMonthly(e.target.value)}
+                                                        className="max-w-[80px]"
+                                                    />
+                                                    <span className="text-sm">days before</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Quarterly */}
+                                            <div className="flex flex-col gap-1">
+                                                <Label className="text-xs text-muted-foreground">Quarterly Installments</Label>
+                                                <div className="flex items-center gap-2">
+                                                    <Input
+                                                        type="number"
+                                                        value={earlyPaymentDaysQuarterly}
+                                                        onChange={(e) => setEarlyPaymentDaysQuarterly(e.target.value)}
+                                                        className="max-w-[80px]"
+                                                    />
+                                                    <span className="text-sm">days before</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Half-Yearly */}
+                                            <div className="flex flex-col gap-1">
+                                                <Label className="text-xs text-muted-foreground">Half-Yearly Installments</Label>
+                                                <div className="flex items-center gap-2">
+                                                    <Input
+                                                        type="number"
+                                                        value={earlyPaymentDaysHalfYearly}
+                                                        onChange={(e) => setEarlyPaymentDaysHalfYearly(e.target.value)}
+                                                        className="max-w-[80px]"
+                                                    />
+                                                    <span className="text-sm">days before</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Yearly */}
+                                            <div className="flex flex-col gap-1">
+                                                <Label className="text-xs text-muted-foreground">Yearly Installments</Label>
+                                                <div className="flex items-center gap-2">
+                                                    <Input
+                                                        type="number"
+                                                        value={earlyPaymentDaysYearly}
+                                                        onChange={(e) => setEarlyPaymentDaysYearly(e.target.value)}
+                                                        className="max-w-[80px]"
+                                                    />
+                                                    <span className="text-sm">days before</span>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -1481,6 +1684,6 @@ export default function FeeSettings() {
                     </p>
                 </AlertDescription>
             </Alert>
-        </div>
+        </div >
     );
 }

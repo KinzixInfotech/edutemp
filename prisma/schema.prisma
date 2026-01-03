@@ -107,6 +107,7 @@ model School {
 
   // Payment Gateway Settings (Generic)
   paymentSettings SchoolPaymentSettings?
+  receipts        Receipt[]
 
   @@index([name])
 }
@@ -1723,6 +1724,7 @@ model Student {
   busAttendances         BusAttendance[]
   studentTransportFees   StudentTransportFee[]
   busRequests            BusRequest[]
+  receipts               Receipt[]
 
   @@index([classId])
   @@index([sectionId])
@@ -1773,6 +1775,7 @@ model Parent {
   school       School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   studentLinks StudentParentLink[]
   busRequests  BusRequest[]
+  receipts     Receipt[]
 
   @@index([schoolId])
   @@index([contactNumber])
@@ -3851,6 +3854,7 @@ model FeePayment {
   feeStructureId        String?                 @db.Uuid
   studentFeeStructure   StudentFeeStructure?    @relation(fields: [studentFeeStructureId], references: [id])
   studentFeeStructureId String?                 @db.Uuid
+  receipts              Receipt[]
 
   @@index([studentFeeId])
   @@index([studentId])
@@ -4995,7 +4999,11 @@ model FeeSettings {
   siblingDiscountPercentage      Float   @default(0)
   earlyPaymentDiscountEnabled    Boolean @default(false)
   earlyPaymentDiscountPercentage Float   @default(0)
-  earlyPaymentDays               Int     @default(10) // Days before due date
+  earlyPaymentDays               Int     @default(10) // Default Fallback
+  earlyPaymentDaysMonthly        Int     @default(7)
+  earlyPaymentDaysQuarterly      Int     @default(15)
+  earlyPaymentDaysHalfYearly     Int     @default(30)
+  earlyPaymentDaysYearly         Int     @default(60)
   staffWardDiscountEnabled       Boolean @default(false)
   staffWardDiscountPercentage    Float   @default(0)
 
@@ -5005,6 +5013,43 @@ model FeeSettings {
   school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
   @@index([schoolId])
+}
+
+// ==================== RECEIPT MANAGEMENT ====================
+
+model Receipt {
+  id            String @id @default(uuid()) @db.Uuid
+  schoolId      String @db.Uuid
+  receiptNumber String @unique // e.g., REC-2024-001
+
+  // Payment Reference
+  feePaymentId String     @db.Uuid
+  feePayment   FeePayment @relation(fields: [feePaymentId], references: [id], onDelete: Cascade)
+
+  // Student/Parent Info
+  studentId String  @db.Uuid
+  student   Student @relation(fields: [studentId], references: [userId])
+  parentId  String? @db.Uuid
+  parent    Parent? @relation(fields: [parentId], references: [id])
+
+  // Receipt Data (JSON snapshot for reliable PDF generation)
+  receiptData Json // Complete snapshot: student name, items, amounts, school details, etc.
+
+  // PDF Storage
+  pdfUrl       String? // URL to stored PDF file
+  pdfGenerated Boolean @default(false)
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+  @@index([feePaymentId])
+  @@index([studentId])
+  @@index([receiptNumber])
+  @@index([createdAt])
 }
 
 // ==================== PAYMENT GATEWAY SETTINGS ====================
