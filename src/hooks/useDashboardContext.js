@@ -27,7 +27,7 @@ export function useDashboardContext(schoolId) {
         queryFn: () => fetchDashboardContext(schoolId),
         enabled: !!schoolId,
         staleTime: 5 * 60 * 1000, // 5 minutes
-        gcTime: 10 * 60 * 1000, // 10 minutes (cacheTime renamed to gcTime in v5)
+        gcTime: 10 * 60 * 1000, // 10 minutes
         refetchOnWindowFocus: false,
     });
 }

@@ -26,6 +26,7 @@ import { NumberTicker } from '@/components/ui/number-ticker';
 import ScrollMouse from '@/components/ScrollMouse';
 import dynamic from 'next/dynamic';
 import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
+import ProductGuideAI from '@/components/ProductGuideAI';
 
 
 // Organization Schema for SEO
@@ -68,7 +69,11 @@ export default function HomePage() {
             <HeroSection />
             <MarqueeBanner />
             <AboutBriefSection />
+            <ProductGuideAI />
+
             <WhyEduBreezySection />
+
+            {/* AI Product Guide - Ask questions about EduBreezy */}
 
             {/* <TrustedSection /> */}
             <FeaturesSection />
@@ -81,7 +86,9 @@ export default function HomePage() {
             {/* <PricingSection /> */}
             <TestimonialsSection />
             {/* <div className='p-2'> */}
-            <DownloadAppCTA />
+            <div id="app">
+                <DownloadAppCTA />
+            </div>
             {/* </div> */}
             <FinalCTA />
             {/* <Footer /> */}
@@ -153,18 +160,18 @@ function HeroSection() {
                     {/* Badge */}
                     <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 border-[#0469ff]/20 bg-[#0469ff]/5">
                         <div className="w-2 h-2 rounded-full bg-[#0469ff] animate-pulse" />
-                        <span className="text-sm font-semibold text-[#0469ff]">Next-Generation School ERP</span>
+                        <span className="text-sm font-semibold text-[#0469ff]">AI Powered School ERP</span>
                     </div>
 
                     {/* Main Heading */}
                     <h1 className="text-[clamp(2.8rem,8vw,6.5rem)] font-bold leading-[1.05] tracking-tight">
                         <span className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent">
-                            Transform Education
+                            Modern School Management
                         </span>
                         <br />
                         <span className="relative inline-block mt-2">
                             <span className="text-[#0469ff]">
-                                With Intelligent Systems
+                                Built for Real Schools
                             </span>
                             {/* Underline Effect */}
                             <svg className="absolute -bottom-4 left-0 w-full" height="12" viewBox="0 0 300 12" fill="none">
@@ -175,7 +182,7 @@ function HeroSection() {
 
                     {/* Subtitle */}
                     <p className="text-xl md:text-2xl text-gray-600 max-w-[800px] mx-auto leading-relaxed font-medium">
-                        An all-in-one school ERP with intelligent systems and a modern UI/UX that simplifies administration and enhances learning outcomes.
+                        An all-in-one school ERP with smart insights and modern UI/UX that simplifies administration and improves outcomes.
                     </p>
 
                     {/* CTA Buttons */}
@@ -184,7 +191,7 @@ function HeroSection() {
                             <button className="group relative px-10 py-4 rounded-full font-bold text-lg text-white bg-[#0469ff]  hover:shadow-2xl transition-all duration-300 overflow-hidden">
                                 <span className="absolute inset-0 bg-[#0358dd] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                                 <span className="relative flex items-center gap-3">
-                                    Start Free Trial
+                                    Get Started
                                     <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center">
                                         <ArrowRight className="w-5 h-5 text-[#0469ff] transition-transform duration-300 group-hover:translate-x-0.5" />
                                     </div>

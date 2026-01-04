@@ -1,0 +1,498 @@
+{
+    "brand": {
+        "name": "EduBreezy",
+        "tagline": "Next-Generation School ERP",
+        "description": "An all-in-one school management platform blending powerful technology, intuitive design, and education-first thinking."
+    },
+    "features": [
+        {
+            "id": "admission",
+            "name": "Admission & Enrollment",
+            "description": "Complete digital admission pipeline with customizable online forms, document upload, multi-stage application tracking, automated workflows, and inquiry management.",
+            "subFeatures": [
+                "Online admission forms with custom fields",
+                "Document upload and verification",
+                "Multi-stage application workflow",
+                "Automated status notifications",
+                "Inquiry tracking and follow-up",
+                "Bulk student import via Excel"
+            ],
+            "status": "available"
+        },
+        {
+            "id": "student_management",
+            "name": "Student Information System",
+            "description": "Comprehensive student database with profiles, academic history, parent linking, section assignments, and complete lifecycle management from admission to alumni.",
+            "subFeatures": [
+                "Detailed student profiles with photos",
+                "Parent/guardian linking",
+                "Class and section assignments",
+                "Academic year transitions",
+                "Student-wise reports",
+                "Alumni tracking"
+            ],
+            "status": "available"
+        },
+        {
+            "id": "fees",
+            "name": "Fee Management",
+            "description": "End-to-end fee lifecycle management with flexible fee structures, online payments, installment plans, late fee automation, instant receipts, and detailed collection analytics.",
+            "subFeatures": [
+                "Flexible fee structure creation",
+                "Class-wise and student-wise fee assignment",
+                "Multiple payment modes (online, cash, cheque, UPI)",
+                "Installment and partial payment support",
+                "Automatic late fee calculation",
+                "Instant digital receipts",
+                "Fee concessions and scholarships",
+                "Due date reminders via SMS",
+                "Collection reports and analytics"
+            ],
+            "status": "available"
+        },
+        {
+            "id": "attendance",
+            "name": "Smart Attendance System",
+            "description": "Real-time attendance tracking for students and staff with geo-fencing, auto-marking rules, leave management, instant parent notifications, and comprehensive analytics.",
+            "subFeatures": [
+                "Student attendance with status (Present, Absent, Late, Half-day)",
+                "Staff attendance tracking",
+                "Geo-fencing for location-based marking",
+                "Auto-absent marking after cutoff time",
+                "Bulk attendance entry",
+                "Leave request and approval workflow",
+                "Instant SMS/push notifications to parents",
+                "Attendance reports and statistics",
+                "Delegation for class teachers"
+            ],
+            "status": "available"
+        },
+        {
+            "id": "exams",
+            "name": "Examination Management",
+            "description": "Complete exam lifecycle management from scheduling to result declaration with hall ticket generation, marks entry, grade calculation, and automated report cards.",
+            "subFeatures": [
+                "Exam schedule creation and management",
+                "Subject-wise exam configuration",
+                "Hall ticket / Admit card generation",
+                "Exam hall and seat allocation",
+                "Marks entry with validation",
+                "Grade calculation with custom grading scales",
+                "Pass/fail determination",
+                "Online examinations support",
+                "Automated report card generation",
+                "Performance analytics"
+            ],
+            "status": "available"
+        },
+        {
+            "id": "timetable",
+            "name": "Timetable & Academics",
+            "description": "Intelligent timetable creation with time slots, teacher assignments, subject mapping, and template management for efficient academic scheduling.",
+            "subFeatures": [
+                "Class-wise timetable creation",
+                "Time slot management",
+                "Teacher assignment to periods",
+                "Subject-teacher mapping",
+                "Timetable templates",
+                "Conflict detection",
+                "Teacher shift management"
+            ],
+            "status": "available"
+        },
+        {
+            "id": "homework",
+            "name": "Homework & Assignments",
+            "description": "Digital homework assignment and tracking system with due dates, subject linking, and class-wise distribution.",
+            "subFeatures": [
+                "Create and assign homework",
+                "Due date tracking",
+                "Subject and class linking",
+                "Assignment management",
+                "Parent visibility via app"
+            ],
+            "status": "available"
+        },
+        {
+            "id": "communication",
+            "name": "Communication Hub",
+            "description": "Multi-channel communication with notices, SMS messaging, push notifications, and in-app messaging for seamless school-parent connectivity.",
+            "subFeatures": [
+                "Notice board with audience targeting",
+                "SMS messaging with templates",
+                "Push notifications via mobile app",
+                "SMS wallet and credit management",
+                "Bulk messaging",
+                "Message delivery tracking"
+            ],
+            "status": "available"
+        },
+        {
+            "id": "transport",
+            "name": "Transport Management",
+            "description": "Complete transport operations with vehicle management, route planning, GPS tracking, driver apps, bus attendance, and transport fee management.",
+            "subFeatures": [
+                "Vehicle registration and management",
+                "Route creation with stops",
+                "Student-to-route assignment",
+                "Student-to-stop assignment",
+                "Real-time GPS tracking",
+                "Driver mobile app",
+                "Bus trip logging",
+                "Bus attendance tracking",
+                "Transport fee management",
+                "Bus request handling",
+                "Transport staff management"
+            ],
+            "status": "available"
+        },
+        {
+            "id": "library",
+            "name": "Library Management",
+            "description": "Complete library operations with book catalog, genre categorization, issue/return tracking, fine calculation, and book request management.",
+            "subFeatures": [
+                "Book catalog with ISBN, author, publisher",
+                "Genre and category management",
+                "Book copy tracking",
+                "Issue and return management",
+                "Due date and fine calculation",
+                "Book request by students",
+                "Librarian dashboard",
+                "Digital library integration"
+            ],
+            "status": "available"
+        },
+        {
+            "id": "inventory",
+            "name": "Inventory & Store",
+            "description": "School inventory management with item tracking, category organization, purchase orders, sales to students, and stock management.",
+            "subFeatures": [
+                "Item catalog with SKU and pricing",
+                "Category organization",
+                "Stock quantity tracking",
+                "Low stock alerts",
+                "Purchase order management",
+                "Sales to students/parents",
+                "Transaction history",
+                "Uniform and books sales"
+            ],
+            "status": "available"
+        },
+        {
+            "id": "payroll",
+            "name": "Payroll & HR",
+            "description": "Comprehensive payroll processing with salary structures, allowances, deductions, payslip generation, leave management, and audit trails.",
+            "subFeatures": [
+                "Staff salary structure definition",
+                "Basic pay, allowances, deductions",
+                "Payroll period management",
+                "Bulk payroll processing",
+                "Automated payslip generation",
+                "Leave bucket and balance tracking",
+                "Payroll audit logs",
+                "Tax calculation support"
+            ],
+            "status": "available"
+        },
+        {
+            "id": "staff_management",
+            "name": "Staff Management",
+            "description": "Complete staff lifecycle management for teaching and non-teaching staff with profiles, qualifications, department assignments, and role management.",
+            "subFeatures": [
+                "Teaching staff profiles",
+                "Non-teaching staff profiles",
+                "Qualification and experience tracking",
+                "Department and designation assignment",
+                "Role-based access control",
+                "Staff attendance integration",
+                "Librarian, Accountant, Principal, Director roles"
+            ],
+            "status": "available"
+        },
+        {
+            "id": "certificates",
+            "name": "Digital Certificates & Documents",
+            "description": "Generate and manage official school documents with customizable templates, digital signatures, QR verification, and bulk generation.",
+            "subFeatures": [
+                "Transfer certificate generation",
+                "Bonafide certificate",
+                "Character certificate",
+                "Custom certificate templates",
+                "Digital signature integration",
+                "School stamp integration",
+                "QR code verification",
+                "Bulk certificate generation",
+                "ID card generation",
+                "Admit card generation"
+            ],
+            "status": "available"
+        },
+        {
+            "id": "calendar",
+            "name": "School Calendar",
+            "description": "Academic calendar management with events, holidays, vacations, exam schedules, and day-type configuration.",
+            "subFeatures": [
+                "Event scheduling",
+                "Holiday management",
+                "Vacation periods",
+                "Half-day marking",
+                "Exam day configuration",
+                "Academic year planning"
+            ],
+            "status": "available"
+        },
+        {
+            "id": "parent_app",
+            "name": "Parent Mobile App",
+            "description": "Native iOS and Android apps for parents with real-time access to attendance, fees, grades, homework, notices, and direct communication with teachers.",
+            "subFeatures": [
+                "View child's attendance",
+                "Fee payment and receipts",
+                "Exam results and report cards",
+                "Homework and assignments",
+                "Notice board",
+                "Direct messaging with teachers",
+                "Transport tracking",
+                "Push notifications"
+            ],
+            "status": "available"
+        },
+        {
+            "id": "school_explorer",
+            "name": "School Explorer Platform",
+            "description": "Public school discovery platform where parents can explore, compare, and inquire about schools with detailed profiles, ratings, and admission inquiries.",
+            "subFeatures": [
+                "Public school profiles",
+                "School search and filtering",
+                "Ratings and reviews",
+                "Fee range display",
+                "Facility showcasing",
+                "Achievement display",
+                "Online admission inquiry",
+                "School comparison",
+                "Verified school badges"
+            ],
+            "status": "available"
+        },
+        {
+            "id": "ai_insights",
+            "name": "AI-Powered Dashboard",
+            "description": "Intelligent dashboard with AI-generated insights, attendance predictions, fee collection analysis, and automated recommendations for school administrators.",
+            "subFeatures": [
+                "AI-generated daily briefings",
+                "Attendance pattern analysis",
+                "Fee collection insights",
+                "Trend predictions",
+                "Smart recommendations",
+                "Cached insights for cost efficiency"
+            ],
+            "status": "available"
+        },
+        {
+            "id": "reports",
+            "name": "Reports & Analytics",
+            "description": "Comprehensive reporting with attendance reports, fee collection analytics, exam performance analysis, and exportable data.",
+            "subFeatures": [
+                "Attendance reports (daily, monthly, yearly)",
+                "Fee collection reports",
+                "Defaulter lists",
+                "Exam performance analytics",
+                "Class-wise and subject-wise analysis",
+                "Excel and PDF exports"
+            ],
+            "status": "available"
+        },
+        {
+            "id": "media_library",
+            "name": "Media Library",
+            "description": "Centralized media management for school photos, videos, and documents with gallery organization.",
+            "subFeatures": [
+                "Photo galleries",
+                "Video uploads",
+                "Document storage",
+                "Event-wise organization"
+            ],
+            "status": "available"
+        },
+        {
+            "id": "alumni",
+            "name": "Alumni Management",
+            "description": "Track and engage with alumni with profiles, graduation details, and alumni network management.",
+            "subFeatures": [
+                "Alumni profiles",
+                "Graduation year tracking",
+                "Contact information",
+                "Alumni engagement"
+            ],
+            "status": "available"
+        },
+        {
+            "id": "partner_program",
+            "name": "Partner & Referral Program",
+            "description": "Partner management system with lead tracking, commission management, and payouts for school referral partners.",
+            "subFeatures": [
+                "Partner registration",
+                "Lead tracking and management",
+                "Commission calculation",
+                "Payout management",
+                "Marketing asset distribution"
+            ],
+            "status": "available"
+        }
+    ],
+    "userRoles": [
+        {
+            "role": "Super Admin",
+            "description": "Complete system access with all administrative privileges"
+        },
+        {
+            "role": "Admin",
+            "description": "School administrator with full school management access"
+        },
+        {
+            "role": "Principal",
+            "description": "Academic head with oversight of academics and staff"
+        },
+        {
+            "role": "Director",
+            "description": "Management oversight with financial and operational access"
+        },
+        {
+            "role": "Teaching Staff",
+            "description": "Teachers with attendance, homework, and class management"
+        },
+        {
+            "role": "Non-Teaching Staff",
+            "description": "Support staff with limited module access"
+        },
+        {
+            "role": "Accountant",
+            "description": "Finance team with fee and payroll access"
+        },
+        {
+            "role": "Librarian",
+            "description": "Library management access"
+        },
+        {
+            "role": "Transport Staff",
+            "description": "Drivers and transport coordinators"
+        },
+        {
+            "role": "Parent",
+            "description": "View-only access to child's information via app"
+        },
+        {
+            "role": "Student",
+            "description": "Limited access to own academic information"
+        }
+    ],
+    "security": {
+        "dataEncryption": "256-bit AES encryption for all data at rest and in transit",
+        "compliance": "Compliant with Indian data protection guidelines",
+        "hosting": "Secure cloud hosting on AWS/GCP with 99.9% uptime guarantee",
+        "backup": "Daily automated backups with instant recovery",
+        "access": "Role-based access control with audit logs",
+        "authentication": "Secure authentication with session management"
+    },
+    "compatibility": {
+        "boards": [
+            "CBSE",
+            "ICSE",
+            "State Boards",
+            "IB",
+            "IGCSE",
+            "Cambridge"
+        ],
+        "schoolTypes": [
+            "K-12",
+            "Primary",
+            "Secondary",
+            "Higher Secondary",
+            "Play Schools",
+            "International Schools"
+        ],
+        "languages": [
+            "English",
+            "Hindi",
+            "Regional languages supported"
+        ]
+    },
+    "technicalSpecs": {
+        "platform": "Cloud-based SaaS",
+        "mobileApps": "Native iOS and Android apps",
+        "browser": "Chrome, Firefox, Safari, Edge",
+        "api": "RESTful APIs for integrations",
+        "database": "PostgreSQL with real-time sync"
+    },
+    "pricing": {
+        "model": "Per-student pricing with volume discounts",
+        "trial": "14-day free trial available",
+        "support": "Dedicated onboarding support included",
+        "customization": "Custom modules available on request"
+    },
+    "onboarding": {
+        "duration": "Typically 1-2 weeks for complete setup",
+        "support": "Dedicated implementation team assigned",
+        "training": "Free training sessions for all staff",
+        "migration": "Data migration assistance from existing systems",
+        "import": "Bulk import via Excel for students, staff, fees"
+    },
+    "faq": [
+        {
+            "question": "What features does EduBreezy offer?",
+            "answer": "EduBreezy offers 20+ modules including admissions, student management, fee collection, attendance tracking, exam management, report cards, timetable, homework, transport with GPS tracking, library, inventory, payroll, digital certificates, parent mobile app, school explorer platform, and AI-powered analytics. All features work together seamlessly."
+        },
+        {
+            "question": "Is EduBreezy suitable for CBSE / ICSE schools?",
+            "answer": "Yes! EduBreezy is fully compatible with CBSE, ICSE, State Boards, IB, IGCSE, and Cambridge curriculums. Our system adapts to your board's requirements for report cards, grading patterns, and academic structures."
+        },
+        {
+            "question": "How does AI help school administrators?",
+            "answer": "Our AI provides intelligent insights on attendance patterns, fee collection trends, and student performance. It generates automated daily briefings, predicts potential issues, and helps administrators make data-driven decisions without manual analysis."
+        },
+        {
+            "question": "Is student data secure in EduBreezy?",
+            "answer": "Absolutely. We use 256-bit AES encryption, role-based access control, daily automated backups, and are compliant with Indian data protection guidelines. Your data is hosted on secure cloud infrastructure with 99.9% uptime."
+        },
+        {
+            "question": "How does fee management work?",
+            "answer": "Our fee module handles the complete lifecycle - fee structure creation, class-wise and student-wise assignment, automated invoicing, multiple payment modes (online, UPI, cash, cheque), installment plans, late fee calculation, instant digital receipts, due reminders via SMS, and detailed collection reports."
+        },
+        {
+            "question": "Can parents pay online?",
+            "answer": "Yes, absolutely! Parents can safely pay fees online using our secure payment gateway which supports Credit Cards, Debit Cards, Net Banking, and UPI. They receive instant digital receipts, and the school's accounts are automatically updated."
+        },
+        {
+            "question": "Does EduBreezy support exams and results?",
+            "answer": "Yes, we provide complete exam management - schedule creation, subject configuration, hall ticket generation, seat allocation, marks entry with validation, grade calculation, automated report cards, online exams support, and performance analytics with subject-wise and class-wise analysis."
+        },
+        {
+            "question": "How does transport management work?",
+            "answer": "Our transport module covers vehicle registration, route planning with stops, student-to-route and stop assignment, real-time GPS tracking, driver mobile app, bus trip logging, bus attendance, transport fee management, and parent visibility of bus location."
+        },
+        {
+            "question": "What about attendance tracking?",
+            "answer": "Our smart attendance system supports student and staff tracking with status options (Present, Absent, Late, Half-day), geo-fencing, auto-absent marking, bulk entry, leave management, instant SMS notifications to parents, and comprehensive attendance reports and statistics."
+        },
+        {
+            "question": "Can I generate certificates and ID cards?",
+            "answer": "Yes! Generate transfer certificates, bonafide certificates, character certificates, and custom documents with your school's letterhead, digital signatures, and stamps. We also support ID card and admit card generation with QR verification."
+        },
+        {
+            "question": "Is there a mobile app for parents?",
+            "answer": "Yes, we provide native iOS and Android apps for parents to view attendance, pay fees, check exam results, view homework, read notices, track transport, and communicate with teachers - all in real-time with push notifications."
+        },
+        {
+            "question": "How easy is onboarding?",
+            "answer": "Very easy! Our dedicated team handles complete setup in 1-2 weeks. We provide data migration from your existing system via Excel import, free training for all staff, and ongoing support to ensure smooth adoption."
+        },
+        {
+            "question": "What user roles are supported?",
+            "answer": "EduBreezy supports multiple roles: Super Admin, Admin, Principal, Director, Teaching Staff, Non-Teaching Staff, Accountant, Librarian, Transport Staff, Parent, and Student - each with appropriate access levels and permissions."
+        },
+        {
+            "question": "Can I request a demo?",
+            "answer": "Yes! We offer personalized demos tailored to your school's needs. Contact us through our website or call our sales team to schedule a free demo session where we can show you all features relevant to your school."
+        }
+    ]
+}

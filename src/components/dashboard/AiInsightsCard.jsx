@@ -12,7 +12,7 @@
  * - Loading skeleton matching design
  */
 
-import { Sparkles, Calendar, Loader2, MoreHorizontal, Bot, TrendingUp, TrendingDown, Users, IndianRupee } from 'lucide-react';
+import { Sparkles, Calendar, Loader2, MoreHorizontal, Bot, TrendingUp, TrendingDown, Users, IndianRupee, RefreshCw } from 'lucide-react';
 import { useDashboardContext } from '@/hooks/useDashboardContext';
 import { useAiInsights } from '@/hooks/useAiInsights';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
@@ -22,9 +22,9 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 
 // Category badge styles
 const CATEGORY_STYLES = {
-    PREDICTIVE: {
-        bg: 'bg-blue-100 dark:bg-blue-900/40',
-        text: 'text-blue-700 dark:text-blue-300',
+    ATTENDANCE: {
+        bg: 'bg-purple-100 dark:bg-purple-900/40',
+        text: 'text-purple-700 dark:text-purple-300',
     },
     FINANCIAL: {
         bg: 'bg-orange-100 dark:bg-orange-900/40',
@@ -34,9 +34,13 @@ const CATEGORY_STYLES = {
         bg: 'bg-green-100 dark:bg-green-900/40',
         text: 'text-green-700 dark:text-green-300',
     },
-    ATTENDANCE: {
-        bg: 'bg-purple-100 dark:bg-purple-900/40',
-        text: 'text-purple-700 dark:text-purple-300',
+    EXAM: {
+        bg: 'bg-red-100 dark:bg-red-900/40',
+        text: 'text-red-700 dark:text-red-300',
+    },
+    EVENT: {
+        bg: 'bg-blue-100 dark:bg-blue-900/40',
+        text: 'text-blue-700 dark:text-blue-300',
     },
     GENERAL: {
         bg: 'bg-gray-100 dark:bg-gray-800',
@@ -44,25 +48,25 @@ const CATEGORY_STYLES = {
     },
 };
 
-// Default insights when AI is unavailable
+// Default insights when AI/data is unavailable
 const DEFAULT_INSIGHTS = [
     {
-        category: 'PREDICTIVE',
-        title: 'Attendance Prediction',
-        description: 'Historical patterns show consistent attendance. Monitor for seasonal variations.',
-        type: 'prediction',
+        category: 'ATTENDANCE',
+        title: 'Attendance Update',
+        description: 'Loading attendance data...',
+        type: 'loading',
     },
     {
         category: 'FINANCIAL',
-        title: 'Revenue Forecast',
-        description: 'Fee collection is on track. Expected to meet monthly targets based on current trends.',
-        type: 'forecast',
+        title: 'Fee Collection',
+        description: 'Loading fee data...',
+        type: 'loading',
     },
     {
-        category: 'ACADEMIC',
-        title: 'Performance Alert',
-        description: 'Overall academic performance is stable. Review individual class reports for details.',
-        type: 'alert',
+        category: 'EVENT',
+        title: 'School Calendar',
+        description: 'Loading upcoming events...',
+        type: 'loading',
     },
 ];
 
@@ -222,42 +226,53 @@ export function AiInsightsCard({ schoolId }) {
     const {
         data: context,
         isLoading: contextLoading,
-        error: contextError,
     } = useDashboardContext(schoolId);
 
     const {
         data: insightsData,
         isLoading: insightsLoading,
-        error: insightsError,
+        refetch,
+        isFetching,
     } = useAiInsights(schoolId, context?.aiAllowed);
 
-    // Parse AI insights into card format
+    // Parse insights into card format (works with both AI and live hints)
     const parseInsights = (rawInsights) => {
         if (!rawInsights || rawInsights.length === 0) return DEFAULT_INSIGHTS;
 
         return rawInsights.map((insight, index) => {
-            // Determine category based on content keywords
-            let category = 'GENERAL';
-            const lowerInsight = insight.toLowerCase();
+            // Handle object format (from combined hook) or string format
+            const text = typeof insight === 'object' ? (insight.text || insight.hint) : insight;
+            const sourceCategory = typeof insight === 'object' ? insight.category : null;
 
-            if (lowerInsight.includes('attendance') || lowerInsight.includes('predict')) {
-                category = 'PREDICTIVE';
-            } else if (lowerInsight.includes('fee') || lowerInsight.includes('payment') || lowerInsight.includes('revenue') || lowerInsight.includes('₹')) {
-                category = 'FINANCIAL';
-            } else if (lowerInsight.includes('academic') || lowerInsight.includes('grade') || lowerInsight.includes('performance') || lowerInsight.includes('exam')) {
-                category = 'ACADEMIC';
+            // Determine category based on content keywords or source category
+            let category = sourceCategory || 'GENERAL';
+            if (!sourceCategory && text) {
+                const lowerInsight = text.toLowerCase();
+                if (lowerInsight.includes('attendance') || lowerInsight.includes('present')) {
+                    category = 'ATTENDANCE';
+                } else if (lowerInsight.includes('fee') || lowerInsight.includes('payment') || lowerInsight.includes('₹') || lowerInsight.includes('collected')) {
+                    category = 'FINANCIAL';
+                } else if (lowerInsight.includes('exam') || lowerInsight.includes('grade') || lowerInsight.includes('performance')) {
+                    category = 'ACADEMIC';
+                } else if (lowerInsight.includes('event') || lowerInsight.includes('calendar')) {
+                    category = 'EVENT';
+                }
             }
 
-            // Generate title from first sentence or use default
-            const titleMatch = insight.match(/^([^.!?]+)/);
-            const title = titleMatch ? titleMatch[1].slice(0, 30) + (titleMatch[1].length > 30 ? '...' : '') : `Insight ${index + 1}`;
+            // Generate title
+            const title = typeof insight === 'object' && insight.title
+                ? insight.title
+                : category === 'ATTENDANCE' ? 'Attendance Update'
+                    : category === 'FINANCIAL' ? 'Fee Collection'
+                        : category === 'ACADEMIC' ? 'Academic Insight'
+                            : category === 'EVENT' ? 'Upcoming Event'
+                                : `Insight ${index + 1}`;
 
             return {
                 category,
-                title: category === 'PREDICTIVE' ? 'Attendance Prediction' :
-                    category === 'FINANCIAL' ? 'Revenue Forecast' :
-                        category === 'ACADEMIC' ? 'Performance Alert' : title,
-                description: insight,
+                title,
+                description: text,
+                source: typeof insight === 'object' ? insight.source : 'AI',
             };
         });
     };
@@ -266,19 +281,48 @@ export function AiInsightsCard({ schoolId }) {
         ? parseInsights(insightsData.insights).slice(0, 3)
         : DEFAULT_INSIGHTS;
 
+    const isLoading = contextLoading || insightsLoading;
+
+    // Handle refresh - only refetch, don't force regenerate (cost-controlled)
+    const handleRefresh = () => {
+        if (!isFetching) {
+            refetch();
+        }
+    };
+
     return (
         <div className="mb-6">
             {/* Section Header */}
-            <div className="flex items-center gap-2 mb-4">
-                <Bot className="w-4 h-4 text-purple-500 dark:text-purple-400" />
-                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    AI-POWERED INSIGHTS
-                </h3>
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                    <Bot className="w-4 h-4 text-purple-500 dark:text-purple-400" />
+                    <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        AI-POWERED INSIGHTS
+                    </h3>
+                    {insightsData?.cached && (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-500 rounded">
+                            CACHED
+                        </span>
+                    )}
+                </div>
+
+                {/* Refresh Button */}
+                {context?.aiAllowed && (
+                    <button
+                        onClick={handleRefresh}
+                        disabled={isFetching || isLoading}
+                        className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-purple-500 dark:hover:text-purple-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Refresh insights"
+                    >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
+                        <span className="hidden sm:inline">Refresh</span>
+                    </button>
+                )}
             </div>
 
             {/* Cards Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {contextLoading || insightsLoading ? (
+                {isLoading ? (
                     <>
                         <InsightCardSkeleton />
                         <InsightCardSkeleton />
@@ -286,10 +330,6 @@ export function AiInsightsCard({ schoolId }) {
                     </>
                 ) : !context?.aiAllowed ? (
                     <NonAiDayCard context={context} />
-                ) : insightsError ? (
-                    insights.map((insight, index) => (
-                        <InsightCard key={index} insight={insight} index={index} />
-                    ))
                 ) : (
                     insights.map((insight, index) => (
                         <InsightCard key={index} insight={insight} index={index} />

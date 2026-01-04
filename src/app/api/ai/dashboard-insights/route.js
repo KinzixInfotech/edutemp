@@ -90,6 +90,14 @@ export async function GET(request) {
             select: { name: true },
         });
 
+        // Check if force refresh requested
+        const forceRefresh = searchParams.get('force') === 'true';
+        if (forceRefresh) {
+            console.log('🔄 Force refresh requested - clearing cache');
+            const { invalidateInsightsCache } = await import('@/lib/ai/insightsGenerator');
+            await invalidateInsightsCache(schoolId);
+        }
+
         // Generate insights
         const result = await generateDashboardInsights({
             schoolId,
@@ -110,6 +118,7 @@ export async function GET(request) {
         }
 
         return NextResponse.json({
+            summary: result.summary,
             insights: result.insights,
             cached: result.cached,
             dayType: result.dayType,

@@ -45,6 +45,17 @@ export default function WelcomeBanner({ fullUser, schoolName }) {
     const { data: context, isLoading: contextLoading } = useDashboardContext(fullUser?.schoolId);
     const { data: insightsData, isLoading: insightsLoading } = useAiInsights(fullUser?.schoolId, context?.aiAllowed);
 
+    // DEBUG: Log context and insights data
+    console.log('🔍 [WelcomeBanner Debug]', {
+        schoolId: fullUser?.schoolId,
+        contextLoading,
+        insightsLoading,
+        context,
+        insightsData,
+        aiAllowed: context?.aiAllowed,
+        dayType: context?.dayType,
+    });
+
     // Get time-based greeting
     useEffect(() => {
         const hour = new Date().getHours();
@@ -78,12 +89,25 @@ export default function WelcomeBanner({ fullUser, schoolName }) {
             return context?.messages?.general || `Good ${greeting}, ${firstName}. Have a great day!`;
         }
 
-        // AI is allowed - get summary from insights
+        // AI is allowed - use summary paragraph if available
+        if (insightsData?.summary) {
+            // Strip any greeting from AI summary to prevent duplicates like "Good night, Good morning"
+            let cleanSummary = insightsData.summary
+                .replace(/^(Good\s+)?(morning|afternoon|evening|night)[!,.\s]*/i, '')
+                .trim();
+            // Capitalize first letter if needed
+            if (cleanSummary) {
+                cleanSummary = cleanSummary.charAt(0).toUpperCase() + cleanSummary.slice(1);
+            }
+            return `Good ${greeting}, ${firstName}. ${cleanSummary}`;
+        }
+
+        // Fallback: use first insight if no summary
         if (insightsData?.insights?.length > 0) {
             return `Good ${greeting}, ${firstName}. ${insightsData.insights[0]}`;
         }
 
-        return `Good ${greeting}, ${firstName}. Based on today's schedule, everything is running smoothly. Your dashboard is ready for action!`;
+        return `Good ${greeting}, ${firstName}. Your dashboard is ready. Check the insights below for today's summary.`;
     }, [context, contextLoading, insightsData, greeting, fullUser?.name]);
 
     const isLoading = contextLoading || (context?.aiAllowed && insightsLoading);

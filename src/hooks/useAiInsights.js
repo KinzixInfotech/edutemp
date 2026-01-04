@@ -4,25 +4,34 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-
-const supabase = createClientComponentClient();
+import { supabase } from '@/lib/supabase';
 
 /**
  * Fetch AI insights for a school
  */
 async function fetchAiInsights(schoolId) {
-    // Get the current session token
+    // Get the current session token using shared supabase client
     const { data: { session } } = await supabase.auth.getSession();
 
     if (!session?.access_token) {
-        throw new Error('Not authenticated');
+        // Try fetching without auth header - the API might use cookies directly
+        const response = await fetch(`/api/ai/dashboard-insights?schoolId=${schoolId}`, {
+            credentials: 'include',
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to fetch AI insights');
+        }
+
+        return response.json();
     }
 
     const response = await fetch(`/api/ai/dashboard-insights?schoolId=${schoolId}`, {
         headers: {
             'Authorization': `Bearer ${session.access_token}`,
         },
+        credentials: 'include',
     });
 
     if (!response.ok) {
@@ -47,8 +56,6 @@ export function useAiInsights(schoolId, aiAllowed = true) {
         staleTime: 10 * 60 * 1000, // 10 minutes
         gcTime: 30 * 60 * 1000, // 30 minutes
         refetchOnWindowFocus: false,
-        retry: 1, // Only retry once
+        retry: 1,
     });
 }
-
-export default useAiInsights;

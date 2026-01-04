@@ -175,7 +175,8 @@ async function computeDayContext(schoolId, date = new Date(), includeNextWorking
     }
 
     // 3. Check for Sunday
-    if (dayOfWeek === 0) {
+    const bypassSunday = process.env.BYPASS_SUNDAY === 'true';
+    if (dayOfWeek === 0 && !bypassSunday) {
         context.dayType = DAY_TYPES.SUNDAY;
         context.isWorkingDay = false;
         context.attendanceExpected = false;

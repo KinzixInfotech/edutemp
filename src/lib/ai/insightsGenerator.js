@@ -36,7 +36,7 @@ async function checkAiPermissions(schoolId, userId, userRole) {
         settings = {
             aiEnabled: true,
             allowedRoles: ['SUPER_ADMIN', 'ADMIN'],
-            dailyLimit: 1,
+            dailyLimit: 3, // 3 calls per day (morning, midday, evening)
             monthlyTokenLimit: null,
             model: MODEL_NAME,
         };
@@ -60,7 +60,7 @@ async function checkAiPermissions(schoolId, userId, userRole) {
         where: {
             schoolId,
             feature: 'DASHBOARD_INSIGHTS',
-            cached: false, // Only count non-cached calls
+            cached: false,
             createdAt: { gte: today },
         },
     });
@@ -177,24 +177,73 @@ async function logAiUsage(params) {
 }
 
 /**
- * Parse AI response to extract insights array
+ * Parse Gemini response - now expects { summary, insights } format
  */
 function parseInsightsResponse(text) {
-    if (!text) return [];
+    if (!text) return { summary: null, insights: [] };
 
     try {
-        // Try to parse as JSON array
-        const parsed = JSON.parse(text);
-        if (Array.isArray(parsed)) {
-            return parsed.slice(0, 3); // Max 3 insights
+        // Clean up the text - remove markdown code blocks if present
+        let cleanText = text.trim();
+        if (cleanText.startsWith('```json')) {
+            cleanText = cleanText.replace(/^```json\n?/, '').replace(/\n?```$/, '');
+        } else if (cleanText.startsWith('```')) {
+            cleanText = cleanText.replace(/^```\n?/, '').replace(/\n?```$/, '');
         }
-    } catch {
-        // If not valid JSON, try to extract insights
-        const lines = text.split('\n').filter(line => line.trim());
-        return lines.slice(0, 3);
+
+        // Try to find and parse JSON object with summary and insights
+        const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (parsed.summary && parsed.insights) {
+                return {
+                    summary: parsed.summary,
+                    insights: Array.isArray(parsed.insights)
+                        ? parsed.insights.filter(i => typeof i === 'string').slice(0, 3)
+                        : []
+                };
+            }
+        }
+
+        // Fallback: Try to parse as array (old format)
+        const arrayMatch = cleanText.match(/\[[\s\S]*\]/);
+        if (arrayMatch) {
+            const parsed = JSON.parse(arrayMatch[0]);
+            if (Array.isArray(parsed)) {
+                return {
+                    summary: parsed[0] || null,
+                    insights: parsed.slice(0, 3)
+                };
+            }
+        }
+
+        // Direct parse attempt
+        const parsed = JSON.parse(cleanText);
+        if (parsed.summary) {
+            return {
+                summary: parsed.summary,
+                insights: parsed.insights || []
+            };
+        }
+    } catch (e) {
+        // Parse failed, try fallback extraction
+        // Fallback: extract what we can
+        const summaryMatch = text.match(/"summary"\s*:\s*"([^"]+)"/);
+        const summary = summaryMatch ? summaryMatch[1] : null;
+
+        // Extract insights from quoted strings
+        const quoteMatches = text.match(/"([^"]{15,80})"/g);
+        const insights = quoteMatches
+            ? quoteMatches
+                .map(q => q.replace(/"/g, '').trim())
+                .filter(s => s !== summary && s.length > 10)
+                .slice(0, 3)
+            : [];
+
+        return { summary, insights };
     }
 
-    return [];
+    return { summary: null, insights: [] };
 }
 
 /**
@@ -206,53 +255,220 @@ async function getDashboardStats(schoolId) {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
+    // Yesterday for comparison
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    // Get next 7 days for events
+    const nextWeek = new Date(today);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+
+    // Last 7 days for trends
+    const lastWeek = new Date(today);
+    lastWeek.setDate(lastWeek.getDate() - 7);
+
     try {
-        // Get today's attendance counts
-        const [studentsPresent, teachersPresent] = await Promise.all([
+        // Parallel queries for comprehensive data
+        const [
+            // Attendance counts
+            studentsPresent,
+            totalStudents,
+            teachingStaffPresent,
+            totalTeachingStaff,
+            nonTeachingStaffPresent,
+            totalNonTeachingStaff,
+            // Yesterday's attendance for comparison
+            yesterdayStudentsPresent,
+            // Fee stats
+            feesToday,
+            yesterdayFees,
+            weeklyFees,
+            outstandingFees,
+            totalExpectedFees,
+            studentsWithDues,
+            // Calendar events
+            upcomingEvents,
+            // Upcoming exams
+            upcomingExams,
+            // School config
+            schoolConfig
+        ] = await Promise.all([
+            // Students present today
             prisma.attendance.count({
                 where: {
                     schoolId,
                     date: { gte: today, lt: tomorrow },
                     status: 'PRESENT',
-                    user: { student: { isNot: null } },
-                },
+                    user: { role: { name: 'STUDENT' } }
+                }
             }),
+            // Total students
+            prisma.student.count({
+                where: { schoolId }
+            }),
+            // Teaching staff present
             prisma.attendance.count({
                 where: {
                     schoolId,
                     date: { gte: today, lt: tomorrow },
                     status: 'PRESENT',
-                    user: { teacher: { isNot: null } },
-                },
+                    user: { role: { name: 'TEACHING_STAFF' } }
+                }
             }),
+            // Total teaching staff
+            prisma.user.count({
+                where: { schoolId, role: { name: 'TEACHING_STAFF' } }
+            }),
+            // Non-teaching staff present
+            prisma.attendance.count({
+                where: {
+                    schoolId,
+                    date: { gte: today, lt: tomorrow },
+                    status: 'PRESENT',
+                    user: { role: { name: 'NON_TEACHING_STAFF' } }
+                }
+            }),
+            // Total non-teaching staff
+            prisma.user.count({
+                where: { schoolId, role: { name: 'NON_TEACHING_STAFF' } }
+            }),
+            // Yesterday's student attendance for comparison
+            prisma.attendance.count({
+                where: {
+                    schoolId,
+                    date: { gte: yesterday, lt: today },
+                    status: 'PRESENT',
+                    user: { role: { name: 'STUDENT' } }
+                }
+            }),
+            // Fees collected today
+            prisma.feePayment.aggregate({
+                where: {
+                    schoolId,
+                    paymentDate: { gte: today, lt: tomorrow },
+                    status: 'SUCCESS'
+                },
+                _sum: { amount: true },
+                _count: true
+            }),
+            // Yesterday's fees for comparison
+            prisma.feePayment.aggregate({
+                where: {
+                    schoolId,
+                    paymentDate: { gte: yesterday, lt: today },
+                    status: 'SUCCESS'
+                },
+                _sum: { amount: true }
+            }),
+            // Weekly fees for trends
+            prisma.feePayment.aggregate({
+                where: {
+                    schoolId,
+                    paymentDate: { gte: lastWeek, lt: tomorrow },
+                    status: 'SUCCESS'
+                },
+                _sum: { amount: true }
+            }),
+            // Outstanding fees
+            prisma.studentFee.aggregate({
+                where: {
+                    schoolId,
+                    balanceAmount: { gt: 0 }
+                },
+                _sum: { balanceAmount: true }
+            }),
+            // Total expected fees
+            prisma.studentFee.aggregate({
+                where: { schoolId },
+                _sum: { finalAmount: true }
+            }),
+            // Students with pending fees
+            prisma.studentFee.count({
+                where: {
+                    schoolId,
+                    balanceAmount: { gt: 0 }
+                }
+            }),
+            // Upcoming events (next 7 days)
+            prisma.calendarEvent.findMany({
+                where: {
+                    schoolId,
+                    startDate: { gte: today, lte: nextWeek },
+                    status: 'SCHEDULED'
+                },
+                select: {
+                    title: true,
+                    startDate: true,
+                    eventType: true
+                },
+                orderBy: { startDate: 'asc' },
+                take: 5
+            }),
+            // Upcoming exams (next 14 days)
+            prisma.exam.findMany({
+                where: {
+                    schoolId,
+                    startDate: { gte: today },
+                    status: 'SCHEDULED'
+                },
+                select: {
+                    id: true,
+                    title: true,
+                    startDate: true,
+                    endDate: true
+                },
+                orderBy: { startDate: 'asc' },
+                take: 3
+            }),
+            // School config for timing
+            prisma.attendanceConfig.findUnique({
+                where: { schoolId },
+                select: {
+                    defaultStartTime: true,
+                    defaultEndTime: true,
+                    autoMarkTime: true
+                }
+            })
         ]);
 
-        // Get fee stats (last 30 days)
-        const thirtyDaysAgo = new Date(today);
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-        const feeStats = await prisma.feePayment.aggregate({
-            where: {
-                createdAt: { gte: today, lt: tomorrow },
-            },
-            _sum: { amount: true },
-        });
-
-        // Get upcoming events
-        const upcomingEvents = await prisma.calendarEvent.count({
-            where: {
-                schoolId,
-                startDate: { gte: today },
-                status: 'SCHEDULED',
-            },
-        });
-
         return {
+            // Attendance
             studentsPresent,
-            teachersPresent,
-            feesCollectedToday: feeStats._sum?.amount || 0,
-            pendingFees: 0, // Would need more complex query
-            upcomingEvents,
+            totalStudents,
+            teachingStaffPresent,
+            totalTeachingStaff,
+            nonTeachingStaffPresent,
+            totalNonTeachingStaff,
+            totalStaff: totalTeachingStaff + totalNonTeachingStaff,
+            staffPresent: teachingStaffPresent + nonTeachingStaffPresent,
+            // Yesterday comparison
+            yesterdayStudentsPresent,
+            // Fees
+            feesCollectedToday: feesToday._sum?.amount || 0,
+            feesCollectedCount: feesToday._count || 0,
+            yesterdayFeesCollected: yesterdayFees._sum?.amount || 0,
+            weeklyFeesCollected: weeklyFees._sum?.amount || 0,
+            outstandingFees: outstandingFees._sum?.balanceAmount || 0,
+            totalExpectedFees: totalExpectedFees._sum?.finalAmount || 0,
+            studentsWithDues,
+            // Events
+            upcomingEvents: upcomingEvents.map(e => ({
+                title: e.title,
+                date: e.startDate,
+                type: e.eventType
+            })),
+            upcomingEventsCount: upcomingEvents.length,
+            // Exams
+            upcomingExams: upcomingExams.map(e => ({
+                id: e.id,
+                title: e.title,
+                date: e.startDate
+            })),
+            // School config
+            schoolConfig: schoolConfig || {
+                defaultStartTime: '09:00',
+                defaultEndTime: '17:00'
+            }
         };
     } catch (error) {
         console.error('Error getting dashboard stats:', error);
@@ -366,10 +582,10 @@ export async function generateDashboardInsights(params) {
     }
 
     // 8. Parse response
-    let insights = parseInsightsResponse(result.text);
+    const parsed = parseInsightsResponse(result.text);
 
     // 9. Apply rules to filter/modify insights
-    insights = applyRulesToInsights(insights, context);
+    let insights = applyRulesToInsights(parsed.insights || [], context);
 
     // 10. Log usage
     await logAiUsage({
@@ -387,10 +603,15 @@ export async function generateDashboardInsights(params) {
         cached: false,
     });
 
-    // 11. Cache result
-    await cacheInsights(schoolId, dayType, feature, { insights, dayType });
+    // 11. Cache result (include summary)
+    await cacheInsights(schoolId, dayType, feature, {
+        summary: parsed.summary,
+        insights,
+        dayType
+    });
 
     return {
+        summary: parsed.summary,
         insights,
         cached: false,
         dayType,

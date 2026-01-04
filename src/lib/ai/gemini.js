@@ -15,8 +15,8 @@ const genAI = process.env.GOOGLE_GEMINI_API_KEY
     : null;
 
 // Model configuration
-const MODEL_NAME = 'gemini-1.5-flash';
-const MAX_OUTPUT_TOKENS = 256; // Keep responses short
+export const MODEL_NAME = 'gemini-2.5-flash';
+const MAX_OUTPUT_TOKENS = 2048; // Increased to prevent truncation of JSON
 
 /**
  * Generate a hash for caching purposes
@@ -123,39 +123,59 @@ export function buildDashboardInsightsPrompt(context) {
         recentTrends = {}
     } = context;
 
-    const basePrompt = `You are an AI assistant for ${schoolName || 'a school'} ERP dashboard.
+    // Format currency in lakhs for readability
+    const formatCurrency = (amount) => {
+        if (!amount) return '₹0';
+        if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`;
+        if (amount >= 1000) return `₹${(amount / 1000).toFixed(1)}K`;
+        return `₹${amount}`;
+    };
+
+    // Build upcoming events string
+    const eventsStr = todayStats.upcomingEvents?.length > 0
+        ? todayStats.upcomingEvents.map(e => e.title).join(', ')
+        : 'None scheduled';
+
+    const basePrompt = `You are a smart AI assistant for ${schoolName || 'a school'} ERP dashboard.
 Today is a ${dayType} day.
 
-Generate 1-3 SHORT, actionable insights for the school admin.
-Each insight should be ONE sentence maximum.
-Focus on what's most important for today.
+Generate a comprehensive dashboard summary for the school admin.
 
-Current stats:`;
+CURRENT DASHBOARD DATA:
+📊 ATTENDANCE:
+- Students: ${todayStats.studentsPresent ?? 0} present out of ${todayStats.totalStudents ?? 0} total
+- Teaching Staff: ${todayStats.teachingStaffPresent ?? 0} present out of ${todayStats.totalTeachingStaff ?? 0} total
+- Non-Teaching Staff: ${todayStats.nonTeachingStaffPresent ?? 0} present out of ${todayStats.totalNonTeachingStaff ?? 0} total
 
-    const statsSection = `
-- Students present: ${todayStats.studentsPresent ?? 'N/A'}
-- Teachers present: ${todayStats.teachersPresent ?? 'N/A'}
-- Fees collected today: ₹${todayStats.feesCollectedToday ?? 0}
-- Pending fees: ₹${todayStats.pendingFees ?? 0}
-- Upcoming events: ${todayStats.upcomingEvents ?? 'None'}`;
+💰 FEES:
+- Collected Today: ${formatCurrency(todayStats.feesCollectedToday)} (${todayStats.feesCollectedCount ?? 0} transactions)
+- Outstanding: ${formatCurrency(todayStats.outstandingFees)} from ${todayStats.studentsWithDues ?? 0} students
+- Total Expected: ${formatCurrency(todayStats.totalExpectedFees)}
 
-    const trendsSection = recentTrends.attendanceTrend
-        ? `\nRecent trends:\n- Attendance trend: ${recentTrends.attendanceTrend}`
-        : '';
+📅 UPCOMING EVENTS (next 7 days): ${eventsStr}`;
 
     const constraints = `
 
+YOUR TASK:
+Generate a JSON object with TWO parts:
+1. "summary" - A 2-3 sentence paragraph summarizing the overall dashboard status (for the main greeting banner)
+2. "insights" - An array of 3 specific, actionable insights (for insight cards)
+
 RULES:
-- Return ONLY 1-3 insights as a JSON array of strings
-- Each insight must be under 100 characters
-- Be specific and actionable
-- ${dayType === 'EXAM' ? 'Focus on exam-related insights. Attendance may vary.' : ''}
-- ${dayType === 'HALF_DAY' ? 'Note that it\'s a half day with reduced activity.' : ''}
-- Do NOT mention holidays, Sundays, or vacations as AI is not called on those days
+- Be natural and conversational, like a helpful colleague
+- Include actual numbers from the data (e.g., "0 of 33 students", "₹6K collected")
+- If attendance is 0, mention it naturally (not alarmingly)
+- Highlight positive things (fees collected, events coming up)
+- Each insight should be under 60 characters
+- Don't mention weekends or holidays
 
-Example format: ["First insight here", "Second insight here"]`;
+RESPOND WITH ONLY THIS JSON FORMAT:
+{
+  "summary": "Your 2-3 sentence overall summary here.",
+  "insights": ["Insight 1", "Insight 2", "Insight 3"]
+}`;
 
-    return basePrompt + statsSection + trendsSection + constraints;
+    return basePrompt + constraints;
 }
 
 export default {
