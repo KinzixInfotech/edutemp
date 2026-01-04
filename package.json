@@ -21,6 +21,7 @@
     "@fullcalendar/interaction": "^6.1.18",
     "@fullcalendar/react": "^6.1.18",
     "@fullcalendar/timegrid": "^6.1.18",
+    "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^5.2.2",
     "@mui/x-charts": "^8.10.2",
     "@nivo/heatmap": "^0.99.0",

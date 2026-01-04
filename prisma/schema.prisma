@@ -109,6 +109,11 @@ model School {
   paymentSettings SchoolPaymentSettings?
   receipts        Receipt[]
 
+  // AI System
+  aiUsageLogs    AiUsageLog[]
+  aiInsightCache AiInsightCache[]
+  aiSettings     AiSettings?
+
   @@index([name])
 }
 
@@ -1587,6 +1592,9 @@ model User {
   payrollProfile  EmployeePayrollProfile?
   transportStaff  TransportStaff?
   importHistories ImportHistory[]
+
+  // AI System
+  aiUsageLogs AiUsageLog[]
 
   @@index([schoolId])
   @@index([roleId])
@@ -5248,4 +5256,70 @@ model SmsSettings {
   whitelistedDomains Json     @default("[]")
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+}
+
+// ============================================
+// AI SYSTEM - USAGE TRACKING & CONTROL
+// ============================================
+
+model AiUsageLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  schoolId     String   @db.Uuid
+  userId       String   @db.Uuid
+  userRole     String // ADMIN, SUPER_ADMIN
+  feature      String // DASHBOARD_INSIGHTS, ATTENDANCE_SUMMARY, etc
+  model        String // gemini-1.5-flash
+  inputTokens  Int?
+  outputTokens Int?
+  totalTokens  Int?
+  costUsd      Float?
+  promptHash   String
+  responseHash String?
+  cached       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, createdAt])
+  @@index([userId])
+  @@index([feature])
+}
+
+model AiInsightCache {
+  id        String   @id @default(uuid()) @db.Uuid
+  schoolId  String   @db.Uuid
+  date      DateTime @db.Date
+  dayType   String // HOLIDAY, WORKING, EXAM, HALF_DAY, SUNDAY, VACATION
+  feature   String // DASHBOARD_INSIGHTS
+  response  String   @db.Text
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, date, feature])
+  @@index([schoolId, date])
+  @@index([expiresAt])
+}
+
+model AiSettings {
+  id                String   @id @default(uuid()) @db.Uuid
+  schoolId          String   @unique @db.Uuid
+  aiEnabled         Boolean  @default(true)
+  allowedRoles      String[] @default(["SUPER_ADMIN", "ADMIN"])
+  dailyLimit        Int      @default(1) // Max AI runs per day per school
+  monthlyTokenLimit Int? // Optional monthly token budget
+  model             String   @default("gemini-1.5-flash")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+}
+
+model AiActionPolicy {
+  id        String   @id @default(uuid()) @db.Uuid
+  feature   String   @unique // DASHBOARD_INSIGHTS, FEES, ATTENDANCE
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
 }

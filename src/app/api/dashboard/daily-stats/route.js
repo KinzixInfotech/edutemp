@@ -38,7 +38,9 @@ export async function GET(req) {
                 totalNonTeachingStaff,
                 todayPayments,
                 totalCollected,
-                recentPayments
+                recentPayments,
+                outstandingFeesData,
+                studentsWithDuesCount
             ] = await Promise.all([
                 // Students present today
                 prisma.attendance.count({
@@ -137,7 +139,26 @@ export async function GET(req) {
                             }
                         }
                     }
-                }) : []
+                }) : [],
+
+                // Outstanding fees - sum of balance amounts
+                academicYearId ? prisma.studentFee.aggregate({
+                    where: {
+                        schoolId,
+                        academicYearId,
+                        balanceAmount: { gt: 0 }
+                    },
+                    _sum: { balanceAmount: true }
+                }) : { _sum: { balanceAmount: null } },
+
+                // Count of students with pending fees
+                academicYearId ? prisma.studentFee.count({
+                    where: {
+                        schoolId,
+                        academicYearId,
+                        balanceAmount: { gt: 0 }
+                    }
+                }) : 0
             ]);
 
             return {
@@ -153,6 +174,8 @@ export async function GET(req) {
                     count: todayPayments._count || 0
                 },
                 totalCollected: totalCollected._sum.amount || 0,
+                outstandingFees: outstandingFeesData._sum?.balanceAmount || 0,
+                studentsWithDues: studentsWithDuesCount || 0,
                 recentPayments: recentPayments,
                 date: today.toISOString()
             };

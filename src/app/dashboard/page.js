@@ -43,6 +43,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 
 import OnboardingModal from '@/components/dashboard/OnboardingModal';
+import AiInsightsCard from '@/components/dashboard/AiInsightsCard';
+import RecentPaymentsWidget from '@/components/dashboard/widgets/RecentPaymentsWidget';
 
 // School Timing Warning Component
 const SchoolTimingWarning = ({ schoolId }) => {
@@ -416,9 +418,19 @@ export default function Dashboard() {
       case "ADMIN":
         return (
           <>
+            {/* Page Header */}
+            <div className="px-4 mb-2">
+              <h1 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                DASHBOARD OVERVIEW
+              </h1>
+            </div>
+
             {/* Welcome Banner */}
             <div className='px-4'>
-              <WelcomeBanner fullUser={fullUser} />
+              <WelcomeBanner
+                fullUser={fullUser}
+                schoolName={fullUser?.school?.name || 'Your School'}
+              />
 
               {/* Setup Warnings */}
               {academicYearsQuery.data?.length === 0 && (
@@ -443,18 +455,6 @@ export default function Dashboard() {
                         You haven't created any classes yet. You need classes to enroll students and manage the timetable.
                       </p>
                       <Link href="/dashboard/schools/create-classes">
-                        {/* Note: Linking to Create Students or a Manage Classes page if exists. Assuming Manage Classes is better but user asked for warning to create class. Dashboard has 'create-students' which implies manual student/class creation or generally managing structure. Better link might be academic/classes if it exists, checking file list... yes classes endpoint exists but page? */}
-                        {/* Based on file list, dashboard/schools/create-students seems relevant or dashboard/schools/academic-years (maybe class is inside there?). Let's check structure.
-                             Actually, looking at file list: src/app/dashboard/schools/create-students/page.jsx exists.
-                             src/app/dashboard/examination/create/page.jsx exists.
-                             I'll link to a generic managing place or the create-students page for now which often has class setup.
-                             Wait, I should verify if there is a 'Manage Classes' page.
-                             The directory src/app/dashboard/schools/classes doesn't seem to be in the list I saw earlier (list was truncated).
-                             I'll stick to a safe link or just the warning for now.
-                             The user said "give him warning to create class".
-                             I'll link to "/dashboard/schools" or similar if unsure, but let's try to find a specific one later.
-                             For now, I will use a generic button.
-                          */}
                         <Button variant="outline" size="sm" className="mt-3 border-orange-300 dark:border-orange-700 hover:bg-orange-100 dark:hover:bg-orange-900/50 text-orange-800 dark:text-orange-200">
                           Create Classes
                         </Button>
@@ -490,34 +490,38 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className='px-4 flex items-center justify-between'>
-              <h2 className="text-xl font-semibold tracking-tight">Dashboard Overview</h2>
-              {/* Customization option removed as per request */}
-            </div>
-
-            {/* Daily Stats Cards */}
-            <div className='px-4 mt-4'>
+            {/* Key Metrics Cards */}
+            <div className='px-4 mt-6'>
               <DailyStatsCards
                 schoolId={fullUser?.schoolId}
                 academicYearId={activeAcademicYear?.id}
               />
             </div>
 
-            {/* Fixed Widgets Grid */}
-            <div className="px-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-              {['CALENDAR', 'QUICK_ACTIONS', 'ATTENDANCE', 'FEE_STATS', 'RECENT_PAYMENTS', 'NOTICE_BOARD'].map(widgetId => {
+            {/* AI Insights Section */}
+            <div className="px-4">
+              <AiInsightsCard schoolId={fullUser?.schoolId} />
+            </div>
+
+            {/* Widgets Grid - 3 equal columns for main widgets */}
+            <div className="px-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
+              {['CALENDAR', 'ATTENDANCE', 'FEE_STATS'].map(widgetId => {
                 const widgetConfig = WIDGETS[widgetId];
                 if (!widgetConfig) return null;
                 const WidgetComponent = widgetConfig.component;
                 return (
-                  <div key={widgetId} className={widgetConfig.defaultSize}>
-                    <WidgetComponent
-                      fullUser={fullUser}
-                    // onRemove prop removed as widgets are now fixed
-                    />
+                  <div key={widgetId} className="col-span-1">
+                    <WidgetComponent fullUser={fullUser} />
                   </div>
                 );
               })}
+            </div>
+
+            {/* Recent Payments - Full Width */}
+            <div className="px-4 mt-4">
+              {WIDGETS['RECENT_PAYMENTS'] && (
+                <RecentPaymentsWidget fullUser={fullUser} />
+              )}
             </div>
           </>
         );
@@ -533,7 +537,7 @@ export default function Dashboard() {
         const superadmindata = [
           { label: "Total School", value: schoolCount, trend: trend + '%', direction: direction, info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
           { label: "Active Accounts", value: activeCount ?? '...', direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
-          // { label: "Total Revenue", value: "2000", direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
+          // {label: "Total Revenue", value: "2000", direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
           { label: "Total Employees", value: "0", direction: "up", info: "Trending up this month", description: "Visitors for the last 6 months", date: "Aug 2, 2025" },
         ];
 

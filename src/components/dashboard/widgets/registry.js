@@ -39,22 +39,22 @@ export const WIDGETS = {
         icon: Receipt,
         defaultSize: 'col-span-1 md:col-span-2'
     },
-    NOTICE_BOARD: {
-        id: 'NOTICE_BOARD',
-        title: 'Notice Board',
-        description: 'Recent announcements and notices',
-        component: NoticeBoardWidget,
-        icon: Bell,
-        defaultSize: 'col-span-1 md:col-span-2'
-    },
-    QUICK_ACTIONS: {
-        id: 'QUICK_ACTIONS',
-        title: 'Quick Actions',
-        description: 'Shortcuts to common tasks',
-        component: QuickActionsWidget,
-        icon: Zap,
-        defaultSize: 'col-span-1'
-    }
+    // NOTICE_BOARD: {
+    //     id: 'NOTICE_BOARD',
+    //     title: 'Notice Board',
+    //     description: 'Recent announcements and notices',
+    //     component: NoticeBoardWidget,
+    //     icon: Bell,
+    //     defaultSize: 'col-span-1 md:col-span-2'
+    // },
+    // QUICK_ACTIONS: {
+    //     id: 'QUICK_ACTIONS',
+    //     title: 'Quick Actions',
+    //     description: 'Shortcuts to common tasks',
+    //     component: QuickActionsWidget,
+    //     icon: Zap,
+    //     defaultSize: 'col-span-1'
+    // }
 };
 
-export const DEFAULT_WIDGETS = ['CALENDAR', 'STATS_OVERVIEW', 'QUICK_ACTIONS', 'ATTENDANCE', 'FEE_STATS', 'NOTICE_BOARD', 'RECENT_PAYMENTS'];
+export const DEFAULT_WIDGETS = ['CALENDAR', 'STATS_OVERVIEW', 'ATTENDANCE', 'FEE_STATS', 'RECENT_PAYMENTS'];
