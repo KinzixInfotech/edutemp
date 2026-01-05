@@ -6,7 +6,8 @@
     "dev": "cross-env HOST=0.0.0.0 next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "generate-knowledge": "node scripts/generate-product-knowledge.cjs"
   },
   "prisma": {
     "schema": "./prisma/schema.prisma"

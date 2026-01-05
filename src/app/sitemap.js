@@ -29,13 +29,25 @@ export default async function sitemap() {
             url: `${baseUrl}/about`,
             lastModified: new Date(),
             changeFrequency: 'monthly',
-            priority: 0.8,
+            priority: 0.9,
+        },
+        {
+            url: `${baseUrl}/contact`,
+            lastModified: new Date(),
+            changeFrequency: 'monthly',
+            priority: 0.9,
+        },
+        {
+            url: `${baseUrl}/features`,
+            lastModified: new Date(),
+            changeFrequency: 'monthly',
+            priority: 0.9,
         },
         {
             url: `${baseUrl}/partners`,
             lastModified: new Date(),
             changeFrequency: 'monthly',
-            priority: 0.7,
+            priority: 0.8,
         },
         {
             url: `${baseUrl}/privacy-policy`,

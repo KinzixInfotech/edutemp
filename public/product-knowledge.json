@@ -440,59 +440,697 @@
     "faq": [
         {
             "question": "What features does EduBreezy offer?",
+            "aliases": [
+                "modules available",
+                "what can edubreezy do",
+                "list of features",
+                "capabilities"
+            ],
             "answer": "EduBreezy offers 20+ modules including admissions, student management, fee collection, attendance tracking, exam management, report cards, timetable, homework, transport with GPS tracking, library, inventory, payroll, digital certificates, parent mobile app, school explorer platform, and AI-powered analytics. All features work together seamlessly."
         },
         {
             "question": "Is EduBreezy suitable for CBSE / ICSE schools?",
+            "aliases": [
+                "cbse compatible",
+                "icse support",
+                "state board",
+                "ib school",
+                "curriculum support"
+            ],
             "answer": "Yes! EduBreezy is fully compatible with CBSE, ICSE, State Boards, IB, IGCSE, and Cambridge curriculums. Our system adapts to your board's requirements for report cards, grading patterns, and academic structures."
         },
         {
             "question": "How does AI help school administrators?",
+            "aliases": [
+                "ai features",
+                "smart insights",
+                "automation",
+                "ai dashboard",
+                "intelligent analytics"
+            ],
             "answer": "Our AI provides intelligent insights on attendance patterns, fee collection trends, and student performance. It generates automated daily briefings, predicts potential issues, and helps administrators make data-driven decisions without manual analysis."
         },
         {
             "question": "Is student data secure in EduBreezy?",
+            "aliases": [
+                "data security",
+                "is my data safe",
+                "privacy",
+                "encryption",
+                "data protection"
+            ],
             "answer": "Absolutely. We use 256-bit AES encryption, role-based access control, daily automated backups, and are compliant with Indian data protection guidelines. Your data is hosted on secure cloud infrastructure with 99.9% uptime."
         },
         {
             "question": "How does fee management work?",
+            "aliases": [
+                "fee collection",
+                "fee structure",
+                "collect fees",
+                "fee module",
+                "billing system"
+            ],
             "answer": "Our fee module handles the complete lifecycle - fee structure creation, class-wise and student-wise assignment, automated invoicing, multiple payment modes (online, UPI, cash, cheque), installment plans, late fee calculation, instant digital receipts, due reminders via SMS, and detailed collection reports."
         },
         {
             "question": "Can parents pay online?",
+            "aliases": [
+                "pay fees online",
+                "online payment",
+                "parent payment",
+                "digital payment",
+                "upi payment",
+                "card payment",
+                "internet payment",
+                "pay school fees"
+            ],
             "answer": "Yes, absolutely! Parents can safely pay fees online using our secure payment gateway which supports Credit Cards, Debit Cards, Net Banking, and UPI. They receive instant digital receipts, and the school's accounts are automatically updated."
         },
         {
             "question": "Does EduBreezy support exams and results?",
+            "aliases": [
+                "exam management",
+                "result entry",
+                "report cards",
+                "grades",
+                "marks entry",
+                "hall tickets"
+            ],
             "answer": "Yes, we provide complete exam management - schedule creation, subject configuration, hall ticket generation, seat allocation, marks entry with validation, grade calculation, automated report cards, online exams support, and performance analytics with subject-wise and class-wise analysis."
         },
         {
             "question": "How does transport management work?",
+            "aliases": [
+                "bus tracking",
+                "school bus",
+                "transport module",
+                "gps tracking",
+                "driver app",
+                "route planning"
+            ],
             "answer": "Our transport module covers vehicle registration, route planning with stops, student-to-route and stop assignment, real-time GPS tracking, driver mobile app, bus trip logging, bus attendance, transport fee management, and parent visibility of bus location."
         },
         {
             "question": "What about attendance tracking?",
+            "aliases": [
+                "attendance system",
+                "mark attendance",
+                "student attendance",
+                "staff attendance",
+                "present absent"
+            ],
             "answer": "Our smart attendance system supports student and staff tracking with status options (Present, Absent, Late, Half-day), geo-fencing, auto-absent marking, bulk entry, leave management, instant SMS notifications to parents, and comprehensive attendance reports and statistics."
         },
         {
             "question": "Can I generate certificates and ID cards?",
+            "aliases": [
+                "tc generation",
+                "transfer certificate",
+                "bonafide",
+                "id card",
+                "admit card",
+                "document generation"
+            ],
             "answer": "Yes! Generate transfer certificates, bonafide certificates, character certificates, and custom documents with your school's letterhead, digital signatures, and stamps. We also support ID card and admit card generation with QR verification."
         },
         {
             "question": "Is there a mobile app for parents?",
+            "aliases": [
+                "parent app",
+                "mobile application",
+                "android app",
+                "ios app",
+                "phone app",
+                "parent portal"
+            ],
             "answer": "Yes, we provide native iOS and Android apps for parents to view attendance, pay fees, check exam results, view homework, read notices, track transport, and communicate with teachers - all in real-time with push notifications."
         },
         {
             "question": "How easy is onboarding?",
+            "aliases": [
+                "setup process",
+                "implementation",
+                "getting started",
+                "migration",
+                "how to start",
+                "data import"
+            ],
             "answer": "Very easy! Our dedicated team handles complete setup in 1-2 weeks. We provide data migration from your existing system via Excel import, free training for all staff, and ongoing support to ensure smooth adoption."
         },
         {
             "question": "What user roles are supported?",
+            "aliases": [
+                "user types",
+                "access levels",
+                "permissions",
+                "admin roles",
+                "who can use"
+            ],
             "answer": "EduBreezy supports multiple roles: Super Admin, Admin, Principal, Director, Teaching Staff, Non-Teaching Staff, Accountant, Librarian, Transport Staff, Parent, and Student - each with appropriate access levels and permissions."
         },
         {
             "question": "Can I request a demo?",
+            "aliases": [
+                "book demo",
+                "schedule demo",
+                "see demo",
+                "trial",
+                "free demo",
+                "product demo"
+            ],
             "answer": "Yes! We offer personalized demos tailored to your school's needs. Contact us through our website or call our sales team to schedule a free demo session where we can show you all features relevant to your school."
         }
-    ]
+    ],
+    "schemaFeatures": {
+        "lastGenerated": "2026-01-05T06:25:27.232Z",
+        "modelCount": 172,
+        "featureCount": 21,
+        "categorizedCount": 172,
+        "features": {
+            "platform": [
+                "School",
+                "ImportHistory",
+                "User",
+                "MasterAdmin",
+                "QrVerificationSettings",
+                "PdfExportSettings",
+                "UserSession",
+                "PromotionHistory",
+                "SchoolSettings",
+                "SchoolPaymentSettings"
+            ],
+            "school_explorer": [
+                "SchoolPublicProfile",
+                "SchoolAchievement",
+                "SchoolFacility",
+                "SchoolBadge",
+                "SchoolRating",
+                "AdmissionInquiry"
+            ],
+            "media_library": [
+                "SchoolGallery",
+                "Upload",
+                "Gallery"
+            ],
+            "partner_program": [
+                "Partner",
+                "PartnerLead",
+                "LeadActivity",
+                "PartnerSchool",
+                "PartnerCommission",
+                "PartnerPayout",
+                "PartnerActivity",
+                "CommissionSlab"
+            ],
+            "admission": [
+                "Form",
+                "FormField",
+                "Application",
+                "ApplicationDocument",
+                "Stage",
+                "StageHistory"
+            ],
+            "fees": [
+                "Payment",
+                "TransportFee",
+                "StudentTransportFee",
+                "TransportFeePayment",
+                "FeeStructure",
+                "FeeParticular",
+                "FeeInstallmentRule",
+                "StudentFee",
+                "FeeDiscount",
+                "FeePayment",
+                "FeePaymentInstallment",
+                "FeeReminder",
+                "LoanRepayment",
+                "FeeSettings",
+                "Receipt",
+                "FeeAuditLog"
+            ],
+            "transport": [
+                "Vehicle",
+                "Route",
+                "VehicleLocation",
+                "TransportStaff",
+                "VehicleAssignment",
+                "RouteAssignment",
+                "BusStop",
+                "BusTrip",
+                "BusRequest",
+                "Syllabus"
+            ],
+            "student_management": [
+                "StudentRouteAssignment",
+                "StudentStopAssignment",
+                "Student",
+                "Parent",
+                "StudentParentLink",
+                "Class",
+                "Section",
+                "SectionSubjectTeacher",
+                "Subject",
+                "AcademicYear",
+                "StudentFeeStructure",
+                "StudentFeeParticular",
+                "StudentFeeInstallment",
+                "StudentExamAttempt",
+                "StudentExamAnswer"
+            ],
+            "attendance": [
+                "BusAttendance",
+                "Attendance",
+                "AttendanceDelegation",
+                "AttendanceConfig",
+                "LeaveRequest",
+                "LeaveBalance",
+                "AttendanceStats",
+                "BulkAttendance",
+                "AttendanceDocument",
+                "LeaveDocument",
+                "AttendanceNotification",
+                "HallAttendance",
+                "LeaveBucket"
+            ],
+            "homework": [
+                "Assignment",
+                "HomeworkSubmission",
+                "Homework"
+            ],
+            "inventory": [
+                "InventoryItem",
+                "InventoryCategory",
+                "InventorySale",
+                "InventorySaleItem",
+                "InventoryTransaction",
+                "PurchaseOrder",
+                "PurchaseOrderItem"
+            ],
+            "communication": [
+                "Notice",
+                "NoticeTarget",
+                "NoticeRead",
+                "Notification",
+                "SmsWallet",
+                "SmsWalletTransaction",
+                "SmsLog",
+                "SmsTriggerConfig",
+                "SmsSettings"
+            ],
+            "staff_management": [
+                "Admin",
+                "Accountant",
+                "TeachingStaff",
+                "NonTeachingStaff",
+                "Director",
+                "Principal"
+            ],
+            "library": [
+                "Librarian",
+                "LibraryBook",
+                "LibraryBookCopy",
+                "LibraryTransaction",
+                "LibrarySettings",
+                "LibraryBookRequest",
+                "MediaLibrary"
+            ],
+            "exams": [
+                "ExamSeries",
+                "ExamIssue",
+                "Exam",
+                "ExamSubject",
+                "ExamResult",
+                "ExamHall",
+                "ExamHallInvigilator"
+            ],
+            "timetable": [
+                "TimeSlot",
+                "TimetableEntry",
+                "TeacherShift",
+                "Timetable"
+            ],
+            "certificates": [
+                "TimetableTemplate",
+                "Document",
+                "Signature",
+                "Stamp",
+                "CertificateTemplate",
+                "DocumentTemplate",
+                "CertificateGenerated",
+                "DigitalIdCard",
+                "AdmitCard",
+                "SmsTemplate"
+            ],
+            "calendar": [
+                "SchoolCalendar",
+                "SecurityEvent",
+                "CalendarEvent",
+                "CalendarEventTarget",
+                "EventReminder"
+            ],
+            "alumni": [
+                "Alumni"
+            ],
+            "payroll": [
+                "PayrollConfig",
+                "SalaryStructure",
+                "PayrollPeriod",
+                "PayrollItem",
+                "Payslip",
+                "PayrollAuditLog"
+            ],
+            "ai_insights": [
+                "AiUsageLog",
+                "AiInsightCache",
+                "AiSettings",
+                "AiActionPolicy"
+            ]
+        },
+        "capabilities": [
+            {
+                "id": "platform",
+                "name": "Platform",
+                "description": "Core platform infrastructure and settings.",
+                "modelCount": 10,
+                "models": [
+                    "School",
+                    "ImportHistory",
+                    "User",
+                    "MasterAdmin",
+                    "QrVerificationSettings",
+                    "PdfExportSettings",
+                    "UserSession",
+                    "PromotionHistory",
+                    "SchoolSettings",
+                    "SchoolPaymentSettings"
+                ]
+            },
+            {
+                "id": "school_explorer",
+                "name": "School Explorer",
+                "description": "Public school discovery platform with profiles and ratings.",
+                "modelCount": 6,
+                "models": [
+                    "SchoolPublicProfile",
+                    "SchoolAchievement",
+                    "SchoolFacility",
+                    "SchoolBadge",
+                    "SchoolRating",
+                    "AdmissionInquiry"
+                ]
+            },
+            {
+                "id": "media_library",
+                "name": "Media Library",
+                "description": "Centralized media management for photos, videos, and documents.",
+                "modelCount": 3,
+                "models": [
+                    "SchoolGallery",
+                    "Upload",
+                    "Gallery"
+                ]
+            },
+            {
+                "id": "partner_program",
+                "name": "Partner Program",
+                "description": "Partner management with leads, commissions, and payouts.",
+                "modelCount": 8,
+                "models": [
+                    "Partner",
+                    "PartnerLead",
+                    "LeadActivity",
+                    "PartnerSchool",
+                    "PartnerCommission",
+                    "PartnerPayout",
+                    "PartnerActivity",
+                    "CommissionSlab"
+                ]
+            },
+            {
+                "id": "admission",
+                "name": "Admission",
+                "description": "Digital admission pipeline with forms, workflows, and tracking.",
+                "modelCount": 6,
+                "models": [
+                    "Form",
+                    "FormField",
+                    "Application",
+                    "ApplicationDocument",
+                    "Stage",
+                    "StageHistory"
+                ]
+            },
+            {
+                "id": "fees",
+                "name": "Fees",
+                "description": "End-to-end fee management with online payments, installments, receipts, and analytics.",
+                "modelCount": 16,
+                "models": [
+                    "Payment",
+                    "TransportFee",
+                    "StudentTransportFee",
+                    "TransportFeePayment",
+                    "FeeStructure",
+                    "FeeParticular",
+                    "FeeInstallmentRule",
+                    "StudentFee",
+                    "FeeDiscount",
+                    "FeePayment",
+                    "FeePaymentInstallment",
+                    "FeeReminder",
+                    "LoanRepayment",
+                    "FeeSettings",
+                    "Receipt",
+                    "FeeAuditLog"
+                ]
+            },
+            {
+                "id": "transport",
+                "name": "Transport",
+                "description": "Transport operations with GPS tracking, route planning, and driver apps.",
+                "modelCount": 10,
+                "models": [
+                    "Vehicle",
+                    "Route",
+                    "VehicleLocation",
+                    "TransportStaff",
+                    "VehicleAssignment",
+                    "RouteAssignment",
+                    "BusStop",
+                    "BusTrip",
+                    "BusRequest",
+                    "Syllabus"
+                ]
+            },
+            {
+                "id": "student_management",
+                "name": "Student Management",
+                "description": "Comprehensive student database with profiles, academic history, parent linking, and lifecycle management.",
+                "modelCount": 15,
+                "models": [
+                    "StudentRouteAssignment",
+                    "StudentStopAssignment",
+                    "Student",
+                    "Parent",
+                    "StudentParentLink",
+                    "Class",
+                    "Section",
+                    "SectionSubjectTeacher",
+                    "Subject",
+                    "AcademicYear",
+                    "StudentFeeStructure",
+                    "StudentFeeParticular",
+                    "StudentFeeInstallment",
+                    "StudentExamAttempt",
+                    "StudentExamAnswer"
+                ]
+            },
+            {
+                "id": "attendance",
+                "name": "Attendance",
+                "description": "Smart attendance tracking with geo-fencing, leave management, and parent notifications.",
+                "modelCount": 13,
+                "models": [
+                    "BusAttendance",
+                    "Attendance",
+                    "AttendanceDelegation",
+                    "AttendanceConfig",
+                    "LeaveRequest",
+                    "LeaveBalance",
+                    "AttendanceStats",
+                    "BulkAttendance",
+                    "AttendanceDocument",
+                    "LeaveDocument",
+                    "AttendanceNotification",
+                    "HallAttendance",
+                    "LeaveBucket"
+                ]
+            },
+            {
+                "id": "homework",
+                "name": "Homework",
+                "description": "Homework assignment and tracking with due dates and parent visibility.",
+                "modelCount": 3,
+                "models": [
+                    "Assignment",
+                    "HomeworkSubmission",
+                    "Homework"
+                ]
+            },
+            {
+                "id": "inventory",
+                "name": "Inventory",
+                "description": "Inventory management with stock tracking, purchase orders, and sales.",
+                "modelCount": 7,
+                "models": [
+                    "InventoryItem",
+                    "InventoryCategory",
+                    "InventorySale",
+                    "InventorySaleItem",
+                    "InventoryTransaction",
+                    "PurchaseOrder",
+                    "PurchaseOrderItem"
+                ]
+            },
+            {
+                "id": "communication",
+                "name": "Communication",
+                "description": "Multi-channel communication with notices, SMS, and push notifications.",
+                "modelCount": 9,
+                "models": [
+                    "Notice",
+                    "NoticeTarget",
+                    "NoticeRead",
+                    "Notification",
+                    "SmsWallet",
+                    "SmsWalletTransaction",
+                    "SmsLog",
+                    "SmsTriggerConfig",
+                    "SmsSettings"
+                ]
+            },
+            {
+                "id": "staff_management",
+                "name": "Staff Management",
+                "description": "Staff lifecycle management for teaching and non-teaching staff.",
+                "modelCount": 6,
+                "models": [
+                    "Admin",
+                    "Accountant",
+                    "TeachingStaff",
+                    "NonTeachingStaff",
+                    "Director",
+                    "Principal"
+                ]
+            },
+            {
+                "id": "library",
+                "name": "Library",
+                "description": "Library management with catalog, issue/return tracking, and fine calculation.",
+                "modelCount": 7,
+                "models": [
+                    "Librarian",
+                    "LibraryBook",
+                    "LibraryBookCopy",
+                    "LibraryTransaction",
+                    "LibrarySettings",
+                    "LibraryBookRequest",
+                    "MediaLibrary"
+                ]
+            },
+            {
+                "id": "exams",
+                "name": "Exams",
+                "description": "Complete exam lifecycle from scheduling to report cards with analytics.",
+                "modelCount": 7,
+                "models": [
+                    "ExamSeries",
+                    "ExamIssue",
+                    "Exam",
+                    "ExamSubject",
+                    "ExamResult",
+                    "ExamHall",
+                    "ExamHallInvigilator"
+                ]
+            },
+            {
+                "id": "timetable",
+                "name": "Timetable",
+                "description": "Intelligent timetable creation with conflict detection.",
+                "modelCount": 4,
+                "models": [
+                    "TimeSlot",
+                    "TimetableEntry",
+                    "TeacherShift",
+                    "Timetable"
+                ]
+            },
+            {
+                "id": "certificates",
+                "name": "Certificates",
+                "description": "Digital certificate generation with templates, signatures, and QR verification.",
+                "modelCount": 10,
+                "models": [
+                    "TimetableTemplate",
+                    "Document",
+                    "Signature",
+                    "Stamp",
+                    "CertificateTemplate",
+                    "DocumentTemplate",
+                    "CertificateGenerated",
+                    "DigitalIdCard",
+                    "AdmitCard",
+                    "SmsTemplate"
+                ]
+            },
+            {
+                "id": "calendar",
+                "name": "Calendar",
+                "description": "Academic calendar with events, holidays, and exam schedules.",
+                "modelCount": 5,
+                "models": [
+                    "SchoolCalendar",
+                    "SecurityEvent",
+                    "CalendarEvent",
+                    "CalendarEventTarget",
+                    "EventReminder"
+                ]
+            },
+            {
+                "id": "alumni",
+                "name": "Alumni",
+                "description": "Alumni tracking and engagement.",
+                "modelCount": 1,
+                "models": [
+                    "Alumni"
+                ]
+            },
+            {
+                "id": "payroll",
+                "name": "Payroll",
+                "description": "Payroll processing with salary structures, deductions, and audit trails.",
+                "modelCount": 6,
+                "models": [
+                    "PayrollConfig",
+                    "SalaryStructure",
+                    "PayrollPeriod",
+                    "PayrollItem",
+                    "Payslip",
+                    "PayrollAuditLog"
+                ]
+            },
+            {
+                "id": "ai_insights",
+                "name": "Ai Insights",
+                "description": "AI-powered dashboard with intelligent insights and predictions.",
+                "modelCount": 4,
+                "models": [
+                    "AiUsageLog",
+                    "AiInsightCache",
+                    "AiSettings",
+                    "AiActionPolicy"
+                ]
+            }
+        ]
+    }
 }

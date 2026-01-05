@@ -11,12 +11,12 @@ import PageTransitionLoader from "@/components/PageTransitionLoader";
 import { Suspense } from "react";
 import { Analytics } from "@vercel/analytics/next"
 
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://edubreezy.com';
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.edubreezy.com';
 
 export const metadata = {
   // Core metadata
   title: {
-    default: "EduBreezy – India’s Leading School Management ERP & Explorer Platform",
+    default: "EduBreezy – India’s Leading AI Powered School Management ERP",
     template: "%s | EduBreezy"
   },
   description: "EduBreezy is India's leading school management platform. Find and compare schools, read verified parent reviews, manage admissions, fees, attendance, and more. Edu Breezy simplifies education.",
@@ -54,8 +54,8 @@ export const metadata = {
     locale: "en_IN",
     url: baseUrl,
     siteName: "EduBreezy",
-    title: "EduBreezy - School Management & Explorer Platform",
-    description: "EduBreezy is India's leading school management platform. Find and compare schools, read verified parent reviews, manage admissions, fees, attendance, and more. Edu Breezy simplifies education",
+    title: "EduBreezy - AI-Powered School Management ERP",
+    description: "AI-powered school management platform trusted by 500+ schools. Smart attendance, online fees, exam analytics, transport GPS & parent app.",
     images: [
       {
         url: `${baseUrl}/by.png`,
@@ -76,8 +76,8 @@ export const metadata = {
   // Twitter Card
   twitter: {
     card: "summary_large_image",
-    title: "EduBreezy - School Management & Explorer Platform",
-    description: "EduBreezy is India's leading school management platform. Find and compare schools, read verified parent reviews, manage admissions, fees, attendance, and more. Edu Breezy simplifies education",
+    title: "EduBreezy - AI-Powered School Management ERP",
+    description: "AI-powered school management platform trusted by 500+ schools. Smart attendance, online fees, exam analytics, transport GPS & parent app.",
     images: [`${baseUrl}/by.png`],
     creator: "@edubreezy",
   },
@@ -126,20 +126,64 @@ export default function RootLayout({ children }) {
     "@context": "https://schema.org",
     "@type": "Organization",
     "name": "EduBreezy",
-    "alternateName": "Edu Breezy",
+    "alternateName": ["Edu Breezy", "EduBreezy ERP"],
     "url": "https://www.edubreezy.com",
     "logo": "https://edubreezy.com/favicon.ico",
     "sameAs": [
       "https://twitter.com/edubreezy",
-      "https://facebook.com/edubreezy"
+      "https://facebook.com/edubreezy",
+      "https://instagram.com/official_edubreezy"
     ],
-    "description": "India's leading school management platform"
+    "description": "AI-powered school management platform trusted by 500+ schools in India"
+  };
+
+  // SiteNavigationElement to hint sitelinks to Google
+  const siteNavigationSchema = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SiteNavigationElement",
+        "name": "About EduBreezy",
+        "url": "https://www.edubreezy.com/about"
+      },
+      {
+        "@type": "SiteNavigationElement",
+        "name": "Contact Us",
+        "url": "https://www.edubreezy.com/contact"
+      },
+      {
+        "@type": "SiteNavigationElement",
+        "name": "School Explorer - Find Schools",
+        "url": "https://school.edubreezy.com/explore"
+      },
+      {
+        "@type": "SiteNavigationElement",
+        "name": "EduBreezy Pay - Online Fees",
+        "url": "https://pay.edubreezy.com"
+      },
+      {
+        "@type": "SiteNavigationElement",
+        "name": "Partner With Us",
+        "url": "https://www.edubreezy.com/partners"
+      }
+    ]
   };
 
   return (
     <Provider>
       <html lang="en" suppressHydrationWarning={true}>
         <head>
+          {/* Google Tag Manager */}
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+              new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+              j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+              'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+              })(window,document,'script','dataLayer','GTM-PN2FHJNH');`
+            }}
+          />
+          {/* End Google Tag Manager */}
           <link rel="preconnect" href="https://fonts.googleapis.com" />
           <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
           <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet" />
@@ -152,8 +196,22 @@ export default function RootLayout({ children }) {
             type="application/ld+json"
             dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
           />
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(siteNavigationSchema) }}
+          />
         </head>
         <body className="min-h-screen flex flex-col">
+          {/* Google Tag Manager (noscript) */}
+          <noscript>
+            <iframe
+              src="https://www.googletagmanager.com/ns.html?id=GTM-PN2FHJNH"
+              height="0"
+              width="0"
+              style={{ display: 'none', visibility: 'hidden' }}
+            />
+          </noscript>
+          {/* End Google Tag Manager (noscript) */}
           {/* JavaScript disabled warning */}
           <noscript>
             <div style={{

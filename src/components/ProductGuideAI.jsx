@@ -419,7 +419,18 @@ export default function ProductGuideAI() {
     );
 }
 
-// Typing animation component
+// Parse markdown bold (**text**) into React elements
+function parseMarkdown(text) {
+    const parts = text.split(/(\*\*[^*]+\*\*)/g);
+    return parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+            return <strong key={i} className="font-semibold text-gray-900">{part.slice(2, -2)}</strong>;
+        }
+        return part;
+    });
+}
+
+// Typing animation component with bullet point and markdown support
 function TypewriterText({ text }) {
     const [displayedText, setDisplayedText] = useState('');
 
@@ -433,18 +444,37 @@ function TypewriterText({ text }) {
             } else {
                 clearInterval(interval);
             }
-        }, 15); // Adjust typing speed here
+        }, 10); // Fast typing
 
         return () => clearInterval(interval);
     }, [text]);
 
+    // Parse text into lines for proper bullet rendering
+    const lines = displayedText.split('\n');
+
     return (
-        <motion.p
+        <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="text-gray-700 leading-relaxed mb-4"
         >
-            {displayedText}
-        </motion.p>
+            {lines.map((line, index) => {
+                const trimmedLine = line.trim();
+                // Check if line is a bullet point
+                if (trimmedLine.startsWith('•') || trimmedLine.startsWith('-') || trimmedLine.startsWith('*') && !trimmedLine.startsWith('**')) {
+                    const bulletContent = line.replace(/^[\s]*[•\-\*]\s*/, '');
+                    return (
+                        <div key={index} className="flex items-start gap-2 ml-2 my-1.5">
+                            <span className="text-blue-500 font-bold mt-0.5">•</span>
+                            <span className="flex-1">{parseMarkdown(bulletContent)}</span>
+                        </div>
+                    );
+                }
+                // Regular text with markdown parsing
+                return line.trim() ? (
+                    <p key={index} className="mb-2">{parseMarkdown(line)}</p>
+                ) : null;
+            })}
+        </motion.div>
     );
 }

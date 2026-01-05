@@ -1,57 +1,33 @@
 /**
  * Product Guide AI API
- * Marketing AI for homepage with strict guardrails
+ * Smart marketing AI for homepage with semantic matching
  * 
- * Rules:
- * - Only answers from product-knowledge.json
- * - No database access
- * - No hallucination
- * - Cached responses
- * - Token limited
+ * Features:
+ * - Fuzzy FAQ matching with synonym support
+ * - Feature-based context focusing
+ * - Intelligent caching with normalized keys
+ * - Cost-efficient AI calls
  */
 
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { generateKey, getCache, setCache } from '@/lib/cache';
+import {
+    extractKeywords,
+    findBestFaqMatch,
+    buildFocusedContext,
+    normalizeForCache
+} from '@/lib/ai/questionMatcher';
 import fs from 'fs';
 import path from 'path';
 
 // Gemini Flash-Lite for cost efficiency
-const MODEL_NAME = 'gemini-2.0-flash-lite';
+const MODEL_NAME = 'gemini-2.5-flash-lite';
 const MAX_OUTPUT_TOKENS = 300;
 const CACHE_TTL = 86400; // 24 hours
 
-// Allowed questions (whitelist)
-const ALLOWED_QUESTIONS = [
-    'what features does edubreezy offer',
-    'is edubreezy suitable for cbse icse schools',
-    'how does ai help school administrators',
-    'is student data secure in edubreezy',
-    'how does fee management work',
-    'does edubreezy support exams and results',
-    'how easy is onboarding',
-    'can i request a demo',
-    // Variations & Keywords
-    'feature', 'module', 'offer',
-    'cbse', 'icse', 'board', 'curriculum',
-    'security', 'secure', 'data', 'privacy',
-    'fee', 'payment', 'paid', 'cost', 'price', 'pricing', 'online',
-    'exam', 'result', 'grade', 'mark', 'report',
-    'onboarding', 'setup', 'start', 'implement',
-    'demo', 'trial', 'see', 'watch',
-    'ai', 'artificial intelligence', 'smart', 'automation',
-    'app', 'mobile', 'android', 'ios', 'phone',
-    'attendance', 'track', 'present', 'absent',
-    'transport', 'bus', 'gps', 'driver',
-    'library', 'book',
-    'payroll', 'salary', 'staff', 'hr',
-    'certificate', 'document',
-    'inventory', 'stock',
-    'parent', 'student', 'teacher', 'admin',
-    'sms', 'notification', 'communication',
-    'time', 'calendar', 'schedule',
-    'system', 'erp', 'platform', 'cloud',
-];
+// Similarity thresholds
+const FAQ_MATCH_THRESHOLD = 0.4; // 40% keyword overlap = FAQ match
 
 // Get product knowledge (cached in memory)
 let productKnowledge = null;
@@ -70,35 +46,32 @@ async function getProductKnowledge() {
     }
 }
 
-// Check if question is within scope
-function isQuestionAllowed(question) {
-    const normalized = question.toLowerCase().replace(/[?!.,]/g, '').trim();
+// Build guardrailed prompt with focused context
+function buildPrompt(question, context) {
+    return `You are a helpful product guide for EduBreezy, a school management ERP platform.
 
-    // Check against allowed topics
-    return ALLOWED_QUESTIONS.some(allowed =>
-        normalized.includes(allowed) || allowed.includes(normalized)
-    );
-}
+RULES:
+1. Answer using ONLY the provided product context below.
+2. Find relevant information in features, subFeatures, or descriptions.
+3. When listing capabilities, use bullet points (• feature name).
+4. Keep the intro brief, then show 3-5 key bullet points.
+5. End with: "Would you like a demo to see this in action?"
+6. Be friendly and helpful.
 
-// Build guardrailed prompt
-function buildPrompt(question, knowledge) {
-    return `You are a product guide for EduBreezy, a school management ERP platform.
+FORMAT EXAMPLE:
+Yes, EduBreezy supports [feature]. Here's what it includes:
+• Point one
+• Point two
+• Point three
 
-STRICT RULES:
-1. Answer using the provided product knowledge.
-2. If the user asks about a specific feature (like "online payment"), check if it's mentioned in any module description or sub-feature.
-3. You CAN combine information from different parts of the knowledge base.
-4. If a feature is DEFINITELY not mentioned, say "This feature is planned" or redirect to a demo.
-5. Keep answers short (2-3 sentences max), clear, and professional.
-6. End with a soft call-to-action like "Would you like a demo to see this in action?"
-7. Do NOT include greetings or filler words.
+Would you like a demo to see this in action?
 
-PRODUCT KNOWLEDGE:
-${JSON.stringify(knowledge, null, 2)}
+PRODUCT CONTEXT:
+${JSON.stringify(context, null, 2)}
 
 USER QUESTION: ${question}
 
-ANSWER (2-3 sentences max):`;
+HELPFUL ANSWER:`;
 }
 
 export async function POST(request) {
@@ -114,29 +87,18 @@ export async function POST(request) {
         }
 
         // Enforce character limit
-        if (question.length > 150) {
+        if (question.length > 200) {
             return NextResponse.json(
-                { error: 'Question must be under 150 characters' },
+                { error: 'Question must be under 200 characters' },
                 { status: 400 }
             );
         }
 
-        // Normalize question for matching
-        const normalizedQuestion = question.toLowerCase().trim();
-
-        // Check if question is within allowed scope
-        if (!isQuestionAllowed(normalizedQuestion)) {
-            return NextResponse.json({
-                answer: "For detailed or custom requirements, I'd recommend requesting a personalized demo where our team can address your specific needs. Would you like me to help you schedule one?",
-                source: 'redirect',
-                cached: false,
-            });
-        }
+        // Normalize question for caching
+        const cacheKey = generateKey('product-guide-v3', { q: normalizeForCache(question) });
 
         // Check cache first
-        const cacheKey = generateKey('product-guide-v2', { q: normalizedQuestion });
         const cached = await getCache(cacheKey);
-
         if (cached) {
             return NextResponse.json({
                 answer: cached.answer,
@@ -147,7 +109,6 @@ export async function POST(request) {
 
         // Load product knowledge
         const knowledge = await getProductKnowledge();
-
         if (!knowledge) {
             return NextResponse.json(
                 { error: 'Product knowledge unavailable' },
@@ -155,27 +116,34 @@ export async function POST(request) {
             );
         }
 
-        // Check FAQ for exact match first
-        const faqMatch = knowledge.faq?.find(faq => {
-            const qNorm = normalizedQuestion;
-            const faqNorm = faq.question.toLowerCase();
-            return qNorm === faqNorm || faqNorm.includes(qNorm) || (qNorm.includes(faqNorm) && faqNorm.length > 20);
-        });
+        // Step 1: Try fuzzy FAQ matching
+        const { match: faqMatch, score: faqScore } = findBestFaqMatch(question, knowledge.faq || []);
 
-        if (faqMatch) {
-            // Use FAQ answer directly (no AI call needed)
+        if (faqMatch && faqScore >= FAQ_MATCH_THRESHOLD) {
+            // High-confidence FAQ match - no AI needed
             const answer = faqMatch.answer + " Would you like a demo to see this in action?";
             await setCache(cacheKey, { answer }, CACHE_TTL);
 
             return NextResponse.json({
                 answer,
                 source: 'faq',
+                score: faqScore.toFixed(2),
                 cached: false,
             });
         }
 
-        // Call Gemini for non-FAQ questions
-        const apiKey = process.env.GEMINI_API_KEY;
+        // Step 2: Extract keywords and check if question is about our product
+        const keywords = extractKeywords(question);
+        if (keywords.length === 0) {
+            return NextResponse.json({
+                answer: "Could you rephrase your question? I'm here to help you learn about EduBreezy's features, pricing, and security. Would you like a demo?",
+                source: 'clarify',
+                cached: false,
+            });
+        }
+
+        // Step 3: Call AI with focused context
+        const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
         if (!apiKey) {
             return NextResponse.json(
                 { error: 'AI service not configured' },
@@ -183,16 +151,19 @@ export async function POST(request) {
             );
         }
 
+        // Build focused context (only relevant features)
+        const focusedContext = buildFocusedContext(question, knowledge);
+
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({
             model: MODEL_NAME,
             generationConfig: {
                 maxOutputTokens: MAX_OUTPUT_TOKENS,
-                temperature: 0.4, // Balanced for factual but natural responses
+                temperature: 0.5, // Slightly more creative for natural responses
             },
         });
 
-        const prompt = buildPrompt(question, knowledge);
+        const prompt = buildPrompt(question, focusedContext);
         const result = await model.generateContent(prompt);
         const response = result.response;
         const answer = response.text()?.trim() || "I'd be happy to help you learn more. Would you like to schedule a demo?";
