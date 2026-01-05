@@ -47,6 +47,10 @@ export default function ForgotPasswordPage() {
             });
 
             if (error) {
+                // Handle captcha error specifically
+                if (error.message?.includes('captcha') || error.code === 'unexpected_failure') {
+                    throw new Error('Please disable captcha in Supabase settings for development, or try again later.');
+                }
                 throw error;
             }
 

@@ -197,7 +197,7 @@ export default function ProductGuideAI() {
                 </div>
 
                 {/* Main Card */}
-                <div className="bg-white/80 backdrop-blur-xl rounded-3xl border border-gray-200/50 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] overflow-hidden">
+                <div className="bg-white/80 border backdrop-blur-xl rounded-3xl border border-gray-200/50 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] overflow-hidden">
                     {/* Suggested Questions */}
                     <div className="p-6 border-b border-gray-100">
                         <div className="flex items-center gap-2 mb-4">

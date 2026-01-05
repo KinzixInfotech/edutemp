@@ -5,7 +5,7 @@ import { DotPattern } from '@/components/ui/dot-pattern';
 
 export default function WebDashboardCTA() {
     return (
-        <section className="relative py-16 md:py-24 px-5 overflow-visible">
+        <section className="relative py-24 md:py-32 px-5 overflow-visible">
             {/* Dot Pattern Background */}
             <DotPattern
                 className="absolute inset-0 opacity-30 [mask-image:radial-gradient(ellipse_at_center,white,transparent_80%)]"
@@ -17,9 +17,9 @@ export default function WebDashboardCTA() {
             />
 
             <div className="max-w-7xl mx-auto relative z-10">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-0 items-center">
 
-                    {/* Right - Phone Mockup */}
+                    {/* Right - Phone Mockup with Peeking Effect */}
                     <div className="relative hidden lg:flex justify-center items-center py-20 lg:py-0">
                         <style dangerouslySetInnerHTML={{
                             __html: `
@@ -32,26 +32,35 @@ export default function WebDashboardCTA() {
                         {/* Glow Effect */}
                         <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 blur-3xl rounded-3xl" />
 
-                        <div
-                            className="relative z-20 transition-all duration-1000 hover:scale-[1.03] group"
-                        >
-                            {/* The Mockup - 3D Black Device */}
-                            <div
-                                className="w-[330px] sm:w-[370px] h-[670px] sm:h-[760px] bg-[#0A0A0A] rounded-[3.8rem] p-2 shadow-[0_80px_150px_-30px_rgba(0,0,0,0.8)] border border-white/10 relative"
-                            >
-                                {/* Screen Content Container */}
-                                <div className="w-full h-full bg-slate-900 rounded-[3rem] overflow-hidden relative shadow-inner">
-                                    <img
-                                        src="./ss2.png"
-                                        alt="App Screenshot"
-                                        className="w-full h-full object-contain"
-                                    />
-                                </div>
+                        {/* Phone Mockups Container - GROUP for hover */}
+                        <div className="group z-20 flex items-center justify-center scale-[1.3] lg:scale-[1.4] 2xl:scale-[1.4] cursor-pointer absolute">
 
-                                {/* Physical Buttons (Side) */}
-                                <div className="absolute top-32 -left-[2px] w-1 h-12 bg-slate-800 rounded-r-md border-r border-white/10"></div>
-                                <div className="absolute top-48 -left-[2px] w-1 h-20 bg-slate-800 rounded-r-md border-r border-white/10"></div>
-                                <div className="absolute top-40 -right-[2px] w-1 h-24 bg-slate-800 rounded-l-md border-l border-white/10"></div>
+                            {/* Back Phone (ss.png) - Peeks left on hover */}
+                            <div
+                                className="absolute w-[210px] sm:w-[180px] lg:w-[200px] 2xl:w-[220px] h-[460px] sm:h-[400px] lg:h-[445px] 2xl:h-[490px] rounded-[2rem] overflow-hidden transition-all duration-500 ease-out opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:-translate-x-16 rotate-0 group-hover:-rotate-[8deg] -z-10"
+                                style={{
+                                    boxShadow: '0 0 0 3px #1a1a2e, 0 25px 50px -12px rgba(0, 0, 0, 0.15)'
+                                }}
+                            >
+                                <img
+                                    src="/ss.png"
+                                    alt="EduBreezy App - Screen 2"
+                                    className="w-full h-full object-contain bg-white"
+                                />
+                            </div>
+
+                            {/* Front Phone (ss2.png) - Rotates right on hover */}
+                            <div
+                                className="w-[210px] sm:w-[180px] lg:w-[200px] 2xl:w-[220px] h-[460px] sm:h-[400px] lg:h-[445px] 2xl:h-[490px] rounded-[2rem] overflow-hidden relative z-10 transition-all duration-500 ease-out group-hover:translate-x-8 group-hover:rotate-[8deg]"
+                                style={{
+                                    boxShadow: '0 0 0 3px #1a1a2e, 0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                                }}
+                            >
+                                <img
+                                    src="ss2.png"
+                                    alt="EduBreezy App"
+                                    className="w-full h-full object-contain bg-white"
+                                />
                             </div>
                         </div>
 
@@ -60,8 +69,8 @@ export default function WebDashboardCTA() {
                     </div>
 
                     {/* Left Content */}
-                    <div className="lg:pr-8">
-                        <h2 className="text-4xl  md:text-5xl  2xl:text-6xl font-black text-slate-900 leading-[1em] mb-8 tracking-tight">
+                    <div>
+                        <h2 className="text-4xl  md:text-5xl  2xl:text-6xl font-bold text-slate-900 leading-[1em] mb-8 tracking-tight">
                             Modern App For
                             <br className="hidden md:block" />
                             <span className="relative inline-block mt-2">

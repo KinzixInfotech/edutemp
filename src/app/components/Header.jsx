@@ -43,12 +43,6 @@ const menuConfig = {
             link: "/contact",
             target: "_self"
         },
-        {
-            name: "Support",
-            type: "link",
-            link: "/support",
-            target: "_self"
-        }
     ]
 };
 

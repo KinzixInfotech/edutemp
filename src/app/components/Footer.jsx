@@ -16,6 +16,8 @@ const footerData = {
                 { label: "Features", link: "/features" },
                 // { label: "Pricing", link: "/pricing" },
                 { label: "Download", link: "#download" },
+                { label: "Developer Login", link: "/developer-login" },
+                { label: "Support", link: "/support" },
                 // { label: "Changelog", link: "/changelog" },
             ],
         },
