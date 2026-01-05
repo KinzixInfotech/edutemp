@@ -10,6 +10,7 @@ import NavigationProgress from "./components/NavigationProgress";
 import PageTransitionLoader from "@/components/PageTransitionLoader";
 import { Suspense } from "react";
 import { Analytics } from "@vercel/analytics/next"
+import FloatingDemoButton from "@/components/FloatingDemoButton";
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.edubreezy.com';
 
@@ -256,6 +257,7 @@ export default function RootLayout({ children }) {
             <NavigationProgress />
             <PageTransitionLoader />
           </Suspense>
+          <FloatingDemoButton />
           <Toaster
             theme="system"
             toastOptions={{
