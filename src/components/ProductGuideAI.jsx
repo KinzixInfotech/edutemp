@@ -17,6 +17,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Sparkles, Send, Loader2, MessageCircle, Bot, ArrowRight, ThumbsUp, ThumbsDown, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Link from 'next/link';
+import SectionHeading from '@/components/SectionHeading';
 
 // Suggested questions
 const PRIMARY_QUESTIONS = [
@@ -176,33 +177,27 @@ export default function ProductGuideAI() {
     };
 
     return (
-        <section className="py-20 md:py-28 px-5 bg-gradient-to-b from-white via-blue-50/30 to-white relative overflow-hidden">
+        <section className="py-12 md:py-20 lg:py-28 px-4 md:px-5 bg-gradient-to-b from-white via-blue-50/30 to-white relative overflow-hidden">
             {/* Decorative Elements */}
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-gradient-to-br from-blue-400/10 via-purple-400/5 to-transparent rounded-full blur-3xl pointer-events-none" />
             <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-gradient-to-tl from-blue-400/10 to-transparent rounded-full blur-3xl pointer-events-none" />
 
             <div className="max-w-[900px] mx-auto relative z-10">
                 {/* Header */}
-                <div className="text-center mb-10">
-                    <span className="inline-flex items-center gap-2 bg-[#0569ff]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-5">
-                        <span className="w-2 h-2 bg-[#0569ff] rounded-full"></span>
-                        AI-POWERED PRODUCT GUIDE
-                    </span>
-                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
-                        Explore <span className="text-blue-600">EduBreezy Instantly</span>
-                    </h2>
-                    <p className="text-gray-600 text-lg max-w-xl mx-auto">
-                        Ask our AI to understand features, security, pricing, and workflows in seconds.
-                    </p>
-                </div>
+                <SectionHeading
+                    badge="AI-POWERED PRODUCT GUIDE"
+                    title="Explore"
+                    highlightedText="EduBreezy Instantly"
+                    description="Ask our AI to understand features, security, pricing, and workflows in seconds."
+                />
 
                 {/* Main Card */}
                 <div className="bg-white/80 border backdrop-blur-xl rounded-3xl border border-gray-200/50 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] overflow-hidden">
                     {/* Suggested Questions */}
-                    <div className="p-6 border-b border-gray-100">
-                        <div className="flex items-center gap-2 mb-4">
-                            <MessageCircle className="w-4 h-4 text-gray-400" />
-                            <span className="text-sm text-gray-500 font-medium">Suggested questions</span>
+                    <div className="p-4 md:p-6 border-b border-gray-100">
+                        <div className="flex items-center gap-2 mb-3 md:mb-4">
+                            <MessageCircle className="w-3.5 h-3.5 md:w-4 md:h-4 text-gray-400" />
+                            <span className="text-xs md:text-sm text-gray-500 font-medium">Suggested questions</span>
                         </div>
 
                         <div className="flex flex-wrap gap-2">
@@ -251,10 +246,10 @@ export default function ProductGuideAI() {
                                 exit={{ opacity: 0, height: 0 }}
                                 className="border-b border-gray-100"
                             >
-                                <div className="p-6 bg-gradient-to-br from-blue-50/50 to-purple-50/30">
-                                    <div className="flex gap-4">
-                                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#0469ff] flex items-center justify-center shadow-lg">
-                                            <Bot className="w-5 h-5 text-white" />
+                                <div className="p-4 md:p-6 bg-gradient-to-br from-blue-50/50 to-purple-50/30">
+                                    <div className="flex gap-3 md:gap-4">
+                                        <div className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 rounded-full bg-[#0469ff] flex items-center justify-center shadow-lg">
+                                            <Bot className="w-4 h-4 md:w-5 md:h-5 text-white" />
                                         </div>
                                         <div className="flex-1">
                                             <div className="text-xs font-semibold text-blue-600 mb-2 flex items-center gap-1.5">
@@ -282,12 +277,12 @@ export default function ProductGuideAI() {
                                                             animate={{ opacity: 1, y: 0 }}
                                                         >
                                                             <Link
-                                                                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors mb-4"
+                                                                className="inline-flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-medium rounded-lg transition-colors mb-3 md:mb-4"
                                                                 href={quickAction.href}
                                                             >
 
                                                                 {quickAction.label}
-                                                                <ExternalLink className="w-3.5 h-3.5" />
+                                                                <ExternalLink className="w-3 h-3 md:w-3.5 md:h-3.5" />
                                                             </Link>
                                                         </motion.a>
                                                     )}
@@ -296,7 +291,7 @@ export default function ProductGuideAI() {
                                                     <motion.div
                                                         initial={{ opacity: 0 }}
                                                         animate={{ opacity: 1 }}
-                                                        className="flex items-center gap-3 pt-3 border-t border-gray-200/50"
+                                                        className="flex items-center gap-2 md:gap-3 pt-2 md:pt-3 border-t border-gray-200/50"
                                                     >
                                                         <span className="text-xs text-gray-400">Was this helpful?</span>
                                                         <button
@@ -334,9 +329,9 @@ export default function ProductGuideAI() {
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ delay: 0.3 }}
-                                            className="mt-5 pt-4 border-t border-gray-200/50"
+                                            className="mt-4 md:mt-5 pt-3 md:pt-4 border-t border-gray-200/50"
                                         >
-                                            <div className="text-xs font-medium text-gray-400 mb-3">
+                                            <div className="text-xs font-medium text-gray-400 mb-2 md:mb-3">
                                                 Related questions
                                             </div>
                                             <div className="flex flex-wrap gap-2">
@@ -358,18 +353,18 @@ export default function ProductGuideAI() {
                     </AnimatePresence>
 
                     {/* Input Area */}
-                    <form onSubmit={handleSubmit} className="p-6">
-                        <div className="flex gap-3">
+                    <form onSubmit={handleSubmit} className="p-4 md:p-6">
+                        <div className="flex gap-2 md:gap-3">
                             <div className="flex-1 relative">
                                 <input
                                     type="text"
                                     value={question}
                                     onChange={(e) => setQuestion(e.target.value.slice(0, 150))}
                                     placeholder="Ask about features, pricing, or security..."
-                                    className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-full text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                    className="w-full px-4 md:px-5 py-3 md:py-4 bg-gray-50 border border-gray-200 rounded-full text-sm md:text-base text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                                     disabled={isLoading}
                                 />
-                                <span className="absolute right-5 bottom-3 text-xs text-gray-400">
+                                <span className="absolute right-3 md:right-5 bottom-2.5 md:bottom-3 text-xs text-gray-400">
                                     {question.length}/150
                                 </span>
                             </div>
@@ -388,16 +383,16 @@ export default function ProductGuideAI() {
                                 )}
                             </button>
                         </div>
-                        <p className="text-xs text-gray-400 mt-3 text-center">
+                        <p className="text-xs text-gray-400 mt-2 md:mt-3 text-center">
                             Powered by AI • Answers based on EduBreezy product knowledge
                         </p>
                     </form>
                 </div>
 
                 {/* CTA */}
-                <div className="text-center mt-8">
-                    <p className="text-gray-500 mb-4">Want a personalized walkthrough?</p>
-                    <div className="flex items-center justify-center gap-4 flex-wrap">
+                <div className="text-center mt-6 md:mt-8">
+                    <p className="text-sm md:text-base text-gray-500 mb-3 md:mb-4">Want a personalized walkthrough?</p>
+                    <div className="flex items-center justify-center gap-3 md:gap-4 flex-wrap">
                         <a
                             href="/features"
                             className="inline-flex items-center gap-2 px-6 py-3 bg-white hover:bg-gray-50 text-gray-900 font-semibold rounded-full border border-gray-200 transition-colors"

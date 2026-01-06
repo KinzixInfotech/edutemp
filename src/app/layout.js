@@ -11,6 +11,7 @@ import PageTransitionLoader from "@/components/PageTransitionLoader";
 import { Suspense } from "react";
 import { Analytics } from "@vercel/analytics/next"
 import FloatingDemoButton from "@/components/FloatingDemoButton";
+import AOSProvider from "@/components/AosProvider";
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.edubreezy.com';
 
@@ -172,6 +173,7 @@ export default function RootLayout({ children }) {
 
   return (
     <Provider>
+
       <html lang="en" suppressHydrationWarning={true}>
         <head>
           {/* Google Tag Manager */}
@@ -252,6 +254,7 @@ export default function RootLayout({ children }) {
             </div>
           </noscript>
           <Analytics />
+          <AOSProvider />
           <ClientProduct>{children}</ClientProduct>
           <Suspense fallback={<div />}>
             <NavigationProgress />

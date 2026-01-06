@@ -27,7 +27,7 @@ import ScrollMouse from '@/components/ScrollMouse';
 import dynamic from 'next/dynamic';
 import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
 import ProductGuideAI from '@/components/ProductGuideAI';
-
+import SectionHeading from '@/components/SectionHeading';
 
 // Organization Schema for SEO
 const organizationSchema = {
@@ -440,19 +440,12 @@ function WhyEduBreezySection() {
         <section className="py-24 md:py-32 bg-[#f5f7fa] px-5">
             <div className="max-w-[1200px] mx-auto">
                 {/* Header - Matching site style */}
-                <div className="text-left md:text-center mb-16 md:mb-20">
-                    <span className="inline-flex items-center gap-2 bg-[#0569ff]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-5">
-                        <span className="w-2 h-2 bg-[#0569ff] rounded-full"></span>
-                        OUR APPS
-                    </span>
-                    <h2 className="text-3xl md:text-4xl lg:text-[3.2rem] font-bold text-[#1a1a2e] leading-[1.1] mb-4">
-                        One Platform,{' '}
-                        <span className="text-[#0569ff]">Every User</span>
-                    </h2>
-                    <p className="text-slate-500 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
-                        One app, multiple logins — for everyone in your school ecosystem.
-                    </p>
-                </div>
+                <SectionHeading
+                    badge="OUR APPS"
+                    title="One Platform,"
+                    highlightedText="Every User"
+                    description="One app, multiple logins — for everyone in your school ecosystem."
+                />
 
                 {/* Apps Grid - Matching FeaturesSection cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-4">
@@ -536,9 +529,9 @@ function WhyEduBreezySection() {
 
                 {/* Bottom CTA */}
                 <div className="text-center">
-                    <p className="text-slate-500 mb-6">
+                    {/* <p className="text-slate-500 mb-6">
                         Built by educators. Designed for simplicity.
-                    </p>
+                    </p> */}
                     <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                         <Link href="/schoollogin">
                             <button className="group w-full flex items-center justify-center px-2 gap-3 bg-[#0166f6] text-white rounded-full text-lg font-semibold cursor-pointer transition-all duration-300 hover:bg-[#0152d9] hover:scale-105 ">
@@ -809,19 +802,12 @@ function FeaturesSection() {
         <section className="py-24 md:py-32 px-5 bg-white" id="features">
             <div className="max-w-[1200px] mx-auto">
                 {/* Section Header */}
-                <div className="text-left md:text-center mb-16 md:mb-20">
-                    <span className="inline-flex items-center gap-2 bg-[#0569ff]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-5">
-                        <span className="w-2 h-2 bg-[#0569ff] rounded-full"></span>
-                        PLATFORM MODULES
-                    </span>
-                    <h2 className="text-3xl md:text-4xl lg:text-[3.2rem] font-bold text-[#1a1a2e] leading-[1.1] mb-4">
-                        Powerful Features For{' '}
-                        <span className="text-[#0569ff]">Modern Schools</span>
-                    </h2>
-                    <p className="text-slate-500 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
-                        Everything you need to manage admissions, academics, attendance, fees, and more — all in one platform.
-                    </p>
-                </div>
+                <SectionHeading
+                    badge="PLATFORM MODULES"
+                    title="Powerful Features For"
+                    highlightedText="Modern Schools"
+                    description="Everything you need to manage admissions, academics, attendance, fees, and more — all in one platform."
+                />
 
                 {/* Features Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
@@ -917,19 +903,12 @@ function HowWeWorkSection() {
         <section className="py-24 md:py-32 px-5 bg-[#f5f7fa]">
             <div className="max-w-[1200px] mx-auto">
                 {/* Section Header */}
-                <div className="text-left md:text-center mb-16 md:mb-20">
-                    <span className="inline-flex items-center gap-2 bg-[#0569ff]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-5">
-                        <span className="w-2 h-2 bg-[#0569ff] rounded-full"></span>
-                        HOW IT WORKS
-                    </span>
-                    <h2 className="text-3xl md:text-4xl lg:text-[3.2rem] font-bold text-[#1a1a2e] leading-[1.1] mb-4">
-                        Make Your School{' '}
-                        <span className="text-[#0569ff]">Smarter</span>
-                    </h2>
-                    <p className="text-slate-500 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
-                        A simple, step-by-step approach to transform your school management.
-                    </p>
-                </div>
+                <SectionHeading
+                    badge="HOW IT WORKS"
+                    title="Make Your School"
+                    highlightedText="Smarter"
+                    description="A simple, step-by-step approach to transform your school management."
+                />
 
                 {/* Steps Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
@@ -1033,68 +1012,61 @@ function SchoolExplorerSection() {
         <section className="py-24 md:py-32 px-5 bg-gradient-to-b from-white to-[#f5f7fa]">
             <div className="max-w-[1200px] mx-auto">
                 {/* Section Header */}
-                <div className="text-left md:text-center mb-16 md:mb-20">
-                    <span className="inline-flex items-center gap-2 bg-[#0569ff]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-5">
-                        <span className="w-2 h-2 bg-[#0569ff] rounded-full"></span>
-                        SCHOOL EXPLORER
-                    </span>
-                    <h2 className="text-3xl md:text-4xl lg:text-[3.2rem] font-bold text-[#1a1a2e] leading-[1.1] mb-4">
-                        Get Discovered by{' '}
-                        <span className="text-[#0569ff]">Parents</span>
-                    </h2>
-                    <p className="text-slate-500 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
-                        List your school on school.edubreezy.com and reach 50,000+ parents searching for schools.
-                    </p>
-                </div>
+                <SectionHeading
+                    badge="SCHOOL EXPLORER"
+                    title="Get Discovered by"
+                    highlightedText="Parents"
+                    description="List your school on school.edubreezy.com and reach 50,000+ parents searching for schools."
+                />
 
                 {/* Main Card */}
-                <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.08)] overflow-hidden">
+                <div className="bg-white rounded-[1.5rem] md:rounded-[2.5rem] border border-slate-100 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.08)] overflow-hidden">
                     <div className="grid grid-cols-1 lg:grid-cols-2">
                         {/* Left - Content */}
-                        <div className="p-8 md:p-12 lg:p-16">
-                            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-[#0569ff]/10 to-[#10B981]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-6">
-                                <Globe size={16} />
+                        <div className="p-6 md:p-10 lg:p-16">
+                            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-[#0569ff]/10 to-[#10B981]/10 text-[#0569ff] px-3 py-2 rounded-full text-xs md:text-sm font-semibold mb-6">
+                                <Globe size={14} className="md:w-4 md:h-4" />
                                 school.edubreezy.com
                             </div>
 
-                            <h3 className="text-2xl md:text-3xl font-bold text-[#1a1a2e] mb-4">
+                            <h3 className="text-xl md:text-2xl lg:text-3xl font-bold text-[#1a1a2e] mb-3 md:mb-4">
                                 Increase Admissions with Proven Strategies
                             </h3>
 
-                            <p className="text-slate-500 mb-8 leading-relaxed">
+                            <p className="text-slate-500 text-sm md:text-base mb-6 md:mb-8 leading-relaxed">
                                 Showcase your strengths, receive inquiries, and convert leads into admissions with our school discovery platform.
                             </p>
 
                             {/* Stats */}
-                            <div className="grid grid-cols-3 gap-4 mb-8 p-4 bg-[#f5f7fa] rounded-2xl">
+                            <div className="grid grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8 p-3 md:p-4 bg-[#f5f7fa] rounded-xl md:rounded-2xl">
                                 <div className="text-center">
-                                    <div className="text-2xl font-bold text-[#0569ff]">50K+</div>
-                                    <div className="text-xs text-slate-500">Parents</div>
+                                    <div className="text-lg md:text-2xl font-bold text-[#0569ff]">50K+</div>
+                                    <div className="text-[10px] md:text-xs text-slate-500">Parents</div>
                                 </div>
                                 <div className="text-center border-x border-slate-200">
-                                    <div className="text-2xl font-bold text-[#10B981]">10K+</div>
-                                    <div className="text-xs text-slate-500">Inquiries</div>
+                                    <div className="text-lg md:text-2xl font-bold text-[#10B981]">10K+</div>
+                                    <div className="text-[10px] md:text-xs text-slate-500">Inquiries</div>
                                 </div>
                                 <div className="text-center">
-                                    <div className="text-2xl font-bold text-[#F59E0B]">95%</div>
-                                    <div className="text-xs text-slate-500">Satisfaction</div>
+                                    <div className="text-lg md:text-2xl font-bold text-[#F59E0B]">95%</div>
+                                    <div className="text-[10px] md:text-xs text-slate-500">Satisfaction</div>
                                 </div>
                             </div>
 
                             {/* CTA */}
-                            <div className="flex flex-wrap gap-4">
+                            <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
                                 <a
                                     href="https://school.edubreezy.com/explore"
                                     target="_blank"
-                                    className="inline-flex items-center gap-2 bg-[#0569ff] text-white px-6 py-3.5 rounded-full font-bold hover:bg-[#0358dd] transition-all duration-300 hover:shadow-lg"
+                                    className="inline-flex items-center justify-center gap-2 bg-[#0569ff] text-white px-5 md:px-6 py-3 md:py-3.5 rounded-full text-sm md:text-base font-bold hover:bg-[#0358dd] transition-all duration-300 hover:shadow-lg"
                                 >
                                     List Your School Free
-                                    <ArrowRight size={18} />
+                                    <ArrowRight size={16} className="md:w-[18px] md:h-[18px]" />
                                 </a>
                                 <a
                                     href="https://school.edubreezy.com"
                                     target="_blank"
-                                    className="inline-flex items-center gap-2 text-slate-600 font-semibold px-6 py-3.5 border border-slate-200 rounded-full hover:bg-slate-50 transition-all"
+                                    className="inline-flex items-center justify-center gap-2 text-slate-600 font-semibold px-5 md:px-6 py-3 md:py-3.5 border border-slate-200 rounded-full text-sm md:text-base hover:bg-slate-50 transition-all"
                                 >
                                     Explore Schools
                                 </a>
@@ -1102,29 +1074,30 @@ function SchoolExplorerSection() {
                         </div>
 
                         {/* Right - Features Grid */}
-                        <div className="bg-[#f5f7fa] p-8 md:p-12 lg:p-16 border-t lg:border-t-0 lg:border-l border-slate-100">
-                            <div className="grid grid-cols-2 gap-5">
+                        <div className="bg-[#f5f7fa] p-6 md:p-10 lg:p-16 border-t lg:border-t-0 lg:border-l border-slate-100">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5">
                                 {features.map((feature, index) => {
                                     const IconComponent = feature.icon;
                                     return (
                                         <div
                                             key={index}
-                                            className="group bg-white p-6 rounded-2xl border border-slate-100 transition-all duration-300 hover:shadow-lg hover:-translate-y-1"
+                                            className="group bg-white p-5 md:p-6 rounded-xl md:rounded-2xl border border-slate-100 transition-all duration-300 hover:shadow-lg hover:-translate-y-1"
                                         >
                                             <div
-                                                className="w-14 h-14 rounded-xl flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110"
+                                                className="w-12 h-12 md:w-14 md:h-14 rounded-lg md:rounded-xl flex items-center justify-center mb-3 md:mb-4 transition-transform duration-300 group-hover:scale-110"
                                                 style={{ backgroundColor: `${feature.color}15` }}
                                             >
                                                 <IconComponent
-                                                    size={26}
+                                                    size={22}
+                                                    className="md:w-[26px] md:h-[26px]"
                                                     style={{ color: feature.color }}
                                                     strokeWidth={1.5}
                                                 />
                                             </div>
-                                            <h4 className="text-[#1a1a2e] text-base font-bold mb-2 group-hover:text-[#0569ff] transition-colors">
+                                            <h4 className="text-[#1a1a2e] text-sm md:text-base font-bold mb-2 group-hover:text-[#0569ff] transition-colors">
                                                 {feature.title}
                                             </h4>
-                                            <p className="text-slate-500 text-sm leading-relaxed">
+                                            <p className="text-slate-500 text-xs md:text-sm leading-relaxed">
                                                 {feature.desc}
                                             </p>
                                         </div>
@@ -1277,19 +1250,12 @@ function PricingSection() {
         <section className="py-24 md:py-32 px-5 bg-white relative overflow-hidden" id="pricing">
             <div className="max-w-[1200px] mx-auto relative z-10">
                 {/* Section Header */}
-                <div className="text-center mb-16 md:mb-20">
-                    <span className="inline-flex items-center gap-2 bg-[#0569ff]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-5">
-                        <span className="w-2 h-2 bg-[#0569ff] rounded-full"></span>
-                        SIMPLE PRICING
-                    </span>
-                    <h2 className="text-3xl md:text-4xl lg:text-[3.2rem] font-bold text-[#1a1a2e] leading-[1.1] mb-4">
-                        Transparent Pricing for{' '}
-                        <span className="text-[#0569ff]">Every School</span>
-                    </h2>
-                    <p className="text-slate-500 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
-                        One simple plan. No hidden fees. Pay yearly and save 30%.
-                    </p>
-                </div>
+                <SectionHeading
+                    badge="SIMPLE PRICING"
+                    title="Transparent Pricing for"
+                    highlightedText="Every School"
+                    description="One simple plan. No hidden fees. Pay yearly and save 30%."
+                />
 
                 {/* Pricing Card - Full Width with Two Columns */}
                 <div className="bg-[#f5f7fa] rounded-[2.5rem] border border-slate-100 overflow-hidden">
@@ -1444,19 +1410,17 @@ function TestimonialsSection() {
             </div>
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-                <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6">
-                    <div className="max-w-2xl">
-                        <h2 className="text-blue-600 font-bold text-sm uppercase tracking-[0.2em] mb-4">Success Stories</h2>
-                        <h3 className="text-3xl md:text-4xl lg:text-[3.2rem] font-bold text-[#1a1a2e] leading-[1.1] mb-3">
-                            What our <span className="text-[#0166f6] font-bold italic">  <Highlighter action="underline" color="black">Partners</Highlighter></span> say.
-                        </h3>
-                        <p className="text-slate-500 text-lg font-medium">
-                            Join over 2,500+ educational institutions that have revolutionized their administration.
-                        </p>
-                    </div>
+                <div className="relative mb-16">
+                    {/* Centered Heading */}
+                    <SectionHeading
+                        badge="SUCCESS STORIES"
+                        title="What our"
+                        highlightedText={<span className="text-[#0569ff] font-bold italic">Partners Says</span>}
+                        description="Join over 2,500+ educational institutions that have revolutionized their administration."
+                    />
 
-                    {/* Scroll Controls */}
-                    <div className="flex gap-4">
+                    {/* Scroll Controls - Positioned on right for desktop */}
+                    <div className="flex gap-4 justify-center md:justify-end md:absolute md:right-0 md:bottom-0">
                         <button
                             onClick={() => scroll('left')}
                             className="w-14 h-14 rounded-full border border-slate-200 flex items-center justify-center hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-90"
