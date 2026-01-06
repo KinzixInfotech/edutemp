@@ -21,15 +21,15 @@ import Link from 'next/link';
 // Suggested questions
 const PRIMARY_QUESTIONS = [
     "What features does EduBreezy offer?",
-    "Is EduBreezy suitable for CBSE / ICSE schools?",
+    "Calculate pricing for 500 students",
     "How does AI help school administrators?",
     "Is student data secure in EduBreezy?",
     "How does fee management work?",
 ];
 
 const SECONDARY_QUESTIONS = [
+    "Is EduBreezy suitable for CBSE / ICSE schools?",
     "Does EduBreezy support exams and results?",
-    "How easy is onboarding?",
     "Can I request a demo?",
 ];
 

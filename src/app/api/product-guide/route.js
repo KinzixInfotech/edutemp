@@ -74,6 +74,127 @@ USER QUESTION: ${question}
 HELPFUL ANSWER:`;
 }
 
+// Check if question is about pricing/cost calculation (more flexible)
+function isPricingQuestion(question) {
+    const q = question.toLowerCase();
+
+    // Direct pricing keywords
+    const pricingTerms = ['pricing', 'price', 'cost', 'charge', 'rate', 'fee'];
+    const hasPricingTerm = pricingTerms.some(term => q.includes(term));
+
+    // Student count indicators
+    const hasStudentCount = /\d+\s*(student|child|kid|pupil|learner)/i.test(question);
+
+    // Pricing questions
+    const pricingPhrases = ['how much', 'what does it cost', 'pricing model', 'pricing structure', 'cost for'];
+    const hasPricingPhrase = pricingPhrases.some(phrase => q.includes(phrase));
+
+    // If has pricing term + student count, or pricing question phrase
+    return (hasPricingTerm && hasStudentCount) || hasPricingPhrase;
+}
+
+// Calculate pricing based on student count
+function calculatePricing(question) {
+    // Try to extract student count from question
+    const numbers = question.match(/\d+/g);
+    const studentCount = numbers ? parseInt(numbers[0]) : 100;
+
+    const PRICE_PER_100_STUDENTS = 10500;
+    const ORIGINAL_PRICE_PER_100 = 15000;
+    const units = Math.ceil(studentCount / 100);
+    const yearlyPrice = units * PRICE_PER_100_STUDENTS
+    const originalPrice = units * ORIGINAL_PRICE_PER_100;
+    const savings = originalPrice - yearlyPrice;
+    const perStudentYearly = 105;
+    const perStudentMonthly = (perStudentYearly / 12).toFixed(2);
+    const monthlyTotal = Math.round(yearlyPrice / 12);
+
+    return {
+        studentCount,
+        units,
+        yearlyPrice,
+        originalPrice,
+        savings,
+        perStudentYearly,
+        perStudentMonthly,
+        monthlyTotal
+    };
+}
+
+// Generate pricing response
+function generatePricingResponse(pricing) {
+    return `Great question! 🎉 Let me break down the pricing for **${pricing.studentCount} students**:
+
+📊 **Your Pricing Summary:**
+• **Total Yearly Cost:** ₹${pricing.yearlyPrice.toLocaleString('en-IN')} 
+• **Original Price:** ~~₹${pricing.originalPrice.toLocaleString('en-IN')}~~ (30% OFF applied! 🔥)
+• **You Save:** ₹${pricing.savings.toLocaleString('en-IN')} per year!
+
+💡 **Per Student Breakdown:**
+• **Per Student/Year:** ₹${pricing.perStudentYearly}
+• **Per Student/Month:** Just ₹${pricing.perStudentMonthly}! ☕
+
+📦 **How it works:**
+You need ${pricing.units} unit${pricing.units > 1 ? 's' : ''} (1 unit = 100 students)
+${pricing.units} × ₹10,500 = ₹${pricing.yearlyPrice.toLocaleString('en-IN')}/year
+
+✨ That's less than the cost of a samosa per student per month! 🥟
+
+**Everything's included:** All modules, mobile apps, unlimited users, 24/7 support, and free data migration! 
+
+Want to get started or need a custom quote? 📞`;
+}
+
+// Check if question is off-topic (not about EduBreezy/school management)
+function isOffTopicQuestion(question, keywords) {
+    const offTopicIndicators = [
+        'weather', 'moon', 'sun', 'distance', 'planet', 'space', 'star',
+        'cricket', 'football', 'movie', 'song', 'joke', 'food', 'recipe',
+        'capital', 'president', 'history', 'geography', 'math problem',
+        'who is', 'what is the distance', 'how tall', 'how old', 'when was',
+        'translate', 'poem', 'story', 'game', 'python', 'javascript code'
+    ];
+
+    const q = question.toLowerCase();
+
+    // Check for off-topic indicators
+    const hasOffTopic = offTopicIndicators.some(ind => q.includes(ind));
+
+    // If very few EduBreezy-related keywords and has off-topic indicators
+    if (hasOffTopic && keywords.length <= 1) {
+        return true;
+    }
+
+    return false;
+}
+
+// Build prompt for fun off-topic responses
+function buildOffTopicPrompt(question) {
+    return `You are EduBreezy's friendly AI assistant with a fun, witty personality! 😄
+
+The user asked: "${question}"
+
+This question is NOT about school management or EduBreezy. Your job is to:
+1. Acknowledge their question with humor (use emojis!)
+2. Give a BRIEF, witty answer or fun fact (1-2 sentences max)
+3. Make a clever comparison/transition back to EduBreezy
+4. End with an invitation to learn about EduBreezy
+
+RULES:
+- Keep it SHORT (max 4-5 lines total)
+- Use emojis liberally 
+- Be playful and funny
+- Always redirect to EduBreezy at the end
+- Don't be preachy, be entertaining!
+
+EXAMPLE FORMAT:
+🌙 Ooh, space talk! The Moon is 384,400 km from Earth... BUT you know what's further? The distance between traditional school admin and EduBreezy! 🚀
+
+One is stuck in the stone age, the other is in the future! Want to explore the EduBreezy universe? 🌌
+
+YOUR TURN - BE CREATIVE AND FUNNY:`;
+}
+
 export async function POST(request) {
     try {
         const { question } = await request.json();
@@ -92,6 +213,18 @@ export async function POST(request) {
                 { error: 'Question must be under 200 characters' },
                 { status: 400 }
             );
+        }
+
+        // Step 0: Check if it's a pricing question
+        if (isPricingQuestion(question)) {
+            const pricing = calculatePricing(question);
+            const answer = generatePricingResponse(pricing);
+
+            return NextResponse.json({
+                answer,
+                source: 'pricing',
+                cached: false,
+            });
         }
 
         // Normalize question for caching
@@ -121,7 +254,7 @@ export async function POST(request) {
 
         if (faqMatch && faqScore >= FAQ_MATCH_THRESHOLD) {
             // High-confidence FAQ match - no AI needed
-            const answer = faqMatch.answer + " Would you like a demo to see this in action?";
+            const answer = faqMatch.answer + " Would you like a demo to see this in action? 🎯";
             await setCache(cacheKey, { answer }, CACHE_TTL);
 
             return NextResponse.json({
@@ -134,9 +267,49 @@ export async function POST(request) {
 
         // Step 2: Extract keywords and check if question is about our product
         const keywords = extractKeywords(question);
+
+        // Check for off-topic questions BEFORE saying we can't understand
+        if (isOffTopicQuestion(question, keywords)) {
+            // Use AI to generate a fun, context-aware response
+            const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
+            if (apiKey) {
+                try {
+                    const genAI = new GoogleGenerativeAI(apiKey);
+                    const model = genAI.getGenerativeModel({
+                        model: MODEL_NAME,
+                        generationConfig: {
+                            maxOutputTokens: 200,
+                            temperature: 0.9, // Higher for more creative/fun responses
+                        },
+                    });
+
+                    const prompt = buildOffTopicPrompt(question);
+                    const result = await model.generateContent(prompt);
+                    const funAnswer = result.response.text()?.trim();
+
+                    if (funAnswer) {
+                        return NextResponse.json({
+                            answer: funAnswer,
+                            source: 'fun-ai',
+                            cached: false,
+                        });
+                    }
+                } catch (error) {
+                    console.error('Fun response AI error:', error);
+                }
+            }
+
+            // Fallback if AI fails
+            return NextResponse.json({
+                answer: `🤔 Hmm, that's an interesting question! But I'm like a loyal school bell - I only ring for school stuff! 🔔\n\nI'm EduBreezy's AI buddy, and I'm REALLY good at talking about:\n• 📚 School management features\n• 💰 Pricing & calculations\n• 🔒 Security & data safety\n• 📱 Mobile apps & parent communication\n\nThink of me as your friendly school nerd! 🤓\n\nWhat would you like to know about making your school AWESOME? 🚀`,
+                source: 'fun-fallback',
+                cached: false,
+            });
+        }
+
         if (keywords.length === 0) {
             return NextResponse.json({
-                answer: "Could you rephrase your question? I'm here to help you learn about EduBreezy's features, pricing, and security. Would you like a demo?",
+                answer: "🤔 Hmm, I didn't quite catch that! Could you rephrase?\n\nI'm great at answering questions about:\n• 📚 EduBreezy features\n• 💰 Pricing & costs\n• 🔒 Security\n• 📱 Mobile apps\n\nWant me to show you around? 🚀",
                 source: 'clarify',
                 cached: false,
             });
@@ -166,7 +339,7 @@ export async function POST(request) {
         const prompt = buildPrompt(question, focusedContext);
         const result = await model.generateContent(prompt);
         const response = result.response;
-        const answer = response.text()?.trim() || "I'd be happy to help you learn more. Would you like to schedule a demo?";
+        const answer = response.text()?.trim() || "I'd be happy to help you learn more! Would you like to schedule a demo? 🎯";
 
         // Cache the response
         await setCache(cacheKey, { answer }, CACHE_TTL);
@@ -180,7 +353,7 @@ export async function POST(request) {
     } catch (error) {
         console.error('Product Guide AI error:', error);
         return NextResponse.json(
-            { error: 'Something went wrong. Please try again.' },
+            { error: 'Oops! Something went wrong 😅 Please try again!' },
             { status: 500 }
         );
     }
