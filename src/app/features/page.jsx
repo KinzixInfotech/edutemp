@@ -232,46 +232,55 @@ export default function FeaturesIntroPage() {
             </section>
 
             {/* Categories Grid */}
-            <section className="py-20 px-5 bg-gray-50">
-                <div className="max-w-6xl mx-auto">
+            <section className="py-20 md:py-28 px-5 bg-[#f5f7fa]">
+                <div className="max-w-[1200px] mx-auto">
                     <div className="text-center mb-16">
-                        <h2 className="text-3xl md:text-4xl font-bold text-[#1a1a2e] mb-4">
+                        <span className="inline-flex items-center gap-2 bg-[#0569ff]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-4">
+                            <span className="text-lg">✦</span>
                             Feature Categories
+                        </span>
+                        <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a1a2e] mb-4">
+                            Explore Our Modules
                         </h2>
-                        <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-                            Explore our features organized by category. Each module is designed to work seamlessly together.
+                        <p className="text-slate-500 text-lg max-w-2xl mx-auto">
+                            Each module is designed to work seamlessly together for complete school management.
                         </p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {categories.map((category) => {
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {categories.map((category, index) => {
                             const IconComponent = category.icon;
                             return (
                                 <Link key={category.id} href={`/features/docs#${category.id}`}>
-                                    <div className="group relative bg-white p-8 rounded-2xl border border-gray-100 hover:border-[#0569ff]/20 hover:shadow-[0_10px_40px_rgba(5,105,255,0.15)] transition-all duration-300 cursor-pointer h-full">
-                                        <div className="absolute inset-0 bg-gradient-to-br from-[#0569ff]/0 to-[#0569ff]/0 group-hover:from-[#0569ff]/5 group-hover:to-transparent rounded-2xl transition-all duration-300" />
-                                        <div className="relative">
-                                            <div className={`w-16 h-16 bg-gradient-to-br ${category.color} rounded-2xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform shadow-lg`}>
-                                                <IconComponent size={32} className="text-white" />
+                                    <div className="group bg-white p-8 rounded-[2rem] border border-slate-100 transition-all duration-300 hover:shadow-[0_20px_50px_-15px_rgba(0,0,0,0.1)] hover:-translate-y-1 cursor-pointer h-full">
+                                        {/* Icon + Count */}
+                                        <div className="flex items-center gap-4 mb-5">
+                                            <div
+                                                className={`w-14 h-14 bg-gradient-to-br ${category.color} rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 shadow-lg`}
+                                            >
+                                                <IconComponent size={28} className="text-white" strokeWidth={1.5} />
                                             </div>
-                                            <h3 className="text-xl font-bold text-[#1a1a2e] mb-3 group-hover:text-[#0569ff] transition-colors">
-                                                {category.name}
-                                            </h3>
-                                            <p className="text-sm text-gray-600 mb-4 font-medium">
-                                                {category.count} feature{category.count !== 1 ? 's' : ''} available
-                                            </p>
-                                            <ul className="space-y-2 mb-6">
-                                                {category.features.map((feature, idx) => (
-                                                    <li key={idx} className="text-sm text-gray-500 flex items-center gap-2">
-                                                        <div className="w-1.5 h-1.5 bg-[#0569ff]/60 rounded-full" />
-                                                        {feature}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                            <div className="flex items-center gap-2 text-[#0569ff] font-semibold text-sm group-hover:gap-3 transition-all">
-                                                Explore
-                                                <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                                            </div>
+                                            <span className="text-xs font-semibold text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
+                                                {category.count} feature{category.count !== 1 ? 's' : ''}
+                                            </span>
+                                        </div>
+
+                                        <h3 className="text-xl font-bold text-[#1a1a2e] mb-3 group-hover:text-[#0569ff] transition-colors">
+                                            {category.name}
+                                        </h3>
+
+                                        <ul className="space-y-2 mb-6">
+                                            {category.features.map((feature, idx) => (
+                                                <li key={idx} className="text-sm text-slate-500 flex items-center gap-2">
+                                                    <div className="w-1.5 h-1.5 bg-[#0569ff] rounded-full shrink-0" />
+                                                    {feature}
+                                                </li>
+                                            ))}
+                                        </ul>
+
+                                        <div className="flex items-center gap-2 text-[#0569ff] font-semibold text-sm group-hover:gap-3 transition-all">
+                                            Explore Module
+                                            <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
                                         </div>
                                     </div>
                                 </Link>

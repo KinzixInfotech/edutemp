@@ -575,84 +575,148 @@ function HowItWorksSection() {
     );
 }
 
-// Commission Structure
+// Commission Structure - Partner Levels
 function CommissionSection() {
+    const partnerLevels = [
+        {
+            tier: "Bronze",
+            emoji: "🟤",
+            color: "#CD7F32",
+            eligibility: "1–5 active schools",
+            year1: "20%",
+            renewal: "15%",
+            benefit: "Access to partner dashboard",
+            example: "₹10,500"
+        },
+        {
+            tier: "Silver",
+            emoji: "⚪",
+            color: "#C0C0C0",
+            eligibility: "6–20 active schools",
+            year1: "25%",
+            renewal: "15%",
+            benefit: "Priority onboarding support + Dedicated partner manager",
+            example: "₹13,125",
+            featured: true
+        },
+        {
+            tier: "Gold",
+            emoji: "🟡",
+            color: "#FFD700",
+            eligibility: "21+ active schools",
+            year1: "30%",
+            renewal: "20%",
+            benefit: "Early access to new features + Highest visibility",
+            example: "₹15,750"
+        }
+    ];
+
     return (
         <section className="py-20 md:py-28 px-5 bg-gradient-to-br from-[#0569ff] to-[#0a52c6] text-white">
             <div className="max-w-[1200px] mx-auto">
                 <div className="text-center mb-16">
                     <span className="inline-flex items-center gap-2 bg-white/20 text-white px-4 py-2 rounded-full text-sm font-semibold mb-4">
                         <DollarSign size={16} />
-                        Earning Potential
+                        Partner Levels
                     </span>
                     <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
-                        Transparent Commission Structure
+                        Simple & Transparent Commissions
                     </h2>
                     <p className="text-white/80 text-lg max-w-2xl mx-auto">
-                        No hidden terms. Clear payouts. Earn more as you grow.
+                        The more schools you onboard, the more you earn. No hidden terms.
                     </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {[
-                        {
-                            tier: "Bronze",
-                            referrals: "1-5 Schools",
-                            commission: "15%",
-                            bonus: "₹5,000 welcome bonus"
-                        },
-                        {
-                            tier: "Silver",
-                            referrals: "6-15 Schools",
-                            commission: "20%",
-                            bonus: "₹15,000 quarterly bonus",
-                            featured: true
-                        },
-                        {
-                            tier: "Gold",
-                            referrals: "16+ Schools",
-                            commission: "30%",
-                            bonus: "₹50,000 annual bonus + rewards"
-                        }
-                    ].map((plan, index) => (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                    {partnerLevels.map((level, index) => (
                         <div
                             key={index}
-                            className={`p-8 rounded-2xl ${plan.featured
+                            className={`p-8 rounded-2xl ${level.featured
                                 ? 'bg-white text-[#1a1a2e] shadow-2xl scale-105'
                                 : 'bg-white/10 backdrop-blur-sm'
                                 }`}
                         >
-                            {plan.featured && (
+                            {level.featured && (
                                 <span className="inline-block bg-[#0569ff] text-white text-xs font-bold px-3 py-1 rounded-full mb-4">
                                     MOST POPULAR
                                 </span>
                             )}
-                            <h3 className={`text-xl font-bold mb-2 ${plan.featured ? 'text-[#1a1a2e]' : 'text-white'}`}>
-                                {plan.tier} Partner
-                            </h3>
-                            <p className={`text-sm mb-6 ${plan.featured ? 'text-gray-500' : 'text-white/70'}`}>
-                                {plan.referrals}
-                            </p>
-                            <div className="mb-6">
-                                <span className={`text-5xl font-bold ${plan.featured ? 'text-[#0569ff]' : 'text-white'}`}>
-                                    {plan.commission}
-                                </span>
-                                <span className={`text-sm ${plan.featured ? 'text-gray-500' : 'text-white/70'}`}> commission</span>
+
+                            <div className="flex items-center gap-2 mb-3">
+                                <span className="text-2xl">{level.emoji}</span>
+                                <h3 className={`text-xl font-bold ${level.featured ? 'text-[#1a1a2e]' : 'text-white'}`}>
+                                    {level.tier} Partner
+                                </h3>
                             </div>
-                            <div className={`p-4 rounded-xl ${plan.featured ? 'bg-[#f8fafc]' : 'bg-white/10'}`}>
-                                <p className={`text-sm ${plan.featured ? 'text-[#1a1a2e]' : 'text-white'}`}>
-                                    <Gift size={16} className="inline mr-2" />
-                                    {plan.bonus}
+
+                            <p className={`text-sm mb-6 ${level.featured ? 'text-gray-500' : 'text-white/70'}`}>
+                                {level.eligibility}
+                            </p>
+
+                            {/* Commission Rates */}
+                            <div className="space-y-3 mb-6">
+                                <div className={`flex justify-between items-center p-3 rounded-xl ${level.featured ? 'bg-[#f8fafc]' : 'bg-white/10'}`}>
+                                    <span className={`text-sm ${level.featured ? 'text-gray-600' : 'text-white/80'}`}>Year 1</span>
+                                    <span className={`text-2xl font-bold ${level.featured ? 'text-[#0569ff]' : 'text-white'}`}>{level.year1}</span>
+                                </div>
+                                <div className={`flex justify-between items-center p-3 rounded-xl ${level.featured ? 'bg-[#f8fafc]' : 'bg-white/10'}`}>
+                                    <span className={`text-sm ${level.featured ? 'text-gray-600' : 'text-white/80'}`}>Renewal</span>
+                                    <span className={`text-2xl font-bold ${level.featured ? 'text-[#10B981]' : 'text-green-300'}`}>{level.renewal}</span>
+                                </div>
+                            </div>
+
+                            <div className={`p-4 rounded-xl mb-4 ${level.featured ? 'bg-[#f8fafc]' : 'bg-white/10'}`}>
+                                <p className={`text-sm ${level.featured ? 'text-[#1a1a2e]' : 'text-white'}`}>
+                                    <CheckCircle size={16} className={`inline mr-2 ${level.featured ? 'text-[#10B981]' : 'text-green-300'}`} />
+                                    {level.benefit}
+                                </p>
+                            </div>
+
+                            {/* Example Earning */}
+                            <div className={`text-center p-3 rounded-xl border ${level.featured ? 'border-[#0569ff]/20 bg-[#0569ff]/5' : 'border-white/20'}`}>
+                                <p className={`text-xs mb-1 ${level.featured ? 'text-gray-500' : 'text-white/60'}`}>
+                                    Example: School pays ₹52,500/year
+                                </p>
+                                <p className={`font-bold ${level.featured ? 'text-[#0569ff]' : 'text-white'}`}>
+                                    You earn: {level.example}
                                 </p>
                             </div>
                         </div>
                     ))}
                 </div>
 
-                <div className="text-center mt-12">
-                    <p className="text-white/80 mb-6">
-                        Plus, earn <span className="font-bold text-white">recurring commissions</span> on every renewal!
-                    </p>
+                {/* Commission Rules */}
+                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 md:p-8 mb-8">
+                    <h4 className="font-bold text-lg mb-4 flex items-center gap-2">
+                        <Shield size={20} />
+                        How Commission Works
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-white/90 text-sm">
+                        <div className="flex items-start gap-2">
+                            <CheckCircle size={16} className="text-green-300 shrink-0 mt-0.5" />
+                            <span>Commission % calculated on yearly ERP subscription amount</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                            <CheckCircle size={16} className="text-green-300 shrink-0 mt-0.5" />
+                            <span>Applies only to paid & active schools</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                            <CheckCircle size={16} className="text-green-300 shrink-0 mt-0.5" />
+                            <span>Paid yearly, after successful payment</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                            <CheckCircle size={16} className="text-green-300 shrink-0 mt-0.5" />
+                            <span>Recurring earnings on every renewal</span>
+                        </div>
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-white/20">
+                        <p className="text-white/60 text-xs">
+                            Note: Commission does not apply to SMS recharges, hardware/biometric devices, or third-party charges.
+                        </p>
+                    </div>
+                </div>
+
+                <div className="text-center">
                     <Link href="/partners/register">
                         <button className="inline-flex items-center gap-2 bg-white text-[#0569ff] px-8 py-4 rounded-full font-bold hover:bg-gray-100 transition-all shadow-lg">
                             Start Earning Today

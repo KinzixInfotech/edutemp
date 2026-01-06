@@ -10,7 +10,7 @@ import {
     Pencil, BookMarked, Ruler, Calculator, Highlighter as HighlighterIcon, School,
     Home, Bus, Smartphone, MapPin, Plane, Globe, MessageCircle, Laptop, Wifi,
     UserPlus, Building2, MessageSquare, Sparkles, Library, Award, Trophy,
-    Microscope, Clipboard, Bell, Zap, ClipboardCheck, FileCheck
+    Microscope, Clipboard, Bell, Zap, ClipboardCheck, FileCheck, Handshake
 } from 'lucide-react';
 import Header from './components/Header';
 import { DotPattern } from '@/components/ui/dot-pattern';
@@ -80,6 +80,8 @@ export default function HomePage() {
             <WebDashboardCTA />
 
             <SchoolExplorerSection />
+            {/* Partner Teaser - Grow With Us */}
+            <PartnerTeaser />
             {/* <CommunicatingSeamlesslySection /> */}
             <HowWeWorkSection />
             {/* <BentoSection /> */}
@@ -1106,6 +1108,40 @@ function SchoolExplorerSection() {
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+// Partner Teaser - Compact CTA for Partner Program
+function PartnerTeaser() {
+    return (
+        <section className="py-12 md:py-16 px-5 bg-gradient-to-r from-[#0a2540] to-[#0d3356]">
+            <div className="max-w-[1200px] mx-auto">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="text-center md:text-left">
+                        <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
+                            <span className="inline-flex items-center gap-1.5 bg-[#10B981]/20 text-[#10B981] px-3 py-1 rounded-full text-xs font-semibold">
+                                <Handshake size={14} />
+                                Grow With Us
+                            </span>
+                        </div>
+                        <h3 className="text-xl md:text-2xl font-bold text-white mb-2">
+                            Earn up to <span className="text-[#10B981]">30%</span> recurring commission
+                        </h3>
+                        <p className="text-white/70 text-sm md:text-base max-w-lg">
+                            Help schools adopt EduBreezy and build a sustainable income. Perfect for teachers, consultants & education agents.
+                        </p>
+                    </div>
+                    <Link href="/partners">
+                        <button className="group flex items-center pr-1 gap-2 bg-white text-[#0569ff] border-0 rounded-full text-sm md:text-base font-semibold cursor-pointer shadow-lg hover:shadow-xl transition-all duration-300 whitespace-nowrap">
+                            <span className='px-1 pl-5 md:pl-6 py-3 md:py-3.5'>Become a Partner</span>
+                            <span className='bg-[#0569ff] p-2.5 md:p-3 shadow-lg rounded-full group-hover:bg-[#0358dd] transition-colors'>
+                                <ArrowRight size={16} className="md:w-[18px] md:h-[18px] text-white" />
+                            </span>
+                        </button>
+                    </Link>
                 </div>
             </div>
         </section>
