@@ -1,8 +1,6 @@
-import { PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import { NextResponse } from "next/server";
-
-const prisma = new PrismaClient();
+import prisma from "@/lib/prisma"; // Use singleton to prevent connection pool exhaustion
 
 const updateSchema = z.object({
     name: z.string().optional(),
@@ -15,8 +13,8 @@ const updateSchema = z.object({
     domainMode: z.enum(["tenant", "custom"]).optional(),
     tenantName: z.string().optional(),
     customDomain: z.string().optional(),
-  });
-  
+});
+
 
 export async function PUT(req) {
     try {

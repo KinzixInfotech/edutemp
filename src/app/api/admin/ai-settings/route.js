@@ -7,48 +7,8 @@
  */
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { verifyAdminAccess } from '@/lib/api-auth';
 import prisma from '@/lib/prisma';
-
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
-
-// Helper to verify admin access
-async function verifyAdminAccess(request, schoolId) {
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return { error: 'Unauthorized', status: 401 };
-    }
-
-    const token = authHeader.substring(7);
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
-        return { error: 'Unauthorized', status: 401 };
-    }
-
-    const fullUser = await prisma.user.findUnique({
-        where: { id: user.id },
-        include: { role: true },
-    });
-
-    if (!fullUser) {
-        return { error: 'User not found', status: 404 };
-    }
-
-    const allowedRoles = ['ADMIN', 'SUPER_ADMIN'];
-    if (!allowedRoles.includes(fullUser.role.name)) {
-        return { error: 'Access denied. Admin role required.', status: 403 };
-    }
-
-    if (fullUser.role.name !== 'SUPER_ADMIN' && fullUser.schoolId !== schoolId) {
-        return { error: 'Access denied to this school', status: 403 };
-    }
-
-    return { user: fullUser };
-}
 
 export async function GET(request) {
     try {

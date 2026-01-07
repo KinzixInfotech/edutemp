@@ -1,5 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+import prisma from '@/lib/prisma'; // Use singleton to prevent connection pool exhaustion
 
 export async function GET(req) {
     try {

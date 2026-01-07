@@ -1,12 +1,7 @@
 // Public API: School Reviews - GET (public) and POST (authenticated)
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+import supabaseServer from '@/lib/supabase-server'; // Use singleton
 
 // Helper to resolve profileId from schoolId (params.id)
 async function getProfileId(schoolId) {
@@ -69,7 +64,7 @@ export async function POST(req, props) {
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
         }
 
-        const { data: { user }, error: authError } = await supabase.auth.getUser(
+        const { data: { user }, error: authError } = await supabaseServer.auth.getUser(
             authHeader.replace('Bearer ', '')
         );
 

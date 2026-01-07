@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '@/lib/prisma'; // Use singleton to prevent connection pool exhaustion
 
 export async function POST(req) {
     try {
@@ -20,7 +18,7 @@ export async function POST(req) {
             options: {
                 data: {
                     name,  //  this adds `name` to user_metadata
-                    role  
+                    role
                 }
             }
         });

@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,6 +33,13 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
     Table,
     TableBody,
     TableCell,
@@ -39,7 +47,8 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
     Loader2,
@@ -52,34 +61,41 @@ import {
     Copy,
     BookMarked,
     Trash2,
+    Eye,
+    MoreHorizontal,
+    ArrowUpDown,
+    ChevronLeft,
+    ChevronRight,
+    RefreshCw,
+    RotateCcw,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-
 import Link from "next/link";
 
 export default function LibraryManagementPage() {
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;
-    console.log(fullUser, 'from catalog');
+    const queryClient = useQueryClient();
 
-    const [stats, setStats] = useState(null);
-    const [books, setBooks] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [submitting, setSubmitting] = useState(false);
-    const [searchTerm, setSearchTerm] = useState("");
-    const [categoryFilter, setCategoryFilter] = useState("");
+    // State
+    const [search, setSearch] = useState("");
+    const [categoryFilter, setCategoryFilter] = useState("all");
     const [isAddBookOpen, setIsAddBookOpen] = useState(false);
     const [isAddCopiesOpen, setIsAddCopiesOpen] = useState(false);
     const [selectedBook, setSelectedBook] = useState(null);
     const [isRequestBookOpen, setIsRequestBookOpen] = useState(false);
     const [requestRemarks, setRequestRemarks] = useState("");
-    const [requestingBook, setRequestingBook] = useState(false);
 
     // Delete state
     const [bookToDelete, setBookToDelete] = useState(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-    const [deleting, setDeleting] = useState(false);
+
+    // Table state
+    const [sortColumn, setSortColumn] = useState("title");
+    const [sortDirection, setSortDirection] = useState("asc");
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
 
     const [bookForm, setBookForm] = useState({
         title: "",
@@ -99,108 +115,100 @@ export default function LibraryManagementPage() {
         condition: "GOOD",
     });
 
-    useEffect(() => {
-        if (schoolId) {
-            fetchData();
-        }
-    }, [schoolId]);
+    // Fetch stats
+    const { data: stats } = useQuery({
+        queryKey: ["library-stats", schoolId],
+        queryFn: async () => {
+            const res = await axios.get(`/api/schools/${schoolId}/library/stats`);
+            return res.data;
+        },
+        enabled: !!schoolId,
+    });
 
-    const fetchData = async () => {
-        setLoading(true);
-        try {
-            const [statsRes, booksRes] = await Promise.all([
-                axios.get(`/api/schools/${schoolId}/library/stats`),
-                axios.get(`/api/schools/${schoolId}/library/books`),
-            ]);
+    // Fetch books with server-side search
+    const { data: books = [], isLoading, refetch } = useQuery({
+        queryKey: ["library-books", schoolId, search, categoryFilter],
+        queryFn: async () => {
+            const params = new URLSearchParams();
+            if (search) params.set("search", search);
+            if (categoryFilter && categoryFilter !== "all") params.set("category", categoryFilter);
+            const res = await axios.get(`/api/schools/${schoolId}/library/books?${params}`);
+            return res.data || [];
+        },
+        enabled: !!schoolId,
+    });
 
-            setStats(statsRes.data);
-            setBooks(booksRes.data || []);
-        } catch (error) {
-            console.error("Failed to fetch library data", error);
-            toast.error("Failed to load library data");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleAddBook = async () => {
-        setSubmitting(true);
-        try {
-            await axios.post(`/api/schools/${schoolId}/library/books`, bookForm);
+    // Add book mutation
+    const addBookMutation = useMutation({
+        mutationFn: async (data) => {
+            return axios.post(`/api/schools/${schoolId}/library/books`, data);
+        },
+        onSuccess: () => {
             toast.success("Book added successfully");
             setIsAddBookOpen(false);
-            fetchData();
+            queryClient.invalidateQueries(["library-books"]);
+            queryClient.invalidateQueries(["library-stats"]);
             resetBookForm();
-        } catch (error) {
+        },
+        onError: (error) => {
             toast.error(error.response?.data?.error || "Failed to add book");
-        } finally {
-            setSubmitting(false);
-        }
-    };
+        },
+    });
 
-    const handleAddCopies = async () => {
-        try {
-            await axios.post(
-                `/api/schools/${schoolId}/library/books/${selectedBook.id}/copies`,
-                copiesForm
-            );
+    // Add copies mutation
+    const addCopiesMutation = useMutation({
+        mutationFn: async ({ bookId, data }) => {
+            return axios.post(`/api/schools/${schoolId}/library/books/${bookId}/copies`, data);
+        },
+        onSuccess: () => {
             toast.success(`${copiesForm.count} copies added successfully`);
             setIsAddCopiesOpen(false);
-            fetchData();
+            queryClient.invalidateQueries(["library-books"]);
+            queryClient.invalidateQueries(["library-stats"]);
             setCopiesForm({
                 count: 1,
                 startAccessionNumber: "",
                 location: "General Shelf",
                 condition: "GOOD",
             });
-        } catch (error) {
+        },
+        onError: () => {
             toast.error("Failed to add copies");
-        }
-    };
+        },
+    });
 
-    const handleRequestBook = async () => {
-        if (!selectedBook) return;
-
-        setRequestingBook(true);
-        try {
-            await axios.post(`/api/schools/${schoolId}/library/requests`, {
-                bookId: selectedBook.id,
-                userId: fullUser.id,
-                userType: fullUser.role === "STUDENT" ? "STUDENT" : "TEACHER",
-                remarks: requestRemarks,
-            });
+    // Request book mutation
+    const requestBookMutation = useMutation({
+        mutationFn: async (data) => {
+            return axios.post(`/api/schools/${schoolId}/library/requests`, data);
+        },
+        onSuccess: () => {
             toast.success("Book request submitted successfully");
             setIsRequestBookOpen(false);
             setRequestRemarks("");
             setSelectedBook(null);
-        } catch (error) {
+        },
+        onError: (error) => {
             toast.error(error.response?.data?.error || "Failed to request book");
-        } finally {
-            setRequestingBook(false);
-        }
-    };
+        },
+    });
 
-    const handleDeleteBook = async () => {
-        if (!bookToDelete) return;
-        setDeleting(true);
-        try {
-            await axios.delete(`/api/schools/${schoolId}/library/books/${bookToDelete.id}`);
+    // Delete book mutation
+    const deleteBookMutation = useMutation({
+        mutationFn: async (bookId) => {
+            return axios.delete(`/api/schools/${schoolId}/library/books/${bookId}`);
+        },
+        onSuccess: () => {
             toast.success("Book deleted successfully");
-            setBooks(books.filter((b) => b.id !== bookToDelete.id));
             setIsDeleteDialogOpen(false);
             setBookToDelete(null);
-            fetchData(); // Refresh stats
-        } catch (error) {
+            queryClient.invalidateQueries(["library-books"]);
+            queryClient.invalidateQueries(["library-stats"]);
+        },
+        onError: (error) => {
             toast.error(error.response?.data?.error || "Failed to delete book");
-        } finally {
-            setDeleting(false);
-        }
-    };
-
-    const confirmDelete = (book) => {
-        setBookToDelete(book);
-        setIsDeleteDialogOpen(true);
-    };
+        },
+    });
 
     const resetBookForm = () => {
         setBookForm({
@@ -215,16 +223,114 @@ export default function LibraryManagementPage() {
         });
     };
 
-    const filteredBooks = books.filter((book) => {
-        const matchesSearch =
-            book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            book.author.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            book.ISBN.includes(searchTerm);
-        const matchesCategory = !categoryFilter || book.category === categoryFilter;
-        return matchesSearch && matchesCategory;
-    });
+    const clearAllFilters = () => {
+        setSearch("");
+        setCategoryFilter("all");
+        setCurrentPage(1);
+    };
 
-    const categories = [...new Set(books.map((b) => b.category))];
+    // Get unique categories from books
+    const categories = useMemo(() => {
+        return [...new Set(books.map((b) => b.category).filter(Boolean))];
+    }, [books]);
+
+    // Sort and paginate books
+    const processedBooks = useMemo(() => {
+        let sorted = [...books];
+
+        sorted.sort((a, b) => {
+            let aVal, bVal;
+            switch (sortColumn) {
+                case "title":
+                    aVal = a.title || "";
+                    bVal = b.title || "";
+                    break;
+                case "author":
+                    aVal = a.author || "";
+                    bVal = b.author || "";
+                    break;
+                case "category":
+                    aVal = a.category || "";
+                    bVal = b.category || "";
+                    break;
+                case "available":
+                    aVal = a.availableCopies || 0;
+                    bVal = b.availableCopies || 0;
+                    break;
+                case "total":
+                    aVal = a.totalCopies || 0;
+                    bVal = b.totalCopies || 0;
+                    break;
+                default:
+                    aVal = a.title || "";
+                    bVal = b.title || "";
+            }
+
+            if (typeof aVal === "string") {
+                return sortDirection === "asc"
+                    ? aVal.localeCompare(bVal)
+                    : bVal.localeCompare(aVal);
+            }
+            return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
+        });
+
+        return sorted;
+    }, [books, sortColumn, sortDirection]);
+
+    // Pagination
+    const totalPages = Math.ceil(processedBooks.length / pageSize);
+    const paginatedBooks = processedBooks.slice(
+        (currentPage - 1) * pageSize,
+        currentPage * pageSize
+    );
+
+    const handleSort = (column) => {
+        if (sortColumn === column) {
+            setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+        } else {
+            setSortColumn(column);
+            setSortDirection("asc");
+        }
+    };
+
+    const SortableHeader = ({ column, children }) => (
+        <TableHead
+            className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
+            onClick={() => handleSort(column)}
+        >
+            <div className="flex items-center gap-1">
+                {children}
+                <ArrowUpDown className={`w-4 h-4 ${sortColumn === column ? "text-primary" : "text-muted-foreground/50"}`} />
+            </div>
+        </TableHead>
+    );
+
+    const getAvailabilityBadge = (available, total) => {
+        if (available === 0) {
+            return <Badge variant="destructive">Not Available</Badge>;
+        }
+        if (available < total / 2) {
+            return <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 border-yellow-200">{available} / {total}</Badge>;
+        }
+        return <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200">{available} / {total}</Badge>;
+    };
+
+    // Table loading skeleton rows
+    const TableLoadingRows = () => (
+        <>
+            {[1, 2, 3, 4, 5].map((i) => (
+                <TableRow key={i}>
+                    <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                    <TableCell><Skeleton className="h-8 w-8" /></TableCell>
+                </TableRow>
+            ))}
+        </>
+    );
 
     if (!schoolId) {
         return (
@@ -239,93 +345,106 @@ export default function LibraryManagementPage() {
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Library Management</h1>
+                    <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+                        <Book className="w-8 h-8 text-blue-600" />
+                        Library Catalog
+                    </h1>
                     <p className="text-muted-foreground mt-2">
                         Manage books, track issues, and monitor library operations
                     </p>
                 </div>
-                <Dialog open={isAddBookOpen} onOpenChange={setIsAddBookOpen}>
-                    <DialogTrigger asChild>
-                        <Button>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Book
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                        <DialogHeader>
-                            <DialogTitle>Add New Book</DialogTitle>
-                        </DialogHeader>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label>Title *</Label>
-                                <Input
-                                    value={bookForm.title}
-                                    onChange={(e) => setBookForm({ ...bookForm, title: e.target.value })}
-                                />
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => refetch()}>
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Refresh
+                    </Button>
+                    <Dialog open={isAddBookOpen} onOpenChange={setIsAddBookOpen}>
+                        <DialogTrigger asChild>
+                            <Button>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Book
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                            <DialogHeader>
+                                <DialogTitle>Add New Book</DialogTitle>
+                            </DialogHeader>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label>Title *</Label>
+                                    <Input
+                                        value={bookForm.title}
+                                        onChange={(e) => setBookForm({ ...bookForm, title: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Author *</Label>
+                                    <Input
+                                        value={bookForm.author}
+                                        onChange={(e) => setBookForm({ ...bookForm, author: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>ISBN *</Label>
+                                    <Input
+                                        value={bookForm.ISBN}
+                                        onChange={(e) => setBookForm({ ...bookForm, ISBN: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Category *</Label>
+                                    <Input
+                                        value={bookForm.category}
+                                        onChange={(e) => setBookForm({ ...bookForm, category: e.target.value })}
+                                        placeholder="e.g., Fiction, Science, History"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Publisher</Label>
+                                    <Input
+                                        value={bookForm.publisher}
+                                        onChange={(e) => setBookForm({ ...bookForm, publisher: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Edition</Label>
+                                    <Input
+                                        value={bookForm.edition}
+                                        onChange={(e) => setBookForm({ ...bookForm, edition: e.target.value })}
+                                    />
+                                </div>
+                                <div className="col-span-2 space-y-2">
+                                    <Label>Description</Label>
+                                    <Input
+                                        value={bookForm.description}
+                                        onChange={(e) => setBookForm({ ...bookForm, description: e.target.value })}
+                                    />
+                                </div>
+                                <div className="col-span-2 space-y-2">
+                                    <Label>Cover Image URL</Label>
+                                    <Input
+                                        value={bookForm.coverImage}
+                                        onChange={(e) => setBookForm({ ...bookForm, coverImage: e.target.value })}
+                                    />
+                                </div>
                             </div>
-                            <div className="space-y-2">
-                                <Label>Author *</Label>
-                                <Input
-                                    value={bookForm.author}
-                                    onChange={(e) => setBookForm({ ...bookForm, author: e.target.value })}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>ISBN *</Label>
-                                <Input
-                                    value={bookForm.ISBN}
-                                    onChange={(e) => setBookForm({ ...bookForm, ISBN: e.target.value })}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Category *</Label>
-                                <Input
-                                    value={bookForm.category}
-                                    onChange={(e) => setBookForm({ ...bookForm, category: e.target.value })}
-                                    placeholder="e.g., Fiction, Science, History"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Publisher</Label>
-                                <Input
-                                    value={bookForm.publisher}
-                                    onChange={(e) => setBookForm({ ...bookForm, publisher: e.target.value })}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Edition</Label>
-                                <Input
-                                    value={bookForm.edition}
-                                    onChange={(e) => setBookForm({ ...bookForm, edition: e.target.value })}
-                                />
-                            </div>
-                            <div className="col-span-2 space-y-2">
-                                <Label>Description</Label>
-                                <Input
-                                    value={bookForm.description}
-                                    onChange={(e) => setBookForm({ ...bookForm, description: e.target.value })}
-                                />
-                            </div>
-                            <div className="col-span-2 space-y-2">
-                                <Label>Cover Image URL</Label>
-                                <Input
-                                    value={bookForm.coverImage}
-                                    onChange={(e) => setBookForm({ ...bookForm, coverImage: e.target.value })}
-                                />
-                            </div>
-                        </div>
-                        <Button onClick={handleAddBook} className="w-full mt-4" disabled={submitting}>
-                            {submitting ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Adding...
-                                </>
-                            ) : (
-                                "Add Book"
-                            )}
-                        </Button>
-                    </DialogContent>
-                </Dialog>
+                            <Button
+                                onClick={() => addBookMutation.mutate(bookForm)}
+                                className="w-full mt-4"
+                                disabled={addBookMutation.isPending}
+                            >
+                                {addBookMutation.isPending ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Adding...
+                                    </>
+                                ) : (
+                                    "Add Book"
+                                )}
+                            </Button>
+                        </DialogContent>
+                    </Dialog>
+                </div>
             </div>
 
             <Separator />
@@ -378,22 +497,21 @@ export default function LibraryManagementPage() {
                 </Card>
             </div>
 
-            {/* Books Catalog */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Book Catalog</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex gap-4 mb-4">
-                        <div className="flex-1">
+            {/* Filters */}
+            <Card className="border-0 shadow-none border">
+                <CardContent className="pt-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="relative lg:col-span-2">
+                            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                             <Input
                                 placeholder="Search by title, author, or ISBN..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                value={search}
+                                onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+                                className="pl-10"
                             />
                         </div>
-                        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                            <SelectTrigger className="w-[200px]">
+                        <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setCurrentPage(1); }}>
+                            <SelectTrigger>
                                 <SelectValue placeholder="All Categories" />
                             </SelectTrigger>
                             <SelectContent>
@@ -405,213 +523,325 @@ export default function LibraryManagementPage() {
                                 ))}
                             </SelectContent>
                         </Select>
+                        <Button variant="outline" onClick={clearAllFilters}>
+                            <RotateCcw className="w-4 h-4 mr-2" />
+                            Clear
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Data Table */}
+            <Card className="border-0 shadow-none border">
+                <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle>Books ({processedBooks.length})</CardTitle>
+                            <CardDescription>All books in the library catalog</CardDescription>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">Rows per page:</span>
+                            <Select value={pageSize.toString()} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
+                                <SelectTrigger className="w-20">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="10">10</SelectItem>
+                                    <SelectItem value="25">25</SelectItem>
+                                    <SelectItem value="50">50</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div className="rounded-lg border overflow-hidden">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="dark:bg-background/50 bg-muted/50">
+                                    <SortableHeader column="title">Title</SortableHeader>
+                                    <SortableHeader column="author">Author</SortableHeader>
+                                    <TableHead>ISBN</TableHead>
+                                    <SortableHeader column="category">Category</SortableHeader>
+                                    <TableHead>Publisher</TableHead>
+                                    <SortableHeader column="available">Availability</SortableHeader>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {isLoading ? (
+                                    <TableLoadingRows />
+                                ) : paginatedBooks.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={7} className="text-center py-12">
+                                            <div className="flex flex-col items-center gap-2">
+                                                <Book className="w-12 h-12 text-muted-foreground/50" />
+                                                <p className="text-muted-foreground">No books found</p>
+                                                <Button variant="outline" size="sm" onClick={clearAllFilters}>
+                                                    Clear filters
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    paginatedBooks.map((book, index) => (
+                                        <TableRow key={book.id} className={`hover:bg-muted/30 dark:hover:bg-background/30 ${index % 2 === 0 ? "bg-muted dark:bg-background/50" : ""}`}>
+                                            <TableCell className="font-medium">{book.title}</TableCell>
+                                            <TableCell className="text-muted-foreground">{book.author}</TableCell>
+                                            <TableCell className="text-muted-foreground font-mono text-xs">{book.ISBN}</TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline" className="text-xs">
+                                                    {book.category}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-muted-foreground">{book.publisher || "-"}</TableCell>
+                                            <TableCell>{getAvailabilityBadge(book.availableCopies, book.totalCopies)}</TableCell>
+                                            <TableCell className="text-right">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="sm">
+                                                            <MoreHorizontal className="w-4 h-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem asChild>
+                                                            <Link href={`/dashboard/schools/library/catalog/${book.id}`}>
+                                                                <Eye className="w-4 h-4 mr-2" />
+                                                                View Details
+                                                            </Link>
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => {
+                                                            setSelectedBook(book);
+                                                            setIsAddCopiesOpen(true);
+                                                        }}>
+                                                            <Copy className="w-4 h-4 mr-2" />
+                                                            Add Copies
+                                                        </DropdownMenuItem>
+                                                        {book.availableCopies === 0 && (
+                                                            <DropdownMenuItem onClick={() => {
+                                                                setSelectedBook(book);
+                                                                setIsRequestBookOpen(true);
+                                                            }}>
+                                                                <BookMarked className="w-4 h-4 mr-2" />
+                                                                Request Book
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem
+                                                            className="text-red-600"
+                                                            onClick={() => {
+                                                                setBookToDelete(book);
+                                                                setIsDeleteDialogOpen(true);
+                                                            }}
+                                                        >
+                                                            <Trash2 className="w-4 h-4 mr-2" />
+                                                            Delete
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
                     </div>
 
-                    {loading ? (
-                        <div className="flex justify-center p-8">
-                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                        </div>
-                    ) : filteredBooks.length === 0 ? (
-                        <div className="text-center text-muted-foreground py-8">No books found</div>
-                    ) : (
-                        <div className="space-y-4">
-                            {filteredBooks.map((book) => (
-                                <div
-                                    key={book.id}
-                                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                        <div className="flex items-center justify-between mt-4">
+                            <p className="text-sm text-muted-foreground">
+                                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, processedBooks.length)} of {processedBooks.length} books
+                            </p>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                    disabled={currentPage === 1}
                                 >
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-2">
-                                            <h3 className="font-semibold">{book.title}</h3>
-                                            <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                                                {book.category}
-                                            </span>
-                                        </div>
-                                        <div className="text-sm text-muted-foreground mt-1">
-                                            by {book.author} • ISBN: {book.ISBN}
-                                        </div>
-                                        {book.publisher && (
-                                            <div className="text-sm text-muted-foreground">
-                                                Published by {book.publisher}
-                                                {book.edition && ` • ${book.edition} Edition`}
-                                            </div>
-                                        )}
-                                        <div className="flex items-center gap-4 mt-2 text-sm">
-                                            <span className="text-green-600 font-medium">
-                                                {book.availableCopies} available
-                                            </span>
-                                            <span className="text-muted-foreground">
-                                                {book.totalCopies} total copies
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {book.availableCopies === 0 && (
-                                            <Dialog
-                                                open={isRequestBookOpen && selectedBook?.id === book.id}
-                                                onOpenChange={(open) => {
-                                                    setIsRequestBookOpen(open);
-                                                    if (open) setSelectedBook(book);
-                                                }}
+                                    <ChevronLeft className="w-4 h-4" />
+                                </Button>
+                                <div className="flex items-center gap-1">
+                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                        let pageNum;
+                                        if (totalPages <= 5) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage <= 3) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage >= totalPages - 2) {
+                                            pageNum = totalPages - 4 + i;
+                                        } else {
+                                            pageNum = currentPage - 2 + i;
+                                        }
+                                        return (
+                                            <Button
+                                                key={pageNum}
+                                                variant={currentPage === pageNum ? "default" : "outline"}
+                                                size="sm"
+                                                onClick={() => setCurrentPage(pageNum)}
+                                                className="w-8 h-8 p-0"
                                             >
-                                                <DialogTrigger asChild>
-                                                    <Button variant="default" size="sm">
-                                                        <BookMarked className="h-4 w-4 mr-2" />
-                                                        Request Book
-                                                    </Button>
-                                                </DialogTrigger>
-                                                <DialogContent>
-                                                    <DialogHeader>
-                                                        <DialogTitle>Request Book</DialogTitle>
-                                                    </DialogHeader>
-                                                    <div className="space-y-4">
-                                                        <div className="bg-muted/50 p-4 rounded-lg space-y-2">
-                                                            <p className="font-semibold">{book.title}</p>
-                                                            <p className="text-sm text-muted-foreground">by {book.author}</p>
-                                                            <p className="text-xs text-orange-600 font-medium">
-                                                                No copies currently available
-                                                            </p>
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <Label>Remarks (Optional)</Label>
-                                                            <Textarea
-                                                                value={requestRemarks}
-                                                                onChange={(e) => setRequestRemarks(e.target.value)}
-                                                                placeholder="Any additional notes..."
-                                                                rows={3}
-                                                            />
-                                                        </div>
-                                                        <Button
-                                                            onClick={handleRequestBook}
-                                                            disabled={requestingBook}
-                                                            className="w-full"
-                                                        >
-                                                            {requestingBook ? (
-                                                                <>
-                                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                                    Submitting...
-                                                                </>
-                                                            ) : (
-                                                                "Submit Request"
-                                                            )}
-                                                        </Button>
-                                                    </div>
-                                                </DialogContent>
-                                            </Dialog>
-                                        )}
-                                        <Dialog
-                                            open={isAddCopiesOpen && selectedBook?.id === book.id}
-                                            onOpenChange={(open) => {
-                                                setIsAddCopiesOpen(open);
-                                                if (open) setSelectedBook(book);
-                                            }}
-                                        >
-                                            <DialogTrigger asChild>
-                                                <Button variant="outline" size="sm">
-                                                    <Copy className="h-4 w-4 mr-2" />
-                                                    Add Copies
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent>
-                                                <DialogHeader>
-                                                    <DialogTitle>Add Copies - {book.title}</DialogTitle>
-                                                </DialogHeader>
-                                                <div className="space-y-4">
-                                                    <div className="space-y-2">
-                                                        <Label>Number of Copies</Label>
-                                                        <Input
-                                                            type="number"
-                                                            min="1"
-                                                            value={copiesForm.count}
-                                                            onChange={(e) =>
-                                                                setCopiesForm({ ...copiesForm, count: parseInt(e.target.value) })
-                                                            }
-                                                        />
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <Label>Starting Accession Number</Label>
-                                                        <Input
-                                                            value={copiesForm.startAccessionNumber}
-                                                            onChange={(e) =>
-                                                                setCopiesForm({ ...copiesForm, startAccessionNumber: e.target.value })
-                                                            }
-                                                            placeholder="e.g., ACC-001"
-                                                        />
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <Label>Location</Label>
-                                                        <Input
-                                                            value={copiesForm.location}
-                                                            onChange={(e) =>
-                                                                setCopiesForm({ ...copiesForm, location: e.target.value })
-                                                            }
-                                                        />
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <Label>Condition</Label>
-                                                        <Select
-                                                            value={copiesForm.condition}
-                                                            onValueChange={(value) =>
-                                                                setCopiesForm({ ...copiesForm, condition: value })
-                                                            }
-                                                        >
-                                                            <SelectTrigger>
-                                                                <SelectValue />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="NEW">New</SelectItem>
-                                                                <SelectItem value="GOOD">Good</SelectItem>
-                                                                <SelectItem value="FAIR">Fair</SelectItem>
-                                                                <SelectItem value="POOR">Poor</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
-                                                    <Button onClick={handleAddCopies} className="w-full">
-                                                        Add {copiesForm.count} {copiesForm.count === 1 ? "Copy" : "Copies"}
-                                                    </Button>
-                                                </div>
-                                            </DialogContent>
-                                        </Dialog>
-                                        <Link href={`/dashboard/schools/library/catalog/${book.id}`}>
-                                            <Button variant="outline" size="sm">
-                                                View Details
+                                                {pageNum}
                                             </Button>
-                                        </Link>
-                                        <Button
-                                            variant="destructive"
-                                            size="sm"
-                                            onClick={() => confirmDelete(book)}
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </div>
+                                        );
+                                    })}
                                 </div>
-                            ))}
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                    disabled={currentPage === totalPages}
+                                >
+                                    <ChevronRight className="w-4 h-4" />
+                                </Button>
+                            </div>
                         </div>
                     )}
                 </CardContent>
             </Card>
 
+            {/* Add Copies Dialog */}
+            <Dialog open={isAddCopiesOpen} onOpenChange={setIsAddCopiesOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Add Copies - {selectedBook?.title}</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label>Number of Copies</Label>
+                            <Input
+                                type="number"
+                                min="1"
+                                value={copiesForm.count}
+                                onChange={(e) =>
+                                    setCopiesForm({ ...copiesForm, count: parseInt(e.target.value) })
+                                }
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Starting Accession Number</Label>
+                            <Input
+                                value={copiesForm.startAccessionNumber}
+                                onChange={(e) =>
+                                    setCopiesForm({ ...copiesForm, startAccessionNumber: e.target.value })
+                                }
+                                placeholder="e.g., ACC-001"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Location</Label>
+                            <Input
+                                value={copiesForm.location}
+                                onChange={(e) =>
+                                    setCopiesForm({ ...copiesForm, location: e.target.value })
+                                }
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Condition</Label>
+                            <Select
+                                value={copiesForm.condition}
+                                onValueChange={(value) =>
+                                    setCopiesForm({ ...copiesForm, condition: value })
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="NEW">New</SelectItem>
+                                    <SelectItem value="GOOD">Good</SelectItem>
+                                    <SelectItem value="FAIR">Fair</SelectItem>
+                                    <SelectItem value="POOR">Poor</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <Button
+                            onClick={() => addCopiesMutation.mutate({ bookId: selectedBook?.id, data: copiesForm })}
+                            className="w-full"
+                            disabled={addCopiesMutation.isPending}
+                        >
+                            {addCopiesMutation.isPending ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Adding...
+                                </>
+                            ) : (
+                                `Add ${copiesForm.count} ${copiesForm.count === 1 ? "Copy" : "Copies"}`
+                            )}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Request Book Dialog */}
+            <Dialog open={isRequestBookOpen} onOpenChange={setIsRequestBookOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Request Book</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                            <p className="font-semibold">{selectedBook?.title}</p>
+                            <p className="text-sm text-muted-foreground">by {selectedBook?.author}</p>
+                            <p className="text-xs text-orange-600 font-medium">
+                                No copies currently available
+                            </p>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Remarks (Optional)</Label>
+                            <Textarea
+                                value={requestRemarks}
+                                onChange={(e) => setRequestRemarks(e.target.value)}
+                                placeholder="Any additional notes..."
+                                rows={3}
+                            />
+                        </div>
+                        <Button
+                            onClick={() => requestBookMutation.mutate({
+                                bookId: selectedBook?.id,
+                                userId: fullUser?.id,
+                                userType: fullUser?.role === "STUDENT" ? "STUDENT" : "TEACHER",
+                                remarks: requestRemarks,
+                            })}
+                            disabled={requestBookMutation.isPending}
+                            className="w-full"
+                        >
+                            {requestBookMutation.isPending ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Submitting...
+                                </>
+                            ) : (
+                                "Submit Request"
+                            )}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete Confirmation Dialog */}
             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                         <AlertDialogDescription>
                             This action cannot be undone. This will permanently delete the book
-                            "{bookToDelete?.title}" and all its copies from the library.
+                            &quot;{bookToDelete?.title}&quot; and all its copies from the library.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel disabled={deleteBookMutation.isPending}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={(e) => {
                                 e.preventDefault();
-                                handleDeleteBook();
+                                deleteBookMutation.mutate(bookToDelete?.id);
                             }}
-                            disabled={deleting}
+                            disabled={deleteBookMutation.isPending}
                             className="bg-red-600 hover:bg-red-700"
                         >
-                            {deleting ? (
+                            {deleteBookMutation.isPending ? (
                                 <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                     Deleting...
@@ -623,6 +853,6 @@ export default function LibraryManagementPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </div >
+        </div>
     );
 }

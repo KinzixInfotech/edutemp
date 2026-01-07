@@ -164,11 +164,6 @@ export async function middleware(request) {
         return NextResponse.next();
     }
 
-    // Only track API routes, skip health endpoint
-    if (!pathname.startsWith('/api') || pathname === '/api/health' || pathname.includes('/api/health/')) {
-        return NextResponse.next();
-    }
-
     const startTime = Date.now();
     const response = NextResponse.next();
 
@@ -179,8 +174,18 @@ export async function middleware(request) {
     return response;
 }
 
+// Maximum number of unique endpoints to track (prevents memory leak)
+const MAX_METRICS_ENTRIES = 200;
+
 function trackMetric(endpoint, method, statusCode, responseTime) {
     const key = `${method}:${endpoint}`;
+
+    // Prevent memory leak: limit entries and clean old ones periodically
+    if (apiMetrics.size >= MAX_METRICS_ENTRIES && !apiMetrics.has(key)) {
+        // Remove oldest entry (first in Map)
+        const firstKey = apiMetrics.keys().next().value;
+        apiMetrics.delete(firstKey);
+    }
 
     let metrics = apiMetrics.get(key) || {
         endpoint,
@@ -204,9 +209,9 @@ function trackMetric(endpoint, method, statusCode, responseTime) {
     metrics.errorCount += isSuccess ? 0 : 1;
     metrics.lastChecked = new Date();
 
-    // Track response times (keep last 100)
+    // Track response times (keep last 50 instead of 100 to save memory)
     metrics.responseTimes.push(responseTime);
-    if (metrics.responseTimes.length > 100) {
+    if (metrics.responseTimes.length > 50) {
         metrics.responseTimes.shift();
     }
     metrics.avgResponseTime = metrics.responseTimes.reduce((a, b) => a + b, 0) / metrics.responseTimes.length;

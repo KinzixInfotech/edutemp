@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // 🔥 Enable gzip compression for responses
+  compress: true,
+
   images: {
     remotePatterns: [
       {
@@ -19,6 +22,19 @@ const nextConfig = {
         hostname: "sea1.ingest.uploadthing.com",
       },
     ],
+  },
+
+  // 🔥 Security + Performance headers
+  async headers() {
+    return [
+      {
+        source: '/api/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'DENY' },
+        ],
+      },
+    ];
   },
 
   // 🔥 Prisma + Turbopack fix
@@ -46,3 +62,4 @@ const nextConfig = {
 };
 
 export default nextConfig;
+

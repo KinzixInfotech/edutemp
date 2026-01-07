@@ -13,15 +13,9 @@
  */
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { verifyAdminAccess } from '@/lib/api-auth';
 import { generateDashboardInsights } from '@/lib/ai/insightsGenerator';
 import prisma from '@/lib/prisma';
-
-// Initialize Supabase for auth
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
 
 export async function GET(request) {
     try {
@@ -35,54 +29,11 @@ export async function GET(request) {
             );
         }
 
-        // Get auth token from header
-        const authHeader = request.headers.get('Authorization');
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return NextResponse.json(
-                { error: 'Unauthorized' },
-                { status: 401 }
-            );
-        }
+        // Use shared auth utility - reduces code and ensures consistency
+        const auth = await verifyAdminAccess(request, schoolId);
+        if (auth.error) return auth.response;
 
-        const token = authHeader.substring(7);
-        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
-        if (authError || !user) {
-            return NextResponse.json(
-                { error: 'Unauthorized' },
-                { status: 401 }
-            );
-        }
-
-        // Get full user with role
-        const fullUser = await prisma.user.findUnique({
-            where: { id: user.id },
-            include: { role: true },
-        });
-
-        if (!fullUser) {
-            return NextResponse.json(
-                { error: 'User not found' },
-                { status: 404 }
-            );
-        }
-
-        // Check role - Only ADMIN and SUPER_ADMIN
-        const allowedRoles = ['ADMIN', 'SUPER_ADMIN'];
-        if (!allowedRoles.includes(fullUser.role.name)) {
-            return NextResponse.json(
-                { error: 'Access denied. Admin role required.' },
-                { status: 403 }
-            );
-        }
-
-        // Verify school access
-        if (fullUser.role.name !== 'SUPER_ADMIN' && fullUser.schoolId !== schoolId) {
-            return NextResponse.json(
-                { error: 'Access denied to this school' },
-                { status: 403 }
-            );
-        }
+        const { user: fullUser } = auth;
 
         // Get school name for context
         const school = await prisma.school.findUnique({

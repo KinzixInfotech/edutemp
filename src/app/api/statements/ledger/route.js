@@ -1,13 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import redis from '@/lib/redis';
-import { createClient } from '@supabase/supabase-js';
-
-// Initialize Supabase client for token verification
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+import supabaseServer from '@/lib/supabase-server'; // Use singleton
 
 /**
  * Ledger Statement API
@@ -53,7 +47,7 @@ export async function GET(request) {
         // Method 2: Try Supabase JWT (admin dashboard)
         if (!isAuthorized) {
             try {
-                const { data: { user }, error } = await supabase.auth.getUser(token);
+                const { data: { user }, error } = await supabaseServer.auth.getUser(token);
 
                 if (!error && user) {
                     // Verify the user has access to this school

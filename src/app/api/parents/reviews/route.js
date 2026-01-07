@@ -1,28 +1,15 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { createClient } from '@supabase/supabase-js';
+import { verifyAuth } from '@/lib/api-auth';
 import { remember, generateKey } from '@/lib/cache';
-
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
 
 export async function GET(req) {
     try {
-        // 1. Check Supabase authentication
-        const authHeader = req.headers.get('authorization');
-        if (!authHeader) {
-            return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-        }
+        // Use shared auth utility - reduces code and ensures consistency
+        const auth = await verifyAuth(req);
+        if (auth.error) return auth.response;
 
-        const { data: { user }, error: authError } = await supabase.auth.getUser(
-            authHeader.replace('Bearer ', '')
-        );
-
-        if (authError || !user) {
-            return NextResponse.json({ error: 'Invalid authentication' }, { status: 401 });
-        }
+        const { supabaseUser: user } = auth;
 
         // 2. Fetch authenticated user's reviews with caching
         const cacheKey = generateKey('parent-reviews', { userId: user.id });

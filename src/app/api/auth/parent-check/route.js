@@ -1,12 +1,7 @@
 // Helper API: Check if authenticated user is a parent of a specific school
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+import supabaseServer from '@/lib/supabase-server'; // Use singleton
 
 export async function GET(req) {
     try {
@@ -19,7 +14,7 @@ export async function GET(req) {
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
         }
 
-        const { data: { user }, error: authError } = await supabase.auth.getUser(
+        const { data: { user }, error: authError } = await supabaseServer.auth.getUser(
             authHeader.replace('Bearer ', '')
         );
 
