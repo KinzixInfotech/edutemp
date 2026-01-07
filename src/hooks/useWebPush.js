@@ -50,29 +50,41 @@ export function useWebPush({ onMessageReceived } = {}) {
     const getAndSaveToken = async () => {
         try {
             const supported = await isSupported();
-            if (!supported) return;
+            if (!supported) {
+                console.log('❌ Firebase messaging not supported in this browser');
+                return;
+            }
+
+            // Ensure service worker is registered for FCM
+            let serviceWorkerRegistration;
+            if ('serviceWorker' in navigator) {
+                serviceWorkerRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+            }
 
             const currentToken = await getToken(messaging, {
-                vapidKey: process.env.NEXT_PUBLIC_VAPID_KEY
+                vapidKey: process.env.NEXT_PUBLIC_VAPID_KEY,
+                serviceWorkerRegistration
             });
 
             if (currentToken) {
                 setToken(currentToken);
                 await saveTokenToBackend(fullUser.id, currentToken);
             } else {
-                console.log('No registration token available.');
+                console.log('❌ No registration token available.');
             }
         } catch (error) {
-            console.error('An error occurred while retrieving token.', error);
+            console.error('❌ Error retrieving token:', error);
         }
     };
 
     // Listen for foreground messages
     useEffect(() => {
-        if (!messaging) return;
+        if (!messaging) {
+            console.log('❌ Messaging not initialized');
+            return;
+        }
 
         const unsubscribe = onMessage(messaging, (payload) => {
-            console.log('Message received. ', payload);
 
             // Play sound
             try {
@@ -149,10 +161,7 @@ export function useWebPush({ onMessageReceived } = {}) {
 
     const saveTokenToBackend = async (userId, token) => {
         try {
-            // Check if token is already saved in local storage to avoid redundant API calls
-            const savedToken = localStorage.getItem(`fcm_token_${userId}`);
-            if (savedToken === token) return;
-
+            // Always save token to backend to ensure it's up to date
             const response = await fetch(`/api/users/${userId}/fcm-token`, {
                 method: 'POST',
                 headers: {
@@ -162,13 +171,13 @@ export function useWebPush({ onMessageReceived } = {}) {
             });
 
             if (response.ok) {
-                console.log('FCM token saved to backend');
                 localStorage.setItem(`fcm_token_${userId}`, token);
             } else {
-                console.error('Failed to save FCM token to backend');
+                const errorData = await response.json();
+                console.error('❌ Failed to save FCM token:', errorData);
             }
         } catch (error) {
-            console.error('Error saving FCM token:', error);
+            console.error('❌ Error saving FCM token:', error);
         }
     };
 

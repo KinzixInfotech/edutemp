@@ -45,16 +45,6 @@ export default function WelcomeBanner({ fullUser, schoolName }) {
     const { data: context, isLoading: contextLoading } = useDashboardContext(fullUser?.schoolId);
     const { data: insightsData, isLoading: insightsLoading } = useAiInsights(fullUser?.schoolId, context?.aiAllowed);
 
-    // DEBUG: Log context and insights data
-    console.log('🔍 [WelcomeBanner Debug]', {
-        schoolId: fullUser?.schoolId,
-        contextLoading,
-        insightsLoading,
-        context,
-        insightsData,
-        aiAllowed: context?.aiAllowed,
-        dayType: context?.dayType,
-    });
 
     // Get time-based greeting
     useEffect(() => {

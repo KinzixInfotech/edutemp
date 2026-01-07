@@ -948,6 +948,117 @@ export async function notifyHomeworkEvaluated({
         actionUrl: '/homework'
     });
 }
+
+/**
+ * Notify Admin, Principal, Director when a new leave request is created
+ */
+export async function notifyLeaveRequestCreated({
+    schoolId,
+    userId,
+    userName,
+    leaveType,
+    startDate,
+    endDate,
+    totalDays,
+    senderId
+}) {
+    const startFormatted = new Date(startDate).toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short'
+    });
+    const endFormatted = new Date(endDate).toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+    });
+
+    return sendNotification({
+        schoolId,
+        title: 'New Leave Request',
+        message: `${userName} has requested ${leaveType.toLowerCase()} leave (${totalDays} days) from ${startFormatted} to ${endFormatted}`,
+        type: 'LEAVE',
+        priority: 'HIGH',
+        icon: '📝',
+        targetOptions: {
+            roleNames: ['ADMIN', 'PRINCIPAL', 'DIRECTOR']
+        },
+        senderId,
+        metadata: {
+            userId,
+            leaveType,
+            startDate,
+            endDate,
+            totalDays,
+            requestType: 'LEAVE_REQUEST'
+        },
+        actionUrl: '/leave-management'
+    });
+}
+
+/**
+ * Notify Admin, Principal, Director when a new regularization request is created
+ */
+export async function notifyRegularizationRequestCreated({
+    schoolId,
+    userId,
+    userName,
+    date,
+    requestedStatus,
+    reason,
+    senderId
+}) {
+    const dateFormatted = new Date(date).toLocaleDateString('en-IN', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short'
+    });
+
+    return sendNotification({
+        schoolId,
+        title: 'Attendance Regularization Request',
+        message: `${userName} has requested attendance regularization for ${dateFormatted} (${requestedStatus.toLowerCase()})`,
+        type: 'ATTENDANCE',
+        priority: 'HIGH',
+        icon: '🔄',
+        targetOptions: {
+            roleNames: ['ADMIN', 'PRINCIPAL', 'DIRECTOR']
+        },
+        senderId,
+        metadata: {
+            userId,
+            date,
+            requestedStatus,
+            reason,
+            requestType: 'REGULARIZATION_REQUEST'
+        },
+        actionUrl: '/regularization'
+    });
+}
+
+/**
+ * Notify user when their leave request is rejected
+ */
+export async function notifyLeaveRejected({
+    schoolId,
+    userId,
+    leaveType,
+    startDate,
+    endDate,
+    reason
+}) {
+    return sendNotification({
+        schoolId,
+        title: 'Leave Request Rejected',
+        message: `Your ${leaveType.toLowerCase()} leave from ${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()} has been rejected${reason ? `: ${reason}` : ''}`,
+        type: 'LEAVE',
+        priority: 'HIGH',
+        icon: '❌',
+        targetOptions: { userIds: [userId] },
+        metadata: { leaveType, startDate, endDate, reason },
+        actionUrl: '/leaves'
+    });
+}
+
 // Export all notification types as enum
 export const NOTIFICATION_TYPES = {
     GENERAL: 'GENERAL',

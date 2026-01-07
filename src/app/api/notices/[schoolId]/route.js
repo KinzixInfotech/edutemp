@@ -99,7 +99,11 @@ export async function GET(request, props) {
                     );
                 }
 
-                where.AND = [audienceFilter];
+                where.AND = [
+                    audienceFilter,
+                    // Exclude notices created by this user (they see their own in "Sent" tab)
+                    { NOT: { createdById: userId } }
+                ];
 
                 notices = await prisma.notice.findMany({
                     where,

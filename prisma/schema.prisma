@@ -2669,6 +2669,14 @@ model AttendanceConfig {
   requireApprovalDays Int     @default(3) // Past attendance needs approval after X days
   autoApproveLeaves   Boolean @default(false)
 
+  // Leave Approval Hierarchy - NEW
+  // Controls who can approve leave and regularization requests
+  adminCanApproveLeaves     Boolean @default(true) // Admin can approve leaves
+  principalCanApproveLeaves Boolean @default(true) // Principal can approve leaves
+  directorCanApproveLeaves  Boolean @default(true) // Director can approve leaves
+  directorOverridesAll      Boolean @default(false) // If true, only Director can approve (Admin/Principal read-only)
+  principalOverridesAdmin   Boolean @default(false) // If true, Admin becomes read-only for leaves
+
   // Notifications
   sendDailyReminders Boolean @default(true)
   reminderTime       String  @default("08:30")

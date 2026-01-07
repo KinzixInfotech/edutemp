@@ -43,6 +43,19 @@ export default function LeaveManagement() {
         }
     });
 
+    // Fetch permission settings to check if admin can approve
+    const { data: permissions } = useQuery({
+        queryKey: ['leave-permissions', schoolId],
+        queryFn: async () => {
+            const res = await fetch(`/api/schools/${schoolId}/attendance/leave-permissions?viewerRole=ADMIN`);
+            if (!res.ok) return { viewer: { canApprove: true } };
+            return res.json();
+        },
+        enabled: !!schoolId
+    });
+
+    const canApprove = permissions?.viewer?.canApprove !== false;
+
     const actionMutation = useMutation({
         mutationFn: async ({ action }) => {
             const res = await fetch(`/api/schools/${schoolId}/attendance/admin/leave-management`, {
@@ -143,6 +156,21 @@ export default function LeaveManagement() {
                 </div>
             </div>
 
+            {/* Permission Restricted Banner */}
+            {!canApprove && (
+                <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-center gap-3">
+                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
+                        <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div>
+                        <p className="font-medium text-amber-800 dark:text-amber-200">View Only Mode</p>
+                        <p className="text-sm text-amber-600 dark:text-amber-400">
+                            Leave approval has been restricted by Director/Principal. You can view requests but cannot approve or reject them.
+                        </p>
+                    </div>
+                </div>
+            )}
+
             {/* Filters */}
             <Card>
                 <CardContent className="pt-6">
@@ -176,7 +204,7 @@ export default function LeaveManagement() {
                 </TabsList>
 
                 {/* Action Bar */}
-                {statusFilter === 'PENDING' && leaves.length > 0 && (
+                {statusFilter === 'PENDING' && leaves.length > 0 && canApprove && (
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
