@@ -9,7 +9,7 @@ export async function GET(req, { params }) {
         // Validate schoolId
         if (!schoolId || schoolId === 'null' || schoolId === 'undefined') {
             return NextResponse.json(
-                { error: 'Invalid schoolId', staff: [], summary: { total: 0, teaching: 0, nonTeaching: 0 } },
+                { error: 'Invalid schoolId', staff: [], summary: { total: 0, teaching: 0, nonTeaching: 0, onLeave: 0 } },
                 { status: 400 }
             );
         }
@@ -32,10 +32,127 @@ export async function GET(req, { params }) {
                 roleFilter = { name: { in: ['TEACHING_STAFF', 'NON_TEACHING_STAFF'] } };
             }
 
+            // Handle special ON_LEAVE status
+            if (status === 'ON_LEAVE') {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                // Find all approved leave requests that are active today
+                const activeLeaves = await prisma.leaveRequest.findMany({
+                    where: {
+                        schoolId,
+                        status: 'APPROVED',
+                        startDate: { lte: today },
+                        endDate: { gte: today },
+                        user: {
+                            deletedAt: null,
+                            role: roleFilter,
+                            ...(search && {
+                                OR: [
+                                    { name: { contains: search, mode: 'insensitive' } },
+                                    { email: { contains: search, mode: 'insensitive' } }
+                                ]
+                            })
+                        }
+                    },
+                    include: {
+                        user: {
+                            select: {
+                                id: true,
+                                name: true,
+                                email: true,
+                                profilePicture: true,
+                                status: true,
+                                role: { select: { name: true } },
+                                teacher: {
+                                    select: {
+                                        employeeId: true,
+                                        designation: true,
+                                        departmentId: true
+                                    }
+                                },
+                                nonTeachingStaff: {
+                                    select: {
+                                        employeeId: true,
+                                        designation: true,
+                                        departmentId: true
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    orderBy: { endDate: 'asc' }
+                });
+
+                // Get unique users (in case someone has multiple leaves)
+                const uniqueUsers = new Map();
+                activeLeaves.forEach(leave => {
+                    if (!uniqueUsers.has(leave.user.id)) {
+                        uniqueUsers.set(leave.user.id, {
+                            ...leave.user,
+                            leaveType: leave.leaveType,
+                            leaveEndDate: leave.endDate
+                        });
+                    }
+                });
+
+                const onLeaveStaff = Array.from(uniqueUsers.values());
+
+                // Get counts
+                const [teachingCount, nonTeachingCount, totalActive, onLeaveCount] = await Promise.all([
+                    prisma.user.count({
+                        where: { schoolId, deletedAt: null, status: 'ACTIVE', role: { name: 'TEACHING_STAFF' } }
+                    }),
+                    prisma.user.count({
+                        where: { schoolId, deletedAt: null, status: 'ACTIVE', role: { name: 'NON_TEACHING_STAFF' } }
+                    }),
+                    prisma.user.count({
+                        where: { schoolId, deletedAt: null, status: 'ACTIVE', role: { name: { in: ['TEACHING_STAFF', 'NON_TEACHING_STAFF'] } } }
+                    }),
+                    prisma.leaveRequest.groupBy({
+                        by: ['userId'],
+                        where: {
+                            schoolId,
+                            status: 'APPROVED',
+                            startDate: { lte: today },
+                            endDate: { gte: today },
+                            user: { deletedAt: null, role: { name: { in: ['TEACHING_STAFF', 'NON_TEACHING_STAFF'] } } }
+                        }
+                    }).then(result => result.length)
+                ]);
+
+                return {
+                    summary: {
+                        total: totalActive,
+                        teaching: teachingCount,
+                        nonTeaching: nonTeachingCount,
+                        onLeave: onLeaveCount
+                    },
+                    staff: onLeaveStaff.map(t => ({
+                        id: t.id,
+                        name: t.name || '',
+                        firstName: t.name?.split(' ')[0] || '',
+                        lastName: t.name?.split(' ').slice(1).join(' ') || '',
+                        email: t.email,
+                        profilePicture: t.profilePicture,
+                        employeeId: t.teacher?.employeeId || t.nonTeachingStaff?.employeeId || '',
+                        designation: t.teacher?.designation || t.nonTeachingStaff?.designation || '',
+                        type: t.role.name === 'TEACHING_STAFF' ? 'teaching' : 'non-teaching',
+                        status: 'on_leave',
+                        leaveType: t.leaveType,
+                        leaveEndDate: t.leaveEndDate
+                    }))
+                };
+            }
+
+            // Valid UserStatus enum values for regular status filter
+            const validStatuses = ['ACTIVE', 'INACTIVE', 'LEFT', 'DISABLED', 'BANNED'];
+            const statusFilter = validStatuses.includes(status) ? status : 'ACTIVE';
+
             const where = {
                 schoolId,
                 deletedAt: null,
-                status: status,
+                status: statusFilter,
                 role: roleFilter,
                 ...(search && {
                     OR: [
@@ -45,7 +162,11 @@ export async function GET(req, { params }) {
                 })
             };
 
-            const [teachers, teachingCount, nonTeachingCount, totalActive] = await Promise.all([
+            // Get on leave count for summary
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const [teachers, teachingCount, nonTeachingCount, totalActive, onLeaveCount] = await Promise.all([
                 prisma.user.findMany({
                     where,
                     select: {
@@ -54,12 +175,7 @@ export async function GET(req, { params }) {
                         email: true,
                         profilePicture: true,
                         status: true,
-                        role: {
-                            select: {
-                                name: true
-                            }
-                        },
-                        // Use correct relation names from User model
+                        role: { select: { name: true } },
                         teacher: {
                             select: {
                                 employeeId: true,
@@ -79,36 +195,32 @@ export async function GET(req, { params }) {
                     take: 100
                 }),
                 prisma.user.count({
-                    where: {
-                        schoolId,
-                        deletedAt: null,
-                        status: 'ACTIVE',
-                        role: { name: 'TEACHING_STAFF' }
-                    }
+                    where: { schoolId, deletedAt: null, status: 'ACTIVE', role: { name: 'TEACHING_STAFF' } }
                 }),
                 prisma.user.count({
-                    where: {
-                        schoolId,
-                        deletedAt: null,
-                        status: 'ACTIVE',
-                        role: { name: 'NON_TEACHING_STAFF' }
-                    }
+                    where: { schoolId, deletedAt: null, status: 'ACTIVE', role: { name: 'NON_TEACHING_STAFF' } }
                 }),
                 prisma.user.count({
+                    where: { schoolId, deletedAt: null, status: 'ACTIVE', role: { name: { in: ['TEACHING_STAFF', 'NON_TEACHING_STAFF'] } } }
+                }),
+                prisma.leaveRequest.groupBy({
+                    by: ['userId'],
                     where: {
                         schoolId,
-                        deletedAt: null,
-                        status: 'ACTIVE',
-                        role: { name: { in: ['TEACHING_STAFF', 'NON_TEACHING_STAFF'] } }
+                        status: 'APPROVED',
+                        startDate: { lte: today },
+                        endDate: { gte: today },
+                        user: { deletedAt: null, role: { name: { in: ['TEACHING_STAFF', 'NON_TEACHING_STAFF'] } } }
                     }
-                })
+                }).then(result => result.length)
             ]);
 
             return {
                 summary: {
                     total: totalActive,
                     teaching: teachingCount,
-                    nonTeaching: nonTeachingCount
+                    nonTeaching: nonTeachingCount,
+                    onLeave: onLeaveCount
                 },
                 staff: teachers.map(t => ({
                     id: t.id,
@@ -123,7 +235,7 @@ export async function GET(req, { params }) {
                     status: t.status?.toLowerCase() || 'active'
                 }))
             };
-        }, 120);
+        }, 60); // Shorter cache for leave data
 
         return NextResponse.json(data);
     } catch (error) {

@@ -70,7 +70,8 @@ export default function WelcomeBanner({ fullUser, schoolName }) {
         if (!context?.aiAllowed) {
             const dayType = context?.dayType;
             if (dayType === 'SUNDAY') {
-                return `Good ${greeting}, ${firstName}. It's Sunday! School is closed today. Enjoy your weekend and prepare for the upcoming week.`;
+                return `Good ${greeting}, ${firstName}
+                . It's Sunday! School is closed today. Enjoy your weekend and prepare for the upcoming week.`;
             } else if (dayType === 'HOLIDAY') {
                 return `Good ${greeting}, ${firstName}. Happy ${context?.holidayName || 'Holiday'}! School is closed today. Enjoy your time off.`;
             } else if (dayType === 'VACATION') {
