@@ -47,14 +47,7 @@ export default function Footer() {
         <footer className="relative  overflow-hidden bg-white px-4 lg:px-16 py-16">
             {/* Main content section */}
             {/* Centered large branding */}
-            <div className="text-center mb-20">
-                <h1 className="text-[clamp(4rem,15vw,12rem)] font-black leading-none tracking-normal text-slate-900">
-                    edu<span style={{ color: "#076bfd" }}>breezy</span>
-                </h1>
-                <p className="text-slate-600 text-lg mt-6 max-w-2xl mx-auto">
-                    Empowering educational institutions with innovative management solutions for a brighter future.
-                </p>
-            </div>
+
             <div className="max-w-7xl mx-auto">
                 {/* Links grid - top section */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12 mb-16">
@@ -184,6 +177,14 @@ export default function Footer() {
                         </p>
                     </div>
                 </div>
+            </div>
+            <div className="text-center mb-2">
+                <h1 className="text-[clamp(4rem,15vw,12rem)] font-black leading-none tracking-normal text-slate-900">
+                    edu<span style={{ color: "#076bfd" }}>breezy</span>
+                </h1>
+                <p className="text-slate-600 text-lg mt-6 max-w-2xl mx-auto">
+                    Empowering educational institutions with innovative management solutions for a brighter future.
+                </p>
             </div>
         </footer>
     );
