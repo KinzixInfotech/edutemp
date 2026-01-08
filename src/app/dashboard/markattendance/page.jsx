@@ -1,21 +1,25 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Loader2, MapPin, Clock, CalendarDays, CheckCircle2, XCircle, AlertTriangle, Coffee, Lock, LogOut } from "lucide-react";
+import {
+    Loader2, MapPin, Clock, CalendarDays, CheckCircle2, XCircle,
+    AlertTriangle, Coffee, Lock, LogOut, History, Timer, TrendingUp
+} from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function SelfAttendancePage() {
     const { fullUser } = useAuth();
-    const [loading, setLoading] = useState(true);
-    const [actionLoading, setActionLoading] = useState(false);
-    const [data, setData] = useState(null);
+    const queryClient = useQueryClient();
     const [currentTime, setCurrentTime] = useState(new Date());
 
     useEffect(() => {
@@ -23,59 +27,37 @@ export default function SelfAttendancePage() {
         return () => clearInterval(timer);
     }, []);
 
-    const fetchAttendanceData = async () => {
-        if (!fullUser?.id || !fullUser?.schoolId) return;
-
-        try {
-            setLoading(true);
+    // Fetch attendance data using React Query
+    const { data, isLoading, error, refetch } = useQuery({
+        queryKey: ['selfAttendance', fullUser?.id, fullUser?.schoolId],
+        queryFn: async () => {
             const res = await fetch(`/api/schools/${fullUser.schoolId}/attendance/mark?userId=${fullUser.id}`);
-            const result = await res.json();
-
             if (!res.ok) {
-                throw new Error(result.error || "Failed to fetch attendance data");
+                const err = await res.json();
+                throw new Error(err.error || "Failed to fetch attendance data");
             }
+            return res.json();
+        },
+        enabled: !!fullUser?.id && !!fullUser?.schoolId,
+        staleTime: 1000 * 30,
+        refetchInterval: 1000 * 60,
+    });
 
-            setData(result);
-        } catch (error) {
-            console.error("Fetch error:", error);
-            toast.error(error.message);
-        } finally {
-            setLoading(false);
-        }
-    };
+    // Fetch attendance history
+    const { data: historyData, isLoading: historyLoading } = useQuery({
+        queryKey: ['attendanceHistory', fullUser?.id, fullUser?.schoolId],
+        queryFn: async () => {
+            const res = await fetch(`/api/schools/${fullUser.schoolId}/attendance/user/${fullUser.id}?limit=10`);
+            if (!res.ok) return { records: [] };
+            return res.json();
+        },
+        enabled: !!fullUser?.id && !!fullUser?.schoolId,
+        staleTime: 1000 * 60 * 5,
+    });
 
-    useEffect(() => {
-        fetchAttendanceData();
-    }, [fullUser]);
-
-    const handleMarkAttendance = async (type) => {
-        if (!fullUser?.id || !fullUser?.schoolId) return;
-
-        try {
-            setActionLoading(true);
-
-            // Get location
-            let location = null;
-            if (data?.config?.enableGeoFencing) {
-                try {
-                    const pos = await new Promise((resolve, reject) => {
-                        navigator.geolocation.getCurrentPosition(resolve, reject, {
-                            enableHighAccuracy: true,
-                            timeout: 5000,
-                            maximumAge: 0
-                        });
-                    });
-                    location = {
-                        latitude: pos.coords.latitude,
-                        longitude: pos.coords.longitude,
-                    };
-                } catch (locError) {
-                    if (data.config.enableGeoFencing) {
-                        throw new Error("Location access required for attendance");
-                    }
-                }
-            }
-
+    // Mark attendance mutation
+    const markMutation = useMutation({
+        mutationFn: async ({ type, location }) => {
             const res = await fetch(`/api/schools/${fullUser.schoolId}/attendance/mark`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -89,27 +71,74 @@ export default function SelfAttendancePage() {
                     }
                 }),
             });
-
             const result = await res.json();
-
-            if (!res.ok) {
-                throw new Error(result.message || result.error || "Failed to mark attendance");
-            }
-
-            toast.success(result.message);
-            fetchAttendanceData(); // Refresh data
-        } catch (error) {
-            console.error("Marking error:", error);
+            if (!res.ok) throw new Error(result.message || result.error || "Failed to mark attendance");
+            return result;
+        },
+        onSuccess: (data) => {
+            toast.success(data.message);
+            queryClient.invalidateQueries(['selfAttendance']);
+            queryClient.invalidateQueries(['attendanceHistory']);
+        },
+        onError: (error) => {
             toast.error(error.message);
-        } finally {
-            setActionLoading(false);
         }
+    });
+
+    const handleMarkAttendance = async (type) => {
+        let location = null;
+
+        if (data?.config?.enableGeoFencing) {
+            try {
+                const pos = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        enableHighAccuracy: true,
+                        timeout: 5000,
+                        maximumAge: 0
+                    });
+                });
+                location = {
+                    latitude: pos.coords.latitude,
+                    longitude: pos.coords.longitude,
+                };
+            } catch (locError) {
+                toast.error("Location access required for attendance");
+                return;
+            }
+        }
+
+        markMutation.mutate({ type, location });
     };
 
-    if (loading && !data) {
+    // Loading state
+    if (isLoading && !data) {
         return (
-            <div className="flex items-center justify-center h-[calc(100vh-100px)]">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="p-6 space-y-6">
+                <div className="flex justify-between items-center">
+                    <Skeleton className="h-8 w-48" />
+                </div>
+                <div className="grid gap-4 md:grid-cols-4">
+                    {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
+                </div>
+                <div className="grid gap-4 lg:grid-cols-3">
+                    <Skeleton className="h-96 lg:col-span-2 rounded-xl" />
+                    <Skeleton className="h-96 rounded-xl" />
+                </div>
+            </div>
+        );
+    }
+
+    // Error state
+    if (error || data?.needsSetup) {
+        return (
+            <div className="p-6">
+                <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Attendance Not Configured</AlertTitle>
+                    <AlertDescription>
+                        {error?.message || "Attendance settings have not been configured for your school. Please contact your administrator."}
+                    </AlertDescription>
+                </Alert>
             </div>
         );
     }
@@ -118,11 +147,9 @@ export default function SelfAttendancePage() {
     const isCheckedIn = !!attendance?.checkInTime;
     const isCheckedOut = !!attendance?.checkOutTime;
 
-    // Determine button states
     const canCheckIn = isWorkingDay && windows?.checkIn?.isOpen && !isCheckedIn;
     const canCheckOut = isWorkingDay && windows?.checkOut?.isOpen && isCheckedIn && !isCheckedOut;
 
-    // Helper to format time
     const formatTime = (isoString) => {
         if (!isoString) return "--:--";
         return new Date(isoString).toLocaleTimeString("en-US", {
@@ -131,18 +158,82 @@ export default function SelfAttendancePage() {
         });
     };
 
+    const formatDate = (date) => {
+        return new Date(date).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric"
+        });
+    };
+
+    const getStatusBadge = (status) => {
+        const styles = {
+            PRESENT: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
+            LATE: "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
+            ABSENT: "bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300",
+            HALF_DAY: "bg-orange-100 text-orange-700 dark:bg-orange-950/50 dark:text-orange-300",
+            ON_LEAVE: "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
+        };
+        return styles[status] || "bg-gray-100 text-gray-700";
+    };
+
     return (
-        <div className="min-h-screen bg-background p-4 md:p-6 space-y-6">
-            <div className="flex flex-col gap-2">
-                <h1 className="text-3xl font-bold tracking-tight">Self Attendance</h1>
-                <p className="text-muted-foreground">
-                    Mark your daily attendance and view your monthly statistics.
-                </p>
+        <div className="p-6 space-y-6">
+            {/* Header */}
+            <div>
+                <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                    <Clock className="w-6 h-6 text-primary" />
+                    Self Attendance
+                </h1>
+                <p className="text-muted-foreground">Mark your daily attendance and view your statistics.</p>
             </div>
 
-            {/* Holiday / Non-Working Day Alert */}
+            {/* Stats Cards - Like Noticeboard */}
+            <div className="grid gap-4 md:grid-cols-4">
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Present Days</CardTitle>
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{monthlyStats?.presentDays || 0}</div>
+                        <p className="text-xs text-muted-foreground">This month</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Absent Days</CardTitle>
+                        <XCircle className="h-4 w-4 text-rose-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{monthlyStats?.absentDays || 0}</div>
+                        <p className="text-xs text-muted-foreground">This month</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Late Arrivals</CardTitle>
+                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{monthlyStats?.lateDays || 0}</div>
+                        <p className="text-xs text-muted-foreground">This month</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Attendance</CardTitle>
+                        <TrendingUp className="h-4 w-4 text-primary" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{monthlyStats?.attendancePercentage || 0}%</div>
+                        <p className="text-xs text-muted-foreground">Overall score</p>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Holiday Alert */}
             {!isWorkingDay && (
-                <Alert variant="default" className="bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900/50">
+                <Alert className="bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900/50">
                     <Coffee className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                     <AlertTitle className="text-amber-800 dark:text-amber-200 font-semibold">
                         No Attendance Required
@@ -154,104 +245,104 @@ export default function SelfAttendancePage() {
                 </Alert>
             )}
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="space-y-6">
                 {/* Main Action Card */}
-                <Card className="lg:col-span-2 border-primary/20 shadow-md">
-                    <CardHeader>
-                        <CardTitle className="flex items-center justify-between">
-                            <span>Today's Status</span>
-                            <Badge variant={isCheckedOut ? "secondary" : isCheckedIn ? "success" : "outline"} className="text-sm px-3 py-1">
-                                {isCheckedOut ? "Present (Completed)" : isCheckedIn ? "Checked In" : "Not Marked"}
+                <Card>
+                    <CardHeader className="pb-4">
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="text-lg">Today's Status</CardTitle>
+                            <Badge
+                                variant="outline"
+                                className={
+                                    isCheckedOut
+                                        ? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800"
+                                        : isCheckedIn
+                                            ? "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800"
+                                            : "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300"
+                                }
+                            >
+                                {isCheckedOut ? "✓ Completed" : isCheckedIn ? "● Working" : "○ Not Marked"}
                             </Badge>
-                        </CardTitle>
+                        </div>
                         <CardDescription>
                             {currentTime.toLocaleDateString("en-US", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-8">
-                        <div className="flex flex-col items-center justify-center py-6 space-y-6">
-                            <div className="text-5xl font-bold tabular-nums tracking-tight text-primary">
+                    <CardContent className="space-y-6">
+                        {/* Live Clock */}
+                        <div className="flex flex-col items-center justify-center py-4 space-y-4">
+                            <div className="text-4xl md:text-5xl font-bold tabular-nums tracking-tight text-primary">
                                 {currentTime.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                             </div>
 
-                            {/* Dynamic Action Button Section */}
-                            <div className="w-full max-w-md flex flex-col items-center gap-2">
-                                {/* Case 1: Not Checked In */}
+                            {/* Action Buttons */}
+                            <div className="w-full max-w-sm space-y-3">
                                 {!isCheckedIn && (
                                     <>
-                                        {isWorkingDay && windows?.checkIn?.isOpen ? (
-                                            <Button
-                                                size="lg"
-                                                className="w-full text-lg h-14"
-                                                onClick={() => handleMarkAttendance("CHECK_IN")}
-                                                disabled={actionLoading}
-                                            >
-                                                {actionLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}
-                                                Check In Now
-                                            </Button>
-                                        ) : (
-                                            <Button size="lg" className="w-full text-lg h-14" disabled variant="outline">
+                                        <Button
+                                            size="lg"
+                                            className="w-full h-12 text-base"
+                                            onClick={() => handleMarkAttendance("CHECK_IN")}
+                                            disabled={!canCheckIn || markMutation.isPending}
+                                        >
+                                            {markMutation.isPending ? (
+                                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                            ) : canCheckIn ? (
+                                                <CheckCircle2 className="mr-2 h-5 w-5" />
+                                            ) : (
                                                 <Lock className="mr-2 h-5 w-5" />
-                                                {!isWorkingDay ? "Holiday / Weekend" : "Check-in Closed"}
-                                            </Button>
-                                        )}
-
-                                        {/* Window Info */}
-                                        {isWorkingDay && !windows?.checkIn?.isOpen && (
-                                            <p className="text-sm text-muted-foreground">
-                                                Check-in window: <span className="font-medium">{formatTime(windows?.checkIn?.start)} - {formatTime(windows?.checkIn?.end)}</span>
+                                            )}
+                                            {!isWorkingDay ? "Holiday / Weekend" : canCheckIn ? "Check In Now" : "Check-in Closed"}
+                                        </Button>
+                                        {isWorkingDay && windows?.checkIn?.isOpen && (
+                                            <p className="text-sm text-center text-emerald-600 dark:text-emerald-400">
+                                                Window open until {formatTime(windows.checkIn.end)}
                                             </p>
                                         )}
-                                        {isWorkingDay && windows?.checkIn?.isOpen && (
-                                            <p className="text-sm text-emerald-600 font-medium">
-                                                Window open until {formatTime(windows.checkIn.end)}
+                                        {isWorkingDay && !windows?.checkIn?.isOpen && (
+                                            <p className="text-sm text-center text-muted-foreground">
+                                                Check-in: {formatTime(windows?.checkIn?.start)} - {formatTime(windows?.checkIn?.end)}
                                             </p>
                                         )}
                                     </>
                                 )}
 
-                                {/* Case 2: Checked In, Not Checked Out */}
                                 {isCheckedIn && !isCheckedOut && (
                                     <>
                                         <Button
                                             size="lg"
-                                            className="w-full text-lg h-14"
+                                            className="w-full h-12 text-base"
+                                            variant={canCheckOut ? "destructive" : "secondary"}
                                             onClick={() => handleMarkAttendance("CHECK_OUT")}
-                                            disabled={!canCheckOut || actionLoading}
-                                            variant="destructive"
+                                            disabled={!canCheckOut || markMutation.isPending}
                                         >
-                                            {actionLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <LogOut className="mr-2 h-5 w-5" />}
+                                            {markMutation.isPending ? (
+                                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                            ) : (
+                                                <LogOut className="mr-2 h-5 w-5" />
+                                            )}
                                             Check Out
                                         </Button>
-
-                                        <div className="text-center space-y-1">
-                                            <p className="text-sm">
-                                                Checked in at: <span className="font-medium">{formatTime(attendance.checkInTime)}</span>
+                                        <div className="text-center space-y-1 text-sm">
+                                            <p>In at <span className="font-semibold">{formatTime(attendance.checkInTime)}</span></p>
+                                            <p className="flex items-center justify-center gap-1">
+                                                <Timer className="h-4 w-4" />
+                                                <span className="font-mono font-bold text-primary">{attendance?.liveWorkingHours?.toFixed(2) || '0.00'} hrs</span>
                                             </p>
-                                            <p className="text-sm">
-                                                Working Hours: <span className="font-mono font-bold text-primary">{attendance?.liveWorkingHours} hrs</span>
-                                            </p>
-
-                                            {windows?.checkOut?.minTime && new Date() < new Date(windows.checkOut.minTime) && (
-                                                <p className="text-xs text-amber-600 font-medium mt-1">
-                                                    Minimum hours not met. Check out after {formatTime(windows.checkOut.minTime)}
-                                                </p>
-                                            )}
                                         </div>
                                     </>
                                 )}
 
-                                {/* Case 3: Completed */}
                                 {isCheckedOut && (
-                                    <div className="flex flex-col items-center gap-2 p-4 bg-muted/30 rounded-lg border w-full">
-                                        <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+                                    <div className="flex flex-col items-center gap-2 p-4 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                                        <CheckCircle2 className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
                                         <div className="text-center">
-                                            <p className="font-semibold text-lg">Attendance Completed</p>
+                                            <p className="font-semibold">Attendance Completed</p>
                                             <p className="text-sm text-muted-foreground">
                                                 {formatTime(attendance.checkInTime)} - {formatTime(attendance.checkOutTime)}
                                             </p>
-                                            <p className="text-sm font-medium mt-1">
-                                                Total: {attendance.workingHours} hrs
+                                            <p className="text-sm font-medium mt-1 text-emerald-700 dark:text-emerald-300">
+                                                Total: {attendance.workingHours?.toFixed(2)} hrs
                                             </p>
                                         </div>
                                     </div>
@@ -261,97 +352,102 @@ export default function SelfAttendancePage() {
 
                         <Separator />
 
+                        {/* Shift Info */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                            <div className="space-y-1">
+                            <div className="p-3 bg-muted/50 rounded-lg">
                                 <p className="text-xs text-muted-foreground uppercase font-medium">Shift Start</p>
-                                <p className="text-lg font-semibold">{formatTime(windows?.checkIn?.start)}</p>
+                                <p className="text-lg font-semibold mt-1">{config?.startTime || '--:--'}</p>
                             </div>
-                            <div className="space-y-1">
+                            <div className="p-3 bg-muted/50 rounded-lg">
                                 <p className="text-xs text-muted-foreground uppercase font-medium">Shift End</p>
-                                <p className="text-lg font-semibold">{formatTime(windows?.checkOut?.start)}</p>
+                                <p className="text-lg font-semibold mt-1">{config?.endTime || '--:--'}</p>
                             </div>
-                            <div className="space-y-1">
-                                <p className="text-xs text-muted-foreground uppercase font-medium">Late Threshold</p>
-                                <p className="text-lg font-semibold">{config?.gracePeriod} mins</p>
+                            <div className="p-3 bg-muted/50 rounded-lg">
+                                <p className="text-xs text-muted-foreground uppercase font-medium">Grace Period</p>
+                                <p className="text-lg font-semibold mt-1">{config?.gracePeriod || 0} mins</p>
                             </div>
-                            <div className="space-y-1">
+                            <div className="p-3 bg-muted/50 rounded-lg">
                                 <p className="text-xs text-muted-foreground uppercase font-medium">Min Hours</p>
-                                <p className="text-lg font-semibold">{config?.minWorkingHours} hrs</p>
+                                <p className="text-lg font-semibold mt-1">{config?.minWorkingHours || 0} hrs</p>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* Stats Card */}
-                <div className="space-y-6">
+                {/* Geofencing Info - Only show if enabled */}
+                {config?.enableGeoFencing && (
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Monthly Overview</CardTitle>
-                            <CardDescription>Statistics for {currentTime.toLocaleDateString("en-US", { month: 'long' })}</CardDescription>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <MapPin className="h-4 w-4 text-muted-foreground" />
+                                Location Required
+                            </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="space-y-2">
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Attendance Score</span>
-                                    <span className="font-bold">{monthlyStats?.attendancePercentage}%</span>
-                                </div>
-                                <Progress value={monthlyStats?.attendancePercentage || 0} className="h-2" />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-100 dark:border-emerald-900/50">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                                        <span className="text-sm font-medium text-emerald-900 dark:text-emerald-200">Present</span>
-                                    </div>
-                                    <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-100">{monthlyStats?.presentDays || 0}</p>
-                                </div>
-                                <div className="p-3 bg-rose-50 dark:bg-rose-950/30 rounded-lg border border-rose-100 dark:border-rose-900/50">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <XCircle className="h-4 w-4 text-rose-600" />
-                                        <span className="text-sm font-medium text-rose-900 dark:text-rose-200">Absent</span>
-                                    </div>
-                                    <p className="text-2xl font-bold text-rose-700 dark:text-rose-100">{monthlyStats?.absentDays || 0}</p>
-                                </div>
-                                <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-100 dark:border-amber-900/50">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <Clock className="h-4 w-4 text-amber-600" />
-                                        <span className="text-sm font-medium text-amber-900 dark:text-amber-200">Late</span>
-                                    </div>
-                                    <p className="text-2xl font-bold text-amber-700 dark:text-amber-100">{monthlyStats?.lateDays || 0}</p>
-                                </div>
-                                <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-100 dark:border-blue-900/50">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <CalendarDays className="h-4 w-4 text-blue-600" />
-                                        <span className="text-sm font-medium text-blue-900 dark:text-blue-200">Leaves</span>
-                                    </div>
-                                    <p className="text-2xl font-bold text-blue-700 dark:text-blue-100">{monthlyStats?.leaveDays || 0}</p>
-                                </div>
+                        <CardContent>
+                            <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
+                                <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                                <p>
+                                    You must be within <strong>{config.allowedRadius}m</strong> of school to mark attendance.
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
-
-                    {config?.enableGeoFencing && (
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-base flex items-center gap-2">
-                                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                                    Location Restriction
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex items-start gap-3 text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
-                                    <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
-                                    <p>
-                                        You must be within <strong>{config.allowedRadius}m</strong> of the school to mark attendance.
-                                        Please ensure location services are enabled.
-                                    </p>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
-                </div>
+                )}
             </div>
+
+            {/* Attendance History */}
+            <Card>
+                <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2">
+                        <History className="h-5 w-5 text-muted-foreground" />
+                        Recent Attendance
+                    </CardTitle>
+                    <CardDescription>Your attendance records from the last 10 days</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {historyLoading ? (
+                        <div className="space-y-2">
+                            {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+                        </div>
+                    ) : historyData?.records?.length > 0 ? (
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="hidden sm:table-cell">Check In</TableHead>
+                                        <TableHead className="hidden sm:table-cell">Check Out</TableHead>
+                                        <TableHead className="text-right">Hours</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {historyData.records.map((record) => (
+                                        <TableRow key={record.id}>
+                                            <TableCell className="font-medium">{formatDate(record.date)}</TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline" className={getStatusBadge(record.status)}>
+                                                    {record.status}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="hidden sm:table-cell">{formatTime(record.checkInTime)}</TableCell>
+                                            <TableCell className="hidden sm:table-cell">{formatTime(record.checkOutTime)}</TableCell>
+                                            <TableCell className="text-right font-mono">
+                                                {record.workingHours?.toFixed(1) || '-'}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                            <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <p>No attendance records yet</p>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
         </div>
     );
 }

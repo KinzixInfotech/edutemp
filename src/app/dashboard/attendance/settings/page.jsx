@@ -167,30 +167,6 @@ export default function AttendanceSettings() {
                 </Button>
             </div>
 
-            {/* Warning: School Timing Not Configured */}
-            {settings.defaultStartTime === '09:00' && settings.defaultEndTime === '17:00' && (
-                <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-start gap-3">
-                    <div className="bg-amber-100 dark:bg-amber-900/50 p-2 rounded-full shrink-0">
-                        <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                    </div>
-                    <div className="flex-1">
-                        <h3 className="font-semibold text-amber-900 dark:text-amber-100">School Timing Not Configured</h3>
-                        <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                            Your school hours and working days haven't been configured yet. The values shown here are defaults.
-                            Please configure them in <strong>General Settings → School Configuration</strong> for accurate attendance tracking.
-                        </p>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="mt-3 border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-200"
-                            onClick={() => window.location.href = '/dashboard/settings'}
-                        >
-                            Configure School Timing
-                        </Button>
-                    </div>
-                </div>
-            )}
-
             <Tabs defaultValue="working-hours" className="space-y-4">
                 <TabsList>
                     <TabsTrigger value="working-hours">Working Hours</TabsTrigger>
@@ -417,20 +393,34 @@ export default function AttendanceSettings() {
                                 />
                             </div>
 
-                            {/* {settings.autoMarkAbsent && (
-                                <div>
-                                    <Label>Auto-mark Time</Label>
-                                    <Input
-                                        type="time"
-                                        value={settings.autoMarkTime || '10:00'}
-                                        onChange={(e) => handleChange('autoMarkTime', e.target.value)}
-                                        className="mt-1"
-                                    />
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        Mark as absent if not checked-in by this time
-                                    </p>
+                            {settings.autoMarkAbsent && (
+                                <div className="space-y-4 p-4 bg-muted/30 rounded-lg border border-dashed">
+                                    <div className="flex items-start gap-3 p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+                                        <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
+                                        <div className="text-sm">
+                                            <p className="font-medium text-green-900 dark:text-green-100">Scheduled Daily at 10:30 PM IST</p>
+                                            <p className="text-green-700 dark:text-green-300 mt-1">
+                                                The auto-mark absent job runs every day at <strong>10:30 PM IST</strong>.
+                                                Students and staff who haven't checked in for that day will be automatically marked as absent.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                                        <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                                        <div className="text-sm">
+                                            <p className="font-medium text-blue-900 dark:text-blue-100">How it works</p>
+                                            <ul className="text-blue-700 dark:text-blue-300 mt-1 list-disc list-inside space-y-1">
+                                                <li>Runs automatically every night at 10:30 PM IST</li>
+                                                <li>Checks all working days (Mon-Sat, excluding holidays)</li>
+                                                <li>Marks students/staff as absent if no check-in recorded</li>
+                                                <li>Sends <strong>grouped notifications</strong> to students &amp; parents</li>
+                                                <li>Notifications include student name, class, section, and all absent dates</li>
+                                            </ul>
+                                        </div>
+                                    </div>
                                 </div>
-                            )} */}
+                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>

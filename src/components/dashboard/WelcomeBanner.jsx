@@ -1,10 +1,9 @@
 'use client';
 import { useEffect, useState, useMemo } from 'react';
-import { ChevronRight, BarChart3, Plus, Sparkles, Loader2, Star } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
+import { ChevronRight, Sparkles, Loader2, Star } from 'lucide-react';
 import { useDashboardContext } from '@/hooks/useDashboardContext';
 import { useAiInsights } from '@/hooks/useAiInsights';
+import Image from 'next/image';
 
 // Typing effect hook
 function useTypingEffect(text, speed = 30, enabled = true) {
@@ -38,13 +37,20 @@ function useTypingEffect(text, speed = 30, enabled = true) {
     return { displayedText, isComplete };
 }
 
+// Get initials from name
+function getInitials(name) {
+    if (!name) return 'U';
+    const parts = name.trim().split(' ');
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+}
+
 export default function WelcomeBanner({ fullUser, schoolName }) {
     const [greeting, setGreeting] = useState('');
 
     // Fetch AI context and insights
     const { data: context, isLoading: contextLoading } = useDashboardContext(fullUser?.schoolId);
     const { data: insightsData, isLoading: insightsLoading } = useAiInsights(fullUser?.schoolId, context?.aiAllowed);
-
 
     // Get time-based greeting
     useEffect(() => {
@@ -70,8 +76,7 @@ export default function WelcomeBanner({ fullUser, schoolName }) {
         if (!context?.aiAllowed) {
             const dayType = context?.dayType;
             if (dayType === 'SUNDAY') {
-                return `Good ${greeting}, ${firstName}
-                . It's Sunday! School is closed today. Enjoy your weekend and prepare for the upcoming week.`;
+                return `Good ${greeting}, ${firstName}. It's Sunday! School is closed today. Enjoy your weekend and prepare for the upcoming week.`;
             } else if (dayType === 'HOLIDAY') {
                 return `Good ${greeting}, ${firstName}. Happy ${context?.holidayName || 'Holiday'}! School is closed today. Enjoy your time off.`;
             } else if (dayType === 'VACATION') {
@@ -82,18 +87,15 @@ export default function WelcomeBanner({ fullUser, schoolName }) {
 
         // AI is allowed - use summary paragraph if available
         if (insightsData?.summary) {
-            // Strip any greeting from AI summary to prevent duplicates like "Good night, Good morning"
             let cleanSummary = insightsData.summary
                 .replace(/^(Good\s+)?(morning|afternoon|evening|night)[!,.\s]*/i, '')
                 .trim();
-            // Capitalize first letter if needed
             if (cleanSummary) {
                 cleanSummary = cleanSummary.charAt(0).toUpperCase() + cleanSummary.slice(1);
             }
             return `Good ${greeting}, ${firstName}. ${cleanSummary}`;
         }
 
-        // Fallback: use first insight if no summary
         if (insightsData?.insights?.length > 0) {
             return `Good ${greeting}, ${firstName}. ${insightsData.insights[0]}`;
         }
@@ -107,13 +109,15 @@ export default function WelcomeBanner({ fullUser, schoolName }) {
     const firstName = fullUser?.name?.split(' ')[0] || 'Admin';
     const roleName = fullUser?.role?.name === 'ADMIN' ? 'Administrator' : fullUser?.role?.name || 'User';
     const school = schoolName || fullUser?.school?.name || 'School';
+    const userImage = fullUser?.profilePicture;
+    const initials = getInitials(fullUser?.name);
 
     return (
-        <div className="rounded-2xl bg-white border dark:bg-[#1a1a1d] p-6 mb-3">
+        <div className="rounded-2xl bg-white border dark:bg-[#1a1a1d] p-4 sm:p-6 mb-3">
             {/* Header Row */}
-            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-6">
+            <div className="flex items-start justify-between gap-4 mb-6">
                 {/* Left: Breadcrumb + Greeting */}
-                <div>
+                <div className="flex-1 min-w-0">
                     {/* Breadcrumb */}
                     <div className="flex items-center gap-1.5 text-xs mb-3">
                         <span className="text-gray-500 dark:text-gray-400 font-medium">DASHBOARD</span>
@@ -122,7 +126,7 @@ export default function WelcomeBanner({ fullUser, schoolName }) {
                     </div>
 
                     {/* Greeting */}
-                    <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-1">
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-1">
                         Welcome back, <span className="text-primary">{firstName}</span>
                     </h1>
 
@@ -132,27 +136,39 @@ export default function WelcomeBanner({ fullUser, schoolName }) {
                     </p>
                 </div>
 
-                {/* Right: Action Buttons */}
-                <div className="flex items-center gap-3 flex-shrink-0">
-                    <Button className="gap-2 bg-primary hover:bg-primary/90 text-white rounded-lg px-5">
-                        <Plus className="w-4 h-4" />
-                        Quick Action
-                    </Button>
-                    {/* <Link href="/dashboard/fees/reports">
-                        <Button variant="outline" className="gap-2 rounded-lg px-5 border-gray-300 dark:border-gray-700">
-                            <BarChart3 className="w-4 h-4" />
-                            Reports
-                        </Button>
-                    </Link> */}
+                {/* Right: User Profile Image */}
+                <div className="flex-shrink-0">
+                    <div className="relative">
+                        {/* Profile Image/Avatar */}
+                        <div className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-full overflow-hidden ring-4 ring-gray-100 dark:ring-gray-800 bg-gradient-to-br from-primary/20 to-primary/40">
+                            {userImage ? (
+                                <img
+                                    src={userImage}
+                                    alt={fullUser?.name || 'User'}
+                                    width={80}
+                                    height={80}
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary to-primary/80">
+                                    <span className="text-lg sm:text-xl md:text-2xl font-bold text-white">
+                                        {initials}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                        {/* Online indicator */}
+                        <div className="absolute bottom-0 right-0 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-green-500 rounded-full ring-2 ring-white dark:ring-[#1a1a1d]" />
+                    </div>
                 </div>
             </div>
 
             {/* AI Briefing Card */}
-            <div className="flex items-start gap-4 bg-[#f8fafc] dark:bg-[#222225] rounded-xl p-4 border border-gray-100 dark:border-gray-800">
+            <div className="flex items-start gap-3 sm:gap-4 bg-[#f8fafc] dark:bg-[#222225] rounded-xl p-3 sm:p-4 border border-gray-100 dark:border-gray-800">
                 {/* Left: Sparkle Icon */}
-                <div className="flex-shrink-0 mt-1">
-                    <div className="p-2 bg-blue-100 dark:bg-blue-900/40 rounded-lg">
-                        <Sparkles className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <div className="flex-shrink-0 mt-0.5">
+                    <div className="p-1.5 sm:p-2 bg-blue-100 dark:bg-blue-900/40 rounded-lg">
+                        <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400" />
                     </div>
                 </div>
 
@@ -160,16 +176,16 @@ export default function WelcomeBanner({ fullUser, schoolName }) {
                 <div className="flex-1 min-w-0">
                     {/* Header */}
                     <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wide">
+                        <span className="text-[10px] sm:text-xs font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wide">
                             AI {greeting.toUpperCase()} BRIEFING
                         </span>
-                        <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded uppercase">
+                        <span className="px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-bold bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded uppercase">
                             SMART
                         </span>
                     </div>
 
                     {/* Message */}
-                    <div className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+                    <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
                         {isLoading ? (
                             <span className="flex items-center gap-2 text-gray-400">
                                 <Loader2 className="w-3 h-3 animate-spin" />

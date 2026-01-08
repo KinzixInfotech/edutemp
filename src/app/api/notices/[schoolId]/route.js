@@ -14,18 +14,20 @@ export async function GET(request, props) {
 
         // Filters
         const category = searchParams.get('category');
-        const status = searchParams.get('status') || 'PUBLISHED';
+        const status = searchParams.get('status'); // Don't default to PUBLISHED - allow all
         const priority = searchParams.get('priority');
         const userId = searchParams.get('userId');
+        const creatorId = searchParams.get('creatorId'); // Filter by notice creator (for admin manage page)
         const limit = parseInt(searchParams.get('limit') || '50');
         const page = parseInt(searchParams.get('page') || '1');
         const skip = (page - 1) * limit;
 
         const where = {
             schoolId,
-            status,
+            ...(status && { status }), // Only filter by status if provided
             ...(category && category !== 'All' && { category }),
             ...(priority && { priority }),
+            ...(creatorId && { createdById: creatorId }), // Filter by creator
         };
 
         // Generate cache key based on all query params
@@ -35,6 +37,7 @@ export async function GET(request, props) {
             status,
             priority,
             userId,
+            creatorId,
             limit,
             page
         });

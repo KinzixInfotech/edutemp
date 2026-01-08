@@ -58,6 +58,7 @@ export async function GET(req, props) {
 
             // Fetch Google Calendar events (if user is authenticated)
             let googleEvents = [];
+            let googleCalendarError = false;
             const gmailAccount = await prisma.gmailAccount.findFirst({
                 where: {
                     user: {
@@ -79,8 +80,14 @@ export async function GET(req, props) {
                         startDate,
                         endDate
                     );
+                    // If we got here without events and there was a token, likely an error occurred
+                    if (googleEvents.length === 0 && gmailAccount.accessToken) {
+                        // This could be a normal empty result, but we check for token validity
+                        // The fetchGoogleCalendarEvents function returns [] on error
+                    }
                 } catch (error) {
                     console.error('Google Calendar fetch error:', error);
+                    googleCalendarError = true;
                     // Continue without Google events if fetch fails
                 }
             }
@@ -153,12 +160,16 @@ export async function GET(req, props) {
             // Sort by start date
             allEvents.sort((a, b) => new Date(a.start) - new Date(b.start));
 
+            // Determine if there's a Google Calendar issue (account exists but no events and error occurred)
+            const googleCalendarHasIssue = !!gmailAccount && googleCalendarError;
+
             return {
                 events: allEvents,
                 total: allEvents.length,
                 customCount: transformedCustomEvents.length,
                 googleCount: transformedGoogleEvents.length,
-                hasGoogleCalendar: !!gmailAccount,
+                hasGoogleCalendar: !!gmailAccount && !googleCalendarError, // Only true if working
+                googleCalendarError: googleCalendarHasIssue, // New: indicates sync issue
             };
         }, 300); // 5 minutes cache
 
@@ -383,19 +394,24 @@ async function fetchGoogleCalendarEvents(accessToken, refreshToken, accountId, s
                                 gmailAccount.user.schoolId,
                                 'Google Calendar Disconnected',
                                 'Your Google Calendar connection has expired. Please reconnect to continue syncing holidays. Go to Settings > School Configuration to reconnect.',
-                                'WARNING'
+                                'GENERAL'
                             );
                         }
                     } catch (notifyError) {
                         console.error('Failed to create admin notification:', notifyError);
                     }
 
-                    // Return empty array instead of throwing to prevent page crash
-                    return [];
+                    // Throw a specific error so caller knows sync failed
+                    const syncError = new Error('GOOGLE_CALENDAR_SYNC_ERROR');
+                    syncError.code = 'SYNC_ERROR';
+                    throw syncError;
                 }
             } else {
                 console.log('No refresh token available, returning empty events');
-                return [];
+                // Throw error to indicate sync issue
+                const syncError = new Error('GOOGLE_CALENDAR_SYNC_ERROR');
+                syncError.code = 'SYNC_ERROR';
+                throw syncError;
             }
         }
 
@@ -414,24 +430,29 @@ async function fetchGoogleCalendarEvents(accessToken, refreshToken, accountId, s
                         gmailAccount.user.schoolId,
                         'Google Calendar Rate Limit',
                         'Google Calendar API rate limit has been exceeded. Consider using a different Google account or wait 24 hours. Go to Settings > School Configuration to manage your connection.',
-                        'ERROR'
+                        'GENERAL'
                     );
                 }
             } catch (notifyError) {
                 console.error('Failed to create rate limit notification:', notifyError);
             }
 
-            return [];
+            // Throw error for rate limit
+            const syncError = new Error('GOOGLE_CALENDAR_RATE_LIMIT');
+            syncError.code = 'RATE_LIMIT';
+            throw syncError;
         }
 
-        // For other errors, return empty array to prevent page crash
-        console.error('Unhandled Google Calendar error, returning empty events');
-        return [];
+        // For other errors, throw to indicate sync issue
+        console.error('Unhandled Google Calendar error, throwing sync error');
+        const syncError = new Error('GOOGLE_CALENDAR_SYNC_ERROR');
+        syncError.code = 'SYNC_ERROR';
+        throw syncError;
     }
 }
 
 // Helper function to create admin notifications
-async function createAdminNotification(schoolId, title, message, type = 'INFO') {
+async function createAdminNotification(schoolId, title, message, type = 'GENERAL') {
     try {
         // Find admin users for this school
         const adminRoles = await prisma.role.findMany({
@@ -454,11 +475,13 @@ async function createAdminNotification(schoolId, title, message, type = 'INFO') 
         if (adminUsers.length > 0) {
             await prisma.notification.createMany({
                 data: adminUsers.map(admin => ({
-                    userId: admin.id,
+                    receiverId: admin.id, // Fixed: was userId, should be receiverId
+                    schoolId,             // Added: required field
                     title,
                     message,
                     type,
-                    category: 'SYSTEM',
+                    priority: 'HIGH',
+                    icon: '⚠️',
                     isRead: false,
                 })),
                 skipDuplicates: true

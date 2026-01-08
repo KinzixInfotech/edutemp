@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -341,69 +341,107 @@ export default function SchoolCalendar() {
     if (!schoolId || !userId) return <LoaderPage />;
 
     return (
-        <div className="h-full flex flex-col gap-6 p-4 md:p-6">
+        <div className="p-6 space-y-6">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="space-y-1">
-                    <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-3 text-primary">
-                        <Calendar className="w-7 h-7 sm:w-8 sm:h-8 text-primary" />
-                        <span>Calendar</span>
+                    <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                        <Calendar className="w-6 h-6 text-primary" />
+                        School Calendar
                     </h1>
-                    <p className="text-sm text-muted-foreground">
-                        Manage school events and schedules
-                    </p>
+                    <p className="text-muted-foreground">Manage school events and schedules</p>
                 </div>
-                {/* Show sync status badge only */}
-                {hasGoogleCalendar ? (
-                    <Badge variant="outline" className="gap-1.5 px-3 py-1.5">
-                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                        <span className="text-xs">Google Synced</span>
-                    </Badge>
-                ) : (
-                    <Badge variant="outline" className="gap-1.5 px-3 py-1.5 bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800">
-                        <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                        <span className="text-xs text-yellow-700 dark:text-yellow-400">Not Synced</span>
-                    </Badge>
-                )}
+                <div className="flex items-center gap-2">
+                    {/* Show sync status badge - 3 states: connected, error, not connected */}
+                    {eventsData?.googleCalendarError ? (
+                        <Badge variant="outline" className="gap-1.5 px-3 py-1.5 bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800">
+                            <div className="w-2 h-2 rounded-full bg-red-500" />
+                            <span className="text-xs text-red-700 dark:text-red-400">Sync Error</span>
+                        </Badge>
+                    ) : hasGoogleCalendar ? (
+                        <Badge variant="outline" className="gap-1.5 px-3 py-1.5 bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                            <span className="text-xs text-green-700 dark:text-green-400">Google Synced</span>
+                        </Badge>
+                    ) : (
+                        <Badge variant="outline" className="gap-1.5 px-3 py-1.5 bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800">
+                            <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                            <span className="text-xs text-yellow-700 dark:text-yellow-400">Not Synced</span>
+                        </Badge>
+                    )}
+                    <Button onClick={() => setIsCreateOpen(true)}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        New Event
+                    </Button>
+                </div>
             </div>
 
-            <div className="flex flex-col lg:flex-row gap-6 flex-1">
+            {/* Stats Cards - Consistent with other pages */}
+            <div className="grid gap-4 md:grid-cols-4">
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Total Events</CardTitle>
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{eventStats.total}</div>
+                        <p className="text-xs text-muted-foreground">This month</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Holidays</CardTitle>
+                        <Sparkles className="h-4 w-4 text-red-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{eventStats.holidays}</div>
+                        <p className="text-xs text-muted-foreground">Scheduled holidays</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Exams</CardTitle>
+                        <Clock className="h-4 w-4 text-purple-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{eventStats.exams}</div>
+                        <p className="text-xs text-muted-foreground">Exam events</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Meetings</CardTitle>
+                        <Bell className="h-4 w-4 text-blue-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{eventStats.meetings}</div>
+                        <p className="text-xs text-muted-foreground">Scheduled meetings</p>
+                    </CardContent>
+                </Card>
+            </div>
+
+            <div className="flex flex-col lg:flex-row gap-6">
                 {/* Main Calendar */}
-                <div className="flex-1 flex flex-col">
-                    <Card className="flex-1 flex flex-col border hover:border-border/80 transition-all">
+                <div className="flex-1">
+                    <Card>
                         <CardContent className="p-4 md:p-6 flex flex-col h-full">
                             {/* Calendar Header */}
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                                 <div className="flex items-center gap-3">
-                                    <h2 className="text-xl md:text-2xl font-bold">{monthYear}</h2>
-                                    {/* {hasGoogleCalendar && (
-                                        <Badge variant="outline" className="gap-1.5 px-2.5 py-1">
-                                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                                            <span className="text-xs">Google Synced</span>
-                                        </Badge>
-                                    )} */}
+                                    <h2 className="text-xl font-bold">{monthYear}</h2>
                                 </div>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <Button variant="outline" size="sm" onClick={handleToday} className="gap-1.5">
-                                        <Calendar className="h-3.5 w-3.5" />
+                                <div className="flex items-center gap-2">
+                                    <Button variant="outline" size="sm" onClick={handleToday}>
                                         Today
                                     </Button>
-                                    <div className="flex items-center gap-1">
-                                        <Button variant="outline" size="icon" className="h-9 w-9" onClick={handlePrevMonth}>
+                                    <div className="flex items-center">
+                                        <Button variant="outline" size="icon" className="h-8 w-8 rounded-r-none border-r-0" onClick={handlePrevMonth}>
                                             <ChevronLeft className="h-4 w-4" />
                                         </Button>
-                                        <Button variant="outline" size="icon" className="h-9 w-9" onClick={handleNextMonth}>
+                                        <Button variant="outline" size="icon" className="h-8 w-8 rounded-l-none" onClick={handleNextMonth}>
                                             <ChevronRight className="h-4 w-4" />
                                         </Button>
                                     </div>
-                                    <Button
-                                        size="sm"
-                                        onClick={() => setIsCreateOpen(true)}
-                                        className="gap-1.5"
-                                    >
-                                        <Plus className="h-4 w-4" />
-                                        New Event
-                                    </Button>
                                 </div>
                             </div>
 
@@ -522,19 +560,19 @@ export default function SchoolCalendar() {
 
                 {/* Enhanced Sidebar - Collapsible on mobile */}
                 <div className="w-full lg:w-80 xl:w-96">
-                    <Card className="border transition-all">
-                        <CardContent className="p-4 sm:p-6">
-                            <div className="flex items-center justify-between mb-4 sm:mb-5">
-                                <h3 className="text-base sm:text-lg font-bold flex items-center gap-2">
-                                    <div className="p-1.5 sm:p-2 bg-primary/10 rounded-lg">
-                                        <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-                                    </div>
+                    <Card className="border transition-all h-full">
+                        <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2">
+                                    <Clock className="h-5 w-5 text-primary" />
                                     <span>Upcoming</span>
-                                </h3>
-                                <Badge variant="outline" className="font-semibold text-xs sm:text-sm">
+                                </CardTitle>
+                                <Badge variant="secondary" className="font-semibold text-xs">
                                     {upcomingEvents.length} events
                                 </Badge>
                             </div>
+                        </CardHeader>
+                        <CardContent>
                             <div className="space-y-2 sm:space-y-3 max-h-[300px] lg:max-h-[600px] overflow-y-auto scrollbar-thin pr-1">
                                 {upcomingEvents.length === 0 ? (
                                     <div className="text-center py-12">

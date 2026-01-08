@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
 import { useAuth } from "@/context/AuthContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
+import { PiGraduationCapDuotone } from "react-icons/pi";
 import logocllight from '../../public/cl_light_edu.png';
 import logocldark from '../../public/cl_dark_edu.png';
 
@@ -60,6 +60,7 @@ import {
     Receipt,
     HandCoins,
     FileText,
+    GraduationCap,
 } from "lucide-react"
 import { useCommandMenu } from "./CommandMenuContext"
 import { cn } from "@/lib/utils"
@@ -732,9 +733,13 @@ export function AppSidebar({ ...props }) {
                         >
                             <div>
                                 {!isCollapsed ? (
-                                    <Image src={logo} width={195} height={200} alt="EduBreezy" />
+                                    <div className="flex bg-muted p-2 rounded-lg  w-full items-center justify-center">
+                                        <Image src={logo} width={195} height={200} alt="EduBreezy" />
+                                    </div>
                                 ) : (
-                                    <Image src={logoCl} width={60} height={40} alt="EduBreezy" className="object-cover" />
+                                    <div className="bg-muted p-2 rounded-lg ">
+                                        <PiGraduationCapDuotone className="text-black dark:text-white group-hover:scale-110  group-hover:text-primary group-hover:cursor-pointer transition-all" size={20} />
+                                    </div>
                                 )}
                             </div>
                         </SidebarMenuButton>

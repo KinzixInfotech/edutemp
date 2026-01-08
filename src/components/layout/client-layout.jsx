@@ -8,7 +8,7 @@ import "nprogress/nprogress.css";
 import dynamic from "next/dynamic";
 import { useAuth } from "@/context/AuthContext";
 import pkg from "../../../package.json";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 import { useLoader } from "@/app/dashboard/context/Loader";
@@ -26,16 +26,78 @@ import { AcademicYearSetupBannerProvider } from "../AcademicYearSetupBanner";
 import axios from "axios";
 import { toast } from "sonner";
 import { WebPushListener } from "@/components/web-push-listener";
+import { PiGraduationCapDuotone } from "react-icons/pi";
 
 const TopProgressBar = dynamic(() => import("@/app/components/TopProgressBar"), {
     ssr: false,
 });
 
+// Custom CSS keyframes for graduation cap animation
+const spinnerStyles = `
+@keyframes graduationPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+}
+
+@keyframes spinCircle {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+`;
+
 export default function ClientLayout({ children }) {
     const { loadingMsg, fullUser } = useAuth();
-
-
     const [isDbDown, setIsDbDown] = useState(false);
+    const [isNavigating, setIsNavigating] = useState(false);
+    const pathname = usePathname();
+    const previousPathname = useRef(pathname);
+
+    // Detect navigation within /dashboard/ routes
+    useEffect(() => {
+        // Check if we're in dashboard route
+        const isDashboardRoute = pathname?.startsWith('/dashboard');
+
+        // If pathname changed and we're in dashboard, show loading briefly
+        if (previousPathname.current !== pathname && isDashboardRoute) {
+            setIsNavigating(true);
+            // Hide after a short delay (page should be loaded by then)
+            const timer = setTimeout(() => {
+                setIsNavigating(false);
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+
+        previousPathname.current = pathname;
+    }, [pathname]);
+
+    // Listen for route changes via click events on links
+    useEffect(() => {
+        const handleClick = (e) => {
+            const link = e.target.closest('a');
+            if (link && link.href && link.href.includes('/dashboard')) {
+                const url = new URL(link.href);
+                if (url.pathname !== pathname && url.pathname.startsWith('/dashboard')) {
+                    setIsNavigating(true);
+                }
+            }
+        };
+
+        document.addEventListener('click', handleClick);
+        return () => document.removeEventListener('click', handleClick);
+    }, [pathname]);
+
+    // Reset navigation state when pathname changes
+    useEffect(() => {
+        setIsNavigating(false);
+    }, [pathname]);
 
     // Global Error Interceptor for Fetch and Axios
     useEffect(() => {
@@ -146,40 +208,11 @@ export default function ClientLayout({ children }) {
     }));
 
     const router = useRouter();
-    const pathname = usePathname();
     const [loading, setLoading] = useState(false);
-    // useEffect(() => {
-    //     const checkUser = async () => {
-    //         const { data: { session } } = await supabase.auth.getSession();
-
-    //         if (!session?.user) {
-    //             // Not logged in → redirect to login
-    //             router.push("/login");
-    //         } else {
-    //             // Logged in
-    //             setLoading(false);
-    //         }
-    //     };
-
-    //     checkUser();
-
-    //     // Optional: listen to auth state changes (logout elsewhere)
-    //     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-    //         (_event, session) => {
-    //             if (!session?.user) {
-    //                 router.push("/login");
-    //             }
-    //         }
-    //     );
-
-    //     return () => subscription.unsubscribe();
-    // }, [router]);
 
     if (loading) {
         return <LoaderPage showmsg={false} />; // or a spinner
     }
-
-
 
     const hideUI = ["/dashboard/login"].includes(pathname);
 
@@ -187,6 +220,9 @@ export default function ClientLayout({ children }) {
         <NetworkStatusProvider>
             <AcademicYearSetupBannerProvider>
                 <QueryClientProvider client={queryClient}>
+                    {/* Inject animation styles */}
+                    <style dangerouslySetInnerHTML={{ __html: spinnerStyles }} />
+
                     <SidebarProvider
                         style={{
                             "--sidebar-width": "calc(var(--spacing) * 72)",
@@ -203,8 +239,41 @@ export default function ClientLayout({ children }) {
 
                             {!hideUI && <BreadcrumbHeader schoolName={fullUser?.school?.name} />}
 
-                            <main className="w-full h-full relative ">
-                                {/* {!hideUI && <DynamicBreadcrumb />} */}
+                            <main className="w-full h-full relative">
+                                {/* Navigation Loading Spinner */}
+                                {isNavigating && pathname?.startsWith('/dashboard') && (
+                                    <div
+                                        className="fixed top-0 right-0 bottom-0 flex items-center justify-center bg-background/80 backdrop-blur-sm z-50"
+                                        style={{ left: 'var(--sidebar-width, 0px)' }}
+                                    >
+                                        <div className="flex flex-col items-center gap-3">
+                                            {/* Spinning circle around graduation cap */}
+                                            <div className="relative">
+                                                {/* Outer spinning circle */}
+                                                <div
+                                                    className="absolute inset-0 rounded-full border-4 border-primary/20 border-t-primary"
+                                                    style={{
+                                                        width: '5rem',
+                                                        height: '5rem',
+                                                        animation: 'spinCircle 1s linear infinite'
+                                                    }}
+                                                />
+                                                {/* Graduation cap in center (pulse/zoom only) */}
+                                                <div
+                                                    className="w-20 h-20 flex items-center justify-center"
+                                                    style={{ animation: 'graduationPulse 0.8s ease-in-out infinite' }}
+                                                >
+                                                    <PiGraduationCapDuotone
+                                                        className="text-primary"
+                                                        style={{ fontSize: '2.5rem' }}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <span className="text-sm text-muted-foreground animate-pulse">Loading</span>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {loading ? (
                                     <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-50">
                                         <Loader2 className="h-10 w-10 animate-spin text-primary" />

@@ -125,15 +125,15 @@ export default function NoticeAdminPage() {
 
     const watchedValues = watch();
 
-    // Fetch notices
+    // Fetch notices - only notices created by current user
     const { data: noticesData, isLoading } = useQuery({
-        queryKey: ['notices', schoolId],
+        queryKey: ['notices', schoolId, fullUser?.id],
         queryFn: async () => {
-            const res = await fetch(`/api/notices/${schoolId}?limit=100`);
+            const res = await fetch(`/api/notices/${schoolId}?limit=100&creatorId=${fullUser?.id}`);
             if (!res.ok) throw new Error('Failed to fetch notices');
             return res.json();
         },
-        enabled: !!schoolId,
+        enabled: !!schoolId && !!fullUser?.id,
     });
 
     const notices = noticesData?.notices || [];

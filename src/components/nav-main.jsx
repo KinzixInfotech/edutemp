@@ -54,6 +54,26 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
 
     const unreadNoticesCount = noticesData?.unreadCount || 0
 
+    // Fetch attendance window status for indicator
+    const { data: attendanceStatus } = useQuery({
+        queryKey: ['attendance-status', fullUser?.id, fullUser?.schoolId],
+        queryFn: async () => {
+            if (!fullUser?.id || !fullUser?.schoolId) return null
+            const res = await fetch(`/api/schools/${fullUser.schoolId}/attendance/mark?userId=${fullUser.id}`)
+            if (!res.ok) return null
+            return res.json()
+        },
+        enabled: !!fullUser?.id && !!fullUser?.schoolId,
+        staleTime: 1000 * 60, // 1 minute
+        refetchInterval: 1000 * 60 * 2 // Refetch every 2 minutes
+    })
+
+    // Determine if attendance action is needed
+    const isCheckInOpen = attendanceStatus?.isWorkingDay && attendanceStatus?.windows?.checkIn?.isOpen && !attendanceStatus?.attendance?.checkInTime
+    const isCheckOutOpen = attendanceStatus?.isWorkingDay && attendanceStatus?.windows?.checkOut?.isOpen && attendanceStatus?.attendance?.checkInTime && !attendanceStatus?.attendance?.checkOutTime
+    const attendanceActionNeeded = isCheckInOpen || isCheckOutOpen
+
+
     const handleClick = () => setLoading(true)
 
     const normalize = (path) => path?.replace(/\/$/, "")
@@ -247,12 +267,19 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                 >
                                                     <SidebarMenuButton
                                                         asChild
-                                                        className={`w-full font-medium hover:bg-zinc-100 dark:hover:bg-zinc-800/60 py-4 transition-all duration-150 rounded-lg ${isActive
+                                                        className={`w-full font-medium relative hover:bg-zinc-100 dark:hover:bg-zinc-800/60 py-4 transition-all duration-150 rounded-lg ${isActive
                                                             ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" : ""
                                                             }`}
                                                     >
                                                         <Link href={item.url} onClick={handleClick}>
                                                             {item.icon && <item.icon className="w-4 h-4" />}
+                                                            {/* Pulsing indicator for Self Attendance in collapsed mode */}
+                                                            {item.label === "Self Attendance" && attendanceActionNeeded && (
+                                                                <span className="absolute top-1 right-1 flex h-2 w-2">
+                                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                                                </span>
+                                                            )}
                                                         </Link>
                                                     </SidebarMenuButton>
                                                 </SidebarMenuItem>
@@ -278,6 +305,13 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                 <div className="flex items-center gap-2">
                                                     {item.icon && <item.icon className="w-4 h-4" />}
                                                     <span>{item.label}</span>
+                                                    {/* Pulsing indicator for Self Attendance when action needed */}
+                                                    {item.label === "Self Attendance" && attendanceActionNeeded && (
+                                                        <span className="relative flex h-2 w-2">
+                                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 {/* Badge for Noticeboard */}
                                                 {item.label === "Noticeboard" && unreadNoticesCount > 0 && (

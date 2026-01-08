@@ -1,5 +1,5 @@
 // app/api/schools/[schoolId]/attendance/stats/route.js
-// Comprehensive attendance statistics and analytics
+// Comprehensive attendance statistics and analytics with caching
 
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
@@ -9,31 +9,140 @@ import { remember, generateKey } from "@/lib/cache";
 
 // GET - Fetch attendance statistics
 export async function GET(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     const { schoolId } = params;
     const { searchParams } = new URL(req.url);
 
     const userId = searchParams.get('userId');
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
     const month = searchParams.get('month');
     const year = searchParams.get('year');
     const classId = searchParams.get('classId');
+    const fullYear = searchParams.get('fullYear') === 'true'; // New param for full academic year data
 
     try {
+        // Get active academic year first (needed for cache key)
+        const academicYear = await prisma.academicYear.findFirst({
+            where: { schoolId, isActive: true },
+            select: { id: true, startDate: true, endDate: true }
+        });
+
+        if (!academicYear) {
+            return errorResponse('No active academic year', 404);
+        }
+
+        // For full year data (optimized for parent child attendance view)
+        if (fullYear && userId) {
+            const cacheKey = generateKey('attendance:fullYear', {
+                schoolId,
+                userId,
+                academicYearId: academicYear.id
+            });
+
+            const result = await remember(cacheKey, async () => {
+                // Fetch ALL attendance records for the academic year in one query
+                const [allAttendance, allMonthlyStats, studentInfo] = await Promise.all([
+                    prisma.attendance.findMany({
+                        where: {
+                            userId,
+                            schoolId,
+                            date: {
+                                gte: academicYear.startDate,
+                                lte: academicYear.endDate
+                            }
+                        },
+                        orderBy: { date: 'desc' },
+                        select: {
+                            id: true,
+                            date: true,
+                            status: true,
+                            checkInTime: true,
+                            checkOutTime: true,
+                            remarks: true
+                        }
+                    }),
+
+                    // Get all monthly stats for the academic year
+                    prisma.attendanceStats.findMany({
+                        where: {
+                            userId,
+                            academicYearId: academicYear.id
+                        },
+                        orderBy: [{ year: 'asc' }, { month: 'asc' }]
+                    }),
+
+                    // Get student info (admission date for calculating from join)
+                    prisma.student.findUnique({
+                        where: { userId },
+                        select: {
+                            admissionDate: true,
+                            rollNumber: true,
+                            admissionNo: true
+                        }
+                    })
+                ]);
+
+                // Calculate overall stats (from academic year start or admission date)
+                const effectiveStartDate = studentInfo?.admissionDate &&
+                    new Date(studentInfo.admissionDate) > new Date(academicYear.startDate)
+                    ? studentInfo.admissionDate
+                    : academicYear.startDate;
+
+                // Aggregate all monthly stats for overall calculation
+                const overallStats = allMonthlyStats.reduce((acc, stat) => ({
+                    totalWorkingDays: acc.totalWorkingDays + (stat.totalWorkingDays || 0),
+                    totalPresent: acc.totalPresent + (stat.totalPresent || 0),
+                    totalAbsent: acc.totalAbsent + (stat.totalAbsent || 0),
+                    totalHalfDay: acc.totalHalfDay + (stat.totalHalfDay || 0),
+                    totalLate: acc.totalLate + (stat.totalLate || 0),
+                    totalLeaves: acc.totalLeaves + (stat.totalLeaves || 0),
+                }), {
+                    totalWorkingDays: 0,
+                    totalPresent: 0,
+                    totalAbsent: 0,
+                    totalHalfDay: 0,
+                    totalLate: 0,
+                    totalLeaves: 0,
+                });
+
+                // Calculate overall attendance percentage
+                overallStats.attendancePercentage = overallStats.totalWorkingDays > 0
+                    ? ((overallStats.totalPresent + overallStats.totalLate + (overallStats.totalHalfDay * 0.5)) / overallStats.totalWorkingDays) * 100
+                    : 0;
+
+                // Calculate streak from all attendance
+                const streak = calculateStreak(allAttendance);
+
+                return {
+                    userId,
+                    academicYear: {
+                        id: academicYear.id,
+                        startDate: academicYear.startDate,
+                        endDate: academicYear.endDate
+                    },
+                    studentInfo: {
+                        admissionDate: studentInfo?.admissionDate,
+                        rollNumber: studentInfo?.rollNumber,
+                        admissionNo: studentInfo?.admissionNo,
+                        effectiveStartDate
+                    },
+                    // Overall stats for the entire academic year
+                    overallStats,
+                    // All monthly stats for breakdown
+                    monthlyStats: allMonthlyStats,
+                    // All attendance records for calendar view (client will filter)
+                    allAttendance,
+                    streak,
+                    totalRecords: allAttendance.length
+                };
+            }, 600); // 10 minutes cache for full year data
+
+            return apiResponse(result);
+        }
+
+        // Original monthly stats logic (for backwards compatibility)
         const cacheKey = generateKey('attendance:stats', { schoolId, userId, month, year, classId });
 
         const result = await remember(cacheKey, async () => {
-            // Get active academic year
-            const academicYear = await prisma.academicYear.findFirst({
-                where: { schoolId, isActive: true },
-                select: { id: true, startDate: true, endDate: true }
-            });
-
-            if (!academicYear) {
-                throw new Error('No active academic year');
-            }
-
             // 1. USER-SPECIFIC STATS
             if (userId) {
                 const currentMonth = month ? parseInt(month) : new Date().getMonth() + 1;
@@ -200,7 +309,6 @@ export async function GET(req, props) {
             };
         }, 300); // 5 minutes cache
 
-        // Stats is an object, not an array, so return as-is
         return apiResponse(result);
 
     } catch (error) {
@@ -211,7 +319,7 @@ export async function GET(req, props) {
 
 // POST - Force recalculate stats
 export async function POST(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     const { schoolId } = params;
     const body = await req.json();
     const { userId, month, year } = body;
