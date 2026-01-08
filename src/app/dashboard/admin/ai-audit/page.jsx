@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useQuery } from '@tanstack/react-query';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,16 +25,12 @@ import { Sparkles, Download, RefreshCw, ChevronLeft, ChevronRight, DollarSign, C
 import Link from 'next/link';
 import LoaderPage from '@/components/loader-page';
 
-const supabase = createClientComponentClient();
-
 // Fetch AI usage logs
 async function fetchAiUsage({ schoolId, limit, offset, startDate, endDate }) {
     const { data: { session } } = await supabase.auth.getSession();
-
     if (!session?.access_token) {
         throw new Error('Not authenticated');
     }
-
     const params = new URLSearchParams({
         schoolId,
         limit: limit.toString(),

@@ -6,6 +6,7 @@ export async function GET(request) {
     const requestUrl = new URL(request.url);
     const code = requestUrl.searchParams.get('code');
     const next = requestUrl.searchParams.get('next') || '/reset-password';
+    const appRedirect = requestUrl.searchParams.get('appRedirect');
 
     if (code) {
         const cookieStore = await cookies();
@@ -47,5 +48,9 @@ export async function GET(request) {
     }
 
     // URL to redirect to after sign in process completes
-    return NextResponse.redirect(new URL(next, request.url));
+    const redirectUrl = new URL(next, request.url);
+    if (appRedirect) {
+        redirectUrl.searchParams.set('appRedirect', appRedirect);
+    }
+    return NextResponse.redirect(redirectUrl);
 }

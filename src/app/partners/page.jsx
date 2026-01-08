@@ -34,7 +34,7 @@ export default function PartnersPage() {
             <WhyPartnerSection />
 
             {/* Partner Types Section */}
-            <PartnerTypesSection />
+            {/* <PartnerTypesSection /> */}
 
             {/* How It Works Section */}
             <HowItWorksSection />

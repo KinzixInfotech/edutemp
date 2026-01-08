@@ -1,15 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Mail, ArrowRight, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Mail, ArrowRight, Loader2, ArrowLeft, CheckCircle2, Smartphone } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { Suspense } from 'react';
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordContent() {
+    const searchParams = useSearchParams();
+    const redirectTo = searchParams.get('redirectTo');
+    const isFromApp = redirectTo === 'edubreezy';
+
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
     const [submitted, setSubmitted] = useState(false);
@@ -42,8 +48,13 @@ export default function ForgotPasswordPage() {
             }
 
             // 2. If exists, send reset link via Supabase
+            // Include the redirectTo param if user came from app
+            const callbackUrl = isFromApp
+                ? `${window.location.origin}/auth/callback?next=/reset-password&appRedirect=edubreezy`
+                : `${window.location.origin}/auth/callback?next=/reset-password`;
+
             const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+                redirectTo: callbackUrl,
             });
 
             if (error) {
@@ -80,11 +91,24 @@ export default function ForgotPasswordPage() {
                         We've sent a password reset link to <br />
                         <span className="font-medium text-gray-900">{email}</span>
                     </p>
-                    <Link href="/login">
-                        <Button variant="outline" className="w-full h-11 border-gray-200 hover:bg-gray-50 text-gray-700">
-                            Back to Login
-                        </Button>
-                    </Link>
+                    {isFromApp && (
+                        <div className="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                            <div className="flex items-center gap-2 justify-center text-blue-700 mb-2">
+                                <Smartphone className="w-4 h-4" />
+                                <span className="font-semibold text-sm">From EduBreezy App</span>
+                            </div>
+                            <p className="text-sm text-blue-600">
+                                After resetting your password, you'll be redirected back to the app.
+                            </p>
+                        </div>
+                    )}
+                    {!isFromApp && (
+                        <Link href="/login">
+                            <Button variant="outline" className="w-full h-11 border-gray-200 hover:bg-gray-50 text-gray-700">
+                                Back to Login
+                            </Button>
+                        </Link>
+                    )}
                 </div>
             </div>
         );
@@ -94,9 +118,19 @@ export default function ForgotPasswordPage() {
         <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4 font-sans">
             <div className="w-full max-w-[480px] bg-white rounded-[32px] shadow-2xl shadow-gray-200/50 p-8 sm:p-12 relative overflow-hidden">
 
+                {/* App Badge */}
+                {isFromApp && (
+                    <div className="absolute top-6 right-6">
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 rounded-full border border-blue-100">
+                            <Smartphone className="w-3.5 h-3.5 text-blue-600" />
+                            <span className="text-xs font-semibold text-blue-700">App</span>
+                        </div>
+                    </div>
+                )}
+
                 {/* Header */}
                 <div className="text-center mb-10">
-                    <div className="w-14 h-14 bg-[#0166fb] rounded-full flex items-center justify-center mx-auto mb-6">
+                    <div className="w-14 h-14 bg-[#0b5cde] rounded-full flex items-center justify-center mx-auto mb-6">
                         <Mail className="w-7 h-7 text-white" />
                     </div>
                     <h1 className="text-2xl font-bold text-gray-900 mb-2">
@@ -117,7 +151,7 @@ export default function ForgotPasswordPage() {
                                 placeholder="name@example.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="h-12 bg-gray-50 border focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 rounded-xl transition-all font-medium text-gray-900 placeholder:text-gray-400"
+                                className="h-12 bg-gray-50 border focus:bg-white focus:border-[#0b5cde] focus:ring-4 focus:ring-[#0b5cde]/10 rounded-xl transition-all font-medium text-gray-900 placeholder:text-gray-400"
                                 required
                                 autoFocus
                             />
@@ -127,7 +161,7 @@ export default function ForgotPasswordPage() {
                     <Button
                         type="submit"
                         disabled={loading}
-                        className="w-full h-12 bg-[#0068fe] hover:bg-[#0068fe]/80 text-white font-medium rounded-lg active:scale-[0.98] transition-all duration-300"
+                        className="w-full h-12 bg-[#0b5cde] hover:bg-[#0b5cde]/90 text-white font-medium rounded-lg active:scale-[0.98] transition-all duration-300"
                     >
                         {loading ? (
                             <>
@@ -143,13 +177,27 @@ export default function ForgotPasswordPage() {
                     </Button>
                 </form>
 
-                <div className="mt-8 pt-6 border-t border-gray-100 text-center">
-                    <Link href="/login" className="text-sm font-semibold text-gray-500 hover:text-gray-900 inline-flex items-center gap-2 transition-colors">
-                        <ArrowLeft className="w-4 h-4" />
-                        Back to Login
-                    </Link>
-                </div>
+                {!isFromApp && (
+                    <div className="mt-8 pt-6 border-t border-gray-100 text-center">
+                        <Link href="/login" className="text-sm font-semibold text-gray-500 hover:text-gray-900 inline-flex items-center gap-2 transition-colors">
+                            <ArrowLeft className="w-4 h-4" />
+                            Back to Login
+                        </Link>
+                    </div>
+                )}
             </div>
         </div>
+    );
+}
+
+export default function ForgotPasswordPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-[#0b5cde]" />
+            </div>
+        }>
+            <ForgotPasswordContent />
+        </Suspense>
     );
 }

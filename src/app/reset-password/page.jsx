@@ -1,24 +1,29 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Lock, Eye, EyeOff, Loader2, CheckCircle2, Smartphone } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import Image from 'next/image';
+import { Suspense } from 'react';
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const appRedirect = searchParams.get('appRedirect');
+    const isFromApp = appRedirect === 'edubreezy';
+
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [verifying, setVerifying] = useState(true);
     const [session, setSession] = useState(null);
+    const [success, setSuccess] = useState(false);
 
     useEffect(() => {
         // Check for active session (established via callback)
@@ -38,6 +43,11 @@ export default function ResetPasswordPage() {
 
         return () => subscription.unsubscribe();
     }, []);
+
+    const handleAppRedirect = () => {
+        // Redirect to the EduBreezy app using the custom scheme
+        window.location.href = 'edubreezy://password-reset-success';
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -83,11 +93,15 @@ export default function ResetPasswordPage() {
             }
 
             toast.success('Password updated successfully');
+            setSuccess(true);
 
-            // 3. Redirect to login
-            setTimeout(() => {
-                router.push('/login');
-            }, 2000);
+            // For app users, show success with redirect button
+            // For web users, auto-redirect to login
+            if (!isFromApp) {
+                setTimeout(() => {
+                    router.push('/login');
+                }, 2000);
+            }
 
         } catch (error) {
             console.error('Update password error:', error);
@@ -102,7 +116,7 @@ export default function ResetPasswordPage() {
     if (verifying) {
         return (
             <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                <Loader2 className="w-8 h-8 animate-spin text-[#0b5cde]" />
             </div>
         );
     }
@@ -118,11 +132,57 @@ export default function ResetPasswordPage() {
                     <p className="text-gray-500 mb-8">
                         The password reset link is invalid or has expired. Please request a new one.
                     </p>
-                    <Link href="/forgot-password">
-                        <Button className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl">
+                    <Link href={isFromApp ? "/forgot-password?redirectTo=edubreezy" : "/forgot-password"}>
+                        <Button className="w-full h-11 bg-[#0b5cde] hover:bg-[#0b5cde]/90 text-white font-medium rounded-xl">
                             Request New Link
                         </Button>
                     </Link>
+                </div>
+            </div>
+        );
+    }
+
+    // Success state
+    if (success) {
+        return (
+            <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4 font-sans">
+                <div className="w-full max-w-[480px] bg-white rounded-[32px] shadow-2xl shadow-gray-200/50 p-8 sm:p-12 text-center">
+                    <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <CheckCircle2 className="w-8 h-8 text-green-600" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Password Updated!</h2>
+                    <p className="text-gray-500 mb-8">
+                        Your password has been successfully updated.
+                    </p>
+
+                    {isFromApp ? (
+                        <div className="space-y-4">
+                            <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 mb-6">
+                                <div className="flex items-center gap-2 justify-center text-blue-700 mb-2">
+                                    <Smartphone className="w-4 h-4" />
+                                    <span className="font-semibold text-sm">Return to App</span>
+                                </div>
+                                <p className="text-sm text-blue-600">
+                                    Click the button below to return to the EduBreezy app and log in with your new password.
+                                </p>
+                            </div>
+                            <Button
+                                onClick={handleAppRedirect}
+                                className="w-full h-12 bg-[#0b5cde] hover:bg-[#0b5cde]/90 text-white font-medium rounded-lg"
+                            >
+                                <Smartphone className="w-4 h-4 mr-2" />
+                                Open EduBreezy App
+                            </Button>
+                            <p className="text-xs text-gray-400 mt-4">
+                                If the button doesn't work, please open the app manually and log in.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <p className="text-sm text-gray-500">Redirecting to login...</p>
+                            <Loader2 className="w-6 h-6 animate-spin text-[#0b5cde] mx-auto" />
+                        </div>
+                    )}
                 </div>
             </div>
         );
@@ -132,10 +192,20 @@ export default function ResetPasswordPage() {
         <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4 font-sans">
             <div className="w-full max-w-[480px] bg-white rounded-[32px] shadow-2xl shadow-gray-200/50 p-8 sm:p-12 relative overflow-hidden">
 
+                {/* App Badge */}
+                {isFromApp && (
+                    <div className="absolute top-6 right-6">
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 rounded-full border border-blue-100">
+                            <Smartphone className="w-3.5 h-3.5 text-blue-600" />
+                            <span className="text-xs font-semibold text-blue-700">App</span>
+                        </div>
+                    </div>
+                )}
+
                 {/* Header */}
                 <div className="text-center mb-10">
-                    <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                        <Lock className="w-7 h-7 text-[#0166fb]" />
+                    <div className="w-14 h-14 bg-[#0b5cde]/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                        <Lock className="w-7 h-7 text-[#0b5cde]" />
                     </div>
                     <h1 className="text-2xl font-bold text-gray-900 mb-2">
                         Set New Password
@@ -154,7 +224,7 @@ export default function ResetPasswordPage() {
                                 type={showPassword ? 'text' : 'password'}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="h-12 bg-gray-50 border focus:bg-white focus:border-[#0166fb] focus:ring-4 focus:ring-[#0166fb]/10 rounded-lg transition-all font-medium text-gray-900 placeholder:text-gray-400 pr-10"
+                                className="h-12 bg-gray-50 border focus:bg-white focus:border-[#0b5cde] focus:ring-4 focus:ring-[#0b5cde]/10 rounded-lg transition-all font-medium text-gray-900 placeholder:text-gray-400 pr-10"
                                 required
                                 minLength={6}
                                 placeholder="••••••••"
@@ -176,7 +246,7 @@ export default function ResetPasswordPage() {
                             type="password"
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
-                            className="h-12 bg-gray-50 border focus:bg-white focus:border-[#0166fb] focus:ring-4 focus:ring-[#0166fb]/10 rounded-lg transition-all font-medium text-gray-900 placeholder:text-gray-400"
+                            className="h-12 bg-gray-50 border focus:bg-white focus:border-[#0b5cde] focus:ring-4 focus:ring-[#0b5cde]/10 rounded-lg transition-all font-medium text-gray-900 placeholder:text-gray-400"
                             required
                             minLength={6}
                             placeholder="••••••••"
@@ -186,7 +256,7 @@ export default function ResetPasswordPage() {
                     <Button
                         type="submit"
                         disabled={loading}
-                        className="w-full h-12 bg-[#0166fb] hover:bg-[#0166fb]/80 text-white font-medium rounded-lg active:scale-[0.98] transition-all duration-300"
+                        className="w-full h-12 bg-[#0b5cde] hover:bg-[#0b5cde]/90 text-white font-medium rounded-lg active:scale-[0.98] transition-all duration-300"
                     >
                         {loading ? (
                             <>
@@ -199,11 +269,23 @@ export default function ResetPasswordPage() {
                     </Button>
                 </form>
 
-                {/* Optional Footer/Branding */}
+                {/* Footer */}
                 <div className="mt-8 pt-6 border-t border-gray-100 text-center">
                     <p className="text-xs text-gray-400">Secure Password Reset · EduBreezy</p>
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function ResetPasswordPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-[#0b5cde]" />
+            </div>
+        }>
+            <ResetPasswordContent />
+        </Suspense>
     );
 }
