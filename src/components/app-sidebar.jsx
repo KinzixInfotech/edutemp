@@ -558,6 +558,7 @@ export const SidebarData = [
                     { label: "Trips", url: "/dashboard/schools/transport/trips", roles: ["ADMIN"] },
                     { label: "Student Assignment", url: "/dashboard/schools/transport/student-assign", roles: ["ADMIN"] },
                     { label: "Bus Requests", url: "/dashboard/schools/transport/requests", roles: ["ADMIN"] },
+                    { label: "Live Tracking", url: "/dashboard/transport/live-tracking", roles: ["ADMIN", "PRINCIPAL", "DIRECTOR"] },
                 ],
             },
         ],

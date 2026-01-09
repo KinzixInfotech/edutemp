@@ -879,6 +879,8 @@ model Vehicle {
   pucNumber          String?
   pucExpiry          DateTime?
   status             String // e.g., "active", "maintenance", "inactive"
+  trackingStatus     String?             @default("OFFLINE") // MOVING, IDLE, OFFLINE
+  lastLocationTime   DateTime?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   school             School              @relation(fields: [schoolId], references: [id])
@@ -5330,4 +5332,37 @@ model AiActionPolicy {
   feature   String   @unique // DASHBOARD_INSIGHTS, FEES, ATTENDANCE
   enabled   Boolean  @default(true)
   createdAt DateTime @default(now())
+}
+
+// ============================================
+// CRON NOTIFICATION SYSTEM
+// ============================================
+
+// Track sent cron notifications (deduplication + audit)
+model CronNotificationLog {
+  id       String   @id @default(uuid()) @db.Uuid
+  schoolId String   @db.Uuid
+  userId   String   @db.Uuid
+  ruleType String // ATTENDANCE_REMINDER, FEE_DUE, MARKED_ABSENT, etc.
+  ruleKey  String // Unique key (e.g., "absent_2024-01-09_userId")
+  title    String
+  message  String
+  priority String   @default("NORMAL") // NORMAL, HIGH, CRITICAL
+  sentAt   DateTime @default(now())
+
+  @@unique([userId, ruleKey]) // Prevent duplicate notifications
+  @@index([schoolId, sentAt])
+  @@index([userId, ruleType, sentAt])
+  @@index([sentAt])
+}
+
+// Daily limit tracker (max 3 pushes/user/day)
+model NotificationDailyLimit {
+  id     String   @id @default(uuid()) @db.Uuid
+  userId String   @db.Uuid
+  date   DateTime @db.Date
+  count  Int      @default(0)
+
+  @@unique([userId, date])
+  @@index([date])
 }
