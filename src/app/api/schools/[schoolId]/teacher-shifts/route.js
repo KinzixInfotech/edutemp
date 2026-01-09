@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 
 // GET /api/schools/[schoolId]/teacher-shifts
 export async function GET(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     try {
         const { schoolId } = params;
         const { searchParams } = new URL(req.url);
@@ -66,7 +66,7 @@ export async function GET(req, props) {
 
 // POST /api/schools/[schoolId]/teacher-shifts
 export async function POST(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     try {
         const { schoolId } = params;
         const body = await req.json();
@@ -127,6 +127,7 @@ export async function POST(req, props) {
             );
         }
 
+        // Manual shift creation - mark as override so timetable sync won't overwrite it
         const shift = await prisma.teacherShift.create({
             data: {
                 schoolId,
@@ -138,6 +139,8 @@ export async function POST(req, props) {
                 date: shiftDate,
                 roomNumber: roomNumber || null,
                 notes: notes || null,
+                isOverride: true, // Mark as override since admin manually created it
+                timetableEntryId: null, // No link to timetable (manual creation)
             },
             include: {
                 class: { select: { className: true } },

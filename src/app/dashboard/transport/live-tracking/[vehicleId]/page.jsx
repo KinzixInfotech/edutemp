@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { GoogleMap, useLoadScript, Marker, Polyline } from "@react-google-maps/api";
+import { GoogleMap, useLoadScript, Marker, Polyline, OverlayView } from "@react-google-maps/api";
 import { useState, useCallback, useRef, useEffect } from "react";
 import { ArrowLeft, Bus, MapPin, Clock, Phone, User, Navigation, RefreshCw, Users, Route, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -97,9 +97,9 @@ export default function SingleBusTrackingPage() {
 
     const getStatusBadge = (status) => {
         switch (status) {
-            case "MOVING": return <Badge className="bg-green-100 text-green-800 text-lg px-4 py-1">🟢 Moving</Badge>;
-            case "IDLE": return <Badge className="bg-yellow-100 text-yellow-800 text-lg px-4 py-1">🟡 Idle</Badge>;
-            default: return <Badge className="bg-red-100 text-red-800 text-lg px-4 py-1">🔴 Offline</Badge>;
+            case "MOVING": return <Badge className="bg-green-500/20 text-green-600 dark:text-green-400 border border-green-500/30 text-sm px-4 py-1.5 rounded-full font-semibold">Moving</Badge>;
+            case "IDLE": return <Badge className="bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border border-yellow-500/30 text-sm px-4 py-1.5 rounded-full font-semibold">Idle</Badge>;
+            default: return <Badge className="bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30 text-sm px-4 py-1.5 rounded-full font-semibold">Offline</Badge>;
         }
     };
 
@@ -190,13 +190,63 @@ export default function SingleBusTrackingPage() {
                                     mapTypeControl: false,
                                 }}
                             >
-                                {/* Bus Marker */}
+                                {/* Bus Marker with Number Plate Label */}
                                 {location && (
-                                    <Marker
-                                        position={{ lat: location.latitude, lng: location.longitude }}
-                                        icon={getBusIcon(status)}
-                                        title={vehicle?.licensePlate}
-                                    />
+                                    <>
+                                        {/* Number Plate Label */}
+                                        <OverlayView
+                                            position={{ lat: location.latitude, lng: location.longitude }}
+                                            mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                                            getPixelPositionOffset={() => ({ x: 0, y: 0 })}
+                                        >
+                                            <div
+                                                style={{
+                                                    transform: 'translate(-50%, -70px)',
+                                                    display: 'inline-block',
+                                                    overflow: 'visible'
+                                                }}
+                                            >
+                                                {/* Number Plate Badge */}
+                                                <div
+                                                    style={{
+                                                        backgroundColor: status === 'MOVING' ? '#10B981' : status === 'IDLE' ? '#F59E0B' : '#EF4444',
+                                                        padding: '6px 16px',
+                                                        borderRadius: '8px',
+                                                        color: 'white',
+                                                        fontSize: '14px',
+                                                        fontWeight: 'bold',
+                                                        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                                                        border: '2px solid white',
+                                                        whiteSpace: 'nowrap',
+                                                        display: 'inline-block'
+                                                    }}
+                                                >
+                                                    {vehicle?.licensePlate}
+                                                </div>
+                                                {/* Arrow pointing down */}
+                                                <div
+                                                    style={{
+                                                        width: 0,
+                                                        height: 0,
+                                                        margin: '0 auto',
+                                                        borderLeft: '8px solid transparent',
+                                                        borderRight: '8px solid transparent',
+                                                        borderTop: `8px solid ${status === 'MOVING' ? '#10B981' : status === 'IDLE' ? '#F59E0B' : '#EF4444'}`,
+                                                    }}
+                                                />
+                                            </div>
+                                        </OverlayView>
+
+                                        {/* Bus Icon Marker */}
+                                        <Marker
+                                            position={{ lat: location.latitude, lng: location.longitude }}
+                                            icon={{
+                                                url: `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="${status === 'MOVING' ? '#10B981' : status === 'IDLE' ? '#F59E0B' : '#EF4444'}" stroke="white" stroke-width="3"/><path d="M14 18h20c1.1 0 2 .9 2 2v8c0 1.1-.9 2-2 2H14c-1.1 0-2-.9-2-2v-8c0-1.1.9-2 2-2z" fill="white"/><circle cx="17" cy="32" r="2" fill="white"/><circle cx="31" cy="32" r="2" fill="white"/><rect x="15" y="20" width="4" height="4" rx="0.5" fill="${status === 'MOVING' ? '#10B981' : status === 'IDLE' ? '#F59E0B' : '#EF4444'}"/><rect x="21" y="20" width="4" height="4" rx="0.5" fill="${status === 'MOVING' ? '#10B981' : status === 'IDLE' ? '#F59E0B' : '#EF4444'}"/><rect x="27" y="20" width="4" height="4" rx="0.5" fill="${status === 'MOVING' ? '#10B981' : status === 'IDLE' ? '#F59E0B' : '#EF4444'}"/></svg>`)}`,
+                                                scaledSize: new window.google.maps.Size(44, 44),
+                                                anchor: new window.google.maps.Point(22, 22),
+                                            }}
+                                        />
+                                    </>
                                 )}
 
                                 {/* Route Polyline */}

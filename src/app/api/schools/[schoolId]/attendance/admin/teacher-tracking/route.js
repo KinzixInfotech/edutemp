@@ -3,18 +3,16 @@ import { NextResponse } from 'next/server';
 
 export async function GET(req, props) {
     const params = await props.params;
-    const { schoolId } = params; // Fix: await params
+    const { schoolId } = params;
     const { searchParams } = new URL(req.url);
 
     const dateParam = searchParams.get('date');
     let today;
 
     if (dateParam) {
-        // Parse YYYY-MM-DD and store as UTC midnight
         const [year, month, day] = dateParam.split('-').map(Number);
-        today = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0)); // Use UTC!
+        today = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
     } else {
-        // Get current date in IST, then convert to UTC midnight
         const now = new Date();
         const istOffset = 5.5 * 60 * 60 * 1000;
         const istTime = new Date(now.getTime() + istOffset);
@@ -24,79 +22,74 @@ export async function GET(req, props) {
         today = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
     }
 
-    const teacherId = searchParams.get('teacherId');
-
     try {
-        console.log('Querying date:', today.toISOString()); // Debug log
-
-        // Build where clause
-        const where = {
-            schoolId,
-            date: today,
-            user: {
-                role: { name: 'TEACHING_STAFF' }
+        // STEP 1: Fetch ALL teaching staff (not just those with attendance records)
+        const allTeachers = await prisma.user.findMany({
+            where: {
+                schoolId,
+                role: { name: 'TEACHING_STAFF' },
+                status: 'ACTIVE'
             },
-            ...(teacherId && { userId: teacherId })
-        };
-
-        // Fetch all teacher attendance with device and location info
-        const teacherAttendance = await prisma.attendance.findMany({
-            where,
-            include: {
-                user: {
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                profilePicture: true,
+                teacher: {
                     select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                        profilePicture: true,
-                        teacher: {
-                            select: {
-                                employeeId: true,
-                                designation: true,
-                                department: {
-                                    select: { name: true }
-                                }
-                            }
+                        employeeId: true,
+                        designation: true,
+                        department: {
+                            select: { name: true }
                         }
                     }
                 }
             },
-            orderBy: [
-                { status: 'asc' },
-                { checkInTime: 'asc' }
-            ]
+            orderBy: { name: 'asc' }
         });
 
-        console.log('Found records:', teacherAttendance.length); // Debug log
+        // STEP 2: Fetch today's attendance for all teachers
+        const todayAttendance = await prisma.attendance.findMany({
+            where: {
+                schoolId,
+                date: today,
+                userId: { in: allTeachers.map(t => t.id) }
+            }
+        });
 
-        // Calculate streaks and format data
+        // Create a map for quick lookup
+        const attendanceMap = new Map();
+        todayAttendance.forEach(att => {
+            attendanceMap.set(att.userId, att);
+        });
+
+        // STEP 3: Merge teachers with their attendance data
         const trackingData = await Promise.all(
-            teacherAttendance.map(async (att) => {
-                const streak = await calculateStreak(att.userId, schoolId);
+            allTeachers.map(async (teacher) => {
+                const att = attendanceMap.get(teacher.id);
+                const streak = await calculateStreak(teacher.id, schoolId);
 
-                // Parse location data
-                const checkInLoc = att.checkInLocation;
-                const checkOutLoc = att.checkOutLocation;
-
-                // Parse device info
-                const device = att.deviceInfo || {};
+                // Parse location and device info if attendance exists
+                const checkInLoc = att?.checkInLocation;
+                const checkOutLoc = att?.checkOutLocation;
+                const device = att?.deviceInfo || {};
 
                 return {
-                    userId: att.user.id,
-                    name: att.user.name,
-                    email: att.user.email,
-                    profilePicture: att.user.profilePicture,
-                    employeeId: att.user.teacher?.employeeId,
-                    designation: att.user.teacher?.designation,
-                    department: att.user.teacher?.department?.name,
+                    userId: teacher.id,
+                    name: teacher.name,
+                    email: teacher.email,
+                    profilePicture: teacher.profilePicture,
+                    employeeId: teacher.teacher?.employeeId,
+                    designation: teacher.teacher?.designation,
+                    department: teacher.teacher?.department?.name,
 
-                    // Attendance info
-                    status: att.status,
-                    checkInTime: att.checkInTime,
-                    checkOutTime: att.checkOutTime,
-                    workingHours: att.workingHours || 0,
-                    isLateCheckIn: att.isLateCheckIn,
-                    lateByMinutes: att.lateByMinutes,
+                    // Attendance info (null if no attendance record)
+                    status: att?.status || null,
+                    checkInTime: att?.checkInTime || null,
+                    checkOutTime: att?.checkOutTime || null,
+                    workingHours: att?.workingHours || 0,
+                    isLateCheckIn: att?.isLateCheckIn || false,
+                    lateByMinutes: att?.lateByMinutes || 0,
 
                     // Location data
                     checkInLocation: checkInLoc ? {
@@ -114,31 +107,33 @@ export async function GET(req, props) {
                     } : null,
 
                     // Device info
-                    deviceInfo: {
+                    deviceInfo: att ? {
                         deviceId: device.deviceId || 'Unknown',
                         platform: device.platform || 'Unknown',
                         osVersion: device.osVersion || 'Unknown',
                         appVersion: device.appVersion || 'Unknown'
-                    },
+                    } : null,
 
                     // Streak
-                    consecutiveDays: streak,
+                    streak,
 
                     // Additional
-                    remarks: att.remarks,
-                    markedAt: att.markedAt
+                    remarks: att?.remarks || null,
+                    markedAt: att?.markedAt || null
                 };
             })
         );
 
         // Calculate summary stats
+        const checkedIn = trackingData.filter(t => t.checkInTime);
         const summary = {
             total: trackingData.length,
-            checkedIn: trackingData.filter(t => t.checkInTime).length,
+            checkedIn: checkedIn.length,
+            notCheckedIn: trackingData.length - checkedIn.length,
             checkedOut: trackingData.filter(t => t.checkOutTime).length,
             late: trackingData.filter(t => t.isLateCheckIn).length,
-            avgWorkingHours: trackingData.length > 0
-                ? (trackingData.reduce((sum, t) => sum + t.workingHours, 0) / trackingData.length).toFixed(2)
+            avgWorkingHours: checkedIn.length > 0
+                ? (checkedIn.reduce((sum, t) => sum + t.workingHours, 0) / checkedIn.length).toFixed(2)
                 : 0
         };
 

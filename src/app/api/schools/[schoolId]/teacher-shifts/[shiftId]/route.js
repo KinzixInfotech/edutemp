@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 
 // DELETE /api/schools/[schoolId]/teacher-shifts/[shiftId]
 export async function DELETE(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     try {
         const { schoolId, shiftId } = params;
 
@@ -39,7 +39,7 @@ export async function DELETE(req, props) {
 
 // PUT /api/schools/[schoolId]/teacher-shifts/[shiftId]
 export async function PUT(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     try {
         const { schoolId, shiftId } = params;
         const body = await req.json();
@@ -119,6 +119,7 @@ export async function PUT(req, props) {
             }
         }
 
+        // Manual shift update - mark as override so timetable sync won't overwrite it
         const updatedShift = await prisma.teacherShift.update({
             where: {
                 id: shiftId,
@@ -133,6 +134,7 @@ export async function PUT(req, props) {
                 ...(roomNumber !== undefined && { roomNumber }),
                 ...(notes !== undefined && { notes }),
                 ...(status && { status }),
+                isOverride: true, // Mark as override since admin manually edited it
             },
             include: {
                 class: { select: { className: true } },
@@ -148,6 +150,76 @@ export async function PUT(req, props) {
         console.error('Error updating teacher shift:', error);
         return NextResponse.json(
             { error: 'Failed to update teacher shift' },
+            { status: 500 }
+        );
+    }
+}
+
+// PATCH /api/schools/[schoolId]/teacher-shifts/[shiftId]/reset
+// Reset an override shift back to timetable sync
+export async function PATCH(req, props) {
+    const params = await props.params;
+    try {
+        const { schoolId, shiftId } = params;
+        const body = await req.json();
+        const { action } = body;
+
+        if (action !== 'reset') {
+            return NextResponse.json(
+                { error: 'Invalid action. Use "reset" to reset override.' },
+                { status: 400 }
+            );
+        }
+
+        const existingShift = await prisma.teacherShift.findUnique({
+            where: { id: shiftId, schoolId },
+            include: { timetableEntry: true },
+        });
+
+        if (!existingShift) {
+            return NextResponse.json(
+                { error: 'Shift not found' },
+                { status: 404 }
+            );
+        }
+
+        // If linked to a timetable entry, sync the data from it
+        let updateData = { isOverride: false };
+
+        if (existingShift.timetableEntry) {
+            const entry = existingShift.timetableEntry;
+            updateData = {
+                classId: entry.classId,
+                sectionId: entry.sectionId,
+                subjectId: entry.subjectId,
+                teacherId: entry.teacherId,
+                timeSlotId: entry.timeSlotId,
+                roomNumber: entry.roomNumber,
+                notes: entry.notes,
+                isOverride: false,
+            };
+        }
+
+        const updatedShift = await prisma.teacherShift.update({
+            where: { id: shiftId },
+            data: updateData,
+            include: {
+                class: { select: { className: true } },
+                section: { select: { name: true } },
+                subject: { select: { subjectName: true } },
+                teacher: { select: { name: true } },
+                timeSlot: { select: { label: true, startTime: true, endTime: true } },
+            },
+        });
+
+        return NextResponse.json({
+            message: 'Shift reset to timetable sync successfully',
+            shift: updatedShift,
+        });
+    } catch (error) {
+        console.error('Error resetting teacher shift:', error);
+        return NextResponse.json(
+            { error: 'Failed to reset teacher shift' },
             { status: 500 }
         );
     }

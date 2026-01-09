@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -17,7 +17,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Save, ArrowLeft, Clock, User2, BookOpen, MapPin, Coffee, Calendar, CheckCircle2, Circle } from "lucide-react";
+import {
+    Loader2, Save, ArrowLeft, Clock, User2, BookOpen, MapPin, Coffee,
+    Calendar, CheckCircle2, Circle, AlertTriangle, GraduationCap,
+    Users, Layers, ChevronRight, Sparkles
+} from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import axios from "axios";
@@ -50,11 +54,36 @@ export default function CreateTimetablePage() {
     const [selectedSection, setSelectedSection] = useState("");
     const [timetable, setTimetable] = useState({});
 
+    // Conflict detection state
+    const [allSchoolEntries, setAllSchoolEntries] = useState([]);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [initialTimetable, setInitialTimetable] = useState({});
+
     useEffect(() => {
         if (fullUser?.schoolId) {
             fetchInitialData();
         }
     }, [fullUser?.schoolId]);
+
+    // Unsaved changes warning
+    useEffect(() => {
+        const handleBeforeUnload = (e) => {
+            if (hasUnsavedChanges) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [hasUnsavedChanges]);
+
+    // Track unsaved changes
+    useEffect(() => {
+        if (Object.keys(initialTimetable).length > 0) {
+            const hasChanges = JSON.stringify(timetable) !== JSON.stringify(initialTimetable);
+            setHasUnsavedChanges(hasChanges);
+        }
+    }, [timetable, initialTimetable]);
 
     useEffect(() => {
         if (selectedClass) {
@@ -66,8 +95,12 @@ export default function CreateTimetablePage() {
 
     const fetchInitialData = async () => {
         try {
-            const classesRes = await axios.get(`/api/schools/${fullUser.schoolId}/classes`);
+            const [classesRes, slotsRes] = await Promise.all([
+                axios.get(`/api/schools/${fullUser.schoolId}/classes`),
+                axios.get(`/api/schools/${fullUser.schoolId}/timetable/slots`),
+            ]);
             setClasses(classesRes.data);
+            setTimeSlots(slotsRes.data || []);
 
             try {
                 const teachersRes = await axios.get(`/api/schools/${fullUser.schoolId}/staff/teachers`);
@@ -76,8 +109,13 @@ export default function CreateTimetablePage() {
                 setTeachers([]);
             }
 
-            const slotsRes = await axios.get(`/api/schools/${fullUser.schoolId}/timetable/slots`);
-            setTimeSlots(slotsRes.data || []);
+            // Fetch all entries for conflict detection
+            try {
+                const allEntriesRes = await axios.get(`/api/schools/${fullUser.schoolId}/timetable/entries`);
+                setAllSchoolEntries(allEntriesRes.data || []);
+            } catch (err) {
+                setAllSchoolEntries([]);
+            }
         } catch (error) {
             console.error("Error fetching data:", error);
             toast.error("Failed to load data");
@@ -125,9 +163,34 @@ export default function CreateTimetablePage() {
                 };
             });
             setTimetable(newTimetable);
+            setInitialTimetable(JSON.parse(JSON.stringify(newTimetable)));
         } catch (error) {
             console.error("Error fetching existing timetable:", error);
         }
+    };
+
+    // Conflict detection helpers
+    const getTeacherConflict = (teacherId, timeSlotId, dayOfWeek) => {
+        if (!teacherId) return null;
+        return allSchoolEntries.find(e =>
+            e.teacher.userId === teacherId &&
+            e.timeSlotId === timeSlotId &&
+            e.dayOfWeek === dayOfWeek &&
+            // Exclude entries from current class/section being edited
+            !(e.classId === parseInt(selectedClass) &&
+                (selectedSection ? e.sectionId === parseInt(selectedSection) : !e.sectionId))
+        );
+    };
+
+    const getRoomConflict = (roomNumber, timeSlotId, dayOfWeek) => {
+        if (!roomNumber) return null;
+        return allSchoolEntries.find(e =>
+            e.roomNumber === roomNumber &&
+            e.timeSlotId === timeSlotId &&
+            e.dayOfWeek === dayOfWeek &&
+            !(e.classId === parseInt(selectedClass) &&
+                (selectedSection ? e.sectionId === parseInt(selectedSection) : !e.sectionId))
+        );
     };
 
     const handleCellChange = (day, slotId, field, value) => {
@@ -180,11 +243,12 @@ export default function CreateTimetablePage() {
                 await axios.post(`/api/schools/${fullUser.schoolId}/timetable/entries`, entry);
             }
 
+            setHasUnsavedChanges(false);
             toast.success("Timetable saved successfully");
             router.push("/dashboard/timetable/manage");
         } catch (error) {
             console.error("Error saving timetable:", error);
-            toast.error(error.response?.data?.error || "Failed to save timetable");
+            toast.error(error.response?.data?.message || error.response?.data?.error || "Failed to save timetable");
         } finally {
             setSaving(false);
         }
@@ -200,30 +264,47 @@ export default function CreateTimetablePage() {
         return { filled, total: daySlots.length };
     };
 
+    const getTotalProgress = () => {
+        let totalFilled = 0;
+        let totalSlots = 0;
+        DAYS.forEach(day => {
+            const progress = getDayProgress(day.value);
+            totalFilled += progress.filled;
+            totalSlots += progress.total;
+        });
+        return { filled: totalFilled, total: totalSlots };
+    };
+
+    const selectedClassData = classes.find(c => c.id.toString() === selectedClass);
+    const selectedSectionData = sections.find(s => s.id.toString() === selectedSection);
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-screen">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <div className="text-center space-y-4">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto" />
+                    <p className="text-muted-foreground">Loading timetable builder...</p>
+                </div>
             </div>
         );
     }
 
     if (timeSlots.length === 0) {
         return (
-            <div className="p-6 space-y-6">
-                <Card className="border-dashed">
-                    <CardContent className="pt-6">
+            <div className="p-8 max-w-2xl mx-auto">
+                <Card className="border-dashed border-2">
+                    <CardContent className="pt-8">
                         <div className="text-center space-y-4 py-8">
-                            <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-                                <Clock className="h-8 w-8 text-primary" />
+                            <div className="mx-auto w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center">
+                                <Clock className="h-10 w-10 text-primary" />
                             </div>
-                            <h2 className="text-xl font-bold">No Time Slots Configured</h2>
-                            <p className="text-muted-foreground max-w-md mx-auto text-sm">
+                            <h2 className="text-2xl font-bold">No Time Slots Configured</h2>
+                            <p className="text-muted-foreground max-w-md mx-auto">
                                 Configure your school's period timings before creating timetables
                             </p>
                             <Link href="/dashboard/timetable/slots">
                                 <Button size="lg" className="mt-4">
-                                    <Clock className="mr-2 h-4 w-4" />
+                                    <Clock className="mr-2 h-5 w-5" />
                                     Configure Time Slots
                                 </Button>
                             </Link>
@@ -235,248 +316,377 @@ export default function CreateTimetablePage() {
     }
 
     return (
-        <div className="p-6 space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <Link href="/dashboard/timetable/manage">
-                        <Button variant="ghost" size="icon" className="rounded-full hover:bg-primary/10">
-                            <ArrowLeft className="h-4 w-4" />
-                        </Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-3xl font-bold">Create Timetable</h1>
-                        <p className="text-muted-foreground text-sm mt-1">Build weekly schedules with ease</p>
+        <div className="min-h-screen">
+            <div className="p-6 space-y-6">
+                {/* Header */}
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-4">
+                        <Link href="/dashboard/timetable/manage">
+                            <Button variant="ghost" size="icon">
+                                <ArrowLeft className="h-5 w-5" />
+                            </Button>
+                        </Link>
+                        <div>
+                            <h1 className="text-2xl font-bold tracking-tight">Create Timetable</h1>
+                            <p className="text-muted-foreground">Build weekly class schedules with ease</p>
+                        </div>
+                    </div>
+                    {selectedClass && selectedSection && (
+                        <div className="hidden md:flex items-center gap-3">
+                            <Badge variant="outline" className="px-3 py-1.5 text-sm">
+                                <GraduationCap className="h-4 w-4 mr-2" />
+                                {selectedClassData?.className}
+                            </Badge>
+                            <Badge variant="outline" className="px-3 py-1.5 text-sm">
+                                <Users className="h-4 w-4 mr-2" />
+                                Section {selectedSectionData?.name}
+                            </Badge>
+                        </div>
+                    )}
+                </div>
+
+                {/* Step Indicator */}
+                <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-muted-foreground/20"></div>
+                    </div>
+                    <div className="relative flex justify-between">
+                        <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${selectedClass ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                            <div className="w-6 h-6 rounded-full bg-current/20 flex dark:text-white items-center justify-center text-xs font-bold">1</div>
+                            <span className="font-medium dark:text-white text-sm hidden sm:inline">Select Class</span>
+                        </div>
+                        <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${selectedSection ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                            <div className="w-6 h-6 rounded-full bg-current/20 flex dark:text-white items-center justify-center text-xs font-bold">2</div>
+                            <span className="font-medium dark:text-white text-sm hidden sm:inline">Select Section</span>
+                        </div>
+                        <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${selectedClass && selectedSection ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                            <div className="w-6 h-6 rounded-full bg-current/20 flex dark:text-white items-center justify-center text-xs font-bold">3</div>
+                            <span className="font-medium dark:text-white text-sm hidden sm:inline">Assign Schedule</span>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Class Selection */}
-            <div className="grid gap-4 md:grid-cols-2">
-                <Card className="shadow-sm">
-                    <CardHeader className="pb-3 bg-muted/50">
-                        <CardTitle className="text-sm font-medium flex items-center gap-2">
-                            <BookOpen className="h-4 w-4" />
-                            Select Class
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <Select value={selectedClass} onValueChange={setSelectedClass}>
-                            <SelectTrigger className="h-12 text-base">
-                                <SelectValue placeholder="Choose a class" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {classes.map((cls) => (
-                                    <SelectItem key={cls.id} value={cls.id.toString()}>
-                                        <div className="flex items-center gap-2">
-                                            <BookOpen className="h-4 w-4 text-muted-foreground" />
-                                            <span>{cls.className}</span>
-                                        </div>
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </CardContent>
-                </Card>
-
-                <Card className="shadow-sm">
-                    <CardHeader className="pb-3 bg-muted/50">
-                        <CardTitle className="text-sm font-medium flex items-center gap-2">
-                            <Calendar className="h-4 w-4" />
-                            Select Section (Optional)
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <Select value={selectedSection} onValueChange={setSelectedSection}>
-                            <SelectTrigger className="h-12 text-base">
-                                <SelectValue placeholder="All sections" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {sections.length > 0 ? sections.map((section) => (
-                                    <SelectItem key={section.id} value={section.id.toString()}>
-                                        <span>Section {section.name}</span>
-                                    </SelectItem>
-                                )) : (
-                                    <div className="p-2 text-sm text-muted-foreground">No sections available</div>
-                                )}
-                            </SelectContent>
-                        </Select>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Timetable Builder with Tabs */}
-            {selectedClass && (
-                <Card className="overflow-hidden">
-                    <Tabs value={activeDay} onValueChange={setActiveDay}>
-                        <div className="border-b bg-muted/30 px-6 py-4">
-                            <TabsList className="grid grid-cols-6 w-full h-auto gap-2 bg-transparent p-0">
-                                {DAYS.map((day) => {
-                                    const progress = getDayProgress(day.value);
-                                    return (
-                                        <TabsTrigger
-                                            key={day.value}
-                                            value={day.value.toString()}
-                                            className="data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg py-3 px-4 flex flex-col items-start gap-1"
-                                        >
-                                            <div className="flex items-center justify-between w-full">
-                                                <span className="font-semibold">{day.short}</span>
-                                                {progress.filled > 0 && (
-                                                    <Badge variant="secondary" className="text-xs px-1.5 py-0">
-                                                        {progress.filled}/{progress.total}
-                                                    </Badge>
-                                                )}
-                                            </div>
-                                            <span className="text-xs text-muted-foreground hidden md:block">{day.label}</span>
-                                        </TabsTrigger>
-                                    );
-                                })}
-                            </TabsList>
-                        </div>
-
-                        {DAYS.map((day) => (
-                            <TabsContent key={day.value} value={day.value.toString()} className="mt-0 p-6">
-                                <div className="space-y-4">
-                                    {timeSlots.map((slot, index) => {
-                                        const cellData = timetable[day.value]?.[slot.id] || {};
-                                        const isFilled = isPeriodFilled(day.value, slot.id);
-
-                                        if (slot.isBreak) {
-                                            return (
-                                                <div key={slot.id} className="flex items-center justify-center py-6 text-muted-foreground">
-                                                    <div className="flex items-center gap-3">
-                                                        <Coffee className="h-5 w-5" />
-                                                        <div>
-                                                            <p className="font-medium">Break Time</p>
-                                                            <p className="text-xs">{slot.startTime} - {slot.endTime}</p>
-                                                        </div>
-                                                    </div>
+                {/* Class & Section Selection */}
+                <div className="grid gap-4 md:grid-cols-2">
+                    <Card>
+                        <CardHeader className="pb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 rounded-xl bg-primary/10">
+                                    <GraduationCap className="h-5 w-5 text-primary" />
+                                </div>
+                                <div>
+                                    <CardTitle className="text-lg">Select Class</CardTitle>
+                                    <CardDescription>Choose the class for this timetable</CardDescription>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <Select value={selectedClass} onValueChange={(val) => { setSelectedClass(val); setSelectedSection(""); }}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Choose a class..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {classes.map((cls) => (
+                                        <SelectItem key={cls.id} value={cls.id.toString()}>
+                                            <div className="flex items-center gap-2">
+                                                <div className="p-1 rounded bg-primary/10">
+                                                    <BookOpen className="h-4 w-4 text-primary" />
                                                 </div>
-                                            );
-                                        }
+                                                <span className="font-medium">{cls.className}</span>
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </CardContent>
+                    </Card>
 
+                    <Card className={`transition-all ${!selectedClass ? 'opacity-60' : ''}`}>
+                        <CardHeader className="pb-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2.5 rounded-xl bg-blue-500/10">
+                                        <Layers className="h-5 w-5 text-blue-500" />
+                                    </div>
+                                    <div>
+                                        <CardTitle className="text-lg">Select Section</CardTitle>
+                                        <CardDescription>Each section has its own timetable</CardDescription>
+                                    </div>
+                                </div>
+                                <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-0">
+                                    Required
+                                </Badge>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <Select value={selectedSection} onValueChange={setSelectedSection} disabled={!selectedClass}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder={selectedClass ? "Choose a section..." : "Select class first"} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {sections.length > 0 ? sections.map((section) => (
+                                        <SelectItem key={section.id} value={section.id.toString()}>
+                                            <div className="flex items-center gap-2">
+                                                <div className="p-1 rounded bg-blue-500/10">
+                                                    <Users className="h-4 w-4 text-blue-500" />
+                                                </div>
+                                                <span className="font-medium">Section {section.name}</span>
+                                            </div>
+                                        </SelectItem>
+                                    )) : (
+                                        <div className="p-4 text-center text-muted-foreground">
+                                            No sections available for this class
+                                        </div>
+                                    )}
+                                </SelectContent>
+                            </Select>
+                            {selectedClass && !selectedSection && (
+                                <div className="mt-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+                                    <p className="text-sm text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                                        <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                                        Select a section to start building the timetable
+                                    </p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Timetable Builder */}
+                {selectedClass && selectedSection && (
+                    <Card>
+                        <Tabs value={activeDay} onValueChange={setActiveDay}>
+                            {/* Day Tabs */}
+                            <div className="px-6 py-4 border-b">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 rounded-lg bg-primary/10">
+                                            <Calendar className="h-5 w-5 text-primary" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-semibold text-lg">Weekly Schedule</h3>
+                                            <p className="text-sm text-muted-foreground">
+                                                {getTotalProgress().filled} of {getTotalProgress().total} periods configured
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-2 w-32 bg-muted rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full bg-primary transition-all duration-500"
+                                                style={{ width: `${(getTotalProgress().filled / getTotalProgress().total) * 100}%` }}
+                                            />
+                                        </div>
+                                        <span className="text-sm font-medium text-primary">
+                                            {Math.round((getTotalProgress().filled / getTotalProgress().total) * 100)}%
+                                        </span>
+                                    </div>
+                                </div>
+                                <TabsList className="grid grid-cols-6 w-full h-auto gap-2 bg-transparent p-0">
+                                    {DAYS.map((day) => {
+                                        const progress = getDayProgress(day.value);
+                                        const isComplete = progress.filled === progress.total && progress.total > 0;
                                         return (
-                                            <Card key={slot.id} className={`transition-all ${isFilled ? 'bg-muted/50 border-primary/30' : ''}`}>
-                                                <CardHeader className="pb-3">
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex items-center gap-3">
-                                                            {isFilled ? (
-                                                                <CheckCircle2 className="h-5 w-5 text-primary" />
-                                                            ) : (
-                                                                <Circle className="h-5 w-5 text-muted-foreground" />
-                                                            )}
-                                                            <div>
-                                                                <CardTitle className="text-base font-semibold">{slot.label}</CardTitle>
-                                                                <p className="text-xs text-muted-foreground mt-0.5">
-                                                                    <Clock className="inline h-3 w-3 mr-1" />
-                                                                    {slot.startTime} - {slot.endTime}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                        <Badge variant="outline" className="text-xs">
-                                                            Period {index + 1}
-                                                        </Badge>
+                                            <TabsTrigger
+                                                key={day.value}
+                                                value={day.value.toString()}
+                                                className="relative data-[state=active]:bg-background rounded-lg py-3 px-3 flex flex-col items-center gap-1.5 transition-all"
+                                            >
+                                                {isComplete && (
+                                                    <div className="absolute -top-1 -right-1">
+                                                        <CheckCircle2 className="h-5 w-5 text-green-500 fill-green-100" />
                                                     </div>
-                                                </CardHeader>
-                                                <CardContent>
-                                                    <div className="grid gap-3 md:grid-cols-3">
-                                                        <div className="space-y-1.5">
-                                                            <Label className="text-xs text-muted-foreground">Subject</Label>
-                                                            <Select
-                                                                value={cellData.subjectId || ""}
-                                                                onValueChange={(val) => handleCellChange(day.value, slot.id, "subjectId", val)}
-                                                            >
-                                                                <SelectTrigger className="h-10">
-                                                                    <SelectValue placeholder="Select subject" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    {subjects.map((subject) => (
-                                                                        <SelectItem key={subject.id} value={subject.id.toString()}>
-                                                                            <div className="flex items-center gap-2">
-                                                                                <BookOpen className="h-3 w-3" />
-                                                                                {subject.subjectName}
-                                                                            </div>
-                                                                        </SelectItem>
-                                                                    ))}
-                                                                </SelectContent>
-                                                            </Select>
+                                                )}
+                                                <span className="font-bold text-lg">{day.short}</span>
+                                                <span className="text-xs text-muted-foreground hidden md:block">{day.label}</span>
+                                                {progress.total > 0 && (
+                                                    <div className="flex items-center gap-1">
+                                                        <div className="h-1.5 w-12 bg-muted rounded-full overflow-hidden">
+                                                            <div
+                                                                className={`h-full transition-all ${isComplete ? 'bg-green-500' : 'bg-primary'}`}
+                                                                style={{ width: `${(progress.filled / progress.total) * 100}%` }}
+                                                            />
                                                         </div>
-
-                                                        <div className="space-y-1.5">
-                                                            <Label className="text-xs text-muted-foreground">Teacher</Label>
-                                                            <Select
-                                                                value={cellData.teacherId || ""}
-                                                                onValueChange={(val) => handleCellChange(day.value, slot.id, "teacherId", val)}
-                                                            >
-                                                                <SelectTrigger className="h-10">
-                                                                    <SelectValue placeholder="Select teacher" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    {teachers.map((teacher) => (
-                                                                        <SelectItem key={teacher.userId} value={teacher.userId}>
-                                                                            <div className="flex items-center gap-2">
-                                                                                <User2 className="h-3 w-3" />
-                                                                                {teacher.name}
-                                                                            </div>
-                                                                        </SelectItem>
-                                                                    ))}
-                                                                </SelectContent>
-                                                            </Select>
-                                                        </div>
-
-                                                        <div className="space-y-1.5">
-                                                            <Label className="text-xs text-muted-foreground">Room Number</Label>
-                                                            <div className="relative">
-                                                                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                                                <Input
-                                                                    placeholder="e.g., 201"
-                                                                    value={cellData.roomNumber || ""}
-                                                                    onChange={(e) => handleCellChange(day.value, slot.id, "roomNumber", e.target.value)}
-                                                                    className="h-10 pl-9"
-                                                                />
-                                                            </div>
-                                                        </div>
+                                                        <span className="text-[10px] text-muted-foreground">{progress.filled}/{progress.total}</span>
                                                     </div>
-                                                </CardContent>
-                                            </Card>
+                                                )}
+                                            </TabsTrigger>
                                         );
                                     })}
+                                </TabsList>
+                            </div>
+
+                            {/* Period Cards */}
+                            {DAYS.map((day) => (
+                                <TabsContent key={day.value} value={day.value.toString()} className="mt-0 p-6">
+                                    <div className="space-y-4">
+                                        {timeSlots.map((slot, index) => {
+                                            const cellData = timetable[day.value]?.[slot.id] || {};
+                                            const isFilled = isPeriodFilled(day.value, slot.id);
+
+                                            // Get conflicts for this slot
+                                            const teacherConflict = getTeacherConflict(cellData.teacherId, slot.id, day.value);
+                                            const roomConflict = getRoomConflict(cellData.roomNumber, slot.id, day.value);
+
+                                            if (slot.isBreak) {
+                                                return (
+                                                    <div key={slot.id} className="flex items-center justify-center py-4">
+                                                        <div className="flex items-center gap-4 px-8 py-3 rounded-full bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+                                                            <Coffee className="h-5 w-5 text-amber-600" />
+                                                            <div className="text-center">
+                                                                <p className="font-medium text-amber-700 dark:text-amber-400">Break Time</p>
+                                                                <p className="text-xs text-amber-600/70">{slot.startTime} - {slot.endTime}</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+
+                                            return (
+                                                <Card
+                                                    key={slot.id}
+                                                    className={`transition-colors ${isFilled
+                                                        ? 'border-l-4 border-l-green-500 bg-green-50/50 dark:bg-green-950/20'
+                                                        : 'border-l-4 border-l-muted'
+                                                        }`}
+                                                >
+                                                    <CardContent className="p-4">
+                                                        <div className="flex items-start justify-between mb-4">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={`p-2.5 rounded-xl ${isFilled ? 'bg-green-100 dark:bg-green-900/30' : 'bg-muted'}`}>
+                                                                    {isFilled ? (
+                                                                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                                                    ) : (
+                                                                        <Circle className="h-5 w-5 text-muted-foreground" />
+                                                                    )}
+                                                                </div>
+                                                                <div>
+                                                                    <h4 className="font-bold text-lg">{slot.label}</h4>
+                                                                    <p className="text-sm text-muted-foreground flex items-center gap-1">
+                                                                        <Clock className="h-3.5 w-3.5" />
+                                                                        {slot.startTime} - {slot.endTime}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            <Badge variant="outline" className="text-xs font-medium">
+                                                                Period {index + 1}
+                                                            </Badge>
+                                                        </div>
+
+                                                        <div className="grid gap-4 md:grid-cols-3">
+                                                            <div className="space-y-1.5">
+                                                                <Label className="text-xs font-medium text-muted-foreground">Subject</Label>
+                                                                <Select
+                                                                    value={cellData.subjectId || ""}
+                                                                    onValueChange={(val) => handleCellChange(day.value, slot.id, "subjectId", val)}
+                                                                >
+                                                                    <SelectTrigger>
+                                                                        <SelectValue placeholder="Select subject" />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent>
+                                                                        {subjects.map((subject) => (
+                                                                            <SelectItem key={subject.id} value={subject.id.toString()}>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <BookOpen className="h-4 w-4 text-primary" />
+                                                                                    {subject.subjectName}
+                                                                                </div>
+                                                                            </SelectItem>
+                                                                        ))}
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            </div>
+
+                                                            <div className="space-y-1.5">
+                                                                <Label className="text-xs font-medium text-muted-foreground">Teacher</Label>
+                                                                <Select
+                                                                    value={cellData.teacherId || ""}
+                                                                    onValueChange={(val) => handleCellChange(day.value, slot.id, "teacherId", val)}
+                                                                >
+                                                                    <SelectTrigger>
+                                                                        <SelectValue placeholder="Select teacher" />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent>
+                                                                        {teachers.map((teacher) => (
+                                                                            <SelectItem key={teacher.userId} value={teacher.userId}>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <User2 className="h-4 w-4 text-blue-500" />
+                                                                                    {teacher.name}
+                                                                                </div>
+                                                                            </SelectItem>
+                                                                        ))}
+                                                                    </SelectContent>
+                                                                </Select>
+                                                                {teacherConflict && (
+                                                                    <div className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-1 p-1.5 rounded bg-amber-50 dark:bg-amber-950/30">
+                                                                        <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                                                                        <span>Already in {teacherConflict.class.className}{teacherConflict.section ? `-${teacherConflict.section.name}` : ''}</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
+                                                            <div className="space-y-1.5">
+                                                                <Label className="text-xs font-medium text-muted-foreground">Room (Optional)</Label>
+                                                                <div className="relative">
+                                                                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                                    <Input
+                                                                        placeholder="e.g., 201"
+                                                                        value={cellData.roomNumber || ""}
+                                                                        onChange={(e) => handleCellChange(day.value, slot.id, "roomNumber", e.target.value)}
+                                                                        className="pl-9"
+                                                                    />
+                                                                </div>
+                                                                {roomConflict && (
+                                                                    <div className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-1 p-1.5 rounded bg-amber-50 dark:bg-amber-950/30">
+                                                                        <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                                                                        <span>Used by {roomConflict.class.className}{roomConflict.section ? `-${roomConflict.section.name}` : ''}</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </CardContent>
+                                                </Card>
+                                            );
+                                        })}
+                                    </div>
+                                </TabsContent>
+                            ))}
+                        </Tabs>
+
+                        {/* Footer */}
+                        <div className="p-4 border-t bg-muted/30">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <Sparkles className="h-5 w-5 text-primary" />
+                                    <p className="text-sm text-muted-foreground">
+                                        <span className="font-semibold text-foreground">{getTotalProgress().filled} periods</span> configured for{" "}
+                                        <span className="font-semibold text-foreground">{selectedClassData?.className} - Section {selectedSectionData?.name}</span>
+                                    </p>
                                 </div>
-                            </TabsContent>
-                        ))}
-                    </Tabs>
-
-                    <Separator />
-
-                    <div className="p-6 bg-muted/30">
-                        <div className="flex items-center justify-between">
-                            <p className="text-sm text-muted-foreground">
-                                {Object.values(timetable).reduce((total, day) => total + Object.keys(day).length, 0)} periods configured
-                            </p>
-                            <div className="flex gap-3">
-                                <Link href="/dashboard/timetable/manage">
-                                    <Button variant="outline" size="lg">
-                                        Cancel
+                                <div className="flex gap-3">
+                                    <Link href="/dashboard/timetable/manage">
+                                        <Button variant="outline" size="lg">
+                                            Cancel
+                                        </Button>
+                                    </Link>
+                                    <Button onClick={handleSave} disabled={saving} size="lg" className="min-w-[140px]">
+                                        {saving ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                                Saving...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Save className="mr-2 h-5 w-5" />
+                                                Save Timetable
+                                            </>
+                                        )}
                                     </Button>
-                                </Link>
-                                <Button onClick={handleSave} disabled={saving} size="lg" className="min-w-[140px]">
-                                    {saving ? (
-                                        <>
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                            Saving...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Save className="mr-2 h-4 w-4" />
-                                            Save Timetable
-                                        </>
-                                    )}
-                                </Button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </Card>
-            )}
+                    </Card>
+                )}
+            </div>
         </div>
     );
 }

@@ -2096,12 +2096,13 @@ model TimetableEntry {
   updatedAt DateTime @updatedAt
 
   // Relations
-  school   School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  class    Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
-  section  Section?      @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  subject  Subject       @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  teacher  TeachingStaff @relation(fields: [teacherId], references: [userId], onDelete: Cascade)
-  timeSlot TimeSlot      @relation(fields: [timeSlotId], references: [id], onDelete: Cascade)
+  school        School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class         Class          @relation(fields: [classId], references: [id], onDelete: Cascade)
+  section       Section?       @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject       Subject        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher       TeachingStaff  @relation(fields: [teacherId], references: [userId], onDelete: Cascade)
+  timeSlot      TimeSlot       @relation(fields: [timeSlotId], references: [id], onDelete: Cascade)
+  teacherShifts TeacherShift[]
 
   @@unique([classId, sectionId, timeSlotId, dayOfWeek])
   @@index([schoolId])
@@ -2126,6 +2127,10 @@ model TeacherShift {
   date       DateTime @db.Date // Specific date for this shift
   roomNumber String?
 
+  // Sync & Override Control
+  timetableEntryId String? @db.Uuid // Link to source timetable entry (if created from timetable)
+  isOverride       Boolean @default(false) // True if admin manually edited (won't be auto-updated)
+
   // Metadata
   status    String   @default("ASSIGNED") // ASSIGNED, CANCELLED, COMPLETED
   notes     String?
@@ -2133,18 +2138,20 @@ model TeacherShift {
   updatedAt DateTime @updatedAt
 
   // Relations
-  school   School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  class    Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
-  section  Section       @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  subject  Subject       @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  teacher  TeachingStaff @relation(fields: [teacherId], references: [userId], onDelete: Cascade)
-  timeSlot TimeSlot      @relation(fields: [timeSlotId], references: [id], onDelete: Cascade)
+  school         School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class          Class           @relation(fields: [classId], references: [id], onDelete: Cascade)
+  section        Section         @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject        Subject         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher        TeachingStaff   @relation(fields: [teacherId], references: [userId], onDelete: Cascade)
+  timeSlot       TimeSlot        @relation(fields: [timeSlotId], references: [id], onDelete: Cascade)
+  timetableEntry TimetableEntry? @relation(fields: [timetableEntryId], references: [id], onDelete: SetNull)
 
   @@unique([teacherId, date, timeSlotId]) // One teacher can't be in two places at same time
   @@index([schoolId])
   @@index([teacherId, date])
   @@index([classId, sectionId, date])
   @@index([date])
+  @@index([timetableEntryId])
 }
 
 // Template for reusing timetable configurations

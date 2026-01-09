@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { GoogleMap, useLoadScript, Marker, InfoWindow, MarkerClusterer } from "@react-google-maps/api";
+import { GoogleMap, useLoadScript, Marker, InfoWindow, MarkerClusterer, OverlayView } from "@react-google-maps/api";
 import { Bus, MapPin, Clock, Phone, User, RefreshCw, Activity, Search, RotateCcw, ArrowUpDown, ChevronLeft, ChevronRight, Eye, MoreHorizontal, Users, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,22 @@ const mapContainerStyle = {
 
 const defaultCenter = { lat: 20.5937, lng: 78.9629 };
 const libraries = ["places"];
+
+// Unique colors for bus markers (based on index/hash)
+const BUS_COLORS = [
+    "#3B82F6", "#10B981", "#8B5CF6", "#F59E0B", "#EF4444",
+    "#06B6D4", "#EC4899", "#84CC16", "#14B8A6", "#F97316",
+    "#6366F1", "#22C55E", "#A855F7", "#FBBF24", "#DC2626",
+];
+
+// Get unique color for a bus based on its ID
+const getBusColor = (busId, status) => {
+    if (status === "OFFLINE") return "#EF4444"; // Always red for offline
+    // Hash the ID to get a consistent color
+    const hash = busId.split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a }, 0);
+    const idx = Math.abs(hash) % BUS_COLORS.length;
+    return BUS_COLORS[idx];
+};
 
 // Custom cluster styles - using a simple blue circle
 const clusterStyles = [
@@ -266,52 +282,142 @@ export default function LiveTrackingPage() {
                     ) : (
                         <div className="relative">
                             <GoogleMap mapContainerStyle={mapContainerStyle} center={mapCenter} zoom={12} onLoad={onMapLoad} options={{ streetViewControl: false, mapTypeControl: false, fullscreenControl: true }}>
-                                {/* Cluster Markers for better scale handling */}
-                                <MarkerClusterer styles={clusterStyles}>
-                                    {(clusterer) => (
-                                        <>
-                                            {buses.map((bus) => {
-                                                if (!bus.location) return null;
-                                                return (
-                                                    <Marker
-                                                        key={bus.id}
-                                                        position={{ lat: bus.location.latitude, lng: bus.location.longitude }}
-                                                        onClick={() => setSelectedBus(bus)}
-                                                        title={bus.licensePlate}
-                                                        clusterer={clusterer}
-                                                        icon={{
-                                                            url: bus.status === "MOVING"
-                                                                ? "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24' fill='%2310B981' stroke='white' stroke-width='2'%3E%3Crect x='3' y='4' width='18' height='12' rx='2'/%3E%3Ccircle cx='7' cy='18' r='2'/%3E%3Ccircle cx='17' cy='18' r='2'/%3E%3C/svg%3E"
-                                                                : bus.status === "IDLE"
-                                                                    ? "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24' fill='%23F59E0B' stroke='white' stroke-width='2'%3E%3Crect x='3' y='4' width='18' height='12' rx='2'/%3E%3Ccircle cx='7' cy='18' r='2'/%3E%3Ccircle cx='17' cy='18' r='2'/%3E%3C/svg%3E"
-                                                                    : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24' fill='%23EF4444' stroke='white' stroke-width='2'%3E%3Crect x='3' y='4' width='18' height='12' rx='2'/%3E%3Ccircle cx='7' cy='18' r='2'/%3E%3Ccircle cx='17' cy='18' r='2'/%3E%3C/svg%3E",
-                                                            scaledSize: new window.google.maps.Size(40, 40),
+                                {/* Bus Markers with Number Plate Labels */}
+                                {buses.map((bus) => {
+                                    if (!bus.location) return null;
+                                    const busColor = getBusColor(bus.id, bus.status);
+                                    const encodedColor = encodeURIComponent(busColor);
+
+                                    return (
+                                        <div key={bus.id}>
+                                            {/* Number Plate Label */}
+                                            <OverlayView
+                                                position={{ lat: bus.location.latitude, lng: bus.location.longitude }}
+                                                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                                                getPixelPositionOffset={() => ({ x: 0, y: 0 })}
+                                            >
+                                                <div
+                                                    className="cursor-pointer"
+                                                    style={{
+                                                        transform: 'translate(-50%, -70px)',
+                                                        display: 'inline-block',
+                                                        overflow: 'visible'
+                                                    }}
+                                                    onClick={() => setSelectedBus(bus)}
+                                                >
+                                                    {/* Number Plate Badge */}
+                                                    <div
+                                                        style={{
+                                                            backgroundColor: busColor,
+                                                            padding: '6px 16px',
+                                                            borderRadius: '8px',
+                                                            color: 'white',
+                                                            fontSize: '14px',
+                                                            fontWeight: 'bold',
+                                                            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                                                            border: '2px solid white',
+                                                            whiteSpace: 'nowrap',
+                                                            display: 'inline-block'
+                                                        }}
+                                                    >
+                                                        {bus.licensePlate}
+                                                    </div>
+                                                    {/* Arrow pointing down */}
+                                                    <div
+                                                        style={{
+                                                            width: 0,
+                                                            height: 0,
+                                                            margin: '0 auto',
+                                                            borderLeft: '8px solid transparent',
+                                                            borderRight: '8px solid transparent',
+                                                            borderTop: `8px solid ${busColor}`,
                                                         }}
                                                     />
-                                                );
-                                            })}
-                                        </>
-                                    )}
-                                </MarkerClusterer>
+                                                </div>
+                                            </OverlayView>
 
-                                {selectedBus && selectedBus.location && (
-                                    <InfoWindow position={{ lat: selectedBus.location.latitude, lng: selectedBus.location.longitude }} onCloseClick={() => setSelectedBus(null)}>
-                                        <div className="p-2 min-w-[200px]">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <Bus className="w-4 h-4" />
-                                                <span className="font-bold">{selectedBus.licensePlate}</span>
-                                            </div>
-                                            <div className="space-y-1 text-sm">
-                                                <p>Status: <span className={cn("font-medium", selectedBus.status === "MOVING" ? "text-green-600" : selectedBus.status === "IDLE" ? "text-yellow-600" : "text-red-600")}>{selectedBus.status}</span></p>
-                                                <p>Updated: {formatTimeAgo(selectedBus.secondsAgo, selectedBus.status)}</p>
-                                                {selectedBus.driver && <p>Driver: {selectedBus.driver.name}</p>}
-                                                {selectedBus.routeName && <p>Route: {selectedBus.routeName}</p>}
-                                            </div>
-                                            <Link href={`/dashboard/transport/live-tracking/${selectedBus.id}`}>
-                                                <Button size="sm" className="mt-2 w-full">View Details</Button>
-                                            </Link>
+                                            {/* Bus Marker - Better bus icon */}
+                                            <Marker
+                                                position={{ lat: bus.location.latitude, lng: bus.location.longitude }}
+                                                onClick={() => setSelectedBus(bus)}
+                                                icon={{
+                                                    url: `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="${busColor}" stroke="white" stroke-width="3"/><path d="M14 18h20c1.1 0 2 .9 2 2v8c0 1.1-.9 2-2 2H14c-1.1 0-2-.9-2-2v-8c0-1.1.9-2 2-2z" fill="white"/><circle cx="17" cy="32" r="2" fill="white"/><circle cx="31" cy="32" r="2" fill="white"/><rect x="15" y="20" width="4" height="4" rx="0.5" fill="${busColor}"/><rect x="21" y="20" width="4" height="4" rx="0.5" fill="${busColor}"/><rect x="27" y="20" width="4" height="4" rx="0.5" fill="${busColor}"/></svg>`)}`,
+                                                    scaledSize: new window.google.maps.Size(44, 44),
+                                                    anchor: new window.google.maps.Point(22, 22),
+                                                }}
+                                            />
                                         </div>
-                                    </InfoWindow>
+                                    );
+                                })}
+
+                                {/* Custom Popup - Dark Mode Compatible */}
+                                {selectedBus && selectedBus.location && (
+                                    <OverlayView
+                                        position={{ lat: selectedBus.location.latitude, lng: selectedBus.location.longitude }}
+                                        mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                                    >
+                                        <div
+                                            className="relative"
+                                            style={{ transform: 'translate(-50%, -180px)' }}
+                                        >
+                                            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-4 min-w-[220px] border border-gray-200 dark:border-gray-700">
+                                                {/* Close button */}
+                                                <button
+                                                    onClick={() => setSelectedBus(null)}
+                                                    className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                                >
+                                                    ✕
+                                                </button>
+
+                                                {/* Header */}
+                                                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100 dark:border-gray-700">
+                                                    <Bus className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                                                    <span className="font-bold text-gray-900 dark:text-white">{selectedBus.licensePlate}</span>
+                                                </div>
+
+                                                {/* Status */}
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <span className="text-sm text-gray-500 dark:text-gray-400">Status</span>
+                                                    <span className={cn(
+                                                        "px-2 py-1 rounded-full text-xs font-bold",
+                                                        selectedBus.status === "MOVING" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
+                                                            selectedBus.status === "IDLE" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
+                                                                "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                                                    )}>{selectedBus.status}</span>
+                                                </div>
+
+                                                {/* Info */}
+                                                <div className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
+                                                    <p className="flex justify-between">
+                                                        <span className="text-gray-400">Updated:</span>
+                                                        <span>{formatTimeAgo(selectedBus.secondsAgo, selectedBus.status)}</span>
+                                                    </p>
+                                                    {selectedBus.driver && (
+                                                        <p className="flex justify-between">
+                                                            <span className="text-gray-400">Driver:</span>
+                                                            <span>{selectedBus.driver.name}</span>
+                                                        </p>
+                                                    )}
+                                                    {selectedBus.routeName && (
+                                                        <p className="flex justify-between">
+                                                            <span className="text-gray-400">Route:</span>
+                                                            <span>{selectedBus.routeName}</span>
+                                                        </p>
+                                                    )}
+                                                </div>
+
+                                                {/* Button */}
+                                                <Link href={`/dashboard/transport/live-tracking/${selectedBus.id}`}>
+                                                    <Button size="sm" className="mt-3 w-full">View Details</Button>
+                                                </Link>
+                                            </div>
+
+                                            {/* Arrow pointing down - Two layers for dark mode */}
+                                            <div className="flex justify-center -mt-[1px]">
+                                                <div className="border-l-[10px] border-r-[10px] border-t-[10px] border-l-transparent border-r-transparent border-t-white dark:border-t-gray-800" />
+                                            </div>
+                                        </div>
+                                    </OverlayView>
                                 )}
                             </GoogleMap>
 

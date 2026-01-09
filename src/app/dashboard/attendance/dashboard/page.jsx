@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Users, Clock, AlertCircle, CheckCircle, TrendingUp, MapPin,
-  Download, RefreshCw, Eye, Calendar, Award, Smartphone, XCircle
+  Download, RefreshCw, Eye, Calendar, Award, Smartphone, XCircle,
+  ArrowUpDown, ChevronLeft, ChevronRight, MoreHorizontal
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,21 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 
@@ -21,6 +37,13 @@ export default function AdminAttendanceDashboard() {
 
   const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
   const [classFilter, setClassFilter] = useState('all');
+
+  // Pagination states for each tab
+  const [alertsPage, setAlertsPage] = useState(1);
+  const [classPage, setClassPage] = useState(1);
+  const [teacherPage, setTeacherPage] = useState(1);
+  const [recentPage, setRecentPage] = useState(1);
+  const pageSize = 10;
 
   // Fetch dashboard data
   const { data, isLoading, refetch } = useQuery({
@@ -44,7 +67,6 @@ export default function AdminAttendanceDashboard() {
     roleWiseStats,
     classWiseStats,
     teacherActivity,
-    monthlyTrend,
     alerts,
     lowAttendanceUsers,
     recentActivity
@@ -58,13 +80,85 @@ export default function AdminAttendanceDashboard() {
     });
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
+  // Pagination helper
+  const paginate = (items, page) => {
+    if (!items) return { data: [], totalPages: 0 };
+    const totalPages = Math.ceil(items.length / pageSize);
+    const data = items.slice((page - 1) * pageSize, page * pageSize);
+    return { data, totalPages, total: items.length };
   };
+
+  // Paginated data
+  const alertsPaginated = paginate(lowAttendanceUsers, alertsPage);
+  const classPaginated = paginate(classWiseStats, classPage);
+  const teacherPaginated = paginate(teacherActivity, teacherPage);
+  const recentPaginated = paginate(recentActivity, recentPage);
+
+  // Pagination Component
+  const Pagination = ({ current, total, totalItems, onChange }) => {
+    if (total <= 1) return null;
+    return (
+      <div className="flex items-center justify-between mt-4">
+        <p className="text-sm text-muted-foreground">
+          Showing {((current - 1) * pageSize) + 1} to {Math.min(current * pageSize, totalItems)} of {totalItems}
+        </p>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onChange(Math.max(1, current - 1))}
+            disabled={current === 1}
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          {Array.from({ length: Math.min(5, total) }, (_, i) => {
+            let pageNum;
+            if (total <= 5) {
+              pageNum = i + 1;
+            } else if (current <= 3) {
+              pageNum = i + 1;
+            } else if (current >= total - 2) {
+              pageNum = total - 4 + i;
+            } else {
+              pageNum = current - 2 + i;
+            }
+            return (
+              <Button
+                key={pageNum}
+                variant={current === pageNum ? "default" : "outline"}
+                size="sm"
+                onClick={() => onChange(pageNum)}
+                className="w-8 h-8 p-0"
+              >
+                {pageNum}
+              </Button>
+            );
+          })}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onChange(Math.min(total, current + 1))}
+            disabled={current === total}
+          >
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
+  // Table loading skeleton
+  const TableSkeleton = ({ cols = 5 }) => (
+    <>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <TableRow key={i}>
+          {Array.from({ length: cols }).map((_, j) => (
+            <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+          ))}
+        </TableRow>
+      ))}
+    </>
+  );
 
   if (isLoading) {
     return (
@@ -74,16 +168,19 @@ export default function AdminAttendanceDashboard() {
     );
   }
 
+  // Calculate total students
+  const totalStudents = roleWiseStats?.find(r => r.roleName === 'STUDENT')?.totalUsers || 0;
+
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+    <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
-            <Users className="w-8 h-8 text-blue-600" />
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <Users className="w-6 h-6 text-primary" />
             Attendance Dashboard
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-muted-foreground">
             Real-time attendance tracking and analytics
           </p>
         </div>
@@ -147,91 +244,82 @@ export default function AdminAttendanceDashboard() {
 
       {/* Holiday/Non-Working Day Alert */}
       {!dayInfo?.isWorkingDay && (
-        <Card className="border-yellow-500 bg-yellow-50">
+        <Card className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <AlertCircle className="w-6 h-6 text-yellow-600" />
               <div>
-                <p className="font-semibold text-yellow-900">
+                <p className="font-semibold text-yellow-900 dark:text-yellow-200">
                   {dayInfo?.dayType === 'HOLIDAY' ? `Holiday: ${dayInfo?.holidayName}` : dayInfo?.dayType}
                 </p>
-                <p className="text-sm text-yellow-800">No attendance required today</p>
+                <p className="text-sm text-yellow-800 dark:text-yellow-300">No attendance required today</p>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Summary Cards */}
+      {/* Stats Cards - Noticeboard Style */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-none">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between mb-2">
-              <Users className="w-8 h-8 opacity-80" />
-              <span className="text-2xl font-bold">
-                {todayOverview ? Math.round((todayOverview.present / todayOverview.total) * 100) : 0}%
-              </span>
-            </div>
-            <h3 className="text-sm font-medium opacity-90">Total Users</h3>
-            <p className="text-2xl font-bold mt-1">{todayOverview?.total || 0}</p>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalStudents}</div>
+            <p className="text-xs text-muted-foreground">Across all classes</p>
           </CardContent>
         </Card>
-
-        <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-none">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between mb-2">
-              <CheckCircle className="w-8 h-8 opacity-80" />
-              <TrendingUp className="w-6 h-6" />
-            </div>
-            <h3 className="text-sm font-medium opacity-90">Present Today</h3>
-            <p className="text-2xl font-bold mt-1">{todayOverview?.present || 0}</p>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Present Today</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{todayOverview?.present || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              {todayOverview?.total ? Math.round((todayOverview.present / todayOverview.total) * 100) : 0}% attendance rate
+            </p>
           </CardContent>
         </Card>
-
-        <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white border-none">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between mb-2">
-              <XCircle className="w-8 h-8 opacity-80" />
-              <span className="text-sm bg-white/20 px-2 py-1 rounded">
-                {todayOverview?.notMarked || 0} Not Marked
-              </span>
-            </div>
-            <h3 className="text-sm font-medium opacity-90">Absent Today</h3>
-            <p className="text-2xl font-bold mt-1">{todayOverview?.absent || 0}</p>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Absent Today</CardTitle>
+            <XCircle className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{todayOverview?.absent || 0}</div>
+            <p className="text-xs text-muted-foreground">{todayOverview?.notMarked || 0} not marked</p>
           </CardContent>
         </Card>
-
-        <Card className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white border-none">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between mb-2">
-              <Clock className="w-8 h-8 opacity-80" />
-              <span className="text-sm bg-white/20 px-2 py-1 rounded">
-                {alerts?.pendingApprovals || 0} Pending
-              </span>
-            </div>
-            <h3 className="text-sm font-medium opacity-90">Late Check-ins</h3>
-            <p className="text-2xl font-bold mt-1">{todayOverview?.late || 0}</p>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Late Check-ins</CardTitle>
+            <Clock className="h-4 w-4 text-yellow-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-600">{todayOverview?.late || 0}</div>
+            <p className="text-xs text-muted-foreground">{alerts?.pendingApprovals || 0} pending approvals</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Role-wise Breakdown */}
+      {/* Role-wise Breakdown - Cleaner Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {roleWiseStats?.map((role) => (
-          <Card key={role.roleId} className="border-l-4 border-blue-500">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">{role.roleName}</p>
-                  <p className="text-2xl font-bold text-blue-600">{role.present}/{role.totalUsers}</p>
-                </div>
-                <CheckCircle className="w-10 h-10 text-blue-500 opacity-20" />
-              </div>
-              <div className="mt-2 text-xs text-muted-foreground">
-                <span className="text-red-600 font-medium">{role.absent} absent</span>
+          <Card key={role.roleId}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{role.roleName}</CardTitle>
+              <CheckCircle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-primary">{role.present}/{role.totalUsers}</div>
+              <p className="text-xs text-muted-foreground">
+                <span className="text-red-600">{role.absent} absent</span>
                 {' • '}
-                <span className="text-yellow-600 font-medium">{role.late} late</span>
-              </div>
+                <span className="text-yellow-600">{role.late} late</span>
+              </p>
             </CardContent>
           </Card>
         ))}
@@ -249,84 +337,103 @@ export default function AdminAttendanceDashboard() {
         {/* Teacher Activity Tab */}
         <TabsContent value="teachers">
           <Card>
-            <CardHeader>
-              <CardTitle>Teacher Activity & Tracking</CardTitle>
-              <CardDescription>Real-time teacher check-in/out with location and device info</CardDescription>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Teacher Activity ({teacherActivity?.length || 0})</CardTitle>
+                  <CardDescription>Real-time teacher check-in/out with location and device info</CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left p-3">Teacher</th>
-                      <th className="text-left p-3">Check-In</th>
-                      <th className="text-left p-3">Check-Out</th>
-                      <th className="text-left p-3">Hours</th>
-                      <th className="text-left p-3">Location</th>
-                      <th className="text-left p-3">Device</th>
-                      <th className="text-left p-3">Streak</th>
-                      <th className="text-left p-3">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {teacherActivity?.map((teacher) => (
-                      <tr key={teacher.userId} className="border-b hover:bg-accent">
-                        <td className="p-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                              {teacher.name?.charAt(0)}
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead>Teacher</TableHead>
+                      <TableHead>Check-In</TableHead>
+                      <TableHead>Check-Out</TableHead>
+                      <TableHead>Hours</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Device</TableHead>
+                      <TableHead>Streak</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {teacherPaginated.data?.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                          No teacher activity found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      teacherPaginated.data?.map((teacher, idx) => (
+                        <TableRow key={teacher.userId} className={idx % 2 === 0 ? "bg-muted/30" : ""}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-primary font-medium">
+                                {teacher.name?.charAt(0)}
+                              </div>
+                              <div>
+                                <p className="font-medium">{teacher.name}</p>
+                                <p className="text-xs text-muted-foreground">{teacher.employeeId}</p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="font-medium">{teacher.name}</p>
-                              <p className="text-xs text-muted-foreground">{teacher.employeeId}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="p-3">
-                          <span className={teacher.isLateCheckIn ? 'text-yellow-600' : ''}>
-                            {formatTime(teacher.checkInTime)}
-                          </span>
-                        </td>
-                        <td className="p-3">{formatTime(teacher.checkOutTime)}</td>
-                        <td className="p-3">
-                          <span className="font-mono">{teacher.workingHours.toFixed(2)}h</span>
-                        </td>
-                        <td className="p-3">
-                          {teacher.location?.checkIn && (
-                            <Button variant="ghost" size="sm" title={`${teacher.location.checkIn.latitude}, ${teacher.location.checkIn.longitude}`}>
-                              <MapPin className="w-4 h-4 text-blue-600" />
-                            </Button>
-                          )}
-                        </td>
-                        <td className="p-3">
-                          {teacher.deviceInfo && (
-                            <div className="flex items-center gap-1" title={`${teacher.deviceInfo.platform} ${teacher.deviceInfo.osVersion}`}>
-                              <Smartphone className="w-4 h-4 text-gray-500" />
-                              <span className="text-xs">{teacher.deviceInfo.deviceId}</span>
-                            </div>
-                          )}
-                        </td>
-                        <td className="p-3">
-                          <Badge variant="secondary" className="flex items-center gap-1">
-                            <Award className="w-3 h-3" />
-                            {teacher.streak} days
-                          </Badge>
-                        </td>
-                        <td className="p-3">
-                          <Badge
-                            variant={
-                              teacher.status === 'PRESENT' ? 'default' :
-                                teacher.status === 'LATE' ? 'warning' : 'destructive'
-                            }
-                          >
-                            {teacher.status}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                          </TableCell>
+                          <TableCell>
+                            <span className={teacher.isLateCheckIn ? 'text-yellow-600' : ''}>
+                              {formatTime(teacher.checkInTime)}
+                            </span>
+                          </TableCell>
+                          <TableCell>{formatTime(teacher.checkOutTime)}</TableCell>
+                          <TableCell>
+                            <span className="font-mono">{teacher.workingHours?.toFixed(2) || 0}h</span>
+                          </TableCell>
+                          <TableCell>
+                            {teacher.location?.checkIn && (
+                              <Button variant="ghost" size="sm" title={`${teacher.location.checkIn.latitude}, ${teacher.location.checkIn.longitude}`}>
+                                <MapPin className="w-4 h-4 text-blue-600" />
+                              </Button>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {teacher.deviceInfo && (
+                              <div className="flex items-center gap-1" title={`${teacher.deviceInfo.platform} ${teacher.deviceInfo.osVersion}`}>
+                                <Smartphone className="w-4 h-4 text-muted-foreground" />
+                                <span className="text-xs">{teacher.deviceInfo.deviceId?.slice(0, 8)}</span>
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="flex items-center gap-1 w-fit">
+                              <Award className="w-3 h-3" />
+                              {teacher.streak} days
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                teacher.status === 'PRESENT' ? 'default' :
+                                  teacher.status === 'LATE' ? 'secondary' : 'destructive'
+                              }
+                              className={teacher.status === 'LATE' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : ''}
+                            >
+                              {teacher.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               </div>
+              <Pagination
+                current={teacherPage}
+                total={teacherPaginated.totalPages}
+                totalItems={teacherPaginated.total}
+                onChange={setTeacherPage}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -334,44 +441,75 @@ export default function AdminAttendanceDashboard() {
         {/* Class-wise Tab */}
         <TabsContent value="classes">
           <Card>
-            <CardHeader>
-              <CardTitle>Class-wise Attendance</CardTitle>
-              <CardDescription>Attendance breakdown by class</CardDescription>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Class-wise Attendance ({classWiseStats?.length || 0})</CardTitle>
+                  <CardDescription>Attendance breakdown by class with progress indicators</CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {classWiseStats?.map((cls) => (
-                  <div key={cls.classId} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-semibold text-lg">{cls.className}</h3>
-                      <Badge variant="outline">{cls.totalStudents} Students</Badge>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4 text-sm mb-3">
-                      <div>
-                        <p className="text-muted-foreground">Present</p>
-                        <p className="text-xl font-bold text-green-600">{cls.present}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Absent</p>
-                        <p className="text-xl font-bold text-red-600">{cls.absent}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Late</p>
-                        <p className="text-xl font-bold text-yellow-600">{cls.late}</p>
-                      </div>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div
-                        className="bg-green-600 h-3 rounded-full transition-all"
-                        style={{ width: `${cls.attendancePercentage}%` }}
-                      />
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      {cls.attendancePercentage}% attendance
-                    </p>
-                  </div>
-                ))}
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead>Class</TableHead>
+                      <TableHead className="text-center">Students</TableHead>
+                      <TableHead className="text-center">Present</TableHead>
+                      <TableHead className="text-center">Absent</TableHead>
+                      <TableHead className="text-center">Late</TableHead>
+                      <TableHead className="w-[200px]">Attendance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {classPaginated.data?.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          No class data found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      classPaginated.data?.map((cls, idx) => (
+                        <TableRow key={cls.classId} className={idx % 2 === 0 ? "bg-muted/30" : ""}>
+                          <TableCell className="font-medium">{cls.className}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline">{cls.totalStudents}</Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="text-green-600 font-semibold">{cls.present}</span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="text-red-600 font-semibold">{cls.absent}</span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="text-yellow-600 font-semibold">{cls.late}</span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-green-500 transition-all"
+                                  style={{ width: `${cls.attendancePercentage || 0}%` }}
+                                />
+                              </div>
+                              <span className="text-sm font-medium w-12 text-right">
+                                {cls.attendancePercentage || 0}%
+                              </span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               </div>
+              <Pagination
+                current={classPage}
+                total={classPaginated.totalPages}
+                totalItems={classPaginated.total}
+                onChange={setClassPage}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -379,34 +517,82 @@ export default function AdminAttendanceDashboard() {
         {/* Alerts Tab */}
         <TabsContent value="alerts">
           <Card>
-            <CardHeader>
-              <CardTitle>Low Attendance Alerts</CardTitle>
-              <CardDescription>Students below 75% attendance threshold</CardDescription>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Low Attendance Alerts ({lowAttendanceUsers?.length || 0})</CardTitle>
+                  <CardDescription>Students below 75% attendance threshold</CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {lowAttendanceUsers?.map((user) => (
-                  <div key={user.userId} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{user.user.name}</span>
-                        <Badge variant="destructive">
-                          {user.attendancePercentage.toFixed(1)}%
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {user.user.student?.admissionNo} • {user.user.student?.class?.className}
-                      </p>
-                    </div>
-                    <Link href={`/dashboard/attendance/student-history?studentId=${user.userId}`}>
-                      <Button variant="outline" size="sm">
-                        <Eye className="w-4 h-4 mr-1" />
-                        View
-                      </Button>
-                    </Link>
-                  </div>
-                ))}
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead>Student</TableHead>
+                      <TableHead>Admission No</TableHead>
+                      <TableHead>Class</TableHead>
+                      <TableHead className="text-center">Attendance %</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {alertsPaginated.data?.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                          No low attendance students found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      alertsPaginated.data?.map((user, idx) => (
+                        <TableRow key={user.userId} className={idx % 2 === 0 ? "bg-muted/30" : ""}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center text-red-600 font-medium">
+                                {user.user.name?.charAt(0)}
+                              </div>
+                              <span className="font-medium">{user.user.name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground font-mono text-sm">
+                            {user.user.student?.admissionNo || '—'}
+                          </TableCell>
+                          <TableCell>{user.user.student?.class?.className || '—'}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="destructive">
+                              {user.attendancePercentage?.toFixed(1)}%
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/dashboard/attendance/student-history?studentId=${user.userId}`}>
+                                    <Eye className="w-4 h-4 mr-2" />
+                                    View History
+                                  </Link>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               </div>
+              <Pagination
+                current={alertsPage}
+                total={alertsPaginated.totalPages}
+                totalItems={alertsPaginated.total}
+                onChange={setAlertsPage}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -414,29 +600,70 @@ export default function AdminAttendanceDashboard() {
         {/* Recent Activity Tab */}
         <TabsContent value="recent">
           <Card>
-            <CardHeader>
-              <CardTitle>Recent Activity</CardTitle>
-              <CardDescription>Latest attendance records</CardDescription>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Recent Activity ({recentActivity?.length || 0})</CardTitle>
+                  <CardDescription>Latest attendance records</CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                {recentActivity?.map((activity) => (
-                  <div key={activity.id} className="flex items-center gap-3 p-3 border rounded-lg hover:bg-accent">
-                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                      {activity.user.name?.charAt(0)}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium">{activity.user.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {activity.marker?.name} marked as {activity.status} at {formatTime(activity.markedAt)}
-                      </p>
-                    </div>
-                    <Badge variant={activity.status === 'PRESENT' ? 'default' : 'destructive'}>
-                      {activity.status}
-                    </Badge>
-                  </div>
-                ))}
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead>User</TableHead>
+                      <TableHead>Marked By</TableHead>
+                      <TableHead>Time</TableHead>
+                      <TableHead className="text-right">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {recentPaginated.data?.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                          No recent activity found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      recentPaginated.data?.map((activity, idx) => (
+                        <TableRow key={activity.id} className={idx % 2 === 0 ? "bg-muted/30" : ""}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-primary font-medium">
+                                {activity.user.name?.charAt(0)}
+                              </div>
+                              <span className="font-medium">{activity.user.name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {activity.marker?.name || 'System'}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {formatTime(activity.markedAt)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Badge
+                              variant={activity.status === 'PRESENT' ? 'default' :
+                                activity.status === 'LATE' ? 'secondary' : 'destructive'}
+                              className={activity.status === 'LATE' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : ''}
+                            >
+                              {activity.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               </div>
+              <Pagination
+                current={recentPage}
+                total={recentPaginated.totalPages}
+                totalItems={recentPaginated.total}
+                onChange={setRecentPage}
+              />
             </CardContent>
           </Card>
         </TabsContent>
