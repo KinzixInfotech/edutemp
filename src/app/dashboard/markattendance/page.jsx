@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
     Loader2, MapPin, Clock, CalendarDays, CheckCircle2, XCircle,
-    AlertTriangle, Coffee, Lock, LogOut, History, Timer, TrendingUp
+    AlertTriangle, Coffee, Lock, LogOut, History, Timer, TrendingUp,
+    Info, CalendarClock, FileText
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +17,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import Link from 'next/link';
+import { cn } from "@/lib/utils";
 
 export default function SelfAttendancePage() {
     const { fullUser } = useAuth();
@@ -88,27 +92,120 @@ export default function SelfAttendancePage() {
     const handleMarkAttendance = async (type) => {
         let location = null;
 
-        if (data?.config?.enableGeoFencing) {
-            try {
-                const pos = await new Promise((resolve, reject) => {
-                    navigator.geolocation.getCurrentPosition(resolve, reject, {
-                        enableHighAccuracy: true,
-                        timeout: 5000,
-                        maximumAge: 0
-                    });
+        // Always attempt to get location for tracking/audit purposes
+        try {
+            const pos = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                    enableHighAccuracy: true,
+                    timeout: 5000,
+                    maximumAge: 0
                 });
-                location = {
-                    latitude: pos.coords.latitude,
-                    longitude: pos.coords.longitude,
-                };
-            } catch (locError) {
-                toast.error("Location access required for attendance");
+            });
+            location = {
+                latitude: pos.coords.latitude,
+                longitude: pos.coords.longitude,
+            };
+        } catch (locError) {
+            console.warn("Location tracking failed:", locError);
+            // Only block if geofencing is strictly enabled
+            if (data?.config?.enableGeoFencing) {
+                toast.error("Location access is required to mark attendance.");
                 return;
             }
         }
 
         markMutation.mutate({ type, location });
     };
+
+    const { attendance, windows, monthlyStats, config, isWorkingDay, dayType, holidayName } = data || {};
+    const isCheckedIn = !!attendance?.checkInTime;
+    const isCheckedOut = !!attendance?.checkOutTime;
+
+    const canCheckIn = isWorkingDay && windows?.checkIn?.isOpen && !isCheckedIn;
+    const canCheckOut = isWorkingDay && windows?.checkOut?.isOpen && isCheckedIn && !isCheckedOut;
+
+    // Helper to calculate time status and progress
+    const timeStatus = useMemo(() => {
+        if (!data || !isWorkingDay || !windows?.checkIn) {
+            return { status: 'CLOSED', color: 'text-rose-500', ringColor: 'stroke-rose-500', progress: 0, message: 'No attendance required' };
+        }
+
+        const now = currentTime.getTime();
+        const start = new Date(windows.checkIn.start).getTime();
+        const end = new Date(windows.checkIn.end).getTime();
+        const shiftStart = config?.startTime ? new Date(`${currentTime.toDateString()} ${config.startTime}`).getTime() : start;
+        const graceEnd = shiftStart + (config?.gracePeriod || 0) * 60 * 1000;
+
+        if (isCheckedIn && !isCheckedOut) {
+            // Working state
+            return {
+                status: 'WORKING',
+                color: 'text-blue-500',
+                ringColor: 'stroke-blue-500',
+                progress: 100,
+                message: 'Currently checked in'
+            };
+        }
+        if (isCheckedOut) {
+            return {
+                status: 'COMPLETED',
+                color: 'text-emerald-500',
+                ringColor: 'stroke-emerald-500',
+                progress: 100,
+                message: 'Attendance completed'
+            };
+        }
+
+        if (now < start) {
+            const opensAt = formatTime(windows.checkIn.start);
+            return {
+                status: 'UPCOMING',
+                color: 'text-blue-500',
+                ringColor: 'stroke-blue-200',
+                progress: 0,
+                message: `Check-in opens at ${opensAt}`
+            };
+        }
+
+        if (now > end) {
+            const closedAt = formatTime(windows.checkIn.end);
+            return {
+                status: 'CLOSED',
+                color: 'text-rose-500',
+                ringColor: 'stroke-rose-200',
+                progress: 100,
+                message: `Check-in closed at ${closedAt}`
+            };
+        }
+
+        // Active Window Calculations
+        const totalDuration = end - start;
+        const elapsed = now - start;
+        const progress = Math.min(100, Math.max(0, (elapsed / totalDuration) * 100));
+
+        if (now <= graceEnd) {
+            return {
+                status: 'ON_TIME',
+                color: 'text-emerald-500',
+                ringColor: 'stroke-emerald-500',
+                progress,
+                message: 'You are on time',
+                isGrace: now > shiftStart // Technically late but within grace
+            };
+        } else if (now <= end) {
+            return {
+                status: 'LATE',
+                color: 'text-amber-500',
+                ringColor: 'stroke-amber-500',
+                progress,
+                message: 'Late check-in',
+                isGrace: false
+            };
+        }
+
+        return { status: 'UNKNOWN', color: 'gray-500', progress: 0 };
+    }, [currentTime, data, isWorkingDay, windows, config, isCheckedIn, isCheckedOut]);
+
 
     // Loading state
     if (isLoading && !data) {
@@ -143,20 +240,13 @@ export default function SelfAttendancePage() {
         );
     }
 
-    const { attendance, windows, monthlyStats, config, isWorkingDay, dayType, holidayName } = data || {};
-    const isCheckedIn = !!attendance?.checkInTime;
-    const isCheckedOut = !!attendance?.checkOutTime;
-
-    const canCheckIn = isWorkingDay && windows?.checkIn?.isOpen && !isCheckedIn;
-    const canCheckOut = isWorkingDay && windows?.checkOut?.isOpen && isCheckedIn && !isCheckedOut;
-
-    const formatTime = (isoString) => {
+    function formatTime(isoString) {
         if (!isoString) return "--:--";
         return new Date(isoString).toLocaleTimeString("en-US", {
-            hour: "2-digit",
+            hour: "numeric",
             minute: "2-digit",
         });
-    };
+    }
 
     const formatDate = (date) => {
         return new Date(date).toLocaleDateString("en-US", {
@@ -176,278 +266,384 @@ export default function SelfAttendancePage() {
         return styles[status] || "bg-gray-100 text-gray-700";
     };
 
+    // Circular Progress Component
+    const size = 320;
+    const strokeWidth = 12;
+    const center = size / 2;
+    const radius = size / 2 - strokeWidth * 2;
+    const circumference = 2 * Math.PI * radius;
+    const strokeDashoffset = circumference - (timeStatus.progress / 100) * circumference;
+
     return (
-        <div className="p-6 space-y-6">
-            {/* Header */}
-            <div>
-                <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                    <Clock className="w-6 h-6 text-primary" />
-                    Self Attendance
-                </h1>
-                <p className="text-muted-foreground">Mark your daily attendance and view your statistics.</p>
-            </div>
+        <TooltipProvider>
+            <div className="p-6 space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                            <Clock className="w-6 h-6 text-primary" />
+                            Self Attendance
+                        </h1>
+                        <p className="text-muted-foreground">Mark your daily attendance and view your statistics.</p>
+                    </div>
+                    <Button variant="outline" asChild>
+                        <Link href="/dashboard/markattendance/report">
+                            <FileText className="mr-2 h-4 w-4" />
+                            View Full Report
+                        </Link>
 
-            {/* Stats Cards - Like Noticeboard */}
-            <div className="grid gap-4 md:grid-cols-4">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Present Days</CardTitle>
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{monthlyStats?.presentDays || 0}</div>
-                        <p className="text-xs text-muted-foreground">This month</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Absent Days</CardTitle>
-                        <XCircle className="h-4 w-4 text-rose-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{monthlyStats?.absentDays || 0}</div>
-                        <p className="text-xs text-muted-foreground">This month</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Late Arrivals</CardTitle>
-                        <AlertTriangle className="h-4 w-4 text-amber-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{monthlyStats?.lateDays || 0}</div>
-                        <p className="text-xs text-muted-foreground">This month</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Attendance</CardTitle>
-                        <TrendingUp className="h-4 w-4 text-primary" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{monthlyStats?.attendancePercentage || 0}%</div>
-                        <p className="text-xs text-muted-foreground">Overall score</p>
-                    </CardContent>
-                </Card>
-            </div>
+                    </Button>
+                </div>
 
-            {/* Holiday Alert */}
-            {!isWorkingDay && (
-                <Alert className="bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900/50">
-                    <Coffee className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                    <AlertTitle className="text-amber-800 dark:text-amber-200 font-semibold">
-                        No Attendance Required
-                    </AlertTitle>
-                    <AlertDescription className="text-amber-700 dark:text-amber-300">
-                        Today is marked as <strong>{dayType?.replace('_', ' ') || 'HOLIDAY'}</strong>
-                        {holidayName ? ` (${holidayName})` : ''}. Enjoy your day off!
-                    </AlertDescription>
-                </Alert>
-            )}
+                {/* Stats Cards - Like Noticeboard */}
+                <div className="grid gap-4 md:grid-cols-4">
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Present Days</CardTitle>
+                            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{monthlyStats?.presentDays || 0}</div>
+                            <p className="text-xs text-muted-foreground">This month</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Absent Days</CardTitle>
+                            <XCircle className="h-4 w-4 text-rose-500" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{monthlyStats?.absentDays || 0}</div>
+                            <p className="text-xs text-muted-foreground">This month</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Late Arrivals</CardTitle>
+                            <AlertTriangle className="h-4 w-4 text-amber-500" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{monthlyStats?.lateDays || 0}</div>
+                            <p className="text-xs text-muted-foreground">This month</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Attendance</CardTitle>
+                            <TrendingUp className="h-4 w-4 text-primary" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{monthlyStats?.attendancePercentage || 0}%</div>
+                            <p className="text-xs text-muted-foreground">Overall score</p>
+                        </CardContent>
+                    </Card>
+                </div>
 
-            <div className="space-y-6">
-                {/* Main Action Card */}
-                <Card>
-                    <CardHeader className="pb-4">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="text-lg">Today's Status</CardTitle>
-                            <Badge
-                                variant="outline"
-                                className={
-                                    isCheckedOut
-                                        ? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800"
-                                        : isCheckedIn
-                                            ? "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800"
-                                            : "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300"
-                                }
-                            >
-                                {isCheckedOut ? "✓ Completed" : isCheckedIn ? "● Working" : "○ Not Marked"}
-                            </Badge>
-                        </div>
-                        <CardDescription>
-                            {currentTime.toLocaleDateString("en-US", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        {/* Live Clock */}
-                        <div className="flex flex-col items-center justify-center py-4 space-y-4">
-                            <div className="text-4xl md:text-5xl font-bold tabular-nums tracking-tight text-primary">
-                                {currentTime.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                {/* Holiday Alert */}
+                {!isWorkingDay && (
+                    <Alert className="bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900/50">
+                        <Coffee className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                        <AlertTitle className="text-amber-800 dark:text-amber-200 font-semibold">
+                            No Attendance Required
+                        </AlertTitle>
+                        <AlertDescription className="text-amber-700 dark:text-amber-300">
+                            Today is marked as <strong>{dayType?.replace('_', ' ') || 'HOLIDAY'}</strong>
+                            {holidayName ? ` (${holidayName})` : ''}. Enjoy your day off!
+                        </AlertDescription>
+                    </Alert>
+                )}
+
+                <div className="space-y-6">
+                    {/* Main Action Card */}
+                    <Card className="overflow-hidden">
+                        <CardHeader className="pb-4 border-b bg-muted/40">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <CardTitle className="text-lg">Today's Status</CardTitle>
+                                    <CardDescription>
+                                        {currentTime.toLocaleDateString("en-US", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                                    </CardDescription>
+                                </div>
+                                <Badge
+                                    variant="outline"
+                                    className={cn(
+                                        "capitalize px-3 py-1",
+                                        isCheckedOut
+                                            ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                                            : isCheckedIn
+                                                ? "bg-blue-100 text-blue-700 border-blue-200"
+                                                : "bg-gray-100 text-gray-700"
+                                    )}
+                                >
+                                    {isCheckedOut ? "✓ Completed" : isCheckedIn ? "● Working" : "○ Not Marked"}
+                                </Badge>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-8 pt-8">
+                            {/* Live Clock with Ring */}
+                            <div className="flex flex-col items-center justify-center relative">
+                                {/* SVG Ring */}
+                                <div className="relative flex items-center justify-center">
+                                    <svg
+                                        width={size}
+                                        height={size}
+                                        viewBox={`0 0 ${size} ${size}`}
+                                        className="transform -rotate-90"
+                                    >
+                                        {/* Background Circle */}
+                                        <circle
+                                            cx={center}
+                                            cy={center}
+                                            r={radius}
+                                            className="stroke-muted fill-none"
+                                            strokeWidth={strokeWidth}
+                                        />
+                                        {/* Progress Circle (Only show if window is active or tracking) */}
+                                        {['ON_TIME', 'LATE', 'WORKING'].includes(timeStatus.status) && (
+                                            <circle
+                                                cx={center}
+                                                cy={center}
+                                                r={radius}
+                                                className={cn("fill-none transition-all duration-1000 ease-out", timeStatus.ringColor)}
+                                                strokeWidth={strokeWidth}
+                                                strokeDasharray={circumference}
+                                                strokeDashoffset={strokeDashoffset}
+                                                strokeLinecap="round"
+                                            />
+                                        )}
+                                    </svg>
+
+                                    {/* Clock Content Inside Ring */}
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
+                                        <div className={cn("text-5xl font-bold tabular-nums tracking-tighter transition-colors", timeStatus.color)}>
+                                            {currentTime.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                                        </div>
+                                        <div className="text-lg text-muted-foreground font-medium">
+                                            {currentTime.toLocaleTimeString("en-US", { second: "2-digit" })} sec
+                                        </div>
+                                        {/* Dynamic Status Message */}
+                                        <div className="mt-6 px-4">
+                                            <Badge variant="secondary" className={cn("font-medium",
+                                                timeStatus.status === 'CLOSED' ? 'bg-rose-100 text-rose-700' :
+                                                    timeStatus.status === 'LATE' ? 'bg-amber-100 text-amber-700' :
+                                                        timeStatus.status === 'ON_TIME' ? 'bg-emerald-100 text-emerald-700' :
+                                                            ''
+                                            )}>
+                                                {timeStatus.message}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Detailed Context Message */}
+                                <div className="mt-2 text-center h-8">
+                                    {timeStatus.status === 'CLOSED' && timeStatus.message.includes('closed') && isWorkingDay && (
+                                        <p className="text-sm text-muted-foreground flex items-center justify-center gap-1">
+                                            <CalendarClock className="w-4 h-4" />
+                                            {config?.startTime
+                                                ? `You can check in tomorrow at ${formatTime(new Date().setHours(...config.startTime.split(':'), 0, 0))}` // Basic approximation for next day
+                                                : "Check-in window closed for today"
+                                            }
+                                        </p>
+                                    )}
+                                    {timeStatus.status === 'LATE' && (
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <p className="text-sm text-amber-600 flex items-center justify-center gap-1 cursor-help underline underline-offset-4 decoration-dotted">
+                                                    <Info className="w-4 h-4" />
+                                                    Grace period ended at {windows?.checkIn?.start && config?.gracePeriod && formatTime(new Date(new Date(windows.checkIn.start).getTime() + config.gracePeriod * 60000))}
+                                                </p>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>You are checking in after the allowed grace period of {config?.gracePeriod} minutes.</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    )}
+                                    {timeStatus.status === 'ON_TIME' && (
+                                        <p className="text-sm text-emerald-600 flex items-center justify-center gap-1">
+                                            <CheckCircle2 className="w-4 h-4" />
+                                            You are within the allowed check-in window.
+                                        </p>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Action Buttons */}
-                            <div className="w-full max-w-sm space-y-3">
+                            <div className="max-w-md mx-auto space-y-3">
                                 {!isCheckedIn && (
-                                    <>
-                                        <Button
-                                            size="lg"
-                                            className="w-full h-12 text-base"
-                                            onClick={() => handleMarkAttendance("CHECK_IN")}
-                                            disabled={!canCheckIn || markMutation.isPending}
-                                        >
-                                            {markMutation.isPending ? (
-                                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                                            ) : canCheckIn ? (
-                                                <CheckCircle2 className="mr-2 h-5 w-5" />
-                                            ) : (
-                                                <Lock className="mr-2 h-5 w-5" />
-                                            )}
-                                            {!isWorkingDay ? "Holiday / Weekend" : canCheckIn ? "Check In Now" : "Check-in Closed"}
-                                        </Button>
-                                        {isWorkingDay && windows?.checkIn?.isOpen && (
-                                            <p className="text-sm text-center text-emerald-600 dark:text-emerald-400">
-                                                Window open until {formatTime(windows.checkIn.end)}
-                                            </p>
+                                    <Button
+                                        size="lg"
+                                        className={cn(
+                                            "w-full h-14 text-lg font-semibold shadow-md transition-all",
+                                            canCheckIn ? "hover:scale-[1.02]" : "opacity-80"
                                         )}
-                                        {isWorkingDay && !windows?.checkIn?.isOpen && (
-                                            <p className="text-sm text-center text-muted-foreground">
-                                                Check-in: {formatTime(windows?.checkIn?.start)} - {formatTime(windows?.checkIn?.end)}
-                                            </p>
+                                        onClick={() => handleMarkAttendance("CHECK_IN")}
+                                        disabled={!canCheckIn || markMutation.isPending}
+                                    >
+                                        {markMutation.isPending ? (
+                                            <Loader2 className="mr-2 h-6 w-6 animate-spin" />
+                                        ) : canCheckIn ? (
+                                            <CheckCircle2 className="mr-2 h-6 w-6" />
+                                        ) : (
+                                            <Lock className="mr-2 h-6 w-6" />
                                         )}
-                                    </>
+                                        {!isWorkingDay ? "Holiday / Weekend" : canCheckIn ? "Check In Now" : "Check-in Closed"}
+                                    </Button>
                                 )}
 
                                 {isCheckedIn && !isCheckedOut && (
                                     <>
                                         <Button
                                             size="lg"
-                                            className="w-full h-12 text-base"
+                                            className="w-full h-14 text-lg font-semibold shadow-md hover:scale-[1.02] transition-all"
                                             variant={canCheckOut ? "destructive" : "secondary"}
                                             onClick={() => handleMarkAttendance("CHECK_OUT")}
                                             disabled={!canCheckOut || markMutation.isPending}
                                         >
                                             {markMutation.isPending ? (
-                                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                                <Loader2 className="mr-2 h-6 w-6 animate-spin" />
                                             ) : (
-                                                <LogOut className="mr-2 h-5 w-5" />
+                                                <LogOut className="mr-2 h-6 w-6" />
                                             )}
                                             Check Out
                                         </Button>
-                                        <div className="text-center space-y-1 text-sm">
-                                            <p>In at <span className="font-semibold">{formatTime(attendance.checkInTime)}</span></p>
-                                            <p className="flex items-center justify-center gap-1">
-                                                <Timer className="h-4 w-4" />
-                                                <span className="font-mono font-bold text-primary">{attendance?.liveWorkingHours?.toFixed(2) || '0.00'} hrs</span>
-                                            </p>
+                                        <div className="grid grid-cols-2 gap-4 pt-2">
+                                            <div className="bg-muted/50 p-3 rounded-lg text-center border">
+                                                <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Checked In</p>
+                                                <p className="text-xl font-bold text-primary mt-1">{formatTime(attendance.checkInTime)}</p>
+                                            </div>
+                                            <div className="bg-muted/50 p-3 rounded-lg text-center border">
+                                                <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Duration</p>
+                                                <p className="text-xl font-mono font-bold text-blue-600 mt-1 flex items-center justify-center gap-1">
+                                                    <Timer className="w-4 h-4" />
+                                                    {attendance?.liveWorkingHours?.toFixed(2) || '0.00'}<span className="text-sm">hr</span>
+                                                </p>
+                                            </div>
                                         </div>
                                     </>
                                 )}
 
                                 {isCheckedOut && (
-                                    <div className="flex flex-col items-center gap-2 p-4 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                                        <CheckCircle2 className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
+                                    <div className="flex flex-col items-center gap-2 p-6 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl border-2 border-emerald-100 dark:border-emerald-900 border-dashed">
+                                        <div className="h-16 w-16 bg-emerald-100 rounded-full flex items-center justify-center mb-2">
+                                            <CheckCircle2 className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
+                                        </div>
                                         <div className="text-center">
-                                            <p className="font-semibold">Attendance Completed</p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {formatTime(attendance.checkInTime)} - {formatTime(attendance.checkOutTime)}
+                                            <h3 className="tex-lg font-bold text-emerald-900 dark:text-emerald-100">You're all done!</h3>
+                                            <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-1">
+                                                Checked out at {formatTime(attendance.checkOutTime)}
                                             </p>
-                                            <p className="text-sm font-medium mt-1 text-emerald-700 dark:text-emerald-300">
-                                                Total: {attendance.workingHours?.toFixed(2)} hrs
-                                            </p>
+                                            <Badge variant="outline" className="mt-3 bg-white/50 border-emerald-200 text-emerald-800">
+                                                Total Duration: {attendance.workingHours?.toFixed(2)} hrs
+                                            </Badge>
                                         </div>
                                     </div>
                                 )}
                             </div>
-                        </div>
+                        </CardContent>
+                    </Card>
 
-                        <Separator />
-
-                        {/* Shift Info */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                            <div className="p-3 bg-muted/50 rounded-lg">
-                                <p className="text-xs text-muted-foreground uppercase font-medium">Shift Start</p>
-                                <p className="text-lg font-semibold mt-1">{config?.startTime || '--:--'}</p>
-                            </div>
-                            <div className="p-3 bg-muted/50 rounded-lg">
-                                <p className="text-xs text-muted-foreground uppercase font-medium">Shift End</p>
-                                <p className="text-lg font-semibold mt-1">{config?.endTime || '--:--'}</p>
-                            </div>
-                            <div className="p-3 bg-muted/50 rounded-lg">
-                                <p className="text-xs text-muted-foreground uppercase font-medium">Grace Period</p>
-                                <p className="text-lg font-semibold mt-1">{config?.gracePeriod || 0} mins</p>
-                            </div>
-                            <div className="p-3 bg-muted/50 rounded-lg">
-                                <p className="text-xs text-muted-foreground uppercase font-medium">Min Hours</p>
-                                <p className="text-lg font-semibold mt-1">{config?.minWorkingHours || 0} hrs</p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Geofencing Info - Only show if enabled */}
-                {config?.enableGeoFencing && (
                     <Card>
-                        <CardHeader className="pb-2">
+                        <CardHeader className="pb-4">
                             <CardTitle className="text-base flex items-center gap-2">
-                                <MapPin className="h-4 w-4 text-muted-foreground" />
-                                Location Required
+                                <Info className="h-4 w-4 text-muted-foreground" />
+                                Shift Details
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
-                                <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
-                                <p>
-                                    You must be within <strong>{config.allowedRadius}m</strong> of school to mark attendance.
-                                </p>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
+                                    <p className="text-xs text-muted-foreground uppercase font-medium">Shift Start</p>
+                                    <p className="text-lg font-semibold mt-1">{config?.startTime || '--:--'}</p>
+                                </div>
+                                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
+                                    <p className="text-xs text-muted-foreground uppercase font-medium">Shift End</p>
+                                    <p className="text-lg font-semibold mt-1">{config?.endTime || '--:--'}</p>
+                                </div>
+                                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
+                                    <p className="text-xs text-muted-foreground uppercase font-medium">Grace Period</p>
+                                    <p className="text-lg font-semibold mt-1 flex items-center justify-center gap-1">
+                                        {config?.gracePeriod || 0}
+                                        <span className="text-xs font-normal text-muted-foreground">mins</span>
+                                    </p>
+                                </div>
+                                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
+                                    <p className="text-xs text-muted-foreground uppercase font-medium">Min Hours</p>
+                                    <p className="text-lg font-semibold mt-1 flex items-center justify-center gap-1">
+                                        {config?.minWorkingHours || 0}
+                                        <span className="text-xs font-normal text-muted-foreground">hrs</span>
+                                    </p>
+                                </div>
                             </div>
+
+                            {/* Geofencing Info - Only show if enabled */}
+                            {config?.enableGeoFencing && (
+                                <div className="mt-4 flex items-start gap-3 text-sm text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-3 rounded-md border border-blue-100 dark:border-blue-900">
+                                    <MapPin className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
+                                    <p>
+                                        <span className="font-semibold text-blue-700 dark:text-blue-300">Geofencing Active: </span>
+                                        You must be within <strong>{config.allowedRadius}m</strong> of school premises to mark attendance.
+                                    </p>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
-                )}
-            </div>
+                </div>
 
-            {/* Attendance History */}
-            <Card>
-                <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2">
-                        <History className="h-5 w-5 text-muted-foreground" />
-                        Recent Attendance
-                    </CardTitle>
-                    <CardDescription>Your attendance records from the last 10 days</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {historyLoading ? (
-                        <div className="space-y-2">
-                            {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
-                        </div>
-                    ) : historyData?.records?.length > 0 ? (
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead className="hidden sm:table-cell">Check In</TableHead>
-                                        <TableHead className="hidden sm:table-cell">Check Out</TableHead>
-                                        <TableHead className="text-right">Hours</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {historyData.records.map((record) => (
-                                        <TableRow key={record.id}>
-                                            <TableCell className="font-medium">{formatDate(record.date)}</TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline" className={getStatusBadge(record.status)}>
-                                                    {record.status}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="hidden sm:table-cell">{formatTime(record.checkInTime)}</TableCell>
-                                            <TableCell className="hidden sm:table-cell">{formatTime(record.checkOutTime)}</TableCell>
-                                            <TableCell className="text-right font-mono">
-                                                {record.workingHours?.toFixed(1) || '-'}
-                                            </TableCell>
+                {/* Attendance History */}
+                <Card>
+                    <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2">
+                            <History className="h-5 w-5 text-muted-foreground" />
+                            Recent Attendance
+                        </CardTitle>
+                        <CardDescription>Your attendance records from the last 10 days</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {historyLoading ? (
+                            <div className="space-y-2">
+                                {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+                            </div>
+                        ) : historyData?.records?.length > 0 ? (
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead className="hidden sm:table-cell">Check In</TableHead>
+                                            <TableHead className="hidden sm:table-cell">Check Out</TableHead>
+                                            <TableHead className="text-right">Hours</TableHead>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    ) : (
-                        <div className="text-center py-8 text-muted-foreground">
-                            <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                            <p>No attendance records yet</p>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-        </div>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {historyData.records.map((record) => (
+                                            <TableRow key={record.id}>
+                                                <TableCell className="font-medium">{formatDate(record.date)}</TableCell>
+                                                <TableCell>
+                                                    <Badge variant="outline" className={getStatusBadge(record.status)}>
+                                                        {record.status}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="hidden sm:table-cell">{formatTime(record.checkInTime)}</TableCell>
+                                                <TableCell className="hidden sm:table-cell">{formatTime(record.checkOutTime)}</TableCell>
+                                                <TableCell className="text-right font-mono">
+                                                    {record.workingHours?.toFixed(1) || '-'}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        ) : (
+                            <div className="text-center py-8 text-muted-foreground">
+                                <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                <p>No attendance records yet</p>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+        </TooltipProvider>
     );
 }

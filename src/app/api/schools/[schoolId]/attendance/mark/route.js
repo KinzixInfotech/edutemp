@@ -33,10 +33,18 @@ function getISTNow() {
 // POST – Mark Check-in / Check-out
 // ──────────────────────────────────────────────────────────────────────
 export async function POST(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     const { schoolId } = params;
     const body = await req.json();
     const { userId, type, location, deviceInfo, remarks } = body;
+
+    // Extract IP Address for tracking
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || req.headers.get('x-real-ip') || 'Unknown';
+    const enrichedDeviceInfo = {
+        ...deviceInfo,
+        ipAddress: ip,
+        userAgent: req.headers.get('user-agent') || deviceInfo?.userAgent
+    };
 
     if (!userId || !type || !['CHECK_IN', 'CHECK_OUT'].includes(type)) {
         return NextResponse.json({
@@ -178,7 +186,7 @@ export async function POST(req, props) {
                     isLateCheckIn: isLate,
                     lateByMinutes,
                     checkInLocation: location || null,
-                    deviceInfo: deviceInfo || null,
+                    deviceInfo: enrichedDeviceInfo || null,
                     remarks,
                     markedBy: userId,
                     requiresApproval: false,
@@ -347,7 +355,7 @@ export async function POST(req, props) {
 // GET – Today's status + LIVE working hours
 // ──────────────────────────────────────────────────────────────────────
 export async function GET(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     const { schoolId } = params;
     const userId = new URL(req.url).searchParams.get('userId');
 
