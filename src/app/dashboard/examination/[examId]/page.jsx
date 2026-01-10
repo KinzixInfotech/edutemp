@@ -36,7 +36,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, ArrowLeft, Calendar, Clock, Save, Trash2, Users, Armchair, UserCheck, FileCheck, Search, Lock, RefreshCw } from "lucide-react";
+import { Loader2, ArrowLeft, Calendar, Clock, Save, Trash2, Users, Armchair, UserCheck, FileCheck, Search, Lock, RefreshCw, Shield, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import axios from "axios";
@@ -69,6 +69,8 @@ export default function ExamDetailsPage() {
   const [allocatingSeats, setAllocatingSeats] = useState(false);
   const [allocations, setAllocations] = useState([]);
   const [showAllocateConfirm, setShowAllocateConfirm] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
 
   // Evaluator State
   const [evaluators, setEvaluators] = useState([]);
@@ -79,6 +81,22 @@ export default function ExamDetailsPage() {
     subjectId: ''
   });
   const [assigningEvaluator, setAssigningEvaluator] = useState(false);
+
+  // Invigilator State
+  const [invigilators, setInvigilators] = useState([]);
+  const [halls, setHalls] = useState([]);
+  const [isInvigilatorDialogOpen, setIsInvigilatorDialogOpen] = useState(false);
+  const [invigilatorForm, setInvigilatorForm] = useState({
+    teacherId: '',
+    hallId: '',
+    date: '',
+    startTime: '',
+    endTime: '',
+    role: 'PRIMARY',
+    subjectId: ''
+  });
+  const [assigningInvigilator, setAssigningInvigilator] = useState(false);
+
   const [teacherSearch, setTeacherSearch] = useState('');
 
   // Filtered teachers based on search
@@ -91,6 +109,12 @@ export default function ExamDetailsPage() {
       teacher.email?.toLowerCase().includes(search)
     );
   });
+
+  // Pagination Logic for Seat Allocation
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = allocations.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(allocations.length / itemsPerPage);
 
   useEffect(() => {
     if (fullUser?.schoolId && examId) {
@@ -119,6 +143,8 @@ export default function ExamDetailsPage() {
       fetchEvaluators();
       fetchTeachers();
       fetchMarksStatus();
+      fetchInvigilators();
+      fetchHalls();
 
     } catch (error) {
       console.error("Error fetching exam:", error);
@@ -229,6 +255,111 @@ export default function ExamDetailsPage() {
     }
   };
 
+  const fetchInvigilators = async () => {
+    try {
+      const res = await axios.get(
+        `/api/schools/${fullUser.schoolId}/examination/exams/${examId}/invigilators`
+      );
+      setInvigilators(res.data.invigilators || []);
+    } catch (error) {
+      console.error("Error fetching invigilators:", error);
+    }
+  };
+
+  const fetchHalls = async () => {
+    try {
+      const res = await axios.get(
+        `/api/schools/${fullUser.schoolId}/examination/halls`
+      );
+      setHalls(res.data || []);
+    } catch (error) {
+      console.error("Error fetching halls:", error);
+    }
+  };
+
+  const handleAssignInvigilator = async () => {
+    const { teacherId, hallId, date, startTime, endTime, role, subjectId } = invigilatorForm;
+
+    if (!teacherId || !hallId || !date || !startTime || !endTime) {
+      toast.error('All fields (Hall, Date, Time, Teacher) are required');
+      return;
+    }
+
+    setAssigningInvigilator(true);
+    try {
+      // Construct full ISO strings for start and end time
+      const startDateTime = new Date(`${date}T${startTime}:00`);
+      const endDateTime = new Date(`${date}T${endTime}:00`);
+
+      await axios.post(
+        `/api/schools/${fullUser.schoolId}/examination/exams/${examId}/invigilators`,
+        {
+          teacherId,
+          hallId,
+          date: new Date(date).toISOString(),
+          startTime: startDateTime.toISOString(),
+          endTime: endDateTime.toISOString(),
+          role,
+          assignedBy: fullUser.id
+        }
+      );
+
+      toast.success('Invigilator assigned and notified');
+      setIsInvigilatorDialogOpen(false);
+      setInvigilatorForm({
+        teacherId: '',
+        hallId: '',
+        date: '',
+        startTime: '',
+        endTime: '',
+        role: 'PRIMARY',
+        subjectId: ''
+      });
+      fetchInvigilators();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to assign invigilator');
+    } finally {
+      setAssigningInvigilator(false);
+    }
+  };
+
+  const handleSubjectSelect = (subjectId) => {
+    // Find subject in exam.subjects (which has includes for date/time)
+    const subjectData = exam.subjects.find(s => s.subjectId === parseInt(subjectId));
+
+    if (subjectData) {
+      // Format time from "HH:mm" usually stored in ExamSubject or just use what data is there
+      // Assuming ExamSubject has { date: DateTime, startTime: String "HH:mm", endTime: String "HH:mm" }
+
+      let newForm = { ...invigilatorForm, subjectId };
+
+      if (subjectData.date) {
+        newForm.date = format(new Date(subjectData.date), 'yyyy-MM-dd');
+      }
+      if (subjectData.startTime) {
+        newForm.startTime = subjectData.startTime;
+      }
+      if (subjectData.endTime) {
+        newForm.endTime = subjectData.endTime;
+      }
+      setInvigilatorForm(newForm);
+    } else {
+      setInvigilatorForm({ ...invigilatorForm, subjectId });
+    }
+  };
+
+  const handleRemoveInvigilator = async (id) => {
+    try {
+      await axios.delete(
+        `/api/schools/${fullUser.schoolId}/examination/exams/${examId}/invigilators?id=${id}`
+      );
+      toast.success('Invigilator removed');
+      fetchInvigilators();
+    } catch (error) {
+      toast.error('Failed to remove invigilator');
+    }
+  };
+
   const handleScheduleSubmit = async () => {
     try {
       await axios.post(
@@ -309,6 +440,7 @@ export default function ExamDetailsPage() {
           <TabsTrigger value="schedule">Exam Schedule</TabsTrigger>
           <TabsTrigger value="seating">Seat Allocation</TabsTrigger>
           <TabsTrigger value="evaluators">Evaluators</TabsTrigger>
+          <TabsTrigger value="invigilators">Invigilators</TabsTrigger>
           <TabsTrigger value="marks">Marks Status</TabsTrigger>
           <TabsTrigger value="students">Classes</TabsTrigger>
         </TabsList>
@@ -493,7 +625,7 @@ export default function ExamDetailsPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      allocations.map((alloc, index) => (
+                      currentItems.map((alloc, index) => (
                         <TableRow key={alloc.id} className={`hover:bg-muted/30 dark:hover:bg-background/30 ${index % 2 === 0 ? "bg-muted dark:bg-background/50" : ""}`}>
                           <TableCell className="font-mono font-bold text-blue-600">{alloc.seatNumber}</TableCell>
                           <TableCell className="font-medium">{alloc.student?.name}</TableCell>
@@ -510,6 +642,36 @@ export default function ExamDetailsPage() {
                   </TableBody>
                 </Table>
               </div>
+
+              {/* PAGINATION CONTROLS */}
+              {allocations.length > 0 && (
+                <div className="flex items-center justify-between mt-4">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, allocations.length)} of {allocations.length} students
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <div className="flex items-center px-2 text-sm font-medium">
+                      Page {currentPage} of {totalPages}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -724,6 +886,225 @@ export default function ExamDetailsPage() {
                               className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
                               onClick={() => handleRemoveEvaluator(ev.id)}
                             >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* INVIGILATORS TAB */}
+        <TabsContent value="invigilators" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-lg font-semibold">Invigilator Assignments</h2>
+              <p className="text-sm text-muted-foreground">
+                Assign teachers to exam halls as invigilators. Supports overlapping shifts.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={fetchInvigilators} title="Refresh">
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+              <Dialog open={isInvigilatorDialogOpen} onOpenChange={setIsInvigilatorDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Shield className="mr-2 h-4 w-4" /> Assign Invigilator
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Assign Invigilator</DialogTitle>
+                  </DialogHeader>
+                  <div className="grid grid-cols-2 gap-4 py-4">
+                    <div className="space-y-2 col-span-2">
+                      <Label>Hall *</Label>
+                      <Select
+                        value={invigilatorForm.hallId}
+                        onValueChange={(val) => setInvigilatorForm({ ...invigilatorForm, hallId: val })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select examination hall" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {halls.map((hall) => (
+                            <SelectItem key={hall.id} value={hall.id}>
+                              {hall.name} ({hall.roomNumber || 'No Room No'})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2 col-span-2">
+                      <Label>Subject (Optional)</Label>
+                      <Select
+                        value={invigilatorForm.subjectId}
+                        onValueChange={handleSubjectSelect}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Auto-fill time from subject..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None (General Duty)</SelectItem>
+                          {exam?.subjects?.map((sub) => (
+                            <SelectItem key={sub.subjectId} value={sub.subjectId.toString()}>
+                              {sub.subject.subjectName} ({sub.date ? format(new Date(sub.date), 'dd MMM') : ''} {sub.startTime}-{sub.endTime})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[10px] text-muted-foreground">Selecting a subject auto-fills date & time.</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Date *</Label>
+                      <Input
+                        type="date"
+                        value={invigilatorForm.date || ''}
+                        onChange={(e) => setInvigilatorForm({ ...invigilatorForm, date: e.target.value })}
+                        min={exam ? format(new Date(exam.startDate), 'yyyy-MM-dd') : ''}
+                        max={exam?.endDate ? format(new Date(exam.endDate), 'yyyy-MM-dd') : ''}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Role</Label>
+                      <Select
+                        value={invigilatorForm.role || 'PRIMARY'}
+                        onValueChange={(val) => setInvigilatorForm({ ...invigilatorForm, role: val })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="PRIMARY">Primary Invigilator</SelectItem>
+                          <SelectItem value="ASSISTANT">Assistant Invigilator</SelectItem>
+                          <SelectItem value="RELIEF">Relief / Substitute</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Start Time *</Label>
+                      <Input
+                        type="time"
+                        value={invigilatorForm.startTime || ''}
+                        onChange={(e) => setInvigilatorForm({ ...invigilatorForm, startTime: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>End Time *</Label>
+                      <Input
+                        type="time"
+                        value={invigilatorForm.endTime || ''}
+                        onChange={(e) => setInvigilatorForm({ ...invigilatorForm, endTime: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="space-y-2 col-span-2">
+                      <Label>Teacher *</Label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search by name, ID, or email..."
+                          value={teacherSearch}
+                          onChange={(e) => setTeacherSearch(e.target.value)}
+                          className="pl-9 mb-2"
+                        />
+                      </div>
+                      <Select
+                        value={invigilatorForm.teacherId}
+                        onValueChange={(val) => setInvigilatorForm({ ...invigilatorForm, teacherId: val })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select teacher" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-60">
+                          {filteredTeachers.length > 0 ? filteredTeachers.map((teacher) => (
+                            <SelectItem key={teacher.userId} value={teacher.userId}>
+                              {teacher.name} ({teacher.employeeId})
+                            </SelectItem>
+                          )) : <SelectItem disabled value="none">No teachers found</SelectItem>}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsInvigilatorDialogOpen(false)}>Cancel</Button>
+                    <Button onClick={handleAssignInvigilator} disabled={assigningInvigilator}>
+                      {assigningInvigilator && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Assign
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+
+          <Card className="border-0 shadow-none border">
+            <CardContent className="pt-6">
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="dark:bg-background/50 bg-muted/50">
+                      <TableHead>Hall / Room</TableHead>
+                      <TableHead>Invigilator</TableHead>
+                      <TableHead>Shift</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {invigilators.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-12">
+                          <div className="flex flex-col items-center gap-2">
+                            <Shield className="w-12 h-12 text-muted-foreground/30" />
+                            <p className="text-muted-foreground">No invigilators assigned</p>
+                            <p className="text-sm text-muted-foreground/70">Assign teachers for shifts</p>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      invigilators.map((inv) => (
+                        <TableRow key={inv.id}>
+                          <TableCell>
+                            <div className="font-medium">{inv.hall.name}</div>
+                            <div className="text-xs text-muted-foreground">Room: {inv.hall.roomNumber || 'N/A'}</div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="font-medium">{inv.teacher.name}</div>
+                            <div className="text-xs text-muted-foreground">{inv.teacher.email}</div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="font-medium">{inv.date ? format(new Date(inv.date), "MMM d, yyyy") : '-'}</div>
+                            <div className="text-xs text-muted-foreground mb-1">
+                              {inv.startTime ? format(new Date(inv.startTime), "h:mm a") : ''} - {inv.endTime ? format(new Date(inv.endTime), "h:mm a") : ''}
+                            </div>
+                            {inv.subject && (
+                              <Badge variant="secondary" className="text-[10px] h-5">
+                                {inv.subject.subjectName}
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={
+                              inv.role === 'PRIMARY' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                inv.role === 'ASSISTANT' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                                  'bg-gray-50 text-gray-700 border-gray-200'
+                            }>
+                              {inv.role || 'PRIMARY'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => handleRemoveInvigilator(inv.id)}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </TableCell>

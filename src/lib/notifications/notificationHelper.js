@@ -1115,3 +1115,54 @@ export const NOTIFICATION_PRIORITIES = {
     HIGH: 'HIGH',
     URGENT: 'URGENT',
 };
+
+export async function notifyInvigilatorAssigned({ schoolId, teacherId, examName, date, hallName, senderId }) {
+    return sendNotification({
+        schoolId,
+        title: 'Invigilation Duty Assigned',
+        message: `You have been assigned as invigilator for ${examName} on ${new Date(date).toLocaleDateString()} in ${hallName}.`,
+        type: 'EXAM_DUTY',
+        priority: 'HIGH',
+        icon: '👀',
+        targetOptions: { userIds: [teacherId] },
+        senderId,
+        metadata: { examName, date, hallName },
+        actionUrl: '/teacher-portal/exams/invigilation'
+    });
+}
+
+/**
+ * Notify parents and students when an offline exam is published
+ */
+export async function notifyExamPublished({ schoolId, examId, examTitle, startDate, classIds, senderId }) {
+    const formattedDate = new Date(startDate).toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+    });
+
+    const message = `The exam schedule for "${examTitle}" (starting ${formattedDate}) has been published. Please check the timetable.`;
+
+    // Target students of these classes + their parents
+    return sendNotification({
+        schoolId,
+        title: 'Exam Schedule Published',
+        message,
+        type: 'EXAM',
+        priority: 'HIGH',
+        icon: '📅',
+        targetOptions: {
+            classIds: classIds.map(id => parseInt(id)),
+            userTypes: ['STUDENT'],
+            includeParents: true // FETCH parents too
+        },
+        senderId,
+        metadata: {
+            examId,
+            examTitle,
+            startDate,
+            type: 'EXAM_PUBLISHED'
+        },
+        actionUrl: `/exams/${examId}`
+    });
+}

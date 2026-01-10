@@ -2224,6 +2224,7 @@ model Subject {
   timetableEntries      TimetableEntry[]
   teacherShifts         TeacherShift[]
   examEvaluators        ExamEvaluator[]
+  examHallInvigilators  ExamHallInvigilator[]
 
   @@index([classId])
   @@index([departmentId])
@@ -4278,11 +4279,22 @@ model ExamHallInvigilator {
 
   assignedAt DateTime @default(now())
 
+  // New fields for shift management
+  date      DateTime
+  startTime DateTime
+  endTime   DateTime
+  role      String?  @default("PRIMARY") // PRIMARY, ASSISTANT, RELIEF
+  subjectId Int? // Optional link to specific subject paper
+
   exam    Exam          @relation(fields: [examId], references: [id], onDelete: Cascade)
   hall    ExamHall      @relation(fields: [hallId], references: [id], onDelete: Cascade)
   teacher TeachingStaff @relation(fields: [teacherId], references: [userId])
+  subject Subject?      @relation(fields: [subjectId], references: [id])
 
-  @@unique([examId, hallId, teacherId])
+  @@index([examId])
+  @@index([hallId])
+  @@index([teacherId])
+  @@index([subjectId])
 }
 
 model HallAttendance {

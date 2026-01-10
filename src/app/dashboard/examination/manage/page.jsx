@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, Calendar, FileText, Trash2, Edit, Copy, Link2, Check } from "lucide-react";
+import { Loader2, Plus, Calendar, FileText, Trash2, Edit, Copy, Link2, Check, Share2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import axios from "axios";
@@ -35,6 +35,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function ExamListPage() {
   const { fullUser } = useAuth();
@@ -43,6 +45,38 @@ export default function ExamListPage() {
   const [copiedId, setCopiedId] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [examToDelete, setExamToDelete] = useState(null);
+
+  // Share Preview State
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [shareText, setShareText] = useState("");
+  const [shareUrl, setShareUrl] = useState("");
+  const [previewData, setPreviewData] = useState(null);
+
+
+
+  const handleSharePreview = (exam) => {
+    const url = `${window.location.origin}/exam/${exam.id}`;
+    const startDate = exam.startDate ? format(new Date(exam.startDate), "dd MMM yyyy") : "TBD";
+
+    let scheduleSection = "";
+    if (exam.subjects && exam.subjects.length > 0) {
+      const subjectDetails = exam.subjects.map(s => {
+        const dateStr = s.date ? format(new Date(s.date), "dd MMM") : "TBD";
+        const timeStr = s.startTime ? `${s.startTime} - ${s.endTime}` : "TBD";
+        return `• ${s.subject?.subjectName || "Subject"}: ${dateStr} (${timeStr})`;
+      }).join('\n');
+      scheduleSection = `\n*📝 Exam Schedule:*\n${subjectDetails}\n`;
+    } else {
+      scheduleSection = "\n*📝 Exam Schedule:*\nNo specific subjects scheduled.\n";
+    }
+
+    const text = `Dear Student/Parent,\n\nThe online exam *"${exam.title}"* has been scheduled starting from ${startDate}\n🔗 *Exam Link:* ${url}\n\nPlease ensure you are ready before the start time.\n\nBest Regards,\nSchool Administration`;
+
+    setShareText(text);
+    setShareUrl(url);
+    setPreviewData(exam);
+    setPreviewOpen(true);
+  };
 
   useEffect(() => {
     if (fullUser?.schoolId) {
@@ -147,6 +181,69 @@ export default function ExamListPage() {
         </Link>
       </div>
 
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share Preview</DialogTitle>
+            <DialogDescription>
+              Preview the message before sharing on WhatsApp.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="bg-[#E5DDD5] dark:bg-[#121b22] p-4 rounded-lg max-h-[400px] overflow-y-auto">
+              <div className="bg-white dark:bg-[#202c33] p-3 rounded-md shadow-sm border-none relative text-sm dark:text-[#d1d7db]">
+                <p>Dear Student/Parent,</p>
+                <br />
+                <p>
+                  The online exam <strong>"{previewData?.title}"</strong> has been scheduled starting from{" "}
+                  <strong>
+                    {previewData?.startDate
+                      ? format(new Date(previewData.startDate), "dd MMM yyyy")
+                      : "TBD"}
+                  </strong>
+                  .
+                </p>
+                <br />
+                <p>
+                  🔗 <strong>Exam Link:</strong>
+                </p>
+                <p className="text-blue-500 break-all">{shareUrl}</p>
+                <br />
+                <p>Please ensure you are ready before the start time.</p>
+                <br />
+                <p>Best Regards,</p>
+                <p>School Administration</p>
+
+                {/* Time stamp simulation */}
+                <div className="text-[10px] text-gray-500 text-right mt-1">
+                  {format(new Date(), "hh:mm a")}
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-center text-muted-foreground mt-2">
+              This message will be sent via WhatsApp.
+            </p>
+          </div>
+          <DialogFooter className="flex gap-2 sm:justify-end">
+            <Button variant="outline" onClick={() => setPreviewOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+                window.open(whatsappUrl, '_blank');
+                setPreviewOpen(false);
+              }}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              <Share2 className="mr-2 h-4 w-4" />
+              Share on WhatsApp
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Card>
         <CardHeader>
           <CardTitle>All Exams</CardTitle>
@@ -230,6 +327,14 @@ export default function ExamListPage() {
                       <div className="flex justify-end gap-2">
                         {exam.type === 'ONLINE' && (
                           <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleSharePreview(exam)}
+                            >
+                              <Share2 className="mr-2 h-4 w-4" />
+                              Share
+                            </Button>
                             <Button
                               variant="outline"
                               size="sm"

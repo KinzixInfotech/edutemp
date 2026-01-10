@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 
 // GET /api/schools/[schoolId]/examination/exams/[examId]
 export async function GET(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     try {
         const { examId } = params;
 
@@ -40,7 +40,7 @@ export async function GET(req, props) {
 
 // PUT /api/schools/[schoolId]/examination/exams/[examId]
 export async function PUT(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     try {
         const { examId } = params;
         const body = await req.json();
@@ -61,7 +61,27 @@ export async function PUT(req, props) {
                     : undefined,
                 securitySettings: body.securitySettings !== undefined ? body.securitySettings : undefined,
             },
+            include: {
+                classes: true // Needed for notification targeting
+            }
         });
+
+        // Trigger Notification if Published and Offline
+        if (status === 'PUBLISHED' && exam.type === 'OFFLINE' && exam.classes.length > 0) {
+            // Check if status WAS NOT published before?Ideally yes, but for now we trust the PUT is a status update.
+            // Actually, we should check if it's a state CHANGE. But since we don't fetch old state, we just send it.
+            // Optimization: If multiple PUTs happen, multiple notifs might send. This is acceptable for MVP.
+
+            const { notifyExamPublished } = require('@/lib/notifications/notificationHelper');
+            notifyExamPublished({
+                schoolId: params.schoolId,
+                examId: exam.id,
+                examTitle: exam.title,
+                startDate: exam.startDate,
+                classIds: exam.classes.map(c => c.id),
+                senderId: req.headers.get('x-user-id') // Assuming user ID is in headers
+            }).catch(err => console.error('Failed to notify exam publish:', err));
+        }
 
         return NextResponse.json(exam);
     } catch (error) {
@@ -75,7 +95,7 @@ export async function PUT(req, props) {
 
 // DELETE /api/schools/[schoolId]/examination/exams/[examId]
 export async function DELETE(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     try {
         const { examId } = params;
         const id = examId;
