@@ -110,9 +110,10 @@ model School {
   receipts        Receipt[]
 
   // AI System
-  aiUsageLogs    AiUsageLog[]
-  aiInsightCache AiInsightCache[]
-  aiSettings     AiSettings?
+  aiUsageLogs     AiUsageLog[]
+  aiInsightCache  AiInsightCache[]
+  aiSettings      AiSettings?
+  attendanceLocks AttendanceLock[]
 
   @@index([name])
 }
@@ -1598,6 +1599,12 @@ model User {
   // AI System
   aiUsageLogs AiUsageLog[]
 
+  // Hall Ticket & Attendance Lock Management
+  hallTicketOverrides     AdmitCard[]      @relation("HallTicketOverride")
+  attendanceLocksLocked   AttendanceLock[] @relation("AttendanceLockedBy")
+  attendanceLocksUnlocked AttendanceLock[] @relation("AttendanceUnlockedBy")
+  admitCards              AdmitCard[]
+
   @@index([schoolId])
   @@index([roleId])
 }
@@ -1929,6 +1936,7 @@ model TeachingStaff {
   timetableEntries      TimetableEntry[]
   examHallInvigilators  ExamHallInvigilator[]
   teacherShifts         TeacherShift[]
+  examEvaluators        ExamEvaluator[]         @relation("EvaluatorAssignments")
 
   @@index([departmentId])
 }
@@ -1990,6 +1998,7 @@ model Class {
   promotionHistoriesTo   PromotionHistory[]     @relation("PromotionToClass")
   teacherShifts          TeacherShift[]
   alumni                 Alumni[]
+  examEvaluators         ExamEvaluator[]
 
   @@unique([id, schoolId])
   @@index([schoolId])
@@ -2214,6 +2223,7 @@ model Subject {
   examSubjects          ExamSubject[]
   timetableEntries      TimetableEntry[]
   teacherShifts         TeacherShift[]
+  examEvaluators        ExamEvaluator[]
 
   @@index([classId])
   @@index([departmentId])
@@ -2303,6 +2313,8 @@ model Exam {
   attempts         StudentExamAttempt[]
   invigilators     ExamHallInvigilator[]
   attendance       HallAttendance[]
+  examEvaluators   ExamEvaluator[]
+  marksSubmissions MarksSubmission[]
 
   @@index([schoolId])
 }
@@ -2387,9 +2399,19 @@ enum ExamType {
 }
 
 enum ExamStatus {
-  DRAFT
-  SCHEDULED
-  COMPLETED
+  DRAFT // Initial creation
+  SCHEDULED // Published, awaiting start
+  IN_PROGRESS // Exam ongoing
+  COMPLETED // Exam finished
+  RESULTS_PENDING // Marks entry in progress
+  RESULTS_PUBLISHED // Final results out
+  PUBLISHED // Legacy - kept for compatibility
+}
+
+enum HallTicketStatus {
+  NOT_ISSUED
+  ISSUED
+  BLOCKED
   PUBLISHED
 }
 
@@ -3519,19 +3541,64 @@ model AdmitCard {
   exam         Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
   schoolId     String   @db.Uuid
   school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  seatNumber   String
+  seatNumber   String?
   center       String?
-  layoutConfig Json
+  layoutConfig Json?
   issueDate    DateTime @default(now())
 
   // Parent sharing
   showToParent Boolean   @default(false)
   sharedAt     DateTime?
 
+  // Eligibility & Issue Control (Hall Ticket Management)
+  status            HallTicketStatus @default(NOT_ISSUED)
+  isEligible        Boolean          @default(true)
+  feeCleared        Boolean          @default(false)
+  attendanceOk      Boolean          @default(false)
+  attendancePercent Float?
+  manualBlock       Boolean          @default(false)
+  blockReason       String?
+  isOverride        Boolean          @default(false)
+  overrideReason    String?
+  overrideBy        String?          @db.Uuid
+  overrideByUser    User?            @relation("HallTicketOverride", fields: [overrideBy], references: [id])
+  overrideAt        DateTime?
+  publishedAt       DateTime?
+  isPublished       Boolean          @default(false)
+  user              User?            @relation(fields: [userId], references: [id])
+  userId            String?          @db.Uuid
+
+  @@unique([studentId, examId])
   @@index([schoolId])
   @@index([studentId])
   @@index([examId])
   @@index([showToParent])
+}
+
+// ============================================
+// ATTENDANCE LOCK - MONTHLY FREEZE CONTROL
+// ============================================
+
+model AttendanceLock {
+  id           String    @id @default(uuid()) @db.Uuid
+  schoolId     String    @db.Uuid
+  month        Int // 1-12
+  year         Int
+  isLocked     Boolean   @default(false)
+  lockedAt     DateTime?
+  lockedBy     String?   @db.Uuid
+  unlockedAt   DateTime?
+  unlockedBy   String?   @db.Uuid
+  unlockReason String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  school         School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  lockedByUser   User?  @relation("AttendanceLockedBy", fields: [lockedBy], references: [id])
+  unlockedByUser User?  @relation("AttendanceUnlockedBy", fields: [unlockedBy], references: [id])
+
+  @@unique([schoolId, month, year])
+  @@index([schoolId])
 }
 
 model AuditLog {
@@ -4235,6 +4302,55 @@ model HallAttendance {
   @@unique([examId, studentId])
   @@index([examId])
   @@index([hallId])
+}
+
+// Marks entry status enum
+enum MarkStatus {
+  DRAFT
+  SUBMITTED
+  LOCKED
+  PUBLISHED
+}
+
+// Evaluator assignments - teachers assigned to mark specific subjects/classes
+model ExamEvaluator {
+  id        String @id @default(uuid()) @db.Uuid
+  examId    String @db.Uuid
+  teacherId String @db.Uuid
+  subjectId Int
+  classId   Int
+
+  assignedAt DateTime @default(now())
+  assignedBy String   @db.Uuid
+
+  exam    Exam          @relation(fields: [examId], references: [id], onDelete: Cascade)
+  teacher TeachingStaff @relation("EvaluatorAssignments", fields: [teacherId], references: [userId])
+  subject Subject       @relation(fields: [subjectId], references: [id])
+  class   Class         @relation(fields: [classId], references: [id])
+
+  @@unique([examId, teacherId, subjectId, classId])
+  @@index([teacherId])
+  @@index([examId])
+}
+
+// Marks submission tracking - per subject/class combination
+model MarksSubmission {
+  id        String @id @default(uuid()) @db.Uuid
+  examId    String @db.Uuid
+  subjectId Int
+  classId   Int
+
+  status       MarkStatus @default(DRAFT)
+  submittedBy  String?    @db.Uuid
+  submittedAt  DateTime?
+  lockedAt     DateTime?
+  lockedBy     String?    @db.Uuid
+  unlockReason String?
+
+  exam Exam @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@unique([examId, subjectId, classId])
+  @@index([examId])
 }
 
 model PromotionHistory {

@@ -34,6 +34,10 @@ export async function middleware(request) {
     const isPayDomain = hostname.includes('pay.edubreezy.com') ||
         hostname.includes('pay.localhost');
 
+    // Check if request is for teacher subdomain
+    const isTeacherDomain = hostname.includes('teacher.edubreezy.com') ||
+        hostname.includes('teacher.localhost');
+
     // Skip domain routing for static files and API routes
     const skipDomainRouting = pathname.startsWith('/_next') ||
         pathname.startsWith('/api') ||
@@ -76,19 +80,44 @@ export async function middleware(request) {
             return NextResponse.next();
         }
 
+        // Handle teacher.edubreezy.com subdomain
+        if (isTeacherDomain) {
+            // For root path, REWRITE to /teacher
+            if (pathname === '/') {
+                const teacherUrl = new URL('/teacher', request.url);
+                return NextResponse.rewrite(teacherUrl);
+            }
+
+            // Only allow /teacher routes on teacher subdomain
+            if (!pathname.startsWith('/teacher')) {
+                const teacherUrl = new URL('/teacher', request.url);
+                return NextResponse.rewrite(teacherUrl);
+            }
+
+            // Teacher portal uses session tokens, not Supabase auth
+            return NextResponse.next();
+        }
+
         // Handle main domain (edubreezy.com)
         // Redirect /explore routes to school subdomain
-        if (!isSchoolDomain && !isPayDomain && pathname.startsWith('/explore')) {
+        if (!isSchoolDomain && !isPayDomain && !isTeacherDomain && pathname.startsWith('/explore')) {
             const schoolUrl = new URL(request.url);
             schoolUrl.hostname = 'school.edubreezy.com';
             return NextResponse.redirect(schoolUrl, { status: 301 });
         }
 
         // Redirect /pay routes to pay subdomain
-        if (!isPayDomain && !isSchoolDomain && pathname.startsWith('/pay')) {
+        if (!isPayDomain && !isSchoolDomain && !isTeacherDomain && pathname.startsWith('/pay')) {
             const payUrl = new URL(request.url);
             payUrl.hostname = 'pay.edubreezy.com';
             return NextResponse.redirect(payUrl, { status: 301 });
+        }
+
+        // Redirect /teacher routes to teacher subdomain
+        if (!isTeacherDomain && !isPayDomain && !isSchoolDomain && pathname.startsWith('/teacher')) {
+            const teacherUrl = new URL(request.url);
+            teacherUrl.hostname = 'teacher.edubreezy.com';
+            return NextResponse.redirect(teacherUrl, { status: 301 });
         }
     }
 
@@ -260,8 +289,9 @@ export const config = {
         '/login',
         '/signup',
         '/api/auth/:path*',
-        '/explore/:path*',  // For school subdomain routing
+        '/explore/:path*',   // For school subdomain routing
         '/pay/:path*',       // For pay subdomain routing
+        '/teacher/:path*',   // For teacher subdomain routing
         '/',                 // For root subdomain redirect
         '/reset-password',   // Check auth for reset password
     ],

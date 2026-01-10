@@ -36,7 +36,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, ArrowLeft, Calendar, Clock, Save, Trash2, Users, Armchair } from "lucide-react";
+import { Loader2, ArrowLeft, Calendar, Clock, Save, Trash2, Users, Armchair, UserCheck, FileCheck, Search, Lock, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import axios from "axios";
@@ -51,6 +51,7 @@ export default function ExamDetailsPage() {
   const [exam, setExam] = useState(null);
   const [loading, setLoading] = useState(true);
   const [subjects, setSubjects] = useState([]); // All available subjects for the classes
+  const [marksStatus, setMarksStatus] = useState([]);
 
   // Schedule Form State
   const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
@@ -68,6 +69,28 @@ export default function ExamDetailsPage() {
   const [allocatingSeats, setAllocatingSeats] = useState(false);
   const [allocations, setAllocations] = useState([]);
   const [showAllocateConfirm, setShowAllocateConfirm] = useState(false);
+
+  // Evaluator State
+  const [evaluators, setEvaluators] = useState([]);
+  const [teachers, setTeachers] = useState([]);
+  const [isEvaluatorDialogOpen, setIsEvaluatorDialogOpen] = useState(false);
+  const [evaluatorForm, setEvaluatorForm] = useState({
+    teacherId: '',
+    subjectId: ''
+  });
+  const [assigningEvaluator, setAssigningEvaluator] = useState(false);
+  const [teacherSearch, setTeacherSearch] = useState('');
+
+  // Filtered teachers based on search
+  const filteredTeachers = teachers.filter(teacher => {
+    if (!teacherSearch.trim()) return true;
+    const search = teacherSearch.toLowerCase();
+    return (
+      teacher.name?.toLowerCase().includes(search) ||
+      teacher.employeeId?.toLowerCase().includes(search) ||
+      teacher.email?.toLowerCase().includes(search)
+    );
+  });
 
   useEffect(() => {
     if (fullUser?.schoolId && examId) {
@@ -93,6 +116,9 @@ export default function ExamDetailsPage() {
       }
 
       fetchAllocations();
+      fetchEvaluators();
+      fetchTeachers();
+      fetchMarksStatus();
 
     } catch (error) {
       console.error("Error fetching exam:", error);
@@ -110,6 +136,96 @@ export default function ExamDetailsPage() {
       setAllocations(res.data);
     } catch (error) {
       console.error("Error fetching allocations:", error);
+    }
+  };
+
+  const fetchEvaluators = async () => {
+    try {
+      const res = await axios.get(
+        `/api/schools/${fullUser.schoolId}/examination/exams/${examId}/evaluators`
+      );
+      setEvaluators(res.data.evaluators || []);
+    } catch (error) {
+      console.error("Error fetching evaluators:", error);
+    }
+  };
+
+
+
+  const fetchMarksStatus = async () => {
+    try {
+      const res = await axios.get(
+        `/api/schools/${fullUser.schoolId}/examination/exams/${examId}/marks-status`
+      );
+      setMarksStatus(res.data.statusData || []);
+    } catch (error) {
+      console.error("Error fetching marks status:", error);
+    }
+  };
+
+  const fetchTeachers = async () => {
+    try {
+      const res = await axios.get(`/api/schools/${fullUser.schoolId}/teachers`);
+      setTeachers(res.data.teachers || []);
+    } catch (error) {
+      console.error("Error fetching teachers:", error);
+    }
+  };
+
+  const handleAssignEvaluator = async () => {
+    if (!evaluatorForm.teacherId || !evaluatorForm.subjectId) {
+      toast.error('Please select teacher and subject');
+      return;
+    }
+    setAssigningEvaluator(true);
+    try {
+      let targetClasses = [];
+
+      // Determine target classes
+      if (evaluatorForm.classId && evaluatorForm.classId !== 'all') {
+        const selectedCls = exam.classes.find(c => String(c.id) === evaluatorForm.classId);
+        if (selectedCls) targetClasses = [selectedCls];
+      } else {
+        targetClasses = exam.classes || [];
+      }
+
+      if (targetClasses.length === 0) {
+        toast.error('No classes found for assignment');
+        return;
+      }
+
+      // Assign to target classes
+      for (const cls of targetClasses) {
+        await axios.post(
+          `/api/schools/${fullUser.schoolId}/examination/exams/${examId}/evaluators`,
+          { teacherId: evaluatorForm.teacherId, subjectId: evaluatorForm.subjectId, classId: String(cls.id), assignedBy: fullUser.id }
+        );
+      }
+
+      const message = targetClasses.length === 1
+        ? `Evaluator assigned to Class ${targetClasses[0].className}`
+        : 'Evaluator assigned to all classes';
+
+      toast.success(message);
+      setIsEvaluatorDialogOpen(false);
+      setEvaluatorForm({ teacherId: '', subjectId: '', classId: 'all' }); // Reset form
+      fetchEvaluators();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to assign evaluator');
+    } finally {
+      setAssigningEvaluator(false);
+    }
+  };
+
+  const handleRemoveEvaluator = async (evaluatorId) => {
+    try {
+      await axios.delete(
+        `/api/schools/${fullUser.schoolId}/examination/exams/${examId}/evaluators?id=${evaluatorId}&userId=${fullUser.id}`
+      );
+      toast.success('Evaluator removed');
+      fetchEvaluators();
+    } catch (error) {
+      toast.error('Failed to remove evaluator');
     }
   };
 
@@ -189,10 +305,12 @@ export default function ExamDetailsPage() {
       </div>
 
       <Tabs defaultValue="schedule" className="w-full">
-        <TabsList>
+        <TabsList className={'bg-[#eef1f3] dark:bg-muted border'}>
           <TabsTrigger value="schedule">Exam Schedule</TabsTrigger>
           <TabsTrigger value="seating">Seat Allocation</TabsTrigger>
-          <TabsTrigger value="students">Participating Students</TabsTrigger>
+          <TabsTrigger value="evaluators">Evaluators</TabsTrigger>
+          <TabsTrigger value="marks">Marks Status</TabsTrigger>
+          <TabsTrigger value="students">Classes</TabsTrigger>
         </TabsList>
 
         {/* SCHEDULE TAB */}
@@ -279,50 +397,58 @@ export default function ExamDetailsPage() {
             </Dialog>
           </div>
 
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead>Max Marks</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {exam.subjects.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                        No subjects scheduled yet.
-                      </TableCell>
+          <Card className="border-0 shadow-none border">
+            <CardContent className="pt-6">
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="dark:bg-background/50 bg-muted/50">
+                      <TableHead>Subject</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Time</TableHead>
+                      <TableHead>Duration</TableHead>
+                      <TableHead>Max Marks</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ) : (
-                    exam.subjects.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">
-                          {item.subject?.subjectName || `ID: ${item.subjectId}`}
-                        </TableCell>
-                        <TableCell>
-                          {item.date ? format(new Date(item.date), "MMM d, yyyy") : "-"}
-                        </TableCell>
-                        <TableCell>
-                          {item.startTime} - {item.endTime}
-                        </TableCell>
-                        <TableCell>{item.duration} mins</TableCell>
-                        <TableCell>{item.maxMarks}</TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" className="text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                  </TableHeader>
+                  <TableBody>
+                    {exam.subjects.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-12">
+                          <div className="flex flex-col items-center gap-2">
+                            <Calendar className="w-12 h-12 text-muted-foreground/30" />
+                            <p className="text-muted-foreground">No subjects scheduled yet</p>
+                            <p className="text-sm text-muted-foreground/70">Click "Add Subject" to schedule exams</p>
+                          </div>
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ) : (
+                      exam.subjects.map((item, index) => (
+                        <TableRow key={item.id} className={`hover:bg-muted/30 dark:hover:bg-background/30 ${index % 2 === 0 ? "bg-muted dark:bg-background/50" : ""}`}>
+                          <TableCell className="font-medium">
+                            <Badge variant="outline" className="text-xs">
+                              {item.subject?.subjectName || `ID: ${item.subjectId}`}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {item.date ? format(new Date(item.date), "MMM d, yyyy") : "-"}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">
+                            {item.startTime} - {item.endTime}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{item.duration} mins</TableCell>
+                          <TableCell className="font-semibold">{item.maxMarks}</TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -342,56 +468,376 @@ export default function ExamDetailsPage() {
             </Button>
           </div>
 
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Seat No</TableHead>
-                    <TableHead>Student Name</TableHead>
-                    <TableHead>Roll No</TableHead>
-                    <TableHead>Class</TableHead>
-                    <TableHead>Hall</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {allocations.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                        No seats allocated. Click "Auto Allocate" to generate seating plan.
-                      </TableCell>
+          <Card className="border-0 shadow-none border">
+            <CardContent className="pt-6">
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="dark:bg-background/50 bg-muted/50">
+                      <TableHead>Seat No</TableHead>
+                      <TableHead>Student Name</TableHead>
+                      <TableHead>Roll No</TableHead>
+                      <TableHead>Class</TableHead>
+                      <TableHead>Hall</TableHead>
                     </TableRow>
-                  ) : (
-                    allocations.map((alloc) => (
-                      <TableRow key={alloc.id}>
-                        <TableCell className="font-mono font-bold">{alloc.seatNumber}</TableCell>
-                        <TableCell>{alloc.student?.name}</TableCell>
-                        <TableCell>{alloc.student?.rollNumber}</TableCell>
-                        <TableCell>
-                          {alloc.student?.class?.className} - {alloc.student?.section?.name}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{alloc.hall?.name}</Badge>
+                  </TableHeader>
+                  <TableBody>
+                    {allocations.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-12">
+                          <div className="flex flex-col items-center gap-2">
+                            <Armchair className="w-12 h-12 text-muted-foreground/30" />
+                            <p className="text-muted-foreground">No seats allocated</p>
+                            <p className="text-sm text-muted-foreground/70">Click "Auto Allocate Seats" to generate seating plan</p>
+                          </div>
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ) : (
+                      allocations.map((alloc, index) => (
+                        <TableRow key={alloc.id} className={`hover:bg-muted/30 dark:hover:bg-background/30 ${index % 2 === 0 ? "bg-muted dark:bg-background/50" : ""}`}>
+                          <TableCell className="font-mono font-bold text-blue-600">{alloc.seatNumber}</TableCell>
+                          <TableCell className="font-medium">{alloc.student?.name}</TableCell>
+                          <TableCell className="text-muted-foreground font-mono text-sm">{alloc.student?.rollNumber}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {alloc.student?.class?.className} - {alloc.student?.section?.name}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">{alloc.hall?.name}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* EVALUATORS TAB */}
+        <TabsContent value="evaluators" className="space-y-4">
+          <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+            <div className="flex gap-3">
+              <div className="mt-0.5">
+                <UserCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-blue-900 dark:text-blue-200 text-sm mb-1">How Evaluation Works</h3>
+                <ul className="list-disc list-inside text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                  <li><strong>Assign Teachers</strong>: Select a teacher and assign them to a Subject and Class.</li>
+                  <li><strong>Teacher Access</strong>: Assigned teachers will see this exam in their portal (<code className="text-xs bg-blue-200/50 px-1 rounded">teacher.edubreezy.com</code>).</li>
+                  <li><strong>Marks Entry</strong>: They can enter marks and save as "Draft".</li>
+                  <li><strong>Submission</strong>: Once they "Submit", marks are locked for them. You can check the status in the "Marks Status" tab.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <Card className="border-0 shadow-none border">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <UserCheck className="h-5 w-5 text-blue-600" />
+                    Evaluator Assignments ({evaluators.length})
+                  </CardTitle>
+                  <CardDescription>
+                    Assign teachers to enter marks. They will be assigned to specific classes or all classes.
+                  </CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={fetchEvaluators} title="Refresh Evaluators">
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                  <Dialog open={isEvaluatorDialogOpen} onOpenChange={setIsEvaluatorDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <UserCheck className="mr-2 h-4 w-4" /> Assign Evaluator
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Assign Evaluator</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label>Teacher *</Label>
+                          <div className="relative">
+                            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              placeholder="Search by name, ID, or email..."
+                              value={teacherSearch}
+                              onChange={(e) => setTeacherSearch(e.target.value)}
+                              className="pl-9 mb-2"
+                            />
+                          </div>
+                          <Select
+                            value={evaluatorForm.teacherId}
+                            onValueChange={(value) => setEvaluatorForm({ ...evaluatorForm, teacherId: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select teacher" />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-60">
+                              {filteredTeachers.length === 0 ? (
+                                <div className="py-6 text-center text-sm text-muted-foreground">
+                                  No teachers found
+                                </div>
+                              ) : (
+                                filteredTeachers.map((teacher) => (
+                                  <SelectItem key={teacher.userId} value={teacher.userId}>
+                                    <div className="flex flex-col">
+                                      <span>{teacher.name}</span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {teacher.employeeId} • {teacher.email}
+                                      </span>
+                                    </div>
+                                  </SelectItem>
+                                ))
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Subject *</Label>
+                          <Select
+                            value={evaluatorForm.subjectId}
+                            onValueChange={(value) => setEvaluatorForm({ ...evaluatorForm, subjectId: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select subject" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {subjects.map((subject) => (
+                                <SelectItem key={subject.id} value={String(subject.id)}>
+                                  {subject.subjectName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Class Selection - Only show if multiple classes */}
+                        {exam.classes && exam.classes.length > 1 && (
+                          <div className="space-y-2">
+                            <Label>Class *</Label>
+                            <Select
+                              value={evaluatorForm.classId || "all"}
+                              onValueChange={(value) => setEvaluatorForm({ ...evaluatorForm, classId: value })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select class" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Participating Classes</SelectItem>
+                                {exam.classes.map((cls) => (
+                                  <SelectItem key={cls.id} value={String(cls.id)}>
+                                    {cls.className}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+
+                        <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                          <p className="text-sm text-blue-700 dark:text-blue-300">
+                            <strong>How it works:</strong>
+                            <br />
+                            {exam.classes && exam.classes.length > 1 ? (
+                              evaluatorForm.classId && evaluatorForm.classId !== "all" ? (
+                                <>The selected teacher will be assigned to evaluate <strong>{subjects.find(s => String(s.id) === evaluatorForm.subjectId)?.subjectName || 'the subject'}</strong> for <strong>Class {exam.classes.find(c => String(c.id) === evaluatorForm.classId)?.className}</strong> only.</>
+                              ) : (
+                                <>The selected teacher will be assigned to evaluate <strong>{subjects.find(s => String(s.id) === evaluatorForm.subjectId)?.subjectName || 'the subject'}</strong> for <strong>ALL {exam.classes.length} participating classes</strong>.</>
+                              )
+                            ) : (
+                              <>The selected teacher will be assigned to evaluate <strong>{subjects.find(s => String(s.id) === evaluatorForm.subjectId)?.subjectName || 'the subject'}</strong> for <strong>Class {exam.classes?.[0]?.className}</strong>.</>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsEvaluatorDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handleAssignEvaluator} disabled={assigningEvaluator}>
+                          {assigningEvaluator && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          Confirm Assignment
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="dark:bg-background/50 bg-muted/50">
+                      <TableHead>Subject</TableHead>
+                      <TableHead>Class</TableHead>
+                      <TableHead>Evaluator</TableHead>
+                      <TableHead>Assigned On</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {evaluators.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-12">
+                          <div className="flex flex-col items-center gap-2">
+                            <UserCheck className="w-12 h-12 text-muted-foreground/30" />
+                            <p className="text-muted-foreground">No evaluators assigned yet</p>
+                            <p className="text-sm text-muted-foreground/70">Click "Assign Evaluator" to get started</p>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      evaluators.map((ev, index) => (
+                        <TableRow key={ev.id} className={`hover:bg-muted/30 dark:hover:bg-background/30 ${index % 2 === 0 ? "bg-muted dark:bg-background/50" : ""}`}>
+                          <TableCell className="font-medium">
+                            <Badge variant="outline" className="text-xs">
+                              {ev.subject?.subjectName}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{ev.class?.className}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-700 dark:text-blue-300 font-medium text-sm">
+                                {ev.teacher?.name?.charAt(0)}
+                              </div>
+                              <div>
+                                <p className="font-medium text-sm">{ev.teacher?.name}</p>
+                                <p className="text-xs text-muted-foreground">{ev.teacher?.employeeId}</p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {ev.assignedAt ? format(new Date(ev.assignedAt), "MMM d, yyyy") : "-"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                              onClick={() => handleRemoveEvaluator(ev.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* MARKS STATUS TAB */}
+        <TabsContent value="marks" className="space-y-4">
+          <Card className="border-0 shadow-none border">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileCheck className="h-5 w-5 text-green-600" />
+                    Marks Entry Status
+                  </CardTitle>
+                  <CardDescription>
+                    Track marks submission progress by evaluators
+                  </CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={fetchMarksStatus} title="Refresh Status">
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="dark:bg-background/50 bg-muted/50">
+                      <TableHead>Subject</TableHead>
+                      <TableHead>Class</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Submitted By</TableHead>
+                      <TableHead>Submitted At</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {marksStatus.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-12">
+                          <div className="flex flex-col items-center gap-2">
+                            <FileCheck className="w-12 h-12 text-muted-foreground/30" />
+                            <p className="text-muted-foreground">No evaluators assigned yet</p>
+                            <p className="text-sm text-muted-foreground/70">Assign evaluators first to enable marks entry</p>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      marksStatus.map((status, index) => (
+                        <TableRow key={index} className={`hover:bg-muted/30 dark:hover:bg-background/30 ${index % 2 === 0 ? "bg-muted dark:bg-background/50" : ""}`}>
+                          <TableCell className="font-medium">
+                            {status.subjectName}
+                          </TableCell>
+                          <TableCell>{status.className}</TableCell>
+                          <TableCell>
+                            {status.status === 'SUBMITTED' || status.status === 'PUBLISHED' ? (
+                              <Badge className="bg-green-100 text-green-700 border-0 hover:bg-green-100">Submitted</Badge>
+                            ) : status.status === 'DRAFT' ? (
+                              <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 border-0">Draft</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-muted-foreground border-dashed">Pending</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">
+                            {status.teacherName}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">
+                            {status.submittedAt ? format(new Date(status.submittedAt), "MMM d, yyyy h:mm a") : "-"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {/* Actions like Unlock can be added here */}
+                            {status.status === 'SUBMITTED' && (
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Unlock Marks">
+                                <Lock className="h-4 w-4 text-orange-500" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* STUDENTS TAB */}
         <TabsContent value="students">
-          <Card>
-            <CardHeader>
-              <CardTitle>Participating Classes</CardTitle>
+          <Card className="border-0 shadow-none border">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-purple-600" />
+                Participating Classes ({exam.classes.length})
+              </CardTitle>
+              <CardDescription>
+                Classes included in this examination
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-3">
                 {exam.classes.map(cls => (
-                  <Badge key={cls.id} className="text-base px-3 py-1">
+                  <Badge key={cls.id} variant="secondary" className="text-base px-4 py-2 bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
                     {cls.className}
                   </Badge>
                 ))}

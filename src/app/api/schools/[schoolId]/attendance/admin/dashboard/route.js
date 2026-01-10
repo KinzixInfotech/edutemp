@@ -2,6 +2,7 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import dayjs from "dayjs";
+import { remember, generateKey } from '@/lib/cache';
 export async function GET(req, props) {
   const params = await props.params;
   const { schoolId } = params;
@@ -227,35 +228,50 @@ export async function GET(req, props) {
       where: { schoolId, status: 'PENDING' }
     });
 
-    // 7. LOW ATTENDANCE ALERTS
-    const lowAttendanceUsers = await prisma.attendanceStats.findMany({
+    // Calculate working days in current month for data sufficiency check
+    const MIN_WORKING_DAYS = 10; // Minimum days required for reliable alerts
+    const workingDaysCount = await prisma.schoolCalendar.count({
       where: {
         schoolId,
-        academicYearId: academicYear.id,
-        month: date.getMonth() + 1,
-        year: date.getFullYear(),
-        attendancePercentage: { lt: 75 }
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: { select: { name: true } },
-            student: {
-              select: {
-                class: { select: { className: true } },
-                section: { select: { name: true } },
-                admissionNo: true,
+        dayType: 'WORKING_DAY',
+        date: { gte: monthStart, lte: today }
+      }
+    });
+
+    const hasInsufficientData = workingDaysCount < MIN_WORKING_DAYS;
+
+    // 7. LOW ATTENDANCE ALERTS (Only show if sufficient data exists)
+    let lowAttendanceUsers = [];
+    if (!hasInsufficientData) {
+      lowAttendanceUsers = await prisma.attendanceStats.findMany({
+        where: {
+          schoolId,
+          academicYearId: academicYear.id,
+          month: date.getMonth() + 1,
+          year: date.getFullYear(),
+          attendancePercentage: { lt: 75 }
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: { select: { name: true } },
+              student: {
+                select: {
+                  class: { select: { className: true } },
+                  section: { select: { name: true } },
+                  admissionNo: true,
+                }
               }
             }
           }
-        }
-      },
-      orderBy: { attendancePercentage: 'asc' },
-      take: 20,
-    });
+        },
+        orderBy: { attendancePercentage: 'asc' },
+        take: 20,
+      });
+    }
 
     // 8. RECENT ACTIVITY
     const recentActivity = await prisma.attendance.findMany({
@@ -314,6 +330,9 @@ export async function GET(req, props) {
         pendingApprovals,
         pendingLeaves,
         lowAttendanceCount: lowAttendanceUsers.length,
+        hasInsufficientData,
+        workingDaysCount,
+        minWorkingDays: MIN_WORKING_DAYS,
       },
       lowAttendanceUsers,
       recentActivity,

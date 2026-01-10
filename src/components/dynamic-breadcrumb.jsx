@@ -67,7 +67,7 @@ export function DynamicBreadcrumb() {
                     const isRoutable = !NON_ROUTABLE_PATHS.has(href)
 
                     return (
-                        <Fragment key={path}>
+                        <Fragment key={`${index}-${path}`}>
                             {index > 0 && <BreadcrumbSeparator />}
 
                             <BreadcrumbItem>

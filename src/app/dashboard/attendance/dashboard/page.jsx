@@ -330,7 +330,12 @@ export default function AdminAttendanceDashboard() {
         <TabsList>
           <TabsTrigger value="teachers">Teacher Activity</TabsTrigger>
           <TabsTrigger value="classes">Class-wise</TabsTrigger>
-          <TabsTrigger value="alerts">Alerts ({alerts?.lowAttendanceCount || 0})</TabsTrigger>
+          <TabsTrigger value="alerts" className="relative">
+            Alerts ({alerts?.lowAttendanceCount || 0})
+            {alerts?.hasInsufficientData && (
+              <span className="ml-1 text-amber-500" title="Insufficient data">⚠</span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="recent">Recent Activity</TabsTrigger>
         </TabsList>
 
@@ -526,6 +531,21 @@ export default function AdminAttendanceDashboard() {
               </div>
             </CardHeader>
             <CardContent>
+              {/* Insufficient Data Warning */}
+              {alerts?.hasInsufficientData && (
+                <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-amber-700 dark:text-amber-500">Insufficient Data</p>
+                      <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
+                        Only {alerts.workingDaysCount} working day{alerts.workingDaysCount !== 1 ? 's' : ''} recorded this month.
+                        Attendance alerts require at least {alerts.minWorkingDays} working days for reliable data.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="rounded-lg border overflow-hidden">
                 <Table>
                   <TableHeader>

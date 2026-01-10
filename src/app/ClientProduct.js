@@ -19,6 +19,7 @@ export default function ClientProduct({ children }) {
 
     const isSchoolDomain = hostname.startsWith("school.")
     const isPayDomain = hostname.startsWith("pay.")
+    const isTeacherDomain = hostname.startsWith("teacher.")
 
     const hideHeader =
         pathname.startsWith("/dashboard") ||
@@ -26,7 +27,8 @@ export default function ClientProduct({ children }) {
         pathname.startsWith("/exam") ||
         pathname.startsWith("/forms") ||
         (isSchoolDomain || pathname.startsWith("/explore")) ||
-        (isPayDomain || pathname.startsWith("/pay"))
+        (isPayDomain || pathname.startsWith("/pay")) ||
+        (isTeacherDomain || pathname.startsWith("/teacher"))
 
 
     const hidefooter =
@@ -34,7 +36,9 @@ export default function ClientProduct({ children }) {
         pathname === "/login" ||
         pathname.startsWith("/exam") ||
         pathname.startsWith("/forms") ||
-        (isPayDomain || pathname.startsWith("/pay"))
+        (isPayDomain || pathname.startsWith("/pay")) ||
+        (isTeacherDomain || pathname.startsWith("/teacher"))
+
 
 
 

@@ -1059,6 +1059,40 @@ export async function notifyLeaveRejected({
     });
 }
 
+/**
+ * Notify teacher when assigned as an evaluator
+ */
+export async function notifyEvaluatorAssigned({
+    schoolId,
+    teacherId,
+    examTitle,
+    subjectName,
+    className,
+    examId,
+    senderId
+}) {
+    await sendNotification({
+        schoolId,
+        title: 'New Evaluator Assignment',
+        message: `You have been assigned to evaluate ${subjectName} for ${className} in "${examTitle}". Check in teacher portal: https://teacher.edubreezy.com/`,
+        type: 'EXAM',
+        priority: 'HIGH',
+        icon: '📝',
+        targetOptions: {
+            userIds: [teacherId]
+        },
+        senderId,
+        metadata: {
+            examId,
+            examTitle,
+            subjectName,
+            className,
+            assignmentType: 'EVALUATOR'
+        },
+        actionUrl: 'https://teacher.edubreezy.com/'
+    });
+}
+
 // Export all notification types as enum
 export const NOTIFICATION_TYPES = {
     GENERAL: 'GENERAL',
