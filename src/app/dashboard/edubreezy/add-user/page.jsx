@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { toast } from "sonner";
 import Image from "next/image";
-import { Eye, EyeOff, Loader2, Plus } from "lucide-react";
+import { Eye, EyeOff, Loader2, Plus, Lock, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -16,6 +16,12 @@ import { Button } from "@/components/ui/button";
 import CropImageDialog from "@/app/components/CropImageDialog";
 import { uploadFiles } from "@/app/components/utils/uploadThing";
 import FileUploadButton from "@/components/fileupload";
+
+// ============================================
+// PAGE ACCESS PASSWORD - Change this to your desired password
+// ============================================
+const PAGE_ACCESS_PASSWORD = "EduBreezy@2025";
+const AUTH_STORAGE_KEY = "adduser_page_auth";
 
 const schema = z.object({
     name: z.string().min(1, "Name is required"),
@@ -25,6 +31,13 @@ const schema = z.object({
 });
 
 export default function CreateSuperadminPage() {
+    // Password gate state
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [accessPassword, setAccessPassword] = useState("");
+    const [showAccessPassword, setShowAccessPassword] = useState(false);
+    const [authError, setAuthError] = useState("");
+    const [checkingAuth, setCheckingAuth] = useState(true);
+
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [resetKey, setResetKey] = useState(0);
@@ -38,10 +51,8 @@ export default function CreateSuperadminPage() {
     const [cropDialogOpen, setCropDialogOpen] = useState(false);
     const router = useRouter();
     const [errorUpload, setErrorupload] = useState(false);
-    useEffect(() => {
-        fetchUsers();
-    }, []);
 
+    // Fetch users function - defined before useEffect that uses it
     const fetchUsers = async () => {
         const res = await fetch("/api/superadmin");
         if (res.ok) {
@@ -49,6 +60,112 @@ export default function CreateSuperadminPage() {
             setUsers(data);
         }
     };
+
+    // Check if already authenticated on mount
+    useEffect(() => {
+        const storedAuth = localStorage.getItem(AUTH_STORAGE_KEY);
+        if (storedAuth === "true") {
+            setIsAuthenticated(true);
+        }
+        setCheckingAuth(false);
+    }, []);
+
+    useEffect(() => {
+        if (isAuthenticated) {
+            fetchUsers();
+        }
+    }, [isAuthenticated]);
+
+    // Handle password submission
+    const handleAccessSubmit = (e) => {
+        e.preventDefault();
+        if (accessPassword === PAGE_ACCESS_PASSWORD) {
+            setIsAuthenticated(true);
+            localStorage.setItem(AUTH_STORAGE_KEY, "true");
+            setAuthError("");
+            toast.success("Access granted!");
+        } else {
+            setAuthError("Incorrect password. Please try again.");
+            toast.error("Incorrect password");
+        }
+    };
+
+    // Logout from page (clear stored auth)
+    const handleLogout = () => {
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+        setIsAuthenticated(false);
+        setAccessPassword("");
+    };
+
+    // Show loading while checking auth
+    if (checkingAuth) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <Loader2 className="animate-spin h-8 w-8 text-primary" />
+            </div>
+        );
+    }
+
+    // Password gate UI
+    if (!isAuthenticated) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/30 p-4">
+                <Card className="w-full max-w-md shadow-2xl border-2">
+                    <CardHeader className="text-center space-y-4">
+                        <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                            <Lock className="w-8 h-8 text-primary" />
+                        </div>
+                        <div>
+                            <CardTitle className="text-2xl">Protected Page</CardTitle>
+                            <CardDescription className="mt-2">
+                                This page is password protected. Please enter the access password to continue.
+                            </CardDescription>
+                        </div>
+                    </CardHeader>
+                    <Separator />
+                    <CardContent className="pt-6">
+                        <form onSubmit={handleAccessSubmit} className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="accessPassword">Access Password</Label>
+                                <div className="relative">
+                                    <Input
+                                        id="accessPassword"
+                                        type={showAccessPassword ? "text" : "password"}
+                                        placeholder="Enter password"
+                                        value={accessPassword}
+                                        onChange={(e) => {
+                                            setAccessPassword(e.target.value);
+                                            setAuthError("");
+                                        }}
+                                        className="pr-10 bg-accent"
+                                        autoFocus
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAccessPassword(!showAccessPassword)}
+                                        className="absolute cursor-pointer right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors"
+                                    >
+                                        {showAccessPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                    </button>
+                                </div>
+                                {authError && (
+                                    <p className="text-sm text-destructive flex items-center gap-1">
+                                        {authError}
+                                    </p>
+                                )}
+                            </div>
+                            <Button type="submit" className="w-full dark:text-white" size="lg">
+                                <ShieldCheck className="w-4 h-4 mr-2" />
+                                Unlock Page
+                            </Button>
+                        </form>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    // Original page content (only shown when authenticated)
 
     const handleImageUpload = (previewUrl) => {
         if (!previewUrl || previewUrl === rawImage) return;

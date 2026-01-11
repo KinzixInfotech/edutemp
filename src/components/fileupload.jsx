@@ -120,6 +120,7 @@ export default function FileUploadButton({ field, onChange, resetKey, saveToLibr
                             </p>
                             <div className="flex gap-2 mt-4">
                                 <Button
+                                    type="button"
                                     variant="outline"
                                     onClick={openFileDialog}
                                 >
@@ -131,6 +132,7 @@ export default function FileUploadButton({ field, onChange, resetKey, saveToLibr
                                 </Button>
                                 {user?.schoolId && (
                                     <Button
+                                        type="button"
                                         variant="outline"
                                         onClick={() => setShowLibrary(true)}
                                     >

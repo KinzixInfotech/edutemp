@@ -53,6 +53,7 @@ export default function Step2Domain({ data, updateFormData, nextStep }) {
             schoolCode: data.schoolCode || '',
             generateWebsite: data.generateWebsite || false,
         },
+        mode: 'onChange', // Enable live validation
     });
 
     const subdomain = useWatch({ control: form.control, name: 'tenantName' });
@@ -109,7 +110,7 @@ export default function Step2Domain({ data, updateFormData, nextStep }) {
     };
 
     const handleCopy = async () => {
-        await navigator.clipboard.writeText(`EB-${form.getValues('schoolCode')}`);
+        await navigator.clipboard.writeText(form.getValues('schoolCode'));
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
@@ -216,15 +217,11 @@ export default function Step2Domain({ data, updateFormData, nextStep }) {
                             <FormLabel>School Code *</FormLabel>
                             <FormControl>
                                 <div className="flex flex-row gap-2 items-center">
-                                    <div className="pointer-events-none py-1 px-3.5 border rounded-lg w-16 flex items-center justify-center bg-muted">
-                                        <span className="text-black/55 dark:text-gray-200 text-lg">EB-</span>
-                                    </div>
-
                                     <Input
                                         readOnly
                                         value={field.value}
-                                        className="flex-1 cursor-default"
-                                        placeholder="Generate"
+                                        className="flex-1 cursor-default font-mono"
+                                        placeholder="Click Generate"
                                     />
 
                                     <Button

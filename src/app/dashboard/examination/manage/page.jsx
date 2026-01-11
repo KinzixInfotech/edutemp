@@ -213,14 +213,12 @@ export default function ExamListPage() {
                 <br />
                 <p>Best Regards,</p>
                 <p>School Administration</p>
-
                 {/* Time stamp simulation */}
                 <div className="text-[10px] text-gray-500 text-right mt-1">
                   {format(new Date(), "hh:mm a")}
                 </div>
               </div>
             </div>
-
             <p className="text-xs text-center text-muted-foreground mt-2">
               This message will be sent via WhatsApp.
             </p>
@@ -243,7 +241,6 @@ export default function ExamListPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
       <Card>
         <CardHeader>
           <CardTitle>All Exams</CardTitle>

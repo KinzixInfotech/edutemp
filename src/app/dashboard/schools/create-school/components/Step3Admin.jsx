@@ -15,9 +15,15 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
 const step3Schema = z.object({
-    adminName: z.string().min(1, 'Admin name is required'),
-    adminem: z.string().email('Invalid email'),
-    adminPassword: z.string().min(6, 'Password must be at least 6 characters'),
+    adminName: z.string()
+        .min(2, 'Admin name must be at least 2 characters')
+        .max(50, 'Admin name cannot exceed 50 characters'),
+    adminEmail: z.string()
+        .email('Please enter a valid email address')
+        .min(1, 'Email is required'),
+    adminPassword: z.string()
+        .min(8, 'Password must be at least 8 characters')
+        .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Password must contain uppercase, lowercase and number'),
 });
 
 export default function Step3Admin({ data, updateFormData, nextStep }) {
@@ -25,9 +31,10 @@ export default function Step3Admin({ data, updateFormData, nextStep }) {
         resolver: zodResolver(step3Schema),
         defaultValues: {
             adminName: data.adminName || '',
-            adminem: data.adminem || '',
+            adminEmail: data.adminEmail || '',
             adminPassword: data.adminPassword || '',
         },
+        mode: 'onChange', // Enable live validation
     });
 
     const onSubmit = (formValues) => {
@@ -38,8 +45,8 @@ export default function Step3Admin({ data, updateFormData, nextStep }) {
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                    <p className="text-sm text-blue-900">
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+                    <p className="text-sm text-blue-900 dark:text-blue-300">
                         Create an admin account that will have full access to manage this school.
                     </p>
                 </div>
@@ -62,12 +69,17 @@ export default function Step3Admin({ data, updateFormData, nextStep }) {
                 {/* Admin Email */}
                 <FormField
                     control={form.control}
-                    name="adminem"
+                    name="adminEmail"
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>Admin Email *</FormLabel>
                             <FormControl>
-                                <Input placeholder="admin@school.com" {...field} />
+                                <Input
+                                    type="email"
+                                    placeholder="admin@school.com"
+                                    {...field}
+                                    className={form.formState.errors.adminEmail ? 'border-red-500' : ''}
+                                />
                             </FormControl>
                             <FormMessage />
                         </FormItem>

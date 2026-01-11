@@ -1,8 +1,9 @@
-import { AuditAction } from "@prisma/client";
+import { AuditAction, SubscriptionAction } from "@prisma/client";
 import { supabaseAdmin } from "@/lib/supbase-admin";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
+import { addYears, addDays } from "date-fns";
 
 // Schema validation
 const schoolSchema = z.object({
@@ -18,9 +19,9 @@ const schoolSchema = z.object({
   tenantName: z.string().optional(),
   customDomain: z.string().optional().nullable(),
 
-  // Admin
+  // Admin (fixed typo: adminem → adminEmail)
   adminName: z.string().min(1),
-  adminem: z.string().email(),
+  adminEmail: z.string().email(),
   adminPassword: z.string().min(6),
 
   // Director
@@ -28,13 +29,24 @@ const schoolSchema = z.object({
   directorEmail: z.string().email(),
   directorPassword: z.string().min(6),
 
-  //Principal (optional)
+  // Principal (optional - only validated in superRefine if createPrincipal is true)
   createPrincipal: z.boolean(),
-  principalName: z.string().optional(),
-  principalEmail: z.string().email().optional().or(z.literal('')),
-  principalPassword: z.string().min(6).optional(),
+  principalName: z.string().optional().or(z.literal('')),
+  principalEmail: z.string().optional().or(z.literal('')),
+  principalPassword: z.string().optional().or(z.literal('')),
 
   generateWebsite: z.boolean().optional(),
+
+  // ERP Plan & Capacity (Super Admin controlled)
+  expectedStudents: z.coerce.number().min(1).default(100),
+  unitsPurchased: z.coerce.number().min(1).optional(),
+  includedCapacity: z.coerce.number().optional(),
+  softCapacity: z.coerce.number().optional(),
+  yearlyAmount: z.coerce.number().optional(),
+  billingStartDate: z.coerce.date().optional(),
+  billingEndDate: z.coerce.date().optional(),
+  isTrial: z.boolean().optional().default(false),
+  trialDays: z.coerce.number().optional(),
 }).superRefine((data, ctx) => {
   if (data.domainMode === "tenant" && !data.tenantName) {
     ctx.addIssue({
@@ -76,6 +88,11 @@ const schoolSchema = z.object({
   }
 });
 
+// Pricing constants
+const PRICE_PER_UNIT = 10500; // ₹10,500 per 100 students / year
+const STUDENTS_PER_UNIT = 100;
+const SOFT_BUFFER_PERCENT = 5;
+
 export async function POST(req) {
   let createdAdminId = null;
   let createdDirectorId = null;
@@ -89,10 +106,22 @@ export async function POST(req) {
       ? `${parsed.tenantName?.toLowerCase().replace(/\s+/g, "")}.edubreezy.com`
       : parsed.customDomain || "";
 
+    // Calculate ERP capacity values
+    const expectedStudents = parsed.expectedStudents || 100;
+    const unitsPurchased = parsed.unitsPurchased || Math.ceil(expectedStudents / STUDENTS_PER_UNIT);
+    const includedCapacity = parsed.includedCapacity || (unitsPurchased * STUDENTS_PER_UNIT);
+    const softCapacity = parsed.softCapacity || Math.floor(includedCapacity * (1 + SOFT_BUFFER_PERCENT / 100));
+    const yearlyAmount = parsed.yearlyAmount || (unitsPurchased * PRICE_PER_UNIT);
+    const billingStartDate = parsed.billingStartDate || new Date();
+    const billingEndDate = parsed.billingEndDate || addYears(billingStartDate, 1);
+    const isTrial = parsed.isTrial || false;
+    const trialDays = parsed.trialDays || 0;
+    const trialEndsAt = isTrial && trialDays > 0 ? addDays(new Date(), trialDays) : null;
+
     // Step 1: Create Supabase Auth users
     // --- Create Admin User ---
     const { data: adminData, error: adminError } = await supabaseAdmin.auth.admin.createUser({
-      email: parsed.adminem,
+      email: parsed.adminEmail,
       password: parsed.adminPassword,
       email_confirm: true,
     });
@@ -152,7 +181,6 @@ export async function POST(req) {
           contactNumber: parsed.phone,
           profilePicture: parsed.profilePicture || "",
           location: parsed.location,
-          SubscriptionType: parsed.subscriptionType,
           SubscriptionType: parsed.subscriptionType,
           Language: parsed.language,
           websiteConfig: parsed.generateWebsite ? {
@@ -227,7 +255,7 @@ export async function POST(req) {
         data: {
           id: createdAdminId,
           name: parsed.adminName,
-          email: parsed.adminem,
+          email: parsed.adminEmail,
           password: parsed.adminPassword,
           school: { connect: { id: school.id } },
           role: { connect: { id: adminRole.id } },
@@ -246,7 +274,7 @@ export async function POST(req) {
           password: parsed.directorPassword,
           school: { connect: { id: school.id } },
           role: { connect: { id: directorRole.id } },
-          Director: {
+          director: {
             create: { schoolId: school.id },
           },
         },
@@ -263,14 +291,76 @@ export async function POST(req) {
             password: parsed.principalPassword,
             school: { connect: { id: school.id } },
             role: { connect: { id: principalRole.id } },
-            Principal: {
+            principal: {
               create: { schoolId: school.id },
             },
           },
         });
       }
 
-      // Audit log
+      // Create School Subscription (ERP Billing)
+      const subscription = await tx.schoolSubscription.create({
+        data: {
+          schoolId: school.id,
+          expectedStudents,
+          unitsPurchased,
+          includedCapacity,
+          softCapacity,
+          pricePerUnit: PRICE_PER_UNIT,
+          yearlyAmount,
+          billingStartDate,
+          billingEndDate,
+          isTrial,
+          trialDays: isTrial ? trialDays : null,
+          trialEndsAt,
+          status: isTrial ? 'TRIAL' : 'ACTIVE',
+          createdBy: createdAdminId, // Super Admin who created
+        },
+      });
+
+      // Create Subscription Audit Logs
+      await tx.subscriptionAuditLog.createMany({
+        data: [
+          {
+            subscriptionId: subscription.id,
+            action: SubscriptionAction.SUBSCRIPTION_CREATED,
+            performedBy: createdAdminId,
+            newValue: {
+              schoolId: school.id,
+              schoolName: parsed.name,
+              domain: resolvedDomain,
+            },
+          },
+          {
+            subscriptionId: subscription.id,
+            action: SubscriptionAction.CAPACITY_ASSIGNED,
+            performedBy: createdAdminId,
+            newValue: {
+              expectedStudents,
+              unitsPurchased,
+              includedCapacity,
+              softCapacity,
+              yearlyAmount,
+              pricePerUnit: PRICE_PER_UNIT,
+            },
+          },
+          {
+            subscriptionId: subscription.id,
+            action: SubscriptionAction.HANDOVER_COMPLETED,
+            performedBy: createdAdminId,
+            newValue: {
+              adminEmail: parsed.adminEmail,
+              directorEmail: parsed.directorEmail,
+              principalEmail: parsed.createPrincipal ? parsed.principalEmail : null,
+              billingStart: billingStartDate,
+              billingEnd: billingEndDate,
+              isTrial,
+            },
+          },
+        ],
+      });
+
+      // Audit log for school creation
       await tx.auditLog.create({
         data: {
           userId: adminUser.id,
@@ -280,14 +370,21 @@ export async function POST(req) {
           newData: {
             name: parsed.name,
             domain: resolvedDomain,
-            adminEmail: parsed.adminem,
+            adminEmail: parsed.adminEmail,
             directorEmail: parsed.directorEmail,
             principalEmail: parsed.createPrincipal ? parsed.principalEmail : null,
+            subscriptionId: subscription.id,
+            capacity: {
+              expectedStudents,
+              unitsPurchased,
+              softCapacity,
+              yearlyAmount,
+            },
           },
         },
       });
 
-      return { school, adminUser, directorUser, principalUser };
+      return { school, adminUser, directorUser, principalUser, subscription };
     });
 
     return NextResponse.json({ success: true, result });
@@ -295,21 +392,14 @@ export async function POST(req) {
   } catch (error) {
     console.error("❌ Error creating school:", error);
 
-    // Cleanup Supabase user if creation partially failed
-    if (createdAdminId) {
+    // Cleanup Supabase users if creation partially failed
+    const usersToCleanup = [createdAdminId, createdDirectorId, createdPrincipalId].filter(Boolean);
+    for (const userId of usersToCleanup) {
       try {
-        await supabaseAdmin.auth.admin.deleteUser(createdAdminId);
-        console.log(`🔁 Rolled back Supabase user: ${createdAdminId}`);
+        await supabaseAdmin.auth.admin.deleteUser(userId);
+        console.log(`🔁 Rolled back Supabase user: ${userId}`);
       } catch (cleanupError) {
         console.error("⚠️ Failed to delete Supabase user:", cleanupError);
-      }
-      if (createdMasterId) {
-        try {
-          await supabaseAdmin.auth.admin.deleteUser(createdMasterId);
-          console.log(`🔁 Rolled back Supabase user: ${createdMasterId}`);
-        } catch (cleanupError) {
-          console.error("⚠️ Failed to delete Supabase user:", cleanupError);
-        }
       }
     }
 

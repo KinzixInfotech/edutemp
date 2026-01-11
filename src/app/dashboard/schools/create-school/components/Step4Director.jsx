@@ -19,30 +19,46 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Info } from 'lucide-react';
 
 const step4Schema = z.object({
-    directorName: z.string().min(1, 'Director name is required'),
-    directorEmail: z.string().email('Invalid email'),
-    directorPassword: z.string().min(6, 'Password must be at least 6 characters'),
+    directorName: z.string()
+        .min(2, 'Director name must be at least 2 characters')
+        .max(50, 'Director name cannot exceed 50 characters'),
+    directorEmail: z.string()
+        .email('Please enter a valid email address')
+        .min(1, 'Email is required'),
+    directorPassword: z.string()
+        .min(8, 'Password must be at least 8 characters')
+        .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Password must contain uppercase, lowercase and number'),
     createPrincipal: z.boolean(),
-    principalName: z.string().optional(),
-    principalEmail: z.string().email().optional().or(z.literal('')),
-    principalPassword: z.string().optional(),
-}).refine(
-    (data) => {
-        if (data.createPrincipal) {
-            return (
-                !!data.principalName?.trim() &&
-                !!data.principalEmail?.trim() &&
-                !!data.principalPassword &&
-                data.principalPassword.length >= 6
-            );
+    // Principal fields - no min validation here, handled in superRefine
+    principalName: z.string().optional().or(z.literal('')),
+    principalEmail: z.string().optional().or(z.literal('')),
+    principalPassword: z.string().optional().or(z.literal('')),
+}).superRefine((data, ctx) => {
+    // Only validate principal fields if createPrincipal is true
+    if (data.createPrincipal) {
+        if (!data.principalName || data.principalName.trim().length < 2) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Principal name must be at least 2 characters',
+                path: ['principalName'],
+            });
         }
-        return true;
-    },
-    {
-        message: 'All principal fields are required when creating a principal',
-        path: ['principalName'],
+        if (!data.principalEmail || !data.principalEmail.includes('@')) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Please enter a valid email address',
+                path: ['principalEmail'],
+            });
+        }
+        if (!data.principalPassword || data.principalPassword.length < 8) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Principal password must be at least 8 characters',
+                path: ['principalPassword'],
+            });
+        }
     }
-);
+});
 
 export default function Step4Director({ data, updateFormData, nextStep }) {
     const form = useForm({
@@ -56,6 +72,7 @@ export default function Step4Director({ data, updateFormData, nextStep }) {
             principalEmail: data.principalEmail || '',
             principalPassword: data.principalPassword || '',
         },
+        mode: 'onChange', // Enable live validation
     });
 
     const createPrincipal = useWatch({ control: form.control, name: 'createPrincipal' });
@@ -74,8 +91,8 @@ export default function Step4Director({ data, updateFormData, nextStep }) {
                         <h3 className="text-lg font-semibold">Director Profile</h3>
                     </div>
 
-                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                        <p className="text-sm text-purple-900">
+                    <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+                        <p className="text-sm text-purple-900 dark:text-purple-300">
                             The Director will have authority to approve payroll and library requests.
                         </p>
                     </div>

@@ -114,8 +114,96 @@ model School {
   aiInsightCache  AiInsightCache[]
   aiSettings      AiSettings?
   attendanceLocks AttendanceLock[]
+  subscription    SchoolSubscription?
 
   @@index([name])
+}
+
+// ============================================
+// SCHOOL SUBSCRIPTION - ERP BILLING & CAPACITY
+// ============================================
+
+model SchoolSubscription {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @unique @db.Uuid
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  // Capacity
+  expectedStudents Int
+  unitsPurchased   Int // 1 unit = 100 students
+  includedCapacity Int // unitsPurchased × 100
+  softCapacity     Int // includedCapacity × 1.05 (5% buffer)
+
+  // Pricing (locked at creation)
+  pricePerUnit Decimal @default(10500) @db.Decimal(10, 2)
+  yearlyAmount Decimal @db.Decimal(10, 2)
+
+  // Billing Period
+  billingStartDate DateTime
+  billingEndDate   DateTime
+
+  // Trial
+  isTrial     Boolean   @default(false)
+  trialDays   Int?
+  trialEndsAt DateTime?
+
+  // Status
+  status      SubscriptionStatus @default(ACTIVE)
+  activatedAt DateTime           @default(now())
+  renewedAt   DateTime?
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String   @db.Uuid // Super Admin who created
+
+  auditLogs SubscriptionAuditLog[]
+
+  @@index([schoolId])
+  @@index([status])
+  @@index([billingEndDate])
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  EXPIRED
+  SUSPENDED
+  CANCELLED
+}
+
+model SubscriptionAuditLog {
+  id             String             @id @default(uuid()) @db.Uuid
+  subscriptionId String             @db.Uuid
+  subscription   SchoolSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  action      SubscriptionAction
+  performedBy String             @db.Uuid // Super Admin ID
+
+  // Changes
+  previousValue Json?
+  newValue      Json?
+  reason        String?
+
+  createdAt DateTime @default(now())
+
+  @@index([subscriptionId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+enum SubscriptionAction {
+  SUBSCRIPTION_CREATED
+  CAPACITY_ASSIGNED
+  CAPACITY_UPGRADED
+  CAPACITY_EXCEEDED
+  TRIAL_STARTED
+  TRIAL_ENDED
+  SUBSCRIPTION_ACTIVATED
+  SUBSCRIPTION_RENEWED
+  SUBSCRIPTION_SUSPENDED
+  SUBSCRIPTION_CANCELLED
+  HANDOVER_COMPLETED
 }
 
 // ============================================

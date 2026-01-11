@@ -4,24 +4,28 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, Loader2 } from 'lucide-react';
+import { Check, Loader2, ArrowLeft, School } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
+import Link from 'next/link';
 
 // Step Components
 import Step1BasicInfo from './Step1BasicInfo';
 import Step2Domain from './Step2Domain';
 import Step3Admin from './Step3Admin';
 import Step4Director from './Step4Director';
-import Step5Review from './Step5Review';
+import Step5ERPPlan from './Step5ERPPlan';
+import Step6Review from './Step6Review';
 
 const STEPS = [
     { id: 1, name: 'School Info', component: Step1BasicInfo },
     { id: 2, name: 'Domain', component: Step2Domain },
     { id: 3, name: 'Admin', component: Step3Admin },
     { id: 4, name: 'Director', component: Step4Director },
-    { id: 5, name: 'Review', component: Step5Review },
+    { id: 5, name: 'ERP Plan', component: Step5ERPPlan },
+    { id: 6, name: 'Review', component: Step6Review },
 ];
 
 export default function SchoolWizard() {
@@ -46,7 +50,7 @@ export default function SchoolWizard() {
 
         // Admin
         adminName: '',
-        adminem: '',
+        adminEmail: '',
         adminPassword: '',
 
         // Director
@@ -59,6 +63,17 @@ export default function SchoolWizard() {
         principalName: '',
         principalEmail: '',
         principalPassword: '',
+
+        // ERP Plan & Capacity (Super Admin controlled)
+        expectedStudents: 100,
+        unitsPurchased: 1,
+        includedCapacity: 100,
+        softCapacity: 105,
+        yearlyAmount: 10500,
+        billingStartDate: null,
+        billingEndDate: null,
+        isTrial: false,
+        trialDays: 30,
     });
 
     const createSchoolMutation = useMutation({
@@ -118,7 +133,28 @@ export default function SchoolWizard() {
     const CurrentStepComponent = STEPS[currentStep - 1].component;
 
     return (
-        <div className="min-h-screen py-8 px-4">
+        <div className="p-6 space-y-6">
+            {/* Header */}
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+                        <School className="w-8 h-8 text-blue-600" />
+                        Create New School
+                    </h1>
+                    <p className="text-muted-foreground mt-2">
+                        Complete all steps to register a new school on EduBreezy
+                    </p>
+                </div>
+                <Link href="/dashboard/schools/all-schools">
+                    <Button variant="outline">
+                        <ArrowLeft className="w-4 h-4 mr-2" />
+                        Back to Schools
+                    </Button>
+                </Link>
+            </div>
+
+            <Separator />
+
             <div className="max-w-5xl mx-auto">
                 {/* Stepper Progress Indicator */}
                 <div className="mb-10">
@@ -202,19 +238,13 @@ export default function SchoolWizard() {
                         ← Back
                     </Button>
 
-                    {currentStep < STEPS.length ? (
-                        <Button
-                            onClick={nextStep}
-                            disabled={createSchoolMutation.isPending}
-                            className="px-6"
-                        >
-                            Next →
-                        </Button>
-                    ) : (
+                    {/* Only show Create School button on the final step (Review) */}
+                    {/* Steps 1-4 have their own form submit buttons with Zod validation */}
+                    {currentStep === STEPS.length && (
                         <Button
                             onClick={handleSubmit}
                             disabled={createSchoolMutation.isPending}
-                            className="px-8"
+                            className="px-8 bg-green-600 hover:bg-green-700"
                         >
                             {createSchoolMutation.isPending ? (
                                 <>

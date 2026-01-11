@@ -125,6 +125,17 @@ export async function middleware(request) {
     // AUTH PROTECTION
     // ============================================
 
+    // Define publicly accessible dashboard routes (these handle their own auth)
+    const publicDashboardRoutes = [
+        '/dashboard/edubreezy/add-user',
+    ];
+    const isPublicDashboardRoute = publicDashboardRoutes.some(route => pathname === route || pathname.startsWith(route + '/'));
+
+    // Skip auth for public dashboard routes - they handle their own password protection
+    if (isPublicDashboardRoute) {
+        return NextResponse.next();
+    }
+
     // Define protected routes
     const isProtectedRoute = pathname.startsWith('/dashboard') || pathname.startsWith('/reset-password');
     const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/signup');

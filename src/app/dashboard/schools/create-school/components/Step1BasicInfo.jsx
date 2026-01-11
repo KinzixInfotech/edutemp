@@ -28,12 +28,24 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 
 const step1Schema = z.object({
-    name: z.string().min(1, 'School name is required'),
-    email: z.string().email('Invalid email'),
-    phone: z.string().min(1, 'Phone number is required'),
-    location: z.string().min(1, 'Location is required'),
-    subscriptionType: z.enum(['A', 'B', 'C']),
-    language: z.string().min(1),
+    name: z.string()
+        .min(3, 'School name must be at least 3 characters')
+        .max(100, 'School name cannot exceed 100 characters'),
+    email: z.string()
+        .email('Please enter a valid email address')
+        .min(1, 'Email is required'),
+    phone: z.string()
+        .min(10, 'Phone number must be at least 10 digits')
+        .regex(/^[+]?[\d\s()-]{10,}$/, 'Please enter a valid phone number'),
+    location: z.string()
+        .min(5, 'Please enter a complete address')
+        .max(200, 'Address cannot exceed 200 characters'),
+    subscriptionType: z.enum(['A', 'B', 'C'], {
+        required_error: 'Please select a subscription type',
+    }),
+    language: z.enum(['en', 'hi'], {
+        required_error: 'Please select a language',
+    }),
 });
 
 export default function Step1BasicInfo({ data, updateFormData, nextStep }) {
@@ -51,6 +63,7 @@ export default function Step1BasicInfo({ data, updateFormData, nextStep }) {
             subscriptionType: data.subscriptionType || 'A',
             language: data.language || 'en',
         },
+        mode: 'onChange', // Enable live validation
     });
 
     const handleImageUpload = (previewUrl) => {
@@ -111,6 +124,13 @@ export default function Step1BasicInfo({ data, updateFormData, nextStep }) {
 
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                    {/* Info Banner */}
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                        <p className="text-sm text-blue-900 dark:text-blue-300">
+                            Enter the basic information about your school. All fields marked with * are required.
+                        </p>
+                    </div>
+
                     {/* School Name */}
                     <FormField
                         control={form.control}
@@ -119,7 +139,11 @@ export default function Step1BasicInfo({ data, updateFormData, nextStep }) {
                             <FormItem>
                                 <FormLabel>School Name *</FormLabel>
                                 <FormControl>
-                                    <Input placeholder="Sunshine Public School" {...field} />
+                                    <Input
+                                        placeholder="e.g., Sunrise Public School"
+                                        {...field}
+                                        className={form.formState.errors.name ? 'border-red-500 focus:ring-red-500' : ''}
+                                    />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -175,59 +199,33 @@ export default function Step1BasicInfo({ data, updateFormData, nextStep }) {
                     {/* Logo Upload */}
                     <div className="space-y-2">
                         <Label>School Logo</Label>
-                        <FileUploadButton
-                            field="School"
-                            onChange={(previewUrl) => handleImageUpload(previewUrl)}
-                        />
+                        {data.profilePicture ? (
+                            <div className="relative border border-dashed rounded-xl p-4 min-h-52 flex flex-col items-center justify-center">
+                                <img
+                                    src={data.profilePicture}
+                                    alt="School Logo"
+                                    className="max-h-40 rounded object-contain"
+                                />
+                                <p className="text-sm text-green-600 mt-2">✓ Logo uploaded</p>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="mt-2"
+                                    onClick={() => updateFormData({ profilePicture: '' })}
+                                >
+                                    Change Logo
+                                </Button>
+                            </div>
+                        ) : (
+                            <FileUploadButton
+                                field="School"
+                                onChange={(previewUrl) => handleImageUpload(previewUrl)}
+                            />
+                        )}
                     </div>
 
-                    {/* Subscription Type & Language */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField
-                            control={form.control}
-                            name="subscriptionType"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Subscription Type *</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="A">Per Student</SelectItem>
-                                            <SelectItem value="B">Up to 500 Students</SelectItem>
-                                            <SelectItem value="C">501 to 1000 Students</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        <FormField
-                            control={form.control}
-                            name="language"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Language *</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="en">English</SelectItem>
-                                            <SelectItem value="hi">Hindi</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                    </div>
+                    {/* Language is defaulted to English - not shown to user */}
 
                     <Button type="submit" className="w-full">
                         Next
