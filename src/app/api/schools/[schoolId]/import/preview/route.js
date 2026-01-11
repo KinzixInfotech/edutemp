@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import prisma from '@/lib/prisma';
 
-// Field mappings for each module
+// Field mappings for each module - MUST match labels from template/route.js exactly
 const FIELD_MAPPINGS = {
     students: {
         'Full Name *': 'name',
@@ -11,15 +11,15 @@ const FIELD_MAPPINGS = {
         'Class Name *': 'className',
         'Section *': 'sectionName',
         'Gender *': 'gender',
-        'Date of Birth *': 'dob',
+        'Date of Birth (YYYY-MM-DD) *': 'dob',
         'Roll Number': 'rollNumber',
         'Contact Number': 'contactNumber',
         'Address': 'address',
         'City': 'city',
         'State': 'state',
         'Father Name': 'fatherName',
-        'Father Phone': 'fatherPhone',
         'Mother Name': 'motherName',
+        'Father Phone': 'fatherPhone',
         'Mother Phone': 'motherPhone',
         'Blood Group': 'bloodGroup'
     },
@@ -29,9 +29,11 @@ const FIELD_MAPPINGS = {
         'Employee ID *': 'employeeId',
         'Gender *': 'gender',
         'Designation *': 'designation',
-        'Phone': 'phone',
+        'Phone Number': 'phone',
+        'Address': 'address',
         'Qualification': 'qualification',
-        'Joining Date': 'joiningDate',
+        'Subjects (comma separated)': 'subjects',
+        'Joining Date (YYYY-MM-DD)': 'joiningDate',
         'Salary': 'salary'
     },
     nonTeachingStaff: {
@@ -41,15 +43,16 @@ const FIELD_MAPPINGS = {
         'Gender *': 'gender',
         'Designation *': 'designation',
         'Department *': 'department',
-        'Phone': 'phone',
-        'Joining Date': 'joiningDate',
+        'Phone Number': 'phone',
+        'Address': 'address',
+        'Joining Date (YYYY-MM-DD)': 'joiningDate',
         'Salary': 'salary'
     },
     parents: {
         'Full Name *': 'name',
         'Email *': 'email',
-        'Phone *': 'phone',
-        'Relation *': 'relation',
+        'Phone Number *': 'phone',
+        'Relation (Father/Mother/Guardian) *': 'relation',
         'Student Admission No *': 'studentAdmissionNo',
         'Address': 'address',
         'Occupation': 'occupation'
@@ -60,7 +63,8 @@ const FIELD_MAPPINGS = {
         'Quantity *': 'quantity',
         'Unit *': 'unit',
         'Cost Per Unit *': 'costPerUnit',
-        'Location': 'location',
+        'Minimum Quantity': 'minimumQuantity',
+        'Storage Location': 'location',
         'Vendor Name': 'vendorName'
     },
     library: {
@@ -68,6 +72,7 @@ const FIELD_MAPPINGS = {
         'Author *': 'author',
         'ISBN *': 'isbn',
         'Category *': 'category',
+        'Publisher': 'publisher',
         'Published Year': 'publishedYear',
         'Number of Copies': 'copies'
     }
@@ -108,21 +113,33 @@ export async function POST(req, { params }) {
             return NextResponse.json({ error: `Module '${module}' not supported` }, { status: 400 });
         }
 
-        // Validate template columns
+        // Helper function to normalize column names for flexible matching
+        // Removes: asterisks (*), format hints in parentheses like (YYYY-MM-DD), extra spaces
+        // Makes comparison case-insensitive
+        const normalizeColumnName = (col) => {
+            return col
+                .replace(/\s*\*\s*/g, '')           // Remove asterisks
+                .replace(/\s*\([^)]*\)\s*/g, '')    // Remove anything in parentheses (format hints)
+                .trim()                              // Trim whitespace
+                .toLowerCase();                      // Case insensitive
+        };
+
+        // Validate template columns using flexible matching
         const uploadedColumns = Object.keys(rawData[0]).filter(col => col !== 'S.No');
         const expectedColumns = Object.keys(expectedFields);
         const requiredColumns = expectedColumns.filter(col => col.includes('*'));
 
-        const missingRequired = requiredColumns.filter(reqCol =>
-            !uploadedColumns.some(upCol => upCol.trim() === reqCol.trim())
-        );
+        const missingRequired = requiredColumns.filter(reqCol => {
+            const normalizedReq = normalizeColumnName(reqCol);
+            return !uploadedColumns.some(upCol => normalizeColumnName(upCol) === normalizedReq);
+        });
 
         if (missingRequired.length > 0) {
             return NextResponse.json({
                 error: 'Template mapping not matched',
                 details: {
                     message: 'The uploaded file does not match the expected template format.',
-                    missingColumns: missingRequired,
+                    missingColumns: missingRequired.map(c => c.replace(' *', '')),
                     expectedColumns: expectedColumns,
                     uploadedColumns: uploadedColumns,
                     suggestion: 'Please download the correct template.'
@@ -145,11 +162,16 @@ export async function POST(req, { params }) {
 
         // Process each row for preview with validation
         const previewRows = data.map((row, index) => {
-            // Map Excel columns to database fields
+            const rowKeys = Object.keys(row);
+
+            // Map Excel columns to database fields using flexible matching
             const mappedData = {};
             for (const [excelCol, dbField] of Object.entries(expectedFields)) {
-                if (row[excelCol] !== undefined && row[excelCol] !== '') {
-                    let value = row[excelCol];
+                const normalizedExpected = normalizeColumnName(excelCol);
+                const matchingKey = rowKeys.find(key => normalizeColumnName(key) === normalizedExpected);
+
+                if (matchingKey && row[matchingKey] !== undefined && row[matchingKey] !== '') {
+                    let value = row[matchingKey];
                     if (typeof value === 'number') value = String(value);
                     mappedData[dbField] = value;
                 }
@@ -225,14 +247,27 @@ export async function POST(req, { params }) {
 async function checkForDuplicates(module, data, schoolId, fieldMap) {
     const duplicates = [];
 
+    // Helper function to normalize column names for flexible matching
+    const normalizeColumnName = (col) => {
+        return col
+            .replace(/\s*\*\s*/g, '')           // Remove asterisks
+            .replace(/\s*\([^)]*\)\s*/g, '')    // Remove anything in parentheses
+            .trim()
+            .toLowerCase();
+    };
+
     for (let i = 0; i < data.length; i++) {
         const row = data[i];
+        const rowKeys = Object.keys(row);
 
-        // Map row to fields
+        // Map row to fields using flexible matching
         const mappedData = {};
         for (const [excelCol, dbField] of Object.entries(fieldMap)) {
-            if (row[excelCol] !== undefined && row[excelCol] !== '') {
-                let value = row[excelCol];
+            const normalizedExpected = normalizeColumnName(excelCol);
+            const matchingKey = rowKeys.find(key => normalizeColumnName(key) === normalizedExpected);
+
+            if (matchingKey && row[matchingKey] !== undefined && row[matchingKey] !== '') {
+                let value = row[matchingKey];
                 if (typeof value === 'number') value = String(value);
                 mappedData[dbField] = value;
             }

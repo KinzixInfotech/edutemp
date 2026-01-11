@@ -21,6 +21,8 @@ import {
     Clock,
     Save,
     CalendarClock,
+    ChevronLeft,
+    ChevronRight,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -103,6 +105,14 @@ export default function NoticeAdminPage() {
     const [filterStatus, setFilterStatus] = useState('ALL');
     const [uploadedImageUrl, setUploadedImageUrl] = useState('');
     const [uploadResetKey, setUploadResetKey] = useState(0);
+    const [isImageUploading, setIsImageUploading] = useState(false);
+
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+
+    // Image Preview State
+    const [previewImage, setPreviewImage] = useState(null);
 
     const {
         register,
@@ -158,6 +168,21 @@ export default function NoticeAdminPage() {
             return matchesSearch && matchesCategory && matchesStatus;
         });
     }, [notices, searchQuery, filterCategory, filterStatus]);
+
+    // Pagination Logic
+    const { paginatedNotices, totalPages } = useMemo(() => {
+        const total = Math.ceil(filteredNotices.length / pageSize);
+        const paginated = filteredNotices.slice(
+            (currentPage - 1) * pageSize,
+            currentPage * pageSize
+        );
+        return { paginatedNotices: paginated, totalPages: total };
+    }, [filteredNotices, currentPage, pageSize]);
+
+    // Reset page when filters change
+    useMemo(() => {
+        setCurrentPage(1);
+    }, [searchQuery, filterCategory, filterStatus, pageSize]);
 
     // Create mutation
     const createMutation = useMutation({
@@ -273,7 +298,8 @@ export default function NoticeAdminPage() {
 
     const handleSelectAll = (checked) => {
         if (checked) {
-            setSelectedIds(filteredNotices.map(n => n.id));
+            // Select only current page items
+            setSelectedIds(paginatedNotices.map(n => n.id));
         } else {
             setSelectedIds([]);
         }
@@ -378,12 +404,26 @@ export default function NoticeAdminPage() {
                 <CardHeader className="pb-3">
                     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                         <div>
-                            <CardTitle>All Notices</CardTitle>
+                            <CardTitle>All Notices ({filteredNotices.length})</CardTitle>
                             <CardDescription>
-                                Showing {filteredNotices.length} of {notices.length} notices
+                                Manage school notices and announcements
                             </CardDescription>
                         </div>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm text-muted-foreground hidden sm:inline-block">Rows per page:</span>
+                                <Select value={pageSize.toString()} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
+                                    <SelectTrigger className="w-[70px] h-8">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="10">10</SelectItem>
+                                        <SelectItem value="20">20</SelectItem>
+                                        <SelectItem value="50">50</SelectItem>
+                                        <SelectItem value="100">100</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                             {selectedIds.length > 0 && (
                                 <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
                                     <Trash2 className="mr-2 h-4 w-4" />
@@ -436,7 +476,7 @@ export default function NoticeAdminPage() {
                                 <TableRow>
                                     <TableHead className="w-12">
                                         <Checkbox
-                                            checked={selectedIds.length === filteredNotices.length && filteredNotices.length > 0}
+                                            checked={selectedIds.length === paginatedNotices.length && paginatedNotices.length > 0}
                                             onCheckedChange={handleSelectAll}
                                         />
                                     </TableHead>
@@ -457,8 +497,8 @@ export default function NoticeAdminPage() {
                                             <Loader2 className="animate-spin w-6 h-6 mx-auto text-muted-foreground" />
                                         </TableCell>
                                     </TableRow>
-                                ) : filteredNotices.length > 0 ? (
-                                    filteredNotices.map((notice, index) => (
+                                ) : paginatedNotices.length > 0 ? (
+                                    paginatedNotices.map((notice, index) => (
                                         <TableRow key={notice.id} className={index % 2 === 0 ? '' : 'bg-muted/50'}>
                                             <TableCell>
                                                 <Checkbox
@@ -469,8 +509,11 @@ export default function NoticeAdminPage() {
                                             <TableCell>
                                                 <div className="flex items-center gap-3">
                                                     {notice.fileUrl && (
-                                                        <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
-                                                            <Image
+                                                        <div
+                                                            className="w-10 h-10 rounded overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity border border-border"
+                                                            onClick={() => setPreviewImage(notice.fileUrl)}
+                                                        >
+                                                            <img
                                                                 src={notice.fileUrl}
                                                                 alt=""
                                                                 width={40}
@@ -548,6 +591,58 @@ export default function NoticeAdminPage() {
                             </TableBody>
                         </Table>
                     </div>
+
+                    {/* Pagination Controls */}
+                    {totalPages > 1 && (
+                        <div className="flex items-center justify-between mt-4">
+                            <p className="text-sm text-muted-foreground">
+                                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredNotices.length)} of {filteredNotices.length} notices
+                            </p>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                    disabled={currentPage === 1}
+                                >
+                                    <ChevronLeft className="w-4 h-4" />
+                                </Button>
+                                <div className="flex items-center gap-1">
+                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                        let pageNum;
+                                        if (totalPages <= 5) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage <= 3) {
+                                            pageNum = i + 1;
+                                        } else if (currentPage >= totalPages - 2) {
+                                            pageNum = totalPages - 4 + i;
+                                        } else {
+                                            pageNum = currentPage - 2 + i;
+                                        }
+                                        return (
+                                            <Button
+                                                key={pageNum}
+                                                variant={currentPage === pageNum ? "default" : "outline"}
+                                                size="sm"
+                                                onClick={() => setCurrentPage(pageNum)}
+                                                className="w-8 h-8 p-0"
+                                            >
+                                                {pageNum}
+                                            </Button>
+                                        );
+                                    })}
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                    disabled={currentPage === totalPages}
+                                >
+                                    <ChevronRight className="w-4 h-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
@@ -601,6 +696,7 @@ export default function NoticeAdminPage() {
                             <FileUploadButton
                                 field="notice"
                                 onChange={(url) => setUploadedImageUrl(url)}
+                                onUploadStatusChange={(uploading) => setIsImageUploading(uploading)}
                                 resetKey={uploadResetKey}
                                 saveToLibrary={true}
                             />
@@ -759,11 +855,16 @@ export default function NoticeAdminPage() {
                             <Button type="button" variant="outline" onClick={closeDialog}>
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={createMutation.isPending}>
+                            <Button type="submit" disabled={createMutation.isPending || isImageUploading}>
                                 {createMutation.isPending ? (
                                     <>
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                         Saving...
+                                    </>
+                                ) : isImageUploading ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Uploading image...
                                     </>
                                 ) : (
                                     <>
@@ -774,6 +875,29 @@ export default function NoticeAdminPage() {
                             </Button>
                         </div>
                     </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Image Preview Dialog */}
+            <Dialog open={!!previewImage} onOpenChange={(open) => !open && setPreviewImage(null)}>
+                <DialogContent showCloseButton={false} className="max-w-3xl border-0 p-0 overflow-hidden bg-transparent shadow-none">
+                    <div className="relative w-full h-full flex items-center justify-center p-4">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-2 right-2 z-50 bg-black/50 hover:bg-black/70 text-white rounded-full"
+                            onClick={() => setPreviewImage(null)}
+                        >
+                            <X className="h-5 w-5" />
+                        </Button>
+                        {previewImage && (
+                            <img
+                                src={previewImage}
+                                alt="Preview"
+                                className="max-w-full max-h-[85vh] object-contain rounded-md shadow-2xl"
+                            />
+                        )}
+                    </div>
                 </DialogContent>
             </Dialog>
         </div>

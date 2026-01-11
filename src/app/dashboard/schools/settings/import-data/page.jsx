@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import * as XLSX from "xlsx";
 import {
     Card,
     CardContent,
@@ -109,6 +110,9 @@ export default function ImportDataPage() {
     const [selectedExportModules, setSelectedExportModules] = useState([]);
     const [isExporting, setIsExporting] = useState(false);
     const [exportProgress, setExportProgress] = useState("");
+
+    // Export credentials state (auto-export after import)
+    const [exportCredentials, setExportCredentials] = useState(true);
 
     // Fetch import history
     const { data: historyData } = useQuery({
@@ -335,6 +339,11 @@ export default function ImportDataPage() {
                 toast.info(`Sending ${data.emailsSent} credential emails...`);
             }
 
+            // Automatically export credentials if enabled and accounts were created
+            if (exportCredentials && data.credentials && data.credentials.length > 0) {
+                handleExportCredentials(data.credentials, selectedModule);
+            }
+
         } catch (error) {
             toast.error(error.message || "Import failed");
             setImportResults({ error: error.message, details: error.details });
@@ -348,6 +357,51 @@ export default function ImportDataPage() {
     const handleCancelPreview = () => {
         setPreviewData(null);
         setUploadedFile(null);
+    };
+
+    // Export credentials to Excel file
+    const handleExportCredentials = (credentials, moduleType) => {
+        if (!credentials || credentials.length === 0) return;
+
+        try {
+            // Prepare data for Excel
+            const exportData = credentials.map((cred, index) => ({
+                'S.No': index + 1,
+                'Name': cred.name,
+                'Email': cred.email,
+                'Password': cred.password,
+                'User Type': cred.userType === 'student' ? 'Student' :
+                    cred.userType === 'teacher' ? 'Teacher' :
+                        cred.userType === 'staff' ? 'Non-Teaching Staff' : 'Parent'
+            }));
+
+            // Create workbook and worksheet
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(exportData);
+
+            // Set column widths
+            ws['!cols'] = [
+                { wch: 6 },   // S.No
+                { wch: 25 },  // Name
+                { wch: 35 },  // Email
+                { wch: 20 },  // Password
+                { wch: 18 },  // User Type
+            ];
+
+            XLSX.utils.book_append_sheet(wb, ws, 'Credentials');
+
+            // Generate filename with date
+            const date = new Date().toISOString().split('T')[0];
+            const fileName = `${moduleType}_credentials_${date}.xlsx`;
+
+            // Download file
+            XLSX.writeFile(wb, fileName);
+
+            toast.success(`Credentials exported to ${fileName}`);
+        } catch (error) {
+            console.error('Failed to export credentials:', error);
+            toast.error('Failed to export credentials file');
+        }
     };
 
     // Handle export
@@ -1054,6 +1108,18 @@ export default function ImportDataPage() {
                                                                 Send login credentials via email
                                                             </label>
                                                         </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <input
+                                                                type="checkbox"
+                                                                id="exportCredentials"
+                                                                checked={exportCredentials}
+                                                                onChange={(e) => setExportCredentials(e.target.checked)}
+                                                                className="rounded"
+                                                            />
+                                                            <label htmlFor="exportCredentials" className="text-sm">
+                                                                Export credentials to Excel file
+                                                            </label>
+                                                        </div>
                                                         {previewData.duplicateRows > 0 && (
                                                             <div className="flex items-center gap-2">
                                                                 <input
@@ -1206,6 +1272,19 @@ export default function ImportDataPage() {
                                                                 <p className="text-xs text-orange-600">Account Failures</p>
                                                             </div>
                                                         </div>
+
+                                                        {/* Download Credentials Button */}
+                                                        {importResults.credentials?.length > 0 && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="w-full border-blue-300 text-blue-600 hover:bg-blue-50"
+                                                                onClick={() => handleExportCredentials(importResults.credentials, selectedModule)}
+                                                            >
+                                                                <Download className="h-4 w-4 mr-2" />
+                                                                Download Credentials Excel
+                                                            </Button>
+                                                        )}
 
                                                         {/* Failed Account Errors with Retry */}
                                                         {importResults.accountErrors?.length > 0 && (

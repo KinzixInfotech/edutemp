@@ -21,13 +21,25 @@ export async function GET(request, props) {
         const limit = parseInt(searchParams.get('limit') || '50');
         const page = parseInt(searchParams.get('page') || '1');
         const skip = (page - 1) * limit;
+        const unread = searchParams.get('unread') === 'true';
+
+        // Valid category enum values
+        const validCategories = ['GENERAL', 'ACADEMIC', 'EXAM', 'EMERGENCY', 'EVENT', 'HOLIDAY', 'FEE', 'TRANSPORT'];
+        const isValidCategory = category && validCategories.includes(category);
 
         const where = {
             schoolId,
             ...(status && { status }), // Only filter by status if provided
-            ...(category && category !== 'All' && { category }),
+            ...(isValidCategory && { category }), // Only apply if valid category
             ...(priority && { priority }),
             ...(creatorId && { createdById: creatorId }), // Filter by creator
+            ...(unread && userId && { // Unread filter: no read record for this user
+                NoticeReads: {
+                    none: {
+                        userId: userId
+                    }
+                }
+            }),
         };
 
         // Generate cache key based on all query params
@@ -115,6 +127,7 @@ export async function GET(request, props) {
                             select: {
                                 name: true,
                                 email: true,
+                                profilePicture: true,
                             }
                         },
                         NoticeReads: {
@@ -147,6 +160,8 @@ export async function GET(request, props) {
                     attachments: notice.attachments,
                     issuedBy: notice.issuedBy || notice.Author?.name,
                     issuerRole: notice.issuerRole,
+                    authorName: notice.Author?.name,
+                    authorProfilePic: notice.Author?.profilePicture,
                     importantDates: notice.importantDates,
                     read: notice.NoticeReads.length > 0,
                     readAt: notice.NoticeReads[0]?.readAt,
@@ -162,6 +177,7 @@ export async function GET(request, props) {
                             select: {
                                 name: true,
                                 email: true,
+                                profilePicture: true,
                             }
                         },
                         NoticeTarget: {
@@ -283,7 +299,10 @@ export async function POST(request, props) {
 
         if (status === 'PUBLISHED') {
             const targetUsers = await getTargetUsers(schoolId, audience, targets);
-            await sendPushNotifications(targetUsers, notice);
+            // Exclude the notice creator from receiving push notification
+            const usersExcludingSender = targetUsers.filter(u => u.id !== createdById);
+            console.log(`[Notice Push] Excluded sender (${createdById}) from push notifications`);
+            await sendPushNotifications(usersExcludingSender, notice);
         }
 
         return NextResponse.json(notice, { status: 201 });
@@ -297,30 +316,87 @@ export async function POST(request, props) {
 }
 
 async function getTargetUsers(schoolId, audience, targets) {
-    const where = { schoolId };
+    console.log(`[Notice Push] Getting target users for audience: ${audience}, schoolId: ${schoolId}`);
+
+    let users = [];
 
     if (audience === 'ALL') {
+        // Get all users in the school
+        users = await prisma.user.findMany({
+            where: { schoolId, status: 'ACTIVE' },
+            select: { id: true, name: true, fcmToken: true }
+        });
     } else if (audience === 'STUDENTS') {
-        where.role = { name: 'STUDENT' };
+        // Get all students
+        users = await prisma.user.findMany({
+            where: {
+                schoolId,
+                status: 'ACTIVE',
+                role: { name: 'STUDENT' }
+            },
+            select: { id: true, name: true, fcmToken: true }
+        });
     } else if (audience === 'TEACHERS') {
-        where.role = { name: 'TEACHER' };
+        // Get all teaching staff - role is TEACHING_STAFF not TEACHER
+        users = await prisma.user.findMany({
+            where: {
+                schoolId,
+                status: 'ACTIVE',
+                role: { name: 'TEACHING_STAFF' }
+            },
+            select: { id: true, name: true, fcmToken: true }
+        });
+    } else if (audience === 'PARENTS') {
+        // Get all parents
+        users = await prisma.user.findMany({
+            where: {
+                schoolId,
+                status: 'ACTIVE',
+                role: { name: 'PARENT' }
+            },
+            select: { id: true, name: true, fcmToken: true }
+        });
+    } else if (audience === 'STAFF') {
+        // Get all staff (teaching + non-teaching)
+        users = await prisma.user.findMany({
+            where: {
+                schoolId,
+                status: 'ACTIVE',
+                role: { name: { in: ['TEACHING_STAFF', 'NON_TEACHING_STAFF'] } }
+            },
+            select: { id: true, name: true, fcmToken: true }
+        });
     } else if (audience === 'CLASS') {
+        // Get students in specific classes
         const classIds = targets.map(t => t.classId).filter(Boolean);
-        where.student = { classId: { in: classIds } };
+        const students = await prisma.student.findMany({
+            where: { schoolId, classId: { in: classIds } },
+            select: {
+                user: {
+                    select: { id: true, name: true, fcmToken: true }
+                }
+            }
+        });
+        users = students.map(s => s.user);
     } else if (audience === 'SECTION') {
+        // Get students in specific sections
         const sectionIds = targets.map(t => t.sectionId).filter(Boolean);
-        where.student = { sectionId: { in: sectionIds } };
+        const students = await prisma.student.findMany({
+            where: { schoolId, sectionId: { in: sectionIds } },
+            select: {
+                user: {
+                    select: { id: true, name: true, fcmToken: true }
+                }
+            }
+        });
+        users = students.map(s => s.user);
     }
 
-    const users = await prisma.user.findMany({
-        where,
-        select: {
-            id: true,
-            name: true,
-            fcmToken: true,
-        }
-    });
-
+    const usersWithTokens = users.filter(u => u.fcmToken);
+    console.log(`[Notice Push] Found ${users.length} target users, ${usersWithTokens.length} have FCM tokens`);
+    if (usersWithTokens.length > 0) {
+        console.log(`[Notice Push] Users with FCM tokens:`, usersWithTokens.map(u => ({ id: u.id, name: u.name })));
+    }
     return users;
 }
 
@@ -330,38 +406,77 @@ async function sendPushNotifications(users, notice) {
         .filter(Boolean);
 
     if (tokens.length === 0) {
+        console.log('[Notice Push] No FCM tokens found, skipping push notification');
         return;
     }
 
+    console.log(`[Notice Push] Sending push to ${tokens.length} devices for notice: "${notice.title}"${notice.fileUrl ? ' (with image)' : ''}`);
+
+    // Build notification payload with optional image
+    const notificationPayload = {
+        title: notice.title,
+        body: notice.subtitle || notice.description.substring(0, 100) + ' - TAP TO VIEW',
+    };
+
+    // Add image if notice has one
+    if (notice.fileUrl) {
+        notificationPayload.imageUrl = notice.fileUrl;
+    }
+
     const message = {
-        notification: {
-            title: notice.title,
-            body: notice.subtitle || notice.description.substring(0, 100) + '-' + 'TAP TO VIEW ',
-        },
+        notification: notificationPayload,
         data: {
             type: 'NEW_NOTICE',
             noticeId: notice.id.toString(),
             category: notice.category,
             priority: notice.priority,
+            click_action: 'FLUTTER_NOTIFICATION_CLICK',
+            ...(notice.fileUrl && { imageUrl: notice.fileUrl }), // Also include in data for Flutter apps
+        },
+        android: {
+            notification: {
+                channelId: 'default',
+                priority: 'high',
+                ...(notice.fileUrl && { imageUrl: notice.fileUrl }), // Android big picture style
+            },
+        },
+        apns: {
+            payload: {
+                aps: {
+                    sound: 'default',
+                    contentAvailable: true,
+                    mutableContent: true, // Required for iOS to display images
+                },
+            },
+            fcmOptions: {
+                ...(notice.fileUrl && { image: notice.fileUrl }), // iOS image support
+            },
         },
         tokens: tokens,
     };
 
     try {
         const response = await messaging.sendEachForMulticast(message);
+        console.log(`[Notice Push] Sent: ${response.successCount} success, ${response.failureCount} failed`);
 
         if (response.failureCount > 0) {
             const failedTokens = [];
             response.responses.forEach((resp, idx) => {
                 if (!resp.success) {
+                    console.log(`[Notice Push] Token failed: ${resp.error?.code || resp.error?.message}`);
                     failedTokens.push(tokens[idx]);
                 }
             });
 
-            await prisma.user.updateMany({
-                where: { fcmToken: { in: failedTokens } },
-                data: { fcmToken: null }
-            });
+            if (failedTokens.length > 0) {
+                await prisma.user.updateMany({
+                    where: { fcmToken: { in: failedTokens } },
+                    data: { fcmToken: null }
+                });
+                console.log(`[Notice Push] Removed ${failedTokens.length} invalid tokens`);
+            }
         }
-    } catch (error) { }
+    } catch (error) {
+        console.error('[Notice Push] Error sending notifications:', error.message);
+    }
 }

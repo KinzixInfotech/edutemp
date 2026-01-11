@@ -152,9 +152,7 @@ export default function SchoolWizard() {
                     </Button>
                 </Link>
             </div>
-
             <Separator />
-
             <div className="max-w-5xl mx-auto">
                 {/* Stepper Progress Indicator */}
                 <div className="mb-10">
@@ -181,7 +179,6 @@ export default function SchoolWizard() {
                                             )}
                                         </div>
                                     </div>
-
                                     {/* Step Label */}
                                     <span
                                         className={cn(
@@ -194,7 +191,6 @@ export default function SchoolWizard() {
                                         {step.name}
                                     </span>
                                 </div>
-
                                 {/* Connector Line */}
                                 {index < STEPS.length - 1 && (
                                     <div className="flex items-center px-4 pb-8">

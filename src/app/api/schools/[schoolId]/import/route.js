@@ -123,22 +123,34 @@ export async function POST(req, { params }) {
             return NextResponse.json({ error: `Module '${module}' not supported` }, { status: 400 });
         }
 
+        // Helper function to normalize column names for flexible matching
+        // Removes: asterisks (*), format hints in parentheses like (YYYY-MM-DD), extra spaces
+        // Makes comparison case-insensitive
+        const normalizeColumnName = (col) => {
+            return col
+                .replace(/\s*\*\s*/g, '')           // Remove asterisks
+                .replace(/\s*\([^)]*\)\s*/g, '')    // Remove anything in parentheses (format hints)
+                .trim()                              // Trim whitespace
+                .toLowerCase();                      // Case insensitive
+        };
+
         // Validate template columns match expected format
         const uploadedColumns = Object.keys(rawData[0]).filter(col => col !== 'S.No');
         const expectedColumns = Object.keys(expectedFields);
         const requiredColumns = expectedColumns.filter(col => col.includes('*'));
 
-        // Check for missing required columns
-        const missingRequired = requiredColumns.filter(reqCol =>
-            !uploadedColumns.some(upCol => upCol.trim() === reqCol.trim())
-        );
+        // Check for missing required columns using flexible matching
+        const missingRequired = requiredColumns.filter(reqCol => {
+            const normalizedReq = normalizeColumnName(reqCol);
+            return !uploadedColumns.some(upCol => normalizeColumnName(upCol) === normalizedReq);
+        });
 
         if (missingRequired.length > 0) {
             return NextResponse.json({
                 error: 'Template mapping not matched',
                 details: {
                     message: 'The uploaded file does not match the expected template format.',
-                    missingColumns: missingRequired,
+                    missingColumns: missingRequired.map(c => c.replace(' *', '')),
                     expectedColumns: expectedColumns,
                     uploadedColumns: uploadedColumns,
                     suggestion: 'Please download the correct template and ensure all column headers match exactly.'
@@ -147,9 +159,10 @@ export async function POST(req, { params }) {
         }
 
         // Check for completely wrong format (no matching columns at all)
-        const matchingColumns = expectedColumns.filter(expCol =>
-            uploadedColumns.some(upCol => upCol.trim() === expCol.trim())
-        );
+        const matchingColumns = expectedColumns.filter(expCol => {
+            const normalizedExp = normalizeColumnName(expCol);
+            return uploadedColumns.some(upCol => normalizeColumnName(upCol) === normalizedExp);
+        });
 
         if (matchingColumns.length === 0) {
             return NextResponse.json({
@@ -293,7 +306,14 @@ export async function POST(req, { params }) {
         return NextResponse.json({
             message: 'Import completed',
             total: data.length,
-            ...results
+            ...results,
+            // Include credentials for export (only if accounts were created)
+            credentials: createdUsers.length > 0 ? createdUsers.map(u => ({
+                name: u.name,
+                email: u.email,
+                password: u.password,
+                userType: u.userType
+            })) : []
         });
 
     } catch (error) {
@@ -381,11 +401,28 @@ async function createSupabaseAccount(email, password) {
 
 // Process individual row based on module
 async function processRow(module, row, schoolId, fieldMap) {
-    // Map Excel columns to database fields with type conversion
+    // Helper function to normalize column names for flexible matching
+    const normalizeColumnName = (col) => {
+        return col
+            .replace(/\s*\*\s*/g, '')           // Remove asterisks
+            .replace(/\s*\([^)]*\)\s*/g, '')    // Remove anything in parentheses (format hints)
+            .trim()                              // Trim whitespace
+            .toLowerCase();                      // Case insensitive
+    };
+
+    // Get all column keys from the row
+    const rowKeys = Object.keys(row);
+
+    // Map Excel columns to database fields with type conversion using flexible matching
     const mappedData = {};
     for (const [excelCol, dbField] of Object.entries(fieldMap)) {
-        if (row[excelCol] !== undefined && row[excelCol] !== '') {
-            let value = row[excelCol];
+        const normalizedExpected = normalizeColumnName(excelCol);
+
+        // Find the matching column in the row using flexible matching
+        const matchingKey = rowKeys.find(key => normalizeColumnName(key) === normalizedExpected);
+
+        if (matchingKey && row[matchingKey] !== undefined && row[matchingKey] !== '') {
+            let value = row[matchingKey];
             // Convert numbers to strings for text fields (Excel reads "10" as number 10)
             if (typeof value === 'number') {
                 value = String(value);
@@ -448,14 +485,12 @@ async function importStudent(data, schoolId) {
         throw new Error(`Student with admission number '${admissionNo}' or email '${email}' already exists.`);
     }
 
-    // Get student role (global table)
-    const studentRole = await prisma.role.findFirst({
-        where: { name: 'STUDENT' }
+    // Get or create student role (global table)
+    const studentRole = await prisma.role.upsert({
+        where: { name: 'STUDENT' },
+        update: {},
+        create: { name: 'STUDENT' }
     });
-
-    if (!studentRole) {
-        throw new Error('Student role not found');
-    }
 
     const defaultPassword = `Student@${admissionNo}`;
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
@@ -545,14 +580,12 @@ async function importTeacher(data, schoolId) {
         throw new Error(`User with email '${email}' already exists.`);
     }
 
-    // Get teacher role (global table)
-    const teacherRole = await prisma.role.findFirst({
-        where: { name: 'TEACHING_STAFF' }
+    // Get or create teacher role (global table)
+    const teacherRole = await prisma.role.upsert({
+        where: { name: 'TEACHING_STAFF' },
+        update: {},
+        create: { name: 'TEACHING_STAFF' }
     });
-
-    if (!teacherRole) {
-        throw new Error('Teaching staff role not found');
-    }
 
     // Get current academic year
     const academicYear = await prisma.academicYear.findFirst({
@@ -615,6 +648,13 @@ async function importTeacher(data, schoolId) {
     const authResult = await createSupabaseAccount(email, defaultPassword);
     if (authResult.success) {
         authSuccess = true;
+        // Update user with Supabase ID if different
+        if (authResult.userId !== userId) {
+            await prisma.user.update({
+                where: { id: userId },
+                data: { id: authResult.userId }
+            }).catch(() => { }); // Ignore if update fails
+        }
     } else {
         authError = authResult.error;
     }
@@ -636,14 +676,12 @@ async function importNonTeachingStaff(data, schoolId) {
         throw new Error(`User with email '${email}' already exists.`);
     }
 
-    // Get non-teaching staff role (global table)
-    const ntRole = await prisma.role.findFirst({
-        where: { name: 'NON_TEACHING_STAFF' }
+    // Get or create non-teaching staff role (global table)
+    const ntRole = await prisma.role.upsert({
+        where: { name: 'NON_TEACHING_STAFF' },
+        update: {},
+        create: { name: 'NON_TEACHING_STAFF' }
     });
-
-    if (!ntRole) {
-        throw new Error('Non-teaching staff role not found');
-    }
 
     // Get current academic year
     const academicYear = await prisma.academicYear.findFirst({
@@ -730,6 +768,13 @@ async function importNonTeachingStaff(data, schoolId) {
     const authResult = await createSupabaseAccount(email, defaultPassword);
     if (authResult.success) {
         authSuccess = true;
+        // Update user with Supabase ID if different
+        if (authResult.userId !== userId) {
+            await prisma.user.update({
+                where: { id: userId },
+                data: { id: authResult.userId }
+            }).catch(() => { }); // Ignore if update fails
+        }
     } else {
         authError = authResult.error;
     }
@@ -760,14 +805,26 @@ async function importParent(data, schoolId) {
         throw new Error(`User with email '${email}' already exists.`);
     }
 
-    // Get parent role (global table)
-    const parentRole = await prisma.role.findFirst({
-        where: { name: 'PARENT' }
+    // Get or create parent role (global table)
+    const parentRole = await prisma.role.upsert({
+        where: { name: 'PARENT' },
+        update: {},
+        create: { name: 'PARENT' }
     });
 
-    if (!parentRole) {
-        throw new Error('Parent role not found');
-    }
+    // Map relation text to enum value
+    const relationMap = {
+        'father': 'FATHER',
+        'mother': 'MOTHER',
+        'guardian': 'GUARDIAN',
+        'grandfather': 'GRANDFATHER',
+        'grandmother': 'GRANDMOTHER',
+        'uncle': 'UNCLE',
+        'aunt': 'AUNT',
+        'sibling': 'SIBLING',
+        'other': 'OTHER'
+    };
+    const relationEnum = relationMap[relation.toLowerCase()] || 'GUARDIAN';
 
     const defaultPassword = `Parent@${phone.slice(-4)}`;
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
@@ -787,19 +844,26 @@ async function importParent(data, schoolId) {
             }
         });
 
-        await tx.parent.create({
+        // Create parent record with required contactNumber field
+        const parent = await tx.parent.create({
             data: {
                 userId: user.id,
                 name,
                 email,
-                phone,
-                relation,
+                contactNumber: phone, // Required field - use phone as contactNumber
                 schoolId,
-                address: rest.address || '',
-                occupation: rest.occupation || '',
-                students: {
-                    connect: { id: student.id }
-                }
+                address: rest.address || null,
+                occupation: rest.occupation || null,
+            }
+        });
+
+        // Create student-parent link using junction table
+        await tx.studentParentLink.create({
+            data: {
+                studentId: student.userId,
+                parentId: parent.id,
+                relation: relationEnum,
+                isPrimary: true,
             }
         });
 
@@ -813,6 +877,13 @@ async function importParent(data, schoolId) {
     const authResult = await createSupabaseAccount(email, defaultPassword);
     if (authResult.success) {
         authSuccess = true;
+        // Update user with Supabase ID if different
+        if (authResult.userId !== userId) {
+            await prisma.user.update({
+                where: { id: userId },
+                data: { id: authResult.userId }
+            }).catch(() => { }); // Ignore if update fails
+        }
     } else {
         authError = authResult.error;
     }

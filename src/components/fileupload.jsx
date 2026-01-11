@@ -1,18 +1,49 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { AlertCircleIcon, ImageIcon, UploadIcon, XIcon, Library } from "lucide-react"
+import { AlertCircleIcon, ImageIcon, UploadIcon, XIcon, Library, Loader2, CheckCircle } from "lucide-react"
 
 import { useFileUpload } from '@/lib/useFileupload'
 import { Button } from '@/components/ui/button'
 import { MediaLibraryDialog } from './media-library-dialog'
 import { useAuth } from "@/context/AuthContext"
+import { useUploadThing } from "@/lib/uploadthing"
 
-export default function FileUploadButton({ field, onChange, resetKey, saveToLibrary = true }) {
+export default function FileUploadButton({
+    field,
+    onChange,
+    onUploadStatusChange,  // NEW: Callback for upload status (true = uploading, false = done/idle)
+    resetKey,
+    saveToLibrary = true
+}) {
     const maxSizeMB = 2
     const maxSize = maxSizeMB * 1024 * 1024 // 2MB
     const { fullUser: user } = useAuth()
     const [showLibrary, setShowLibrary] = useState(false)
+    const [isUploading, setIsUploading] = useState(false)
+    const [uploadedUrl, setUploadedUrl] = useState(null)
+
+    // Uploadthing hook for auto-upload
+    const { startUpload } = useUploadThing("schoolImageUpload", {
+        onUploadBegin: () => {
+            setIsUploading(true)
+            onUploadStatusChange?.(true)
+        },
+        onClientUploadComplete: (res) => {
+            if (res?.[0]?.ufsUrl) {
+                const url = res[0].ufsUrl;
+                setUploadedUrl(url)
+                setIsUploading(false)
+                onUploadStatusChange?.(false)
+                onChange?.(url)
+            }
+        },
+        onUploadError: (error) => {
+            console.error("Upload error:", error)
+            setIsUploading(false)
+            onUploadStatusChange?.(false)
+        },
+    })
 
     const [
         { files, isDragging, errors },
@@ -29,57 +60,48 @@ export default function FileUploadButton({ field, onChange, resetKey, saveToLibr
     ] = useFileUpload({
         accept: "image/,image/png,image/jpeg,image/jpg,image/gif",
         maxSize,
-    })
-
-
-    const previewUrl = files[0]?.preview || null
-
-    // Send previewUrl to parent only when changed
-    const previousUrlRef = useRef(null)
-    useEffect(() => {
-        if (onChange && previewUrl && previewUrl !== previousUrlRef.current) {
-            previousUrlRef.current = previewUrl
-            onChange(previewUrl)
-
-            // Save to media library if enabled and user is available
-            if (saveToLibrary && user?.schoolId && user?.id && files[0]?.file) {
-                saveImageToLibrary(previewUrl, files[0].file)
+        onFilesAdded: async (addedFiles) => {
+            // Auto-upload when file is added
+            if (addedFiles.length > 0 && user?.schoolId && user?.id) {
+                const file = addedFiles[0].file
+                try {
+                    await startUpload([file], {
+                        schoolId: user.schoolId,
+                        uploadedById: user.id,
+                    })
+                } catch (error) {
+                    console.error("Failed to start upload:", error)
+                }
             }
         }
-    }, [previewUrl, onChange])
+    })
 
-    // Clear preview when resetKey changes
+    const previewUrl = files[0]?.preview || uploadedUrl || null
+
+    // Clear state when resetKey changes
     useEffect(() => {
         if (clearFiles) {
             clearFiles()
-            previousUrlRef.current = null
+            setUploadedUrl(null)
+            setIsUploading(false)
         }
     }, [resetKey])
 
     const fileName = files[0]?.file.name || null
 
-    const saveImageToLibrary = async (url, file) => {
-        try {
-            await fetch(`/api/schools/${user.schoolId}/media`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    url,
-                    fileName: file.name,
-                    fileSize: file.size,
-                    mimeType: file.type,
-                    uploadedById: user.id,
-                }),
-            })
-        } catch (error) {
-            console.error("Failed to save image to library:", error)
-        }
-    }
-
     const handleLibrarySelect = (url) => {
+        setUploadedUrl(url)
         if (onChange) {
             onChange(url)
         }
+    }
+
+    const handleRemove = () => {
+        if (files[0]?.id) {
+            removeFile(files[0].id)
+        }
+        setUploadedUrl(null)
+        onChange?.(null)
     }
 
     return (
@@ -105,6 +127,22 @@ export default function FileUploadButton({ field, onChange, resetKey, saveToLibr
                                 alt={fileName || "Uploaded image"}
                                 className="mx-auto max-h-full rounded object-contain"
                             />
+                            {/* Upload status overlay */}
+                            {isUploading && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
+                                    <div className="flex flex-col items-center gap-2 text-white">
+                                        <Loader2 className="h-8 w-8 animate-spin" />
+                                        <span className="text-sm font-medium">Uploading...</span>
+                                    </div>
+                                </div>
+                            )}
+                            {/* Uploaded checkmark */}
+                            {uploadedUrl && !isUploading && (
+                                <div className="absolute bottom-4 left-4 flex items-center gap-1 bg-green-600 text-white text-xs px-2 py-1 rounded-full">
+                                    <CheckCircle className="h-3 w-3" />
+                                    Uploaded
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center px-4 py-3 text-center">
@@ -123,6 +161,7 @@ export default function FileUploadButton({ field, onChange, resetKey, saveToLibr
                                     type="button"
                                     variant="outline"
                                     onClick={openFileDialog}
+                                    disabled={isUploading}
                                 >
                                     <UploadIcon
                                         className="-ms-1 size-4 opacity-60"
@@ -135,6 +174,7 @@ export default function FileUploadButton({ field, onChange, resetKey, saveToLibr
                                         type="button"
                                         variant="outline"
                                         onClick={() => setShowLibrary(true)}
+                                        disabled={isUploading}
                                     >
                                         <Library
                                             className="-ms-1 size-4 opacity-60"
@@ -152,8 +192,9 @@ export default function FileUploadButton({ field, onChange, resetKey, saveToLibr
                         <button
                             type="button"
                             className="focus-visible:border-ring focus-visible:ring-ring/50 z-50 flex size-8 cursor-pointer items-center justify-center rounded-full bg-black/60 text-white transition-[color,box-shadow] outline-none hover:bg-black/80 focus-visible:ring-[3px]"
-                            onClick={() => removeFile(files[0]?.id)}
+                            onClick={handleRemove}
                             aria-label="Remove image"
+                            disabled={isUploading}
                         >
                             <XIcon className="size-4" aria-hidden="true" />
                         </button>

@@ -10,7 +10,8 @@
     "generate-knowledge": "node scripts/generate-product-knowledge.cjs"
   },
   "prisma": {
-    "schema": "./prisma/schema.prisma"
+    "schema": "./prisma/schema.prisma",
+    "seed": "node prisma/seed.js"
   },
   "dependencies": {
     "@calcom/embed-react": "^1.5.3",
