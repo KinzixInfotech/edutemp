@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { addYears, addDays } from "date-fns";
+import { deleteFileByUrl } from "@/lib/server-uploadthing";
 
 // Schema validation
 const schoolSchema = z.object({
@@ -171,7 +172,7 @@ export async function POST(req) {
     }
 
 
-    // Step 2: Prisma transaction
+    // Step 2: Prisma transaction with extended timeout
     const result = await prisma.$transaction(async (tx) => {
       const school = await tx.school.create({
         data: {
@@ -385,6 +386,9 @@ export async function POST(req) {
       });
 
       return { school, adminUser, directorUser, principalUser, subscription };
+    }, {
+      timeout: 30000, // 30 seconds timeout
+      maxWait: 60000, // 60 seconds max wait
     });
 
     return NextResponse.json({ success: true, result });

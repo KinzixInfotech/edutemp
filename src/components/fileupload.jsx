@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { AlertCircleIcon, ImageIcon, UploadIcon, XIcon, Library, Loader2, CheckCircle } from "lucide-react"
+import { AlertCircleIcon, ImageIcon, UploadIcon, XIcon, Library, Loader2, CheckCircle, RefreshCw } from "lucide-react"
 
 import { useFileUpload } from '@/lib/useFileupload'
 import { Button } from '@/components/ui/button'
@@ -12,16 +12,27 @@ import { useUploadThing } from "@/lib/uploadthing"
 export default function FileUploadButton({
     field,
     onChange,
-    onUploadStatusChange,  // NEW: Callback for upload status (true = uploading, false = done/idle)
+    onUploadStatusChange,  // Callback for upload status (true = uploading, false = done/idle)
+    onCancelled,           // Callback when user cancels crop dialog - for re-upload
     resetKey,
-    saveToLibrary = true
+    saveToLibrary = true,
+    value = null,          // NEW: Pre-set image URL (previously uploaded)
 }) {
     const maxSizeMB = 2
     const maxSize = maxSizeMB * 1024 * 1024 // 2MB
     const { fullUser: user } = useAuth()
     const [showLibrary, setShowLibrary] = useState(false)
     const [isUploading, setIsUploading] = useState(false)
-    const [uploadedUrl, setUploadedUrl] = useState(null)
+    const [uploadedUrl, setUploadedUrl] = useState(value) // Initialize with value prop
+    const [wasCancelled, setWasCancelled] = useState(false)
+
+    // Sync uploadedUrl when value prop changes (e.g., parent passes previous upload)
+    useEffect(() => {
+        if (value && value !== uploadedUrl) {
+            setUploadedUrl(value)
+            setWasCancelled(false)
+        }
+    }, [value])
 
     // Uploadthing hook for auto-upload
     const { startUpload } = useUploadThing("schoolImageUpload", {
@@ -34,6 +45,7 @@ export default function FileUploadButton({
                 const url = res[0].ufsUrl;
                 setUploadedUrl(url)
                 setIsUploading(false)
+                setWasCancelled(false)
                 onUploadStatusChange?.(false)
                 onChange?.(url)
             }
@@ -61,29 +73,40 @@ export default function FileUploadButton({
         accept: "image/,image/png,image/jpeg,image/jpg,image/gif",
         maxSize,
         onFilesAdded: async (addedFiles) => {
-            // Auto-upload when file is added
-            if (addedFiles.length > 0 && user?.schoolId && user?.id) {
+            if (addedFiles.length > 0) {
                 const file = addedFiles[0].file
-                try {
-                    await startUpload([file], {
-                        schoolId: user.schoolId,
-                        uploadedById: user.id,
-                    })
-                } catch (error) {
-                    console.error("Failed to start upload:", error)
+                const preview = addedFiles[0].preview
+
+                setWasCancelled(false)
+
+                // If user has schoolId, do auto-upload (school context)
+                if (user?.schoolId && user?.id) {
+                    try {
+                        await startUpload([file], {
+                            schoolId: user.schoolId,
+                            uploadedById: user.id,
+                        })
+                    } catch (error) {
+                        console.error("Failed to start upload:", error)
+                    }
+                } else {
+                    // No schoolId (super admin context) - pass preview for manual upload flow
+                    onChange?.(preview)
                 }
             }
         }
     })
 
+    // Priority: files preview > uploadedUrl > value prop
     const previewUrl = files[0]?.preview || uploadedUrl || null
 
     // Clear state when resetKey changes
     useEffect(() => {
-        if (clearFiles) {
-            clearFiles()
+        if (resetKey !== undefined) {
+            clearFiles?.()
             setUploadedUrl(null)
             setIsUploading(false)
+            setWasCancelled(false)
         }
     }, [resetKey])
 
@@ -91,9 +114,8 @@ export default function FileUploadButton({
 
     const handleLibrarySelect = (url) => {
         setUploadedUrl(url)
-        if (onChange) {
-            onChange(url)
-        }
+        setWasCancelled(false)
+        onChange?.(url)
     }
 
     const handleRemove = () => {
@@ -101,8 +123,32 @@ export default function FileUploadButton({
             removeFile(files[0].id)
         }
         setUploadedUrl(null)
+        setWasCancelled(false)
         onChange?.(null)
     }
+
+    const handleCropCancelled = () => {
+        setWasCancelled(true)
+        if (files[0]?.id) {
+            removeFile(files[0].id)
+        }
+        onCancelled?.()
+    }
+
+    // Expose cancel handler for parent component
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            window.__fileUploadCancelHandler = handleCropCancelled
+        }
+        return () => {
+            if (typeof window !== 'undefined') {
+                delete window.__fileUploadCancelHandler
+            }
+        }
+    }, [files])
+
+    // Check if we have a valid uploaded URL (not just a local preview)
+    const hasUploadedUrl = uploadedUrl && (uploadedUrl.startsWith('http') || uploadedUrl.startsWith('https'))
 
     return (
         <div className="flex flex-col gap-2">
@@ -120,7 +166,7 @@ export default function FileUploadButton({
                         className="sr-only"
                         aria-label="Upload image file"
                     />
-                    {previewUrl ? (
+                    {previewUrl && !wasCancelled ? (
                         <div className="absolute inset-0 flex items-center justify-center p-4">
                             <img
                                 src={previewUrl}
@@ -136,8 +182,8 @@ export default function FileUploadButton({
                                     </div>
                                 </div>
                             )}
-                            {/* Uploaded checkmark */}
-                            {uploadedUrl && !isUploading && (
+                            {/* Uploaded checkmark - show for actual URLs, not local previews */}
+                            {hasUploadedUrl && !isUploading && (
                                 <div className="absolute bottom-4 left-4 flex items-center gap-1 bg-green-600 text-white text-xs px-2 py-1 rounded-full">
                                     <CheckCircle className="h-3 w-3" />
                                     Uploaded
@@ -152,22 +198,30 @@ export default function FileUploadButton({
                             >
                                 <ImageIcon className="size-4 opacity-60" />
                             </div>
-                            <p className="mb-1.5 text-sm font-medium">Drop {field} image here</p>
+                            <p className="mb-1.5 text-sm font-medium">
+                                {wasCancelled ? "Upload cancelled - " : "Drop "}{field} image here
+                            </p>
                             <p className="text-muted-foreground text-xs">
                                 PNG, JPG or GIF (max. {maxSizeMB}MB)
                             </p>
                             <div className="flex gap-2 mt-4">
                                 <Button
                                     type="button"
-                                    variant="outline"
+                                    variant={wasCancelled ? "default" : "outline"}
                                     onClick={openFileDialog}
                                     disabled={isUploading}
                                 >
-                                    <UploadIcon
-                                        className="-ms-1 size-4 opacity-60"
-                                        aria-hidden="true"
-                                    />
-                                    Upload New
+                                    {wasCancelled ? (
+                                        <>
+                                            <RefreshCw className="-ms-1 size-4 opacity-60" aria-hidden="true" />
+                                            Try Again
+                                        </>
+                                    ) : (
+                                        <>
+                                            <UploadIcon className="-ms-1 size-4 opacity-60" aria-hidden="true" />
+                                            Upload New
+                                        </>
+                                    )}
                                 </Button>
                                 {user?.schoolId && (
                                     <Button
@@ -187,7 +241,7 @@ export default function FileUploadButton({
                         </div>
                     )}
                 </div>
-                {previewUrl && (
+                {previewUrl && !wasCancelled && (
                     <div className="absolute top-4 right-4">
                         <button
                             type="button"

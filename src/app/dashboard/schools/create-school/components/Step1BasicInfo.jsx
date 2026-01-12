@@ -52,6 +52,7 @@ export default function Step1BasicInfo({ data, updateFormData, nextStep }) {
     const [uploading, setUploading] = useState(false);
     const [rawImage, setRawImage] = useState(null);
     const [cropDialogOpen, setCropDialogOpen] = useState(false);
+    const [resetKey, setResetKey] = useState(0); // For resetting file upload after cancel
 
     const form = useForm({
         resolver: zodResolver(step1Schema),
@@ -83,9 +84,16 @@ export default function Step1BasicInfo({ data, updateFormData, nextStep }) {
                 <CropImageDialog
                     image={rawImage}
                     open={cropDialogOpen}
-                    uploading={uploading}
+                    title="Crop School Logo"
+                    defaultAspect={1}
                     onClose={() => {
-                        if (!uploading) setCropDialogOpen(false);
+                        setCropDialogOpen(false);
+                        setRawImage(null);
+                    }}
+                    onCancel={() => {
+                        // User cancelled - reset state to allow re-upload
+                        setRawImage(null);
+                        setResetKey(prev => prev + 1);
                     }}
                     onCropComplete={async (croppedBlob) => {
                         const now = new Date();
@@ -95,28 +103,19 @@ export default function Step1BasicInfo({ data, updateFormData, nextStep }) {
                         const filename = `${timestamp}.jpg`;
                         const file = new File([croppedBlob], filename, { type: 'image/jpeg' });
 
-                        try {
-                            setUploading(true);
-                            const res = await uploadFiles('profilePictureUploader', {
-                                files: [file],
-                                input: {
-                                    profileId: crypto.randomUUID(),
-                                    username: form.getValues('name') || 'School',
-                                },
-                            });
+                        const res = await uploadFiles('profilePictureUploader', {
+                            files: [file],
+                            input: {
+                                profileId: crypto.randomUUID(),
+                                username: form.getValues('name') || 'School',
+                            },
+                        });
 
-                            if (res && res[0]?.url) {
-                                updateFormData({ profilePicture: res[0].url });
-                                toast.success('Image uploaded!');
-                            } else {
-                                toast.error('Upload failed');
-                            }
-                        } catch (err) {
-                            toast.error('Something went wrong during upload');
-                            console.error(err);
-                        } finally {
-                            setUploading(false);
-                            setCropDialogOpen(false);
+                        if (res && res[0]?.url) {
+                            updateFormData({ profilePicture: res[0].url });
+                            // Success toast handled by dialog
+                        } else {
+                            throw new Error('Upload failed - no URL returned');
                         }
                     }}
                 />
@@ -221,6 +220,7 @@ export default function Step1BasicInfo({ data, updateFormData, nextStep }) {
                             <FileUploadButton
                                 field="School"
                                 onChange={(previewUrl) => handleImageUpload(previewUrl)}
+                                resetKey={resetKey}
                             />
                         )}
                     </div>

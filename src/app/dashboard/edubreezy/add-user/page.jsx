@@ -229,56 +229,49 @@ export default function CreateSuperadminPage() {
 
     return (
         <div className="p-6 max-w-5xl mx-auto space-y-8">
-            {/* Crop Dialog */}
+            {/* Enhanced Crop Dialog */}
             {cropDialogOpen && rawImage && (
                 <CropImageDialog
                     image={rawImage}
-                    onClose={() => {
-                        if (!uploading) {
-                            setCropDialogOpen(false);
-                        }
-                    }}
-                    uploading={uploading}
-
                     open={cropDialogOpen}
-                    // onClose={() => setCropDialogOpen(false)}
+                    onClose={() => {
+                        setCropDialogOpen(false);
+                        setRawImage(null);
+                    }}
+                    onCancel={() => {
+                        // User cancelled - reset state to allow re-upload
+                        setRawImage(null);
+                        setResetKey(prev => prev + 1); // Reset file upload button
+                    }}
+                    title="Crop Profile Picture"
+                    defaultAspect={1}
+                    cropShape="round"
                     onCropComplete={async (croppedBlob) => {
                         const now = new Date();
                         const iso = now.toISOString().replace(/[:.]/g, "-");
-                        const perf = Math.floor(performance.now() * 1000); // microseconds (approximate nanos)
+                        const perf = Math.floor(performance.now() * 1000);
                         const timestamp = `${iso}-${perf}`;
                         const filename = `${timestamp}.jpg`;
                         const file = new File([croppedBlob], filename, { type: "image/jpeg" });
                         setTempImage(file);
-                        try {
-                            setUploading(true)
 
-                            const res = await uploadFiles("profilePictureUploader", {
-                                files: [file],
-                                input: {
-                                    profileId: crypto.randomUUID(),
-                                    username: form.name || "User",
-                                },
-                            });
-                            if (res && res[0]?.url) {
-                                setForm({ ...form, profilePicture: res[0].url });
-                                setPreviewUrl(res[0].url);
-                                toast.success("Image uploaded!")
-                                setErrorupload(false);
-                            } else {
-                                toast.error("Upload failed");
-                                setErrorupload(true);
-                            }
-                        } catch (err) {
-                            toast.error("Something went wrong during upload");
-                            console.error(err);
+                        const res = await uploadFiles("profilePictureUploader", {
+                            files: [file],
+                            input: {
+                                profileId: crypto.randomUUID(),
+                                username: form.name || "User",
+                            },
+                        });
 
+                        if (res && res[0]?.url) {
+                            setForm({ ...form, profilePicture: res[0].url });
+                            setPreviewUrl(res[0].url);
+                            setErrorupload(false);
+                            // Success is handled by the dialog's internal state
+                        } else {
                             setErrorupload(true);
-                        } finally {
-                            setUploading(false)
-                            setCropDialogOpen(false);
+                            throw new Error("Upload failed - no URL returned");
                         }
-
                     }}
                 />
             )}
@@ -292,7 +285,12 @@ export default function CreateSuperadminPage() {
                     {/* <Label>Profile Picture</Label> */}
                     {/* <Input type="file" accept="image/*" onChange={handleImageUpload} /> */}
                     {/* <FileUploadButton /> */}
-                    <FileUploadButton field="Superadmin" onChange={(previewUrl) => handleImageUpload(previewUrl)} resetKey={resetKey} />
+                    <FileUploadButton
+                        field="Superadmin"
+                        onChange={(previewUrl) => handleImageUpload(previewUrl)}
+                        resetKey={resetKey}
+                        value={form.profilePicture} // Show previously uploaded image
+                    />
                     {/* {previewUrl && <Image src={previewUrl} width={80} height={80} alt="Preview" className="rounded-full mt-2" />}
                         {errorUpload && <div onClick={() => retryUpload()} ><Button >Retry</Button></div>} */}
                 </div>

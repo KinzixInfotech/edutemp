@@ -44,6 +44,22 @@ export default function LoginPhoto() {
         if (!schoolCode) {
             router.push('/schoollogin');
         } else {
+            // Check if school data is already cached from Hero page
+            const cachedSchool = sessionStorage.getItem('loginSchool');
+            if (cachedSchool) {
+                try {
+                    const parsed = JSON.parse(cachedSchool);
+                    // Verify the cached school matches the schoolCode in URL
+                    if (parsed.schoolCode === schoolCode) {
+                        setSchool(parsed);
+                        setLoadingl(false);
+                        return;
+                    }
+                } catch (e) {
+                    console.error('Error parsing cached school:', e);
+                }
+            }
+            // If no cache or cache mismatch, fetch from API
             fetchSchool();
         }
     }, [schoolCode]);
@@ -54,6 +70,8 @@ export default function LoginPhoto() {
             const data = await res.json();
             if (res.ok) {
                 setSchool(data.school);
+                // Cache for potential page refresh
+                sessionStorage.setItem('loginSchool', JSON.stringify(data.school));
             } else {
                 setSchoolError(true);
             }
@@ -68,7 +86,9 @@ export default function LoginPhoto() {
         e.preventDefault();
         setLoading(true);
 
-        if (!turnstileToken) {
+        // Skip Turnstile in development environment
+        const isDev = process.env.NODE_ENV === 'development';
+        if (!isDev && !turnstileToken) {
             toast.error("Security Check", { description: "Please complete the captcha verification" });
             setLoading(false);
             return;
@@ -342,27 +362,42 @@ export default function LoginPhoto() {
 
 
 
-                            <Button
+                            <button
                                 type="submit"
-                                disabled={loading || alreadyLoggedIn}
-                                className="w-full h-12 bg-gray-900 hover:bg-black text-white font-medium rounded-xl shadow-lg shadow-gray-900/20 active:scale-[0.98] transition-all duration-300 mt-2"
+                                disabled={loading || alreadyLoggedIn || !email || !password}
+                                className={`group w-full relative h-12 rounded-xl border font-bold text-base transition-all duration-300 overflow-hidden flex items-center justify-center gap-2 mt-2 ${loading || alreadyLoggedIn || !email || !password
+                                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                    : 'bg-[#0569ff] text-white shadow-[0_4px_20px_rgba(5,105,255,0.3)] hover:shadow-[0_8px_30px_rgba(5,105,255,0.4)]'
+                                    }`}
                             >
-                                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sign in"}
-                            </Button>
-                            {/* Turnstile Widget */}
-                            <div className="flex justify-center pt-2">
-                                <Turnstile
-                                    sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
-                                    onVerify={(token) => setTurnstileToken(token)}
-                                    theme="light"
-                                />
-                            </div>
+                                {!loading && !alreadyLoggedIn && email && password && (
+                                    <span className="absolute inset-0 bg-[#0358dd] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                )}
+                                {loading ? (
+                                    <>
+                                        <Loader2 className="w-5 h-5 animate-spin relative z-10" />
+                                        <span className="relative z-10">Signing in...</span>
+                                    </>
+                                ) : (
+                                    <span className="relative z-10">Sign in</span>
+                                )}
+                            </button>
+                            {/* Turnstile Widget - Hidden in development */}
+                            {process.env.NODE_ENV !== 'development' && (
+                                <div className="flex justify-center pt-2">
+                                    <Turnstile
+                                        sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+                                        onVerify={(token) => setTurnstileToken(token)}
+                                        theme="light"
+                                    />
+                                </div>
+                            )}
                         </form>
                     </div>
 
                     {/* Bottom Legal/Copyright (Optional) */}
                     <div className="absolute bottom-6 left-0 right-0 text-center">
-                        <p className="text-[10px] text-gray-400">© 2024 Edubreezy. Secure Login.</p>
+                        <p className="text-[10px] text-gray-400">© {new Date().getFullYear()} Edubreezy. Secure Login.</p>
                     </div>
                 </div>
             </div>
