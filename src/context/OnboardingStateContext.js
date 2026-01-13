@@ -41,8 +41,9 @@ export function OnboardingProvider({ children }) {
             return res.json();
         },
         enabled: !!schoolId && isAdmin,
-        staleTime: 60 * 1000, // 1 minute - don't refetch too often
-        refetchOnWindowFocus: false, // Don't refetch on focus to avoid state resets
+        staleTime: 30 * 1000, // 30 seconds
+        refetchOnMount: "always", // Always refetch when component mounts
+        refetchOnWindowFocus: true, // Refetch when tab gets focus
     });
 
     // Mutation to update onboarding status

@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { useOnboarding } from "@/context/OnboardingStateContext";
+import { useQueryClient } from "@tanstack/react-query";
+import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -48,22 +50,52 @@ const stepColors = [
 export default function SchoolOnboardingWizard() {
     const { fullUser } = useAuth();
     const { showWizard, onboardingData, isLoading, dismissWizard, completeOnboarding } = useOnboarding();
-    const [currentStep, setCurrentStep] = useState(0); // 0 = welcome, 1-6 = steps
+    const pathname = usePathname();
+    const queryClient = useQueryClient();
+    const [hasSeenIntro, setHasSeenIntro] = useState(false); // Track if intro was seen
+    const [currentStep, setCurrentStep] = useState(0); // 0 = welcome, 1 = steps
 
     const isAdmin = fullUser?.role?.name === "ADMIN";
+    const schoolId = fullUser?.schoolId || fullUser?.school?.id;
+
+    // ONLY show wizard on the main dashboard page
+    const isDashboardPage = pathname === "/dashboard";
+
+    // Check localStorage to see if intro was already shown for this school
+    useEffect(() => {
+        if (schoolId) {
+            const key = `onboarding-intro-shown-${schoolId}`;
+            const shown = localStorage.getItem(key);
+            if (shown === "true") {
+                setHasSeenIntro(true);
+                setCurrentStep(1); // Skip to steps view
+            }
+        }
+    }, [schoolId]);
+
+    // Mark intro as seen when user clicks "Start Setup"
+    const markIntroAsSeen = () => {
+        if (schoolId) {
+            const key = `onboarding-intro-shown-${schoolId}`;
+            localStorage.setItem(key, "true");
+            setHasSeenIntro(true);
+        }
+    };
 
     const handleDismiss = () => {
+        markIntroAsSeen(); // Mark intro as seen
         dismissWizard();
         toast.info("You can resume setup anytime from the banner above.");
     };
 
     const handleComplete = () => {
+        markIntroAsSeen();
         completeOnboarding();
         toast.success("🎉 School setup complete! Welcome aboard!");
     };
 
-    // Don't render if not showing
-    if (!showWizard || !isAdmin || isLoading || !onboardingData) {
+    // Don't render if not showing OR not on dashboard page
+    if (!showWizard || !isAdmin || isLoading || !onboardingData || !isDashboardPage) {
         return null;
     }
 
@@ -95,15 +127,22 @@ export default function SchoolOnboardingWizard() {
                             userName={userName}
                             schoolName={fullUser?.school?.name}
                             profilePicture={fullUser?.profilePicture}
-                            onContinue={() => setCurrentStep(1)}
+                            onContinue={() => {
+                                markIntroAsSeen();
+                                setCurrentStep(1);
+                            }}
                         />
                     ) : (
                         <SetupStepsView
                             steps={steps}
                             progress={progress}
+                            schoolId={schoolId}
                             onComplete={handleComplete}
                             onDismiss={handleDismiss}
-                            onRefresh={() => queryClient.invalidateQueries(["school-onboarding", schoolId])}
+                            onRefresh={async () => {
+                                await queryClient.invalidateQueries({ queryKey: ["school-onboarding", schoolId] });
+                                await queryClient.refetchQueries({ queryKey: ["school-onboarding", schoolId] });
+                            }}
                         />
                     )}
                 </div>
@@ -228,13 +267,54 @@ function WelcomeStep({ userName, schoolName, profilePicture, onContinue }) {
     );
 }
 
-function SetupStepsView({ steps, progress, onComplete, onDismiss, onRefresh }) {
+// Helper to get manually completed steps from localStorage
+const getManuallyCompletedSteps = (schoolId) => {
+    if (!schoolId || typeof window === 'undefined') return [];
+    try {
+        const key = `onboarding-manual-steps-${schoolId}`;
+        const data = localStorage.getItem(key);
+        return data ? JSON.parse(data) : [];
+    } catch {
+        return [];
+    }
+};
+
+function SetupStepsView({ steps, progress, schoolId, onComplete, onDismiss, onRefresh }) {
     const [refreshing, setRefreshing] = useState(false);
+    const [manualSteps, setManualSteps] = useState([]);
+
+    // Load manually completed steps
+    useEffect(() => {
+        if (schoolId) {
+            setManualSteps(getManuallyCompletedSteps(schoolId));
+        }
+    }, [schoolId]);
 
     const handleRefresh = async () => {
         setRefreshing(true);
         await onRefresh();
+        // Reload manual steps after refresh
+        if (schoolId) {
+            setManualSteps(getManuallyCompletedSteps(schoolId));
+        }
         setTimeout(() => setRefreshing(false), 500);
+    };
+
+    // Merge auto and manual completions
+    const enhancedSteps = steps.map(step => ({
+        ...step,
+        isComplete: step.isComplete || manualSteps.includes(step.id)
+    }));
+
+    // Recalculate progress
+    const completedCount = enhancedSteps.filter(s => s.isComplete).length;
+    const totalCount = enhancedSteps.length;
+    const enhancedProgress = {
+        ...progress,
+        completedSteps: completedCount,
+        totalSteps: totalCount,
+        percentage: Math.round((completedCount / totalCount) * 100),
+        allComplete: completedCount === totalCount
     };
 
     return (
@@ -259,20 +339,20 @@ function SetupStepsView({ steps, progress, onComplete, onDismiss, onRefresh }) {
             <div className="bg-muted rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">
-                        {progress.completedSteps} of {progress.totalSteps} completed
+                        {enhancedProgress.completedSteps} of {enhancedProgress.totalSteps} completed
                     </span>
-                    <Badge variant={progress.allComplete ? "default" : "secondary"}>
-                        {progress.percentage}%
+                    <Badge variant={enhancedProgress.allComplete ? "default" : "secondary"}>
+                        {enhancedProgress.percentage}%
                     </Badge>
                 </div>
                 <div className="w-full bg-background rounded-full h-2.5 overflow-hidden">
                     <motion.div
                         initial={{ width: 0 }}
-                        animate={{ width: `${progress.percentage}%` }}
+                        animate={{ width: `${enhancedProgress.percentage}%` }}
                         transition={{ duration: 0.5, delay: 0.2 }}
                         className={cn(
                             "h-full rounded-full transition-all",
-                            progress.allComplete
+                            enhancedProgress.allComplete
                                 ? "bg-green-500"
                                 : "bg-gradient-to-r from-blue-500 to-indigo-500"
                         )}
@@ -282,7 +362,7 @@ function SetupStepsView({ steps, progress, onComplete, onDismiss, onRefresh }) {
 
             {/* Steps list */}
             <div className="space-y-3">
-                {steps.map((step, index) => {
+                {enhancedSteps.map((step, index) => {
                     const Icon = iconMap[step.icon] || GraduationCap;
                     const colors = stepColors[index];
 

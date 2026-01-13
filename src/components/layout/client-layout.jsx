@@ -14,6 +14,7 @@ import { Loader2 } from "lucide-react";
 import { useLoader } from "@/app/dashboard/context/Loader";
 import SchoolOnboardingWizard from "../dashboard/SchoolOnboardingWizard";
 import { OnboardingSetupBannerProvider } from "../OnboardingSetupBanner";
+import { SetupHelperButton } from "../SetupHelperButton";
 import { OnboardingProvider } from "@/context/OnboardingStateContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/lib/supabase";
@@ -235,6 +236,7 @@ export default function ClientLayout({ children }) {
                             >
 
                                 {!hideUI && <SchoolOnboardingWizard />}
+                                {!hideUI && <SetupHelperButton />}
                                 {!hideUI && <AppSidebar />}
                                 <TopProgressBar />
 
