@@ -97,7 +97,15 @@ export function RequestsDropdown({ schoolId }) {
 
     const libraryRequests = libraryData?.requests || []
     const busRequests = busData?.requests || []
-    const notifications = notificationsData?.notifications || []
+    // Flatten grouped notifications if necessary, or handle flat array
+    const rawNotifications = notificationsData?.notifications || {}
+    const notifications = Array.isArray(rawNotifications)
+        ? rawNotifications
+        : [
+            ...(rawNotifications.today || []),
+            ...(rawNotifications.yesterday || []),
+            ...(rawNotifications.earlier || [])
+        ]
 
     // Total badge count includes pending requests AND unread notifications
     // But currently fetching count of ALL notifications for display? 

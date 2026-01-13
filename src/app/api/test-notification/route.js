@@ -1,65 +1,72 @@
-import { NextResponse } from 'next/server';
-import { messaging } from '@/lib/firebase-admin';
+
+import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { notifyFormSubmission, sendNotification } from "@/lib/notifications/notificationHelper";
 
-export async function GET(request) {
+// GET /api/test-notification?type=form&schoolId=...
+export async function GET(req) {
+    const { searchParams } = new URL(req.url);
+    const type = searchParams.get("type"); // 'form' or 'manual'
+    const schoolId = searchParams.get("schoolId");
+    const userId = searchParams.get("userId"); // Optional: test for specific user
+
+    if (!schoolId) {
+        return NextResponse.json({ error: "schoolId is required" }, { status: 400 });
+    }
+
     try {
-        const { searchParams } = new URL(request.url);
-        const userId = searchParams.get('userId');
+        const debugInfo = {};
 
-        if (!userId) {
-            return NextResponse.json({ error: "Please provide ?userId=... query parameter" }, { status: 400 });
-        }
+        // 1. Check Roles in DB
+        // 1. Check Roles in DB
+        const roles = await prisma.role.findMany({});
+        debugInfo.roles = roles.map(r => r.name);
 
-        console.log(`🧪 Triggering Web Push Test for user: ${userId}`);
-
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { fcmToken: true, name: true, email: true }
-        });
-
-        if (!user) {
-            return NextResponse.json({ error: "User not found" }, { status: 404 });
-        }
-
-        if (!user.fcmToken) {
-            return NextResponse.json({
-                error: "No FCM Token found for this user. Please enable notifications on the dashboard first.",
-                user: { name: user.name, email: user.email }
-            }, { status: 404 });
-        }
-
-        const messagePayload = {
-            token: user.fcmToken,
-            notification: {
-                title: "🔔 Test Web Push",
-                body: `Hello ${user.name || 'User'}! This is a test notification from the server.`,
+        // 2. Check Admins
+        const admins = await prisma.user.findMany({
+            where: {
+                schoolId,
+                role: { name: { in: ['ADMIN', 'Admin', 'admin'] } } // Check variations
             },
-            webpush: {
-                fcmOptions: {
-                    link: "/dashboard"
-                },
-                notification: {
-                    icon: '/icon.png'
-                }
-            }
-        };
+            select: { id: true, name: true, role: { select: { name: true } }, fcmToken: true }
+        });
+        debugInfo.admins = admins;
 
-        const response = await messaging.send(messagePayload);
+        let result;
+
+        if (type === 'form') {
+            // Test the specific helper
+            result = await notifyFormSubmission({
+                schoolId,
+                formTitle: "TEST FORM SUBMISSION",
+                applicantName: "Test Applicant",
+                submissionId: "test-id",
+                formId: "test-form-id"
+            });
+        } else {
+            // Manual test
+            result = await sendNotification({
+                schoolId,
+                title: "Test Notification",
+                message: "This is a test notification from the debug script.",
+                type: 'GENERAL',
+                priority: 'HIGH',
+                targetOptions: {
+                    userIds: userId ? [userId] : admins.map(a => a.id) // Send to specific user or all found admins
+                },
+                metadata: { test: true },
+                actionUrl: '/dashboard'
+            });
+        }
 
         return NextResponse.json({
-            success: true,
-            message: "Test Notification Sent",
-            messageId: response,
-            target: {
-                name: user.name,
-                email: user.email,
-                tokenStart: user.fcmToken.substring(0, 15) + "..."
-            }
+            message: "Test run complete",
+            debug: debugInfo,
+            notificationResult: result
         });
 
     } catch (error) {
-        console.error('Test Notification Error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error("Test notification error:", error);
+        return NextResponse.json({ error: error.message, stack: error.stack }, { status: 500 });
     }
 }

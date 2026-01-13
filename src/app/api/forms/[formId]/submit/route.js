@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { notifyFormSubmission } from "@/lib/notifications/notificationHelper";
 
 // POST: Submit a form
 export async function POST(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     const { formId } = params;
 
     try {
@@ -80,6 +81,21 @@ export async function POST(req, props) {
             }
         }
 
+
+        // Notify Admins
+        try {
+            await notifyFormSubmission({
+                schoolId: form.schoolId,
+                formTitle: form.title,
+                applicantName: applicantName,
+                submissionId: submission.id,
+                formId: form.id
+            });
+        } catch (notifError) {
+            console.error("Failed to send notification:", notifError);
+            // Don't fail the request if notification fails
+        }
+
         return NextResponse.json({ message: "Form submitted successfully", id: submission.id });
     } catch (error) {
         console.error("Error submitting form:", error);
@@ -92,7 +108,7 @@ export async function POST(req, props) {
 
 // GET: Fetch public form details
 export async function GET(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     const { formId } = params;
 
     try {

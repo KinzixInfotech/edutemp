@@ -522,7 +522,11 @@ async function sendPushNotifications({ userIds, title, message, data = {} }) {
                 acc[key] = String(value);
             }
             return acc;
-        }, { click_action: 'FLUTTER_NOTIFICATION_CLICK' });
+        }, {
+            click_action: 'FLUTTER_NOTIFICATION_CLICK',
+            title, // Add title to data
+            body: message // Add body to data
+        });
 
         // Send to Firebase Cloud Messaging
         console.log(`Sending push notification to ${tokens.length} devices`);
@@ -531,6 +535,7 @@ async function sendPushNotifications({ userIds, title, message, data = {} }) {
 
         const response = await messaging.sendEachForMulticast({
             tokens,
+            // Reverting to standard notification payload for reliability
             notification: {
                 title,
                 body: message,
@@ -538,8 +543,7 @@ async function sendPushNotifications({ userIds, title, message, data = {} }) {
             data: stringifiedData,
             android: {
                 notification: {
-                    channelId: 'default', // CRITICALLY IMPORTANT FOR ANDROID 8+
-
+                    channelId: 'default',
                     priority: 'high',
                 },
             },
@@ -1164,5 +1168,36 @@ export async function notifyExamPublished({ schoolId, examId, examTitle, startDa
             type: 'EXAM_PUBLISHED'
         },
         actionUrl: `/exams/${examId}`
+    });
+}
+
+/**
+ * Notify admins about a new form submission
+ */
+export async function notifyFormSubmission({
+    schoolId,
+    formTitle,
+    applicantName,
+    submissionId,
+    formId
+}) {
+    return sendNotification({
+        schoolId,
+        title: 'New Form Submission',
+        message: `${applicantName} has submitted "${formTitle}"`,
+        type: 'GENERAL',
+        priority: 'NORMAL',
+        icon: '📝',
+        targetOptions: {
+            roleNames: ['ADMIN']
+        },
+        metadata: {
+            submissionId,
+            formId,
+            formTitle,
+            applicantName,
+            actionUrl: `/dashboard/forms/${formId}/submissions`
+        },
+        actionUrl: `/dashboard/forms/${formId}/submissions`
     });
 }

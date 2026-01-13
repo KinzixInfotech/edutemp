@@ -52,13 +52,13 @@ export function OnboardingSetupBannerProvider({ children }) {
                                 Resume Setup
                                 <ArrowRight className="ml-1 h-3 w-3" />
                             </Button>
-                            <button
+                            {/* <button
                                 onClick={dismissBanner}
                                 className="p-1 rounded-full hover:bg-blue-500/20 transition-colors ml-2"
                                 aria-label="Dismiss"
                             >
                                 <X className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                            </button>
+                            </button> */}
                         </div>
                     </div>
                 </div>

@@ -148,6 +148,45 @@ export const ourFileRouter = {
   bulkCertificateZip: f({ blob: { maxFileSize: "64MB" } })
     .input(z.object({ schoolId: z.string() }))
     .onUploadComplete(({ metadata, file }) => ({ url: file.ufsUrl })),
+
+  // Form submission file upload (for public forms)
+  formSubmissionUpload: f({
+    image: { maxFileSize: "10MB" },
+    pdf: { maxFileSize: "10MB" },
+    "application/msword": { maxFileSize: "10MB" },
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": { maxFileSize: "10MB" },
+    "application/vnd.ms-excel": { maxFileSize: "10MB" },
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": { maxFileSize: "10MB" },
+    audio: { maxFileSize: "20MB" },
+    video: { maxFileSize: "50MB" },
+  })
+    .input(z.object({
+      schoolId: z.string().optional(),
+      fieldName: z.string().optional(),
+    }))
+    .middleware(async ({ input }) => ({
+      schoolId: input.schoolId,
+      fieldName: input.fieldName,
+    }))
+    .onUploadComplete(async ({ metadata, file }) => {
+      console.log("Form file uploaded:", file.ufsUrl);
+      if (metadata.schoolId && metadata.schoolId !== "public-form") {
+        try {
+          await prisma.upload.create({
+            data: {
+              schoolId: metadata.schoolId,
+              fileUrl: file.ufsUrl,
+              fileName: file.name,
+              mimeType: file.type,
+              size: file.size,
+            },
+          });
+        } catch (error) {
+          console.error("Failed to save upload:", error);
+        }
+      }
+      return { url: file.ufsUrl };
+    }),
 };
 
 export const { GET, POST } = createRouteHandler({
