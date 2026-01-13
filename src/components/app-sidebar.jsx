@@ -662,8 +662,7 @@ export function AppSidebar({ ...props }) {
     const [showSwitchDialog, setShowSwitchDialog] = React.useState(false);
     const [pendingYearId, setPendingYearId] = React.useState(null);
 
-    const logo = resolvedTheme === "dark" ? logoWhite : logoBlack
-    const logoCl = resolvedTheme === "dark" ? logocldark : logocllight
+
     const isCollapsed = state === "collapsed"
 
     // Fetch academic years using TanStack Query
@@ -736,7 +735,8 @@ export function AppSidebar({ ...props }) {
                             <div>
                                 {!isCollapsed ? (
                                     <div className="flex bg-muted p-2 rounded-lg  w-full items-center justify-center">
-                                        <Image src={logo} width={195} height={200} alt="EduBreezy" />
+                                        <Image src={logoBlack} width={195} height={200} alt="EduBreezy" className="dark:hidden block" />
+                                        <Image src={logoWhite} width={195} height={200} alt="EduBreezy" className="hidden dark:block" />
                                     </div>
                                 ) : (
                                     <div className="bg-muted p-2 rounded-lg ">

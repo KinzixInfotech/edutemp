@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertCircleIcon, CalendarCheck, CheckCircle2Icon, Copy, Loader2, Mail, Phone, RefreshCw } from "lucide-react";
+import { AlertCircleIcon, CalendarCheck, CheckCircle2Icon, Copy, Loader2, Mail, Phone, RefreshCw, MessageSquare, Image, Download, ZoomIn, X, FileText, Video, Music } from "lucide-react";
 import { useParams } from "next/navigation";
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -168,9 +168,150 @@ export default function ApplicationDetails() {
     const [assignedRollNumbers, setAssignedRollNumbers] = useState([]);
     const [rollNumberWarning, setRollNumberWarning] = useState("");
 
+    // SMS Dialog state
+    const [smsDialogOpen, setSmsDialogOpen] = useState(false);
+    const [smsMessage, setSmsMessage] = useState("");
+    const [smsSending, setSmsSending] = useState(false);
 
+    // File preview lightbox state
+    const [previewOpen, setPreviewOpen] = useState(false);
+    const [previewUrl, setPreviewUrl] = useState("");
 
     const [scopen, setScopen] = useState(false);
+
+    // Helper: Check if value is a file URL
+    const isFileUrl = (value) => {
+        if (!value) return false;
+        // If it's an object with a url property
+        if (typeof value === 'object' && (value.url || value.fileUrl || value.secure_url)) {
+            return true;
+        }
+        // If string
+        if (typeof value !== 'string') return false;
+        return value.startsWith('http') && (
+            value.includes('uploadthing') ||
+            value.includes('utfs.io') ||
+            value.includes('cloudinary') ||
+            value.includes('.s3.') ||
+            /\.(jpg|jpeg|png|gif|webp|pdf|mp4|mp3|doc|docx|xlsx|csv)$/i.test(value)
+        );
+    };
+
+    // Helper: Get file type from URL
+    const getFileType = (url) => {
+        if (!url) return 'unknown';
+        const lower = url.toLowerCase();
+        if (/\.(jpg|jpeg|png|gif|webp|svg)/.test(lower)) return 'image';
+        if (/\.(mp4|webm|mov|avi)/.test(lower)) return 'video';
+        if (/\.(mp3|wav|ogg)/.test(lower)) return 'audio';
+        if (/\.pdf/.test(lower)) return 'pdf';
+        return 'file';
+    };
+
+    // Helper: Render file preview in table
+    const renderFieldValue = (value) => {
+        if (!value) return <span className="text-muted-foreground">—</span>;
+
+        // Handle arrays (e.g. checkboxes)
+        if (Array.isArray(value)) {
+            return (
+                <div className="flex flex-wrap gap-1">
+                    {value.map((v, i) => <Badge key={i} variant="secondary">{String(v)}</Badge>)}
+                </div>
+            );
+        }
+
+        // Handle objects (extract file url or stringify)
+        if (typeof value === 'object') {
+            const url = value.url || value.fileUrl || value.secure_url;
+            if (url) {
+                // It's a file object, recurse with the url string
+                return renderFieldValue(url);
+            }
+            // Fallback for non-file objects
+            return JSON.stringify(value);
+        }
+
+        if (isFileUrl(value)) {
+            const fileType = getFileType(value);
+
+            if (fileType === 'image') {
+                return (
+                    <div className="flex items-center gap-2">
+                        <div
+                            className="relative w-12 h-12 rounded-md overflow-hidden border cursor-pointer group"
+                            onClick={() => { setPreviewUrl(value); setPreviewOpen(true); }}
+                        >
+                            <img src={value} alt="Preview" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <ZoomIn className="w-4 h-4 text-white" />
+                            </div>
+                        </div>
+                        <Button size="sm" variant="ghost" asChild>
+                            <a href={value} download target="_blank"><Download className="w-4 h-4" /></a>
+                        </Button>
+                    </div>
+                );
+            }
+
+            if (fileType === 'video') {
+                return (
+                    <div className="flex items-center gap-2">
+                        <Video className="w-5 h-5 text-blue-500" />
+                        <Button size="sm" variant="outline" asChild>
+                            <a href={value} target="_blank">View</a>
+                        </Button>
+                    </div>
+                );
+            }
+
+            if (fileType === 'audio') {
+                return (
+                    <div className="flex items-center gap-2">
+                        <Music className="w-5 h-5 text-purple-500" />
+                        <audio controls src={value} className="h-8" />
+                    </div>
+                );
+            }
+
+            if (fileType === 'pdf') {
+                return (
+                    <div className="flex items-center gap-2">
+                        <FileText className="w-5 h-5 text-red-500" />
+                        <Button size="sm" variant="outline" asChild>
+                            <a href={value} target="_blank">View PDF</a>
+                        </Button>
+                        <Button size="sm" variant="ghost" asChild>
+                            <a href={value} download><Download className="w-4 h-4" /></a>
+                        </Button>
+                    </div>
+                );
+            }
+
+            // Generic file
+            return (
+                <div className="flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-gray-500" />
+                    <Button size="sm" variant="outline" asChild>
+                        <a href={value} download>Download</a>
+                    </Button>
+                </div>
+            );
+        }
+
+        // Handle arrays (checkboxes, multiple select)
+        if (Array.isArray(value)) {
+            return (
+                <div className="flex flex-wrap gap-1">
+                    {value.map((v, i) => (
+                        <Badge key={i} variant="secondary" className="text-xs">{v}</Badge>
+                    ))}
+                </div>
+            );
+        }
+
+        return <span className="text-sm">{String(value)}</span>;
+    };
 
     const schoolId = fullUser?.schoolId;
 
@@ -474,7 +615,7 @@ export default function ApplicationDetails() {
 
 
     const currentStageIndex = filteredStages.findIndex(
-        (stage) => stage.id === application.currentStage.id
+        (stage) => stage.id === application.currentStage?.id
     );
     const stepperConfig = filteredStages.map(stage => ({
         id: stage.id,
@@ -572,22 +713,38 @@ export default function ApplicationDetails() {
 
                         {/* <span className="font-semibold">{field.name}: </span>
                                 <span>{field.value}</span> */}
-                        <Label className='mb-4'>Applicant Data</Label>
+                        <Label className='mb-2 text-sm font-semibold'>Applicant Data</Label>
                         <div className="overflow-x-auto rounded-lg border">
-                            <Table className="min-w-[800px]">
+                            <Table>
                                 <TableHeader>
-                                    <TableRow className="bg-background sticky top-0 z-10">
-                                        <TableHead>Field Name</TableHead>
-                                        <TableHead>Value</TableHead>
+                                    <TableRow className="bg-muted/50 dark:bg-background/50">
+                                        <TableHead className="w-1/3 font-semibold">Field Name</TableHead>
+                                        <TableHead className="font-semibold">Value</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {Object.entries(application.data).map(([fieldId, field], index) => (
-                                        <TableRow key={fieldId} className={index % 2 === 0 ? "bg-muted" : "bg-background"}>
-                                            <TableCell>{field.name}</TableCell>
-                                            <TableCell>{field.value || ""}</TableCell>
+                                    {Object.entries(application.data || {}).map(([fieldId, fieldData], index) => {
+                                        // Try to find field config from form definition by ID or by Name check
+                                        const fieldConfig = application.form?.fields?.find(f => f.id === fieldId || f.name === fieldId);
+                                        // Determine label: use form config name (corrected from label), or data name, or fallback to field ID
+                                        const label = fieldConfig?.name || fieldData?.name || fieldId;
+                                        // Determine value: structure might be { name, value } or just raw value
+                                        const value = fieldData?.value !== undefined ? fieldData.value : fieldData;
+
+                                        return (
+                                            <TableRow key={fieldId} className="hover:bg-muted/50 transition-colors">
+                                                <TableCell className="font-medium text-muted-foreground py-3">{label}</TableCell>
+                                                <TableCell className="py-3">{renderFieldValue(value)}</TableCell>
+                                            </TableRow>
+                                        )
+                                    })}
+                                    {Object.keys(application.data || {}).length === 0 && (
+                                        <TableRow>
+                                            <TableCell colSpan={2} className="text-center py-6 text-muted-foreground">
+                                                No application data found
+                                            </TableCell>
                                         </TableRow>
-                                    ))}
+                                    )}
                                 </TableBody>
                             </Table>
                         </div>
@@ -767,7 +924,7 @@ export default function ApplicationDetails() {
                                         onClick={() => {
                                             scheduleTest({
                                                 applicationId: applicationId,
-                                                stageId: application.currentStage.id,
+                                                stageId: application.currentStage?.id,
                                                 movedById,
                                                 testDate: stageData.testDate,
                                                 testStartTime: stageData.testStartTime,
@@ -821,14 +978,89 @@ export default function ApplicationDetails() {
                                 onChange={(e) => handleStageDataChange("notes", e.target.value)}
                             />
                         </div>
-                        <Button variant={'outline'} className={'inline-flex cursor-pointerß'}>
-                            <Mail /> Send Mail To Candidate
-                        </Button>
+                        <Dialog open={smsDialogOpen} onOpenChange={setSmsDialogOpen}>
+                            <DialogTrigger asChild>
+                                <Button variant="outline" className="inline-flex gap-2">
+                                    <MessageSquare className="w-4 h-4" /> Send SMS to Candidate
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-md">
+                                <DialogHeader>
+                                    <DialogTitle>Send SMS to Candidate</DialogTitle>
+                                    <DialogDescription>
+                                        Send a notification SMS to {application.applicantName}
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                    <div>
+                                        <Label className="mb-2">Recipient Phone</Label>
+                                        <Input
+                                            value={application.data?.phone?.value || application.data?.mobile?.value || application.data?.contactNumber?.value || ""}
+                                            disabled
+                                            className="bg-muted"
+                                        />
+                                        {!application.data?.phone?.value && !application.data?.mobile?.value && (
+                                            <p className="text-xs text-amber-500 mt-1">No phone number found in application data</p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <Label className="mb-2">Message Template</Label>
+                                        <Select value={smsMessage} onValueChange={setSmsMessage}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select message type" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="test_scheduled">Test Scheduled Notification</SelectItem>
+                                                <SelectItem value="interview_scheduled">Interview Scheduled Notification</SelectItem>
+                                                <SelectItem value="result_pass">Result: Passed</SelectItem>
+                                                <SelectItem value="result_fail">Result: Not Selected</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    {smsMessage && (
+                                        <div className="p-3 bg-muted rounded-lg text-sm">
+                                            <p className="font-medium mb-1">Preview:</p>
+                                            <p className="text-muted-foreground">
+                                                {smsMessage === "test_scheduled" && `Dear ${application.applicantName}, your admission test has been scheduled${stageData.testDate ? ` on ${stageData.testDate}` : ""}${stageData.testVenue ? ` at ${stageData.testVenue}` : ""}. - St Xavier's School`}
+                                                {smsMessage === "interview_scheduled" && `Dear ${application.applicantName}, your interview has been scheduled. Please check your email for details. - St Xavier's School`}
+                                                {smsMessage === "result_pass" && `Congratulations ${application.applicantName}! You have passed the admission test. Please proceed with the next steps. - St Xavier's School`}
+                                                {smsMessage === "result_fail" && `Dear ${application.applicantName}, thank you for your interest. Unfortunately, you were not selected at this time. - St Xavier's School`}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                                <DialogFooter>
+                                    <Button variant="outline" onClick={() => setSmsDialogOpen(false)}>Cancel</Button>
+                                    <Button
+                                        disabled={smsSending || !smsMessage}
+                                        onClick={async () => {
+                                            const phoneNumber = application.data?.phone?.value || application.data?.mobile?.value || application.data?.contactNumber?.value;
+                                            if (!phoneNumber) {
+                                                toast.error("No phone number found in application");
+                                                return;
+                                            }
+                                            setSmsSending(true);
+                                            try {
+                                                // For now, show success - integrate with actual SMS API when templates are set up
+                                                toast.success("SMS functionality ready - configure SMS templates in Settings > SMS to enable sending");
+                                                setSmsDialogOpen(false);
+                                            } catch (error) {
+                                                toast.error("Failed to send SMS");
+                                            } finally {
+                                                setSmsSending(false);
+                                            }
+                                        }}
+                                    >
+                                        {smsSending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Sending...</> : "Send SMS"}
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                         <Button
                             onClick={() =>
                                 updateTestResult({
                                     applicationId: applicationId,
-                                    stageId: application.currentStage.id,
+                                    stageId: application.currentStage?.id,
                                     testResult: stageData.testResult,
                                     testScore: Number(stageData.testScore),
                                     notes: stageData.notes,
@@ -1267,214 +1499,254 @@ export default function ApplicationDetails() {
     };
 
     return (
-        <div className="p-4 space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center px-4 justify-between">
-                <Card className="shadow-md w-full">
-                    {/* Header for Primary Info (Name, Email) and Action Button 
+        <>
+            <div className="p-4 space-y-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center px-4 justify-between">
+                    <Card className="shadow-md w-full">
+                        {/* Header for Primary Info (Name, Email) and Action Button 
             -----------------------------------------------------------
             */}
-                    <CardHeader className="flex flex-row items-start justify-between">
-                        <div className="space-y-1">
-                            {/* Name as the main title */}
-                            <CardTitle className="text-2xl font-medium  tracking-tight">
-                                {application.applicantName}
-                            </CardTitle>
-                            {/* Email as the description, styled as a clickable link */}
-                            <CardDescription className="text-base text-blue-600 hover:text-blue-700 cursor-pointer">
-                                {application.applicantEmail}
-                            </CardDescription>
-                        </div>
+                        <CardHeader className="flex flex-row items-start justify-between">
+                            <div className="space-y-1">
+                                {/* Name as the main title */}
+                                <CardTitle className="text-2xl font-medium  tracking-tight">
+                                    {application.applicantName}
+                                </CardTitle>
+                                {/* Email as the description, styled as a clickable link */}
+                                <CardDescription className="text-base text-blue-600 hover:text-blue-700 cursor-pointer">
+                                    {application.applicantEmail}
+                                </CardDescription>
+                            </div>
 
-                        {/* Action Button */}
+                            {/* Action Button */}
 
-                        {/* <Button className="ml-4" variant="default">
+                            {/* <Button className="ml-4" variant="default">
                             <Phone className="mr-2 h-4 w-4" /> Call Candidate
                         </Button> */}
-                    </CardHeader>
+                        </CardHeader>
 
-                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 pt-4">
+                        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 pt-4">
 
-                        {/* 1. Application ID */}
-                        <div className="flex w flex-col space-y-1">
-                            <span className="text-xs font-semibold uppercase text-muted-foreground">Application ID</span>
-                            <div className="flex items-center w-full space-x-2">
-                                {/* Use a Badge for visual distinction and allow copying */}
-                                <Badge variant="secondary" className="font-mono text-sm py-1 px-3">
-                                    {applicationId}
-                                </Badge>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopy}>
-                                    <Copy className="h-4 w-4 text-muted-foreground" />
-                                </Button>
+                            {/* 1. Application ID */}
+                            <div className="flex w flex-col space-y-1">
+                                <span className="text-xs font-semibold uppercase text-muted-foreground">Application ID</span>
+                                <div className="flex items-center w-full space-x-2">
+                                    {/* Use a Badge for visual distinction and allow copying */}
+                                    <Badge variant="secondary" className="font-mono text-sm py-1 px-3">
+                                        {applicationId}
+                                    </Badge>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopy}>
+                                        <Copy className="h-4 w-4 text-muted-foreground" />
+                                    </Button>
+                                </div>
                             </div>
-                        </div>
 
-                        {/* 2. Submitted On */}
-                        <div className="flex flex-col space-y-1">
-                            <span className="text-xs font-semibold uppercase text-muted-foreground">Submitted On</span>
-                            <span className="text-base font-medium text-foreground">
-                                {formatDate(application.submittedAt)}
-                            </span>
-                        </div>
+                            {/* 2. Submitted On */}
+                            <div className="flex flex-col space-y-1">
+                                <span className="text-xs font-semibold uppercase text-muted-foreground">Submitted On</span>
+                                <span className="text-base font-medium text-foreground">
+                                    {formatDate(application.submittedAt)}
+                                </span>
+                            </div>
 
-                        {/* 3. Current Stage */}
-                        <div className="flex flex-col space-y-1">
-                            <span className="text-xs font-semibold uppercase text-muted-foreground">Current Stage</span>
-                            {/* <Badge variant="default" className="bg-blue-500 hover:bg-blue-600 w-fit text-base">
+                            {/* 3. Current Stage */}
+                            <div className="flex flex-col space-y-1">
+                                <span className="text-xs font-semibold uppercase text-muted-foreground">Current Stage</span>
+                                {/* <Badge variant="default" className="bg-blue-500 hover:bg-blue-600 w-fit text-base">
                                 {application.currentStage?.name || "N/A"}
                             </Badge> */}
-                            <Badge
-                                className={`px-2 py-1 text-sm font-medium ${getStageStyle(application.currentStage?.name)} capitalize`}
-                            >
-                                {application.currentStage?.name.replace("_", " & ")}
-                            </Badge>
-                        </div>
-
-                    </CardContent>
-                </Card>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 bg-white dark:bg-background p-4 rounded-md">
-                {
-                    test && (
-                        <Alert className="flex transition-all items-start gap-2 mb-2.5 border-green-400 shadow-sm bg-green-50  text-green-800">
-                            <CheckCircle2Icon />
-
-                            <div>
-                                <AlertTitle>Scheduled Test Details</AlertTitle>
-                                {/* <AlertTitle>Test Scheduled</AlertTitle> */}
-                                <AlertDescription className="space-y-1 mt-2.5" >
-                                    <ul className="space-y-1 font-normal text-black text-sm">
-                                        <li> <span className="font-semibold">Test Date: </span>{new Date(test.testDate).toLocaleDateString()}</li>
-                                        <li>
-                                            <span className="font-semibold">Test Time: </span>{" "}
-                                            {new Date(test.testStartTime).toLocaleTimeString([], {
-                                                hour: "2-digit",
-                                                minute: "2-digit",
-                                            })}{" "}
-                                            –{" "}
-                                            {new Date(test.testEndTime).toLocaleTimeString([], {
-                                                hour: "2-digit",
-                                                minute: "2-digit",
-                                            })}
-                                        </li>
-                                        <li className="flex items-center gap-1">
-                                            <span className="font-semibold">Test Venue: </span>
-                                            <span>{test.testVenue}</span>
-                                        </li>
-                                    </ul>
-                                </AlertDescription>
+                                <Badge
+                                    className={`px-2 py-1 text-sm font-medium ${getStageStyle(application.currentStage?.name)} capitalize`}
+                                >
+                                    {application.currentStage?.name.replace("_", " & ")}
+                                </Badge>
                             </div>
-                        </Alert>
-                    )}
-                <Stepper.Provider variant="horizontal" labelOrientation="vertical" initialStep={stages[currentStageIndex]?.id}>
-                    {({ methods }) => {
-                        // store methods in ref
-                        stepperMethodsRef.current = methods;
 
-                        // update state whenever current step changes
-                        useEffect(() => {
-                            if (methods?.current?.id && methods.current.id !== activeStep) {
-                                console.log("Active step changed:", methods.current.id);
-                                setActiveStep(methods.current.id);
-                            }
-                        }, [methods?.current?.id, activeStep]);
+                        </CardContent>
+                    </Card>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 bg-white dark:bg-background p-4 rounded-md">
+                    {
+                        test && (
+                            <Alert className="flex transition-all items-start gap-2 mb-2.5 border-green-400 shadow-sm bg-green-50  text-green-800">
+                                <CheckCircle2Icon />
 
-                        return (
-                            <>
-                                {application.currentStage.name === 'REJECTED' ? (
-                                    <div className="flex  w-full h-max mt-4 p-4 bg-muted  border rounded-md  flex-col gap-2.5">
-                                        <Alert variant="destructive"  >
-                                            <AlertCircleIcon />
+                                <div>
+                                    <AlertTitle>Scheduled Test Details</AlertTitle>
+                                    {/* <AlertTitle>Test Scheduled</AlertTitle> */}
+                                    <AlertDescription className="space-y-1 mt-2.5" >
+                                        <ul className="space-y-1 font-normal text-black text-sm">
+                                            <li> <span className="font-semibold">Test Date: </span>{new Date(test.testDate).toLocaleDateString()}</li>
+                                            <li>
+                                                <span className="font-semibold">Test Time: </span>{" "}
+                                                {new Date(test.testStartTime).toLocaleTimeString([], {
+                                                    hour: "2-digit",
+                                                    minute: "2-digit",
+                                                })}{" "}
+                                                –{" "}
+                                                {new Date(test.testEndTime).toLocaleTimeString([], {
+                                                    hour: "2-digit",
+                                                    minute: "2-digit",
+                                                })}
+                                            </li>
+                                            <li className="flex items-center gap-1">
+                                                <span className="font-semibold">Test Venue: </span>
+                                                <span>{test.testVenue}</span>
+                                            </li>
+                                        </ul>
+                                    </AlertDescription>
+                                </div>
+                            </Alert>
+                        )}
+                    <Stepper.Provider variant="horizontal" labelOrientation="vertical" initialStep={stages[currentStageIndex]?.id}>
+                        {({ methods }) => {
+                            // store methods in ref
+                            stepperMethodsRef.current = methods;
 
-                                            <AlertTitle>Application Rejected.</AlertTitle>
-                                            <AlertDescription>
-                                                <p>Reason: {application.data?.[application.currentStage.id]?.rejectionReason}</p>
-                                            </AlertDescription>
+                            // update state whenever current step changes
+                            useEffect(() => {
+                                if (methods?.current?.id && methods.current.id !== activeStep) {
+                                    console.log("Active step changed:", methods.current.id);
+                                    setActiveStep(methods.current.id);
+                                }
+                            }, [methods?.current?.id, activeStep]);
 
-                                        </Alert>
-                                        <div>
-                                            <Button
-                                                className="w-full"
-                                                onClick={() => {
-                                                    if (rejectedStage) {
-                                                        moveMutation.mutate({
-                                                            id: applicationId,
-                                                            stageId: "670a599b-b5b9-4c4c-9f50-4b4d31ae0cf5",
-                                                            movedById,
-                                                            stageData,
-                                                        });
-                                                    } else {
-                                                        toast.error("Rejected stage not found");
-                                                    }
-                                                }}
-                                                disabled={!rejectedStage || moveMutation.isPending}
-                                                variant="outline"
-                                            >
-                                                {moveMutation.isPending ? (
-                                                    <span className="flex items-center justify-center gap-2">
-                                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                                        Activating...
-                                                    </span>
-                                                ) : (
-                                                    "Activate"
-                                                )}
-                                            </Button>
+                            return (
+                                <>
+                                    {application.currentStage?.name === 'REJECTED' ? (
+                                        <div className="flex  w-full h-max mt-4 p-4 bg-muted  border rounded-md  flex-col gap-2.5">
+                                            <Alert variant="destructive"  >
+                                                <AlertCircleIcon />
 
-                                        </div>
+                                                <AlertTitle>Application Rejected.</AlertTitle>
+                                                <AlertDescription>
+                                                    <p>Reason: {application.data?.[application.currentStage?.id]?.rejectionReason}</p>
+                                                </AlertDescription>
 
-                                    </div>
-                                ) : (
-                                    <>
-                                        <Stepper.Navigation className='border p-4 shadow-md bg-white dark:bg-muted  rounded-md overflow-x-auto overflow-hidden'>
-                                            {methods.all.map((step) => (
-                                                <Stepper.Step
-                                                    key={step.id}
-                                                    of={step.id}
-                                                    onClick={() => methods.goTo(step.id)}
-                                                    disabled={stages.findIndex(s => s.id === step.id) > currentStageIndex && !methods.isLast}
-                                                >
-                                                    <Stepper.Title>
-                                                        {step.title
-                                                            .replace("_", " ")                       // replace underscore with space
-                                                            .toLowerCase()                           // convert all to lowercase
-                                                            .replace(/^\w/, (c) => c.toUpperCase()) // capitalize first letter
+                                            </Alert>
+                                            <div>
+                                                <Button
+                                                    className="w-full"
+                                                    onClick={() => {
+                                                        if (rejectedStage) {
+                                                            moveMutation.mutate({
+                                                                id: applicationId,
+                                                                stageId: "670a599b-b5b9-4c4c-9f50-4b4d31ae0cf5",
+                                                                movedById,
+                                                                stageData,
+                                                            });
+                                                        } else {
+                                                            toast.error("Rejected stage not found");
                                                         }
-                                                    </Stepper.Title>
-
-                                                    <Stepper.Description>{step.description}</Stepper.Description>
-                                                </Stepper.Step>
-                                            ))}
-                                        </Stepper.Navigation>
-
-                                        <div className="mt-4 p-4 bg-white shadow-md dark:bg-muted border rounded-md">
-                                            {methods.current ? renderFieldsForStage(methods.current.title, methods) : <div>Loading stage...</div>}
-                                        </div>
-
-                                        <Stepper.Controls className="mt-4 w-full flex justify-between ">
-                                            {/* <div></div> */}
-                                            <div className="flex gap-3">
-                                                <Button type="button" variant="secondary" onClick={methods.prev} disabled={methods.isFirst}>
-                                                    Previous
+                                                    }}
+                                                    disabled={!rejectedStage || moveMutation.isPending}
+                                                    variant="outline"
+                                                >
+                                                    {moveMutation.isPending ? (
+                                                        <span className="flex items-center justify-center gap-2">
+                                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                                            Activating...
+                                                        </span>
+                                                    ) : (
+                                                        "Activate"
+                                                    )}
                                                 </Button>
-                                                <Button type="button" variant="secondary" onClick={methods.isLast ? methods.reset : methods.next} disabled={methods.isLast}>
-                                                    {methods.isLast ? "Reset" : "Next"}
-                                                </Button>
+
                                             </div>
-                                            <Button
-                                                onClick={() => moveMutation.mutate({ id: applicationId, stageId: methods.current?.id, movedById, stageData })}
-                                                disabled={!methods.current || application.currentStage.id === methods.current.id}
-                                            >
-                                                {methods.current && application.currentStage.id === methods.current.id
-                                                    ? 'Marked'
-                                                    : `Mark`}
-                                            </Button>
-                                        </Stepper.Controls>
-                                    </>
-                                )}
-                            </>
-                        );
-                    }}
-                </Stepper.Provider>
+
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <Stepper.Navigation className='border p-4 shadow-md bg-white dark:bg-muted  rounded-md overflow-x-auto overflow-hidden'>
+                                                {methods.all.map((step) => (
+                                                    <Stepper.Step
+                                                        key={step.id}
+                                                        of={step.id}
+                                                        onClick={() => methods.goTo(step.id)}
+                                                        disabled={stages.findIndex(s => s.id === step.id) > currentStageIndex && !methods.isLast}
+                                                    >
+                                                        <Stepper.Title>
+                                                            {step.title
+                                                                .replace("_", " ")                       // replace underscore with space
+                                                                .toLowerCase()                           // convert all to lowercase
+                                                                .replace(/^\w/, (c) => c.toUpperCase()) // capitalize first letter
+                                                            }
+                                                        </Stepper.Title>
+
+                                                        <Stepper.Description>{step.description}</Stepper.Description>
+                                                    </Stepper.Step>
+                                                ))}
+                                            </Stepper.Navigation>
+
+                                            <div className="mt-4 p-4 bg-white shadow-md dark:bg-muted border rounded-md">
+                                                {methods.current ? renderFieldsForStage(methods.current.title, methods) : <div>Loading stage...</div>}
+                                            </div>
+
+                                            <Stepper.Controls className="mt-4 w-full flex justify-between ">
+                                                {/* <div></div> */}
+                                                <div className="flex gap-3">
+                                                    <Button type="button" variant="secondary" onClick={methods.prev} disabled={methods.isFirst}>
+                                                        Previous
+                                                    </Button>
+                                                    <Button type="button" variant="secondary" onClick={methods.isLast ? methods.reset : methods.next} disabled={methods.isLast}>
+                                                        {methods.isLast ? "Reset" : "Next"}
+                                                    </Button>
+                                                </div>
+                                                <Button
+                                                    onClick={() => moveMutation.mutate({ id: applicationId, stageId: methods.current?.id, movedById, stageData })}
+                                                    disabled={!methods.current || application.currentStage?.id === methods.current.id}
+                                                >
+                                                    {methods.current && application.currentStage?.id === methods.current.id
+                                                        ? 'Marked'
+                                                        : `Mark`}
+                                                </Button>
+                                            </Stepper.Controls>
+                                        </>
+                                    )}
+                                </>
+                            );
+                        }}
+                    </Stepper.Provider>
+                </div>
             </div>
-        </div>
+
+            {/* Image Preview Lightbox */}
+            <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+                <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
+                    <div className="relative">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-2 right-2 z-10 bg-black/50 hover:bg-black/70 text-white"
+                            onClick={() => setPreviewOpen(false)}
+                        >
+                            <X className="w-5 h-5" />
+                        </Button>
+                        <img
+                            src={previewUrl}
+                            alt="Full preview"
+                            className="w-full h-auto max-h-[80vh] object-contain"
+                        />
+                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent flex justify-center gap-3">
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => {
+                                    navigator.clipboard.writeText(previewUrl);
+                                    toast.success("URL copied to clipboard");
+                                }}
+                            >
+                                <Copy className="w-4 h-4 mr-2" /> Copy URL
+                            </Button>
+                            <Button variant="secondary" size="sm" asChild>
+                                <a href={previewUrl} download target="_blank">
+                                    <Download className="w-4 h-4 mr-2" /> Download
+                                </a>
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 }

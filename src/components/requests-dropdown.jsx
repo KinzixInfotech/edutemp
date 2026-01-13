@@ -87,7 +87,8 @@ export function RequestsDropdown({ schoolId }) {
             return {
                 library: libraryData.total || libraryData.requests?.length || 0,
                 bus: busData.total || busData.requests?.length || 0,
-                notifications: notifData.total || notifData.notifications?.length || 0
+                // API returns unreadCount for notifications
+                notifications: notifData.unreadCount || notifData.total || notifData.notifications?.length || 0
             }
         },
         enabled: !!schoolId && !!fullUser?.id,
@@ -133,8 +134,36 @@ export function RequestsDropdown({ schoolId }) {
         return date.toLocaleDateString()
     }
 
+    // Mark all notifications as read when dropdown opens
+    const markAllAsRead = async () => {
+        if (!fullUser?.id || !countsData?.notifications) return;
+
+        try {
+            await fetch('/api/notifications', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    markAllAsRead: true,
+                    userId: fullUser.id
+                })
+            });
+            // Refetch counts to update badge
+            refetchCounts();
+        } catch (error) {
+            console.error('Failed to mark notifications as read:', error);
+        }
+    };
+
+    const handleOpenChange = (isOpen) => {
+        setOpen(isOpen);
+        if (isOpen && countsData?.notifications > 0) {
+            // Mark as read when opening if there are unread notifications
+            markAllAsRead();
+        }
+    };
+
     return (
-        <Popover open={open} onOpenChange={setOpen}>
+        <Popover open={open} onOpenChange={handleOpenChange}>
             <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative">
                     <Bell size={20} className="text-muted-foreground" />
@@ -145,8 +174,8 @@ export function RequestsDropdown({ schoolId }) {
                     )}
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[380px] p-0" align="end">
-                <div className="flex items-center justify-between px-4 py-3 border-b">
+            <PopoverContent className="w-[380px] p-0 max-h-[70vh] flex flex-col" align="end" sideOffset={8}>
+                <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0">
                     <div className="flex items-center gap-2">
                         <Bell size={18} className="text-primary" />
                         <span className="font-semibold">Notifications & Requests</span>
@@ -167,7 +196,7 @@ export function RequestsDropdown({ schoolId }) {
                     </Button>
                 </div>
 
-                <ScrollArea className="max-h-[400px]">
+                <ScrollArea className="flex-1 overflow-auto" style={{ maxHeight: 'calc(70vh - 60px)' }}>
                     {/* General Notifications */}
                     <div className="p-3">
                         <div className="flex items-center justify-between px-2 py-1.5 mb-1">

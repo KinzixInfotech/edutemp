@@ -12,9 +12,9 @@ export function WebPushListener() {
     const queryClient = useQueryClient();
 
     const handleMessage = useCallback((payload) => {
-        console.log("WebPushListener received message, invalidating queries...");
-        // Invalidate queries to update badges
-        queryClient.invalidateQueries({ queryKey: ['requests-counts'] });
+        console.log("WebPushListener received message, refetching queries...");
+        // Force refetch queries to update badges immediately
+        queryClient.refetchQueries({ queryKey: ['requests-counts'] });
         queryClient.invalidateQueries({ queryKey: ['library-requests-count'] });
         queryClient.invalidateQueries({ queryKey: ['bus-requests-count'] });
 

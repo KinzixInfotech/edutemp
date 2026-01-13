@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 
 // GET: Fetch single application by ID
 export async function GET(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     const { id } = params;
     const { searchParams } = new URL(req.url);
     const schoolId = searchParams.get("schoolId");
@@ -16,6 +16,14 @@ export async function GET(req, props) {
                     select: {
                         title: true,
                         category: true,
+                        fields: {
+                            select: {
+                                id: true,
+                                name: true,
+                                type: true,
+                                options: true,
+                            },
+                        },
                     },
                 },
                 currentStage: {

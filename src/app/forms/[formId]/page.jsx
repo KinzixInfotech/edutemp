@@ -67,7 +67,8 @@ export default function PublicFormPage() {
             const submissionData = {};
             form.fields.forEach(field => {
                 if (formData[field.id] !== undefined) {
-                    submissionData[field.name] = formData[field.id];
+                    // Use field ID as key to prevent duplicate name issues
+                    submissionData[field.id] = formData[field.id];
                 }
             });
             await axios.post(`/api/forms/${params.formId}/submit`, {

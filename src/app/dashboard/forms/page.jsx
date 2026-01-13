@@ -348,7 +348,7 @@ export default function FormListPage() {
                         <CheckCircle className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-green-600">{stats.publishedForms}</div>
+                        <div className="text-2xl font-bold">{stats.publishedForms}</div>
                     </CardContent>
                 </Card>
                 <Card>
@@ -357,16 +357,16 @@ export default function FormListPage() {
                         <FileEdit className="h-4 w-4 text-yellow-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-yellow-600">{stats.draftForms}</div>
+                        <div className="text-2xl font-bold">{stats.draftForms}</div>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-medium">Total Submissions</CardTitle>
-                        <Users className="h-4 w-4 text-blue-500" />
+                        <Users className="h-4 w-4 text-purple-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-blue-600">{stats.totalSubmissions}</div>
+                        <div className="text-2xl font-bold">{stats.totalSubmissions}</div>
                     </CardContent>
                 </Card>
             </div>

@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
     Loader2, ArrowLeft, Download, Search, RotateCcw,
-    ArrowUpDown, ChevronLeft, ChevronRight, GripVertical, FileText
+    ArrowUpDown, ChevronLeft, ChevronRight, GripVertical, FileText, FileSpreadsheet, Eye
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import axios from "axios";
 import { format } from "date-fns";
@@ -18,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import * as XLSX from "xlsx";
 
 export default function FormSubmissionsPage({ params }) {
     const { formId } = React.use(params);
@@ -128,22 +130,43 @@ export default function FormSubmissionsPage({ params }) {
         </TableHead>
     );
 
+    // Helper to format values for export
+    const formatExportValue = (value) => {
+        if (value === null || value === undefined) return '';
+        if (Array.isArray(value)) return value.join(', ');
+        if (typeof value === 'object') {
+            // Handle file upload objects
+            if (value.url) return value.url;
+            return JSON.stringify(value);
+        }
+        return String(value);
+    };
+
+    // Get field name from ID using form fields
+    const getFieldName = (fieldId) => {
+        const field = form?.fields?.find(f => f.id === fieldId);
+        return field?.name || fieldId;
+    };
+
     const exportToCSV = () => {
         if (!processedSubmissions.length) return;
 
         // Get all unique keys from data
         const dataKeys = Array.from(new Set(processedSubmissions.flatMap(s => Object.keys(s.data || {}))));
 
-        const headers = ["ID", "Name", "Email", "Submitted At", ...dataKeys];
+        // Map keys to readable names
+        const headerNames = dataKeys.map(key => getFieldName(key));
+
+        const headers = ["ID", "Name", "Email", "Submitted At", ...headerNames];
         const csvContent = [
-            headers.join(","),
+            headers.map(h => `"${h}"`).join(","),
             ...processedSubmissions.map(s => {
                 const row = [
                     s.id,
-                    `"${s.applicantName}"`,
-                    s.applicantEmail,
+                    `"${s.applicantName || ''}"`,
+                    s.applicantEmail || '',
                     format(new Date(s.submittedAt), "yyyy-MM-dd HH:mm:ss"),
-                    ...dataKeys.map(key => `"${s.data[key] || ""}"`)
+                    ...dataKeys.map(key => `"${formatExportValue(s.data?.[key])}"`)
                 ];
                 return row.join(",");
             })
@@ -158,6 +181,36 @@ export default function FormSubmissionsPage({ params }) {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    };
+
+    const exportToExcel = () => {
+        if (!processedSubmissions.length) return;
+
+        // Get all unique keys from data
+        const dataKeys = Array.from(new Set(processedSubmissions.flatMap(s => Object.keys(s.data || {}))));
+
+        // Prepare data for Excel with readable headers
+        const excelData = processedSubmissions.map(s => {
+            const row = {
+                "ID": s.id,
+                "Name": s.applicantName,
+                "Email": s.applicantEmail,
+                "Submitted At": format(new Date(s.submittedAt), "yyyy-MM-dd HH:mm:ss"),
+            };
+            dataKeys.forEach(key => {
+                const fieldName = getFieldName(key);
+                row[fieldName] = formatExportValue(s.data?.[key]);
+            });
+            return row;
+        });
+
+        // Create workbook and worksheet
+        const ws = XLSX.utils.json_to_sheet(excelData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Submissions");
+
+        // Generate and download
+        XLSX.writeFile(wb, `${form?.title || "submissions"}_export.xlsx`);
     };
 
     // Table loading skeleton
@@ -192,6 +245,9 @@ export default function FormSubmissionsPage({ params }) {
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={exportToCSV} disabled={!processedSubmissions.length}>
                         <Download className="mr-2 h-4 w-4" /> Export CSV
+                    </Button>
+                    <Button variant="outline" onClick={exportToExcel} disabled={!processedSubmissions.length}>
+                        <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Excel
                     </Button>
                 </div>
             </div>
@@ -275,43 +331,59 @@ export default function FormSubmissionsPage({ params }) {
                                             <TableCell className="text-muted-foreground">{sub.applicantEmail}</TableCell>
                                             <TableCell className="text-muted-foreground">{format(new Date(sub.submittedAt), "MMM d, yyyy HH:mm")}</TableCell>
                                             <TableCell className="text-right">
-                                                <Dialog>
-                                                    <DialogTrigger asChild>
-                                                        <Button variant="outline" size="sm" onClick={() => setSelectedSubmission(sub)}>View Data</Button>
-                                                    </DialogTrigger>
-                                                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                                                        <DialogHeader>
-                                                            <DialogTitle>Submission Details</DialogTitle>
-                                                        </DialogHeader>
-                                                        <div className="space-y-4">
-                                                            <div className="grid grid-cols-2 gap-4 border-b pb-4">
-                                                                <div>
-                                                                    <p className="text-sm text-muted-foreground">Applicant</p>
-                                                                    <p className="font-medium">{sub.applicantName}</p>
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <Link href={`/dashboard/forms/${formId}/submissions/${sub.id}`}>
+                                                        <Button variant="default" size="sm">
+                                                            <Eye className="mr-1 h-3 w-3" /> View
+                                                        </Button>
+                                                    </Link>
+                                                    <Dialog>
+                                                        <DialogTrigger asChild>
+                                                            <Button variant="outline" size="sm" onClick={() => setSelectedSubmission(sub)}>
+                                                                Quick Preview
+                                                            </Button>
+                                                        </DialogTrigger>
+                                                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                                                            <DialogHeader>
+                                                                <DialogTitle>Submission Preview</DialogTitle>
+                                                            </DialogHeader>
+                                                            <div className="space-y-4">
+                                                                <div className="grid grid-cols-2 gap-4 border-b pb-4">
+                                                                    <div>
+                                                                        <p className="text-sm text-muted-foreground">Applicant</p>
+                                                                        <p className="font-medium">{sub.applicantName}</p>
+                                                                    </div>
+                                                                    <div>
+                                                                        <p className="text-sm text-muted-foreground">Email</p>
+                                                                        <p className="font-medium">{sub.applicantEmail}</p>
+                                                                    </div>
+                                                                    <div>
+                                                                        <p className="text-sm text-muted-foreground">Submitted At</p>
+                                                                        <p className="font-medium">{format(new Date(sub.submittedAt), "PPpp")}</p>
+                                                                    </div>
                                                                 </div>
                                                                 <div>
-                                                                    <p className="text-sm text-muted-foreground">Email</p>
-                                                                    <p className="font-medium">{sub.applicantEmail}</p>
+                                                                    <h3 className="font-semibold mb-2">Form Data</h3>
+                                                                    <div className="grid grid-cols-1 gap-2">
+                                                                        {Object.entries(sub.data || {}).map(([key, value]) => (
+                                                                            <div key={key} className="bg-muted p-3 rounded-md">
+                                                                                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{key}</p>
+                                                                                <p className="text-sm whitespace-pre-wrap">{typeof value === 'object' ? JSON.stringify(value) : String(value)}</p>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
                                                                 </div>
-                                                                <div>
-                                                                    <p className="text-sm text-muted-foreground">Submitted At</p>
-                                                                    <p className="font-medium">{format(new Date(sub.submittedAt), "PPpp")}</p>
+                                                                <div className="pt-2 border-t">
+                                                                    <Link href={`/dashboard/forms/${formId}/submissions/${sub.id}`}>
+                                                                        <Button className="w-full">
+                                                                            <Eye className="mr-2 h-4 w-4" /> View Full Details
+                                                                        </Button>
+                                                                    </Link>
                                                                 </div>
                                                             </div>
-                                                            <div>
-                                                                <h3 className="font-semibold mb-2">Form Data</h3>
-                                                                <div className="grid grid-cols-1 gap-2">
-                                                                    {Object.entries(sub.data || {}).map(([key, value]) => (
-                                                                        <div key={key} className="bg-muted p-3 rounded-md">
-                                                                            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{key}</p>
-                                                                            <p className="text-sm whitespace-pre-wrap">{typeof value === 'object' ? JSON.stringify(value) : value}</p>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </DialogContent>
-                                                </Dialog>
+                                                        </DialogContent>
+                                                    </Dialog>
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     ))
