@@ -128,7 +128,7 @@ export default function OnboardingModal({ fullUser, onSuccess }) {
 
     return (
         <Dialog open={true} onOpenChange={() => { }}>
-            <DialogContent className="sm:max-w-[650px] p-0 overflow-hidden gap-0 border-none bg-white dark:bg-[#121212]" hideClose>
+            <DialogContent showCloseButton={false} className="sm:max-w-[650px] p-0 overflow-hidden gap-0 border-none bg-white dark:bg-[#121212]">
 
                 {/* Big Tab Stepper Header */}
                 <div className="bg-gray-50 dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-gray-800 p-2">

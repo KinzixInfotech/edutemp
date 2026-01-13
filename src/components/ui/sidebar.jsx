@@ -210,8 +210,8 @@ function Sidebar({
           className
         )}
         style={{
-          top: "calc(var(--network-banner-height, 0px) + var(--setup-banner-height, 0px))",
-          height: "calc(100svh - var(--network-banner-height, 0px) - var(--setup-banner-height, 0px))"
+          top: "calc(var(--network-banner-height, 0px) + var(--onboarding-banner-height, 0px) + var(--setup-banner-height, 0px))",
+          height: "calc(100svh - var(--network-banner-height, 0px) - var(--onboarding-banner-height, 0px) - var(--setup-banner-height, 0px))"
         }}
         {...props}>
         <div
@@ -291,7 +291,7 @@ function SidebarInset({
         className
       )}
       style={{
-        marginTop: "calc(var(--network-banner-height, 0px) + var(--setup-banner-height, 0px))",
+        marginTop: "calc(var(--network-banner-height, 0px) + var(--onboarding-banner-height, 0px) + var(--setup-banner-height, 0px))",
         ...style
       }}
       {...props} />

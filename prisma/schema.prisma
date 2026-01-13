@@ -116,6 +116,10 @@ model School {
   attendanceLocks AttendanceLock[]
   subscription    SchoolSubscription?
 
+  // School Onboarding
+  onboardingComplete  Boolean @default(false)
+  onboardingDismissed Boolean @default(false)
+
   @@index([name])
 }
 

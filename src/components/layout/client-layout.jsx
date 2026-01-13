@@ -12,7 +12,9 @@ import { useEffect, useState, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 import { useLoader } from "@/app/dashboard/context/Loader";
-import OnboardingDialog from "../OnboardDialog";
+import SchoolOnboardingWizard from "../dashboard/SchoolOnboardingWizard";
+import { OnboardingSetupBannerProvider } from "../OnboardingSetupBanner";
+import { OnboardingProvider } from "@/context/OnboardingStateContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/lib/supabase";
 import LoaderPage from "../loader-page";
@@ -218,87 +220,91 @@ export default function ClientLayout({ children }) {
 
     return (
         <NetworkStatusProvider>
-            <AcademicYearSetupBannerProvider>
-                <QueryClientProvider client={queryClient}>
-                    {/* Inject animation styles */}
-                    <style dangerouslySetInnerHTML={{ __html: spinnerStyles }} />
+            <OnboardingProvider>
+                <OnboardingSetupBannerProvider>
+                    <AcademicYearSetupBannerProvider>
+                        <QueryClientProvider client={queryClient}>
+                            {/* Inject animation styles */}
+                            <style dangerouslySetInnerHTML={{ __html: spinnerStyles }} />
 
-                    <SidebarProvider
-                        style={{
-                            "--sidebar-width": "calc(var(--spacing) * 72)",
-                            "--header-height": "calc(var(--spacing) * 16)",
-                        }}
-                    >
+                            <SidebarProvider
+                                style={{
+                                    "--sidebar-width": "calc(var(--spacing) * 72)",
+                                    "--header-height": "calc(var(--spacing) * 16)",
+                                }}
+                            >
 
-                        <OnboardingDialog />
-                        {!hideUI && <AppSidebar />}
-                        <TopProgressBar />
+                                {!hideUI && <SchoolOnboardingWizard />}
+                                {!hideUI && <AppSidebar />}
+                                <TopProgressBar />
 
-                        <SidebarInset className={'bg-[#f9fafb] dark:bg-black'}>
-                            {!hideUI && <SiteHeader fullUser={fullUser} />}
+                                <SidebarInset className={'bg-[#f9fafb] dark:bg-black'}>
+                                    {!hideUI && <SiteHeader fullUser={fullUser} />}
 
-                            {!hideUI && <BreadcrumbHeader schoolName={fullUser?.school?.name} />}
+                                    {!hideUI && <BreadcrumbHeader schoolName={fullUser?.school?.name} />}
 
-                            <main className="w-full h-full relative">
-                                {/* Navigation Loading Spinner */}
-                                {isNavigating && pathname?.startsWith('/dashboard') && (
-                                    <div
-                                        className="fixed top-0 right-0 bottom-0 flex items-center justify-center bg-background/80 backdrop-blur-sm z-50"
-                                        style={{ left: 'var(--sidebar-width, 0px)' }}
-                                    >
-                                        <div className="flex flex-col items-center gap-3">
-                                            {/* Spinning circle around graduation cap */}
-                                            <div className="relative">
-                                                {/* Outer spinning circle */}
-                                                <div
-                                                    className="absolute inset-0 rounded-full border-4 border-primary/20 border-t-primary"
-                                                    style={{
-                                                        width: '5rem',
-                                                        height: '5rem',
-                                                        animation: 'spinCircle 1s linear infinite'
-                                                    }}
-                                                />
-                                                {/* Graduation cap in center (pulse/zoom only) */}
-                                                <div
-                                                    className="w-20 h-20 flex items-center justify-center"
-                                                    style={{ animation: 'graduationPulse 0.8s ease-in-out infinite' }}
-                                                >
-                                                    <PiGraduationCapDuotone
-                                                        className="text-primary"
-                                                        style={{ fontSize: '2.5rem' }}
-                                                    />
+                                    <main className="w-full h-full relative">
+                                        {/* Navigation Loading Spinner */}
+                                        {isNavigating && pathname?.startsWith('/dashboard') && (
+                                            <div
+                                                className="fixed top-0 right-0 bottom-0 flex items-center justify-center bg-background/80 backdrop-blur-sm z-50"
+                                                style={{ left: 'var(--sidebar-width, 0px)' }}
+                                            >
+                                                <div className="flex flex-col items-center gap-3">
+                                                    {/* Spinning circle around graduation cap */}
+                                                    <div className="relative">
+                                                        {/* Outer spinning circle */}
+                                                        <div
+                                                            className="absolute inset-0 rounded-full border-4 border-primary/20 border-t-primary"
+                                                            style={{
+                                                                width: '5rem',
+                                                                height: '5rem',
+                                                                animation: 'spinCircle 1s linear infinite'
+                                                            }}
+                                                        />
+                                                        {/* Graduation cap in center (pulse/zoom only) */}
+                                                        <div
+                                                            className="w-20 h-20 flex items-center justify-center"
+                                                            style={{ animation: 'graduationPulse 0.8s ease-in-out infinite' }}
+                                                        >
+                                                            <PiGraduationCapDuotone
+                                                                className="text-primary"
+                                                                style={{ fontSize: '2.5rem' }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <span className="text-sm text-muted-foreground animate-pulse">Loading</span>
                                                 </div>
                                             </div>
-                                            <span className="text-sm text-muted-foreground animate-pulse">Loading</span>
-                                        </div>
-                                    </div>
-                                )}
+                                        )}
 
-                                {loading ? (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-50">
-                                        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                                    </div>
-                                ) : (
-                                    <>
-                                        <WebPushListener />
-                                        {children}
-                                    </>
-                                )}
-                            </main>
-                            <footer className="w-full border-t bg-white dark:bg-muted/30 rounded-b-lg  text-xs text-muted-foreground mt-8">
-                                <div className="max-w-7xl mx-auto px-4 py-3  flex flex-col md:flex-row justify-between items-center gap-2">
-                                    <StatusIndicator />
-                                    <div className="flex items-center gap-4">
-                                        <span>Dashboard Version: <strong>v{pkg.version}</strong></span>
-                                        <span className="text-muted-foreground">A Kinzix Product</span>
-                                    </div>
-                                </div>
-                            </footer>
-                        </SidebarInset>
-                    </SidebarProvider>
-                    {/* <DatabaseErrorDialog open={isDbDown} /> */}
-                </QueryClientProvider>
-            </AcademicYearSetupBannerProvider>
+                                        {loading ? (
+                                            <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-50">
+                                                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <WebPushListener />
+                                                {children}
+                                            </>
+                                        )}
+                                    </main>
+                                    <footer className="w-full border-t bg-white dark:bg-muted/30 rounded-b-lg  text-xs text-muted-foreground mt-8">
+                                        <div className="max-w-7xl mx-auto px-4 py-3  flex flex-col md:flex-row justify-between items-center gap-2">
+                                            <StatusIndicator />
+                                            <div className="flex items-center gap-4">
+                                                <span>Dashboard Version: <strong>v{pkg.version}</strong></span>
+                                                <span className="text-muted-foreground">A Kinzix Product</span>
+                                            </div>
+                                        </div>
+                                    </footer>
+                                </SidebarInset>
+                            </SidebarProvider>
+                            {/* <DatabaseErrorDialog open={isDbDown} /> */}
+                        </QueryClientProvider>
+                    </AcademicYearSetupBannerProvider>
+                </OnboardingSetupBannerProvider>
+            </OnboardingProvider>
         </NetworkStatusProvider>
     );
 }

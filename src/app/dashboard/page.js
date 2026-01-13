@@ -42,7 +42,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 
-import OnboardingModal from '@/components/dashboard/OnboardingModal';
+import OnboardingModal from '@/components/dashboard/OnboardingModal'; // Legacy - kept for reference
 import AiInsightsCard from '@/components/dashboard/AiInsightsCard';
 import RecentPaymentsWidget from '@/components/dashboard/widgets/RecentPaymentsWidget';
 
@@ -433,14 +433,7 @@ export default function Dashboard() {
               />
 
               {/* Setup Warnings */}
-              {academicYearsQuery.data?.length === 0 && (
-                <OnboardingModal
-                  fullUser={fullUser}
-                  onSuccess={() => {
-                    queryClient.invalidateQueries(['academic-years']);
-                  }}
-                />
-              )}
+              {/* Old OnboardingModal removed - replaced by SchoolOnboardingWizard in client-layout */}
 
               <div className="flex flex-col gap-3 mt-4">
                 {/* Warning: No Classes */}
