@@ -279,7 +279,6 @@ export default function ClientLayout({ children }) {
                                                 </div>
                                             </div>
                                         )}
-
                                         {loading ? (
                                             <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-50">
                                                 <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -291,12 +290,26 @@ export default function ClientLayout({ children }) {
                                             </>
                                         )}
                                     </main>
-                                    <footer className="w-full border-t bg-white dark:bg-muted/30 rounded-b-lg  text-xs text-muted-foreground mt-8">
-                                        <div className="max-w-7xl mx-auto px-4 py-3  flex flex-col md:flex-row justify-between items-center gap-2">
-                                            <StatusIndicator />
-                                            <div className="flex items-center gap-4">
-                                                <span>Dashboard Version: <strong>v{pkg.version}</strong></span>
-                                                <span className="text-muted-foreground">A Kinzix Product</span>
+                                    <footer className="w-full mt-auto py-6 px-8 border-t bg-background/50 backdrop-blur-sm">
+                                        <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-muted-foreground/80">
+                                            <div className="flex items-center gap-6">
+                                                <StatusIndicator className="text-[10px] px-2 py-0.5 h-auto font-medium" />
+                                                <div className="hidden md:flex items-center gap-4">
+                                                    <Link target="_blank" href="/support" className="hover:text-foreground transition-colors">Raise A Bug</Link>
+                                                    <Link target="_blank" href="/features/docs" className="hover:text-foreground transition-colors">Documentation</Link>
+                                                    <Link target="_blank" href="/privacy-policy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted/50 border border-muted">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                                                    <span className="font-mono">v{pkg.version}</span>
+                                                </div>
+                                                <span className="opacity-50">•</span>
+                                                <span className="font-medium hover:text-foreground transition-colors cursor-default">
+                                                    Made with <span className="text-red-400">♥</span> by Kinzix
+                                                </span>
                                             </div>
                                         </div>
                                     </footer>

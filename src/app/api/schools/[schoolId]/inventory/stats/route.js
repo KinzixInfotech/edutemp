@@ -12,31 +12,33 @@ export async function GET(request, { params }) {
             const [
                 totalItems,
                 lowStockItems,
-                totalRevenue,
-                totalCost,
+                sales,
                 recentSales,
             ] = await Promise.all([
+                // Total inventory items count
                 prisma.inventoryItem.count({ where: { schoolId } }),
+
+                // Count items with low stock (quantity <= 5)
                 prisma.inventoryItem.count({
                     where: {
                         schoolId,
-                        quantity: {
-                            lte: prisma.inventoryItem.fields.minimumQuantity,
+                        quantity: { lte: 5 },
+                    },
+                }),
+
+                // Get all completed sales with their items
+                prisma.inventorySale.findMany({
+                    where: { schoolId, status: "COMPLETED" },
+                    include: {
+                        items: {
+                            include: {
+                                item: true, // Get the inventory item details
+                            },
                         },
                     },
                 }),
-                prisma.inventorySale.aggregate({
-                    where: { schoolId, status: "COMPLETED" },
-                    _sum: {
-                        totalAmount: true,
-                    },
-                }),
-                prisma.inventoryItem.aggregate({
-                    where: { schoolId },
-                    _sum: {
-                        costPerUnit: true,
-                    },
-                }),
+
+                // Recent sales in last 30 days
                 prisma.inventorySale.count({
                     where: {
                         schoolId,
@@ -47,15 +49,29 @@ export async function GET(request, { params }) {
                 }),
             ]);
 
-            const revenue = totalRevenue._sum.totalAmount || 0;
-            const cost = totalCost._sum.costPerUnit || 0;
-            const profit = revenue - cost;
+            // Calculate revenue and profit from actual sales
+            let totalRevenue = 0;
+            let totalProfit = 0;
+
+            for (const sale of sales) {
+                totalRevenue += sale.totalAmount || 0;
+
+                // Calculate profit from each sale item
+                for (const saleItem of sale.items) {
+                    const sellingPrice = saleItem.pricePerUnit || 0;
+                    const costPrice = saleItem.item?.costPerUnit || 0;
+                    const quantity = saleItem.quantity || 0;
+
+                    // Profit = (Selling Price - Cost Price) * Quantity
+                    totalProfit += (sellingPrice - costPrice) * quantity;
+                }
+            }
 
             return {
                 totalItems,
                 lowStockItems,
-                totalRevenue: revenue,
-                totalProfit: profit,
+                totalRevenue,
+                totalProfit,
                 salesLast30Days: recentSales,
             };
         }, 300);

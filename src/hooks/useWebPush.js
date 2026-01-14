@@ -93,7 +93,7 @@ export function useWebPush({ onMessageReceived } = {}) {
             try {
 
                 // Using a reliable CDN for a simple notification sound
-                const audio = new Audio('https://codeskulptor-demos.commondatastorage.googleapis.com/pang/pop.mp3');
+                const audio = new Audio('./notify.mp3');
                 audio.play().catch(e => console.error("Audio play failed (user interaction needed first?)", e));
             } catch (e) {
                 console.error("Audio initialization failed", e);

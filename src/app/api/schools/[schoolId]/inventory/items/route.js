@@ -59,13 +59,17 @@ export async function POST(request, { params }) {
             vendorContact,
             location,
             status,
+            imageUrl,
         } = body;
+
+        // Handle empty categoryId - convert to null if empty string
+        const validCategoryId = categoryId && categoryId.trim() !== "" ? categoryId : null;
 
         const newItem = await prisma.inventoryItem.create({
             data: {
                 schoolId,
                 name,
-                categoryId,
+                categoryId: validCategoryId,
                 quantity: parseInt(quantity),
                 minimumQuantity: 5, // Default
                 maximumQuantity: 1000, // Default
@@ -78,6 +82,7 @@ export async function POST(request, { params }) {
                 vendorContact,
                 location,
                 status: status || "IN_STOCK",
+                imageUrl: imageUrl || null,
             },
         });
 

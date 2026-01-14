@@ -1,36 +1,53 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
-import { AlertCircleIcon, ImageIcon, UploadIcon, XIcon, Library, Loader2, CheckCircle, RefreshCw } from "lucide-react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import {
+    AlertCircleIcon,
+    ImageIcon,
+    UploadIcon,
+    XIcon,
+    Library,
+    Loader2,
+    CheckCircle,
+    RefreshCw,
+    CloudUpload,
+    Sparkles
+} from "lucide-react"
 
 import { useFileUpload } from '@/lib/useFileupload'
 import { Button } from '@/components/ui/button'
 import { MediaLibraryDialog } from './media-library-dialog'
 import { useAuth } from "@/context/AuthContext"
 import { useUploadThing } from "@/lib/uploadthing"
+import { cn } from "@/lib/utils"
 
 export default function FileUploadButton({
     field,
     onChange,
-    onUploadStatusChange,  // Callback for upload status (true = uploading, false = done/idle)
-    onCancelled,           // Callback when user cancels crop dialog - for re-upload
+    onUploadStatusChange,
+    onCancelled,
     resetKey,
     saveToLibrary = true,
-    value = null,          // NEW: Pre-set image URL (previously uploaded)
+    value = null,
+    compact = false, // New: Compact mode for smaller spaces
+    aspectRatio = "auto", // New: "square", "video", "auto"
 }) {
     const maxSizeMB = 2
-    const maxSize = maxSizeMB * 1024 * 1024 // 2MB
+    const maxSize = maxSizeMB * 1024 * 1024
     const { fullUser: user } = useAuth()
     const [showLibrary, setShowLibrary] = useState(false)
     const [isUploading, setIsUploading] = useState(false)
-    const [uploadedUrl, setUploadedUrl] = useState(value) // Initialize with value prop
+    const [uploadProgress, setUploadProgress] = useState(0)
+    const [uploadedUrl, setUploadedUrl] = useState(value)
     const [wasCancelled, setWasCancelled] = useState(false)
+    const [imageLoaded, setImageLoaded] = useState(false)
 
-    // Sync uploadedUrl when value prop changes (e.g., parent passes previous upload)
+    // Sync uploadedUrl when value prop changes
     useEffect(() => {
         if (value && value !== uploadedUrl) {
             setUploadedUrl(value)
             setWasCancelled(false)
+            setImageLoaded(false)
         }
     }, [value])
 
@@ -38,13 +55,18 @@ export default function FileUploadButton({
     const { startUpload } = useUploadThing("schoolImageUpload", {
         onUploadBegin: () => {
             setIsUploading(true)
+            setUploadProgress(0)
             onUploadStatusChange?.(true)
+        },
+        onUploadProgress: (progress) => {
+            setUploadProgress(progress)
         },
         onClientUploadComplete: (res) => {
             if (res?.[0]?.ufsUrl) {
-                const url = res[0].ufsUrl;
+                const url = res[0].ufsUrl
                 setUploadedUrl(url)
                 setIsUploading(false)
+                setUploadProgress(100)
                 setWasCancelled(false)
                 onUploadStatusChange?.(false)
                 onChange?.(url)
@@ -53,6 +75,7 @@ export default function FileUploadButton({
         onUploadError: (error) => {
             console.error("Upload error:", error)
             setIsUploading(false)
+            setUploadProgress(0)
             onUploadStatusChange?.(false)
         },
     })
@@ -70,16 +93,14 @@ export default function FileUploadButton({
             clearFiles,
         },
     ] = useFileUpload({
-        accept: "image/,image/png,image/jpeg,image/jpg,image/gif",
+        accept: "image/*,image/png,image/jpeg,image/jpg,image/gif,image/webp",
         maxSize,
         onFilesAdded: async (addedFiles) => {
             if (addedFiles.length > 0) {
                 const file = addedFiles[0].file
-                const preview = addedFiles[0].preview
-
                 setWasCancelled(false)
+                setImageLoaded(false)
 
-                // If user has schoolId, do auto-upload (school context)
                 if (user?.schoolId && user?.id) {
                     try {
                         await startUpload([file], {
@@ -90,15 +111,17 @@ export default function FileUploadButton({
                         console.error("Failed to start upload:", error)
                     }
                 } else {
-                    // No schoolId (super admin context) - pass preview for manual upload flow
-                    onChange?.(preview)
+                    onChange?.(addedFiles[0].preview)
                 }
             }
         }
     })
 
     // Priority: files preview > uploadedUrl > value prop
-    const previewUrl = files[0]?.preview || uploadedUrl || null
+    const previewUrl = useMemo(() =>
+        files[0]?.preview || uploadedUrl || null,
+        [files, uploadedUrl]
+    )
 
     // Clear state when resetKey changes
     useEffect(() => {
@@ -107,33 +130,37 @@ export default function FileUploadButton({
             setUploadedUrl(null)
             setIsUploading(false)
             setWasCancelled(false)
+            setUploadProgress(0)
+            setImageLoaded(false)
         }
     }, [resetKey])
 
     const fileName = files[0]?.file.name || null
 
-    const handleLibrarySelect = (url) => {
+    const handleLibrarySelect = useCallback((url) => {
         setUploadedUrl(url)
         setWasCancelled(false)
+        setImageLoaded(false)
         onChange?.(url)
-    }
+    }, [onChange])
 
-    const handleRemove = () => {
+    const handleRemove = useCallback(() => {
         if (files[0]?.id) {
             removeFile(files[0].id)
         }
         setUploadedUrl(null)
         setWasCancelled(false)
+        setImageLoaded(false)
         onChange?.(null)
-    }
+    }, [files, removeFile, onChange])
 
-    const handleCropCancelled = () => {
+    const handleCropCancelled = useCallback(() => {
         setWasCancelled(true)
         if (files[0]?.id) {
             removeFile(files[0].id)
         }
         onCancelled?.()
-    }
+    }, [files, removeFile, onCancelled])
 
     // Expose cancel handler for parent component
     useEffect(() => {
@@ -145,124 +172,231 @@ export default function FileUploadButton({
                 delete window.__fileUploadCancelHandler
             }
         }
-    }, [files])
+    }, [handleCropCancelled])
 
-    // Check if we have a valid uploaded URL (not just a local preview)
     const hasUploadedUrl = uploadedUrl && (uploadedUrl.startsWith('http') || uploadedUrl.startsWith('https'))
+
+    // Aspect ratio classes
+    const aspectClasses = {
+        square: "aspect-square",
+        video: "aspect-video",
+        auto: compact ? "min-h-32" : "min-h-52"
+    }
 
     return (
         <div className="flex flex-col gap-2">
-            <div className="relative">
+            <div className="relative group">
                 <div
                     onDragEnter={handleDragEnter}
                     onDragLeave={handleDragLeave}
                     onDragOver={handleDragOver}
                     onDrop={handleDrop}
                     data-dragging={isDragging || undefined}
-                    className="border-blue-500 data-[dragging=true]:bg-accent/50 has-[input:focus]:border-ring has-[input:focus]:ring-ring/50 relative flex min-h-52 flex-col items-center justify-center overflow-hidden rounded-xl border border-dashed p-4 transition-colors has-[input:focus]:ring-[3px]"
+                    className={cn(
+                        "relative flex flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed transition-all duration-200",
+                        aspectClasses[aspectRatio],
+                        isDragging
+                            ? "border-primary bg-primary/5 scale-[1.02]"
+                            : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30",
+                        previewUrl && !wasCancelled && "border-solid border-muted bg-muted"
+                    )}
                 >
                     <input
                         {...getInputProps()}
                         className="sr-only"
                         aria-label="Upload image file"
                     />
+
                     {previewUrl && !wasCancelled ? (
-                        <div className="absolute inset-0 flex items-center justify-center p-4">
-                            <img
-                                src={previewUrl}
-                                alt={fileName || "Uploaded image"}
-                                className="mx-auto max-h-full rounded object-contain"
-                            />
-                            {/* Upload status overlay */}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            {/* Image with loading state */}
+                            <div className="relative w-full h-full">
+                                {!imageLoaded && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-muted animate-pulse">
+                                        <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
+                                    </div>
+                                )}
+                                <img
+                                    src={previewUrl}
+                                    alt={fileName || "Uploaded image"}
+                                    className={cn(
+                                        "w-full h-full object-contain transition-opacity duration-300",
+                                        imageLoaded ? "opacity-100" : "opacity-0"
+                                    )}
+                                    onLoad={() => setImageLoaded(true)}
+                                    loading="lazy"
+                                />
+                            </div>
+
+                            {/* Upload progress overlay */}
                             {isUploading && (
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
-                                    <div className="flex flex-col items-center gap-2 text-white">
-                                        <Loader2 className="h-8 w-8 animate-spin" />
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                                    <div className="flex flex-col items-center gap-3 text-white">
+                                        <div className="relative">
+                                            <svg className="w-16 h-16 -rotate-90">
+                                                <circle
+                                                    cx="32"
+                                                    cy="32"
+                                                    r="28"
+                                                    stroke="currentColor"
+                                                    strokeWidth="4"
+                                                    fill="none"
+                                                    className="opacity-20"
+                                                />
+                                                <circle
+                                                    cx="32"
+                                                    cy="32"
+                                                    r="28"
+                                                    stroke="currentColor"
+                                                    strokeWidth="4"
+                                                    fill="none"
+                                                    strokeDasharray={175.93}
+                                                    strokeDashoffset={175.93 - (175.93 * uploadProgress) / 100}
+                                                    className="transition-all duration-300"
+                                                />
+                                            </svg>
+                                            <span className="absolute inset-0 flex items-center justify-center text-sm font-bold">
+                                                {Math.round(uploadProgress)}%
+                                            </span>
+                                        </div>
                                         <span className="text-sm font-medium">Uploading...</span>
                                     </div>
                                 </div>
                             )}
-                            {/* Uploaded checkmark - show for actual URLs, not local previews */}
+
+                            {/* Success badge */}
                             {hasUploadedUrl && !isUploading && (
-                                <div className="absolute bottom-4 left-4 flex items-center gap-1 bg-green-600 text-white text-xs px-2 py-1 rounded-full">
-                                    <CheckCircle className="h-3 w-3" />
+                                <div className="absolute bottom-3 left-3 flex items-center gap-1.5 bg-emerald-500 text-white text-xs font-medium px-2.5 py-1 rounded-full shadow-lg">
+                                    <CheckCircle className="h-3.5 w-3.5" />
                                     Uploaded
+                                </div>
+                            )}
+
+                            {/* Remove button - shows on hover */}
+                            <button
+                                type="button"
+                                className={cn(
+                                    "absolute top-3 right-3 flex size-8 cursor-pointer items-center justify-center rounded-full bg-black/70 text-white transition-all duration-200 hover:bg-red-500 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-white/50",
+                                    "opacity-0 group-hover:opacity-100"
+                                )}
+                                onClick={handleRemove}
+                                aria-label="Remove image"
+                                disabled={isUploading}
+                            >
+                                <XIcon className="size-4" aria-hidden="true" />
+                            </button>
+
+                            {/* Change image button - shows on hover */}
+                            {!isUploading && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={openFileDialog}
+                                        className="shadow-lg"
+                                    >
+                                        <RefreshCw className="h-4 w-4 mr-2" />
+                                        Change Image
+                                    </Button>
                                 </div>
                             )}
                         </div>
                     ) : (
-                        <div className="flex flex-col items-center justify-center px-4 py-3 text-center">
-                            <div
-                                className="bg-background mb-2 flex size-11 shrink-0 items-center justify-center rounded-full border"
-                                aria-hidden="true"
-                            >
-                                <ImageIcon className="size-4 opacity-60" />
+                        <div className={cn(
+                            "flex flex-col items-center justify-center text-center",
+                            compact ? "px-3 py-4 gap-2" : "px-6 py-8 gap-3"
+                        )}>
+                            {/* Icon */}
+                            <div className={cn(
+                                "flex items-center justify-center rounded-full bg-primary/10 transition-transform duration-200",
+                                isDragging && "scale-110",
+                                compact ? "size-10" : "size-14"
+                            )}>
+                                {isDragging ? (
+                                    <Sparkles className={cn("text-primary", compact ? "size-5" : "size-7")} />
+                                ) : (
+                                    <CloudUpload className={cn("text-primary", compact ? "size-5" : "size-7")} />
+                                )}
                             </div>
-                            <p className="mb-1.5 text-sm font-medium">
-                                {wasCancelled ? "Upload cancelled - " : "Drop "}{field} image here
-                            </p>
-                            <p className="text-muted-foreground text-xs">
-                                PNG, JPG or GIF (max. {maxSizeMB}MB)
-                            </p>
-                            <div className="flex gap-2 mt-4">
+
+                            {/* Text */}
+                            <div className="space-y-1">
+                                <p className={cn(
+                                    "font-medium text-foreground",
+                                    compact ? "text-sm" : "text-base"
+                                )}>
+                                    {isDragging ? (
+                                        "Drop to upload"
+                                    ) : wasCancelled ? (
+                                        <>
+                                            <span className="text-amber-600">Upload cancelled</span>
+                                            {" - try again"}
+                                        </>
+                                    ) : (
+                                        <>Drop {field} image here</>
+                                    )}
+                                </p>
+                                {!compact && (
+                                    <p className="text-xs text-muted-foreground">
+                                        PNG, JPG, GIF or WebP (max. {maxSizeMB}MB)
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Buttons */}
+                            <div className={cn(
+                                "flex gap-2",
+                                compact ? "mt-1" : "mt-2"
+                            )}>
                                 <Button
                                     type="button"
                                     variant={wasCancelled ? "default" : "outline"}
+                                    size={compact ? "sm" : "default"}
                                     onClick={openFileDialog}
                                     disabled={isUploading}
+                                    className="shadow-sm"
                                 >
                                     {wasCancelled ? (
                                         <>
-                                            <RefreshCw className="-ms-1 size-4 opacity-60" aria-hidden="true" />
-                                            Try Again
+                                            <RefreshCw className="size-4 mr-1.5" />
+                                            Retry
                                         </>
                                     ) : (
                                         <>
-                                            <UploadIcon className="-ms-1 size-4 opacity-60" aria-hidden="true" />
-                                            Upload New
+                                            <UploadIcon className="size-4 mr-1.5" />
+                                            {compact ? "Upload" : "Browse Files"}
                                         </>
                                     )}
                                 </Button>
                                 {user?.schoolId && (
                                     <Button
                                         type="button"
-                                        variant="outline"
+                                        variant="ghost"
+                                        size={compact ? "sm" : "default"}
                                         onClick={() => setShowLibrary(true)}
                                         disabled={isUploading}
+                                        className="text-muted-foreground hover:text-foreground"
                                     >
-                                        <Library
-                                            className="-ms-1 size-4 opacity-60"
-                                            aria-hidden="true"
-                                        />
-                                        Choose from Library
+                                        <Library className="size-4 mr-1.5" />
+                                        {compact ? "Library" : "From Library"}
                                     </Button>
                                 )}
                             </div>
                         </div>
                     )}
                 </div>
-                {previewUrl && !wasCancelled && (
-                    <div className="absolute top-4 right-4">
-                        <button
-                            type="button"
-                            className="focus-visible:border-ring focus-visible:ring-ring/50 z-50 flex size-8 cursor-pointer items-center justify-center rounded-full bg-black/60 text-white transition-[color,box-shadow] outline-none hover:bg-black/80 focus-visible:ring-[3px]"
-                            onClick={handleRemove}
-                            aria-label="Remove image"
-                            disabled={isUploading}
-                        >
-                            <XIcon className="size-4" aria-hidden="true" />
-                        </button>
-                    </div>
-                )}
             </div>
 
+            {/* Error display */}
             {errors.length > 0 && (
-                <div className="text-destructive flex items-center gap-1 text-xs" role="alert">
-                    <AlertCircleIcon className="size-3 shrink-0" />
+                <div className="flex items-center gap-1.5 text-destructive text-sm bg-destructive/10 px-3 py-2 rounded-lg" role="alert">
+                    <AlertCircleIcon className="size-4 shrink-0" />
                     <span>{errors[0]}</span>
                 </div>
             )}
 
+            {/* Media Library Dialog */}
             {user?.schoolId && (
                 <MediaLibraryDialog
                     open={showLibrary}

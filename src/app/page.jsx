@@ -57,6 +57,7 @@ const organizationSchema = {
 };
 
 export default function HomePage() {
+    // 
     return (
         <div className="bg-white overflow-x-hidden">
             {/* Organization Schema for better sitelinks */}
