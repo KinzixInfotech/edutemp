@@ -183,7 +183,8 @@ export default function SchoolOnboardingWizard() {
             setLoading(true);
             const payload = {
                 ...academicYearForm,
-                schoolId: fullUser?.schoolId || fullUser?.school?.id
+                schoolId: fullUser?.schoolId || fullUser?.school?.id,
+                isActive: true
             };
 
             if (!payload.schoolId) {

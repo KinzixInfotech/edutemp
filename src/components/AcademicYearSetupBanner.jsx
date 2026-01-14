@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { useOnboarding } from "@/context/OnboardingStateContext";
 
 // Context to share setup status
 const SetupBannerContext = createContext({
@@ -19,6 +20,7 @@ export const useSetupBanner = () => useContext(SetupBannerContext);
 
 export function AcademicYearSetupBannerProvider({ children }) {
     const { fullUser } = useAuth();
+    const { showWizard } = useOnboarding();
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
@@ -92,7 +94,7 @@ export function AcademicYearSetupBannerProvider({ children }) {
         let type = null;
         let show = false;
 
-        if (mounted && isAdmin && !isLoading && active) {
+        if (mounted && isAdmin && !isLoading && active && fullUser?.school?.onboardingComplete) {
             if (yearsDiffer && status === "pre-start") {
                 // Active is a future year, Running is current → Config mode
                 type = "config-mode";
@@ -170,11 +172,11 @@ export function AcademicYearSetupBannerProvider({ children }) {
     };
 
     return (
-        <SetupBannerContext.Provider value={{ showBanner, bannerHeight, yearStatus, activeYear, runningYear }}>
+        <SetupBannerContext.Provider value={{ showBanner: showWizard ? false : showBanner, bannerHeight: showWizard ? 0 : bannerHeight, yearStatus, activeYear, runningYear }}>
             {/* Set CSS variable for layout offset */}
-            <div style={{ "--setup-banner-height": `${bannerHeight}px` }}>
+            <div style={{ "--setup-banner-height": `${showWizard ? 0 : bannerHeight}px` }}>
                 {/* Fixed banner at top */}
-                {showBanner && (
+                {showBanner && !showWizard && (
                     <div
                         className={`fixed left-0 right-0 z-[99] border-b backdrop-blur-sm transition-all duration-300 ${getBannerStyles(bannerType)}`}
                         style={{
