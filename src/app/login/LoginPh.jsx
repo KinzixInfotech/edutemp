@@ -171,7 +171,7 @@ export default function LoginPhoto() {
                 success: true,
                 schoolCode: school?.schoolCode
             }).catch(err => console.error(err));
-
+ 
             localStorage.setItem("user", JSON.stringify(result));
 
             // Session Record (Async)
