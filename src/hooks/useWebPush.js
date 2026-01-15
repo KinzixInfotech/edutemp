@@ -93,7 +93,7 @@ export function useWebPush({ onMessageReceived } = {}) {
             try {
 
                 // Using a reliable CDN for a simple notification sound
-                const audio = new Audio('./notify.mp3');
+                const audio = new Audio('/notify.mp3');
                 audio.play().catch(e => console.error("Audio play failed (user interaction needed first?)", e));
             } catch (e) {
                 console.error("Audio initialization failed", e);
@@ -109,8 +109,40 @@ export function useWebPush({ onMessageReceived } = {}) {
                 onMessageReceived(payload);
             }
         });
-        console.log(' Messaging  initialized');
-        return () => unsubscribe();
+
+        // Listen for background messages via BroadcastChannel
+        const channel = new BroadcastChannel('fcm-channel');
+        channel.onmessage = (event) => {
+            if (event.data?.type === 'BACKGROUND_MESSAGE') {
+                console.log("🔔 [useWebPush] Background Message Received via BroadcastChannel:", event.data.payload);
+
+                // Play sound for background message too
+                try {
+                    const audio = new Audio('/notify.mp3');
+                    audio.play().catch(e => console.error("Audio play failed", e));
+                } catch (e) {
+                    console.error("Audio initialization failed", e);
+                }
+
+                // Trigger callback to update badge/notification list
+                if (onMessageReceived) {
+                    onMessageReceived({
+                        notification: {
+                            title: event.data.payload.title,
+                            body: event.data.payload.body
+                        },
+                        data: event.data.payload.data
+                    });
+                }
+            }
+        };
+
+        console.log('✅ Messaging initialized with background listener');
+
+        return () => {
+            unsubscribe();
+            channel.close();
+        };
     }, [onMessageReceived]);
 
     const saveTokenToBackend = async (userId, token) => {

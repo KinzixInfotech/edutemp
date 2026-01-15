@@ -91,10 +91,10 @@ const Hero = () => {
 
                         {/* Input Group */}
                         <div className={`flex items-center gap-3 bg-[#f8f9fb] border rounded-xl px-4 py-4 transition-all ${error
-                                ? 'border-red-300 ring-2 ring-red-100'
-                                : schoolFound
-                                    ? 'border-green-300 ring-2 ring-green-100'
-                                    : 'border-gray-200 focus-within:ring-2 focus-within:ring-[#0569ff]/20 focus-within:border-[#0569ff]'
+                            ? 'border-red-300 ring-2 ring-red-100'
+                            : schoolFound
+                                ? 'border-green-300 ring-2 ring-green-100'
+                                : 'border-gray-200 focus-within:ring-2 focus-within:ring-[#0569ff]/20 focus-within:border-[#0569ff]'
                             }`}>
                             <div className="text-white px-4 py-2 rounded-lg font-bold text-sm bg-[#0569ff] shrink-0">
                                 EB -
@@ -146,8 +146,8 @@ const Hero = () => {
                             onClick={handleContinue}
                             disabled={!code || isChecking}
                             className={`group w-full relative px-8 py-4 rounded-xl font-bold text-base transition-all duration-300 overflow-hidden flex items-center justify-center gap-3 ${code && !isChecking
-                                    ? 'bg-[#0569ff] text-white shadow-[0_4px_20px_rgba(5,105,255,0.3)] hover:shadow-[0_8px_30px_rgba(5,105,255,0.4)]'
-                                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                ? 'bg-[#0569ff] text-white shadow-[0_4px_20px_rgba(5,105,255,0.3)] hover:shadow-[0_8px_30px_rgba(5,105,255,0.4)]'
+                                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                 }`}
                         >
                             {code && !isChecking && (

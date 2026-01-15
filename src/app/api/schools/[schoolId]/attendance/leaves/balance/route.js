@@ -13,19 +13,31 @@ export async function GET(req, props) {
     }
 
     try {
-        // Find active academic year for the school
+        // Find current academic year for the school
         const academicYear = await prisma.academicYear.findFirst({
             where: { schoolId, isActive: true },
-            select: { id: true } // Optimization
+            select: { id: true }
         });
 
         if (!academicYear) {
-            // If no academic year, return 0s instead of 404 to avoid breaking UI
+            // Return defaults when no academic year
             return apiResponse({
                 totalUsed: 0,
-                breakdown: {}
+                breakdown: getDefaultBreakdown()
             });
         }
+
+        // Fetch leave buckets to get the configured limits
+        const leaveBuckets = await prisma.leaveBucket.findMany({
+            where: { schoolId, academicYearId: academicYear.id },
+            select: { leaveType: true, yearlyLimit: true }
+        });
+
+        // Create a map of leave type to yearly limit
+        const bucketLimits = {};
+        leaveBuckets.forEach(bucket => {
+            bucketLimits[bucket.leaveType] = bucket.yearlyLimit;
+        });
 
         // Fetch leave balance for the user in the current academic year
         const leaveBalance = await prisma.leaveBalance.findUnique({
@@ -37,31 +49,59 @@ export async function GET(req, props) {
             }
         });
 
-        if (!leaveBalance) {
-            return apiResponse({
-                totalUsed: 0,
-                breakdown: {}
-            });
-        }
+        // Build breakdown with defaults
+        const breakdown = {
+            casualLeaveUsed: leaveBalance?.casualLeaveUsed || 0,
+            casualLeaveTotal: bucketLimits['CASUAL'] ?? 12,
+            casualLeaveBalance: (bucketLimits['CASUAL'] ?? 12) - (leaveBalance?.casualLeaveUsed || 0),
 
-        // Calculate total used leaves across all types
+            sickLeaveUsed: leaveBalance?.sickLeaveUsed || 0,
+            sickLeaveTotal: bucketLimits['SICK'] ?? 10,
+            sickLeaveBalance: (bucketLimits['SICK'] ?? 10) - (leaveBalance?.sickLeaveUsed || 0),
+
+            earnedLeaveUsed: leaveBalance?.earnedLeaveUsed || 0,
+            earnedLeaveTotal: bucketLimits['EARNED'] ?? 15,
+            earnedLeaveBalance: (bucketLimits['EARNED'] ?? 15) - (leaveBalance?.earnedLeaveUsed || 0),
+
+            maternityLeaveUsed: leaveBalance?.maternityLeaveUsed || 0,
+            maternityLeaveTotal: bucketLimits['MATERNITY'] ?? 0,
+            maternityLeaveBalance: (bucketLimits['MATERNITY'] ?? 0) - (leaveBalance?.maternityLeaveUsed || 0),
+        };
+
+        // Calculate total used leaves
         const totalUsed =
-            (leaveBalance.casualLeaveUsed || 0) +
-            (leaveBalance.sickLeaveUsed || 0) +
-            (leaveBalance.earnedLeaveUsed || 0) +
-            (leaveBalance.maternityLeaveUsed || 0);
+            breakdown.casualLeaveUsed +
+            breakdown.sickLeaveUsed +
+            breakdown.earnedLeaveUsed +
+            breakdown.maternityLeaveUsed;
 
         return apiResponse({
             totalUsed,
-            breakdown: leaveBalance
+            breakdown
         });
 
     } catch (error) {
         console.error('Leave balance error:', error);
-        // Fallback to avoid crashing dashboard
         return apiResponse({
             totalUsed: 0,
-            error: 'Failed to fetch'
+            breakdown: getDefaultBreakdown()
         });
     }
+}
+
+function getDefaultBreakdown() {
+    return {
+        casualLeaveUsed: 0,
+        casualLeaveTotal: 12,
+        casualLeaveBalance: 12,
+        sickLeaveUsed: 0,
+        sickLeaveTotal: 10,
+        sickLeaveBalance: 10,
+        earnedLeaveUsed: 0,
+        earnedLeaveTotal: 15,
+        earnedLeaveBalance: 15,
+        maternityLeaveUsed: 0,
+        maternityLeaveTotal: 0,
+        maternityLeaveBalance: 0,
+    };
 }

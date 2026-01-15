@@ -11,10 +11,19 @@ export async function GET(req, props) {
     const params = await props.params;
     const { schoolId } = params;
     const { searchParams } = new URL(req.url);
-    const academicYearId = searchParams.get('academicYearId');
+    let academicYearId = searchParams.get('academicYearId');
     const isActive = searchParams.get('isActive');
 
     try {
+        // If no academicYearId provided, get the current one
+        if (!academicYearId) {
+            const currentYear = await prisma.academicYear.findFirst({
+                where: { schoolId, isActive: true },
+                select: { id: true }
+            });
+            academicYearId = currentYear?.id;
+        }
+
         const cacheKey = generateKey('leave:buckets', { schoolId, academicYearId, isActive });
 
         const buckets = await remember(cacheKey, async () => {
@@ -23,15 +32,6 @@ export async function GET(req, props) {
                     schoolId,
                     ...(academicYearId && { academicYearId }),
                     ...(isActive !== null && isActive !== undefined && { isActive: isActive === 'true' })
-                },
-                include: {
-                    academicYear: {
-                        select: {
-                            id: true,
-                            name: true,
-                            isCurrent: true
-                        }
-                    }
                 },
                 orderBy: [
                     { leaveType: 'asc' }
@@ -55,7 +55,7 @@ export async function POST(req, props) {
     const { schoolId } = params;
     const data = await req.json();
 
-    const {
+    let {
         academicYearId,
         leaveType,
         yearlyLimit,
@@ -67,13 +67,27 @@ export async function POST(req, props) {
         applicableToNonTeaching
     } = data;
 
-    if (!academicYearId || !leaveType || yearlyLimit === undefined) {
+    if (!leaveType || yearlyLimit === undefined) {
         return NextResponse.json({
-            error: 'academicYearId, leaveType, and yearlyLimit are required'
+            error: 'leaveType and yearlyLimit are required'
         }, { status: 400 });
     }
 
     try {
+        // Auto-fetch current academic year if not provided
+        if (!academicYearId) {
+            const currentYear = await prisma.academicYear.findFirst({
+                where: { schoolId, isActive: true },
+                select: { id: true }
+            });
+            if (!currentYear) {
+                return NextResponse.json({
+                    error: 'No current academic year found. Please set up an academic year first.'
+                }, { status: 400 });
+            }
+            academicYearId = currentYear.id;
+        }
+
         // Check if bucket already exists for this leave type and academic year
         const existing = await prisma.leaveBucket.findFirst({
             where: {
@@ -102,11 +116,6 @@ export async function POST(req, props) {
                 applicableToTeaching: applicableToTeaching ?? true,
                 applicableToNonTeaching: applicableToNonTeaching ?? true,
                 isActive: true
-            },
-            include: {
-                academicYear: {
-                    select: { id: true, name: true }
-                }
             }
         });
 

@@ -128,6 +128,13 @@ export async function POST(req, props) {
         const body = await req.json();
         const { bookId, userId, userType, remarks } = body;
 
+        // Fetch user details for notification
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { name: true }
+        });
+
+
         if (!bookId || !userId || !userType) {
             return NextResponse.json(
                 { error: "Missing required fields" },
@@ -189,6 +196,16 @@ export async function POST(req, props) {
                     },
                 },
             },
+        });
+
+        // Send notification to Admin/Librarian
+        const { notifyBookRequested } = await import("@/lib/notifications/notificationHelper");
+        await notifyBookRequested({
+            schoolId,
+            userName: user?.name || "Unknown User",
+            bookTitle: request.book.title,
+            userType,
+            senderId: userId
         });
 
         await invalidatePattern(`library:requests:*${schoolId}*`);

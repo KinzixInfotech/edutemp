@@ -196,7 +196,22 @@ export async function PUT(req) {
 export async function DELETE(req) {
     try {
         const body = await req.json();
-        const { notificationIds } = body;
+        const { notificationIds, clearAll, userId } = body;
+
+        if (clearAll && userId) {
+            await prisma.notification.deleteMany({
+                where: {
+                    receiverId: userId
+                }
+            });
+
+            await invalidatePattern(`notifications:*${userId}*`);
+
+            return NextResponse.json({
+                success: true,
+                message: "All notifications cleared"
+            });
+        }
 
         if (!notificationIds || !Array.isArray(notificationIds)) {
             return NextResponse.json(

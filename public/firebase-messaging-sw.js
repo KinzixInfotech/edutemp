@@ -28,13 +28,25 @@ messaging.onBackgroundMessage(function (payload) {
     const notificationOptions = {
         body: notificationBody,
         icon: '/icon.png',
-        image: payload.notification.image, // Support images
+        image: payload.notification?.image, // Support images
         requireInteraction: true, // Keep notification until user interacts
         tag: 'ren-notification', // Group notifications
         data: payload.data || {}
     };
 
     self.registration.showNotification(notificationTitle, notificationOptions);
+
+    // Broadcast to main app to update badge/notification list
+    const channel = new BroadcastChannel('fcm-channel');
+    channel.postMessage({
+        type: 'BACKGROUND_MESSAGE',
+        payload: {
+            title: notificationTitle,
+            body: notificationBody,
+            data: payload.data || {}
+        }
+    });
+    channel.close();
 });
 
 // Handle Notification Clicks

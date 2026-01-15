@@ -1064,6 +1064,63 @@ export async function notifyLeaveRejected({
 }
 
 /**
+ * Notify teacher when their regularization request is approved
+ */
+export async function notifyRegularizationApproved({
+    schoolId,
+    userId,
+    date,
+    status,
+    remarks
+}) {
+    const dateFormatted = new Date(date).toLocaleDateString('en-IN', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short'
+    });
+
+    return sendNotification({
+        schoolId,
+        title: 'Regularization Approved ✅',
+        message: `Your attendance regularization for ${dateFormatted} has been approved${remarks ? `. Remarks: ${remarks}` : ''}`,
+        type: 'ATTENDANCE',
+        priority: 'NORMAL',
+        icon: '✅',
+        targetOptions: { userIds: [userId] },
+        metadata: { date, status, remarks },
+        actionUrl: '/attendance'
+    });
+}
+
+/**
+ * Notify teacher when their regularization request is rejected
+ */
+export async function notifyRegularizationRejected({
+    schoolId,
+    userId,
+    date,
+    reason
+}) {
+    const dateFormatted = new Date(date).toLocaleDateString('en-IN', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short'
+    });
+
+    return sendNotification({
+        schoolId,
+        title: 'Regularization Rejected',
+        message: `Your attendance regularization for ${dateFormatted} has been rejected${reason ? `: ${reason}` : ''}`,
+        type: 'ATTENDANCE',
+        priority: 'HIGH',
+        icon: '❌',
+        targetOptions: { userIds: [userId] },
+        metadata: { date, reason },
+        actionUrl: '/attendance'
+    });
+}
+
+/**
  * Notify teacher when assigned as an evaluator
  */
 export async function notifyEvaluatorAssigned({
@@ -1199,5 +1256,284 @@ export async function notifyFormSubmission({
             actionUrl: `/dashboard/forms/${formId}/submissions`
         },
         actionUrl: `/dashboard/forms/${formId}/submissions`
+    });
+}
+
+/**
+ * OPTIMIZED: Notify students and parents when attendance is marked
+ * Uses batching, parallel processing, and non-blocking execution
+ * 
+ * @param {Object} params
+ * @param {string} params.schoolId - School ID
+ * @param {Array} params.attendanceRecords - Array of { userId, status, studentName }
+ * @param {string} params.date - Attendance date
+ * @param {string} params.markedBy - Teacher user ID
+ * @param {string} params.className - Class name for notification
+ */
+export async function notifyBulkAttendanceMarked({
+    schoolId,
+    attendanceRecords,
+    date,
+    markedBy,
+    className = ''
+}) {
+    // Execute in background - don't block the API response
+    setImmediate(async () => {
+        try {
+            console.log(`[Attendance Notification] Starting for ${attendanceRecords.length} students...`);
+            const startTime = Date.now();
+
+            if (!attendanceRecords || attendanceRecords.length === 0) {
+                console.log('[Attendance Notification] No records to process');
+                return;
+            }
+
+            const dateFormatted = new Date(date).toLocaleDateString('en-IN', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric'
+            });
+
+            // OPTIMIZATION 1: Batch fetch all parent links in ONE query
+            const studentUserIds = attendanceRecords.map(r => r.userId);
+
+            const [parentLinks, studentInfo] = await Promise.all([
+                prisma.studentParentLink.findMany({
+                    where: {
+                        student: {
+                            userId: { in: studentUserIds },
+                            schoolId
+                        },
+                        isActive: true
+                    },
+                    select: {
+                        student: {
+                            select: { userId: true, name: true }
+                        },
+                        parent: {
+                            select: { userId: true }
+                        }
+                    }
+                }),
+                prisma.student.findMany({
+                    where: {
+                        userId: { in: studentUserIds },
+                        schoolId
+                    },
+                    select: {
+                        userId: true,
+                        name: true
+                    }
+                })
+            ]);
+
+            // Build student name map
+            const studentNameMap = new Map();
+            studentInfo.forEach(s => studentNameMap.set(s.userId, s.name));
+
+            // Build parent-student relationship map
+            const studentToParents = new Map();
+            parentLinks.forEach(link => {
+                const studentId = link.student.userId;
+                if (!studentToParents.has(studentId)) {
+                    studentToParents.set(studentId, []);
+                }
+                studentToParents.get(studentId).push(link.parent.userId);
+            });
+
+            // OPTIMIZATION 2: Group records by status for batch processing
+            const recordsByStatus = attendanceRecords.reduce((acc, record) => {
+                const status = record.status;
+                if (!acc[status]) acc[status] = [];
+                acc[status].push({
+                    ...record,
+                    studentName: record.studentName || studentNameMap.get(record.userId) || 'Student'
+                });
+                return acc;
+            }, {});
+
+            // OPTIMIZATION 3: Prepare all notifications in memory first
+            const allNotifications = [];
+            const allPushTargets = [];
+
+            for (const [status, records] of Object.entries(recordsByStatus)) {
+                for (const record of records) {
+                    const statusEmoji = status === 'PRESENT' ? '✅' : status === 'ABSENT' ? '❌' : '⏰';
+                    const statusText = status === 'PRESENT' ? 'present' : status === 'ABSENT' ? 'absent' : 'late';
+
+                    // Student notification
+                    allNotifications.push({
+                        senderId: markedBy,
+                        receiverId: record.userId,
+                        title: `Attendance Marked ${statusEmoji}`,
+                        message: `You have been marked ${statusText} for ${dateFormatted}${className ? ` in ${className}` : ''}`,
+                        type: 'ATTENDANCE',
+                        priority: status === 'ABSENT' ? 'HIGH' : 'NORMAL',
+                        icon: statusEmoji,
+                        actionUrl: '/attendance',
+                        metadata: JSON.stringify({ status, date }),
+                        isRead: false,
+                        schoolId
+                    });
+                    allPushTargets.push(record.userId);
+
+                    // Parent notifications (if any linked)
+                    const parentIds = studentToParents.get(record.userId) || [];
+                    for (const parentId of parentIds) {
+                        allNotifications.push({
+                            senderId: markedBy,
+                            receiverId: parentId,
+                            title: `Attendance: ${record.studentName} ${statusEmoji}`,
+                            message: `${record.studentName} was marked ${statusText} on ${dateFormatted}`,
+                            type: 'ATTENDANCE',
+                            priority: status === 'ABSENT' ? 'HIGH' : 'NORMAL',
+                            icon: statusEmoji,
+                            actionUrl: '/child/attendance',
+                            metadata: JSON.stringify({ status, date, studentId: record.userId }),
+                            isRead: false,
+                            schoolId
+                        });
+                        allPushTargets.push(parentId);
+                    }
+                }
+            }
+
+            // OPTIMIZATION 4: Batch insert notifications (chunks of 100)
+            const BATCH_SIZE = 100;
+            const notificationBatches = [];
+            for (let i = 0; i < allNotifications.length; i += BATCH_SIZE) {
+                notificationBatches.push(allNotifications.slice(i, i + BATCH_SIZE));
+            }
+
+            // Insert all batches in parallel
+            await Promise.allSettled(
+                notificationBatches.map(batch =>
+                    prisma.notification.createMany({ data: batch })
+                        .catch(err => console.error('[Attendance Notification] Batch insert error:', err))
+                )
+            );
+
+            console.log(`[Attendance Notification] Created ${allNotifications.length} notifications`);
+
+            // OPTIMIZATION 5: Send push notifications in background (non-blocking)
+            const uniquePushTargets = [...new Set(allPushTargets)];
+
+            // Batch push notifications too
+            const pushBatches = [];
+            for (let i = 0; i < uniquePushTargets.length; i += 500) {
+                pushBatches.push(uniquePushTargets.slice(i, i + 500));
+            }
+
+            // Process push batches with Promise.allSettled for resilience
+            for (const batch of pushBatches) {
+                sendPushNotificationsOptimized({
+                    userIds: batch,
+                    title: 'Attendance Update',
+                    message: `Attendance has been marked for ${dateFormatted}`,
+                    data: { type: 'ATTENDANCE', date }
+                }).catch(err => console.error('[Attendance Push] Error:', err));
+            }
+
+            const duration = Date.now() - startTime;
+            console.log(`[Attendance Notification] Completed in ${duration}ms for ${attendanceRecords.length} students, ${allNotifications.length} total notifications`);
+
+        } catch (error) {
+            console.error('[Attendance Notification] Background job error:', error);
+            // Don't throw - this runs in background
+        }
+    });
+}
+
+/**
+ * Optimized push notification sender with connection pooling
+ */
+async function sendPushNotificationsOptimized({ userIds, title, message, data = {} }) {
+    try {
+        // Fetch FCM tokens in bulk
+        const users = await prisma.user.findMany({
+            where: {
+                id: { in: userIds },
+                fcmToken: { not: null }
+            },
+            select: { id: true, fcmToken: true }
+        });
+
+        const validUsers = users.filter(u => u.fcmToken);
+        if (validUsers.length === 0) return;
+
+        const tokens = validUsers.map(u => u.fcmToken);
+
+        // Sanitize data
+        const stringifiedData = Object.entries(data).reduce((acc, [key, value]) => {
+            if (value !== null && value !== undefined) {
+                acc[key] = String(value);
+            }
+            return acc;
+        }, { click_action: 'FLUTTER_NOTIFICATION_CLICK', title, body: message });
+
+        // Send multicast (more efficient than individual sends)
+        const response = await messaging.sendEachForMulticast({
+            tokens,
+            notification: { title, body: message },
+            data: stringifiedData,
+            android: { notification: { channelId: 'default', priority: 'high' } },
+            apns: { payload: { aps: { sound: 'default', contentAvailable: true } } }
+        });
+
+        console.log(`[Push] Sent to ${response.successCount}/${tokens.length} devices`);
+
+        // Cleanup invalid tokens in background
+        if (response.failureCount > 0) {
+            const invalidUserIds = [];
+            response.responses.forEach((resp, idx) => {
+                if (!resp.success) {
+                    const errorCode = resp.error?.code;
+                    if (errorCode === 'messaging/registration-token-not-registered' ||
+                        errorCode === 'messaging/invalid-registration-token') {
+                        invalidUserIds.push(validUsers[idx].id);
+                    }
+                }
+            });
+
+            if (invalidUserIds.length > 0) {
+                prisma.user.updateMany({
+                    where: { id: { in: invalidUserIds } },
+                    data: { fcmToken: null }
+                }).catch(e => console.error('[Push] Token cleanup error:', e));
+            }
+        }
+    } catch (error) {
+        console.error('[Push Optimized] Error:', error);
+    }
+}
+
+/**
+ * Notify Admin and Librarian when a book is requested
+ */
+export async function notifyBookRequested({
+    schoolId,
+    userName,
+    bookTitle,
+    userType,
+    senderId
+}) {
+    return sendNotification({
+        schoolId,
+        title: 'New Book Request',
+        message: `${userName} (${userType.toLowerCase()}) requested "${bookTitle}"`,
+        type: 'LIBRARY',
+        priority: 'NORMAL',
+        icon: '📚',
+        targetOptions: {
+            roleNames: ['ADMIN', 'LIBRARIAN']
+        },
+        senderId,
+        metadata: {
+            bookTitle,
+            userName,
+            userType,
+            requestType: 'BOOK_REQUEST'
+        },
+        actionUrl: '/library/requests'
     });
 }

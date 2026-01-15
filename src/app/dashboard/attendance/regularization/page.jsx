@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-    FileText, CheckCircle, XCircle, Clock, AlertCircle, Eye,
-    Download, Filter, RefreshCw
+    FileText, CheckCircle, XCircle, Clock, AlertCircle,
+    Download, RefreshCw, Search, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,9 +13,20 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
-import { Checkbox } from '@/components/ui/checkbox';
+
+const ITEMS_PER_PAGE = 10;
 
 export default function AttendanceRegularization() {
     const { fullUser } = useAuth();
@@ -23,18 +34,62 @@ export default function AttendanceRegularization() {
     const adminId = fullUser?.id;
     const queryClient = useQueryClient();
 
+    // Filters (client-side)
     const [statusFilter, setStatusFilter] = useState('PENDING');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+
+    // Actions
     const [selectedRequests, setSelectedRequests] = useState([]);
     const [approvalRemarks, setApprovalRemarks] = useState('');
 
+    // Fetch ALL requests once (no status in queryKey)
     const { data, isLoading, refetch } = useQuery({
-        queryKey: ['regularization', schoolId, statusFilter],
+        queryKey: ['regularization', schoolId],
         queryFn: async () => {
-            const res = await fetch(`/api/schools/${schoolId}/attendance/admin/regularization?status=${statusFilter}`);
+            const res = await fetch(`/api/schools/${schoolId}/attendance/admin/regularization?status=PENDING,APPROVED,REJECTED`);
             if (!res.ok) throw new Error('Failed');
             return res.json();
-        }
+        },
+        enabled: !!schoolId,
+        staleTime: 1000 * 60 * 2,
     });
+
+    // Client-side filtering
+    const filteredRequests = useMemo(() => {
+        const allRequests = data?.requests || [];
+        return allRequests.filter(request => {
+            const matchesStatus = request.approvalStatus === statusFilter;
+            const matchesSearch = !searchQuery ||
+                request.user?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                request.user?.email?.toLowerCase().includes(searchQuery.toLowerCase());
+            return matchesStatus && matchesSearch;
+        });
+    }, [data?.requests, statusFilter, searchQuery]);
+
+    // Status counts for badges
+    const statusCounts = useMemo(() => {
+        const allRequests = data?.requests || [];
+        return {
+            PENDING: allRequests.filter(r => r.approvalStatus === 'PENDING').length,
+            APPROVED: allRequests.filter(r => r.approvalStatus === 'APPROVED').length,
+            REJECTED: allRequests.filter(r => r.approvalStatus === 'REJECTED').length,
+        };
+    }, [data?.requests]);
+
+    // Pagination
+    const totalPages = Math.ceil(filteredRequests.length / ITEMS_PER_PAGE);
+    const paginatedRequests = filteredRequests.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE
+    );
+
+    // Reset page when filters change
+    const handleStatusChange = (status) => {
+        setStatusFilter(status);
+        setCurrentPage(1);
+        setSelectedRequests([]);
+    };
 
     const approveMutation = useMutation({
         mutationFn: async ({ action }) => {
@@ -48,7 +103,6 @@ export default function AttendanceRegularization() {
                     remarks: approvalRemarks
                 })
             });
-
             if (!res.ok) throw new Error('Failed');
             return res.json();
         },
@@ -57,14 +111,11 @@ export default function AttendanceRegularization() {
             setSelectedRequests([]);
             setApprovalRemarks('');
             queryClient.invalidateQueries(['regularization']);
-            refetch();
         },
         onError: (error) => {
             toast.error(error.message);
         }
     });
-
-    const requests = data?.requests || [];
 
     const toggleSelection = (id) => {
         setSelectedRequests(prev =>
@@ -72,12 +123,12 @@ export default function AttendanceRegularization() {
         );
     };
 
-    const selectAll = () => {
-        setSelectedRequests(requests.map(r => r.id));
-    };
-
-    const clearSelection = () => {
-        setSelectedRequests([]);
+    const toggleSelectAll = () => {
+        if (selectedRequests.length === paginatedRequests.length) {
+            setSelectedRequests([]);
+        } else {
+            setSelectedRequests(paginatedRequests.map(r => r.id));
+        }
     };
 
     const formatDate = (dateString) => {
@@ -88,34 +139,49 @@ export default function AttendanceRegularization() {
         });
     };
 
-    const formatTime = (dateString) => {
-        if (!dateString) return '—';
-        return new Date(dateString).toLocaleTimeString('en-IN', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+    const getStatusBadge = (status) => {
+        switch (status) {
+            case 'APPROVED': return <Badge className="bg-green-100 text-green-700">Approved</Badge>;
+            case 'REJECTED': return <Badge className="bg-red-100 text-red-700">Rejected</Badge>;
+            default: return <Badge className="bg-yellow-100 text-yellow-700">Pending</Badge>;
+        }
     };
 
-    if (isLoading) {
+    const getRequestedStatusBadge = (status) => {
+        switch (status) {
+            case 'PRESENT': return <Badge className="bg-green-100 text-green-700">Present</Badge>;
+            case 'HALF_DAY': return <Badge className="bg-orange-100 text-orange-700">Half Day</Badge>;
+            case 'ON_LEAVE': return <Badge className="bg-purple-100 text-purple-700">On Leave</Badge>;
+            default: return <Badge variant="secondary">{status}</Badge>;
+        }
+    };
+
+    // Show minimal loading only on first load
+    if (!schoolId) {
         return (
-            <div className="flex items-center justify-center h-screen">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <div className="p-6 space-y-6">
+                <div className="flex justify-between items-center">
+                    <Skeleton className="h-8 w-48" />
+                    <Skeleton className="h-10 w-32" />
+                </div>
+                <div className="grid gap-4 md:grid-cols-3">
+                    {[1, 2, 3].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
+                </div>
+                <Skeleton className="h-96 rounded-xl" />
             </div>
         );
     }
 
     return (
-        <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+        <div className="p-6 space-y-6">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
-                        <FileText className="w-8 h-8 text-blue-600" />
+                    <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                        <FileText className="w-6 h-6 text-primary" />
                         Attendance Regularization
                     </h1>
-                    <p className="text-sm text-muted-foreground mt-1">
-                        Review and approve attendance correction requests
-                    </p>
+                    <p className="text-muted-foreground">Review and approve attendance correction requests</p>
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={() => refetch()}>
@@ -125,246 +191,283 @@ export default function AttendanceRegularization() {
                 </div>
             </div>
 
-            {/* Status Filter Tabs */}
-            <Tabs value={statusFilter} onValueChange={setStatusFilter} className="space-y-4">
+            {/* Stats Cards */}
+            <div className="grid gap-4 md:grid-cols-3">
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Pending</CardTitle>
+                        <Clock className="h-4 w-4 text-yellow-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{statusCounts.PENDING}</div>
+                        <p className="text-xs text-muted-foreground">Awaiting review</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Approved</CardTitle>
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{statusCounts.APPROVED}</div>
+                        <p className="text-xs text-muted-foreground">This period</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Rejected</CardTitle>
+                        <XCircle className="h-4 w-4 text-red-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{statusCounts.REJECTED}</div>
+                        <p className="text-xs text-muted-foreground">This period</p>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Filter Bar */}
+            <Card>
+                <CardContent className="p-4">
+                    <div className="flex flex-col gap-3 md:flex-row">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search by employee name..."
+                                value={searchQuery}
+                                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                                className="pl-9"
+                            />
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Status Tabs */}
+            <Tabs value={statusFilter} onValueChange={handleStatusChange}>
                 <TabsList>
                     <TabsTrigger value="PENDING">
-                        Pending <Badge variant="secondary" className="ml-2">{data?.requests?.length || 0}</Badge>
+                        Pending <Badge variant="secondary" className="ml-2">{statusCounts.PENDING}</Badge>
                     </TabsTrigger>
-                    <TabsTrigger value="APPROVED">Approved</TabsTrigger>
-                    <TabsTrigger value="REJECTED">Rejected</TabsTrigger>
+                    <TabsTrigger value="APPROVED">
+                        Approved <Badge variant="secondary" className="ml-2">{statusCounts.APPROVED}</Badge>
+                    </TabsTrigger>
+                    <TabsTrigger value="REJECTED">
+                        Rejected <Badge variant="secondary" className="ml-2">{statusCounts.REJECTED}</Badge>
+                    </TabsTrigger>
                 </TabsList>
 
-                {/* Action Bar */}
-                {statusFilter === 'PENDING' && requests.length > 0 && (
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                                <div className="flex items-center gap-2">
-                                    <Button variant="outline" size="sm" onClick={selectAll}>
-                                        Select All ({requests.length})
-                                    </Button>
-                                    {selectedRequests.length > 0 && (
-                                        <>
-                                            <Button variant="outline" size="sm" onClick={clearSelection}>
-                                                Clear Selection
+                {/* Bulk Actions */}
+                {statusFilter === 'PENDING' && selectedRequests.length > 0 && (
+                    <Card className="mt-4">
+                        <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                                <Badge variant="secondary">{selectedRequests.length} selected</Badge>
+                                <div className="flex gap-2">
+                                    <Dialog>
+                                        <DialogTrigger asChild>
+                                            <Button size="sm">
+                                                <CheckCircle className="w-4 h-4 mr-2" />
+                                                Approve
                                             </Button>
-                                            <Badge variant="secondary">
-                                                {selectedRequests.length} selected
-                                            </Badge>
-                                        </>
-                                    )}
+                                        </DialogTrigger>
+                                        <DialogContent>
+                                            <DialogHeader>
+                                                <DialogTitle>Approve Requests</DialogTitle>
+                                                <DialogDescription>
+                                                    Approve {selectedRequests.length} regularization request(s)
+                                                </DialogDescription>
+                                            </DialogHeader>
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-2">Remarks (Optional)</label>
+                                                    <Textarea
+                                                        placeholder="Add any remarks..."
+                                                        value={approvalRemarks}
+                                                        onChange={(e) => setApprovalRemarks(e.target.value)}
+                                                        rows={3}
+                                                    />
+                                                </div>
+                                                <Button
+                                                    className="w-full bg-green-600 hover:bg-green-700"
+                                                    onClick={() => approveMutation.mutate({ action: 'APPROVE' })}
+                                                    disabled={approveMutation.isPending}
+                                                >
+                                                    {approveMutation.isPending ? 'Processing...' : 'Confirm Approval'}
+                                                </Button>
+                                            </div>
+                                        </DialogContent>
+                                    </Dialog>
+
+                                    <Dialog>
+                                        <DialogTrigger asChild>
+                                            <Button variant="destructive" size="sm">
+                                                <XCircle className="w-4 h-4 mr-2" />
+                                                Reject
+                                            </Button>
+                                        </DialogTrigger>
+                                        <DialogContent>
+                                            <DialogHeader>
+                                                <DialogTitle>Reject Requests</DialogTitle>
+                                                <DialogDescription>
+                                                    Reject {selectedRequests.length} regularization request(s)
+                                                </DialogDescription>
+                                            </DialogHeader>
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-2">Reason (Required)</label>
+                                                    <Textarea
+                                                        placeholder="Explain why you're rejecting..."
+                                                        value={approvalRemarks}
+                                                        onChange={(e) => setApprovalRemarks(e.target.value)}
+                                                        rows={3}
+                                                    />
+                                                </div>
+                                                <Button
+                                                    className="w-full bg-red-600 hover:bg-red-700"
+                                                    onClick={() => approveMutation.mutate({ action: 'REJECT' })}
+                                                    disabled={approveMutation.isPending || !approvalRemarks}
+                                                >
+                                                    {approveMutation.isPending ? 'Processing...' : 'Confirm Rejection'}
+                                                </Button>
+                                            </div>
+                                        </DialogContent>
+                                    </Dialog>
+
+                                    <Button variant="outline" size="sm" onClick={() => setSelectedRequests([])}>
+                                        Clear
+                                    </Button>
                                 </div>
-
-                                {selectedRequests.length > 0 && (
-                                    <div className="flex gap-2">
-                                        <Dialog>
-                                            <DialogTrigger asChild>
-                                                <Button variant="default" size="sm">
-                                                    <CheckCircle className="w-4 h-4 mr-2" />
-                                                    Approve ({selectedRequests.length})
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent>
-                                                <DialogHeader>
-                                                    <DialogTitle>Approve Requests</DialogTitle>
-                                                    <DialogDescription>
-                                                        Approve {selectedRequests.length} attendance regularization request(s)
-                                                    </DialogDescription>
-                                                </DialogHeader>
-                                                <div className="space-y-4">
-                                                    <div>
-                                                        <label className="block text-sm font-medium mb-2">Admin Remarks (Optional)</label>
-                                                        <Textarea
-                                                            placeholder="Add any remarks..."
-                                                            value={approvalRemarks}
-                                                            onChange={(e) => setApprovalRemarks(e.target.value)}
-                                                            rows={3}
-                                                        />
-                                                    </div>
-                                                    <Button
-                                                        className="w-full bg-green-600 hover:bg-green-700"
-                                                        onClick={() => approveMutation.mutate({ action: 'APPROVE' })}
-                                                        disabled={approveMutation.isPending}
-                                                    >
-                                                        {approveMutation.isPending ? 'Processing...' : 'Confirm Approval'}
-                                                    </Button>
-                                                </div>
-                                            </DialogContent>
-                                        </Dialog>
-
-                                        <Dialog>
-                                            <DialogTrigger asChild>
-                                                <Button variant="destructive" size="sm">
-                                                    <XCircle className="w-4 h-4 mr-2" />
-                                                    Reject ({selectedRequests.length})
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent>
-                                                <DialogHeader>
-                                                    <DialogTitle>Reject Requests</DialogTitle>
-                                                    <DialogDescription>
-                                                        Reject {selectedRequests.length} attendance regularization request(s)
-                                                    </DialogDescription>
-                                                </DialogHeader>
-                                                <div className="space-y-4">
-                                                    <div>
-                                                        <label className="block text-sm font-medium mb-2">Rejection Reason (Required)</label>
-                                                        <Textarea
-                                                            placeholder="Explain why you're rejecting..."
-                                                            value={approvalRemarks}
-                                                            onChange={(e) => setApprovalRemarks(e.target.value)}
-                                                            rows={3}
-                                                        />
-                                                    </div>
-                                                    <Button
-                                                        className="w-full bg-red-600 hover:bg-red-700"
-                                                        onClick={() => approveMutation.mutate({ action: 'REJECT' })}
-                                                        disabled={approveMutation.isPending || !approvalRemarks}
-                                                    >
-                                                        {approveMutation.isPending ? 'Processing...' : 'Confirm Rejection'}
-                                                    </Button>
-                                                </div>
-                                            </DialogContent>
-                                        </Dialog>
-                                    </div>
-                                )}
                             </div>
                         </CardContent>
                     </Card>
                 )}
 
-                {/* Requests List */}
-                <TabsContent value={statusFilter}>
-                    {requests.length === 0 ? (
-                        <Card>
-                            <CardContent className="pt-6">
-                                <div className="text-center py-12">
-                                    <FileText className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                                    <p className="text-muted-foreground">
-                                        No {statusFilter.toLowerCase()} requests found
+                {/* Table Content */}
+                <TabsContent value={statusFilter} className="mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Regularization Requests</CardTitle>
+                            <CardDescription>
+                                {filteredRequests.length} {statusFilter.toLowerCase()} request(s) found
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {isLoading ? (
+                                <div className="flex flex-col items-center justify-center min-h-[200px] text-center p-8">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
+                                    <p className="text-sm text-muted-foreground">Loading requests...</p>
+                                </div>
+                            ) : paginatedRequests.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center min-h-[200px] text-center p-8">
+                                    <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+                                    <h3 className="text-lg font-medium">No requests found</h3>
+                                    <p className="text-sm text-muted-foreground">
+                                        No {statusFilter.toLowerCase()} regularization requests match your filters.
                                     </p>
                                 </div>
-                            </CardContent>
-                        </Card>
-                    ) : (
-                        <div className="space-y-4">
-                            {requests.map((request) => (
-                                <Card key={request.id} className={`
-                  ${selectedRequests.includes(request.id) ? 'ring-2 ring-blue-500' : ''}
-                  hover:shadow-lg transition-all cursor-pointer
-                `}>
-                                    <CardContent className="pt-6">
-                                        <div className="flex items-start gap-4">
-                                            {/* Checkbox */}
-                                            {statusFilter === 'PENDING' && (
-                                                <div className="mt-1">
-                                                    {/* <input
-                                                        type="checkbox"
-                                                        checked={selectedRequests.includes(request.id)}
-                                                        onChange={() => toggleSelection(request.id)}
-                                                        className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                    /> */}
-                                                    <Checkbox
-                                                        checked={selectedRequests.includes(request.id)}
-                                                        onCheckedChange={() => toggleSelection(request.id)}
-                                                        className="w-5 h-5"
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {/* Profile */}
-                                            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-xl font-bold text-blue-600">
-                                                {request.user.name.charAt(0)}
-                                            </div>
-
-                                            {/* Details */}
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <h4 className="font-semibold">{request.user.name}</h4>
-                                                    <Badge variant="outline">{request.user.role.name}</Badge>
-                                                    {request.isPastDate && (
-                                                        <Badge variant="destructive">
-                                                            {request.daysOld} days old
-                                                        </Badge>
+                            ) : (
+                                <>
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                {statusFilter === 'PENDING' && (
+                                                    <TableHead className="w-12">
+                                                        <Checkbox
+                                                            checked={selectedRequests.length === paginatedRequests.length && paginatedRequests.length > 0}
+                                                            onCheckedChange={toggleSelectAll}
+                                                        />
+                                                    </TableHead>
+                                                )}
+                                                <TableHead>Employee</TableHead>
+                                                <TableHead>Date</TableHead>
+                                                <TableHead>Requested Status</TableHead>
+                                                <TableHead>Reason</TableHead>
+                                                <TableHead>Days Old</TableHead>
+                                                <TableHead>Status</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {paginatedRequests.map((request) => (
+                                                <TableRow key={request.id} className={selectedRequests.includes(request.id) ? 'bg-blue-50 dark:bg-blue-950/20' : ''}>
+                                                    {statusFilter === 'PENDING' && (
+                                                        <TableCell>
+                                                            <Checkbox
+                                                                checked={selectedRequests.includes(request.id)}
+                                                                onCheckedChange={() => toggleSelection(request.id)}
+                                                            />
+                                                        </TableCell>
                                                     )}
-                                                </div>
-
-                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm mb-3">
-                                                    <div>
-                                                        <p className="text-muted-foreground">Date</p>
-                                                        <p className="font-medium">{formatDate(request.date)}</p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-muted-foreground mb-1">Requested Status</p>
-                                                        <Badge variant={request.status === 'PRESENT' ? 'default' : 'destructive'}>
-                                                            {request.status}
-                                                        </Badge>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-muted-foreground">Submitted</p>
-                                                        <p className="font-medium">{formatTime(request.markedAt)}</p>
-                                                    </div>
-                                                </div>
-
-                                                {/* Reason */}
-                                                {request.remarks && (
-                                                    <div className="bg-gray-50  dark:bg-muted dark:border rounded-lg p-3 mb-3">
-                                                        <p className="text-sm font-medium mb-1">Reason:</p>
-                                                        <p className="text-sm text-muted-foreground">{request.remarks}</p>
-                                                    </div>
-                                                )}
-
-                                                {/* Documents */}
-                                                {request.documents && request.documents.length > 0 && (
-                                                    <div className="flex gap-2">
-                                                        {request.documents.map((doc, idx) => (
-                                                            <Button key={idx} variant="outline" size="sm" asChild>
-                                                                <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer">
-                                                                    <Download className="w-3 h-3 mr-1" />
-                                                                    {doc.fileName}
-                                                                </a>
-                                                            </Button>
-                                                        ))}
-                                                    </div>
-                                                )}
-
-                                                {/* Approval Info (for approved/rejected) */}
-                                                {request.approvalStatus !== 'PENDING' && (
-                                                    <div className="mt-3 pt-3 border-t">
-                                                        <div className="flex items-center gap-2 text-sm">
-                                                            <p className="text-muted-foreground">
-                                                                {request.approvalStatus === 'APPROVED' ? 'Approved' : 'Rejected'} by {request.approver?.name}
-                                                            </p>
-                                                            <Badge variant={request.approvalStatus === 'APPROVED' ? 'default' : 'destructive'}>
-                                                                {formatDate(request.approvedAt)}
-                                                            </Badge>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium text-sm">
+                                                                {request.user?.name?.charAt(0) || '?'}
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-medium">{request.user?.name}</p>
+                                                                <p className="text-xs text-muted-foreground">
+                                                                    {request.user?.role?.name}
+                                                                </p>
+                                                            </div>
                                                         </div>
-                                                        {request.approvalRemarks && (
-                                                            <p className="text-sm text-muted-foreground mt-2">
-                                                                Remarks: {request.approvalRemarks}
-                                                            </p>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <p className="font-medium">{formatDate(request.date)}</p>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {getRequestedStatusBadge(request.status)}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <p className="text-sm line-clamp-2 max-w-[200px]">{request.remarks || '-'}</p>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {request.daysOld > 0 ? (
+                                                            <Badge variant="outline" className="text-orange-600">
+                                                                {request.daysOld} days
+                                                            </Badge>
+                                                        ) : (
+                                                            <span className="text-muted-foreground">Today</span>
                                                         )}
-                                                    </div>
-                                                )}
-                                            </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {getStatusBadge(request.approvalStatus)}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
 
-                                            {/* Student Info (if applicable) */}
-                                            {request.user.student && (
-                                                <div className="text-right text-sm">
-                                                    <p className="text-muted-foreground">Class</p>
-                                                    <p className="font-medium">{request.user.student.class?.className}</p>
-                                                    <p className="text-xs text-muted-foreground mt-1">
-                                                        {request.user.student.admissionNo}
-                                                    </p>
-                                                </div>
-                                            )}
+                                    {/* Pagination */}
+                                    {totalPages > 1 && (
+                                        <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                                            <p className="text-sm text-muted-foreground">
+                                                Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredRequests.length)} of {filteredRequests.length}
+                                            </p>
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => setCurrentPage(p => p - 1)}
+                                                    disabled={currentPage === 1}
+                                                >
+                                                    <ChevronLeft className="h-4 w-4" />
+                                                    Previous
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => setCurrentPage(p => p + 1)}
+                                                    disabled={currentPage === totalPages}
+                                                >
+                                                    Next
+                                                    <ChevronRight className="h-4 w-4" />
+                                                </Button>
+                                            </div>
                                         </div>
-                                    </CardContent>
-                                </Card>
-                            ))}
-                        </div>
-                    )}
+                                    )}
+                                </>
+                            )}
+                        </CardContent>
+                    </Card>
                 </TabsContent>
             </Tabs>
         </div>

@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { notifyBulkAttendanceMarked } from '@/lib/notifications/notificationHelper';
 
 // ===== CONFIG =====
 export const DEBUG = true;
@@ -472,6 +473,34 @@ export async function POST(req, props) {
         failedCount: results.failed.length
       });
     });
+
+    // BACKGROUND: Send notifications to students and parents (non-blocking)
+    // This runs AFTER the response is sent - doesn't slow down API
+    if (results.success.length > 0) {
+      // Get class name for notification
+      const classInfo = await prisma.class.findUnique({
+        where: { id: toInt(classId) },
+        select: { className: true }
+      });
+
+      // Build attendance records for notification
+      const attendanceRecords = (Array.isArray(attendance) ? attendance : [])
+        .filter(a => results.success.includes(a.userId))
+        .map(a => ({
+          userId: a.userId,
+          status: a.status,
+          studentName: null // Will be fetched in the notification function
+        }));
+
+      // Fire and forget - notifyBulkAttendanceMarked uses setImmediate internally
+      notifyBulkAttendanceMarked({
+        schoolId,
+        attendanceRecords,
+        date: attendanceDate.toISOString(),
+        markedBy,
+        className: classInfo?.className || ''
+      }).catch(err => console.error('Notification dispatch error:', err));
+    }
 
     return NextResponse.json({
       success: true,

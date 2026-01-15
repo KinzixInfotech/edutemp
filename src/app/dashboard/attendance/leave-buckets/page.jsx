@@ -39,19 +39,23 @@ import {
     Bucket,
     Edit,
     Trash2,
-    Calendar
+    Calendar,
+    FileText,
+    Clock,
+    CheckCircle,
+    Users
 } from "lucide-react";
 import { toast } from "sonner";
 
 const leaveTypes = [
-    { value: "CASUAL_LEAVE", label: "Casual Leave", color: "bg-blue-500" },
-    { value: "SICK_LEAVE", label: "Sick Leave", color: "bg-red-500" },
-    { value: "EARNED_LEAVE", label: "Earned Leave", color: "bg-green-500" },
-    { value: "MATERNITY_LEAVE", label: "Maternity Leave", color: "bg-pink-500" },
-    { value: "PATERNITY_LEAVE", label: "Paternity Leave", color: "bg-purple-500" },
-    { value: "COMPENSATORY_OFF", label: "Compensatory Off", color: "bg-orange-500" },
-    { value: "LEAVE_WITHOUT_PAY", label: "Leave Without Pay", color: "bg-gray-500" },
-    { value: "OTHER", label: "Other", color: "bg-slate-500" },
+    { value: "CASUAL", label: "Casual Leave", color: "bg-blue-500" },
+    { value: "SICK", label: "Sick Leave", color: "bg-red-500" },
+    { value: "EARNED", label: "Earned Leave", color: "bg-green-500" },
+    { value: "MATERNITY", label: "Maternity Leave", color: "bg-pink-500" },
+    { value: "PATERNITY", label: "Paternity Leave", color: "bg-purple-500" },
+    { value: "EMERGENCY", label: "Emergency Leave", color: "bg-orange-500" },
+    { value: "UNPAID", label: "Unpaid Leave", color: "bg-gray-500" },
+    { value: "COMPENSATORY", label: "Compensatory Off", color: "bg-cyan-500" },
 ];
 
 const getLeaveTypeLabel = (type) => {
@@ -69,32 +73,12 @@ export default function LeaveBucketsPage() {
 
     const [showDialog, setShowDialog] = useState(false);
     const [editBucket, setEditBucket] = useState(null);
-    const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
 
-    // Fetch academic years
-    const { data: academicYears } = useQuery({
-        queryKey: ["academic-years", schoolId],
-        queryFn: async () => {
-            const res = await fetch(`/api/schools/${schoolId}/academic-years`);
-            if (!res.ok) throw new Error("Failed to fetch academic years");
-            return res.json();
-        },
-        enabled: !!schoolId,
-    });
-
-    // Set default academic year
-    const currentAcademicYear = academicYears?.find(y => y.isCurrent);
-    if (currentAcademicYear && !selectedAcademicYear) {
-        setSelectedAcademicYear(currentAcademicYear.id);
-    }
-
-    // Fetch leave buckets
+    // Fetch leave buckets (API auto-fetches current academic year)
     const { data: buckets, isLoading, refetch } = useQuery({
-        queryKey: ["leave-buckets", schoolId, selectedAcademicYear],
+        queryKey: ["leave-buckets", schoolId],
         queryFn: async () => {
-            const params = new URLSearchParams();
-            if (selectedAcademicYear) params.set("academicYearId", selectedAcademicYear);
-            const res = await fetch(`/api/schools/${schoolId}/attendance/leave-buckets?${params}`);
+            const res = await fetch(`/api/schools/${schoolId}/attendance/leave-buckets`);
             if (!res.ok) throw new Error("Failed to fetch leave buckets");
             return res.json();
         },
@@ -149,7 +133,6 @@ export default function LeaveBucketsPage() {
         const formData = new FormData(e.target);
 
         saveMutation.mutate({
-            academicYearId: formData.get("academicYearId") || selectedAcademicYear,
             leaveType: formData.get("leaveType"),
             yearlyLimit: parseInt(formData.get("yearlyLimit")) || 0,
             monthlyLimit: formData.get("monthlyLimit") ? parseInt(formData.get("monthlyLimit")) : null,
@@ -181,25 +164,16 @@ export default function LeaveBucketsPage() {
 
     return (
         <div className="p-6 space-y-6">
-            {/* Header */}
+            {/* Header - Consistent with Noticeboard */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold">Leave Buckets</h1>
-                    <p className="text-muted-foreground">Configure leave limits for each leave type per academic year</p>
+                    <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                        <Calendar className="w-6 h-6 text-primary" />
+                        Leave Buckets
+                    </h1>
+                    <p className="text-muted-foreground">Configure leave limits for each leave type</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Select value={selectedAcademicYear} onValueChange={setSelectedAcademicYear}>
-                        <SelectTrigger className="w-48">
-                            <SelectValue placeholder="Academic Year" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {academicYears?.map(year => (
-                                <SelectItem key={year.id} value={year.id}>
-                                    {year.name} {year.isCurrent && "(Current)"}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
                     <Button variant="outline" size="icon" onClick={() => refetch()}>
                         <RefreshCw className="h-4 w-4" />
                     </Button>
@@ -209,22 +183,33 @@ export default function LeaveBucketsPage() {
                 </div>
             </div>
 
-            {/* Stats Overview */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {leaveTypes.slice(0, 4).map(type => {
+            {/* Stats Cards - Consistent with Noticeboard */}
+            <div className="grid gap-4 md:grid-cols-4">
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Total Buckets</CardTitle>
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{buckets?.length || 0}</div>
+                        <p className="text-xs text-muted-foreground">Configured leave types</p>
+                    </CardContent>
+                </Card>
+                {leaveTypes.slice(0, 3).map(type => {
                     const bucket = buckets?.find(b => b.leaveType === type.value);
                     return (
-                        <Card key={type.value} className="bg-muted border-none">
-                            <CardContent className="pt-6">
-                                <div className="flex items-center gap-3">
-                                    <div className={`w-3 h-3 rounded-full ${type.color}`} />
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">{type.label}</p>
-                                        <p className="text-xl font-bold">
-                                            {bucket ? `${bucket.yearlyLimit} days/yr` : "Not set"}
-                                        </p>
-                                    </div>
+                        <Card key={type.value}>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">{type.label}</CardTitle>
+                                <div className={`w-3 h-3 rounded-full ${type.color}`} />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold">
+                                    {bucket ? bucket.yearlyLimit : 12}
                                 </div>
+                                <p className="text-xs text-muted-foreground">
+                                    {bucket ? 'days per year' : 'days (default)'}
+                                </p>
                             </CardContent>
                         </Card>
                     );
@@ -232,7 +217,7 @@ export default function LeaveBucketsPage() {
             </div>
 
             {/* Buckets Table */}
-            <Card className="bg-muted border-none">
+            <Card>
                 <CardHeader>
                     <CardTitle>Leave Bucket Configuration</CardTitle>
                     <CardDescription>Define yearly and monthly limits for each leave type</CardDescription>
@@ -304,12 +289,43 @@ export default function LeaveBucketsPage() {
                             </TableBody>
                         </Table>
                     ) : (
-                        <div className="text-center py-12 text-muted-foreground">
-                            <Calendar className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                            <h3 className="text-lg font-medium mb-2">No Leave Buckets</h3>
-                            <p className="mb-4">Configure leave limits for the selected academic year</p>
+                        <div className="text-center py-8">
+                            <Calendar className="mx-auto h-12 w-12 mb-4 text-muted-foreground opacity-50" />
+                            <h3 className="text-lg font-medium mb-2">No Leave Buckets Configured</h3>
+                            <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+                                System is using default values. Create custom buckets to override these defaults.
+                            </p>
+
+                            {/* Default Configuration Table */}
+                            <div className="border rounded-lg max-w-md mx-auto mb-6 text-left">
+                                <div className="bg-muted/50 px-4 py-2 font-medium text-sm">Default Leave Limits</div>
+                                <div className="divide-y">
+                                    <div className="flex items-center justify-between px-4 py-3">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-blue-500" />
+                                            <span className="text-sm">Casual Leave</span>
+                                        </div>
+                                        <span className="font-medium">12 days/year</span>
+                                    </div>
+                                    <div className="flex items-center justify-between px-4 py-3">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-red-500" />
+                                            <span className="text-sm">Sick Leave</span>
+                                        </div>
+                                        <span className="font-medium">10 days/year</span>
+                                    </div>
+                                    <div className="flex items-center justify-between px-4 py-3">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-green-500" />
+                                            <span className="text-sm">Earned Leave</span>
+                                        </div>
+                                        <span className="font-medium">15 days/year</span>
+                                    </div>
+                                </div>
+                            </div>
+
                             <Button onClick={openCreate}>
-                                <Plus className="mr-2 h-4 w-4" /> Add Leave Bucket
+                                <Plus className="mr-2 h-4 w-4" /> Add Custom Bucket
                             </Button>
                         </div>
                     )}
@@ -318,7 +334,7 @@ export default function LeaveBucketsPage() {
 
             {/* Create/Edit Dialog */}
             <Dialog open={showDialog} onOpenChange={setShowDialog}>
-                <DialogContent className="max-w-lg">
+                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>{editBucket ? "Edit Leave Bucket" : "Add Leave Bucket"}</DialogTitle>
                         <DialogDescription>
@@ -326,98 +342,100 @@ export default function LeaveBucketsPage() {
                         </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleSubmit}>
-                        <div className="space-y-4 py-4">
+                        <div className="space-y-6 py-4">
                             {!editBucket && (
-                                <>
-                                    <input type="hidden" name="academicYearId" value={selectedAcademicYear} />
-                                    <div>
-                                        <Label>Leave Type *</Label>
-                                        <Select name="leaveType" required>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select leave type" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {leaveTypes.map(type => (
-                                                    <SelectItem key={type.value} value={type.value}>
-                                                        <div className="flex items-center gap-2">
-                                                            <div className={`w-2 h-2 rounded-full ${type.color}`} />
-                                                            {type.label}
-                                                        </div>
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </>
+                                <div className="space-y-2">
+                                    <Label>Leave Type *</Label>
+                                    <Select name="leaveType" required>
+                                        <SelectTrigger className="mt-1.5">
+                                            <SelectValue placeholder="Select leave type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {leaveTypes.map(type => (
+                                                <SelectItem key={type.value} value={type.value}>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={`w-2 h-2 rounded-full ${type.color}`} />
+                                                        {type.label}
+                                                    </div>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             )}
 
                             <div className="grid grid-cols-2 gap-4">
-                                <div>
+                                <div className="space-y-2">
                                     <Label>Yearly Limit (days) *</Label>
                                     <Input
                                         name="yearlyLimit"
                                         type="number"
                                         min="0"
+                                        className="mt-1.5"
                                         defaultValue={editBucket?.yearlyLimit || 12}
                                         required
                                     />
                                 </div>
-                                <div>
+                                <div className="space-y-2">
                                     <Label>Monthly Limit (days)</Label>
                                     <Input
                                         name="monthlyLimit"
                                         type="number"
                                         min="0"
                                         placeholder="Optional"
+                                        className="mt-1.5"
                                         defaultValue={editBucket?.monthlyLimit || ""}
                                     />
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
-                                <div>
+                                <div className="space-y-2">
                                     <Label>Carry Forward Limit</Label>
                                     <Input
                                         name="carryForwardLimit"
                                         type="number"
                                         min="0"
+                                        className="mt-1.5"
                                         defaultValue={editBucket?.carryForwardLimit || 0}
                                     />
-                                    <p className="text-xs text-muted-foreground mt-1">Max days that can be carried to next year</p>
+                                    <p className="text-xs text-muted-foreground">Max days to carry forward</p>
                                 </div>
-                                <div>
+                                <div className="space-y-2">
                                     <Label>Encashment Limit</Label>
                                     <Input
                                         name="encashmentLimit"
                                         type="number"
                                         min="0"
+                                        className="mt-1.5"
                                         defaultValue={editBucket?.encashmentLimit || 0}
                                     />
-                                    <p className="text-xs text-muted-foreground mt-1">Max days that can be encashed</p>
+                                    <p className="text-xs text-muted-foreground">Max days encashable</p>
                                 </div>
                             </div>
 
-                            <div>
+                            <div className="space-y-2">
                                 <Label>Encashment Rate (₹ per day)</Label>
                                 <Input
                                     name="encashmentPerDayRate"
                                     type="number"
                                     step="0.01"
                                     placeholder="Optional"
+                                    className="mt-1.5"
                                     defaultValue={editBucket?.encashmentPerDayRate || ""}
                                 />
                             </div>
 
-                            <div className="space-y-3">
+                            <div className="space-y-4 pt-2 border-t">
                                 <Label>Applicable To</Label>
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between py-1">
                                     <span className="text-sm">Teaching Staff</span>
                                     <Switch
                                         name="applicableToTeaching"
                                         defaultChecked={editBucket?.applicableToTeaching ?? true}
                                     />
                                 </div>
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between py-1">
                                     <span className="text-sm">Non-Teaching Staff</span>
                                     <Switch
                                         name="applicableToNonTeaching"
@@ -426,7 +444,7 @@ export default function LeaveBucketsPage() {
                                 </div>
                             </div>
                         </div>
-                        <DialogFooter>
+                        <DialogFooter className="gap-2 sm:gap-0">
                             <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
                             <Button type="submit" disabled={saveMutation.isPending}>
                                 {saveMutation.isPending ? "Saving..." : editBucket ? "Update" : "Create"}

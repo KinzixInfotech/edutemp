@@ -162,6 +162,51 @@ export function RequestsDropdown({ schoolId }) {
         }
     };
 
+    const handleClearAll = async () => {
+        if (!fullUser?.id) return;
+
+        // Optimistic update - clear UI immediately
+        const previousNotifications = queryClient.getQueryData(['notifications', fullUser.id]);
+        const previousCounts = queryClient.getQueryData(['requests-counts', schoolId]);
+
+        // Clear notification list
+        queryClient.setQueryData(['notifications', fullUser.id], (old) => {
+            if (!old) return { notifications: [], total: 0 };
+            // Keep structure but clear list
+            const newStructure = { ...old };
+            if (newStructure.notifications) newStructure.notifications = [];
+            if (newStructure.today) newStructure.today = [];
+            if (newStructure.yesterday) newStructure.yesterday = [];
+            if (newStructure.earlier) newStructure.earlier = [];
+            return newStructure;
+        });
+
+        // Clear notification count
+        queryClient.setQueryData(['requests-counts', schoolId], (old) => {
+            if (!old) return old;
+            return { ...old, notifications: 0 };
+        });
+
+        try {
+            await fetch('/api/notifications', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    clearAll: true,
+                    userId: fullUser.id
+                })
+            });
+            // Re-fetch to ensure sync with server
+            await Promise.all([refetchNotifications(), refetchCounts()]);
+        } catch (error) {
+            console.error('Failed to clear notifications:', error);
+            // Revert on failure
+            if (previousNotifications) queryClient.setQueryData(['notifications', fullUser.id], previousNotifications);
+            if (previousCounts) queryClient.setQueryData(['requests-counts', schoolId], previousCounts);
+        }
+    };
+
+
     return (
         <Popover open={open} onOpenChange={handleOpenChange}>
             <PopoverTrigger asChild>
@@ -201,6 +246,18 @@ export function RequestsDropdown({ schoolId }) {
                     <div className="p-3">
                         <div className="flex items-center justify-between px-2 py-1.5 mb-1">
                             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Recent Notifications</span>
+                            {notifications.length > 0 && (
+                                <Button
+                                    variant="ghost"
+                                    className="h-5 px-2 text-[10px] text-muted-foreground hover:text-red-600 hover:bg-red-50"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        handleClearAll();
+                                    }}
+                                >
+                                    Clear All
+                                </Button>
+                            )}
                         </div>
 
                         {notificationsLoading ? (

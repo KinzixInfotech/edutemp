@@ -1,10 +1,15 @@
 // app/api/schools/[schoolId]/attendance/admin/regularization/route.js
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import {
+    notifyRegularizationRequestCreated,
+    notifyRegularizationApproved,
+    notifyRegularizationRejected
+} from '@/lib/notifications/notificationHelper';
 
 // GET - Fetch regularization requests
 export async function GET(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     const { schoolId } = params; // Fix: await params
     const { searchParams } = new URL(req.url);
 
@@ -122,7 +127,7 @@ export async function GET(req, props) {
 
 // POST - Approve or reject requests
 export async function POST(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     const { schoolId } = params;
     const { attendanceIds, action, approvedBy, remarks } = await req.json();
 
@@ -196,7 +201,7 @@ export async function POST(req, props) {
                         results.rejected.push(updated);
                     }
 
-                    // Create notification
+                    // Create notification record in DB
                     await tx.attendanceNotification.create({
                         data: {
                             schoolId,
@@ -210,6 +215,28 @@ export async function POST(req, props) {
                             status: 'PENDING'
                         }
                     });
+
+                    // Send push notification to teacher
+                    try {
+                        if (action === 'APPROVE') {
+                            await notifyRegularizationApproved({
+                                schoolId,
+                                userId: attendance.userId,
+                                date: attendance.date,
+                                status: attendance.status,
+                                remarks
+                            });
+                        } else {
+                            await notifyRegularizationRejected({
+                                schoolId,
+                                userId: attendance.userId,
+                                date: attendance.date,
+                                reason: remarks
+                            });
+                        }
+                    } catch (notifyError) {
+                        console.error('Failed to send regularization notification to teacher:', notifyError);
+                    }
 
                 } catch (error) {
                     results.failed.push({ id, error: error.message });
@@ -237,7 +264,7 @@ export async function POST(req, props) {
 
 // PUT - Request regularization (for teachers/staff to request correction)
 export async function PUT(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     const { schoolId } = params;
     const {
         userId,
@@ -315,6 +342,28 @@ export async function PUT(req, props) {
                     fileName: doc.name
                 }))
             });
+        }
+
+        // Get user name for notification
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { name: true }
+        });
+
+        // Notify school admins about the new regularization request
+        try {
+            await notifyRegularizationRequestCreated({
+                schoolId,
+                userId,
+                userName: user?.name || 'Staff Member',
+                date: requestDate.toISOString(),
+                requestedStatus,
+                reason,
+                senderId: userId
+            });
+        } catch (notifyError) {
+            console.error('Failed to send regularization notification to admins:', notifyError);
+            // Don't fail the request if notification fails
         }
 
         return NextResponse.json({
@@ -401,4 +450,52 @@ async function updateAttendanceStats(tx, schoolId, userId, date) {
     });
 }
 
- 
+// DELETE - Delete rejected regularization requests
+export async function DELETE(req, props) {
+    const params = await props.params;
+    const { schoolId } = params;
+    const { searchParams } = new URL(req.url);
+    const requestId = searchParams.get('requestId');
+    const userId = searchParams.get('userId');
+
+    if (!requestId) {
+        return NextResponse.json({
+            error: 'requestId required'
+        }, { status: 400 });
+    }
+
+    try {
+        const request = await prisma.attendance.findUnique({
+            where: { id: requestId }
+        });
+
+        if (!request) {
+            return NextResponse.json({ error: 'Request not found' }, { status: 404 });
+        }
+
+        if (request.schoolId !== schoolId || request.userId !== userId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+        }
+
+        // Only allow deleting REJECTED regularization requests
+        if (request.approvalStatus === 'REJECTED') {
+            await prisma.attendance.delete({
+                where: { id: requestId }
+            });
+            return NextResponse.json({
+                success: true,
+                message: 'Regularization request deleted'
+            });
+        } else {
+            return NextResponse.json({
+                error: 'Can only delete rejected regularization requests'
+            }, { status: 400 });
+        }
+
+    } catch (error) {
+        console.error('Regularization deletion error:', error);
+        return NextResponse.json({
+            error: 'Failed to delete regularization request'
+        }, { status: 500 });
+    }
+}

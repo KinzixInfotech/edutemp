@@ -3,11 +3,16 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { remember, generateKey, invalidatePattern } from "@/lib/cache";
+import {
+    notifyLeaveRequestCreated,
+    notifyLeaveApproved,
+    notifyLeaveRejected
+} from '@/lib/notifications/notificationHelper';
 
 // GET - Fetch leave requests
 // GET - Fetch leave requests
 export async function GET(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     const { schoolId } = params;
     const { searchParams } = new URL(req.url);
 
@@ -20,134 +25,129 @@ export async function GET(req, props) {
     const endDate = searchParams.get('endDate');
 
     try {
-        const cacheKey = generateKey('attendance:leaves', {
-            schoolId, statusParam, userId, leaveType, page, limit, startDate, endDate
-        });
+        // Temporarily bypass cache for debugging
+        const skip = (page - 1) * limit;
 
-        const result = await remember(cacheKey, async () => {
-            const skip = (page - 1) * limit;
+        // Smart status handling - works for both single and multiple
+        let statusCondition;
+        if (statusParam) {
+            const statuses = statusParam.includes(',')
+                ? statusParam.split(',').map(s => s.trim())
+                : [statusParam];
+            statusCondition = statuses.length === 1
+                ? { status: statuses[0] }
+                : { status: { in: statuses } };
+        } else {
+            statusCondition = { status: 'PENDING' };
+        }
 
-            // Smart status handling - works for both single and multiple
-            let statusCondition;
-            if (statusParam) {
-                const statuses = statusParam.includes(',')
-                    ? statusParam.split(',').map(s => s.trim())
-                    : [statusParam];
-                statusCondition = statuses.length === 1
-                    ? { status: statuses[0] }
-                    : { status: { in: statuses } };
-            } else {
-                statusCondition = { status: 'PENDING' };
-            }
+        console.log('[Leave API Debug] schoolId:', schoolId, 'statusCondition:', statusCondition);
 
-            const where = {
-                schoolId,
-                ...statusCondition, // Use smart condition
-                ...(userId && { userId }),
-                ...(leaveType && { leaveType }),
-                ...(startDate && endDate && {
-                    startDate: { gte: new Date(startDate) },
-                    endDate: { lte: new Date(endDate) }
-                })
-            };
+        const where = {
+            schoolId,
+            ...statusCondition, // Use smart condition
+            ...(userId && { userId }),
+            ...(leaveType && { leaveType }),
+            ...(startDate && endDate && {
+                startDate: { gte: new Date(startDate) },
+                endDate: { lte: new Date(endDate) }
+            })
+        };
 
 
-            const [leaves, total] = await Promise.all([
-                prisma.leaveRequest.findMany({
-                    where,
-                    include: {
-                        user: {
-                            select: {
-                                id: true,
-                                name: true,
-                                email: true,
-                                profilePicture: true,
-                                role: { select: { name: true } },
-                                student: {
-                                    select: {
-                                        admissionNo: true,
-                                        rollNumber: true,
-                                        class: { select: { className: true } },
-                                        section: { select: { name: true } }
-                                    }
-                                },
-                                teacher: {
-                                    select: {
-                                        employeeId: true,
-                                        designation: true,
-                                        department: { select: { name: true } }
-                                    }
+        const [leaves, total] = await Promise.all([
+            prisma.leaveRequest.findMany({
+                where,
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            profilePicture: true,
+                            role: { select: { name: true } },
+                            student: {
+                                select: {
+                                    admissionNo: true,
+                                    rollNumber: true,
+                                    class: { select: { className: true } },
+                                    section: { select: { name: true } }
+                                }
+                            },
+                            teacher: {
+                                select: {
+                                    employeeId: true,
+                                    designation: true,
+                                    department: { select: { name: true } }
                                 }
                             }
-                        },
-                        reviewer: {
-                            select: { name: true }
-                        },
-                        documents: true
-                    },
-                    orderBy: [
-                        { status: 'asc' },
-                        { submittedAt: 'desc' }
-                    ],
-                    skip,
-                    take: limit
-                }),
-                prisma.leaveRequest.count({ where })
-            ]);
-
-            // Get leave balance for each user
-            const academicYear = await prisma.academicYear.findFirst({
-                where: { schoolId, isActive: true },
-                select: { id: true }
-            });
-
-            const leavesWithBalance = await Promise.all(
-                leaves.map(async (leave) => {
-                    const balance = await prisma.leaveBalance.findFirst({
-                        where: {
-                            userId: leave.userId,
-                            schoolId,
-                            academicYearId: academicYear?.id
                         }
-                    });
+                    },
+                    reviewer: {
+                        select: { name: true }
+                    },
+                    documents: true
+                },
+                orderBy: [
+                    { status: 'asc' },
+                    { submittedAt: 'desc' }
+                ],
+                skip,
+                take: limit
+            }),
+            prisma.leaveRequest.count({ where })
+        ]);
 
-                    return {
-                        ...leave,
-                        balance: balance ? {
-                            casualLeave: {
-                                total: balance.casualLeaveTotal,
-                                used: balance.casualLeaveUsed,
-                                balance: balance.casualLeaveBalance
-                            },
-                            sickLeave: {
-                                total: balance.sickLeaveTotal,
-                                used: balance.sickLeaveUsed,
-                                balance: balance.sickLeaveBalance
-                            },
-                            earnedLeave: {
-                                total: balance.earnedLeaveTotal,
-                                used: balance.earnedLeaveUsed,
-                                balance: balance.earnedLeaveBalance
-                            }
-                        } : null
-                    };
-                })
-            );
+        // Get leave balance for each user
+        const academicYear = await prisma.academicYear.findFirst({
+            where: { schoolId, isActive: true },
+            select: { id: true }
+        });
 
-            return {
-                leaves: leavesWithBalance,
-                pagination: {
-                    page,
-                    limit,
-                    total,
-                    totalPages: Math.ceil(total / limit)
-                }
-            };
-        }, 300); // Cache for 5 minutes
+        const leavesWithBalance = await Promise.all(
+            leaves.map(async (leave) => {
+                const balance = await prisma.leaveBalance.findFirst({
+                    where: {
+                        userId: leave.userId,
+                        schoolId,
+                        academicYearId: academicYear?.id
+                    }
+                });
+
+                return {
+                    ...leave,
+                    balance: balance ? {
+                        casualLeave: {
+                            total: balance.casualLeaveTotal,
+                            used: balance.casualLeaveUsed,
+                            balance: balance.casualLeaveBalance
+                        },
+                        sickLeave: {
+                            total: balance.sickLeaveTotal,
+                            used: balance.sickLeaveUsed,
+                            balance: balance.sickLeaveBalance
+                        },
+                        earnedLeave: {
+                            total: balance.earnedLeaveTotal,
+                            used: balance.earnedLeaveUsed,
+                            balance: balance.earnedLeaveBalance
+                        }
+                    } : null
+                };
+            })
+        );
+        console.log('[Leave API Debug] Found', leavesWithBalance.length, 'leaves');
 
         // Return leaves array for backward compatibility
-        return NextResponse.json(result.leaves);
-
+        return NextResponse.json({
+            leaves: leavesWithBalance,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
+        });
     } catch (error) {
         console.error('Leave fetch error:', error);
         return NextResponse.json({
@@ -159,7 +159,7 @@ export async function GET(req, props) {
 
 // POST - Approve or reject leave requests
 export async function POST(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     const { schoolId } = params;
     const { leaveRequestIds, action, adminRemarks, reviewedBy } = await req.json();
 
@@ -308,7 +308,7 @@ export async function POST(req, props) {
                         results.cancelled.push(updated);
                     }
 
-                    // Send notification
+                    // Send DB notification record
                     await tx.attendanceNotification.create({
                         data: {
                             schoolId,
@@ -320,6 +320,30 @@ export async function POST(req, props) {
                             status: 'PENDING'
                         }
                     });
+
+                    // Send push notification to teacher
+                    try {
+                        if (action === 'APPROVED') {
+                            await notifyLeaveApproved({
+                                schoolId,
+                                userId: leave.userId,
+                                leaveType: leave.leaveType,
+                                startDate: leave.startDate,
+                                endDate: leave.endDate
+                            });
+                        } else if (action === 'REJECTED') {
+                            await notifyLeaveRejected({
+                                schoolId,
+                                userId: leave.userId,
+                                leaveType: leave.leaveType,
+                                startDate: leave.startDate,
+                                endDate: leave.endDate,
+                                reason: adminRemarks
+                            });
+                        }
+                    } catch (notifyError) {
+                        console.error('Failed to send leave notification to teacher:', notifyError);
+                    }
 
                 } catch (error) {
                     console.error('Leave processing error:', error);
@@ -355,7 +379,7 @@ export async function POST(req, props) {
 
 // PUT - Create new leave request (by teacher/staff)
 export async function PUT(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     const { schoolId } = params;
     const {
         userId,
@@ -440,7 +464,30 @@ export async function PUT(req, props) {
             });
         }
 
-        await invalidatePattern(`attendance:leaves:${schoolId}*`);
+        // Get user name for notification
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { name: true }
+        });
+
+        // Notify school admins about the new leave request
+        try {
+            await notifyLeaveRequestCreated({
+                schoolId,
+                userId,
+                userName: user?.name || 'Staff Member',
+                leaveType,
+                startDate: start.toISOString(),
+                endDate: end.toISOString(),
+                totalDays,
+                senderId: userId
+            });
+        } catch (notifyError) {
+            console.error('Failed to send leave notification to admins:', notifyError);
+            // Don't fail the request if notification fails
+        }
+
+        await invalidatePattern(`attendance:leaves*`);
 
         return NextResponse.json({
             success: true,
@@ -459,7 +506,7 @@ export async function PUT(req, props) {
 
 // DELETE - Cancel leave request
 export async function DELETE(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     const { schoolId } = params;
     const { searchParams } = new URL(req.url);
     const leaveRequestId = searchParams.get('leaveRequestId');
@@ -484,28 +531,41 @@ export async function DELETE(req, props) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
 
-        if (leave.status !== 'PENDING') {
+        // Only allow cancelling PENDING or deleting REJECTED requests
+        if (leave.status === 'PENDING') {
+            // Cancel pending request
+            await prisma.leaveRequest.update({
+                where: { id: leaveRequestId },
+                data: { status: 'CANCELLED' }
+            });
+            await invalidatePattern(`attendance:leaves*`);
             return NextResponse.json({
-                error: 'Can only cancel pending leave requests'
+                success: true,
+                message: 'Leave request cancelled'
+            });
+        } else if (leave.status === 'REJECTED') {
+            // Delete rejected request permanently
+            await prisma.leaveDocument.deleteMany({
+                where: { leaveRequestId }
+            });
+            await prisma.leaveRequest.delete({
+                where: { id: leaveRequestId }
+            });
+            await invalidatePattern(`attendance:leaves*`);
+            return NextResponse.json({
+                success: true,
+                message: 'Leave request deleted'
+            });
+        } else {
+            return NextResponse.json({
+                error: 'Can only cancel pending or delete rejected leave requests'
             }, { status: 400 });
         }
-
-        await prisma.leaveRequest.update({
-            where: { id: leaveRequestId },
-            data: { status: 'CANCELLED' }
-        });
-
-        await invalidatePattern(`attendance:leaves:${schoolId}*`);
-
-        return NextResponse.json({
-            success: true,
-            message: 'Leave request cancelled'
-        });
 
     } catch (error) {
         console.error('Leave cancellation error:', error);
         return NextResponse.json({
-            error: 'Failed to cancel leave request'
+            error: 'Failed to process leave request'
         }, { status: 500 });
     }
 }
