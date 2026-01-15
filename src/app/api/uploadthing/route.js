@@ -110,9 +110,45 @@ export const ourFileRouter = {
     .input(z.object({ schoolId: z.string(), classId: z.string() }))
     .onUploadComplete(({ metadata, file }) => ({ url: file.ufsUrl })),
 
-  homework: f({ pdf: { maxFileSize: "10MB" } })
-    .input(z.object({ schoolId: z.string(), classId: z.string() }))
-    .onUploadComplete(({ metadata, file }) => ({ url: file.ufsUrl })),
+  homework: f({
+    pdf: { maxFileSize: "15MB" },
+    image: { maxFileSize: "10MB" },
+    "application/msword": { maxFileSize: "10MB" },
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": { maxFileSize: "10MB" },
+  })
+    .input(z.object({
+      schoolId: z.string(),
+      classId: z.string(),
+      teacherId: z.string().optional(),
+      title: z.string().optional(),
+    }))
+    .middleware(async ({ input }) => ({
+      schoolId: input.schoolId,
+      classId: input.classId,
+      teacherId: input.teacherId,
+      title: input.title,
+    }))
+    .onUploadComplete(async ({ metadata, file }) => {
+      console.log("Homework file uploaded for school:", metadata.schoolId);
+      console.log("File URL:", file.ufsUrl);
+
+      // Track upload
+      try {
+        await prisma.upload.create({
+          data: {
+            schoolId: metadata.schoolId,
+            fileUrl: file.ufsUrl,
+            fileName: file.name,
+            mimeType: file.type,
+            size: file.size,
+          },
+        });
+      } catch (err) {
+        console.error("Failed to track homework upload:", err);
+      }
+
+      return { url: file.ufsUrl, fileName: file.name, fileSize: file.size };
+    }),
 
   schoolImageUpload: f({ image: { maxFileSize: "5MB", maxFileCount: 10 } })
     .input(z.object({ schoolId: z.string(), uploadedById: z.string() }))
