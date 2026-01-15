@@ -75,11 +75,15 @@ export async function POST(req, props) {
         const CHECK_OUT_GRACE_HOURS = config.checkOutGraceHours ?? DEFAULT_CHECK_OUT_GRACE_HOURS;
         const MIN_WORKING_HOURS = config.minWorkingHours ?? DEFAULT_MIN_WORKING_HOURS;
 
-        // Check if working day
-        if (calendar?.dayType !== 'WORKING_DAY') {
+        // Check if working day (fallback: Mon-Sat if no calendar entry)
+        const dayOfWeek = today.getDay();
+        const isWeekend = dayOfWeek === 0; // Sunday only
+        const effectiveDayType = calendar?.dayType || (isWeekend ? 'WEEKEND' : 'WORKING_DAY');
+
+        if (effectiveDayType !== 'WORKING_DAY') {
             return NextResponse.json({
-                error: `Today is ${calendar?.dayType || 'HOLIDAY'}. No attendance required.`,
-                dayType: calendar?.dayType,
+                error: `Today is ${effectiveDayType}. No attendance required.`,
+                dayType: effectiveDayType,
                 holidayName: calendar?.holidayName
             }, { status: 400 });
         }
@@ -431,14 +435,20 @@ export async function GET(req, props) {
             minCheckOutTime.setHours(minCheckOutTime.getHours() + MIN_WORKING_HOURS);
         }
 
+        // Determine if today is a working day (fallback: Mon-Sat if no calendar entry)
+        const dayOfWeek = today.getDay();
+        const isWeekend = dayOfWeek === 0; // Sunday only
+        const effectiveDayType = calendar?.dayType || (isWeekend ? 'WEEKEND' : 'WORKING_DAY');
+        const isWorkingDay = effectiveDayType === 'WORKING_DAY';
+
         return NextResponse.json({
             attendance: {
                 ...attendance,
                 workingHours: finalWorkingHours,
                 liveWorkingHours: attendance?.checkOutTime ? null : liveWorkingHours,
             },
-            isWorkingDay: calendar?.dayType === 'WORKING_DAY',
-            dayType: calendar?.dayType,
+            isWorkingDay,
+            dayType: effectiveDayType,
             holidayName: calendar?.holidayName,
             config: {
                 startTime: config.defaultStartTime,

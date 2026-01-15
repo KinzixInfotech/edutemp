@@ -179,15 +179,27 @@ export async function GET(req, props) {
 
         // Create calendar view data
         const calendarData = [];
-        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-            const dateStr = d.toISOString().split('T')[0];
-            const attendance = attendanceRecords.find(r =>
-                r.date.toISOString().split('T')[0] === dateStr
-            );
 
-            const isWorkingDay = workingDays.some(wd =>
-                wd.date.toISOString().split('T')[0] === dateStr
-            );
+        // Helper to format date as YYYY-MM-DD in local timezone (IST)
+        const formatDateLocal = (date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            const dateStr = formatDateLocal(d);
+            const attendance = attendanceRecords.find(r => {
+                // Use local date formatting for comparison to avoid timezone issues
+                const recordDate = new Date(r.date);
+                return formatDateLocal(recordDate) === dateStr;
+            });
+
+            const isWorkingDay = workingDays.some(wd => {
+                const wdDate = new Date(wd.date);
+                return formatDateLocal(wdDate) === dateStr;
+            });
 
             calendarData.push({
                 date: dateStr,

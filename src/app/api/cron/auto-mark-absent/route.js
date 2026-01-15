@@ -94,9 +94,9 @@ export async function GET(request) {
 
         const todayIST = getCurrentISTDate();
 
-        // Calculate date range: yesterday and before (never mark today as absent)
-        const endDate = new Date(todayIST);
-        endDate.setDate(endDate.getDate() - 1); // Yesterday
+        // IMPORTANT: This cron should run at 8-9 PM IST when all school check-in windows are closed
+        // endDate is TODAY because at 8-9 PM, no one can check in anymore
+        const endDate = new Date(todayIST); // Today (not yesterday)
 
         // Start date depends on mode (will be refined per school)
         let defaultStartDate = new Date(endDate);
@@ -528,7 +528,9 @@ async function processDayAndCollect(schoolId, date, academicYearId, absentStuden
     return { markedCount, errorCount };
 }
 
-// Send GROUPED notifications - ONE per user (student/teacher/staff) with all dates
+// Send GROUPED notifications - PERSONALIZED per recipient
+// Self: "You were marked absent..."
+// Parents: "Your child [name] was marked absent..."
 async function sendGroupedNotifications(schoolId, absentUsersMap) {
     let notifiedCount = 0;
     let usersNotified = 0;
@@ -542,57 +544,71 @@ async function sendGroupedNotifications(schoolId, absentUsersMap) {
             // Format dates nicely
             const sortedDates = dates.sort((a, b) => a - b);
             const datesList = sortedDates.map(d => formatShortDate(d)).join(', ');
+            const daysCount = dates.length;
 
             // Build info string (class/section for students, role for staff)
             let infoStr = '';
             if (roleType === 'STUDENT') {
                 infoStr = sectionName ? `${className} - ${sectionName}` : className;
             } else {
-                infoStr = className; // For staff, className contains role name
+                infoStr = roleType.replace(/_/g, ' '); // TEACHING_STAFF → TEACHING STAFF
             }
 
-            // Build notification message
-            const daysCount = dates.length;
-            const title = `⚠️ Absence Alert: ${name}`;
-            const message = daysCount === 1
-                ? `${name} (${infoStr}) was marked absent on ${datesList}.`
-                : `${name} (${infoStr}) was marked absent on ${daysCount} days: ${datesList}.`;
+            // Common metadata for all notifications
+            const commonMetadata = {
+                userId,
+                userName: name,
+                roleType,
+                infoStr,
+                absentDates: sortedDates.map(d => d.toISOString()),
+                daysCount,
+                action: 'AUTO_MARK_ABSENT_GROUPED'
+            };
 
-            // Collect user IDs to notify
-            // Students: notify student + parents
-            // Teachers/Staff: notify only themselves
-            const userIdsToNotify = roleType === 'STUDENT'
-                ? [userId, ...parentUserIds]
-                : [userId];
+            // 1. Send SELF notification (first-person: "You were marked absent...")
+            const selfTitle = `⚠️ Absence Alert`;
+            const selfMessage = daysCount === 1
+                ? `You were marked absent on ${datesList} because you didn't check in.`
+                : `You were marked absent on ${daysCount} days (${datesList}) because you didn't check in.`;
 
-            // Send ONE grouped notification
             await sendNotification({
                 schoolId,
-                title,
-                message,
+                title: selfTitle,
+                message: selfMessage,
                 type: 'ATTENDANCE',
                 priority: daysCount >= 3 ? 'URGENT' : 'HIGH',
                 icon: '⚠️',
-                targetOptions: {
-                    userIds: userIdsToNotify
-                },
-                metadata: {
-                    userId,
-                    userName: name,
-                    roleType,
-                    infoStr,
-                    absentDates: sortedDates.map(d => d.toISOString()),
-                    daysCount,
-                    action: 'AUTO_MARK_ABSENT_GROUPED'
-                },
-                actionUrl: '/attendance',
+                targetOptions: { userIds: [userId] },
+                metadata: { ...commonMetadata, recipientType: 'SELF' },
+                actionUrl: '/dashboard/markattendance',
                 sendPush: true
             });
+            notifiedCount++;
 
-            notifiedCount += userIdsToNotify.length;
+            // 2. Send PARENT notifications (third-person: "Your child [name] was marked absent...")
+            if (roleType === 'STUDENT' && parentUserIds.length > 0) {
+                const parentTitle = `⚠️ Absence Alert: ${name}`;
+                const parentMessage = daysCount === 1
+                    ? `Your child ${name} (${infoStr}) was marked absent on ${datesList}.`
+                    : `Your child ${name} (${infoStr}) was marked absent on ${daysCount} days: ${datesList}.`;
+
+                await sendNotification({
+                    schoolId,
+                    title: parentTitle,
+                    message: parentMessage,
+                    type: 'ATTENDANCE',
+                    priority: daysCount >= 3 ? 'URGENT' : 'HIGH',
+                    icon: '⚠️',
+                    targetOptions: { userIds: parentUserIds },
+                    metadata: { ...commonMetadata, recipientType: 'PARENT' },
+                    actionUrl: '/dashboard/attendance',
+                    sendPush: true
+                });
+                notifiedCount += parentUserIds.length;
+            }
+
             usersNotified++;
-
-            console.log(`[NOTIFY] Sent notification for ${name} (${infoStr}) - ${daysCount} days absent`);
+            console.log(`[NOTIFY] Sent personalized notifications for ${name} (${infoStr}) - ${daysCount} days absent`);
 
         } catch (error) {
             console.error(`[NOTIFY ERROR] Failed for user ${userId}:`, error.message);

@@ -53,11 +53,17 @@ export async function GET(req, props) {
       where: { schoolId_date: { schoolId, date: today } }
     });
 
-    const isWorkingDay = calendar?.dayType === 'WORKING_DAY';
+    // If no calendar entry exists, use default logic: Mon-Sat = working day, Sunday = weekend
+    const dayOfWeek = today.getDay();
+    const isWeekend = dayOfWeek === 0; // Sunday only (0) is weekend by default
+    const isWorkingDay = calendar
+      ? calendar.dayType === 'WORKING_DAY'
+      : !isWeekend; // Default: Mon-Sat are working days when no calendar entry
+
     const dayInfo = {
       date: today.toISOString(),
       isWorkingDay,
-      dayType: calendar?.dayType || 'UNKNOWN',
+      dayType: calendar?.dayType || (isWeekend ? 'WEEKEND' : 'WORKING_DAY'),
       holidayName: calendar?.holidayName
     };
 
