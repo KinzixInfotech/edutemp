@@ -37,6 +37,7 @@ model School {
   libraryBooks           LibraryBook[]
   libraryBookRequests    LibraryBookRequest[]
   MasterAdmin            MasterAdmin?
+  carouselImages         SchoolCarouselImage[]
   NonTeachingStaff       NonTeachingStaff[]
   Notice                 Notice[]
   Student                Student[]
@@ -1693,10 +1694,12 @@ model User {
   aiUsageLogs AiUsageLog[]
 
   // Hall Ticket & Attendance Lock Management
-  hallTicketOverrides     AdmitCard[]      @relation("HallTicketOverride")
-  attendanceLocksLocked   AttendanceLock[] @relation("AttendanceLockedBy")
-  attendanceLocksUnlocked AttendanceLock[] @relation("AttendanceUnlockedBy")
+  hallTicketOverrides     AdmitCard[]           @relation("HallTicketOverride")
+  attendanceLocksLocked   AttendanceLock[]      @relation("AttendanceLockedBy")
+  attendanceLocksUnlocked AttendanceLock[]      @relation("AttendanceUnlockedBy")
   admitCards              AdmitCard[]
+  schoolCarouselImages    SchoolCarouselImage[]
+  uploadedCarouselImages  SchoolCarouselImage[] @relation("UserUploadedCarouselImages")
 
   @@index([schoolId])
   @@index([roleId])
@@ -5593,4 +5596,35 @@ model NotificationDailyLimit {
 
   @@unique([userId, date])
   @@index([date])
+}
+
+// ============================================
+// SCHOOL CAROUSEL - DASHBOARD GALLERY
+// ============================================
+
+model SchoolCarouselImage {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @db.Uuid
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  imageUrl     String
+  caption      String?
+  displayOrder Int     @default(0)
+
+  audience String[] @default(["ALL"])
+  category String? // For grouping images (e.g., "Events", "Announcements", "Sports")
+
+  expiryDate DateTime? // e.g., for limited-time event banners
+
+  uploadedById String? @db.Uuid
+  uploadedBy   User?   @relation("UserUploadedCarouselImages", fields: [uploadedById], references: [id])
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User?    @relation(fields: [userId], references: [id])
+  userId    String?  @db.Uuid
+
+  @@index([schoolId])
 }

@@ -61,6 +61,7 @@ import {
     HandCoins,
     FileText,
     GraduationCap,
+    Images,
 } from "lucide-react"
 import { useCommandMenu } from "./CommandMenuContext"
 import { cn } from "@/lib/utils"
@@ -96,6 +97,12 @@ export const SidebarData = [
             { label: "Profile", url: "/dashboard/partnerprogram/profile", icon: UserPen, roles: ["PARTNER"] },
 
         ],
+    },
+    {
+        title: "School APP",
+        items: [
+            { label: "App Carousel", url: "/dashboard/schools/carousel", icon: Images, roles: ['ADMIN'] },
+        ]
     },
     {
         title: "Data Collection",
@@ -338,6 +345,7 @@ export const SidebarData = [
 
             { label: "All Schools", url: "/dashboard/schools/all-schools", icon: IconDatabase, roles: ['SUPER_ADMIN'] },
             { label: "Manage Website", url: "/dashboard/schools/website", icon: MonitorCog, roles: ['ADMIN'] },
+
         ],
     },
     {
