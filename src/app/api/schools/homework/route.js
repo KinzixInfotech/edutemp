@@ -35,9 +35,16 @@ export async function GET(req) {
 
             if (student) {
                 where.classId = student.classId;
-                where.sectionId = student.sectionId;
+                // Filter homework that either:
+                // 1. Has no sectionId (assigned to entire class), OR
+                // 2. Has sectionId matching the student's section
+                where.OR = [
+                    { sectionId: null },
+                    { sectionId: student.sectionId }
+                ];
             }
         }
+
 
         const homework = await prisma.homework.findMany({
             where,
