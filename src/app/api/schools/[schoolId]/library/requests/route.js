@@ -126,13 +126,29 @@ export async function POST(req, props) {
     try {
         const { schoolId } = params;
         const body = await req.json();
-        const { bookId, userId, userType, remarks } = body;
+        const { bookId, userId, userType, remarks, requestedBy } = body;
 
         // Fetch user details for notification
         const user = await prisma.user.findUnique({
             where: { id: userId },
             select: { name: true }
         });
+
+        // Fetch parent details if requestedBy is present
+        let parentName = null;
+        let validSenderId = userId;
+        if (requestedBy) {
+            const parent = await prisma.user.findUnique({
+                where: { id: requestedBy },
+                select: { name: true, id: true }
+            });
+            if (parent) {
+                parentName = parent.name;
+                validSenderId = parent.id;
+            } else {
+                console.warn(`Book Request: requestedBy ID ${requestedBy} not found in User table, falling back to userId`);
+            }
+        }
 
 
         if (!bookId || !userId || !userType) {
@@ -187,6 +203,7 @@ export async function POST(req, props) {
                 userType,
                 remarks,
                 status: "PENDING",
+                // Store requestedBy if your schema supports it, otherwise it's just used for notification
             },
             include: {
                 book: {
@@ -205,7 +222,8 @@ export async function POST(req, props) {
             userName: user?.name || "Unknown User",
             bookTitle: request.book.title,
             userType,
-            senderId: userId
+            senderId: validSenderId,
+            parentName
         });
 
         await invalidatePattern(`library:requests:*${schoolId}*`);

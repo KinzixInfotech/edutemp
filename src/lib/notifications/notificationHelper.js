@@ -1515,12 +1515,19 @@ export async function notifyBookRequested({
     userName,
     bookTitle,
     userType,
-    senderId
+    senderId,
+    parentName
 }) {
+    let message = `${userName} (${userType.toLowerCase()}) requested "${bookTitle}"`;
+
+    if (parentName) {
+        message = `${parentName} requested "${bookTitle}" for ${userName} (${userType.toLowerCase()})`;
+    }
+
     return sendNotification({
         schoolId,
         title: 'New Book Request',
-        message: `${userName} (${userType.toLowerCase()}) requested "${bookTitle}"`,
+        message,
         type: 'LIBRARY',
         priority: 'NORMAL',
         icon: '📚',
@@ -1532,6 +1539,7 @@ export async function notifyBookRequested({
             bookTitle,
             userName,
             userType,
+            parentName,
             requestType: 'BOOK_REQUEST'
         },
         actionUrl: '/library/requests'

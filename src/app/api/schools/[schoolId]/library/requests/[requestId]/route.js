@@ -98,25 +98,35 @@ export async function PATCH(req, props) {
                 });
             });
 
-            // Fetch user FCM token
-            const user = await prisma.user.findUnique({
-                where: { id: updatedRequest.userId },
-                select: { fcmToken: true },
-            });
+            // Determine push targets
+            const targetUserIds = [updatedRequest.userId];
+
+            // If user is STUDENT, also notify parents
+            if (updatedRequest.userType === 'STUDENT') {
+                const parentLinks = await prisma.studentParentLink.findMany({
+                    where: {
+                        student: { userId: updatedRequest.userId },
+                        isActive: true
+                    },
+                    select: { parent: { select: { userId: true } } }
+                });
+                parentLinks.forEach(link => targetUserIds.push(link.parent.userId));
+            } else if (updatedRequest.userType === 'PARENT') {
+                // If the request was somehow linked to a PARENT user directly
+                targetUserIds.push(updatedRequest.userId);
+            }
 
             // Send push notification
-            if (user?.fcmToken) {
-                await sendNotification({
-                    schoolId,
-                    title: 'Book Request Approved! 📚',
-                    message: `Your request for "${updatedRequest.book.title}" has been approved. Pickup Code: ${pickupCode}. Pickup by ${pickupDate.toLocaleDateString()}.`,
-                    type: 'GENERAL',
-                    priority: 'NORMAL',
-                    targetOptions: { userIds: [updatedRequest.userId] },
-                    metadata: { requestId: updatedRequest.id, bookId: updatedRequest.bookId, pickupCode },
-                    icon: '📚',
-                });
-            }
+            await sendNotification({
+                schoolId,
+                title: 'Book Request Approved! 📚',
+                message: `Your request for "${updatedRequest.book.title}" has been approved. Pickup Code: ${pickupCode}. Pickup by ${pickupDate.toLocaleDateString()}.`,
+                type: 'GENERAL',
+                priority: 'NORMAL',
+                targetOptions: { userIds: targetUserIds },
+                metadata: { requestId: updatedRequest.id, bookId: updatedRequest.bookId, pickupCode },
+                icon: '📚',
+            });
         } else if (action === "REJECT") {
             updatedRequest = await prisma.libraryBookRequest.update({
                 where: { id: requestId },
@@ -136,25 +146,34 @@ export async function PATCH(req, props) {
                 },
             });
 
-            // Fetch user FCM token
-            const user = await prisma.user.findUnique({
-                where: { id: updatedRequest.userId },
-                select: { fcmToken: true },
-            });
+            // Determine push targets
+            const targetUserIds = [updatedRequest.userId];
+
+            // If user is STUDENT, also notify parents
+            if (updatedRequest.userType === 'STUDENT') {
+                const parentLinks = await prisma.studentParentLink.findMany({
+                    where: {
+                        student: { userId: updatedRequest.userId },
+                        isActive: true
+                    },
+                    select: { parent: { select: { userId: true } } }
+                });
+                parentLinks.forEach(link => targetUserIds.push(link.parent.userId));
+            } else if (updatedRequest.userType === 'PARENT') {
+                targetUserIds.push(updatedRequest.userId);
+            }
 
             // Send push notification
-            if (user?.fcmToken) {
-                await sendNotification({
-                    schoolId,
-                    title: 'Book Request Rejected',
-                    message: `Your request for "${updatedRequest.book.title}" was not approved. ${rejectionReason || 'Please contact the library.'}`,
-                    type: 'GENERAL',
-                    priority: 'NORMAL',
-                    targetOptions: { userIds: [updatedRequest.userId] },
-                    metadata: { requestId: updatedRequest.id, bookId: updatedRequest.bookId, reason: rejectionReason },
-                    icon: '❌',
-                });
-            }
+            await sendNotification({
+                schoolId,
+                title: 'Book Request Rejected',
+                message: `Your request for "${updatedRequest.book.title}" was not approved. ${rejectionReason || 'Please contact the library.'}`,
+                type: 'GENERAL',
+                priority: 'NORMAL',
+                targetOptions: { userIds: targetUserIds },
+                metadata: { requestId: updatedRequest.id, bookId: updatedRequest.bookId, reason: rejectionReason },
+                icon: '❌',
+            });
         } else {
             return NextResponse.json({ error: "Invalid action" }, { status: 400 });
         }
