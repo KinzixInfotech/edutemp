@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { sendNotification } from '@/lib/notifications/notificationHelper';
 
 // POST: Start Attempt
 export async function POST(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     try {
         const { examId } = params;
         const body = await req.json();
@@ -106,7 +107,7 @@ export async function POST(req, props) {
 
 // PUT: Submit Attempt
 export async function PUT(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     try {
         const { examId } = params;
         const body = await req.json();
@@ -188,6 +189,43 @@ export async function PUT(req, props) {
                     score: totalScore
                 }
             });
+
+            // Notify parent about exam submission
+            try {
+                const student = await prisma.student.findFirst({
+                    where: { userId: attempt.studentId },
+                    include: {
+                        user: true,
+                        parentLinks: {
+                            where: { isActive: true },
+                            include: { parent: true }
+                        }
+                    }
+                });
+
+                if (student?.parentLinks?.length > 0) {
+                    const parentUserIds = student.parentLinks.map(link => link.parent.userId);
+                    await sendNotification({
+                        schoolId: params.schoolId,
+                        title: '📝 Exam Submitted',
+                        message: `${student.user.name} has completed "${attempt.exam.title}" exam with score: ${totalScore}`,
+                        type: 'EXAM',
+                        priority: 'NORMAL',
+                        icon: '📝',
+                        targetOptions: { userIds: parentUserIds },
+                        metadata: {
+                            examId,
+                            studentId: attempt.studentId,
+                            examTitle: attempt.exam.title,
+                            score: totalScore
+                        }
+                    });
+                    console.log(`✅ Notified ${parentUserIds.length} parent(s) about exam submission`);
+                }
+            } catch (notifyError) {
+                console.error('Failed to notify parent:', notifyError);
+                // Don't fail the submission for notification error
+            }
 
             return NextResponse.json({ success: true, score: totalScore });
         } else {

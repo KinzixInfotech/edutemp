@@ -14,7 +14,21 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
-import { Loader2, Plus, Search, MapPin, Route, Clock, Edit2, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Plus, Search, MapPin, Route, Clock, Edit2, Trash2, ChevronLeft, ChevronRight, Navigation } from "lucide-react";
+import nextDynamic from 'next/dynamic';
+
+// Dynamically import the Google Maps component to avoid SSR issues
+const GoogleMapsLocationPicker = nextDynamic(
+    () => import('@/components/maps/GoogleMapsLocationPicker'),
+    {
+        ssr: false,
+        loading: () => (
+            <div className="flex items-center justify-center h-[300px] bg-muted rounded-lg">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+        )
+    }
+);
 
 async function fetchStops({ schoolId, search, page = 1, limit = 10 }) {
     const params = new URLSearchParams({ schoolId });
@@ -175,8 +189,24 @@ export default function BusStopManagement() {
         setDeleteDialogOpen(true);
     };
 
+    // Handle location change from map
+    const handleLocationChange = (lat, lng, address) => {
+        setFormData(prev => ({
+            ...prev,
+            latitude: lat,
+            longitude: lng,
+            // Optionally set the name from the address if empty
+            ...(address && !prev.name && { name: address.split(',')[0] })
+        }));
+    };
+
     const stopsWithCoords = stops.filter(s => s.latitude && s.longitude).length;
     const totalPages = Math.ceil(total / limit);
+
+    // Open in Google Maps
+    const openInGoogleMaps = (lat, lng) => {
+        window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank');
+    };
 
     return (
         <div className="p-4 md:p-6 space-y-6">
@@ -234,6 +264,7 @@ export default function BusStopManagement() {
                                 <TableHead className="w-12">Order</TableHead>
                                 <TableHead>Stop Name</TableHead>
                                 <TableHead>Route</TableHead>
+                                <TableHead>Location</TableHead>
                                 <TableHead>Pickup Time</TableHead>
                                 <TableHead>Drop Time</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
@@ -242,7 +273,7 @@ export default function BusStopManagement() {
                         <TableBody>
                             {isLoading ? (
                                 Array(5).fill(0).map((_, i) => (
-                                    <TableRow key={i}>{Array(6).fill(0).map((_, j) => (<TableCell key={j}><Skeleton className="h-5 w-20" /></TableCell>))}</TableRow>
+                                    <TableRow key={i}>{Array(7).fill(0).map((_, j) => (<TableCell key={j}><Skeleton className="h-5 w-20" /></TableCell>))}</TableRow>
                                 ))
                             ) : stops.length > 0 ? (
                                 stops.map((stop) => (
@@ -255,6 +286,23 @@ export default function BusStopManagement() {
                                             <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
                                                 {stop.route?.name || "N/A"}
                                             </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            {stop.latitude && stop.longitude ? (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-7 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20 p-0 px-2"
+                                                    onClick={() => openInGoogleMaps(stop.latitude, stop.longitude)}
+                                                >
+                                                    <Navigation className="h-3.5 w-3.5 mr-1" />
+                                                    <span className="font-mono text-xs">
+                                                        {stop.latitude.toFixed(4)}, {stop.longitude.toFixed(4)}
+                                                    </span>
+                                                </Button>
+                                            ) : (
+                                                <span className="text-muted-foreground text-sm">Not set</span>
+                                            )}
                                         </TableCell>
                                         <TableCell>
                                             {stop.pickupTime ? (
@@ -280,7 +328,7 @@ export default function BusStopManagement() {
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="text-center py-12">
+                                    <TableCell colSpan={7} className="text-center py-12">
                                         <MapPin className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
                                         <p className="text-muted-foreground">No stops found</p>
                                         <Button variant="link" onClick={handleAdd} className="mt-2">Add your first stop</Button>
@@ -302,57 +350,106 @@ export default function BusStopManagement() {
                 )}
             </div>
 
+            {/* Add/Edit Dialog with Google Maps */}
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogContent className="sm:max-w-lg">
+                <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>{selectedStop ? "Edit Stop" : "Add New Stop"}</DialogTitle>
-                        <DialogDescription>{selectedStop ? "Update stop details" : "Add a new bus stop to a route"}</DialogDescription>
+                        <DialogDescription>{selectedStop ? "Update stop details and location" : "Add a new bus stop to a route"}</DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-4 py-4">
+                    <div className="grid gap-5 py-4">
+                        {/* Basic Info */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Stop Name <span className="text-destructive">*</span></Label>
+                                <Input
+                                    placeholder="e.g., Main Gate, Sector 15"
+                                    value={formData.name || ""}
+                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                    className={formErrors.name ? "border-destructive" : ""}
+                                />
+                                {formErrors.name && <p className="text-xs text-destructive">{formErrors.name}</p>}
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-2">
+                                    <Label>Route <span className="text-destructive">*</span></Label>
+                                    <Select value={formData.routeId || ""} onValueChange={(val) => setFormData({ ...formData, routeId: val })}>
+                                        <SelectTrigger className={formErrors.routeId ? "border-destructive" : ""}>
+                                            <SelectValue placeholder="Select" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {routes.map((route) => (
+                                                <SelectItem key={route.id} value={route.id}>{route.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {formErrors.routeId && <p className="text-xs text-destructive">{formErrors.routeId}</p>}
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Order <span className="text-destructive">*</span></Label>
+                                    <Input
+                                        type="number"
+                                        min="1"
+                                        value={formData.orderIndex || ""}
+                                        onChange={(e) => setFormData({ ...formData, orderIndex: e.target.value })}
+                                        className={formErrors.orderIndex ? "border-destructive" : ""}
+                                    />
+                                    {formErrors.orderIndex && <p className="text-xs text-destructive">{formErrors.orderIndex}</p>}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Google Maps Location Picker */}
                         <div className="space-y-2">
-                            <Label>Stop Name <span className="text-destructive">*</span></Label>
-                            <Input placeholder="e.g., Main Gate" value={formData.name || ""} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className={formErrors.name ? "border-destructive" : ""} />
-                            {formErrors.name && <p className="text-xs text-destructive">{formErrors.name}</p>}
+                            <Label className="flex items-center gap-2">
+                                <MapPin className="h-4 w-4 text-red-500" />
+                                Location (Click on map or search)
+                            </Label>
+                            <GoogleMapsLocationPicker
+                                latitude={formData.latitude}
+                                longitude={formData.longitude}
+                                onLocationChange={handleLocationChange}
+                                placeholder="Search for a location in India..."
+                            />
                         </div>
+
+                        {/* Coordinates Display (read-only) */}
+                        {(formData.latitude || formData.longitude) && (
+                            <div className="grid grid-cols-2 gap-4 p-3 bg-muted/50 rounded-lg">
+                                <div className="space-y-1">
+                                    <Label className="text-xs text-muted-foreground">Latitude</Label>
+                                    <p className="font-mono text-sm">{formData.latitude?.toFixed(6) || 'Not set'}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs text-muted-foreground">Longitude</Label>
+                                    <p className="font-mono text-sm">{formData.longitude?.toFixed(6) || 'Not set'}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Timing */}
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label>Route <span className="text-destructive">*</span></Label>
-                                <Select value={formData.routeId || ""} onValueChange={(val) => setFormData({ ...formData, routeId: val })}>
-                                    <SelectTrigger className={formErrors.routeId ? "border-destructive" : ""}>
-                                        <SelectValue placeholder="Select route" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {routes.map((route) => (
-                                            <SelectItem key={route.id} value={route.id}>{route.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                {formErrors.routeId && <p className="text-xs text-destructive">{formErrors.routeId}</p>}
+                                <Label className="flex items-center gap-2">
+                                    <Clock className="h-4 w-4 text-blue-500" />
+                                    Pickup Time
+                                </Label>
+                                <Input
+                                    type="time"
+                                    value={formData.pickupTime || ""}
+                                    onChange={(e) => setFormData({ ...formData, pickupTime: e.target.value })}
+                                />
                             </div>
                             <div className="space-y-2">
-                                <Label>Order <span className="text-destructive">*</span></Label>
-                                <Input type="number" min="1" value={formData.orderIndex || ""} onChange={(e) => setFormData({ ...formData, orderIndex: e.target.value })} className={formErrors.orderIndex ? "border-destructive" : ""} />
-                                {formErrors.orderIndex && <p className="text-xs text-destructive">{formErrors.orderIndex}</p>}
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label>Latitude</Label>
-                                <Input type="number" step="any" placeholder="e.g., 28.6139" value={formData.latitude || ""} onChange={(e) => setFormData({ ...formData, latitude: e.target.value })} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Longitude</Label>
-                                <Input type="number" step="any" placeholder="e.g., 77.2090" value={formData.longitude || ""} onChange={(e) => setFormData({ ...formData, longitude: e.target.value })} />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label>Pickup Time</Label>
-                                <Input type="time" value={formData.pickupTime || ""} onChange={(e) => setFormData({ ...formData, pickupTime: e.target.value })} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Drop Time</Label>
-                                <Input type="time" value={formData.dropTime || ""} onChange={(e) => setFormData({ ...formData, dropTime: e.target.value })} />
+                                <Label className="flex items-center gap-2">
+                                    <Clock className="h-4 w-4 text-orange-500" />
+                                    Drop Time
+                                </Label>
+                                <Input
+                                    type="time"
+                                    value={formData.dropTime || ""}
+                                    onChange={(e) => setFormData({ ...formData, dropTime: e.target.value })}
+                                />
                             </div>
                         </div>
                     </div>
@@ -365,6 +462,7 @@ export default function BusStopManagement() {
                 </DialogContent>
             </Dialog>
 
+            {/* Delete Confirmation */}
             <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>

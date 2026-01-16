@@ -4,6 +4,12 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { delCache, invalidatePattern } from '@/lib/cache';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 export async function GET(req, props) {
     const params = await props.params;
@@ -123,27 +129,58 @@ export async function DELETE(req, props) {
     const { id } = params;
 
     try {
-        const existingStaff = await prisma.transportStaff.findUnique({ where: { id } });
+        const existingStaff = await prisma.transportStaff.findUnique({
+            where: { id },
+            select: { id: true, userId: true, schoolId: true }
+        });
         if (!existingStaff) {
             return NextResponse.json({ error: 'Transport staff not found' }, { status: 404 });
         }
 
-        // Soft delete - just mark as inactive
+        // Delete Supabase auth user first
+        if (existingStaff.userId) {
+            const { error: authError } = await supabase.auth.admin.deleteUser(existingStaff.userId);
+            if (authError) {
+                console.error('Error deleting Supabase auth user:', authError);
+                // Continue with database cleanup even if Supabase deletion fails
+            }
+        }
+
+        // Soft delete - mark as inactive
         await prisma.transportStaff.update({
             where: { id },
             data: { isActive: false },
         });
 
-        // Also deactivate all vehicle assignments
+        // Deactivate all vehicle assignments
         await prisma.vehicleAssignment.updateMany({
             where: { transportStaffId: id },
             data: { isActive: false },
         });
 
+        // Deactivate route assignments
+        await prisma.routeAssignment.updateMany({
+            where: {
+                OR: [
+                    { driverId: id },
+                    { conductorId: id }
+                ]
+            },
+            data: { isActive: false },
+        });
+
+        // Optionally: Also update User status if you want complete deactivation
+        if (existingStaff.userId) {
+            await prisma.user.update({
+                where: { id: existingStaff.userId },
+                data: { status: 'INACTIVE' }
+            }).catch(() => { }); // Ignore if status field doesn't exist
+        }
+
         // Invalidate cache
         await invalidatePattern(`transport-staff:*schoolId:${existingStaff.schoolId}*`);
 
-        return NextResponse.json({ success: true, message: 'Transport staff deactivated' });
+        return NextResponse.json({ success: true, message: 'Transport staff deleted and auth removed' });
     } catch (error) {
         console.error('Error deleting transport staff:', error);
         return NextResponse.json({ error: 'Failed to delete transport staff' }, { status: 500 });

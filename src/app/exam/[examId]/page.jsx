@@ -203,6 +203,13 @@ export default function PublicExamPage() {
                 window.addEventListener("blur", handleBlur);
             }
 
+            // Fullscreen exit detection
+            if (res.data.securitySettings?.lockScreen) {
+                document.addEventListener("fullscreenchange", handleFullscreenChange);
+                // Block common keyboard shortcuts
+                document.addEventListener("keydown", handleKeyDown);
+            }
+
         } catch (error) {
             console.error("Start error:", error);
             toast.error("Failed to start exam. " + (error.response?.data?.error || ""));
@@ -219,6 +226,37 @@ export default function PublicExamPage() {
 
     const handleBlur = () => {
         handleViolation("Focus Lost (Window Blur)");
+    };
+
+    const handleFullscreenChange = () => {
+        // If we exited fullscreen during exam, count as violation
+        if (!document.fullscreenElement && viewState === "EXAM") {
+            handleViolation("Exited Fullscreen Mode");
+            // Try to re-enter fullscreen
+            if (containerRef.current?.requestFullscreen) {
+                containerRef.current.requestFullscreen().catch(() => { });
+            }
+        }
+    };
+
+    const handleKeyDown = (e) => {
+        // Block Alt+Tab, Alt+F4, Ctrl+W, Ctrl+T, Windows key, Escape
+        const blockedKeys = ['F4', 'Escape', 'Tab'];
+        const blockedCombos = [
+            e.altKey && e.key === 'Tab',
+            e.altKey && e.key === 'F4',
+            e.ctrlKey && e.key === 'w',
+            e.ctrlKey && e.key === 't',
+            e.ctrlKey && e.key === 'n',
+            e.metaKey, // Windows/Command key
+        ];
+
+        if (blockedKeys.includes(e.key) || blockedCombos.some(Boolean)) {
+            e.preventDefault();
+            e.stopPropagation();
+            toast.warning("This shortcut is blocked during the exam");
+            return false;
+        }
     };
 
     const handleViolation = (reason) => {
@@ -255,6 +293,8 @@ export default function PublicExamPage() {
     const cleanupListeners = () => {
         document.removeEventListener("visibilitychange", handleVisibilityChange);
         window.removeEventListener("blur", handleBlur);
+        document.removeEventListener("fullscreenchange", handleFullscreenChange);
+        document.removeEventListener("keydown", handleKeyDown);
         if (document.fullscreenElement) {
             document.exitFullscreen().catch(err => console.error(err));
         }
@@ -325,7 +365,7 @@ export default function PublicExamPage() {
                                             onChange={(e) => setCredentials({ ...credentials, email: e.target.value })}
                                             required
                                             className="pl-12 h-12 bg-gray-50 border-2 border-gray-200 focus:border-[#0c65f1] focus:bg-white transition-all rounded-xl font-medium"
-                                         />
+                                        />
                                     </div>
                                 </div>
 

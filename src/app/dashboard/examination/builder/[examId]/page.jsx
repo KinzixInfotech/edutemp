@@ -99,6 +99,38 @@ export default function ExamBuilderPage() {
     };
 
     const handleSave = async () => {
+        // Validate questions before saving
+        for (let i = 0; i < questions.length; i++) {
+            const q = questions[i];
+
+            // Check question text is not empty
+            if (!q.question || q.question.trim() === '') {
+                toast.error(`Question ${i + 1} cannot be empty`);
+                return;
+            }
+
+            // For MCQ/CHECKBOX, require at least one correct answer
+            if (q.type === 'MCQ' || q.type === 'CHECKBOX') {
+                if (!q.correctAnswer || q.correctAnswer.length === 0) {
+                    toast.error(`Question ${i + 1}: Please select a correct answer by clicking the circle next to an option`);
+                    return;
+                }
+
+                // Verify correct answer exists in options
+                const validAnswer = q.correctAnswer.every(ans => q.options.includes(ans));
+                if (!validAnswer) {
+                    toast.error(`Question ${i + 1}: Correct answer must match one of the options`);
+                    return;
+                }
+
+                // Check at least 2 options exist
+                if (q.options.length < 2) {
+                    toast.error(`Question ${i + 1}: Please add at least 2 options`);
+                    return;
+                }
+            }
+        }
+
         setSaving(true);
         try {
             // Save Security Settings and Timer

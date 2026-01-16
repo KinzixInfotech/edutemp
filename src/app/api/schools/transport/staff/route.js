@@ -7,6 +7,7 @@ import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { generateKey, remember, delCache, invalidatePattern } from '@/lib/cache';
 import { createClient } from '@supabase/supabase-js';
+import bcrypt from 'bcryptjs';
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -84,7 +85,13 @@ export async function GET(req) {
                         driverRouteAssignments: {
                             where: { isActive: true },
                             include: {
-                                route: { select: { id: true, name: true } },
+                                route: {
+                                    select: {
+                                        id: true,
+                                        name: true,
+                                        stops: true  // Include stops for route display
+                                    }
+                                },
                                 vehicle: {
                                     select: {
                                         id: true,
@@ -106,7 +113,13 @@ export async function GET(req) {
                         conductorRouteAssignments: {
                             where: { isActive: true },
                             include: {
-                                route: { select: { id: true, name: true } },
+                                route: {
+                                    select: {
+                                        id: true,
+                                        name: true,
+                                        stops: true  // Include stops for route display
+                                    }
+                                },
                                 vehicle: {
                                     select: {
                                         id: true,
@@ -206,13 +219,17 @@ export async function POST(req) {
 
         // Create user and transport staff in transaction
         const result = await prisma.$transaction(async (tx) => {
+            // Hash the password before storing
+            const plainPassword = password || `${employeeId}@temp123`;
+            const hashedPassword = await bcrypt.hash(plainPassword, 10);
+
             // Create User
             const user = await tx.user.create({
                 data: {
                     id: authData.user.id,
                     email,
                     name,
-                    password: password || `${employeeId}@temp123`, // Store hashed in production
+                    password: hashedPassword, // Store hashed password
                     schoolId,
                     roleId: roleRecord.id,
                     profilePicture: profilePicture || 'default.png',

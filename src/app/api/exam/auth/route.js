@@ -37,8 +37,9 @@ export async function POST(req) {
             );
         }
 
-        // 2. Verify Password (plain text comparison)
-        if (user.password !== password) {
+        // 2. Verify Password (bcrypt comparison for hashed passwords)
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
             return NextResponse.json(
                 { error: 'Invalid credentials' },
                 { status: 401 }
@@ -59,6 +60,14 @@ export async function POST(req) {
 
         if (!exam) {
             return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
+        }
+
+        // Check exam status - only PUBLISHED exams can be taken
+        if (exam.status !== 'PUBLISHED') {
+            const statusMessage = exam.status === 'DRAFT'
+                ? 'This exam is not yet published. Please contact your teacher.'
+                : 'This exam has been completed and is no longer available.';
+            return NextResponse.json({ error: statusMessage }, { status: 403 });
         }
 
         // Check if student's class is assigned to this exam

@@ -35,9 +35,8 @@ export async function GET(req, props) {
             });
             lastId = lastStudent?.admissionNo;
         } else if (type === "employee") {
-            // Find last employee ID from teaching OR non-teaching staff
-            // This is trickier because they are in different tables.
-            // We will check both.
+            // Find last employee ID from teaching, non-teaching, AND transport staff
+            // We need to check all three tables that use employee IDs.
 
             const lastTeacher = await prisma.teachingStaff.findFirst({
                 where: {
@@ -48,7 +47,7 @@ export async function GET(req, props) {
                 select: { employeeId: true },
             });
 
-            const lastStaff = await prisma.nonTeachingStaff.findFirst({
+            const lastNonTeachingStaff = await prisma.nonTeachingStaff.findFirst({
                 where: {
                     schoolId,
                     employeeId: { startsWith: prefix },
@@ -57,16 +56,35 @@ export async function GET(req, props) {
                 select: { employeeId: true },
             });
 
-            // Compare to find the "max"
-            const tId = lastTeacher?.employeeId || "";
-            const sId = lastStaff?.employeeId || "";
+            const lastTransportStaff = await prisma.transportStaff.findFirst({
+                where: {
+                    schoolId,
+                    employeeId: { startsWith: prefix },
+                },
+                orderBy: { employeeId: "desc" },
+                select: { employeeId: true },
+            });
 
-            // Simple string comparison might fail for "EMP10" vs "EMP2" (EMP2 is > EMP10 alphabetically but not numerically)
-            // Ideally we extract numbers.
-            lastId = tId > sId ? tId : sId;
+            // Extract numeric parts and find the max
+            const extractNumber = (id) => {
+                if (!id) return 0;
+                const numPart = id.slice(prefix.length).replace(/[^0-9]/g, "");
+                return numPart ? parseInt(numPart, 10) : 0;
+            };
 
-            // Better numeric extraction if possible, but for simple 'desc' sort above, Prisma does string sort.
-            // If user uses consistent padding (EMP001), string sort works.
+            const tNum = extractNumber(lastTeacher?.employeeId);
+            const ntsNum = extractNumber(lastNonTeachingStaff?.employeeId);
+            const tsNum = extractNumber(lastTransportStaff?.employeeId);
+
+            // Find the max number and corresponding ID
+            const maxNum = Math.max(tNum, ntsNum, tsNum);
+            if (maxNum === tNum && lastTeacher?.employeeId) {
+                lastId = lastTeacher.employeeId;
+            } else if (maxNum === ntsNum && lastNonTeachingStaff?.employeeId) {
+                lastId = lastNonTeachingStaff.employeeId;
+            } else if (lastTransportStaff?.employeeId) {
+                lastId = lastTransportStaff.employeeId;
+            }
         }
 
         // Generate Next ID

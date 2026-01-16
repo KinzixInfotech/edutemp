@@ -62,13 +62,23 @@ export async function GET(req) {
 
 export async function POST(req) {
     try {
-        const data = await req.json();
-        // Fix: if assignedVehicleId is not a valid UUID, set it to null
-        if (!data.assignedVehicleId || data.assignedVehicleId === "none") {
-            data.assignedVehicleId = null;
+        const body = await req.json();
+        const { name, schoolId, assignedVehicleId, stops } = body;
+
+        // Validation
+        if (!name || !schoolId) {
+            return NextResponse.json({ error: 'name and schoolId are required' }, { status: 400 });
         }
+
         const route = await prisma.route.create({
-            data,
+            data: {
+                name,
+                schoolId,
+                // Provide empty array if stops is not provided
+                stops: stops || [],
+                // Fix: if assignedVehicleId is not a valid UUID or is "none", set to null
+                assignedVehicleId: (!assignedVehicleId || assignedVehicleId === "none") ? null : assignedVehicleId,
+            },
             select: {
                 id: true,
                 name: true,
@@ -81,7 +91,7 @@ export async function POST(req) {
         });
         return NextResponse.json({ route });
     } catch (error) {
-        console.error(error);
+        console.error('Error creating route:', error);
         return NextResponse.json({ error: 'Failed to create route' }, { status: 500 });
     }
 }

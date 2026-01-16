@@ -392,13 +392,14 @@ export async function GET(req) {
             case "STUDENT": {
                 const student = await prisma.student.findUnique({
                     where: { userId },
-                    include: { class: true, section: true },
+                    include: { class: true, section: true, school: true },
                 });
                 console.log("✅ [API] Student details fetched:", student ? "Found" : "Not Found");
                 response.schoolId = student?.schoolId;
                 response.studentData = student;
                 response.class = student?.class;
                 response.section = student?.section;
+                response.school = student?.school;
                 break;
             }
             case "PARENT": {

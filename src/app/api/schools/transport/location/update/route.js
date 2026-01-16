@@ -100,9 +100,11 @@ export async function POST(req) {
             accuracy: acc,
             timestamp: serverTimestamp,
         };
-        // Only include optional relations if they exist
-        if (tripId) locationData.tripId = tripId;
-        if (transportStaffId) locationData.transportStaffId = transportStaffId;
+        // Only include optional relations if they exist and are defined
+        if (tripId && tripId !== 'undefined' && tripId !== 'null') {
+            locationData.tripId = tripId;
+        }
+        // Don't include transportStaffId unless we're sure it's valid - client may send user ID by mistake
 
         let location;
         if (existingLocation) {

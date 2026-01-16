@@ -269,9 +269,11 @@ export default function ExamListPage() {
                     <TableCell className="font-medium">
                       <div className="flex flex-col">
                         <span>{exam.title}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {exam._count?.subjects || 0} Subjects
-                        </span>
+                        {exam.type !== 'ONLINE' && (
+                          <span className="text-xs text-muted-foreground">
+                            {exam._count?.subjects || 0} Subjects
+                          </span>
+                        )}
                         {exam.type === 'ONLINE' && (
                           <div className="flex items-center gap-1 mt-1">
                             <Link2 className="h-3 w-3 text-primary" />
@@ -357,11 +359,13 @@ export default function ExamListPage() {
                             </Link>
                           </>
                         )}
-                        <Link href={`/dashboard/examination/${exam.id}`}>
-                          <Button variant="ghost" size="icon">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </Link>
+                        {exam.type !== 'ONLINE' && (
+                          <Link href={`/dashboard/examination/${exam.id}`}>
+                            <Button variant="ghost" size="icon">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
