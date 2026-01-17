@@ -228,10 +228,10 @@ export default function DownloadAppCTA() {
                                         <div className="w-2 h-2 bg-slate-900 rounded-full border border-white/5"></div>
                                     </div> */}
 
-                                    {/* Screen Content Container - Replace the img src below with your actual image */}
+                                    {/* Screen Content ontainer - Replace the img src below with your actual image */}
                                     <div className="w-full h-full bg-slate-900 rounded-[3rem] overflow-hidden relative shadow-inner">
                                         <img
-                                            src="./img.png"
+                                            src="./ss.png"
                                             alt="App Screenshot"
                                             className="w-full h-full object-cover object-top"
                                         />

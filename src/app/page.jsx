@@ -70,28 +70,29 @@ export default function HomePage() {
             <HeroSection />
             <MarqueeBanner />
             <AboutBriefSection />
-            <ProductGuideAI />
+            <WebDashboardCTA />
+
+            <FeaturesSection />
+            <HowWeWorkSection />
 
             <WhyEduBreezySection />
 
             {/* AI Product Guide - Ask questions about EduBreezy */}
 
             {/* <TrustedSection /> */}
-            <FeaturesSection />
-            <WebDashboardCTA />
-
             <SchoolExplorerSection />
+            <PricingSection />
+
             {/* Partner Teaser - Grow With Us */}
             <PartnerTeaser />
             {/* <CommunicatingSeamlesslySection /> */}
-            <HowWeWorkSection />
             {/* <BentoSection /> */}
-            <PricingSection />
-            <TestimonialsSection />
+            {/* <TestimonialsSection /> */}
             {/* <div className='p-2'> */}
             <div id="app">
                 <DownloadAppCTA />
             </div>
+            <ProductGuideAI />
             {/* </div> */}
             <FinalCTA />
             {/* <Footer /> */}
@@ -354,12 +355,13 @@ function AboutBriefSection() {
     return (
         <section className=" py-16 md:py-24 px-5 relative">
             <div className="max-w-[1200px] mx-auto">
-                <p className="text-[#1a1a2e]/80 text-lg md:text-xl lg:text-2xl leading-relaxed font-light text-left max-w-[900px]">
-                    EduBreezy is a next-generation school management platform blending
-                    powerful technology, intuitive design, and education-first thinking.
-                    {"We're"} here to help forward-thinking schools streamline operations,
-                    engage parents effectively, and unlock the full potential of
-                    modern education management.
+                <p className="text-[#1a1a2e]/80  text-lg md:text-xl lg:text-2xl leading-[2.5rem] font-light  text-center ">
+                    EduBreezy is a next-generation, AI-powered school management platform that blends
+                    powerful technology, intelligent insights, and education-first thinking.
+                    Built with modern UI interfaces for today’s digital era, EduBreezy helps
+                    forward-thinking schools streamline operations, make data-driven decisions,
+                    engage parents more effectively, and unlock the full potential of smart,
+                    future-ready education management.
                 </p>
             </div>
             <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 z-10">
@@ -375,10 +377,34 @@ function WhyEduBreezySection() {
 
     const apps = [
         {
+            icon: Award,
+            title: "Director Login",
+            desc: "High-level oversight & analytics",
+            color: "#14B8A6"
+        },
+        {
+            icon: Trophy,
+            title: "Principal Login",
+            desc: "School operations & staff management",
+            color: "#F97316"
+        },
+        {
             icon: Home,
             title: "Admin Login",
             desc: "Complete dashboard with AI-powered insights",
             color: "#0569ff"
+        },
+        {
+            icon: CreditCard,
+            title: "Accountant Login",
+            desc: "Handle fees, payroll & finances",
+            color: "#0EA5E9"
+        },
+        {
+            icon: BookOpen,
+            title: "Student Login",
+            desc: "Access assignments, results & schedules",
+            color: "#EC4899"
         },
         {
             icon: Users,
@@ -394,28 +420,17 @@ function WhyEduBreezySection() {
         },
         {
             icon: Bus,
-            title: "Driver Login",
+            title: "Bus Driver Login",
             desc: "Real-time tracking & route optimization",
             color: "#8B5CF6"
         },
         // Additional logins (shown on "Show More")
+
         {
-            icon: BookOpen,
-            title: "Student Login",
-            desc: "Access assignments, results & schedules",
-            color: "#EC4899"
-        },
-        {
-            icon: Award,
-            title: "Director Login",
-            desc: "High-level oversight & analytics",
-            color: "#14B8A6"
-        },
-        {
-            icon: Trophy,
-            title: "Principal Login",
-            desc: "School operations & staff management",
-            color: "#F97316"
+            icon: Clipboard,
+            title: "Bus Conductor Login",
+            desc: "Manage bus attendance & pickups",
+            color: "#64748B"
         },
         {
             icon: Library,
@@ -423,18 +438,8 @@ function WhyEduBreezySection() {
             desc: "Manage books, issues & returns",
             color: "#6366F1"
         },
-        {
-            icon: CreditCard,
-            title: "Accountant Login",
-            desc: "Handle fees, payroll & finances",
-            color: "#0EA5E9"
-        },
-        {
-            icon: Clipboard,
-            title: "Conductor Login",
-            desc: "Manage bus attendance & pickups",
-            color: "#64748B"
-        }
+
+
     ];
 
     const visibleApps = showAll ? apps : apps.slice(0, 4);
@@ -1019,7 +1024,7 @@ function SchoolExplorerSection() {
                     badge="SCHOOL EXPLORER"
                     title="Get Discovered by"
                     highlightedText="Parents"
-                    description="List your school on school.edubreezy.com and reach 50,000+ parents searching for schools."
+                    description="List your school on school.edubreezy.com and reach parents searching for schools."
                 />
 
                 {/* Main Card */}
@@ -1041,7 +1046,7 @@ function SchoolExplorerSection() {
                             </p>
 
                             {/* Stats */}
-                            <div className="grid grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8 p-3 md:p-4 bg-[#f5f7fa] rounded-xl md:rounded-2xl">
+                            {/* <div className="grid grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8 p-3 md:p-4 bg-[#f5f7fa] rounded-xl md:rounded-2xl">
                                 <div className="text-center">
                                     <div className="text-lg md:text-2xl font-bold text-[#0569ff]">50K+</div>
                                     <div className="text-[10px] md:text-xs text-slate-500">Parents</div>
@@ -1054,10 +1059,10 @@ function SchoolExplorerSection() {
                                     <div className="text-lg md:text-2xl font-bold text-[#F59E0B]">95%</div>
                                     <div className="text-[10px] md:text-xs text-slate-500">Satisfaction</div>
                                 </div>
-                            </div>
+                            </div> */}
 
                             {/* CTA */}
-                            <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
+                            <div className="flex flex-col sm:flex-row mt-20 gap-3 md:gap-4">
                                 <a
                                     href="https://school.edubreezy.com/explore"
                                     target="_blank"

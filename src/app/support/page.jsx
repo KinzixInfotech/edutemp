@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/accordion";
 import QuoteSection from '@/components/QuoteSection';
 import { Highlighter } from '@/components/ui/highlighter';
+import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
 
 export default function SupportPage() {
     const [formData, setFormData] = useState({
@@ -79,57 +80,74 @@ export default function SupportPage() {
         <div className="bg-white min-h-screen">
             <Header />
 
-            {/* Hero Section */}
-            <section className="min-h-[60vh] pt-32 pb-16 px-5 bg-[linear-gradient(135deg,#f8fafc_0%,#fff9f0_50%,#f0f7ff_100%)] relative overflow-hidden flex items-center">
-                {/* Mesh Gradient Glows */}
-                <div className="absolute top-[10%] -left-[10%] w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(5,105,255,0.2)_0%,transparent_70%)] blur-[80px] rounded-full pointer-events-none" />
-                <div className="absolute bottom-[10%] -right-[10%] w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(249,115,22,0.15)_0%,transparent_70%)] blur-[80px] rounded-full pointer-events-none" />
-                <div className="absolute top-[50%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[radial-gradient(circle,rgba(16,185,129,0.1)_0%,transparent_70%)] blur-[100px] rounded-full pointer-events-none" />
+            {/* Hero Section - Matching Homepage Style */}
+            <section className="relative min-h-[60vh] flex items-center justify-center overflow-hidden bg-white pt-24">
+                {/* Interactive Grid Pattern Background */}
+                <InteractiveGridPattern
+                    className="absolute opacity-80 inset-0 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,white_40%,transparent_70%)]"
+                    squares={[60, 60]}
+                />
 
-                {/* Floating Icons */}
-                <div className="absolute hidden md:flex top-32 left-[10%] w-14 h-14 bg-white rounded-2xl shadow-lg flex items-center justify-center animate-bounce" style={{ animationDuration: '3s' }}>
-                    <Headphones size={28} className="text-[#0569ff]" />
-                </div>
-                <div className="absolute hidden md:flex top-40 right-[15%] w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center animate-bounce" style={{ animationDuration: '2.5s', animationDelay: '0.5s' }}>
-                    <LifeBuoy size={24} className="text-[#10B981]" />
-                </div>
-                <div className="absolute hidden md:flex bottom-32 left-[15%] w-11 h-11 bg-white rounded-xl shadow-lg flex items-center justify-center animate-bounce" style={{ animationDuration: '3.5s', animationDelay: '1s' }}>
-                    <Ticket size={22} className="text-[#F59E0B]" />
-                </div>
-                <div className="absolute hidden md:flex bottom-40 right-[10%] w-14 h-14 bg-white rounded-2xl shadow-lg flex items-center justify-center animate-bounce" style={{ animationDuration: '2.8s', animationDelay: '0.3s' }}>
-                    <MessageCircle size={28} className="text-[#8B5CF6]" />
-                </div>
-
-                <div className="max-w-[1200px] mx-auto text-left md:text-center relative z-10 w-full">
-                    <span className="inline-flex items-center gap-2 bg-[#0569ff]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-6">
-                        <LifeBuoy size={16} />
-                        Support Center
+                {/* Large Background Text */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
+                    <span className="text-[clamp(6rem,20vw,16rem)] font-black text-gray-100/30 leading-none tracking-tighter">
+                        SUPPORT
                     </span>
-                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-[#1a1a2e] mb-6 leading-tight">
-                        We're Here To <Highlighter action="underline" color="#FF9800"><span className="text-[#0569ff]">Help You</span></Highlighter>
-                    </h1>
-                    <p className="text-[#666] text-lg md:text-xl max-w-2xl md:mx-auto mb-10">
-                        Raise a support ticket and our dedicated team will assist you.
-                        We're committed to resolving your issues quickly.
-                    </p>
-                    <div className="flex flex-wrap md:justify-center gap-6">
-                        <div className="flex items-center gap-2 text-[#555]">
-                            <div className="w-8 h-8 bg-[#10B981]/10 rounded-full flex items-center justify-center">
-                                <CheckCircle size={16} className="text-[#10B981]" />
-                            </div>
-                            <span className="text-sm font-medium">24hr Response</span>
+                </div>
+
+                {/* Gradient Orb */}
+                <div className="absolute top-20 right-0 w-[400px] h-[400px] bg-[#0469ff]/5 rounded-full blur-3xl" />
+                <div className="absolute bottom-20 left-0 w-[400px] h-[400px] bg-[#10B981]/5 rounded-full blur-3xl" />
+
+                <div className="relative max-w-[1200px] mx-auto px-6 py-16 z-10 w-full">
+                    <div className="text-center space-y-6">
+                        {/* Badge */}
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 border-[#0469ff]/20 bg-[#0469ff]/5">
+                            <div className="w-2 h-2 rounded-full bg-[#0469ff] animate-pulse" />
+                            <span className="text-sm font-semibold text-[#0469ff]">Support Center</span>
                         </div>
-                        <div className="flex items-center gap-2 text-[#555]">
-                            <div className="w-8 h-8 bg-[#10B981]/10 rounded-full flex items-center justify-center">
-                                <CheckCircle size={16} className="text-[#10B981]" />
+
+                        {/* Main Heading */}
+                        <h1 className="text-[clamp(2.5rem,7vw,5rem)] font-bold leading-[1.05] tracking-tight">
+                            <span className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent">
+                                We're Here To
+                            </span>
+                            <br />
+                            <span className="relative inline-block mt-2">
+                                <span className="text-[#0469ff]">
+                                    Help You
+                                </span>
+                                <svg className="absolute -bottom-3 left-0 w-full" height="10" viewBox="0 0 300 12" fill="none">
+                                    <path d="M2 8C70 3 150 1 298 8" stroke="#0469ff" strokeWidth="3" strokeLinecap="round" />
+                                </svg>
+                            </span>
+                        </h1>
+
+                        {/* Subtitle */}
+                        <p className="text-lg md:text-xl text-gray-600 max-w-[600px] mx-auto leading-relaxed font-medium">
+                            Raise a support ticket and our dedicated team will assist you. We're committed to resolving your issues quickly.
+                        </p>
+
+                        {/* Trust indicators */}
+                        <div className="flex flex-wrap justify-center gap-6 pt-4">
+                            <div className="flex items-center gap-2 text-[#555]">
+                                <div className="w-8 h-8 bg-[#10B981]/10 rounded-full flex items-center justify-center">
+                                    <CheckCircle size={16} className="text-[#10B981]" />
+                                </div>
+                                <span className="text-sm font-medium">24hr Response</span>
                             </div>
-                            <span className="text-sm font-medium">Expert Support</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-[#555]">
-                            <div className="w-8 h-8 bg-[#10B981]/10 rounded-full flex items-center justify-center">
-                                <CheckCircle size={16} className="text-[#10B981]" />
+                            <div className="flex items-center gap-2 text-[#555]">
+                                <div className="w-8 h-8 bg-[#10B981]/10 rounded-full flex items-center justify-center">
+                                    <CheckCircle size={16} className="text-[#10B981]" />
+                                </div>
+                                <span className="text-sm font-medium">Expert Support</span>
                             </div>
-                            <span className="text-sm font-medium">Track Progress</span>
+                            <div className="flex items-center gap-2 text-[#555]">
+                                <div className="w-8 h-8 bg-[#10B981]/10 rounded-full flex items-center justify-center">
+                                    <CheckCircle size={16} className="text-[#10B981]" />
+                                </div>
+                                <span className="text-sm font-medium">Track Progress</span>
+                            </div>
                         </div>
                     </div>
                 </div>

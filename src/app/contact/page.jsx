@@ -16,6 +16,7 @@ import {
 import QuoteSection from '@/components/QuoteSection';
 import { Highlighter } from '@/components/ui/highlighter';
 import CalEmbed from '@/components/cal';
+import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
 
 export default function ContactPage() {
     const [formData, setFormData] = useState({
@@ -66,63 +67,74 @@ export default function ContactPage() {
         <div className="bg-white min-h-screen">
             <Header />
 
-            {/* Hero Section - Full Width with Floating Icons */}
-            <section className="min-h-[70vh] pt-32 pb-20 px-5 bg-[linear-gradient(135deg,#f8fafc_0%,#fff9f0_50%,#f0f7ff_100%)] relative overflow-hidden flex items-center">
-                {/* Mesh Gradient Glows */}
-                <div className="absolute top-[10%] -left-[10%] w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(5,105,255,0.2)_0%,transparent_70%)] blur-[80px] rounded-full pointer-events-none" />
-                <div className="absolute bottom-[10%] -right-[10%] w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(249,115,22,0.15)_0%,transparent_70%)] blur-[80px] rounded-full pointer-events-none" />
-                <div className="absolute top-[50%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[radial-gradient(circle,rgba(16,185,129,0.1)_0%,transparent_70%)] blur-[100px] rounded-full pointer-events-none" />
+            {/* Hero Section - Matching Homepage Style */}
+            <section className="relative min-h-[60vh] flex items-center justify-center overflow-hidden bg-white pt-24">
+                {/* Interactive Grid Pattern Background */}
+                <InteractiveGridPattern
+                    className="absolute opacity-80 inset-0 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,white_40%,transparent_70%)]"
+                    squares={[60, 60]}
+                />
 
-                {/* Floating Icons */}
-                <div className="absolute hidden md:flex top-32 left-[10%] w-14 h-14 bg-white rounded-2xl shadow-lg flex items-center justify-center animate-bounce" style={{ animationDuration: '3s' }}>
-                    <Calendar size={28} className="text-[#0569ff]" />
-                </div>
-                <div className="absolute hidden md:flex top-40 right-[15%] w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center animate-bounce" style={{ animationDuration: '2.5s', animationDelay: '0.5s' }}>
-                    <MessageCircle size={24} className="text-[#10B981]" />
-                </div>
-                <div className="absolute hidden md:flex bottom-32 left-[15%] w-11 h-11 bg-white rounded-xl shadow-lg flex items-center justify-center animate-bounce" style={{ animationDuration: '3.5s', animationDelay: '1s' }}>
-                    <GraduationCap size={22} className="text-[#F59E0B]" />
-                </div>
-                <div className="absolute hidden md:flex bottom-40 right-[10%] w-14 h-14 bg-white rounded-2xl shadow-lg flex items-center justify-center animate-bounce" style={{ animationDuration: '2.8s', animationDelay: '0.3s' }}>
-                    <Users size={28} className="text-[#8B5CF6]" />
-                </div>
-                <div className="absolute hidden md:flex top-[55%] left-[5%] w-10 h-10 bg-white rounded-lg shadow-lg flex items-center justify-center animate-bounce" style={{ animationDuration: '4s', animationDelay: '0.7s' }}>
-                    <Star size={20} className="text-[#EC4899]" />
-                </div>
-                <div className="absolute hidden md:flex top-[45%] right-[5%] w-12 h-12 bg-white rounded-xl shadow-lg flex items-center justify-center animate-bounce" style={{ animationDuration: '3.2s', animationDelay: '1.2s' }}>
-                    <BarChart3 size={24} className="text-[#14B8A6]" />
-                </div>
-
-                <div className="max-w-[1200px] mx-auto text-left md:text-center relative z-10 w-full">
-                    <span className="inline-flex items-center gap-2 bg-[#0569ff]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-6">
-                        <MessageCircle size={16} />
-                        Get In Touch
+                {/* Large Background Text */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
+                    <span className="text-[clamp(6rem,20vw,16rem)] font-black text-gray-100/30 leading-none tracking-tighter">
+                        CONTACT
                     </span>
-                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-[#1a1a2e] mb-6 leading-tight">
-                        Let's Transform Your <br className="md:hidden" /><Highlighter action="underline" color="#FF9800"><span className="text-[#0569ff]">School Together</span></Highlighter>
-                    </h1>
-                    <p className="text-[#666] text-lg md:text-xl max-w-2xl md:mx-auto mb-10">
-                        Book a free demo, ask questions, or get personalized guidance.
-                        We're here to help you modernize your school management.
-                    </p>
-                    <div className="flex flex-wrap md:justify-center gap-6">
-                        <div className="flex items-center gap-2 text-[#555]">
-                            <div className="w-8 h-8 bg-[#10B981]/10 rounded-full flex items-center justify-center">
-                                <CheckCircle size={16} className="text-[#10B981]" />
-                            </div>
-                            <span className="text-sm font-medium">Free Demo</span>
+                </div>
+
+                {/* Gradient Orb */}
+                <div className="absolute top-20 right-0 w-[400px] h-[400px] bg-[#0469ff]/5 rounded-full blur-3xl" />
+                <div className="absolute bottom-20 left-0 w-[400px] h-[400px] bg-[#10B981]/5 rounded-full blur-3xl" />
+
+                <div className="relative max-w-[1200px] mx-auto px-6 py-16 z-10 w-full">
+                    <div className="text-center space-y-6">
+                        {/* Badge */}
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 border-[#0469ff]/20 bg-[#0469ff]/5">
+                            <div className="w-2 h-2 rounded-full bg-[#0469ff] animate-pulse" />
+                            <span className="text-sm font-semibold text-[#0469ff]">Get In Touch</span>
                         </div>
-                        <div className="flex items-center gap-2 text-[#555]">
-                            <div className="w-8 h-8 bg-[#10B981]/10 rounded-full flex items-center justify-center">
-                                <CheckCircle size={16} className="text-[#10B981]" />
+
+                        {/* Main Heading */}
+                        <h1 className="text-[clamp(2.5rem,7vw,5rem)] font-bold leading-[1.05] tracking-tight">
+                            <span className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent">
+                                Let's Transform Your
+                            </span>
+                            <br />
+                            <span className="relative inline-block mt-2">
+                                <span className="text-[#0469ff]">
+                                    School Together
+                                </span>
+                                <svg className="absolute -bottom-3 left-0 w-full" height="10" viewBox="0 0 300 12" fill="none">
+                                    <path d="M2 8C70 3 150 1 298 8" stroke="#0469ff" strokeWidth="3" strokeLinecap="round" />
+                                </svg>
+                            </span>
+                        </h1>
+
+                        {/* Subtitle */}
+                        <p className="text-lg md:text-xl text-gray-600 max-w-[600px] mx-auto leading-relaxed font-medium">
+                            Book a free demo, ask questions, or get personalized guidance. We're here to help you modernize your school management.
+                        </p>
+
+                        {/* Trust indicators */}
+                        <div className="flex flex-wrap justify-center gap-6 pt-4">
+                            <div className="flex items-center gap-2 text-[#555]">
+                                <div className="w-8 h-8 bg-[#10B981]/10 rounded-full flex items-center justify-center">
+                                    <CheckCircle size={16} className="text-[#10B981]" />
+                                </div>
+                                <span className="text-sm font-medium">Free Demo</span>
                             </div>
-                            <span className="text-sm font-medium">No Commitment</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-[#555]">
-                            <div className="w-8 h-8 bg-[#10B981]/10 rounded-full flex items-center justify-center">
-                                <CheckCircle size={16} className="text-[#10B981]" />
+                            <div className="flex items-center gap-2 text-[#555]">
+                                <div className="w-8 h-8 bg-[#10B981]/10 rounded-full flex items-center justify-center">
+                                    <CheckCircle size={16} className="text-[#10B981]" />
+                                </div>
+                                <span className="text-sm font-medium">No Commitment</span>
                             </div>
-                            <span className="text-sm font-medium">24hr Response</span>
+                            <div className="flex items-center gap-2 text-[#555]">
+                                <div className="w-8 h-8 bg-[#10B981]/10 rounded-full flex items-center justify-center">
+                                    <CheckCircle size={16} className="text-[#10B981]" />
+                                </div>
+                                <span className="text-sm font-medium">24hr Response</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -418,37 +430,7 @@ export default function ContactPage() {
                 </div>
             </section>
 
-            {/* FAQ Section with Accordion */}
-            <section className="py-16 px-5 bg-white">
-                <div className="max-w-[800px] mx-auto">
-                    <div className="text-center mb-10">
-                        <span className="inline-flex items-center gap-2 bg-[#0569ff]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-4">
-                            <MessageCircle size={16} />
-                            FAQs
-                        </span>
-                        <h2 className="text-2xl md:text-3xl font-bold text-[#1a1a2e]">
-                            Frequently Asked Questions
-                        </h2>
-                    </div>
 
-                    <Accordion type="single" collapsible className="space-y-3">
-                        {faqs.map((faq, index) => (
-                            <AccordionItem
-                                key={index}
-                                value={`item-${index}`}
-                                className="bg-[#f8fafc] border border-gray-100 rounded-2xl px-6 data-[state=open]:bg-[#0569ff]/5 data-[state=open]:border-[#0569ff]/20 transition-all"
-                            >
-                                <AccordionTrigger className="text-left font-bold text-[#1a1a2e] hover:no-underline py-5">
-                                    {faq.q}
-                                </AccordionTrigger>
-                                <AccordionContent className="text-[#666] pb-5">
-                                    {faq.a}
-                                </AccordionContent>
-                            </AccordionItem>
-                        ))}
-                    </Accordion>
-                </div>
-            </section>
 
             {/* Book a Meeting Section */}
             <section className="py-16 md:py-24 px-5 bg-gradient-to-b from-white to-[#f8fafc]">
@@ -494,7 +476,37 @@ export default function ContactPage() {
                     </div>
                 </div>
             </section>
+            {/* FAQ Section with Accordion */}
+            <section className="py-16 px-5 bg-white">
+                <div className="max-w-[800px] mx-auto">
+                    <div className="text-center mb-10">
+                        <span className="inline-flex items-center gap-2 bg-[#0569ff]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-4">
+                            <MessageCircle size={16} />
+                            FAQs
+                        </span>
+                        <h2 className="text-2xl md:text-3xl font-bold text-[#1a1a2e]">
+                            Frequently Asked Questions
+                        </h2>
+                    </div>
 
+                    <Accordion type="single" collapsible className="space-y-3">
+                        {faqs.map((faq, index) => (
+                            <AccordionItem
+                                key={index}
+                                value={`item-${index}`}
+                                className="bg-[#f8fafc] border border-gray-100 rounded-2xl px-6 data-[state=open]:bg-[#0569ff]/5 data-[state=open]:border-[#0569ff]/20 transition-all"
+                            >
+                                <AccordionTrigger className="text-left font-bold text-[#1a1a2e] hover:no-underline py-5">
+                                    {faq.q}
+                                </AccordionTrigger>
+                                <AccordionContent className="text-[#666] pb-5">
+                                    {faq.a}
+                                </AccordionContent>
+                            </AccordionItem>
+                        ))}
+                    </Accordion>
+                </div>
+            </section>
             {/* Motivational Quote */}
             <QuoteSection
                 quote="We're not just building software. We're building the future of how schools connect, communicate, and create impact."

@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/accordion";
 import QuoteSection from '@/components/QuoteSection';
 import { Highlighter } from '@/components/ui/highlighter';
+import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
 
 export default function PartnersPage() {
     return (
@@ -28,7 +29,7 @@ export default function PartnersPage() {
             <HeroSection />
 
             {/* Stats Section */}
-            <StatsSection />
+            {/* <StatsSection /> */}
 
             {/* Why Partner Section */}
             <WhyPartnerSection />
@@ -46,7 +47,7 @@ export default function PartnersPage() {
             <BenefitsSection />
 
             {/* Testimonials */}
-            <TestimonialsSection />
+            {/* <TestimonialsSection /> */}
 
             {/* FAQ Section */}
             <FAQSection />
@@ -67,124 +68,86 @@ export default function PartnersPage() {
 // Hero Section
 function HeroSection() {
     return (
-        <section className="min-h-[85vh] pt-32 pb-28 px-5 bg-[linear-gradient(135deg,#f8fafc_0%,#eef2ff_50%,#f0f7ff_100%)] relative flex items-center overflow-x-clip">
-            {/* Mesh Gradient Glows */}
-            <div className="absolute top-[10%] -left-[10%] w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(5,105,255,0.2)_0%,transparent_70%)] blur-[80px] rounded-full pointer-events-none" />
-            <div className="absolute bottom-[10%] -right-[10%] w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(16,185,129,0.15)_0%,transparent_70%)] blur-[80px] rounded-full pointer-events-none" />
-            <div className="absolute top-[50%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[radial-gradient(circle,rgba(139,92,246,0.1)_0%,transparent_70%)] blur-[100px] rounded-full pointer-events-none" />
+        <section className="relative min-h-[70vh] flex items-center justify-center overflow-hidden bg-white pt-24">
+            {/* Interactive Grid Pattern Background */}
+            <InteractiveGridPattern
+                className="absolute opacity-80 inset-0 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,white_40%,transparent_70%)]"
+                squares={[60, 60]}
+            />
 
-            {/* Floating Icons - positioned to not overlap with content */}
-            <div className="absolute hidden xl:flex top-28 left-[5%] w-14 h-14 bg-white rounded-2xl shadow-lg items-center justify-center animate-bounce" style={{ animationDuration: '3s' }}>
-                <Handshake size={28} className="text-[#0569ff]" />
-            </div>
-            <div className="absolute hidden xl:flex top-48 right-[5%] w-12 h-12 bg-white rounded-xl shadow-lg items-center justify-center animate-bounce" style={{ animationDuration: '2.5s', animationDelay: '0.5s' }}>
-                <DollarSign size={24} className="text-[#10B981]" />
-            </div>
-            <div className="absolute hidden xl:flex bottom-40 left-[3%] w-11 h-11 bg-white rounded-xl shadow-lg items-center justify-center animate-bounce" style={{ animationDuration: '3.5s', animationDelay: '1s' }}>
-                <TrendingUp size={22} className="text-[#F59E0B]" />
-            </div>
-            <div className="absolute hidden xl:flex bottom-28 right-[3%] w-14 h-14 bg-white rounded-2xl shadow-lg items-center justify-center animate-bounce" style={{ animationDuration: '2.8s', animationDelay: '0.3s' }}>
-                <Award size={28} className="text-[#8B5CF6]" />
+            {/* Large Background Text */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
+                <span className="text-[clamp(6rem,20vw,16rem)] font-black text-gray-100/30 leading-none tracking-tighter">
+                    PARTNERS
+                </span>
             </div>
 
-            <div className="max-w-[1200px] mx-auto relative z-10 w-full">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-                    {/* Left Content */}
-                    <div>
-                        <span className="inline-flex items-center gap-2 bg-[#0569ff]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-6">
-                            <Handshake size={16} />
-                            EduBreezy Partner Program
-                        </span>
-                        <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-[#1a1a2e] mb-6 leading-tight">
-                            <Highlighter action="underline" color="#FF9800">Grow</Highlighter> With Us. <br />
-                            <span className="text-[#0569ff]">Earn</span> With Us.
-                        </h1>
-                        <p className="text-[#666] text-lg md:text-xl max-w-xl mb-8 leading-relaxed">
-                            Join India's fastest-growing EdTech partner network. Help schools transform their
-                            management while earning attractive commissions and building a sustainable business.
-                        </p>
+            {/* Gradient Orb */}
+            <div className="absolute top-20 right-0 w-[400px] h-[400px] bg-[#0469ff]/5 rounded-full blur-3xl" />
+            <div className="absolute bottom-20 left-0 w-[400px] h-[400px] bg-[#10B981]/5 rounded-full blur-3xl" />
 
-                        <div className="flex flex-wrap gap-4 mb-10">
-                            <Link href="/partners/register">
-                                <button className="group flex items-center pr-1 gap-2 bg-[#0569ff] text-white border-0 rounded-full text-base font-semibold cursor-pointer shadow-lg hover:shadow-xl transition-all duration-300">
-                                    <span className='px-1 pl-6 py-3.5'>Become a Partner</span>
-                                    <span className='bg-white p-2.5 rounded-full group-hover:bg-gray-50 transition-colors'>
-                                        <ArrowRight size={18} strokeWidth={3} color='#0569ff' className='transition-transform duration-300 group-hover:-rotate-45' />
-                                    </span>
-                                </button>
-                            </Link>
-                            <Link href="/contact">
-                                <button className="px-6 py-3.5 bg-white border-2 border-[#1a1a2e] text-[#1a1a2e] rounded-full text-base font-semibold hover:bg-[#1a1a2e] hover:text-white transition-all duration-300">
-                                    Talk to Sales
-                                </button>
-                            </Link>
-                        </div>
-
-                        {/* Trust Badges */}
-                        <div className="flex flex-wrap gap-6">
-                            {[
-                                { icon: CheckCircle, text: "No Investment Required" },
-                                { icon: CheckCircle, text: "Instant Onboarding" },
-                                { icon: CheckCircle, text: "Lifetime Earnings" }
-                            ].map((item, index) => (
-                                <div key={index} className="flex items-center gap-2 text-[#555]">
-                                    <item.icon size={18} className="text-[#10B981]" />
-                                    <span className="text-sm font-medium">{item.text}</span>
-                                </div>
-                            ))}
-                        </div>
+            <div className="relative max-w-[1200px] mx-auto px-6 py-20 z-10 w-full">
+                <div className="text-center space-y-8">
+                    {/* Badge */}
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 border-[#0469ff]/20 bg-[#0469ff]/5">
+                        <div className="w-2 h-2 rounded-full bg-[#0469ff] animate-pulse" />
+                        <span className="text-sm font-semibold text-[#0469ff]">EduBreezy Partner Program</span>
                     </div>
 
-                    {/* Right - Visual */}
-                    <div className="relative hidden lg:block pb-8">
-                        <div className="relative bg-gradient-to-br from-[#0569ff] to-[#0a52c6] rounded-3xl p-8 text-white shadow-2xl">
-                            {/* Decorative elements */}
-                            <div className="absolute top-4 right-4 w-20 h-20 bg-white/10 rounded-full blur-xl" />
-                            <div className="absolute bottom-4 left-4 w-16 h-16 bg-white/10 rounded-full blur-lg" />
+                    {/* Main Heading */}
+                    <h1 className="text-[clamp(2.5rem,7vw,5.5rem)] font-bold leading-[1.05] tracking-tight">
+                        <span className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent">
+                            Grow With Us.
+                        </span>
+                        <br />
+                        <span className="relative inline-block mt-2">
+                            <span className="text-[#0469ff]">
+                                Earn With Us.
+                            </span>
+                            <svg className="absolute -bottom-4 left-0 w-full" height="12" viewBox="0 0 300 12" fill="none">
+                                <path d="M2 8C70 3 150 1 298 8" stroke="#0469ff" strokeWidth="3" strokeLinecap="round" />
+                            </svg>
+                        </span>
+                    </h1>
 
-                            <div className="relative z-10">
-                                <div className="flex items-center gap-3 mb-6">
-                                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                                        <Building2 size={24} />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-white/80">Partner Dashboard</p>
-                                        <p className="font-bold text-lg">Your Earnings</p>
-                                    </div>
-                                </div>
+                    {/* Subtitle */}
+                    <p className="text-xl md:text-2xl text-gray-600 max-w-[800px] mx-auto leading-relaxed font-medium">
+                        Join India's fastest-growing EdTech partner network. Help schools transform their management while earning attractive commissions.
+                    </p>
 
-                                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 mb-4">
-                                    <p className="text-white/70 text-sm mb-2">Total Commission Earned</p>
-                                    <p className="text-4xl font-bold">₹2,45,000</p>
-                                    <div className="flex items-center gap-2 mt-2 text-green-300">
-                                        <TrendingUp size={16} />
-                                        <span className="text-sm">+32% this month</span>
+                    {/* CTA Buttons */}
+                    <div className="flex items-center justify-center gap-5 flex-wrap pt-6">
+                        <Link href="/partners/register">
+                            <button className="group relative px-10 py-4 rounded-full font-bold text-lg text-white bg-[#0469ff] hover:shadow-2xl transition-all duration-300 overflow-hidden">
+                                <span className="absolute inset-0 bg-[#0358dd] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                <span className="relative flex items-center gap-3">
+                                    Become a Partner
+                                    <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center">
+                                        <ArrowRight className="w-5 h-5 text-[#0469ff] transition-transform duration-300 group-hover:translate-x-0.5" />
                                     </div>
-                                </div>
+                                </span>
+                            </button>
+                        </Link>
+                        <Link href="/contact">
+                            <button className="group px-10 hover:shadow-lg py-4 rounded-full font-bold text-lg text-[#1a1a2e] bg-[#f8f9fb] border transition-all duration-300 flex items-center gap-3">
+                                Talk to Sales
+                                <ArrowRight className="w-5 h-5" />
+                            </button>
+                        </Link>
+                    </div>
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                                        <p className="text-white/70 text-xs mb-1">Active Referrals</p>
-                                        <p className="text-2xl font-bold">48</p>
-                                    </div>
-                                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
-                                        <p className="text-white/70 text-xs mb-1">Conversion Rate</p>
-                                        <p className="text-2xl font-bold">67%</p>
-                                    </div>
-                                </div>
+                    {/* Trust Badges */}
+                    <div className="flex flex-wrap justify-center gap-6 pt-4">
+                        {[
+                            { icon: CheckCircle, text: "No Investment Required" },
+                            { icon: CheckCircle, text: "Instant Onboarding" },
+                            { icon: CheckCircle, text: "Lifetime Earnings" }
+                        ].map((item, index) => (
+                            <div key={index} className="flex items-center gap-2 text-[#555]">
+                                <item.icon size={18} className="text-[#10B981]" />
+                                <span className="text-sm font-medium">{item.text}</span>
                             </div>
-                        </div>
-
-                        {/* Floating notification - positioned inside the card area */}
-                        {/* <div className="absolute bottom-0 left-4 bg-white rounded-2xl shadow-xl p-4 flex items-center gap-3 z-20 animate-bounce" style={{ animationDuration: '4s' }}>
-                            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                                <DollarSign size={20} className="text-green-600" />
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-500">New Commission</p>
-                                <p className="font-bold text-gray-900">₹15,000 received!</p>
-                            </div>
-                        </div> */}
+                        ))}
                     </div>
                 </div>
             </div>
@@ -580,7 +543,7 @@ function CommissionSection() {
     const partnerLevels = [
         {
             tier: "Bronze",
-            emoji: "🟤",
+            emoji: "",
             color: "#CD7F32",
             eligibility: "1–5 active schools",
             year1: "20%",
@@ -590,7 +553,7 @@ function CommissionSection() {
         },
         {
             tier: "Silver",
-            emoji: "⚪",
+            emoji: "",
             color: "#C0C0C0",
             eligibility: "6–20 active schools",
             year1: "25%",
@@ -601,7 +564,7 @@ function CommissionSection() {
         },
         {
             tier: "Gold",
-            emoji: "🟡",
+            emoji: "",
             color: "#FFD700",
             eligibility: "21+ active schools",
             year1: "30%",
@@ -732,12 +695,12 @@ function CommissionSection() {
 // Benefits Section
 function BenefitsSection() {
     const benefits = [
-        { icon: Gift, title: "Marketing Materials", description: "Ready-to-use brochures, presentations, and social media content" },
+        // { icon: Gift, title: "Marketing Materials", description: "Ready-to-use brochures, presentations, and social media content" },
         { icon: BarChart3, title: "Partner Dashboard", description: "Track referrals, earnings, and performance in real-time" },
-        { icon: HeartHandshake, title: "Dedicated Support", description: "Personal account manager for high-performing partners" },
+        // { icon: HeartHandshake, title: "Dedicated Support", description: "Personal account manager for high-performing partners" },
         { icon: Award, title: "Certification", description: "Get certified as an EduBreezy expert after training" },
         { icon: Globe, title: "Pan-India Opportunity", description: "Refer schools from anywhere in India — no territory restrictions" },
-        { icon: Clock, title: "Quick Payouts", description: "Monthly payouts directly to your bank account" }
+        { icon: Clock, title: "Quick Payouts", description: "Yearly payouts directly to your bank account" }
     ];
 
     return (
@@ -947,9 +910,9 @@ function FinalCTASection() {
                         <Mail size={18} />
                         partners@edubreezy.com
                     </a>
-                    <a href="tel:+919876543210" className="flex items-center gap-2 hover:text-[#0569ff] transition-colors">
+                    <a href="tel:+919471532682" className="flex items-center gap-2 hover:text-[#0569ff] transition-colors">
                         <Phone size={18} />
-                        +91 98765 43210
+                        +91 9471532682
                     </a>
                 </div>
             </div>

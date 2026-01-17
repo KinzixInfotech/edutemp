@@ -32,32 +32,32 @@ export default function WebDashboardCTA() {
                         {/* Glow Effect */}
                         <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 blur-3xl rounded-3xl" />
 
-                        {/* Phone Mockups Container - GROUP for hover */}
-                        <div className="group z-20 flex items-center justify-center scale-100 sm:scale-110 lg:scale-[1.3] 2xl:scale-[1.4] cursor-pointer relative">
+                        {/* Phone Mockups Container */}
+                        <div className="z-20 flex items-center justify-center scale-100 sm:scale-110 lg:scale-[1.3] 2xl:scale-[1.4] relative">
 
-                            {/* Back Phone (ss.png) - Peeks left on hover */}
+                            {/* Back Phone - Always visible */}
                             <div
-                                className="absolute w-[180px] sm:w-[200px] lg:w-[200px] 2xl:w-[220px] h-[400px] sm:h-[445px] lg:h-[445px] 2xl:h-[490px] rounded-[2rem] overflow-hidden transition-all duration-500 ease-out opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:-translate-x-16 rotate-0 group-hover:-rotate-[8deg] -z-10"
+                                className="absolute w-[180px] sm:w-[200px] lg:w-[200px] 2xl:w-[220px] h-[400px] sm:h-[445px] lg:h-[445px] 2xl:h-[490px] rounded-[2rem] overflow-hidden -translate-x-16 -rotate-[8deg] -z-10"
                                 style={{
                                     boxShadow: '0 0 0 3px #1a1a2e, 0 25px 50px -12px rgba(0, 0, 0, 0.15)'
                                 }}
                             >
                                 <img
-                                    src="./ss.png"
+                                    src="/img.png"
                                     alt="EduBreezy App - Screen 2"
                                     className="w-full h-full object-contain bg-white"
                                 />
                             </div>
 
-                            {/* Front Phone (ss2.png) - Rotates right on hover */}
+                            {/* Front Phone - Always visible */}
                             <div
-                                className="w-[180px] sm:w-[200px] lg:w-[200px] 2xl:w-[220px] h-[400px] sm:h-[445px] lg:h-[445px] 2xl:h-[490px] rounded-[2rem] overflow-hidden relative z-10 transition-all duration-500 ease-out group-hover:translate-x-8 group-hover:rotate-[8deg]"
+                                className="w-[180px] sm:w-[200px] lg:w-[200px] 2xl:w-[220px] h-[400px] sm:h-[445px] lg:h-[445px] 2xl:h-[490px] rounded-[2rem] overflow-hidden relative z-10 translate-x-8 rotate-[8deg]"
                                 style={{
                                     boxShadow: '0 0 0 3px #1a1a2e, 0 25px 50px -12px rgba(0, 0, 0, 0.25)'
                                 }}
                             >
                                 <img
-                                    src="./img1.png"
+                                    src="img1.png"
                                     alt="EduBreezy App"
                                     className="w-full h-full object-contain bg-white"
                                 />

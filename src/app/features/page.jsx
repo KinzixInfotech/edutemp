@@ -9,22 +9,15 @@ import {
 } from 'lucide-react';
 import Header from '../components/Header';
 import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
-import { Highlighter } from '@/components/ui/highlighter';
+import SectionHeading from '@/components/SectionHeading';
 
 export default function FeaturesIntroPage() {
-    const stats = [
-        { number: '155+', label: 'Database Models', icon: FileText },
-        { number: '20+', label: 'Feature Modules', icon: Zap },
-        { number: '7', label: 'Categories', icon: Layout },
-        { number: '100%', label: 'Cloud-Based', icon: Cloud },
-    ];
-
     const categories = [
         {
             id: 'core',
             name: 'Core Modules',
             icon: Home,
-            color: 'from-blue-500 to-blue-600',
+            color: '#0569ff',
             features: ['Student Management', 'Staff Management', 'Fee Management', 'Attendance System'],
             count: 4
         },
@@ -32,7 +25,7 @@ export default function FeaturesIntroPage() {
             id: 'academic',
             name: 'Academic',
             icon: GraduationCap,
-            color: 'from-purple-500 to-purple-600',
+            color: '#8B5CF6',
             features: ['Examination & Results', 'Timetable', 'Homework', 'Library'],
             count: 4
         },
@@ -40,7 +33,7 @@ export default function FeaturesIntroPage() {
             id: 'operations',
             name: 'Operations',
             icon: Bus,
-            color: 'from-orange-500 to-orange-600',
+            color: '#F97316',
             features: ['Transport', 'Payroll', 'Inventory', 'Calendar'],
             count: 4
         },
@@ -48,7 +41,7 @@ export default function FeaturesIntroPage() {
             id: 'communication',
             name: 'Communication',
             icon: Bell,
-            color: 'from-green-500 to-green-600',
+            color: '#10B981',
             features: ['Notice Board', 'Parent Portal'],
             count: 2
         },
@@ -56,7 +49,7 @@ export default function FeaturesIntroPage() {
             id: 'growth',
             name: 'Growth & Discovery',
             icon: Globe,
-            color: 'from-cyan-500 to-cyan-600',
+            color: '#06B6D4',
             features: ['Admissions & Forms', 'School Explorer', 'Partner Program'],
             count: 3
         },
@@ -64,7 +57,7 @@ export default function FeaturesIntroPage() {
             id: 'documents',
             name: 'Documents',
             icon: FileText,
-            color: 'from-red-500 to-red-600',
+            color: '#EF4444',
             features: ['Certificates & ID Cards', 'Document Generation'],
             count: 2
         },
@@ -72,160 +65,83 @@ export default function FeaturesIntroPage() {
             id: 'advanced',
             name: 'Advanced',
             icon: Sparkles,
-            color: 'from-pink-500 to-pink-600',
+            color: '#EC4899',
             features: ['Alumni Management', 'EduAI'],
             count: 2
         },
     ];
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-white">
             <Header />
 
-            {/* Hero Section with Animated Mesh Glows */}
-            <section className="relative pt-32 pb-24 px-5 overflow-hidden bg-white">
-                <style jsx>{`
-                    @keyframes float {
-                        0%, 100% { transform: translateY(0px); }
-                        50% { transform: translateY(-20px); }
-                    }
-                    @keyframes floatSlow {
-                        0%, 100% { transform: translateY(0px) translateX(0px); }
-                        50% { transform: translateY(-30px) translateX(10px); }
-                    }
-                    @keyframes pulse {
-                        0%, 100% { opacity: 0.3; }
-                        50% { opacity: 0.5; }
-                    }
-                    @keyframes rotate {
-                        from { transform: rotate(0deg); }
-                        to { transform: rotate(360deg); }
-                    }
-                    @keyframes shimmer {
-                        0% { transform: translateX(-100%); }
-                        100% { transform: translateX(100%); }
-                    }
-                    .mesh-1 {
-                        animation: float 8s ease-in-out infinite, pulse 4s ease-in-out infinite;
-                    }
-                    .mesh-2 {
-                        animation: floatSlow 10s ease-in-out infinite, pulse 5s ease-in-out infinite;
-                    }
-                    .mesh-3 {
-                        animation: float 12s ease-in-out infinite reverse, pulse 6s ease-in-out infinite;
-                    }
-                    .mesh-4 {
-                        animation: floatSlow 9s ease-in-out infinite, pulse 4.5s ease-in-out infinite;
-                    }
-                    .floating-icon {
-                        animation: float 6s ease-in-out infinite;
-                    }
-                    .floating-icon:nth-child(2) {
-                        animation-delay: 1s;
-                    }
-                    .floating-icon:nth-child(3) {
-                        animation-delay: 2s;
-                    }
-                    .floating-icon:nth-child(4) {
-                        animation-delay: 3s;
-                    }
-                    .shimmer-text {
-                        position: relative;
-                        overflow: hidden;
-                    }
-                    .shimmer-text::after {
-                        content: '';
-                        position: absolute;
-                        top: 0;
-                        left: 0;
-                        right: 0;
-                        bottom: 0;
-                        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-                        animation: shimmer 2.5s infinite;
-                    }
-                `}</style>
+            {/* Hero Section - Matching Homepage Style */}
+            <section className="relative min-h-[70vh] flex items-center justify-center overflow-hidden bg-white pt-24">
+                {/* Interactive Grid Pattern Background */}
+                <InteractiveGridPattern
+                    className="absolute opacity-80 inset-0 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,white_40%,transparent_70%)]"
+                    squares={[60, 60]}
+                />
 
-                {/* Animated Mesh Glows - Top */}
-                <div className="mesh-1 absolute -top-[80px] -left-[100px] w-[400px] h-[400px] bg-[radial-gradient(circle,rgba(5,105,255,0.35)_0%,transparent_70%)] blur-[60px] rounded-full pointer-events-none" />
-                <div className="mesh-2 absolute -top-[60px] -right-[120px] w-[450px] h-[450px] bg-[radial-gradient(circle,rgba(255,122,0,0.3)_0%,transparent_70%)] blur-[70px] rounded-full pointer-events-none" />
-                <div className="mesh-3 absolute top-[200px] left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(5,105,255,0.15)_0%,transparent_70%)] blur-[80px] rounded-full pointer-events-none" />
-
-                {/* Animated Mesh Glows - Bottom */}
-                <div className="mesh-4 absolute -bottom-[100px] left-[20%] w-[380px] h-[380px] bg-[radial-gradient(circle,rgba(5,105,255,0.25)_0%,transparent_70%)] blur-[65px] rounded-full pointer-events-none" />
-                <div className="mesh-1 absolute -bottom-[80px] right-[15%] w-[420px] h-[420px] bg-[radial-gradient(circle,rgba(255,122,0,0.2)_0%,transparent_70%)] blur-[75px] rounded-full pointer-events-none" />
-
-                {/* Floating Icons - Better Spacing */}
-                <div className="floating-icon hidden md:flex absolute top-[22%] left-[15%] w-12 h-12 bg-gradient-to-br from-orange-500/10 to-orange-500/5 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-orange-500/20 pointer-events-none">
-                    <Bus size={24} className="text-orange-500/60" />
-                </div>
-                <div className="floating-icon hidden md:flex  absolute top-[28%] left-[23%] w-10 h-10 bg-gradient-to-br from-pink-500/10 to-pink-500/5 backdrop-blur-sm rounded-xl flex items-center justify-center border border-pink-500/20 pointer-events-none">
-                    <Award size={20} className="text-pink-500/60" />
-                </div>
-                <div className="floating-icon hidden md:flex  absolute top-[25%] right-[20%] w-14 h-14 bg-gradient-to-br from-purple-500/10 to-purple-500/5 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-purple-500/20 pointer-events-none">
-                    <GraduationCap size={28} className="text-purple-500/60" />
-                </div>
-                <div className="floating-icon hidden md:flex  absolute top-[32%] right-[8%] w-12 h-12 bg-gradient-to-br from-pink-500/10 to-pink-500/5 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-pink-500/20 pointer-events-none">
-                    <Sparkles size={24} className="text-pink-500/60" />
-                </div>
-                <div className="floating-icon hidden md:flex  absolute bottom-[28%] right-[18%] w-12 h-12 bg-gradient-to-br from-green-500/10 to-green-500/5 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-green-500/20 pointer-events-none">
-                    <Bell size={24} className="text-green-500/60" />
-                </div>
-                <div className="floating-icon hidden md:flex  absolute bottom-[18%] right-[25%] w-10 h-10 bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 backdrop-blur-sm rounded-xl flex items-center justify-center border border-yellow-500/20 pointer-events-none">
-                    <Wallet size={20} className="text-yellow-500/60" />
-                </div>
-                <div className="floating-icon absolute bottom-[25%] left-[20%] w-12 h-12 bg-gradient-to-br from-[#0569ff]/10 to-[#0569ff]/5 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-[#0569ff]/20 pointer-events-none">
-                    <Users size={24} className="text-[#0569ff]/60" />
-                </div>
-                <div className="floating-icon hidden md:flex  absolute bottom-[15%] left-[12%] w-12 h-12 bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-cyan-500/20 pointer-events-none">
-                    <Globe size={24} className="text-cyan-500/60" />
+                {/* Large Background Text */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
+                    <span className="text-[clamp(8rem,25vw,20rem)] font-black text-gray-100/30 leading-none tracking-tighter">
+                        FEATURES
+                    </span>
                 </div>
 
-                <div className="max-w-6xl mx-auto relative z-10">
-                    <div className="text-left md:text-center">
-                        <span className="inline-flex px-4 py-2 bg-gradient-to-r from-[#0569ff]/10 to-[#ff7a00]/10 border border-[#0569ff]/20 rounded-full text-sm font-medium mb-6 text-[#0569ff]">
-                            Complete Feature Documentation
-                        </span>
-                        <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-[1.1] text-[#1a1a2e]">
-                            <Highlighter action="underline" color="#FF9800">Everything</Highlighter> Your School Needs,
+                {/* Gradient Orb */}
+                <div className="absolute top-20 right-0 w-[400px] h-[400px] bg-[#0469ff]/5 rounded-full blur-3xl" />
+                <div className="absolute bottom-20 left-0 w-[400px] h-[400px] bg-[#F97316]/5 rounded-full blur-3xl" />
+
+                <div className="relative max-w-[1400px] mx-auto px-6 py-20 z-10 w-full">
+                    <div className="text-center space-y-8">
+                        {/* Badge */}
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 border-[#0469ff]/20 bg-[#0469ff]/5">
+                            <div className="w-2 h-2 rounded-full bg-[#0469ff] animate-pulse" />
+                            <span className="text-sm font-semibold text-[#0469ff]">Complete Feature Suite</span>
+                        </div>
+
+                        {/* Main Heading */}
+                        <h1 className="text-[clamp(2.5rem,7vw,5.5rem)] font-bold leading-[1.05] tracking-tight">
+                            <span className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent">
+                                Everything Your School
+                            </span>
                             <br />
-                            <span className="shimmer-text bg-gradient-to-r from-[#0569ff] via-[#0450d4] to-[#ff7a00] bg-clip-text text-transparent inline-block">
-                                In One Platform
+                            <span className="relative inline-block mt-2">
+                                <span className="text-[#0469ff]">
+                                    Needs, In One Platform
+                                </span>
+                                <svg className="absolute -bottom-4 left-0 w-full" height="12" viewBox="0 0 300 12" fill="none">
+                                    <path d="M2 8C70 3 150 1 298 8" stroke="#0469ff" strokeWidth="3" strokeLinecap="round" />
+                                </svg>
                             </span>
                         </h1>
-                        <p className="text-lg md:text-xl text-gray-600 mb-12 max-w-3xl md:mx-auto leading-relaxed">
-                            Discover our comprehensive suite of 20+ modules designed to streamline every aspect of school management—from admissions to alumni.
+
+                        {/* Subtitle */}
+                        <p className="text-xl md:text-2xl text-gray-600 max-w-[800px] mx-auto leading-relaxed font-medium">
+                            Discover our comprehensive suite of modules designed to streamline every aspect of school management—from admissions to alumni.
                         </p>
 
                         {/* CTA Buttons */}
-                        <div className="flex flex-wrap gap-4 md:justify-center mb-16">
+                        <div className="flex items-center justify-center gap-5 flex-wrap pt-6">
                             <Link href="/features/docs">
-                                <button className="group flex items-center pr-1 gap-2 bg-[#0569ff] text-white border-0 rounded-full text-[0.95rem] font-semibold cursor-pointer shadow-[0_4px_14px_rgba(5,105,255,0.3)] hover:shadow-[0_6px_20px_rgba(5,105,255,0.4)] transition-all duration-300">
-                                    <span className='px-1 pl-6 py-3 md:py-3.5'>Browse All Features</span>
-                                    <span className='bg-white p-2.5 md:p-3 shadow-lg rounded-full group-hover:bg-gray-50 transition-colors'>
-                                        <ArrowRight size={20} strokeWidth={3} color='#0569ff' className='transition-transform duration-300 group-hover:-rotate-45' />
+                                <button className="group relative px-10 py-4 rounded-full font-bold text-lg text-white bg-[#0469ff] hover:shadow-2xl transition-all duration-300 overflow-hidden">
+                                    <span className="absolute inset-0 bg-[#0358dd] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                    <span className="relative flex items-center gap-3">
+                                        Browse All Features
+                                        <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center">
+                                            <ArrowRight className="w-5 h-5 text-[#0469ff] transition-transform duration-300 group-hover:translate-x-0.5" />
+                                        </div>
                                     </span>
                                 </button>
                             </Link>
                             <Link href="/contact">
-                                <button className="px-6 py-3 md:py-3.5 bg-white border-2 border-[#0569ff] text-[#0569ff] rounded-full text-[0.95rem] font-semibold hover:bg-[#0569ff] hover:text-white transition-all duration-300 shadow-md hover:shadow-lg">
+                                <button className="group px-10 hover:shadow-lg py-4 rounded-full font-bold text-lg text-[#0469ff] bg-[#f8f9fb] border transition-all duration-300 flex items-center gap-3">
                                     Request Demo
+                                    <ArrowRight className="w-5 h-5" />
                                 </button>
                             </Link>
-                        </div>
-
-                        {/* Stats Grid */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-4xl md:mx-auto">
-                            {stats.map((stat, index) => (
-                                <div key={index} className="relative group">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-[#0569ff]/5 to-transparent rounded-2xl blur-xl group-hover:blur-2xl transition-all" />
-                                    <div className="relative bg-white/80 backdrop-blur-sm p-6 rounded-2xl border border-gray-200/50 hover:border-[#0569ff]/30 hover:shadow-[0_8px_30px_rgba(5,105,255,0.15)] transition-all duration-300">
-                                        <div className="text-3xl md:text-4xl font-bold bg-gradient-to-br from-[#0569ff] to-[#0450d4] bg-clip-text text-transparent mb-2">
-                                            {stat.number}
-                                        </div>
-                                        <div className="text-gray-600 text-xs md:text-sm font-medium">{stat.label}</div>
-                                    </div>
-                                </div>
-                            ))}
                         </div>
                     </div>
                 </div>
@@ -234,18 +150,12 @@ export default function FeaturesIntroPage() {
             {/* Categories Grid */}
             <section className="py-20 md:py-28 px-5 bg-[#f5f7fa]">
                 <div className="max-w-[1200px] mx-auto">
-                    <div className="text-center mb-16">
-                        <span className="inline-flex items-center gap-2 bg-[#0569ff]/10 text-[#0569ff] px-4 py-2 rounded-full text-sm font-semibold mb-4">
-                            <span className="text-lg">✦</span>
-                            Feature Categories
-                        </span>
-                        <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a1a2e] mb-4">
-                            Explore Our Modules
-                        </h2>
-                        <p className="text-slate-500 text-lg max-w-2xl mx-auto">
-                            Each module is designed to work seamlessly together for complete school management.
-                        </p>
-                    </div>
+                    <SectionHeading
+                        badge="FEATURE CATEGORIES"
+                        title="Explore Our"
+                        highlightedText="Modules"
+                        description="Each module is designed to work seamlessly together for complete school management."
+                    />
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                         {categories.map((category, index) => {
@@ -256,9 +166,10 @@ export default function FeaturesIntroPage() {
                                         {/* Icon + Count */}
                                         <div className="flex items-center gap-4 mb-5">
                                             <div
-                                                className={`w-14 h-14 bg-gradient-to-br ${category.color} rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 shadow-lg`}
+                                                className="w-14 h-14 rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
+                                                style={{ backgroundColor: `${category.color}15` }}
                                             >
-                                                <IconComponent size={28} className="text-white" strokeWidth={1.5} />
+                                                <IconComponent size={28} style={{ color: category.color }} strokeWidth={1.5} />
                                             </div>
                                             <span className="text-xs font-semibold text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
                                                 {category.count} feature{category.count !== 1 ? 's' : ''}

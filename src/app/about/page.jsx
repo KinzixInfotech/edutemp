@@ -86,70 +86,76 @@ export default function AboutPage() {
         }
       `}</style>
 
-      {/* Hero Section */}
-      <section className="relative min-h-[80vh] flex items-center pt-24 pb-16 overflow-hidden bg-[linear-gradient(120deg,#f8fafc_0%,#fff9f0_50%,#f0f7ff_100%)]">
-        {/* Mesh Gradients */}
-        <div className="absolute top-[10%] -left-[10%] w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(5,105,255,0.2)_0%,transparent_70%)] blur-[80px] rounded-full pointer-events-none" />
-        <div className="absolute bottom-[10%] -right-[10%] w-[600px] h-[600px] bg-[radial-gradient(circle,rgba(255,150,50,0.15)_0%,transparent_70%)] blur-[100px] rounded-full pointer-events-none" />
-        <DotPattern width={24} height={24} cr={1} className="absolute inset-0 w-full h-full opacity-15" />
+      {/* Hero Section - Matching Homepage Style */}
+      <section className="relative min-h-[70vh] flex items-center justify-center overflow-hidden bg-white pt-24">
+        {/* Interactive Grid Pattern Background */}
+        <InteractiveGridPattern
+          className="absolute opacity-80 inset-0 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,white_40%,transparent_70%)]"
+          squares={[60, 60]}
+        />
 
-        {/* Floating Icons */}
-        <div className="hidden md:block absolute top-[15%] left-[8%] opacity-10 animate-[float_6s_ease-in-out_infinite]">
-          <GraduationCap size={80} className="text-black" />
-        </div>
-        <div className="hidden md:block absolute top-[20%] right-[10%] opacity-10 animate-[float_7s_ease-in-out_infinite_1s]">
-          <BookOpen size={70} className="text-black" />
-        </div>
-        <div className="hidden md:block absolute bottom-[20%] left-[15%] opacity-10 animate-[float_8s_ease-in-out_infinite_2s]">
-          <Award size={60} className="text-black" />
+        {/* Large Background Text */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
+          <span className="text-[clamp(8rem,25vw,20rem)] font-black text-gray-100/30 leading-none tracking-tighter">
+            ABOUT
+          </span>
         </div>
 
-        <div className="max-w-7xl mx-auto px-5 relative z-10">
+        {/* Gradient Orb */}
+        <div className="absolute top-20 right-0 w-[400px] h-[400px] bg-[#0469ff]/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-20 left-0 w-[400px] h-[400px] bg-[#F97316]/5 rounded-full blur-3xl" />
+
+        <div className="relative max-w-[1400px] mx-auto px-6 py-20 z-10 w-full">
           <motion.div
-            className="text-left md:text-center max-w-4xl md:mx-auto"
+            className="text-center space-y-8"
             initial="hidden"
             animate="visible"
             variants={staggerContainer}
           >
-            <motion.div variants={fadeInUp}>
-              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#0569ff]/10 text-[#0569ff] text-sm font-semibold border border-[#0569ff]/20 mb-6">
-                <Sparkles className="w-4 h-4" />
-                About EduBreezy
-              </span>
+            {/* Badge */}
+            <motion.div variants={fadeInUp} className="inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 border-[#0469ff]/20 bg-[#0469ff]/5">
+              <div className="w-2 h-2 rounded-full bg-[#0469ff] animate-pulse" />
+              <span className="text-sm font-semibold text-[#0469ff]">About EduBreezy</span>
             </motion.div>
 
-            <motion.h1
-              variants={fadeInUp}
-              className="text-4xl md:text-5xl lg:text-6xl font-bold text-[#1a1a2e] leading-[1.15] mb-6"
-            >
-              Transforming Education,{' '}
-              <span className="relative inline-block">
-                <Highlighter action="underline" color="#FF9800"><span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0569ff] to-[#0450d4]">One School</span></Highlighter>
-
-                {/* <span className="absolute bottom-1 left-0 w-full h-3 bg-[#FF9800]/30 -rotate-1 rounded -z-10"></span> */}
-              </span>{' '}
-              at a Time
+            {/* Main Heading */}
+            <motion.h1 variants={fadeInUp} className="text-[clamp(2.5rem,7vw,5.5rem)] font-bold leading-[1.05] tracking-tight">
+              <span className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent">
+                Transforming Education,
+              </span>
+              <br />
+              <span className="relative inline-block mt-2">
+                <span className="text-[#0469ff]">
+                  One School at a Time
+                </span>
+                <svg className="absolute -bottom-4 left-0 w-full" height="12" viewBox="0 0 300 12" fill="none">
+                  <path d="M2 8C70 3 150 1 298 8" stroke="#0469ff" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+              </span>
             </motion.h1>
 
-            <motion.p
-              variants={fadeInUp}
-              className="text-lg md:text-xl text-gray-600 max-w-2xl md:mx-auto mb-10 leading-relaxed"
-            >
+            {/* Subtitle */}
+            <motion.p variants={fadeInUp} className="text-xl md:text-2xl text-gray-600 max-w-[800px] mx-auto leading-relaxed font-medium">
               We're on a mission to simplify school management and empower educators with modern technology that just works.
             </motion.p>
 
-            <motion.div variants={fadeInUp} className="flex flex-wrap gap-4 md:justify-center">
+            {/* CTA Buttons */}
+            <motion.div variants={fadeInUp} className="flex items-center justify-center gap-5 flex-wrap pt-6">
               <Link href="/contact">
-                <button className="group flex items-center pr-1 gap-2 bg-[#0569ff] text-white border-0 rounded-full text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-300">
-                  <span className='px-1 pl-6 py-3'>Get Started</span>
-                  <span className='bg-white p-2.5 rounded-full group-hover:bg-gray-50 transition-colors'>
-                    <ArrowRight size={20} strokeWidth={3} color='#0569ff' className='transition-transform duration-300 group-hover:-rotate-45' />
+                <button className="group relative px-10 py-4 rounded-full font-bold text-lg text-white bg-[#0469ff] hover:shadow-2xl transition-all duration-300 overflow-hidden">
+                  <span className="absolute inset-0 bg-[#0358dd] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <span className="relative flex items-center gap-3">
+                    Get Started
+                    <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center">
+                      <ArrowRight className="w-5 h-5 text-[#0469ff] transition-transform duration-300 group-hover:translate-x-0.5" />
+                    </div>
                   </span>
                 </button>
               </Link>
               <Link href="/features">
-                <button className="px-6 py-3.5 bg-white border-2 border-[#0569ff] text-[#0569ff] rounded-full text-base font-semibold hover:bg-[#0569ff] hover:text-white transition-all duration-300 shadow-md">
+                <button className="group px-10 hover:shadow-lg py-4 rounded-full font-bold text-lg text-[#0469ff] bg-[#f8f9fb] border transition-all duration-300 flex items-center gap-3">
                   Explore Features
+                  <ArrowRight className="w-5 h-5" />
                 </button>
               </Link>
             </motion.div>
@@ -157,7 +163,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Stats Section */}
+      {/* Stats Section
       <section className="py-16 bg-white border-y border-gray-100">
         <div className="max-w-7xl mx-auto px-5">
           <motion.div
@@ -184,7 +190,7 @@ export default function AboutPage() {
             ))}
           </motion.div>
         </div>
-      </section>
+      </section> */}
 
       {/* Story Section - Image Left, Text Right */}
       <section className="py-20 md:py-28 bg-gray-50 px-5">
@@ -198,13 +204,13 @@ export default function AboutPage() {
               variants={fadeInLeft}
               className="relative"
             >
-              <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+              <div className="relative rounded-3xl overflow-hidden ">
                 <img
-                  src="./schl.jpeg"
+                  src="./bulb.png"
                   alt="Modern EduBreezy Dashboard Interface"
                   className="w-full h-[400px] object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                <div className="absolute inset-0 " />
               </div>
             </motion.div>
 
@@ -286,15 +292,15 @@ export default function AboutPage() {
               variants={fadeInRight}
               className="relative order-1 md:order-2"
             >
-              <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+              <div className="relative rounded-3xl overflow-hiddenl">
                 <img
-                  src="https://images.unsplash.com/photo-1577896851231-70ef18881754?w=800&h=600&fit=crop"
+                  src="./schl.png"
                   alt="Teacher with students"
-                  className="w-full h-[400px] object-cover"
+                  className="w-full h-[400px] scale-120 lg:scale-150 object-cover"
                 />
               </div>
               {/* Floating Card */}
-              <div className="absolute -bottom-6 -left-6 md:-left-8 bg-white rounded-2xl p-4 shadow-xl border border-gray-100">
+              {/* <div className="absolute -bottom-6 -left-6 md:-left-8 bg-white rounded-2xl p-4 shadow-xl border border-gray-100">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full bg-[#FF9800]/10 flex items-center justify-center">
                     <Star className="w-6 h-6 text-[#FF9800]" />
@@ -304,12 +310,13 @@ export default function AboutPage() {
                     <div className="text-sm text-gray-500">From 500+ Schools</div>
                   </div>
                 </div>
-              </div>
+              </div> */}
             </motion.div>
           </div>
         </div>
       </section>
 
+      {/* Values Section */}
       {/* Values Section */}
       <section className="py-20 md:py-28 bg-gray-50 px-5">
         <div className="max-w-7xl mx-auto">
@@ -320,9 +327,10 @@ export default function AboutPage() {
             variants={fadeInUp}
             className="text-center mb-16"
           >
-            <span className="inline-block px-4 py-1.5 rounded-full bg-[#0569ff]/10 text-[#0569ff] text-sm font-semibold mb-4">
-              Our Values
-            </span>
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 border-[#0469ff]/20 bg-[#0469ff]/5 mb-4">
+              <div className="w-2 h-2 rounded-full bg-[#0469ff] animate-pulse" />
+              <span className="text-sm font-semibold text-[#0469ff]">Our Values</span>
+            </div>
             <h2 className="text-3xl md:text-4xl font-bold text-[#1a1a2e] mb-4">
               What We Stand For
             </h2>
@@ -344,8 +352,11 @@ export default function AboutPage() {
                 variants={fadeInUp}
                 className="bg-white p-6 rounded-2xl border border-gray-100 hover:shadow-xl hover:border-[#0569ff]/20 transition-all duration-300 group"
               >
-                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${value.color} flex items-center justify-center mb-5 group-hover:scale-110 transition-transform shadow-lg`}>
-                  <value.icon className="w-7 h-7 text-white" />
+                <div
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform"
+                  style={{ backgroundColor: `${value.color}15` }}
+                >
+                  <value.icon className="w-7 h-7" style={{ color: value.color }} />
                 </div>
                 <h3 className="text-xl font-bold text-[#1a1a2e] mb-2 group-hover:text-[#0569ff] transition-colors">
                   {value.title}
