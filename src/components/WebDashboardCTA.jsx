@@ -43,7 +43,7 @@ export default function WebDashboardCTA() {
                                 }}
                             >
                                 <img
-                                    src="/ss.png"
+                                    src="./ss.png"
                                     alt="EduBreezy App - Screen 2"
                                     className="w-full h-full object-contain bg-white"
                                 />
@@ -57,7 +57,7 @@ export default function WebDashboardCTA() {
                                 }}
                             >
                                 <img
-                                    src="ss2.png"
+                                    src="./img1.png"
                                     alt="EduBreezy App"
                                     className="w-full h-full object-contain bg-white"
                                 />

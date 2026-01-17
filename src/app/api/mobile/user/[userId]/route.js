@@ -73,12 +73,12 @@ const getRoleSpecificData = async (userId, roleName) => {
                             relation: true,
                             student: {
                                 select: {
-                                    id: true,
+                                    userId: true,
                                     name: true,
                                     admissionNo: true,
                                     user: { select: { profilePicture: true } },
-                                    class: { select: { id: true, className: true } },
-                                    section: { select: { id: true, name: true } },
+                                    class: { select: { className: true } },
+                                    section: { select: { name: true } },
                                 },
                             },
                         },
