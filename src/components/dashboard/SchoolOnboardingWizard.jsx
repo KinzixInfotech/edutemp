@@ -29,9 +29,12 @@ import {
     CalendarDays,
     Clock,
     School,
+    MapPin,
+    Navigation,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import GoogleMapsLocationPicker from "@/components/maps/GoogleMapsLocationPicker";
 
 const iconMap = {
     GraduationCap,
@@ -66,7 +69,8 @@ const wizardSteps = [
     { number: 1, title: "Welcome", icon: School },
     { number: 2, title: "Academic Year", icon: CalendarDays },
     { number: 3, title: "School Timing", icon: Clock },
-    { number: 4, title: "Setup Checklist", icon: CheckCircle2 },
+    { number: 4, title: "School Location", icon: MapPin },
+    { number: 5, title: "Setup Checklist", icon: CheckCircle2 },
 ];
 
 // Startup sound - subtle chime (from public folder)
@@ -94,6 +98,15 @@ export default function SchoolOnboardingWizard() {
         startTime: '09:00',
         endTime: '17:00',
     });
+
+    // School Location form
+    const [locationForm, setLocationForm] = useState({
+        schoolLatitude: null,
+        schoolLongitude: null,
+        geofenceRadius: 200,
+        attendanceRadius: 500,
+    });
+    const [isDetectingLocation, setIsDetectingLocation] = useState(false);
 
     const isAdmin = fullUser?.role?.name === "ADMIN";
     const schoolId = fullUser?.schoolId || fullUser?.school?.id;
@@ -234,10 +247,68 @@ export default function SchoolOnboardingWizard() {
 
             toast.success("School Timing Saved!");
             localStorage.setItem(`onboarding-timing-done-${schoolId}`, "true");
-            setCurrentStep(3); // Move to setup steps
+            setCurrentStep(3); // Move to school location step
 
         } catch (err) {
             toast.error(err.message || "Failed to save school timing");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Detect current location using browser geolocation
+    const detectCurrentLocation = () => {
+        if (!navigator.geolocation) {
+            toast.error("Geolocation is not supported by your browser");
+            return;
+        }
+
+        setIsDetectingLocation(true);
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                setLocationForm(prev => ({
+                    ...prev,
+                    schoolLatitude: parseFloat(position.coords.latitude.toFixed(6)),
+                    schoolLongitude: parseFloat(position.coords.longitude.toFixed(6)),
+                }));
+                toast.success("Location detected successfully!");
+                setIsDetectingLocation(false);
+            },
+            (error) => {
+                console.error("Geolocation error:", error);
+                toast.error("Failed to detect location. Please enter manually.");
+                setIsDetectingLocation(false);
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    };
+
+    const handleSaveSchoolLocation = async () => {
+        try {
+            setLoading(true);
+
+            if (!locationForm.schoolLatitude || !locationForm.schoolLongitude) {
+                toast.error("Please enter school coordinates");
+                return;
+            }
+
+            const res = await fetch(`/api/schools/${schoolId}/settings`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(locationForm),
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.error || "Failed to save location");
+            }
+
+            toast.success("School Location Saved!");
+            localStorage.setItem(`onboarding-location-done-${schoolId}`, "true");
+            setCurrentStep(4); // Move to setup checklist
+
+        } catch (err) {
+            toast.error(err.message || "Failed to save school location");
         } finally {
             setLoading(false);
         }
@@ -253,6 +324,12 @@ export default function SchoolOnboardingWizard() {
         toast.info("You can configure school timing later in Settings");
         localStorage.setItem(`onboarding-timing-done-${schoolId}`, "true");
         setCurrentStep(3);
+    };
+
+    const skipLocation = () => {
+        toast.info("You can configure school location later in Settings");
+        localStorage.setItem(`onboarding-location-done-${schoolId}`, "true");
+        setCurrentStep(4);
     };
 
     const handleDismiss = () => {
@@ -435,6 +512,20 @@ export default function SchoolOnboardingWizard() {
                         )}
 
                         {currentStep === 3 && (
+                            <SchoolLocationStep
+                                key="school-location"
+                                form={locationForm}
+                                setForm={setLocationForm}
+                                loading={loading}
+                                isDetecting={isDetectingLocation}
+                                onDetect={detectCurrentLocation}
+                                onBack={() => setCurrentStep(2)}
+                                onNext={handleSaveSchoolLocation}
+                                onSkip={skipLocation}
+                            />
+                        )}
+
+                        {currentStep === 4 && (
                             <SetupStepsView
                                 key="setup-steps"
                                 steps={steps}
@@ -709,6 +800,100 @@ function SchoolTimingStep({ form, setForm, toggleWorkingDay, loading, onBack, on
                     Skip
                 </Button>
                 <Button onClick={onNext} disabled={loading} size="lg" className="flex-1 h-12 font-semibold bg-green-600 hover:bg-green-700">
+                    {loading ? (
+                        <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Saving...
+                        </>
+                    ) : (
+                        <>
+                            Next: Setup Checklist
+                            <ArrowRight className="ml-2 w-4 h-4" />
+                        </>
+                    )}
+                </Button>
+            </div>
+        </motion.div>
+    );
+}
+
+// School Location Step
+function SchoolLocationStep({ form, setForm, loading, isDetecting, onDetect, onBack, onNext, onSkip }) {
+    const handleLocationChange = (lat, lng, address) => {
+        setForm(prev => ({
+            ...prev,
+            schoolLatitude: lat,
+            schoolLongitude: lng,
+        }));
+    };
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-6"
+        >
+            <div className="text-center space-y-2">
+                <div className="mx-auto w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center mb-4">
+                    <MapPin className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+                </div>
+                <h3 className="text-2xl font-semibold">Set School Location</h3>
+                <p className="text-muted-foreground">Pin your school on the map for transport tracking and attendance features.</p>
+            </div>
+
+            <div className="bg-muted/50 p-5 rounded-2xl border border-border/50">
+                <GoogleMapsLocationPicker
+                    latitude={form.schoolLatitude}
+                    longitude={form.schoolLongitude}
+                    onLocationChange={handleLocationChange}
+                    placeholder="Search for your school..."
+                />
+            </div>
+
+            {/* Manual Input Option */}
+            <details className="group text-sm">
+                <summary className="text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+                    Can't find your school? Enter coordinates manually
+                </summary>
+                <div className="mt-3 grid grid-cols-2 gap-3 p-4 bg-muted/50 rounded-lg border">
+                    <Input
+                        type="number"
+                        step="0.000001"
+                        placeholder="Latitude (e.g. 23.7948)"
+                        value={form.schoolLatitude ?? ""}
+                        onChange={(e) => setForm(prev => ({
+                            ...prev,
+                            schoolLatitude: e.target.value ? parseFloat(e.target.value) : null
+                        }))}
+                    />
+                    <Input
+                        type="number"
+                        step="0.000001"
+                        placeholder="Longitude (e.g. 85.3456)"
+                        value={form.schoolLongitude ?? ""}
+                        onChange={(e) => setForm(prev => ({
+                            ...prev,
+                            schoolLongitude: e.target.value ? parseFloat(e.target.value) : null
+                        }))}
+                    />
+                </div>
+            </details>
+
+            <div className="flex gap-3 pt-2">
+                <Button variant="outline" size="lg" onClick={onBack} disabled={loading} className="h-12">
+                    Back
+                </Button>
+                <Button variant="ghost" size="lg" onClick={onSkip} disabled={loading} className="h-12 text-muted-foreground">
+                    Skip
+                </Button>
+                <Button
+                    onClick={onNext}
+                    disabled={loading || !form.schoolLatitude || !form.schoolLongitude}
+                    size="lg"
+                    className="flex-1 h-12 font-semibold bg-amber-600 hover:bg-amber-700"
+                >
                     {loading ? (
                         <>
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />

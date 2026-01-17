@@ -5181,13 +5181,20 @@ model Principal {
 }
 
 model SchoolSettings {
-  id                String   @id @default(uuid()) @db.Uuid
-  schoolId          String   @unique @db.Uuid
-  school            School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  id                String  @id @default(uuid()) @db.Uuid
+  schoolId          String  @unique @db.Uuid
+  school            School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   admissionNoPrefix String? // e.g., "STU"
   employeeIdPrefix  String? // e.g., "EMP"
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+
+  // School Location for Geofencing & Attendance
+  schoolLatitude   Float? // School GPS latitude
+  schoolLongitude  Float? // School GPS longitude
+  geofenceRadius   Int    @default(200) // Meters - transport driver geofencing (auto trip start/end)
+  attendanceRadius Int    @default(500) // Meters - teacher attendance proximity check
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([schoolId])
 }

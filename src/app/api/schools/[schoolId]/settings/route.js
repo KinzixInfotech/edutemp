@@ -29,11 +29,21 @@ export async function POST(req, props) {
             update: {
                 admissionNoPrefix: body.admissionNoPrefix,
                 employeeIdPrefix: body.employeeIdPrefix,
+                // Location fields
+                ...(body.schoolLatitude !== undefined && { schoolLatitude: body.schoolLatitude }),
+                ...(body.schoolLongitude !== undefined && { schoolLongitude: body.schoolLongitude }),
+                ...(body.geofenceRadius !== undefined && { geofenceRadius: body.geofenceRadius }),
+                ...(body.attendanceRadius !== undefined && { attendanceRadius: body.attendanceRadius }),
             },
             create: {
                 schoolId,
                 admissionNoPrefix: body.admissionNoPrefix,
                 employeeIdPrefix: body.employeeIdPrefix,
+                // Location fields
+                schoolLatitude: body.schoolLatitude ?? null,
+                schoolLongitude: body.schoolLongitude ?? null,
+                geofenceRadius: body.geofenceRadius ?? 200,
+                attendanceRadius: body.attendanceRadius ?? 500,
             },
         });
 

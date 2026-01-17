@@ -10,9 +10,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Save, Settings as SettingsIcon, Calendar, Clock, Globe, Check, AlertTriangle, ExternalLink, RefreshCw, Unlink } from "lucide-react";
+import { Loader2, Save, Settings as SettingsIcon, Calendar, Clock, Globe, Check, AlertTriangle, ExternalLink, RefreshCw, Unlink, MapPin, Navigation, Info } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import GoogleMapsLocationPicker from "@/components/maps/GoogleMapsLocationPicker";
 
 export default function GeneralSettingsPage() {
     const { fullUser } = useAuth();
@@ -35,6 +36,15 @@ export default function GeneralSettingsPage() {
 
     const [hasGoogleCalendar, setHasGoogleCalendar] = useState(false);
     const [isCheckingGoogle, setIsCheckingGoogle] = useState(false);
+
+    // Location form data
+    const [locationData, setLocationData] = useState({
+        schoolLatitude: null,
+        schoolLongitude: null,
+        geofenceRadius: 200,
+        attendanceRadius: 500,
+    });
+    const [isDetectingLocation, setIsDetectingLocation] = useState(false);
 
     // Fetch settings
     const { data: settings, isLoading } = useQuery({
@@ -79,6 +89,13 @@ export default function GeneralSettingsPage() {
             setFormData({
                 admissionNoPrefix: settings.admissionNoPrefix || "",
                 employeeIdPrefix: settings.employeeIdPrefix || "",
+            });
+            // Load location data
+            setLocationData({
+                schoolLatitude: settings.schoolLatitude ?? null,
+                schoolLongitude: settings.schoolLongitude ?? null,
+                geofenceRadius: settings.geofenceRadius ?? 200,
+                attendanceRadius: settings.attendanceRadius ?? 500,
             });
         }
     }, [settings]);
@@ -168,6 +185,53 @@ export default function GeneralSettingsPage() {
 
     const handleGoogleCalendarConnect = () => {
         window.location.href = `/api/auth/google-calendar?userId=${userId}&schoolId=${schoolId}`;
+    };
+
+    // Save location settings mutation
+    const saveLocationMutation = useMutation({
+        mutationFn: async (data) => {
+            const res = await fetch(`/api/schools/${schoolId}/settings`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+            });
+            if (!res.ok) throw new Error("Failed to save location settings");
+            return res.json();
+        },
+        onSuccess: () => {
+            toast.success("School location saved successfully");
+            queryClient.invalidateQueries(["schoolSettings", schoolId]);
+        },
+        onError: (err) => {
+            toast.error(err.message);
+        },
+    });
+
+    // Detect current location using browser geolocation
+    const detectCurrentLocation = () => {
+        if (!navigator.geolocation) {
+            toast.error("Geolocation is not supported by your browser");
+            return;
+        }
+
+        setIsDetectingLocation(true);
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                setLocationData(prev => ({
+                    ...prev,
+                    schoolLatitude: parseFloat(position.coords.latitude.toFixed(6)),
+                    schoolLongitude: parseFloat(position.coords.longitude.toFixed(6)),
+                }));
+                toast.success("Location detected successfully!");
+                setIsDetectingLocation(false);
+            },
+            (error) => {
+                console.error("Geolocation error:", error);
+                toast.error("Failed to detect location. Please enter coordinates manually.");
+                setIsDetectingLocation(false);
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
     };
 
     const toggleWorkingDay = (day) => {
@@ -437,6 +501,105 @@ export default function GeneralSettingsPage() {
                                 <>
                                     <Save className="mr-2 h-4 w-4" />
                                     Save Changes
+                                </>
+                            )}
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* School Location Section */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <MapPin className="h-5 w-5" />
+                        School Location
+                    </CardTitle>
+                    <CardDescription>
+                        Set your school's coordinates for geofencing and proximity-based features.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    {/* Info Banner */}
+                    <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+                        <div className="flex gap-3">
+                            <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                            <div className="space-y-1 text-sm">
+                                <p className="font-medium text-blue-900 dark:text-blue-200">This location is used for:</p>
+                                <ul className="text-blue-700 dark:text-blue-300 list-disc list-inside space-y-0.5">
+                                    <li><strong>Transport Geofencing:</strong> Auto-detect when drivers reach school to start/end trips</li>
+                                    <li><strong>Teacher Attendance:</strong> Allow teachers to mark attendance only when within school radius</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Interactive Map Picker */}
+                    <GoogleMapsLocationPicker
+                        latitude={locationData.schoolLatitude}
+                        longitude={locationData.schoolLongitude}
+                        onLocationChange={(lat, lng, address) => {
+                            setLocationData(prev => ({
+                                ...prev,
+                                schoolLatitude: lat,
+                                schoolLongitude: lng,
+                            }));
+                        }}
+                        placeholder="Search for your school location..."
+                    />
+
+                    {/* Manual Input Option */}
+                    <details className="group">
+                        <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors flex items-center gap-2">
+                            <span>Can't find your school? Enter coordinates manually</span>
+                        </summary>
+                        <div className="mt-3 grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg border">
+                            <div className="space-y-1">
+                                <Label className="text-xs">Latitude</Label>
+                                <Input
+                                    type="number"
+                                    step="0.000001"
+                                    placeholder="e.g. 23.794857"
+                                    value={locationData.schoolLatitude ?? ""}
+                                    onChange={(e) => setLocationData(prev => ({
+                                        ...prev,
+                                        schoolLatitude: e.target.value ? parseFloat(e.target.value) : null
+                                    }))}
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-xs">Longitude</Label>
+                                <Input
+                                    type="number"
+                                    step="0.000001"
+                                    placeholder="e.g. 85.345678"
+                                    value={locationData.schoolLongitude ?? ""}
+                                    onChange={(e) => setLocationData(prev => ({
+                                        ...prev,
+                                        schoolLongitude: e.target.value ? parseFloat(e.target.value) : null
+                                    }))}
+                                />
+                            </div>
+                            <p className="col-span-2 text-xs text-muted-foreground">
+                                Tip: You can find coordinates on <a href="https://maps.google.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Google Maps</a> by right-clicking any location.
+                            </p>
+                        </div>
+                    </details>
+
+                    <div className="flex justify-end pt-4 border-t">
+                        <Button
+                            onClick={() => saveLocationMutation.mutate(locationData)}
+                            disabled={saveLocationMutation.isPending || !locationData.schoolLatitude || !locationData.schoolLongitude}
+                        >
+                            {saveLocationMutation.isPending ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Saving...
+                                </>
+                            ) : (
+                                <>
+                                    <MapPin className="mr-2 h-4 w-4" />
+                                    Save Location Settings
                                 </>
                             )}
                         </Button>
