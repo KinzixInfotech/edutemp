@@ -88,7 +88,7 @@ export async function GET(req, props) {
                             include: {
                                 student: {
                                     select: {
-                                        id: true,
+                                        userId: true,
                                         name: true,
                                         admissionNo: true,
                                         class: { select: { className: true } },
@@ -96,7 +96,7 @@ export async function GET(req, props) {
                                         user: { select: { profilePicture: true } },
                                     },
                                 },
-                                feeStructureItem: {
+                                globalFeeStructure: {
                                     select: { name: true },
                                 },
                             },
@@ -115,7 +115,7 @@ export async function GET(req, props) {
                     discountType: disc.discountType,
                     value: disc.value,
                     amount: disc.amount,
-                    feeName: disc.studentFee?.feeStructureItem?.name,
+                    feeName: disc.studentFee?.globalFeeStructure?.name,
                     student: disc.studentFee?.student,
                     submittedAt: disc.createdAt,
                     pendingSince: getTimeSince(disc.createdAt),

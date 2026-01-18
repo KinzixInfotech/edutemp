@@ -74,7 +74,12 @@ export async function sendNotification({
                 userIds: targetUserIds,
                 title,
                 message,
-                data: { type, actionUrl, ...metadata }
+                data: {
+                    type,
+                    actionUrl,
+                    senderId: senderId || null, // Include sender for self-broadcast detection
+                    ...metadata
+                }
             });
         }
 

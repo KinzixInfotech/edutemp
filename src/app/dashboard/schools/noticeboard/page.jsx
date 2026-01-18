@@ -228,51 +228,72 @@ export default function NoticeboardPage() {
       {filteredNotices.length > 0 ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredNotices.map((notice) => (
-            <Card key={notice.id} className="overflow-hidden hover:shadow-md transition-shadow">
+            <Card key={notice.id} className="overflow-hidden hover:shadow-lg transition-all duration-300 group">
               {/* Image Header */}
-              {notice.fileUrl && (
-                <div className="h-40 w-full relative bg-muted">
-                  <Image
+              {notice.fileUrl ? (
+                <div className="h-48 w-full relative overflow-hidden bg-gradient-to-br from-muted to-muted/50">
+                  <img
                     src={notice.fileUrl}
                     alt={notice.title}
-                    fill
-                    className="object-cover"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
+                  {/* Gradient overlay for better text readability */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                  {/* Category badge on image */}
+                  <div className="absolute top-3 left-3">
+                    <Badge className={`${getCategoryColor(notice.category)} text-white border-0 shadow-sm`}>
+                      {notice.category}
+                    </Badge>
+                  </div>
+                  {/* Priority badge */}
+                  {notice.priority !== 'NORMAL' && (
+                    <div className="absolute top-3 right-3">
+                      <Badge variant="destructive" className="shadow-sm">
+                        {notice.priority}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="h-32 w-full bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 flex items-center justify-center relative">
+                  <Megaphone className="w-12 h-12 text-primary/30" />
+                  {/* Category badge */}
+                  <div className="absolute top-3 left-3">
+                    <Badge className={`${getCategoryColor(notice.category)} text-white border-0 shadow-sm`}>
+                      {notice.category}
+                    </Badge>
+                  </div>
+                  {notice.priority !== 'NORMAL' && (
+                    <div className="absolute top-3 right-3">
+                      <Badge variant="destructive" className="shadow-sm">
+                        {notice.priority}
+                      </Badge>
+                    </div>
+                  )}
                 </div>
               )}
 
               <CardHeader className="pb-2">
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${getCategoryColor(notice.category)}`} />
-                    <span className="text-xs font-semibold text-muted-foreground uppercase">{notice.category}</span>
-                  </div>
-                  {notice.priority !== 'NORMAL' && (
-                    <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50">
-                      {notice.priority}
-                    </Badge>
-                  )}
-                </div>
-                <CardTitle className="text-lg">
+                <CardTitle className="text-lg line-clamp-2 group-hover:text-primary transition-colors">
                   {notice.title}
                 </CardTitle>
-                <CardDescription className="line-clamp-2">
+                <CardDescription className="line-clamp-3 text-sm">
                   {notice.subtitle || notice.description}
                 </CardDescription>
               </CardHeader>
 
-              <CardContent>
+              <CardContent className="pt-0">
                 {/* Metadata Footer */}
-                <div className="flex items-center justify-between text-xs text-muted-foreground pt-4">
+                <div className="flex items-center justify-between text-xs text-muted-foreground pt-4 border-t">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium text-[10px]">
-                      {(notice.issuedBy || 'A')[0]}
+                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-[10px]">
+                      {(notice.issuedBy || 'A')[0].toUpperCase()}
                     </div>
-                    <span>{notice.issuedBy || 'Admin'}</span>
+                    <span className="font-medium">{notice.issuedBy || 'Admin'}</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {format(new Date(notice.publishedAt), 'MMM d, yyyy')}
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <Clock className="h-3.5 w-3.5" />
+                    <span>{format(new Date(notice.publishedAt), 'MMM d, yyyy')}</span>
                   </div>
                 </div>
               </CardContent>
