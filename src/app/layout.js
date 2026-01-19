@@ -57,7 +57,7 @@ export const metadata = {
     url: baseUrl,
     siteName: "EduBreezy",
     title: "EduBreezy - AI-Powered School Management ERP",
-    description: "AI-powered school management platform trusted by 500+ schools. Smart attendance, online fees, exam analytics, transport GPS & parent app.",
+    description: "From attendance to payroll — manage your entire school on one smart platform. AI-driven automation, live bus tracking, exam analytics, digital fees, and a seamless parent app, all with a modern user interface.",
     images: [
       {
         url: `${baseUrl}/by.png`,
@@ -79,7 +79,7 @@ export const metadata = {
   twitter: {
     card: "summary_large_image",
     title: "EduBreezy - AI-Powered School Management ERP",
-    description: "AI-powered school management platform trusted by 500+ schools. Smart attendance, online fees, exam analytics, transport GPS & parent app.",
+    description: "From attendance to payroll — manage your entire school on one smart platform. AI-driven automation, live bus tracking, exam analytics, digital fees, and a seamless parent app, all with a modern user interface.",
     images: [`${baseUrl}/by.png`],
     creator: "@edubreezy",
   },
@@ -136,7 +136,7 @@ export default function RootLayout({ children }) {
       "https://facebook.com/edubreezy",
       "https://instagram.com/official_edubreezy"
     ],
-    "description": "AI-powered school management platform trusted by 500+ schools in India"
+    "description": "From attendance to payroll — manage your entire school on one smart platform. AI-driven automation, live bus tracking, exam analytics, digital fees, and a seamless parent app, all with a modern user interface."
   };
 
   // SiteNavigationElement to hint sitelinks to Google
