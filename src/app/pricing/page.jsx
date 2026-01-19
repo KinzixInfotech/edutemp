@@ -108,7 +108,7 @@ export default function PricingCalculatorPage() {
                 {/* Calculator Section */}
                 <section className="px-5 -mt-8">
                     <div className="max-w-5xl mx-auto">
-                        <div className="bg-white rounded-[2rem] p-6 md:p-10 border border-slate-200 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)]">
+                        <div className="bg-white rounded-[2rem] p-4 md:p-10 border border-slate-200 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)]">
 
                             {/* Grid Layout for Calculator */}
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
@@ -125,17 +125,17 @@ export default function PricingCalculatorPage() {
                                     </div>
 
                                     {/* Number Input with +/- Buttons */}
-                                    <div className="bg-[#f8fafc] rounded-2xl p-6 border border-slate-100">
-                                        <div className="flex items-center justify-center gap-4 mb-6">
+                                    <div className="bg-[#f8fafc] rounded-2xl p-4 md:p-6 border border-slate-100">
+                                        <div className="flex items-center justify-center gap-2 md:gap-4 mb-6">
                                             <button
                                                 onClick={() => incrementStudents(-50)}
-                                                className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:border-[#0569ff] transition-all active:scale-95"
+                                                className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:border-[#0569ff] transition-all active:scale-95 flex-shrink-0"
                                             >
                                                 <Minus className="w-5 h-5" />
                                             </button>
 
                                             <div className="relative flex-1 max-w-[200px]">
-                                                <Users className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                                                <Users className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-slate-400" />
                                                 <input
                                                     type="text"
                                                     inputMode="numeric"
@@ -143,7 +143,7 @@ export default function PricingCalculatorPage() {
                                                     value={inputValue}
                                                     onChange={handleInputChange}
                                                     onBlur={handleInputBlur}
-                                                    className="w-full pl-12 pr-4 py-4 text-2xl font-bold text-center border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0569ff] focus:border-[#0569ff] transition-all bg-white"
+                                                    className="w-full pl-10 pr-2 md:pl-12 md:pr-4 py-3 md:py-4 text-xl md:text-2xl font-bold text-center border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0569ff] focus:border-[#0569ff] transition-all bg-white"
                                                     min="1"
                                                     max="10000"
                                                 />
@@ -151,7 +151,7 @@ export default function PricingCalculatorPage() {
 
                                             <button
                                                 onClick={() => incrementStudents(50)}
-                                                className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:border-[#0569ff] transition-all active:scale-95"
+                                                className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:border-[#0569ff] transition-all active:scale-95 flex-shrink-0"
                                             >
                                                 <Plus className="w-5 h-5" />
                                             </button>
@@ -203,7 +203,7 @@ export default function PricingCalculatorPage() {
                                     </div>
 
                                     {/* Fun Comparison */}
-                                    <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-5 border border-amber-200">
+                                    <div className="bg-gradient-to-br lg:block hidden from-amber-50 to-orange-50 rounded-xl p-5 border border-amber-200">
                                         <p className="text-center text-slate-700 font-medium mb-3">
                                             💡 ₹8.75/month per child is...
                                         </p>
@@ -222,7 +222,7 @@ export default function PricingCalculatorPage() {
                                     </div>
 
                                     {/* Trust Indicators */}
-                                    <div className="bg-white rounded-xl p-5 border border-slate-100">
+                                    <div className="bg-white lg:block hidden rounded-xl p-5 border border-slate-100">
                                         <h4 className="font-semibold text-[#1a1a2e] mb-4 flex items-center gap-2">
                                             <CheckCircle className="w-4 h-4 text-green-500" />
                                             Why Schools Love Us

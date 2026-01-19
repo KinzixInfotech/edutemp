@@ -355,7 +355,7 @@ function AboutBriefSection() {
     return (
         <section className=" py-16 md:py-24 px-5 relative">
             <div className="max-w-[1200px] mx-auto">
-                <p className="text-[#1a1a2e]/80  text-lg md:text-xl lg:text-2xl leading-[2.5rem] font-light  text-center ">
+                <p className="text-[#1a1a2e]/80  text-lg md:text-xl lg:text-2xl lg:leading-[2.5rem] leading-[2rem] font-light  text-center ">
                     EduBreezy is a next-generation, AI-powered school management platform that blends
                     powerful technology, intelligent insights, and education-first thinking.
                     Built with modern UI interfaces for today’s digital era, EduBreezy helps

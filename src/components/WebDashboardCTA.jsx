@@ -37,7 +37,7 @@ export default function WebDashboardCTA() {
 
                             {/* Back Phone - Always visible */}
                             <div
-                                className="absolute w-[180px] sm:w-[200px] lg:w-[200px] 2xl:w-[220px] h-[400px] sm:h-[445px] lg:h-[445px] 2xl:h-[490px] rounded-[2rem] overflow-hidden -translate-x-16 -rotate-[8deg] -z-10"
+                                className="absolute w-[180px] sm:w-[200px] lg:w-[200px] 2xl:w-[220px] h-[400px] sm:h-[445px] lg:h-[445px] 2xl:h-[490px] rounded-[2rem] overflow-hidden -translate-x-12 -rotate-[8deg] -z-10"
                                 style={{
                                     boxShadow: '0 0 0 3px #1a1a2e, 0 25px 50px -12px rgba(0, 0, 0, 0.15)'
                                 }}
@@ -51,7 +51,7 @@ export default function WebDashboardCTA() {
 
                             {/* Front Phone - Always visible */}
                             <div
-                                className="w-[180px] sm:w-[200px] lg:w-[200px] 2xl:w-[220px] h-[400px] sm:h-[445px] lg:h-[445px] 2xl:h-[490px] rounded-[2rem] overflow-hidden relative z-10 translate-x-8 rotate-[8deg]"
+                                className="w-[180px] sm:w-[200px] lg:w-[200px] 2xl:w-[220px] h-[400px] sm:h-[445px] lg:h-[445px] 2xl:h-[490px] rounded-[2rem] overflow-hidden relative z-10 translate-x-12 rotate-[8deg]"
                                 style={{
                                     boxShadow: '0 0 0 3px #1a1a2e, 0 25px 50px -12px rgba(0, 0, 0, 0.25)'
                                 }}
