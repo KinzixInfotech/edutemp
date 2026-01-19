@@ -273,7 +273,7 @@ export default function PartnerRegistrationPage() {
                                         <input
                                             {...register("contactPhone")}
                                             className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl py-3 px-4 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#0c65f1] focus:bg-white transition-all font-medium"
-                                            placeholder="+91 98765 43210"
+                                            placeholder="+91 9471 532 682"
                                         />
                                         {errors.contactPhone && <p className="text-red-500 text-xs mt-1 font-medium">{errors.contactPhone.message}</p>}
                                     </div>
