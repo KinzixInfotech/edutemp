@@ -26,16 +26,8 @@ export async function GET(req) {
     const schoolId = sanitizeUUID(searchParams.get("schoolId"));
     const academicYearId = sanitizeUUID(searchParams.get("academicYearId"));
     const classId = searchParams.get("classId");
-    const startDate = searchParams.get("startDate");
-    const endDate = searchParams.get("endDate");
 
-    console.log('📊 [FEE DASHBOARD] Request params:', {
-      schoolId,
-      academicYearId,
-      classId,
-      startDate,
-      endDate
-    });
+    console.log('📊 [FEE DASHBOARD] Request params:', { schoolId, academicYearId, classId });
 
     if (!schoolId || !academicYearId) {
       return NextResponse.json(
@@ -44,13 +36,20 @@ export async function GET(req) {
       );
     }
 
+    // Fetch academic year to get dates
+    const academicYear = await prisma.academicYear.findUnique({
+      where: { id: academicYearId },
+      select: { startDate: true, endDate: true, name: true }
+    });
+
+    const startDate = academicYear?.startDate;
+    const endDate = academicYear?.endDate || new Date(); // Default to now if no end date
+
     // Generate cache key
     const cacheKey = generateKey('fee-dashboard', {
       schoolId,
       academicYearId,
       classId: classId || 'all',
-      startDate: startDate || 'none',
-      endDate: endDate || 'none'
     });
 
     // Use Redis caching with 60 second TTL
@@ -111,33 +110,39 @@ export async function GET(req) {
         prisma.studentFee.count({ where: { ...where, status: "UNPAID" } }),
         prisma.studentFee.count({ where: { ...where, status: "OVERDUE" } }),
 
-        // Recent Payments (last 10)
+        // Recent Payments - all payments for the year (client-side pagination)
         prisma.feePayment.findMany({
           where: {
             schoolId,
             academicYearId,
             status: "SUCCESS",
-            ...(startDate && endDate
-              ? {
-                paymentDate: {
-                  gte: new Date(`${startDate}T00:00:00.000Z`),
-                  lte: new Date(`${endDate}T23:59:59.999Z`),
-                },
-              }
-              : {})
+            // Use academic year dates for filtering
+            paymentDate: {
+              gte: startDate,
+              lte: endDate,
+            },
           },
-          include: {
+          select: {
+            id: true,
+            receiptNumber: true,
+            amount: true,
+            paymentDate: true,
+            paymentMethod: true,
+            paymentMode: true,
+            status: true,
+            receiptUrl: true,
+            transactionId: true,
+            gatewayPaymentId: true,
             student: {
               select: {
                 name: true,
-                // user: { select: { name: true } },
                 admissionNo: true,
                 class: { select: { className: true } },
               },
             },
           },
           orderBy: { paymentDate: "desc" },
-          take: 10,
+          take: 100, // Limit to last 100 for performance
         }),
         // Overdue Students
         prisma.studentFee.findMany({
@@ -229,18 +234,16 @@ export async function GET(req) {
             schoolId,
             academicYearId,
             status: "SUCCESS",
-            ...(startDate && endDate && {
-              paymentDate: {
-                gte: new Date(`${startDate}T00:00:00.000Z`),
-                lte: new Date(`${endDate}T23:59:59.999Z`),
-              },
-            }),
+            paymentDate: {
+              gte: startDate,
+              lte: endDate,
+            },
           },
           _sum: { amount: true },
           _count: true,
         }),
 
-        // Monthly collection trend (✅ FIXED)
+        // Monthly collection trend
         prisma.$queryRaw`
   SELECT 
     DATE_TRUNC('month', "paymentDate") AS month,
@@ -250,9 +253,7 @@ export async function GET(req) {
   WHERE "schoolId" = ${schoolId}::uuid
     AND "academicYearId" = ${academicYearId}::uuid
     AND "status" = 'SUCCESS'
-    ${startDate && endDate
-            ? Prisma.sql`AND "paymentDate" BETWEEN ${new Date(`${startDate}T00:00:00.000Z`)} AND ${new Date(`${endDate}T23:59:59.999Z`)}`
-            : Prisma.empty}
+    AND "paymentDate" BETWEEN ${startDate} AND ${endDate}
   GROUP BY month
   ORDER BY month DESC
   LIMIT 12;

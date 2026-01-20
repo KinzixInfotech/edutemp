@@ -487,82 +487,62 @@ export async function POST(req) {
         }
 
         const result = await prisma.$transaction(async (tx) => {
+            // Fetch academic year for dates
+            const academicYear = await tx.academicYear.findUnique({
+                where: { id: academicYearId },
+                select: { startDate: true, endDate: true }
+            });
+
+            if (!academicYear) {
+                throw new Error("Academic year not found");
+            }
+
             // Check existing
             const existing = await tx.globalFeeStructure.findUnique({
                 where: {
-                    schoolId_academicYearId_classId: {
-                        schoolId,
-                        academicYearId,
-                        classId
-                    }
+                    schoolId_academicYearId_classId: { schoolId, academicYearId, classId }
                 },
             });
 
             if (existing) {
-                const statusMsg = existing.status === 'ARCHIVED'
-                    ? "Structure is ARCHIVED. Please restore it from the list."
-                    : `Structure already exists (Status: ${existing.status}).`;
-                throw new Error(`Fee structure already exists for this class. ${statusMsg}`);
+                throw new Error(`Fee structure already exists for this class (Status: ${existing.status}).`);
             }
 
-            // Calculate total
             const totalAmount = particulars.reduce((sum, p) => sum + p.amount, 0);
 
-            // Create structure with DRAFT status
+            // Create structure
             const structure = await tx.globalFeeStructure.create({
                 data: {
-                    schoolId,
-                    academicYearId,
-                    classId,
-                    name,
-                    description,
-                    mode,
-                    totalAmount,
-                    status: "DRAFT", // New structures start as DRAFT
+                    schoolId, academicYearId, classId, name, description, mode, totalAmount,
+                    status: "DRAFT",
                     enableInstallments,
                     particulars: {
-                        create: particulars.map((p, index) => ({
-                            name: p.name,
-                            amount: p.amount,
-                            category: p.category,
-                            isOptional: p.isOptional || false,
-                            displayOrder: index,
+                        create: particulars.map((p, i) => ({
+                            name: p.name, amount: p.amount, category: p.category,
+                            isOptional: p.isOptional || false, displayOrder: i,
                         })),
                     },
                 },
                 include: { particulars: true },
             });
 
-            // ===================================
-            // AUTO-GENERATE INSTALLMENT RULES
-            // ===================================
-            let rulesToCreate = installmentRules;
+            // Generate installment rules using academic year dates
+            const rulesToCreate = installmentRules?.length > 0
+                ? installmentRules
+                : generateInstallmentRules(mode, totalAmount, academicYear.startDate, academicYear.endDate);
 
-            if (!rulesToCreate || rulesToCreate.length === 0) {
-                // Generate based on mode
-                rulesToCreate = generateInstallmentRules(mode, totalAmount, new Date());
-            }
-
-            // Validate percentages sum to 100
-            const totalPercentage = rulesToCreate.reduce((sum, r) => sum + r.percentage, 0);
-            if (Math.abs(totalPercentage - 100) > 0.01) {
-                throw new Error("Installment percentages must sum to 100%");
-            }
-
-            // Create installment rules
-            for (const rule of rulesToCreate) {
-                await tx.feeInstallmentRule.create({
-                    data: {
-                        globalFeeStructureId: structure.id,
-                        installmentNumber: rule.installmentNumber,
-                        dueDate: new Date(rule.dueDate),
-                        percentage: rule.percentage,
-                        amount: (totalAmount * rule.percentage) / 100,
-                        lateFeeAmount: rule.lateFeeAmount || 0,
-                        lateFeeAfterDays: rule.lateFeeAfterDays || 0,
-                    },
-                });
-            }
+            // Create installment rules (batch for efficiency)
+            await tx.feeInstallmentRule.createMany({
+                data: rulesToCreate.map(rule => ({
+                    globalFeeStructureId: structure.id,
+                    installmentNumber: rule.installmentNumber,
+                    dueDate: new Date(rule.dueDate),
+                    percentage: rule.percentage,
+                    amount: rule.amount,
+                    lateFeeAmount: rule.lateFeeAmount || 0,
+                    lateFeeAfterDays: rule.lateFeeAfterDays || 0,
+                })),
+            });
 
             return structure;
         });
@@ -584,61 +564,61 @@ export async function POST(req) {
 }
 
 // ===================================
-// HELPER: Auto-generate installment rules
+// HELPER: Generate installment rules based on academic year
 // ===================================
-function generateInstallmentRules(mode, totalAmount, startDate) {
-    const rules = [];
-    let numberOfInstallments = 1;
-    const currentDate = new Date(startDate);
+function generateInstallmentRules(mode, totalAmount, academicYearStart, academicYearEnd) {
+    const startDate = new Date(academicYearStart);
+    const endDate = academicYearEnd ? new Date(academicYearEnd) : null;
 
-    // Determine number of installments
-    switch (mode) {
-        case "MONTHLY":
-            numberOfInstallments = 12;
-            break;
-        case "QUARTERLY":
-            numberOfInstallments = 4;
-            break;
-        case "HALF_YEARLY":
-            numberOfInstallments = 2;
-            break;
-        case "YEARLY":
-        case "ONE_TIME":
-            numberOfInstallments = 1;
-            break;
+    // Calculate months between start and end (or default to mode-based count)
+    let numberOfInstallments = 1;
+
+    if (endDate && mode === "MONTHLY") {
+        // Calculate actual months in academic year
+        const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+            (endDate.getMonth() - startDate.getMonth()) + 1;
+        numberOfInstallments = Math.max(1, Math.min(months, 12)); // Cap at 12
+    } else {
+        switch (mode) {
+            case "MONTHLY": numberOfInstallments = 12; break;
+            case "QUARTERLY": numberOfInstallments = 4; break;
+            case "HALF_YEARLY": numberOfInstallments = 2; break;
+            default: numberOfInstallments = 1;
+        }
     }
 
-    const percentagePerInstallment = 100 / numberOfInstallments;
-    const amountPerInstallment = totalAmount / numberOfInstallments;
+    // Proper amount distribution with rounding
+    const baseAmount = Math.floor((totalAmount / numberOfInstallments) * 100) / 100;
+    const remainder = Math.round((totalAmount - baseAmount * numberOfInstallments) * 100) / 100;
+    const percentagePerInstallment = Math.round((100 / numberOfInstallments) * 100) / 100;
 
+    const rules = [];
     for (let i = 0; i < numberOfInstallments; i++) {
-        let dueDate = new Date(currentDate);
+        const dueDate = new Date(startDate);
 
         if (mode === "MONTHLY") {
-            // Monthly: Due on 10th of each month
-            dueDate.setMonth(currentDate.getMonth() + i + 1);
+            dueDate.setMonth(startDate.getMonth() + i);
             dueDate.setDate(10);
         } else if (mode === "QUARTERLY") {
-            // Quarterly: Every 3 months on 15th
-            dueDate.setMonth(currentDate.getMonth() + (i * 3) + 1);
+            dueDate.setMonth(startDate.getMonth() + (i * 3));
             dueDate.setDate(15);
         } else if (mode === "HALF_YEARLY") {
-            // Half-yearly: Every 6 months on 15th
-            dueDate.setMonth(currentDate.getMonth() + (i * 6) + 1);
+            dueDate.setMonth(startDate.getMonth() + (i * 6));
             dueDate.setDate(15);
         } else {
-            // Yearly/One-time: Due next month on 15th
-            dueDate.setMonth(currentDate.getMonth() + 1);
             dueDate.setDate(15);
         }
+
+        // Last installment gets remainder for exact total
+        const isLast = i === numberOfInstallments - 1;
 
         rules.push({
             installmentNumber: i + 1,
             dueDate: dueDate.toISOString(),
             percentage: percentagePerInstallment,
-            amount: amountPerInstallment,
-            lateFeeAmount: 100, // Default ₹100 late fee
-            lateFeeAfterDays: 7, // After 7 days
+            amount: isLast ? baseAmount + remainder : baseAmount,
+            lateFeeAmount: 100,
+            lateFeeAfterDays: 7,
         });
     }
 

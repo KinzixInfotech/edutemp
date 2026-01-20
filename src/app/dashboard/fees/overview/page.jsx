@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -15,7 +15,11 @@ import {
   XCircle,
   CreditCard,
   FileText,
-  Eye
+  Eye,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  ExternalLink
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,17 +27,20 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 
 export default function AdminFeeDashboard() {
   const { fullUser } = useAuth();
   const schoolId = fullUser?.schoolId;
 
-  const [dateRange, setDateRange] = useState({
-    startDate: new Date(new Date().getFullYear(), 3, 1).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0]
-  });
   const [selectedClass, setSelectedClass] = useState('all');
+
+  // Pagination state for Recent Payments
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
+  const ITEMS_PER_PAGE = 10;
 
   // Fetch active academic year
   const { data: academicYears } = useQuery({
@@ -45,19 +52,25 @@ export default function AdminFeeDashboard() {
     },
     enabled: !!schoolId,
   });
+  const activeAcademicYear = academicYears?.find(y => y.isActive);
+  const academicYearId = activeAcademicYear?.id;
 
-  const academicYearId = academicYears?.find(y => y.isActive)?.id;
+  // Format dates for date input min/max
+  const academicYearMinDate = activeAcademicYear?.startDate
+    ? new Date(activeAcademicYear.startDate).toISOString().split('T')[0]
+    : '';
+  const academicYearMaxDate = activeAcademicYear?.endDate
+    ? new Date(activeAcademicYear.endDate).toISOString().split('T')[0]
+    : new Date().toISOString().split('T')[0];
 
   // Fetch dashboard stats
   const { data: dashboardData, isLoading, refetch } = useQuery({
-    queryKey: ['fee-dashboard', schoolId, academicYearId, dateRange, selectedClass],
+    queryKey: ['fee-dashboard', schoolId, academicYearId, selectedClass],
     queryFn: async () => {
       const params = new URLSearchParams({
         schoolId,
         academicYearId,
         ...(selectedClass !== 'all' && { classId: selectedClass }),
-        startDate: dateRange.startDate,
-        endDate: dateRange.endDate
       });
 
       const res = await fetch(`/api/schools/fee/admin/dashboard?${params}`);
@@ -131,24 +144,8 @@ export default function AdminFeeDashboard() {
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Start Date</label>
-              <Input
-                type="date"
-                value={dateRange.startDate}
-                onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">End Date</label>
-              <Input
-                type="date"
-                value={dateRange.endDate}
-                onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-              />
-            </div>
-            <div>
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="w-48">
               <label className="block text-sm font-medium mb-2">Class</label>
               <Select value={selectedClass} onValueChange={setSelectedClass}>
                 <SelectTrigger>
@@ -164,20 +161,18 @@ export default function AdminFeeDashboard() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-end gap-2">
-              <Link href="/dashboard/fees/manage-fee-structure" className="flex-1">
-                <Button variant="outline" className="w-full">
-                  <FileText className="w-4 h-4 mr-2" />
-                  Structures
-                </Button>
-              </Link>
-              <Link href="/dashboard/fees/payments" className="flex-1">
-                <Button variant="outline" className="w-full">
-                  <CreditCard className="w-4 h-4 mr-2" />
-                  Payments
-                </Button>
-              </Link>
-            </div>
+            <Link href="/dashboard/fees/manage-fee-structure">
+              <Button variant="outline">
+                <FileText className="w-4 h-4 mr-2" />
+                Structures
+              </Button>
+            </Link>
+            <Link href="/dashboard/fees/payments">
+              <Button variant="outline">
+                <CreditCard className="w-4 h-4 mr-2" />
+                Payments
+              </Button>
+            </Link>
           </div>
         </CardContent>
       </Card>
@@ -295,55 +290,179 @@ export default function AdminFeeDashboard() {
 
         <TabsContent value="recent">
           <Card>
-            <CardHeader>
-              <CardTitle>Recent Payments</CardTitle>
-              <CardDescription>Latest {recentPayments?.length || 0} payment transactions</CardDescription>
+            <CardHeader className="pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <CardTitle>Recent Payments</CardTitle>
+                  <CardDescription>All payment transactions for this academic year</CardDescription>
+                </div>
+                <div className="flex flex-wrap items-end gap-3">
+                  <div className="flex gap-2">
+                    <Input
+                      type="date"
+                      placeholder="From"
+                      className="w-36"
+                      value={dateFilter.start}
+                      min={academicYearMinDate}
+                      max={dateFilter.end || academicYearMaxDate}
+                      onChange={(e) => { setDateFilter(prev => ({ ...prev, start: e.target.value })); setCurrentPage(1); }}
+                    />
+                    <Input
+                      type="date"
+                      placeholder="To"
+                      className="w-36"
+                      value={dateFilter.end}
+                      min={dateFilter.start || academicYearMinDate}
+                      max={academicYearMaxDate}
+                      onChange={(e) => { setDateFilter(prev => ({ ...prev, end: e.target.value })); setCurrentPage(1); }}
+                    />
+                  </div>
+                  <div className="relative w-48">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search student..."
+                      className="pl-8"
+                      value={searchQuery}
+                      onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                    />
+                  </div>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {recentPayments?.map((payment, idx) => (
-                  <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent">
-                    
-                    <div className="flex-1">
-                      <Badge
-                          variant="secondary"
-                          className={`text-xs my-2 ${payment.status === 'SUCCESS'
-                              ? 'bg-green-100 text-green-700'
-                              : payment.status === 'failed'
-                                ? 'bg-red-100 text-red-700'
-                                : ''
-                            }`}
-                        >
-                          {payment.status}
-                        </Badge>
-                      <div className="flex items-center gap-2">
-                        
-                        <span className="font-medium">{payment.student.name} • ({payment.receiptNumber})</span>
-                        <Badge variant="outline" className="text-xs">{payment.student.class?.className}</Badge>
-                      </div>
-                      <div className='inline-flex flex-row gap-3'>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {formatDate(payment.paymentDate)} • {payment.paymentMethod} • {payment.paymentMode}
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Admission Number: {payment.student.admissionNo}
+              {(() => {
+                // Filter payments
+                const filtered = (recentPayments || []).filter(payment => {
+                  const matchesSearch = !searchQuery ||
+                    payment.student?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    payment.receiptNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    payment.student?.admissionNo?.toLowerCase().includes(searchQuery.toLowerCase());
 
-                        </p>
-                        
+                  const paymentDate = new Date(payment.paymentDate);
+                  const matchesDateStart = !dateFilter.start || paymentDate >= new Date(dateFilter.start);
+                  const matchesDateEnd = !dateFilter.end || paymentDate <= new Date(dateFilter.end + 'T23:59:59');
 
-                      </div>
+                  return matchesSearch && matchesDateStart && matchesDateEnd;
+                });
+
+                const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+                const paginatedPayments = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+                return (
+                  <>
+                    <div className="overflow-x-auto rounded-md border">
+                      <Table className="min-w-[900px]">
+                        <TableHeader className="bg-muted sticky top-0 z-10">
+                          <TableRow>
+                            <TableHead className="w-12">#</TableHead>
+                            <TableHead>Receipt No</TableHead>
+                            <TableHead>Student</TableHead>
+                            <TableHead>Class</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Method</TableHead>
+                            <TableHead>Mode</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
+                            <TableHead className="w-24">Receipt</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {paginatedPayments.length > 0 ? (
+                            paginatedPayments.map((payment, idx) => (
+                              <TableRow key={payment.id} className={idx % 2 === 0 ? 'bg-background' : 'bg-muted/50'}>
+                                <TableCell className="text-muted-foreground">
+                                  {(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}
+                                </TableCell>
+                                <TableCell className="font-mono text-sm">{payment.receiptNumber}</TableCell>
+                                <TableCell>
+                                  <div>
+                                    <span className="font-medium">{payment.student?.name || 'N/A'}</span>
+                                    <p className="text-xs text-muted-foreground">{payment.student?.admissionNo}</p>
+                                  </div>
+                                </TableCell>
+                                <TableCell>{payment.student?.class?.className || '-'}</TableCell>
+                                <TableCell>{formatDate(payment.paymentDate)}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="text-xs">{payment.paymentMethod}</Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="secondary" className="text-xs">{payment.paymentMode}</Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    className={`text-xs ${payment.status === 'SUCCESS'
+                                      ? 'bg-green-100 text-green-700 hover:bg-green-100'
+                                      : payment.status === 'FAILED'
+                                        ? 'bg-red-100 text-red-700 hover:bg-red-100'
+                                        : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-100'
+                                      }`}
+                                  >
+                                    {payment.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right font-semibold">
+                                  {formatCurrency(payment.amount)}
+                                </TableCell>
+                                <TableCell>
+                                  {payment.receiptUrl ? (
+                                    <a href={payment.receiptUrl} target="_blank" rel="noopener noreferrer">
+                                      <Button variant="ghost" size="sm">
+                                        <ExternalLink className="w-4 h-4 mr-1" />
+                                        View
+                                      </Button>
+                                    </a>
+                                  ) : (
+                                    <Button variant="ghost" size="sm" disabled>
+                                      <Download className="w-4 h-4 mr-1" />
+                                      N/A
+                                    </Button>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          ) : (
+                            <TableRow>
+                              <TableCell colSpan={10} className="text-center py-10 text-muted-foreground">
+                                No payments found matching your criteria.
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-lg">{formatCurrency(payment.amount)}</p>
-                      <Button variant="ghost" size="sm" className="mt-1">
-                        <Download className="w-4 h-4 mr-1" />
-                        Receipt
-                      </Button>
-                    </div>
 
-                  </div>
-                ))}
-              </div>
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between mt-4">
+                        <p className="text-sm text-muted-foreground">
+                          Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)} of {filtered.length} payments
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            disabled={currentPage === 1}
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </Button>
+                          <span className="text-sm px-2">
+                            Page {currentPage} of {totalPages}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                            disabled={currentPage === totalPages}
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </CardContent>
           </Card>
         </TabsContent>
