@@ -87,10 +87,10 @@ const getRoleSpecificData = async (userId, roleName) => {
             });
 
         case 'TEACHING_STAFF':
-            return prisma.teacher.findUnique({
+            return prisma.teachingStaff.findUnique({
                 where: { userId },
                 select: {
-                    id: true,
+                    userId: true,
                     name: true,
                     email: true,
                     contactNumber: true,
