@@ -114,7 +114,7 @@ import React from 'react';
 
 export default function DownloadAppCTA() {
     return (
-        <section className="py-32 overflow-visible bg-[#f9fafc]">
+        <section className="py-32 overflow-visible bg-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Main Card with grid background - overflow-visible is key for the pop-out effect */}
                 <div className="relative bg-blue-600 rounded-[3rem] grid-bg shadow-[0_30px_60px_-15px_rgba(37,99,235,0.3)] overflow-visible">

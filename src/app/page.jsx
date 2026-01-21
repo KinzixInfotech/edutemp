@@ -1031,8 +1031,8 @@ function SchoolExplorerSection() {
                 <div className="bg-white rounded-[1.5rem] md:rounded-[2.5rem] border border-slate-100 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.08)] overflow-hidden">
                     <div className="grid grid-cols-1 lg:grid-cols-2">
                         {/* Left - Content */}
-                        <div className="p-6 md:p-10 lg:p-16">
-                            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-[#0569ff]/10 to-[#10B981]/10 text-[#0569ff] px-3 py-2 rounded-full text-xs md:text-sm font-semibold mb-6">
+                        <div className="p-6 md:p-10 lg:p-16 flex flex-col justify-center">
+                            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-[#0569ff]/10 to-[#10B981]/10 text-[#0569ff] px-3 py-2 rounded-full text-xs md:text-sm font-semibold mb-6 self-start">
                                 <Globe size={14} className="md:w-4 md:h-4" />
                                 school.edubreezy.com
                             </div>
@@ -1062,7 +1062,7 @@ function SchoolExplorerSection() {
                             </div> */}
 
                             {/* CTA */}
-                            <div className="flex flex-col sm:flex-row mt-20 gap-3 md:gap-4">
+                            <div className="flex flex-col sm:flex-row mt-8 gap-3 md:gap-4">
                                 <a
                                     href="https://school.edubreezy.com/explore"
                                     target="_blank"
@@ -1082,36 +1082,8 @@ function SchoolExplorerSection() {
                         </div>
 
                         {/* Right - Features Grid */}
-                        <div className="bg-[#f5f7fa] p-6 md:p-10 lg:p-16 border-t lg:border-t-0 lg:border-l border-slate-100">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5">
-                                {features.map((feature, index) => {
-                                    const IconComponent = feature.icon;
-                                    return (
-                                        <div
-                                            key={index}
-                                            className="group bg-white p-5 md:p-6 rounded-xl md:rounded-2xl border border-slate-100 transition-all duration-300 hover:shadow-lg hover:-translate-y-1"
-                                        >
-                                            <div
-                                                className="w-12 h-12 md:w-14 md:h-14 rounded-lg md:rounded-xl flex items-center justify-center mb-3 md:mb-4 transition-transform duration-300 group-hover:scale-110"
-                                                style={{ backgroundColor: `${feature.color}15` }}
-                                            >
-                                                <IconComponent
-                                                    size={22}
-                                                    className="md:w-[26px] md:h-[26px]"
-                                                    style={{ color: feature.color }}
-                                                    strokeWidth={1.5}
-                                                />
-                                            </div>
-                                            <h4 className="text-[#1a1a2e] text-sm md:text-base font-bold mb-2 group-hover:text-[#0569ff] transition-colors">
-                                                {feature.title}
-                                            </h4>
-                                            <p className="text-slate-500 text-xs md:text-sm leading-relaxed">
-                                                {feature.desc}
-                                            </p>
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                        <div className="bg-white p-6 md:p-10 lg:p-16 flex items-center justify-center">
+                            <img src="./sx.png" alt="School Explorer" className="w-full h-full max-h-[400px] object-contain rounded-2xl scale-130" />
                         </div>
                     </div>
                 </div>
