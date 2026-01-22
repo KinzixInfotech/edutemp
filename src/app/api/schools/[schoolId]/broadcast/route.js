@@ -110,10 +110,12 @@ export async function POST(req, props) {
             icon: category === 'EMERGENCY' ? '🚨' : '📢',
             targetOptions,
             senderId,
+            imageUrl, // Pass image URL for push notification
             metadata: {
                 noticeId: notice.id,
                 category,
                 audience,
+                imageUrl, // Include in metadata for client-side handling
             },
             actionUrl: '/noticeboard',
             sendPush: true,

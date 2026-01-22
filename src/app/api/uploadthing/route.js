@@ -108,7 +108,15 @@ export const ourFileRouter = {
 
   syllabus: f({ pdf: { maxFileSize: "10MB" } })
     .input(z.object({ schoolId: z.string(), classId: z.string() }))
-    .onUploadComplete(({ metadata, file }) => ({ url: file.ufsUrl })),
+    .middleware(async ({ input }) => ({
+      schoolId: input.schoolId,
+      classId: input.classId,
+    }))
+    .onUploadComplete(({ metadata, file }) => {
+      console.log("Syllabus uploaded for school:", metadata.schoolId, "class:", metadata.classId);
+      console.log("File URL:", file.ufsUrl);
+      return { url: file.ufsUrl };
+    }),
 
   homework: f({
     pdf: { maxFileSize: "15MB" },

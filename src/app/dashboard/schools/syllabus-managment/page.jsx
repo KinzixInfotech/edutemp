@@ -96,16 +96,39 @@ export default function SyllabusManagement() {
             if (!formData.classId) throw new Error('Please select a class.');
 
             setUploading(true);
-            const uploadRes = await startUpload([selectedFile], {
-                schoolId: fullUser?.schoolId,
-                classId: formData?.classId,
-            });
 
-            if (!uploadRes || !uploadRes[0].ufsUrl) throw new Error('Upload failed');
+            let uploadRes;
+            try {
+                console.log('📤 Starting upload with file:', selectedFile.name, 'size:', selectedFile.size);
+                uploadRes = await startUpload([selectedFile], {
+                    schoolId: fullUser?.schoolId,
+                    classId: formData?.classId,
+                });
+            } catch (uploadError) {
+                console.error('📤 Upload error details:', uploadError);
+                throw new Error(`Upload failed: ${uploadError.message || 'Network error - check your connection'}`);
+            }
+
+            console.log('📤 Upload response:', JSON.stringify(uploadRes, null, 2));
+
+            if (!uploadRes || uploadRes.length === 0) {
+                throw new Error('Upload failed - no response from server');
+            }
+
+            // Check for various URL properties that uploadthing might return
+            const firstResult = uploadRes[0];
+            const fileUrl = firstResult.url || firstResult.ufsUrl || firstResult.serverData?.url || firstResult.fileUrl;
+
+            console.log('📤 First result keys:', Object.keys(firstResult));
+            console.log('📤 Extracted fileUrl:', fileUrl);
+
+            if (!fileUrl) {
+                throw new Error(`Upload failed - no URL found. Keys: ${Object.keys(firstResult).join(', ')}`);
+            }
 
             return axios.post('/api/schools/syllabus', {
-                senderId:fullUser?.id,
-                fileUrl: uploadRes[0].ufsUrl,
+                senderId: fullUser?.id,
+                fileUrl: fileUrl,
                 schoolId: fullUser?.schoolId,
                 classId: formData?.classId,
                 academicYearId: formData.academicYearId || null,

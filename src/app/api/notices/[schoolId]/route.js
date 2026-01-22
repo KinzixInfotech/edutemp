@@ -302,6 +302,7 @@ export async function POST(request, props) {
             // Exclude the notice creator from receiving push notification
             const usersExcludingSender = targetUsers.filter(u => u.id !== createdById);
             console.log(`[Notice Push] Excluded sender (${createdById}) from push notifications`);
+            console.log(`[Notice Push] Notice fileUrl: ${notice.fileUrl || 'NO IMAGE'}`);
             await sendPushNotifications(usersExcludingSender, notice);
         }
 
@@ -418,9 +419,9 @@ async function sendPushNotifications(users, notice) {
         body: notice.subtitle || notice.description.substring(0, 100) + ' - TAP TO VIEW',
     };
 
-    // Add image if notice has one
+    // Add image if notice has one (use 'image' for FCM standard field)
     if (notice.fileUrl) {
-        notificationPayload.imageUrl = notice.fileUrl;
+        notificationPayload.image = notice.fileUrl; // Standard FCM field for notification image
     }
 
     const message = {
@@ -431,13 +432,13 @@ async function sendPushNotifications(users, notice) {
             category: notice.category,
             priority: notice.priority,
             click_action: 'FLUTTER_NOTIFICATION_CLICK',
-            ...(notice.fileUrl && { imageUrl: notice.fileUrl }), // Also include in data for Flutter apps
+            ...(notice.fileUrl && { imageUrl: notice.fileUrl }), // Also include in data for React Native apps
         },
         android: {
             notification: {
                 channelId: 'default',
                 priority: 'high',
-                ...(notice.fileUrl && { imageUrl: notice.fileUrl }), // Android big picture style
+                ...(notice.fileUrl && { image: notice.fileUrl }), // Android Big Picture style (use 'image' not 'imageUrl')
             },
         },
         apns: {
@@ -445,17 +446,20 @@ async function sendPushNotifications(users, notice) {
                 aps: {
                     sound: 'default',
                     contentAvailable: true,
-                    mutableContent: true, // Required for iOS to display images
+                    'mutable-content': 1, // Required for iOS to display images (must be hyphenated and value 1)
                 },
             },
-            fcmOptions: {
-                ...(notice.fileUrl && { image: notice.fileUrl }), // iOS image support
-            },
+            ...(notice.fileUrl && {
+                fcm_options: {
+                    image: notice.fileUrl, // iOS image support
+                },
+            }),
         },
         tokens: tokens,
     };
 
     try {
+        console.log(`[Notice Push] FCM Message Payload:`, JSON.stringify(message, null, 2));
         const response = await messaging.sendEachForMulticast(message);
         console.log(`[Notice Push] Sent: ${response.successCount} success, ${response.failureCount} failed`);
 

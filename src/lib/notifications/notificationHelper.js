@@ -35,6 +35,7 @@ export async function sendNotification({
     metadata = {},
     icon = '📢',
     actionUrl = null,
+    imageUrl = null,
     sendPush = true
 }) {
     try {
@@ -74,9 +75,11 @@ export async function sendNotification({
                 userIds: targetUserIds,
                 title,
                 message,
+                imageUrl,
                 data: {
                     type,
                     actionUrl,
+                    imageUrl,
                     senderId: senderId || null, // Include sender for self-broadcast detection
                     ...metadata
                 }
@@ -501,8 +504,14 @@ async function getTargetUserIds(schoolId, targetOptions) {
 }
 /**
  * Send push notifications via FCM
+ * @param {Object} params
+ * @param {string[]} params.userIds - User IDs to send to
+ * @param {string} params.title - Notification title
+ * @param {string} params.message - Notification body
+ * @param {string} params.imageUrl - Optional image URL (must be HTTPS and publicly accessible)
+ * @param {Object} params.data - Additional data payload
  */
-async function sendPushNotifications({ userIds, title, message, data = {} }) {
+async function sendPushNotifications({ userIds, title, message, imageUrl = null, data = {} }) {
     try {
         // Get FCM tokens for users
         const users = await prisma.user.findMany({
@@ -537,19 +546,22 @@ async function sendPushNotifications({ userIds, title, message, data = {} }) {
         console.log(`Sending push notification to ${tokens.length} devices`);
         console.log(`Targeting User IDs:`, validUsers.map(u => u.id));
         console.log(`Payload Title: ${title}`);
+        if (imageUrl) console.log(`Image URL: ${imageUrl}`);
 
-        const response = await messaging.sendEachForMulticast({
+        // Build FCM message with optional image support
+        const fcmMessage = {
             tokens,
-            // Reverting to standard notification payload for reliability
             notification: {
                 title,
                 body: message,
+                ...(imageUrl && { image: imageUrl }), // Standard FCM notification image field
             },
             data: stringifiedData,
             android: {
                 notification: {
                     channelId: 'default',
                     priority: 'high',
+                    ...(imageUrl && { image: imageUrl }), // Android Big Picture style (use 'image')
                 },
             },
             apns: {
@@ -557,10 +569,18 @@ async function sendPushNotifications({ userIds, title, message, data = {} }) {
                     aps: {
                         sound: 'default',
                         contentAvailable: true,
+                        'mutable-content': 1, // Required for iOS image notifications
                     },
                 },
+                ...(imageUrl && {
+                    fcm_options: {
+                        image: imageUrl, // iOS image support
+                    },
+                }),
             },
-        });
+        };
+
+        const response = await messaging.sendEachForMulticast(fcmMessage);
 
         console.log(`Sent notification to ${response.successCount} parents (Failed: ${response.failureCount})`);
 
@@ -766,7 +786,7 @@ export async function notifyAttendanceMarked({ schoolId, studentIds, date, statu
     });
 }
 
-export async function notifyNoticePublished({ schoolId, noticeTitle, targetOptions, senderId }) {
+export async function notifyNoticePublished({ schoolId, noticeTitle, targetOptions, senderId, imageUrl = null }) {
     return sendNotification({
         schoolId,
         title: 'New Notice',
@@ -776,6 +796,7 @@ export async function notifyNoticePublished({ schoolId, noticeTitle, targetOptio
         icon: '📌',
         targetOptions,
         senderId,
+        imageUrl,
         actionUrl: '/notices'
     });
 }
