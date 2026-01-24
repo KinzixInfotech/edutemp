@@ -30,7 +30,7 @@ export async function GET(req) {
     }
 
     try {
-        const cacheKey = generateKey('bus-trips', { schoolId, routeId, vehicleId, status, date, page, limit });
+        const cacheKey = generateKey('bus-trips', { schoolId, routeId, vehicleId, driverId, conductorId, status, date, page, limit });
 
         const data = await remember(cacheKey, async () => {
             const where = {
@@ -67,7 +67,34 @@ export async function GET(req) {
                 prisma.busTrip.count({ where }),
             ]);
 
-            return { trips, total, page, limit, totalPages: Math.ceil(total / limit) };
+            // If driver or conductor ID provided, also fetch their active route assignment
+            // This enables on-demand trip creation in the frontend
+            let assignment = null;
+            if (driverId || conductorId) {
+                assignment = await prisma.routeAssignment.findFirst({
+                    where: {
+                        schoolId,
+                        isActive: true,
+                        ...(driverId && { driverId }),
+                        ...(conductorId && { conductorId }),
+                    },
+                    include: {
+                        route: { select: { id: true, name: true } },
+                        vehicle: { select: { id: true, licensePlate: true, model: true, capacity: true } },
+                        driver: { select: { id: true, name: true } },
+                        conductor: { select: { id: true, name: true } },
+                    }
+                });
+            }
+
+            return {
+                trips,
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+                assignment // For on-demand trip creation
+            };
         }, CACHE_TTL);
 
         return NextResponse.json(data);

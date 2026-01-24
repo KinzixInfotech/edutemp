@@ -5,10 +5,16 @@ import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { sendNotification } from '@/lib/notifications/notificationHelper';
 
+// Helper to get day name
+const getDayName = (date) => {
+    const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+    return days[date.getDay()];
+};
+
 export async function POST(req) {
     try {
         const data = await req.json();
-        const { schoolId, date, senderId } = data;
+        const { schoolId, date, senderId, skipValidation } = data;
 
         if (!schoolId) {
             return NextResponse.json({ error: 'schoolId is required' }, { status: 400 });
@@ -17,6 +23,68 @@ export async function POST(req) {
         // Default to today if no date provided
         const targetDate = date ? new Date(date) : new Date();
         targetDate.setHours(0, 0, 0, 0);
+
+        const dayName = getDayName(targetDate);
+        const dateStr = targetDate.toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'short',
+            day: 'numeric'
+        });
+
+        // === SKIP VALIDATION CHECKS (unless explicitly bypassed) ===
+        if (!skipValidation) {
+            // 1. Check SchoolCalendar for the date
+            const calendarEntry = await prisma.schoolCalendar.findUnique({
+                where: {
+                    schoolId_date: {
+                        schoolId,
+                        date: targetDate
+                    }
+                }
+            });
+
+            // Check if it's a holiday
+            if (calendarEntry?.isHoliday) {
+                return NextResponse.json({
+                    success: false,
+                    skippedReason: 'HOLIDAY',
+                    message: `${dateStr} is a holiday: ${calendarEntry.holidayName || 'School Holiday'}`,
+                    created: 0,
+                    skipped: 0
+                });
+            }
+
+            // 2. Check if it's a working day based on SchoolCalendar.dayType
+            // If calendar entry exists, check dayType. If no entry, default to allowing trips.
+            if (calendarEntry && calendarEntry.dayType !== 'WORKING_DAY') {
+                return NextResponse.json({
+                    success: false,
+                    skippedReason: 'NON_WORKING_DAY',
+                    message: `${dateStr} is not a working day (${calendarEntry.dayType})`,
+                    created: 0,
+                    skipped: 0
+                });
+            }
+
+            // 3. Check BusServiceSuspension
+            const suspension = await prisma.busServiceSuspension.findFirst({
+                where: {
+                    schoolId,
+                    startDate: { lte: targetDate },
+                    endDate: { gte: targetDate }
+                }
+            });
+
+            if (suspension) {
+                return NextResponse.json({
+                    success: false,
+                    skippedReason: 'SERVICE_SUSPENDED',
+                    message: `Bus service is suspended: ${suspension.reason}`,
+                    created: 0,
+                    skipped: 0
+                });
+            }
+        }
 
         // Get all active route assignments
         const assignments = await prisma.routeAssignment.findMany({
@@ -123,11 +191,7 @@ export async function POST(req) {
         }
 
         // Send notifications to drivers about their trips
-        const dateStr = targetDate.toLocaleDateString('en-US', {
-            weekday: 'long',
-            month: 'short',
-            day: 'numeric'
-        });
+        // (dateStr already defined above)
 
         for (const [driverUserId, data] of driverNotifications) {
             const tripCount = data.trips.length;

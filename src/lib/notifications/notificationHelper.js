@@ -1571,3 +1571,188 @@ export async function notifyBookRequested({
         actionUrl: '/library/requests'
     });
 }
+
+/**
+ * Notify parents when bus trip starts
+ * @param {string} schoolId - School ID
+ * @param {string} tripId - Trip ID
+ * @param {string} vehicleId - Vehicle ID
+ * @param {string} routeName - Route name
+ * @param {string} tripType - PICKUP or DROP
+ * @param {string} licensePlate - Vehicle license plate
+ */
+export async function notifyTripStarted({
+    schoolId,
+    tripId,
+    routeId,
+    vehicleId,
+    routeName,
+    tripType,
+    licensePlate
+}) {
+    try {
+        console.log(`[Trip Start] Starting notification for tripId: ${tripId}, routeId: ${routeId}`);
+
+        // Get all students assigned to this route
+        const students = await prisma.studentRouteAssignment.findMany({
+            where: {
+                routeId
+            },
+            include: {
+                student: {
+                    include: {
+                        studentParentLinks: {
+                            where: { isActive: true },
+                            include: {
+                                parent: {
+                                    select: { userId: true }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        console.log(`[Trip Start] Found ${students.length} student assignments for vehicle ${vehicleId}`);
+
+        // Extract unique parent user IDs
+        const parentIds = new Set();
+        students.forEach(assignment => {
+            console.log(`[Trip Start] Student: ${assignment.student?.id}, parentLinks: ${assignment.student?.studentParentLinks?.length || 0}`);
+            assignment.student.studentParentLinks.forEach(link => {
+                if (link.parent?.userId) {
+                    parentIds.add(link.parent.userId);
+                }
+            });
+        });
+
+        if (parentIds.size === 0) {
+            console.log('[Trip Start] No parents found to notify - check if students are assigned to vehicle and have active parent links');
+            return;
+        }
+
+        const tripTypeText = tripType === 'PICKUP' ? 'Pick-up' : 'Drop';
+
+        console.log(`[Trip Start] Sending notification to ${parentIds.size} parents: ${Array.from(parentIds).join(', ')}`);
+
+        await sendNotification({
+            schoolId,
+            title: `🚌 Bus ${tripTypeText} Started`,
+            message: `${licensePlate} (${routeName}) has started the ${tripTypeText.toLowerCase()} trip`,
+            type: 'TRANSPORT',
+            priority: 'HIGH',
+            icon: '🚌',
+            targetOptions: {
+                userIds: Array.from(parentIds)
+            },
+            metadata: {
+                tripId,
+                vehicleId,
+                routeName,
+                tripType,
+                licensePlate,
+                eventType: 'TRIP_STARTED'
+            },
+            actionUrl: `/transport/track/${tripId}`
+        });
+
+        console.log(`[Trip Start] ✅ Successfully notified ${parentIds.size} parents for ${licensePlate}`);
+    } catch (error) {
+        console.error('[Trip Start] Notification error:', error);
+        // Don't throw - notification failure shouldn't block trip start
+    }
+}
+
+/**
+ * Notify parents when bus is approaching their child's stop
+ * @param {string} schoolId - School ID
+ * @param {string} tripId - Trip ID
+ * @param {string} stopId - Bus stop ID
+ * @param {string} stopName - Stop name
+ * @param {number} etaMinutes - Estimated time in minutes
+ * @param {string} tripType - PICKUP or DROP
+ * @param {string} licensePlate - Vehicle license plate
+ */
+export async function notifyApproachingStop({
+    schoolId,
+    tripId,
+    stopId,
+    stopName,
+    etaMinutes,
+    tripType,
+    licensePlate
+}) {
+    try {
+        // Get students at this specific stop for this trip
+        const students = await prisma.studentStopAssignment.findMany({
+            where: {
+                stopId: stopId,
+                isActive: true
+            },
+            include: {
+                student: {
+                    select: {
+                        name: true,
+                        studentParentLinks: {
+                            where: { isActive: true },
+                            include: {
+                                parent: {
+                                    select: { userId: true }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (students.length === 0) {
+            console.log(`[Approaching Stop] No students found at ${stopName}`);
+            return;
+        }
+
+        // Notify each parent individually with child's name
+        let notificationsSent = 0;
+        for (const assignment of students) {
+            const childName = assignment.student.name;
+            const parentIds = assignment.student.studentParentLinks.map(link => link.parent.userId);
+
+            if (parentIds.length === 0) continue;
+
+            const message = etaMinutes <= 2
+                ? `${licensePlate} is arriving at ${stopName} now!`
+                : `${licensePlate} will reach ${stopName} in ~${etaMinutes} minutes`;
+
+            await sendNotification({
+                schoolId,
+                title: `🚌 Bus Approaching - ${childName}`,
+                message,
+                type: 'TRANSPORT',
+                priority: etaMinutes <= 2 ? 'URGENT' : 'HIGH',
+                icon: '📍',
+                targetOptions: {
+                    userIds: parentIds
+                },
+                metadata: {
+                    tripId,
+                    stopId,
+                    stopName,
+                    etaMinutes,
+                    tripType,
+                    childName,
+                    licensePlate,
+                    eventType: 'APPROACHING_STOP'
+                },
+                actionUrl: `/transport/track/${tripId}`
+            });
+
+            notificationsSent += parentIds.length;
+        }
+
+        console.log(`[Approaching Stop] Notified ${notificationsSent} parents for stop: ${stopName}`);
+    } catch (error) {
+        console.error('[Approaching Stop] Notification error:', error);
+        // Don't throw - notification failure shouldn't block location tracking
+    }
+}

@@ -1,6 +1,9 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { apiResponse, errorResponse } from "@/lib/api-utils";
+import { remember, generateKey } from "@/lib/cache";
+
+const CACHE_TTL = 300; // 5 minutes
 
 export async function GET(req, props) {
     const params = await props.params;
@@ -13,72 +16,78 @@ export async function GET(req, props) {
     }
 
     try {
-        // Find current academic year for the school
-        const academicYear = await prisma.academicYear.findFirst({
-            where: { schoolId, isActive: true },
-            select: { id: true }
-        });
+        const cacheKey = generateKey('leaves-balance', { schoolId, userId });
 
-        if (!academicYear) {
-            // Return defaults when no academic year
-            return apiResponse({
-                totalUsed: 0,
-                breakdown: getDefaultBreakdown()
+        const result = await remember(cacheKey, async () => {
+            // Find current academic year for the school
+            const academicYear = await prisma.academicYear.findFirst({
+                where: { schoolId, isActive: true },
+                select: { id: true }
             });
-        }
 
-        // Fetch leave buckets to get the configured limits
-        const leaveBuckets = await prisma.leaveBucket.findMany({
-            where: { schoolId, academicYearId: academicYear.id },
-            select: { leaveType: true, yearlyLimit: true }
-        });
-
-        // Create a map of leave type to yearly limit
-        const bucketLimits = {};
-        leaveBuckets.forEach(bucket => {
-            bucketLimits[bucket.leaveType] = bucket.yearlyLimit;
-        });
-
-        // Fetch leave balance for the user in the current academic year
-        const leaveBalance = await prisma.leaveBalance.findUnique({
-            where: {
-                userId_academicYearId: {
-                    userId,
-                    academicYearId: academicYear.id
-                }
+            if (!academicYear) {
+                // Return defaults when no academic year
+                return {
+                    totalUsed: 0,
+                    breakdown: getDefaultBreakdown()
+                };
             }
-        });
 
-        // Build breakdown with defaults
-        const breakdown = {
-            casualLeaveUsed: leaveBalance?.casualLeaveUsed || 0,
-            casualLeaveTotal: bucketLimits['CASUAL'] ?? 12,
-            casualLeaveBalance: (bucketLimits['CASUAL'] ?? 12) - (leaveBalance?.casualLeaveUsed || 0),
+            // Fetch leave buckets to get the configured limits
+            const leaveBuckets = await prisma.leaveBucket.findMany({
+                where: { schoolId, academicYearId: academicYear.id },
+                select: { leaveType: true, yearlyLimit: true }
+            });
 
-            sickLeaveUsed: leaveBalance?.sickLeaveUsed || 0,
-            sickLeaveTotal: bucketLimits['SICK'] ?? 10,
-            sickLeaveBalance: (bucketLimits['SICK'] ?? 10) - (leaveBalance?.sickLeaveUsed || 0),
+            // Create a map of leave type to yearly limit
+            const bucketLimits = {};
+            leaveBuckets.forEach(bucket => {
+                bucketLimits[bucket.leaveType] = bucket.yearlyLimit;
+            });
 
-            earnedLeaveUsed: leaveBalance?.earnedLeaveUsed || 0,
-            earnedLeaveTotal: bucketLimits['EARNED'] ?? 15,
-            earnedLeaveBalance: (bucketLimits['EARNED'] ?? 15) - (leaveBalance?.earnedLeaveUsed || 0),
+            // Fetch leave balance for the user in the current academic year
+            const leaveBalance = await prisma.leaveBalance.findUnique({
+                where: {
+                    userId_academicYearId: {
+                        userId,
+                        academicYearId: academicYear.id
+                    }
+                }
+            });
 
-            maternityLeaveUsed: leaveBalance?.maternityLeaveUsed || 0,
-            maternityLeaveTotal: bucketLimits['MATERNITY'] ?? 0,
-            maternityLeaveBalance: (bucketLimits['MATERNITY'] ?? 0) - (leaveBalance?.maternityLeaveUsed || 0),
-        };
+            // Build breakdown with defaults
+            const breakdown = {
+                casualLeaveUsed: leaveBalance?.casualLeaveUsed || 0,
+                casualLeaveTotal: bucketLimits['CASUAL'] ?? 12,
+                casualLeaveBalance: (bucketLimits['CASUAL'] ?? 12) - (leaveBalance?.casualLeaveUsed || 0),
 
-        // Calculate total used leaves
-        const totalUsed =
-            breakdown.casualLeaveUsed +
-            breakdown.sickLeaveUsed +
-            breakdown.earnedLeaveUsed +
-            breakdown.maternityLeaveUsed;
+                sickLeaveUsed: leaveBalance?.sickLeaveUsed || 0,
+                sickLeaveTotal: bucketLimits['SICK'] ?? 10,
+                sickLeaveBalance: (bucketLimits['SICK'] ?? 10) - (leaveBalance?.sickLeaveUsed || 0),
 
-        return apiResponse({
-            totalUsed,
-            breakdown
-        });
+                earnedLeaveUsed: leaveBalance?.earnedLeaveUsed || 0,
+                earnedLeaveTotal: bucketLimits['EARNED'] ?? 15,
+                earnedLeaveBalance: (bucketLimits['EARNED'] ?? 15) - (leaveBalance?.earnedLeaveUsed || 0),
+
+                maternityLeaveUsed: leaveBalance?.maternityLeaveUsed || 0,
+                maternityLeaveTotal: bucketLimits['MATERNITY'] ?? 0,
+                maternityLeaveBalance: (bucketLimits['MATERNITY'] ?? 0) - (leaveBalance?.maternityLeaveUsed || 0),
+            };
+
+            // Calculate total used leaves
+            const totalUsed =
+                breakdown.casualLeaveUsed +
+                breakdown.sickLeaveUsed +
+                breakdown.earnedLeaveUsed +
+                breakdown.maternityLeaveUsed;
+
+            return {
+                totalUsed,
+                breakdown
+            };
+        }, CACHE_TTL);
+
+        return apiResponse(result);
 
     } catch (error) {
         console.error('Leave balance error:', error);

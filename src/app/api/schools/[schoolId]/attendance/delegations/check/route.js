@@ -3,6 +3,9 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { remember, generateKey } from '@/lib/cache';
+
+const CACHE_TTL = 120; // 2 minutes (shorter because delegations can change)
 
 const ISTDate = (input) => {
     try {
@@ -76,104 +79,111 @@ export async function GET(req, props) {
     }
 
     try {
-        // Check if teacher is substitute for any class today
-        const activeDelegations = await prisma.attendanceDelegation.findMany({
-            where: {
-                schoolId,
-                substituteTeacherId: teacherId,
-                status: 'ACTIVE',
-                startDate: { lte: checkDate },
-                endDate: { gte: checkDate }
-            },
-            include: {
-                originalTeacher: {
-                    select: {
-                        userId: true,
-                        name: true,
-                        employeeId: true,
-                        user: { select: { profilePicture: true } }
-                    }
+        const dateStr = checkDate.toISOString().split('T')[0];
+        const cacheKey = generateKey('delegation-check', { schoolId, teacherId, date: dateStr });
+
+        const result = await remember(cacheKey, async () => {
+            // Check if teacher is substitute for any class today
+            const activeDelegations = await prisma.attendanceDelegation.findMany({
+                where: {
+                    schoolId,
+                    substituteTeacherId: teacherId,
+                    status: 'ACTIVE',
+                    startDate: { lte: checkDate },
+                    endDate: { gte: checkDate }
                 },
-                class: {
-                    select: {
-                        id: true,
-                        className: true,
-                        _count: {
-                            select: { students: true }
+                include: {
+                    originalTeacher: {
+                        select: {
+                            userId: true,
+                            name: true,
+                            employeeId: true,
+                            user: { select: { profilePicture: true } }
+                        }
+                    },
+                    class: {
+                        select: {
+                            id: true,
+                            className: true,
+                            _count: {
+                                select: { students: true }
+                            }
+                        }
+                    },
+                    section: {
+                        select: {
+                            id: true,
+                            name: true,
+                            _count: {
+                                select: { students: true }
+                            }
                         }
                     }
                 },
-                section: {
-                    select: {
-                        id: true,
-                        name: true,
-                        _count: {
-                            select: { students: true }
+                orderBy: { createdAt: 'desc' }
+            });
+
+            // Also get teacher's own classes
+            const ownClasses = await prisma.teachingStaff.findUnique({
+                where: { userId: teacherId },
+                select: {
+                    Class: {
+                        where: { schoolId },
+                        select: {
+                            id: true,
+                            className: true,
+                            _count: { select: { students: true } }
+                        }
+                    },
+                    sectionsAssigned: {
+                        where: { schoolId },
+                        select: {
+                            id: true,
+                            name: true,
+                            classId: true,
+                            class: { select: { className: true } },
+                            _count: { select: { students: true } }
                         }
                     }
                 }
-            },
-            orderBy: { createdAt: 'desc' }
-        });
+            });
 
-        // Also get teacher's own classes
-        const ownClasses = await prisma.teachingStaff.findUnique({
-            where: { userId: teacherId },
-            select: {
-                Class: {
-                    where: { schoolId },
-                    select: {
-                        id: true,
-                        className: true,
-                        _count: { select: { students: true } }
-                    }
-                },
-                sectionsAssigned: {
-                    where: { schoolId },
-                    select: {
-                        id: true,
-                        name: true,
-                        classId: true,
-                        class: { select: { className: true } },
-                        _count: { select: { students: true } }
-                    }
+            const hasDelegations = activeDelegations.length > 0;
+
+            return {
+                success: true,
+                hasDelegations,
+                date: dateStr,
+                delegations: activeDelegations.map(d => ({
+                    id: d.id,
+                    classId: d.classId,
+                    className: d.class.className,
+                    sectionId: d.sectionId,
+                    sectionName: d.section?.name || null,
+                    studentCount: d.section ? d.section._count.students : d.class._count.students,
+                    originalTeacher: {
+                        id: d.originalTeacher.userId,
+                        name: d.originalTeacher.name,
+                        employeeId: d.originalTeacher.employeeId,
+                        profilePicture: d.originalTeacher.user.profilePicture
+                    },
+                    startDate: d.startDate,
+                    endDate: d.endDate,
+                    reason: d.reason,
+                    // Add version for tracking changes
+                    version: generateDelegationVersion(d),
+                    createdAt: d.createdAt,
+                    updatedAt: d.updatedAt,
+                    acknowledgedAt: d.acknowledgedAt // Include acknowledgment status
+                })),
+                ownClasses: {
+                    classTeacher: ownClasses?.Class || [],
+                    sections: ownClasses?.sectionsAssigned || []
                 }
-            }
-        });
+            };
+        }, CACHE_TTL);
 
-        const hasDelegations = activeDelegations.length > 0;
-
-        return NextResponse.json({
-            success: true,
-            hasDelegations,
-            date: checkDate.toISOString().split('T')[0],
-            delegations: activeDelegations.map(d => ({
-                id: d.id,
-                classId: d.classId,
-                className: d.class.className,
-                sectionId: d.sectionId,
-                sectionName: d.section?.name || null,
-                studentCount: d.section ? d.section._count.students : d.class._count.students,
-                originalTeacher: {
-                    id: d.originalTeacher.userId,
-                    name: d.originalTeacher.name,
-                    employeeId: d.originalTeacher.employeeId,
-                    profilePicture: d.originalTeacher.user.profilePicture
-                },
-                startDate: d.startDate,
-                endDate: d.endDate,
-                reason: d.reason,
-                // Add version for tracking changes
-                version: generateDelegationVersion(d),
-                createdAt: d.createdAt,
-                updatedAt: d.updatedAt,
-                acknowledgedAt: d.acknowledgedAt // Include acknowledgment status
-            })),
-            ownClasses: {
-                classTeacher: ownClasses?.Class || [],
-                sections: ownClasses?.sectionsAssigned || []
-            }
-        });
+        return NextResponse.json(result);
     } catch (error) {
         console.error('Check delegation error:', error);
         return NextResponse.json({

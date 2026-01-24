@@ -106,6 +106,10 @@ model School {
   smsWallet        SmsWallet?
   feeSettings      FeeSettings?
 
+  // Transport Auto-Generation
+  transportSettings     TransportSettings?
+  busServiceSuspensions BusServiceSuspension[]
+
   // Payment Gateway Settings (Generic)
   paymentSettings SchoolPaymentSettings?
   receipts        Receipt[]
@@ -1127,6 +1131,44 @@ model RouteAssignment {
   @@index([schoolId])
   @@index([driverId])
   @@index([isActive])
+}
+
+// Transport Settings for Auto-Generation
+model TransportSettings {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @unique @db.Uuid
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  // Auto-generation settings
+  autoGenerateTrips     Boolean @default(true)
+  generateDaysInAdvance Int     @default(1) // Generate X days ahead
+  generateTime          String  @default("06:00") // Time to auto-generate (for cron)
+
+  // Weekly schedule (which days bus service operates)
+  // Store as array: ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
+  operatingDays String[] @default(["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Bus Service Suspension - Emergency disable for specific dates
+model BusServiceSuspension {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @db.Uuid
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  // Suspension period
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+
+  // Reason and metadata
+  reason    String
+  createdBy String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  @@index([schoolId])
+  @@index([startDate, endDate])
 }
 
 // Bus Stop with schedule

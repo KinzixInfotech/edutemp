@@ -1,6 +1,9 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { notifyBulkAttendanceMarked } from '@/lib/notifications/notificationHelper';
+import { remember, generateKey, invalidatePattern } from '@/lib/cache';
+
+const CACHE_TTL = 120; // 2 minutes (short because attendance can change)
 
 // ===== CONFIG =====
 export const DEBUG = true;
@@ -59,97 +62,104 @@ export async function GET(req, props) {
   }
 
   try {
+    const dateStr = date.toISOString().split('T')[0];
+    const cacheKey = generateKey('attendance-bulk', { schoolId, classId, sectionId: sectionId || 'all', date: dateStr });
+
     debugLog('GET /attendance/bulk called', {
       schoolId,
       classId,
       sectionId,
       dateParam,
       parsedDate: date.toISOString(),
-      dateOnly: date.toISOString().split('T')[0]
+      dateOnly: dateStr
     });
 
-    // Get students in class/section
-    const students = await prisma.student.findMany({
-      where: {
-        schoolId,
-        classId: toInt(classId),
-        ...(sectionId && sectionId !== 'all' && { sectionId: toInt(sectionId) }),
-        user: {
-          deletedAt: null,
-          status: 'ACTIVE'
-        }
-      },
-      select: {
-        userId: true,
-        name: true,
-        admissionNo: true,
-        rollNumber: true,
-        class: { select: { className: true } },
-        section: { select: { name: true } },
-        user: {
-          select: {
-            attendance: {
-              where: {
-                date: {
-                  gte: date,
-                  lt: getNextDay(date)
+    const result = await remember(cacheKey, async () => {
+      // Get students in class/section
+      const students = await prisma.student.findMany({
+        where: {
+          schoolId,
+          classId: toInt(classId),
+          ...(sectionId && sectionId !== 'all' && { sectionId: toInt(sectionId) }),
+          user: {
+            deletedAt: null,
+            status: 'ACTIVE'
+          }
+        },
+        select: {
+          userId: true,
+          name: true,
+          admissionNo: true,
+          rollNumber: true,
+          class: { select: { className: true } },
+          section: { select: { name: true } },
+          user: {
+            select: {
+              attendance: {
+                where: {
+                  date: {
+                    gte: date,
+                    lt: getNextDay(date)
+                  }
+                },
+                select: {
+                  id: true,
+                  status: true,
+                  checkInTime: true,
+                  remarks: true,
+                  isLateCheckIn: true,
                 }
-              },
-              select: {
-                id: true,
-                status: true,
-                checkInTime: true,
-                remarks: true,
-                isLateCheckIn: true,
               }
             }
           }
-        }
-      },
-      orderBy: [
-        { rollNumber: 'asc' },
-        { name: 'asc' }
-      ]
-    });
+        },
+        orderBy: [
+          { rollNumber: 'asc' },
+          { name: 'asc' }
+        ]
+      });
 
-    // Check if bulk attendance already marked
-    const existingBulk = await prisma.bulkAttendance.findFirst({
-      where: {
-        schoolId,
-        classId: toInt(classId),
-        ...(sectionId && sectionId !== 'all' && { sectionId: toInt(sectionId) }),
-        date: {
-          gte: date,
-          lt: getNextDay(date)
-        }
-      },
-      include: { marker: { select: { name: true } } }
-    });
+      // Check if bulk attendance already marked
+      const existingBulk = await prisma.bulkAttendance.findFirst({
+        where: {
+          schoolId,
+          classId: toInt(classId),
+          ...(sectionId && sectionId !== 'all' && { sectionId: toInt(sectionId) }),
+          date: {
+            gte: date,
+            lt: getNextDay(date)
+          }
+        },
+        include: { marker: { select: { name: true } } }
+      });
 
-    // Format response
-    const studentsWithAttendance = students.map(student => ({
-      userId: student.userId,
-      name: student.name,
-      admissionNo: student.admissionNo,
-      rollNumber: student.rollNumber,
-      className: student.class?.className,
-      sectionName: student.section?.name,
-      attendance: student.user.attendance[0] || null,
-      isMarked: !!student.user.attendance[0],
-    }));
+      // Format response
+      const studentsWithAttendance = students.map(student => ({
+        userId: student.userId,
+        name: student.name,
+        admissionNo: student.admissionNo,
+        rollNumber: student.rollNumber,
+        className: student.class?.className,
+        sectionName: student.section?.name,
+        attendance: student.user.attendance[0] || null,
+        isMarked: !!student.user.attendance[0],
+      }));
+
+      return {
+        students: studentsWithAttendance,
+        totalStudents: students.length,
+        markedCount: studentsWithAttendance.filter(s => s.isMarked).length,
+        existingBulk,
+        date: date.toISOString(),
+      };
+    }, CACHE_TTL);
 
     debugLog('Students fetched:', {
-      total: students.length,
-      marked: studentsWithAttendance.filter(s => s.isMarked).length
+      total: result.totalStudents,
+      marked: result.markedCount
     });
 
-    return NextResponse.json({
-      students: studentsWithAttendance,
-      totalStudents: students.length,
-      markedCount: studentsWithAttendance.filter(s => s.isMarked).length,
-      existingBulk,
-      date: date.toISOString(),
-    });
+    return NextResponse.json(result);
 
   } catch (error) {
     console.error('Fetch students error:', error);

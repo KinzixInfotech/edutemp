@@ -609,6 +609,25 @@ export default function TripManagement() {
                         </Button>
                     </div>
 
+                    {/* On-Demand Info Banner */}
+                    <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                        <div className="flex gap-3">
+                            <div className="shrink-0">
+                                <Bus className="h-5 w-5 text-blue-600" />
+                            </div>
+                            <div className="space-y-1">
+                                <p className="font-medium text-blue-900 dark:text-blue-200">On-Demand Trips Enabled</p>
+                                <p className="text-sm text-blue-700 dark:text-blue-300">
+                                    Drivers can now start trips directly from their app without pre-scheduled trips.
+                                    Trips are created automatically when drivers tap "Start Trip".
+                                </p>
+                                <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                                    <strong>Generate Trips</strong> is optional - use it only if you want to pre-schedule trips for a specific date.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between pb-2">

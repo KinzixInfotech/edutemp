@@ -4,6 +4,7 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { invalidatePattern } from '@/lib/cache';
+import { notifyTripStarted } from '@/lib/notifications/notificationHelper';
 
 export async function POST(req, props) {
     const params = await props.params;
@@ -62,6 +63,16 @@ export async function POST(req, props) {
         });
 
         await invalidatePattern(`bus-trips:*schoolId:${trip.route.schoolId}*`);
+
+        // Notify parents that trip has started
+        await notifyTripStarted({
+            schoolId: trip.route.schoolId,
+            tripId: id,
+            vehicleId: updatedTrip.vehicle.id,
+            routeName: updatedTrip.route.name,
+            tripType: updatedTrip.tripType,
+            licensePlate: updatedTrip.vehicle.licensePlate
+        });
 
         return NextResponse.json({ success: true, trip: updatedTrip, message: 'Trip started successfully' });
     } catch (error) {
