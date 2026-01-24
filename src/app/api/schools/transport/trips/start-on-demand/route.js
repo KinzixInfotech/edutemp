@@ -137,6 +137,9 @@ export async function POST(req) {
                     }
 
                     return updated;
+                }, {
+                    maxWait: 5000, // Wait max 5s for transaction to start
+                    timeout: 20000 // Allow 20s for transaction to complete
                 });
 
                 await invalidatePattern(`bus-trips:*schoolId:${schoolId}*`);
@@ -207,6 +210,9 @@ export async function POST(req) {
             }
 
             return trip;
+        }, {
+            maxWait: 5000, // Wait max 5s for transaction to start
+            timeout: 20000 // Allow 20s for transaction to complete
         });
 
         await invalidatePattern(`bus-trips:*schoolId:${schoolId}*`);
