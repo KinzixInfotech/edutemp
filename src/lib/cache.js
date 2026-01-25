@@ -27,9 +27,19 @@ export const generateKey = (prefix, params = {}) => {
 export const getCache = async (key) => {
     try {
         const data = await redis.get(key);
-        return data ? JSON.parse(data) : null;
+        if (!data) return null;
+        // Upstash returns already-parsed data when using their SDK
+        // If it's a string, try to parse it; otherwise return as-is
+        if (typeof data === 'string') {
+            try {
+                return JSON.parse(data);
+            } catch {
+                return data;
+            }
+        }
+        return data;
     } catch (error) {
-        // console.warn(`Cache get error for key ${key}:`, error);
+        console.warn(`Cache get error for key ${key}:`, error);
         return null;
     }
 };

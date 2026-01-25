@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCache, setCache, delCache, generateKey } from '@/lib/cache';
 
-// Cache TTL: 1 hour (since images don't change often)
-const CACHE_TTL = 3600;
+// Cache TTL: 5 minutes (reduced for quicker updates after upload)
+const CACHE_TTL = 300;
 
 export async function GET(request) {
     try {
@@ -44,24 +44,23 @@ export async function GET(request) {
             return NextResponse.json(images);
         }
 
-        // Try to get from cache first
+        // TEMPORARILY DISABLED CACHE FOR DEBUGGING - always fetch fresh
+        // TODO: Re-enable after fixing cache invalidation
         const cacheKey = generateKey('school_carousel', { schoolId });
-        let images = await getCache(cacheKey);
 
-        if (!images) {
-            images = await prisma.schoolCarouselImage.findMany({
-                where: whereClause,
-                orderBy: { displayOrder: 'asc' },
-                include: {
-                    uploadedBy: {
-                        select: { name: true, email: true }
-                    }
+        // Skip cache, always fetch from DB
+        let images = await prisma.schoolCarouselImage.findMany({
+            where: whereClause,
+            orderBy: { displayOrder: 'asc' },
+            include: {
+                uploadedBy: {
+                    select: { name: true, email: true }
                 }
-            });
+            }
+        });
 
-            // Cache the result
-            await setCache(cacheKey, images, CACHE_TTL);
-        }
+        // Still update cache for when we re-enable
+        await setCache(cacheKey, images, CACHE_TTL);
 
         // Filter by audience if role is provided
         if (role) {
@@ -114,6 +113,7 @@ export async function POST(request) {
         // Invalidate cache
         const cacheKey = generateKey('school_carousel', { schoolId });
         await delCache(cacheKey);
+        console.log('🗑️ Carousel cache invalidated for:', cacheKey);
 
         return NextResponse.json(newImage);
     } catch (error) {
