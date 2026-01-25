@@ -110,7 +110,7 @@ function HeroSection() {
         <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-white">
             {/* Interactive Grid Pattern Background */}
             <InteractiveGridPattern
-                className="absolute opacity-80 inset-0 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,white_40%,transparent_70%)]"
+                className="absolute opacity-80 inset-0 [http://localhost:3000/dashboard/schools/syllabus-managmentmask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,white_40%,transparent_70%)]"
                 squares={[60, 60]}
             />
 

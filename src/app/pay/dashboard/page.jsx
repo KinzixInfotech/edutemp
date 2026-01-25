@@ -969,4 +969,3 @@ export default function PayDashboardPage() {
         </div>
     );
 }
-

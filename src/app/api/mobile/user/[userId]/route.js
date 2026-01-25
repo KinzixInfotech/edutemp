@@ -266,6 +266,80 @@ export async function GET(req, context) {
     }
 }
 
+// PUT: Update user profile (currently supports profilePicture)
+export async function PUT(req, context) {
+    try {
+        const { userId } = await context.params;
+
+        if (!userId) {
+            return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
+        }
+
+        const body = await req.json();
+        const { profilePicture } = body;
+
+        // Validate input
+        if (!profilePicture) {
+            return NextResponse.json({ error: 'Missing profilePicture' }, { status: 400 });
+        }
+
+        console.log(`📱 [Mobile API] Updating profile picture for userId: ${userId}`);
+
+        // 1. Get current user to find old profile picture
+        const currentUser = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { profilePicture: true }
+        });
+
+        // 2. Update the user's profile picture
+        const updatedUser = await prisma.user.update({
+            where: { id: userId },
+            data: { profilePicture },
+            select: {
+                id: true,
+                profilePicture: true,
+            },
+        });
+
+        // 3. Invalidate cache so next GET fetches fresh data
+        await invalidateProfileCache(userId);
+
+        console.log(`✅ [Mobile API] Profile picture updated for userId: ${userId}`);
+
+        // 4. Delete old image from UploadThing if it exists and is different
+        if (currentUser?.profilePicture &&
+            currentUser.profilePicture !== profilePicture &&
+            currentUser.profilePicture !== 'default.png' &&
+            currentUser.profilePicture.includes('http')) {
+
+            try {
+                // Extract file key from URL
+                // Format: https://utfs.io/f/KEY or https://.../f/KEY
+                const urlParts = currentUser.profilePicture.split('/f/');
+                if (urlParts.length > 1) {
+                    const fileKey = urlParts[1];
+                    console.log(`🗑️ [Mobile API] Deleting old profile picture: ${fileKey}`);
+
+                    // Import dynamically to avoid circular dependency issues if any
+                    const { utapi } = await import("@/lib/server-uploadthing");
+                    await utapi.deleteFiles(fileKey);
+                }
+            } catch (deleteError) {
+                console.error('⚠️ [Mobile API] Failed to delete old profile picture:', deleteError);
+                // We don't fail the request if deletion fails, just log it
+            }
+        }
+
+        return NextResponse.json({
+            success: true,
+            profilePicture: updatedUser.profilePicture,
+        });
+    } catch (error) {
+        console.error('❌ [Mobile API] PUT Error:', error);
+        return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 });
+    }
+}
+
 // Optional: Invalidate cache when profile is updated (call from PUT/PATCH handlers)
 export const invalidateProfileCache = async (userId) => {
     const cacheKey = generateKey('mobile:profile', userId);
