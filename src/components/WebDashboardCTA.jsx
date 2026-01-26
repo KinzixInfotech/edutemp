@@ -13,12 +13,12 @@ export default function WebDashboardCTA() {
                     {/* Content - Left Side */}
                     <div className="flex-1 text-center lg:text-left">
                         {/* Heading */}
-                        <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a1a2e] mb-6 leading-tight">
+                        <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-[#1a1a2e] mb-4 md:mb-6 leading-tight tracking-tight">
                             Modern App For <br /> <span className="text-[#0469ff]">Modern Schools</span>
                         </h2>
 
                         {/* Description */}
-                        <p className="text-lg md:text-xl text-gray-600 mb-8 leading-relaxed max-w-xl">
+                        <p className="text-base md:text-lg lg:text-xl text-gray-600 mb-6 md:mb-8 leading-relaxed max-w-xl font-medium">
                             Experience seamless school management on mobile. Access student data, track attendance, manage fees, and communicate with parents—all from your smartphone.
                         </p>
 

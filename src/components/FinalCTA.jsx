@@ -24,7 +24,7 @@ export default function FinalCTA() {
                 </div>
 
                 {/* Heading - Inline */}
-                <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 leading-tight">
+                <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-5 leading-[1.1]">
                     <span className="text-gray-900">Transform Your School </span>
                     <span className="text-[#0166f6]">Management Today</span>
                 </h2>

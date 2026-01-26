@@ -390,14 +390,14 @@ function AppShowcaseSection() {
             <div className="max-w-[1400px] mx-auto px-6 relative z-10">
                 {/* Section Header */}
                 <div className="text-center mb-12 md:mb-20">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 border-gray-300 bg-white mb-6">
-                        <Smartphone className="w-4 h-4 text-gray-600" />
-                        <span className="text-sm font-semibold text-gray-600">Mobile Experience</span>
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-full border-2 border-gray-300 bg-white mb-4 md:mb-6">
+                        <Smartphone className="w-3.5 h-3.5 md:w-4 md:h-4 text-gray-600" />
+                        <span className="text-xs md:text-sm font-bold uppercase tracking-wider text-gray-600">Mobile Experience</span>
                     </div>
-                    <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold text-[#1a1a2e] mb-4">
+                    <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-[#1a1a2e] mb-4 md:mb-6 leading-tight tracking-tight">
                         Designed for <span className="text-[#0469ff]">Modern Parents</span>
                     </h2>
-                    <p className="text-lg md:text-xl text-gray-600 max-w-[700px] mx-auto">
+                    <p className="text-base md:text-lg lg:text-xl text-gray-600 font-medium max-w-[700px] mx-auto leading-relaxed">
                         Get important updates, track your child's progress, and handle fee payments—quickly and securely—all from EduBreezy's app.
                     </p>
                 </div>
@@ -531,40 +531,41 @@ function BusTrackingSection() {
                     {/* Content - Right Side */}
                     <div className="flex-1 text-center lg:text-left">
                         {/* Badge */}
-                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 border-[#0469ff]/20 bg-[#0469ff]/5 mb-6">
-                            <Bus className="w-4 h-4 text-[#0469ff]" />
-                            <span className="text-sm font-semibold text-[#0469ff]">Live Bus Tracking</span>
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-full border-2 border-[#0469ff]/20 bg-[#0469ff]/5 mb-4 md:mb-6">
+                            <Bus className="w-3.5 h-3.5 md:w-4 md:h-4 text-[#0469ff]" />
+                            <span className="text-xs md:text-sm font-semibold text-[#0469ff]">Live Bus Tracking</span>
                         </div>
 
                         {/* Heading */}
-                        <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a1a2e] mb-4 leading-tight">
+                        <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-[#1a1a2e] mb-4 md:mb-6 leading-tight tracking-tight">
                             Track Your Child's <span className="text-[#0469ff]">School Bus</span> in Real-Time
                         </h2>
 
                         {/* Description */}
-                        <p className="text-lg md:text-xl text-gray-600 mb-8 leading-relaxed">
+                        <p className="text-base md:text-lg lg:text-xl text-gray-600 font-medium mb-6 md:mb-8 leading-relaxed">
                             Know exactly when the bus arrives. Get live location updates, estimated arrival times, and instant notifications for pickup and drop-off.
                         </p>
 
                         {/* Features List */}
-                        <div className="space-y-4 mb-8">
-                            <div className="flex items-center gap-3 justify-center lg:justify-start">
-                                <div className="w-8 h-8 rounded-full bg-[#10B981]/10 flex items-center justify-center">
-                                    <MapPin className="w-4 h-4 text-[#10B981]" />
+                        {/* Features List - Aligned container */}
+                        <div className="w-fit mx-auto lg:mx-0 space-y-4 mb-8">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-full bg-[#10B981]/10 flex items-center justify-center shrink-0">
+                                    <MapPin className="w-5 h-5 text-[#10B981]" />
                                 </div>
-                                <span className="text-gray-700 font-medium">Real-time GPS location tracking</span>
+                                <span className="text-gray-700 font-medium text-lg text-left">Real-time GPS location tracking</span>
                             </div>
-                            <div className="flex items-center gap-3 justify-center lg:justify-start">
-                                <div className="w-8 h-8 rounded-full bg-[#F59E0B]/10 flex items-center justify-center">
-                                    <Bell className="w-4 h-4 text-[#F59E0B]" />
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-full bg-[#F59E0B]/10 flex items-center justify-center shrink-0">
+                                    <Bell className="w-5 h-5 text-[#F59E0B]" />
                                 </div>
-                                <span className="text-gray-700 font-medium">Instant arrival notifications</span>
+                                <span className="text-gray-700 font-medium text-lg text-left">Instant arrival notifications</span>
                             </div>
-                            <div className="flex items-center gap-3 justify-center lg:justify-start">
-                                <div className="w-8 h-8 rounded-full bg-[#8B5CF6]/10 flex items-center justify-center">
-                                    <Clock className="w-4 h-4 text-[#8B5CF6]" />
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-full bg-[#8B5CF6]/10 flex items-center justify-center shrink-0">
+                                    <Clock className="w-5 h-5 text-[#8B5CF6]" />
                                 </div>
-                                <span className="text-gray-700 font-medium">ETA updates & route history</span>
+                                <span className="text-gray-700 font-medium text-lg text-left">ETA updates & route history</span>
                             </div>
                         </div>
 
@@ -726,14 +727,14 @@ function CommunicatingSeamlesslySection() {
                         Communicating Seamlessly
                     </h2>
                    */}
-                    <span className="inline-block bg-[#0569ff]/10 text-[#0569ff] px-4 py-1.5 rounded-full text-sm font-semibold mb-4">
+                    <span className="inline-block bg-[#0569ff]/10 text-[#0569ff] px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-bold uppercase tracking-wider mb-4 md:mb-6">
                         Our Mobile App
                     </span>
-                    <h2 className="text-3xl md:text-4x`l lg:text-5xl font-bold text-[#1a1a2e] leading-tight mb-4">
+                    <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-[#1a1a2e] leading-tight mb-4 md:mb-6 tracking-tight">
                         <Highlighter action="underline" color="black">Modern App</Highlighter> for
-                        <span className="text-[#0569ff]">                 <Highlighter isView={true} action="underline" color="black"> Modern Schools</Highlighter></span>
+                        <span className="text-[#0569ff]"> <Highlighter isView={true} action="underline" color="black">Modern Schools</Highlighter></span>
                     </h2>
-                    <p className="text-base sm:text-lg md:text-xl text-[#666] max-w-2xl mx-auto leading-relaxed">
+                    <p className="text-base md:text-lg lg:text-xl text-gray-600 font-medium max-w-2xl mx-auto leading-relaxed">
                         Beautifully designed, intuitive mobile app that bring schools, parents, director, principal, teachers, and students together on one powerful platform.
                     </p>
                 </div>
@@ -1174,11 +1175,11 @@ function SchoolExplorerSection() {
                                 school.edubreezy.com
                             </div>
 
-                            <h3 className="text-xl md:text-2xl lg:text-3xl font-bold text-[#1a1a2e] mb-3 md:mb-4">
+                            <h3 className="text-3xl md:text-4xl lg:text-5xl font-black text-[#1a1a2e] mb-4 md:mb-6 leading-tight tracking-tight">
                                 Increase Admissions with Proven Strategies
                             </h3>
 
-                            <p className="text-slate-500 text-sm md:text-base mb-6 md:mb-8 leading-relaxed">
+                            <p className="text-base md:text-lg text-slate-600 font-medium mb-6 md:mb-8 leading-relaxed">
                                 Showcase your strengths, receive inquiries, and convert leads into admissions with our school discovery platform.
                             </p>
 
@@ -1236,16 +1237,16 @@ function PartnerTeaser() {
             <div className="max-w-[1200px] mx-auto">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                     <div className="text-center md:text-left">
-                        <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
-                            <span className="inline-flex items-center gap-1.5 bg-[#10B981]/20 text-[#10B981] px-3 py-1 rounded-full text-xs font-semibold">
+                        <div className="flex items-center justify-center md:justify-start gap-2 mb-4 md:mb-6">
+                            <span className="inline-flex items-center gap-1.5 bg-[#10B981]/20 text-[#10B981] px-3 py-1.5 rounded-full text-xs md:text-sm font-semibold">
                                 <Handshake size={14} />
                                 Grow With Us
                             </span>
                         </div>
-                        <h3 className="text-xl md:text-2xl font-bold text-white mb-2">
+                        <h3 className="text-4xl md:text-5xl lg:text-6xl font-black text-white mb-3 md:mb-4 leading-tight tracking-tight">
                             Earn up to <span className="text-[#10B981]">30%</span> recurring commission
                         </h3>
-                        <p className="text-white/70 text-sm md:text-base max-w-lg">
+                        <p className="text-white/90 text-base md:text-lg lg:text-xl font-medium max-w-lg leading-relaxed">
                             Help schools adopt EduBreezy and build a sustainable income. Perfect for teachers, consultants & education agents.
                         </p>
                     </div>
@@ -1269,18 +1270,12 @@ function BentoSection() {
         <section className="py-20 px-5 bg-white">
             <div className="max-w-[1100px] mx-auto">
                 {/* Section header */}
-                <div className="text-center mb-4">
-                    <span className="inline-flex items-center gap-2 text-[#0569ff] text-sm font-medium">
-                        <span className="text-lg">✦</span> Core Features
-                    </span>
-                </div>
-                <h2 className="text-[clamp(2rem,4vw,2.8rem)] font-bold text-[#1a1a2e] text-center mb-4">
-                    Simplifying School Management.
-                </h2>
-                <p className="text-center text-[#666] max-w-[500px] mx-auto mb-[50px] text-base">
-                    Our platform offers a range of features to help educators
-                    and administrators streamline their tasks.
-                </p>
+                <SectionHeading
+                    badge="Core Features"
+                    title="Simplifying School"
+                    highlightedText="Management"
+                    description="Our platform offers a range of features to help educators and administrators streamline their tasks."
+                />
 
                 {/* Bento Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-5">

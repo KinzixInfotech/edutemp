@@ -133,14 +133,14 @@ export default function DownloadAppCTA() {
 
                         {/* Left Content Area: Takes 60% width on large screens */}
                         <div className="lg:w-3/5 p-8 md:p-16 lg:py-24 z-10 text-center lg:text-left">
-                            <span className="inline-block py-1.5 px-4 rounded-full bg-white/10 text-white text-[10px] font-bold uppercase tracking-[0.2em] mb-8 backdrop-blur-md border border-white/20">
+                            <span className="inline-block py-1 px-3 md:py-1.5 md:px-4 rounded-full bg-white/10 text-white text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] mb-6 md:mb-8 backdrop-blur-md border border-white/20">
                                 Mobile Experience
                             </span>
-                            <h2 className="text-4xl md:text-6xl font-black text-white mb-6 leading-[1.1] tracking-tight">
+                            <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-white mb-6 md:mb-8 leading-tight tracking-tight">
                                 Seamless School <br />
                                 <span className="text-blue-200">Management.</span>
                             </h2>
-                            <p className="text-blue-100 text-lg mb-10 max-w-lg mx-auto lg:mx-0 leading-relaxed font-medium opacity-90">
+                            <p className="text-blue-100 text-base md:text-lg lg:text-xl font-medium mb-8 md:mb-10 max-w-lg mx-auto lg:mx-0 leading-relaxed opacity-90">
                                 Access your dashboard, track performance, and stay updated with real-time notifications. Download the EduBreezy app today.
                             </p>
 
