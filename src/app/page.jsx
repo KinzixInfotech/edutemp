@@ -1,11 +1,12 @@
 'use client'
-import React, { useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import React, { useRef, useState, useEffect } from 'react';
+import { AnimatePresence, motion, useScroll, useTransform, useSpring } from 'motion/react';
 import Script from 'next/script';
 
 import {
     CheckCircle, Star, Users, BookOpen, BarChart3,
     Clock, GraduationCap, CreditCard, ArrowRight,
+    ChevronDown,
     TrendingUp, PieChart, Calendar, FileText, Play, XIcon, Check,
     Pencil, BookMarked, Ruler, Calculator, Highlighter as HighlighterIcon, School,
     Home, Bus, Smartphone, MapPin, Plane, Globe, MessageCircle, Laptop, Wifi,
@@ -71,6 +72,7 @@ export default function HomePage() {
             <MarqueeBanner />
             <AboutBriefSection />
             <WebDashboardCTA />
+            <BusTrackingSection />
 
             <FeaturesSection />
             <HowWeWorkSection />
@@ -84,7 +86,6 @@ export default function HomePage() {
             <PricingSection />
 
             {/* Partner Teaser - Grow With Us */}
-            <PartnerTeaser />
             {/* <CommunicatingSeamlesslySection /> */}
             {/* <BentoSection /> */}
             {/* <TestimonialsSection /> */}
@@ -95,6 +96,7 @@ export default function HomePage() {
             <ProductGuideAI />
             {/* </div> */}
             <FinalCTA />
+            <PartnerTeaser />
             {/* <Footer /> */}
         </div>
     );
@@ -110,7 +112,7 @@ function HeroSection() {
         <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-white">
             {/* Interactive Grid Pattern Background */}
             <InteractiveGridPattern
-                className="absolute opacity-80 inset-0 [http://localhost:3000/dashboard/schools/syllabus-managmentmask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,white_40%,transparent_70%)]"
+                className="absolute opacity-80 inset-0 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,white_40%,transparent_70%)]"
                 squares={[60, 60]}
             />
 
@@ -203,7 +205,7 @@ function HeroSection() {
                             </button>
                         </Link>
                         <button
-                            onClick={() => setIsVideoOpen(true)}
+                            // onClick={() => setIsVideoOpen(true)}
                             className="group px-10 hover:shadow-lg py-4 rounded-full font-bold text-lg text-[#0469ff] bg-[#f8f9fb] border transition-all duration-300 flex items-center gap-3"
                         >
                             Watch Demo
@@ -350,15 +352,248 @@ function MarqueeBanner() {
     );
 }
 
+// App Showcase Section - Scroll-based 3D Rotation Animation
+function AppShowcaseSection() {
+    const sectionRef = useRef(null);
+
+    // Track scroll progress within this section
+    const { scrollYProgress } = useScroll({
+        target: sectionRef,
+        offset: ["start end", "end start"]
+    });
+
+    // Transform scroll progress to rotation values
+    // Starts tilted (-35deg on X, 25deg on Y) and rotates to center (0, 0)
+    const rotateX = useTransform(scrollYProgress, [0, 0.5, 1], [35, 0, -10]);
+    const rotateY = useTransform(scrollYProgress, [0, 0.5, 1], [-25, 0, 10]);
+    const scale = useTransform(scrollYProgress, [0, 0.5, 1], [0.8, 1, 0.95]);
+    const opacity = useTransform(scrollYProgress, [0, 0.2, 0.8, 1], [0.3, 1, 1, 0.5]);
+
+    // Apply spring physics for smooth animation
+    const springConfig = { stiffness: 100, damping: 30, restDelta: 0.001 };
+    const smoothRotateX = useSpring(rotateX, springConfig);
+    const smoothRotateY = useSpring(rotateY, springConfig);
+    const smoothScale = useSpring(scale, springConfig);
+
+    return (
+        <section
+            ref={sectionRef}
+            className="relative min-h-[100vh] md:min-h-[120vh] py-20 md:py-32 bg-[#f0f2f5] overflow-hidden"
+        >
+            {/* Subtle gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-b from-white/50 via-transparent to-white/50 pointer-events-none" />
+
+            {/* Decorative blurred circles */}
+            <div className="absolute top-20 left-10 w-[300px] h-[300px] bg-[#0469ff]/5 rounded-full blur-3xl" />
+            <div className="absolute bottom-20 right-10 w-[400px] h-[400px] bg-[#0469ff]/3 rounded-full blur-3xl" />
+
+            <div className="max-w-[1400px] mx-auto px-6 relative z-10">
+                {/* Section Header */}
+                <div className="text-center mb-12 md:mb-20">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 border-gray-300 bg-white mb-6">
+                        <Smartphone className="w-4 h-4 text-gray-600" />
+                        <span className="text-sm font-semibold text-gray-600">Mobile Experience</span>
+                    </div>
+                    <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold text-[#1a1a2e] mb-4">
+                        Designed for <span className="text-[#0469ff]">Modern Parents</span>
+                    </h2>
+                    <p className="text-lg md:text-xl text-gray-600 max-w-[700px] mx-auto">
+                        Get important updates, track your child's progress, and handle fee payments—quickly and securely—all from EduBreezy's app.
+                    </p>
+                </div>
+
+                {/* Phone Mockup with 3D Rotation */}
+                <div className="flex justify-center items-center" style={{ perspective: "1500px" }}>
+                    <motion.div
+                        style={{
+                            rotateX: smoothRotateX,
+                            rotateY: smoothRotateY,
+                            scale: smoothScale,
+                            opacity: opacity,
+                            transformStyle: "preserve-3d"
+                        }}
+                        className="relative"
+                    >
+                        {/* Phone Frame */}
+                        <div className="relative">
+                            {/* Phone Shadow */}
+                            <div
+                                className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-[80%] h-[40px] bg-black/20 blur-2xl rounded-full"
+                                style={{ transform: "translateZ(-50px)" }}
+                            />
+
+                            {/* Phone Device */}
+                            <div
+                                className="relative bg-[#1a1a2e] rounded-[3rem] p-3 md:p-4 shadow-2xl"
+                                style={{
+                                    boxShadow: "0 50px 100px -20px rgba(0,0,0,0.3), 0 30px 60px -30px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)"
+                                }}
+                            >
+                                {/* Dynamic Island */}
+                                <div className="absolute top-6 left-1/2 -translate-x-1/2 w-[100px] h-[28px] bg-black rounded-full z-20" />
+
+                                {/* Screen Content */}
+                                <div className="relative w-[280px] md:w-[320px] lg:w-[380px] rounded-[2.2rem] overflow-hidden bg-white">
+                                    <img
+                                        src="/app-screenshot.png"
+                                        alt="EduBreezy Mobile App"
+                                        className="w-full h-auto object-cover"
+                                    />
+                                </div>
+
+                                {/* Side Buttons */}
+                                <div className="absolute right-[-3px] top-32 w-[3px] h-12 bg-[#2a2a3e] rounded-l" />
+                                <div className="absolute left-[-3px] top-24 w-[3px] h-8 bg-[#2a2a3e] rounded-r" />
+                                <div className="absolute left-[-3px] top-36 w-[3px] h-16 bg-[#2a2a3e] rounded-r" />
+                            </div>
+                        </div>
+
+                        {/* Floating Feature Badges */}
+                        <motion.div
+                            className="absolute -left-16 md:-left-32 top-1/4 bg-white px-4 py-2 rounded-full shadow-lg border border-gray-100"
+                            style={{ transform: "translateZ(50px)" }}
+                            initial={{ opacity: 0, x: -20 }}
+                            whileInView={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.3 }}
+                        >
+                            <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                                <Bell className="w-4 h-4 text-[#0469ff]" />
+                                Real-time Alerts
+                            </span>
+                        </motion.div>
+
+                        <motion.div
+                            className="absolute -right-16 md:-right-36 top-1/3 bg-white px-4 py-2 rounded-full shadow-lg border border-gray-100"
+                            style={{ transform: "translateZ(40px)" }}
+                            initial={{ opacity: 0, x: 20 }}
+                            whileInView={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.5 }}
+                        >
+                            <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                                <CreditCard className="w-4 h-4 text-[#10B981]" />
+                                Easy Payments
+                            </span>
+                        </motion.div>
+
+                        <motion.div
+                            className="absolute -left-12 md:-left-28 bottom-1/4 bg-white px-4 py-2 rounded-full shadow-lg border border-gray-100"
+                            style={{ transform: "translateZ(30px)" }}
+                            initial={{ opacity: 0, x: -20 }}
+                            whileInView={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.7 }}
+                        >
+                            <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                                <BarChart3 className="w-4 h-4 text-[#F59E0B]" />
+                                Progress Tracking
+                            </span>
+                        </motion.div>
+                    </motion.div>
+                </div>
+
+                {/* App Store Buttons */}
+                <div className="flex flex-wrap gap-4 justify-center mt-16">
+                    <a href="#" className="hover:scale-105 transition-transform duration-300 opacity-50 cursor-not-allowed">
+                        <img
+                            src="https://upload.wikimedia.org/wikipedia/commons/3/3c/Download_on_the_App_Store_Badge.svg"
+                            alt="Download on the App Store"
+                            className="h-12 md:h-14"
+                        />
+                    </a>
+                    <a href="#" className="hover:scale-105 transition-transform duration-300">
+                        <img
+                            src="https://upload.wikimedia.org/wikipedia/commons/7/78/Google_Play_Store_badge_EN.svg"
+                            alt="Get it on Google Play"
+                            className="h-12 md:h-14"
+                        />
+                    </a>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+// Bus Tracking Section - Static showcase
+function BusTrackingSection() {
+    return (
+        <section className="py-20 md:py-28 bg-[#f5f7fa]">
+            <div className="max-w-[1400px] mx-auto px-6">
+                <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
+
+                    {/* Phone Image - Left Side */}
+                    <div className="flex-1 flex justify-center lg:justify-center">
+                        <img
+                            src="/app_image.png"
+                            alt="EduBreezy Bus Tracking"
+                            className="w-[300px] md:w-[350px] lg:w-[400px] h-auto"
+                        />
+                    </div>
+
+                    {/* Content - Right Side */}
+                    <div className="flex-1 text-center lg:text-left">
+                        {/* Badge */}
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 border-[#0469ff]/20 bg-[#0469ff]/5 mb-6">
+                            <Bus className="w-4 h-4 text-[#0469ff]" />
+                            <span className="text-sm font-semibold text-[#0469ff]">Live Bus Tracking</span>
+                        </div>
+
+                        {/* Heading */}
+                        <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a1a2e] mb-4 leading-tight">
+                            Track Your Child's <span className="text-[#0469ff]">School Bus</span> in Real-Time
+                        </h2>
+
+                        {/* Description */}
+                        <p className="text-lg md:text-xl text-gray-600 mb-8 leading-relaxed">
+                            Know exactly when the bus arrives. Get live location updates, estimated arrival times, and instant notifications for pickup and drop-off.
+                        </p>
+
+                        {/* Features List */}
+                        <div className="space-y-4 mb-8">
+                            <div className="flex items-center gap-3 justify-center lg:justify-start">
+                                <div className="w-8 h-8 rounded-full bg-[#10B981]/10 flex items-center justify-center">
+                                    <MapPin className="w-4 h-4 text-[#10B981]" />
+                                </div>
+                                <span className="text-gray-700 font-medium">Real-time GPS location tracking</span>
+                            </div>
+                            <div className="flex items-center gap-3 justify-center lg:justify-start">
+                                <div className="w-8 h-8 rounded-full bg-[#F59E0B]/10 flex items-center justify-center">
+                                    <Bell className="w-4 h-4 text-[#F59E0B]" />
+                                </div>
+                                <span className="text-gray-700 font-medium">Instant arrival notifications</span>
+                            </div>
+                            <div className="flex items-center gap-3 justify-center lg:justify-start">
+                                <div className="w-8 h-8 rounded-full bg-[#8B5CF6]/10 flex items-center justify-center">
+                                    <Clock className="w-4 h-4 text-[#8B5CF6]" />
+                                </div>
+                                <span className="text-gray-700 font-medium">ETA updates & route history</span>
+                            </div>
+                        </div>
+
+                        {/* CTA */}
+                        <Link href="/features">
+                            <button className="inline-flex items-center gap-3 px-8 py-4 bg-[#0469ff] text-white font-bold rounded-full hover:bg-[#0358dd] transition-all duration-300 hover:shadow-lg">
+                                Learn More
+                                <ArrowRight className="w-5 h-5" />
+                            </button>
+                        </Link>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+    );
+}
+
 // About Brief Section
 function AboutBriefSection() {
+
     return (
         <section className=" py-16 md:py-24 px-5 relative">
             <div className="max-w-[1200px] mx-auto">
+
                 <p className="text-[#1a1a2e]/80  text-lg md:text-xl lg:text-2xl lg:leading-[2.5rem] leading-[2rem] font-light  text-center ">
                     EduBreezy is a next-generation, AI-powered school management platform that blends
                     powerful technology, intelligent insights, and education-first thinking.
-                    Built with modern UI interfaces for today’s digital era, EduBreezy helps
+                    Built with modern UI interfaces for today's digital era, EduBreezy helps
                     forward-thinking schools streamline operations, make data-driven decisions,
                     engage parents more effectively, and unlock the full potential of smart,
                     future-ready education management.
@@ -409,157 +644,63 @@ function WhyEduBreezySection() {
         {
             icon: Users,
             title: "Parent Login",
-            desc: "Stay connected with your child's progress",
-            color: "#10B981"
+            desc: "Track your child's progress easily",
+            color: "#8B5CF6"
         },
         {
             icon: GraduationCap,
             title: "Teacher Login",
-            desc: "Simplify classroom management & grading",
-            color: "#F59E0B"
+            desc: "Manage classes, attendance & grades",
+            color: "#10B981"
         },
-        {
-            icon: Bus,
-            title: "Bus Driver Login",
-            desc: "Real-time tracking & route optimization",
-            color: "#8B5CF6"
-        },
-        // Additional logins (shown on "Show More")
-
-        {
-            icon: Clipboard,
-            title: "Bus Conductor Login",
-            desc: "Manage bus attendance & pickups",
-            color: "#64748B"
-        },
-        {
-            icon: Library,
-            title: "Librarian Login",
-            desc: "Manage books, issues & returns",
-            color: "#6366F1"
-        },
-
-
     ];
 
-    const visibleApps = showAll ? apps : apps.slice(0, 4);
+    const visibleApps = showAll ? apps : apps.slice(0, 6);
 
     return (
-        <section className="py-24 md:py-32 bg-[#f5f7fa] px-5">
+        <section className="py-20 md:py-28 px-5 bg-[#f5f7fa]">
             <div className="max-w-[1200px] mx-auto">
-                {/* Header - Matching site style */}
+                {/* Section Header */}
                 <SectionHeading
-                    badge="OUR APPS"
+                    badge="ROLE-BASED ACCESS"
                     title="One Platform,"
-                    highlightedText="Every User"
-                    description="One app, multiple logins — for everyone in your school ecosystem."
+                    highlightedText="Multiple Logins"
+                    description="Tailored dashboards for every stakeholder. From directors to students, everyone gets exactly what they need."
                 />
 
-                {/* Apps Grid - Matching FeaturesSection cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-4">
-                    {(showAll ? visibleApps.slice(0, 8) : visibleApps).map((app, index) => {
-                        const IconComponent = app.icon;
-                        return (
+                {/* Apps Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                    {visibleApps.map((app, index) => (
+                        <div
+                            key={index}
+                            className="bg-white rounded-2xl p-6 border border-slate-100 hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300 group cursor-pointer hover:-translate-y-1"
+                        >
                             <div
-                                key={index}
-                                className="group bg-white p-8 rounded-[2rem] border border-slate-100 transition-all duration-300 hover:shadow-[0_20px_50px_-15px_rgba(0,0,0,0.1)] hover:-translate-y-1"
+                                className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110"
+                                style={{ backgroundColor: `${app.color}15` }}
                             >
-                                {/* Icon */}
-                                <div
-                                    className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5 transition-transform duration-300 group-hover:scale-110"
-                                    style={{ backgroundColor: `${app.color}15` }}
-                                >
-                                    <IconComponent
-                                        size={28}
-                                        style={{ color: app.color }}
-                                        strokeWidth={1.5}
-                                    />
-                                </div>
-
-                                <h3 className="text-[#1a1a2e] text-xl font-bold mb-2 group-hover:text-[#0569ff] transition-colors">
-                                    {app.title}
-                                </h3>
-                                <p className="text-slate-500 text-sm leading-relaxed">
-                                    {app.desc}
-                                </p>
+                                <app.icon className="w-6 h-6" style={{ color: app.color }} />
                             </div>
-                        );
-                    })}
+                            <h3 className="text-lg font-bold text-[#1a1a2e] mb-1 group-hover:text-[#0569ff] transition-colors">
+                                {app.title}
+                            </h3>
+                            <p className="text-slate-500 text-sm">{app.desc}</p>
+                        </div>
+                    ))}
                 </div>
 
-                {/* Last 2 cards centered */}
-                {showAll && (
-                    <div className="flex justify-center gap-6 mb-8">
-                        {visibleApps.slice(8).map((app, index) => {
-                            const IconComponent = app.icon;
-                            return (
-                                <div
-                                    key={index}
-                                    className="group bg-white p-8 rounded-[2rem] border border-slate-100 transition-all duration-300 hover:shadow-[0_20px_50px_-15px_rgba(0,0,0,0.1)] hover:-translate-y-1 w-full sm:w-[calc(25%-12px)]"
-                                >
-                                    {/* Icon */}
-                                    <div
-                                        className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5 transition-transform duration-300 group-hover:scale-110"
-                                        style={{ backgroundColor: `${app.color}15` }}
-                                    >
-                                        <IconComponent
-                                            size={28}
-                                            style={{ color: app.color }}
-                                            strokeWidth={1.5}
-                                        />
-                                    </div>
-
-                                    <h3 className="text-[#1a1a2e] text-xl font-bold mb-2 group-hover:text-[#0569ff] transition-colors">
-                                        {app.title}
-                                    </h3>
-                                    <p className="text-slate-500 text-sm leading-relaxed">
-                                        {app.desc}
-                                    </p>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-
                 {/* Show More Button */}
-                {!showAll && (
-                    <div className="text-center mb-16">
+                {apps.length > 6 && (
+                    <div className="text-center mt-8">
                         <button
-                            onClick={() => setShowAll(true)}
-                            className="inline-flex items-center gap-2 px-6 py-3 text-[#0569ff] font-semibold hover:bg-[#0569ff]/5 rounded-full transition-all duration-300"
+                            onClick={() => setShowAll(!showAll)}
+                            className="inline-flex items-center gap-2 px-6 py-3 text-[#0569ff] font-semibold hover:bg-[#0569ff]/5 rounded-full transition-colors"
                         >
-                            Show More Logins
-                            <span className="text-xs bg-[#0569ff]/10 px-2 py-1 rounded-full">+6</span>
+                            {showAll ? 'Show Less' : 'Show More'}
+                            <ChevronDown className={`w-5 h-5 transition-transform ${showAll ? 'rotate-180' : ''}`} />
                         </button>
                     </div>
                 )}
-                {showAll && <div className="mb-16"></div>}
-
-                {/* Bottom CTA */}
-                <div className="text-center">
-                    {/* <p className="text-slate-500 mb-6">
-                        Built by educators. Designed for simplicity.
-                    </p> */}
-                    <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                        <Link href="/schoollogin">
-                            <button className="group w-full flex items-center justify-center px-2 gap-3 bg-[#0166f6] text-white rounded-full text-lg font-semibold cursor-pointer transition-all duration-300 hover:bg-[#0152d9] hover:scale-105 ">
-                                <span className='px-6 py-4'>Get Started Now</span>
-                                <span className='bg-white/20 p-3 rounded-full group-hover:bg-white/30 transition-all'>
-                                    <ArrowRight size={20} strokeWidth={3} color='white' className='transition-transform duration-300 group-hover:-rotate-45' />
-                                </span>
-                            </button>
-                        </Link>
-
-                        <Link href="/contact">
-                            <button className="group w-full flex items-center justify-center px-2 gap-3 border-2 border-gray-300 text-gray-700 bg-white rounded-full text-lg font-semibold cursor-pointer transition-all duration-300 hover:border-gray-400 hover:bg-gray-50 hover:scale-105 ">
-                                <span className='px-6 py-4'>Request a Demo</span>
-                                <span className='bg-gray-200 p-3 rounded-full group-hover:bg-gray-300 transition-all'>
-                                    <ArrowRight size={20} strokeWidth={3} color='black' className='transition-transform duration-300 group-hover:-rotate-45' />
-                                </span>
-                            </button>
-                        </Link>
-                    </div>
-                </div>
             </div>
         </section>
     );
@@ -588,7 +729,7 @@ function CommunicatingSeamlesslySection() {
                     <span className="inline-block bg-[#0569ff]/10 text-[#0569ff] px-4 py-1.5 rounded-full text-sm font-semibold mb-4">
                         Our Mobile App
                     </span>
-                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a1a2e] leading-tight mb-4">
+                    <h2 className="text-3xl md:text-4x`l lg:text-5xl font-bold text-[#1a1a2e] leading-tight mb-4">
                         <Highlighter action="underline" color="black">Modern App</Highlighter> for
                         <span className="text-[#0569ff]">                 <Highlighter isView={true} action="underline" color="black"> Modern Schools</Highlighter></span>
                     </h2>
@@ -824,21 +965,21 @@ function FeaturesSection() {
                         return (
                             <div
                                 key={index}
-                                className="group bg-[#f5f7fa] p-8 rounded-[2rem] border border-slate-100 transition-all duration-300 hover:bg-white hover:shadow-[0_20px_50px_-15px_rgba(0,0,0,0.1)] hover:-translate-y-1"
+                                className="group bg-[#f8fafc] p-8 rounded-2xl border border-slate-200 transition-all duration-300 hover:bg-white hover:shadow-lg hover:border-slate-300 hover:-translate-y-1"
                             >
                                 {/* Icon */}
                                 <div
-                                    className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5 transition-transform duration-300 group-hover:scale-110"
+                                    className="w-14 h-14 rounded-xl flex items-center justify-center mb-5 transition-transform duration-300 group-hover:scale-110"
                                     style={{ backgroundColor: `${feature.color}15` }}
                                 >
                                     <IconComponent
-                                        size={28}
+                                        size={26}
                                         style={{ color: feature.color }}
                                         strokeWidth={1.5}
                                     />
                                 </div>
 
-                                <h3 className="text-[#1a1a2e] text-xl font-bold mb-2 group-hover:text-[#0569ff] transition-colors">
+                                <h3 className="text-[#1a1a2e] text-lg font-bold mb-2">
                                     {feature.title}
                                 </h3>
                                 <p className="text-slate-500 text-sm leading-relaxed">
@@ -852,7 +993,7 @@ function FeaturesSection() {
                 {/* CTA */}
                 <div className="text-center">
                     <Link href="/features">
-                        <button className="inline-flex items-center gap-3 px-8 py-4 bg-[#1a1a2e] text-white font-bold rounded-full hover:bg-black transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+                        <button className="inline-flex items-center gap-3 px-8 py-4 bg-[#0569ff] text-white font-bold rounded-full hover:bg-[#0358dd] transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
                             Explore All Features
                             <ArrowRight size={20} />
                         </button>
@@ -908,7 +1049,7 @@ function HowWeWorkSection() {
     ];
 
     return (
-        <section className="py-24 md:py-32 px-5 bg-[#f5f7fa]">
+        <section className="py-24 md:py-32 px-5 bg-[#f8fafc]">
             <div className="max-w-[1200px] mx-auto">
                 {/* Section Header */}
                 <SectionHeading
@@ -925,29 +1066,29 @@ function HowWeWorkSection() {
                         return (
                             <div
                                 key={index}
-                                className="group bg-white p-8 rounded-[2rem] border border-slate-100 transition-all duration-300 hover:shadow-[0_20px_50px_-15px_rgba(0,0,0,0.1)] hover:-translate-y-1"
+                                className="group bg-white p-8 rounded-2xl border border-slate-200 transition-all duration-300 hover:shadow-lg hover:border-slate-300 hover:-translate-y-1"
                             >
                                 {/* Step Number + Icon */}
                                 <div className="flex items-center gap-4 mb-5">
                                     <div
-                                        className="w-14 h-14 rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
+                                        className="w-14 h-14 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
                                         style={{ backgroundColor: `${step.color}15` }}
                                     >
                                         <IconComponent
-                                            size={28}
+                                            size={26}
                                             style={{ color: step.color }}
                                             strokeWidth={1.5}
                                         />
                                     </div>
                                     <span
-                                        className="text-4xl font-black opacity-20"
-                                        style={{ color: step.color }}
+                                        className="text-3xl font-bold"
+                                        style={{ color: `${step.color}30` }}
                                     >
                                         0{index + 1}
                                     </span>
                                 </div>
 
-                                <h3 className="text-[#1a1a2e] text-xl font-bold mb-2 group-hover:text-[#0569ff] transition-colors">
+                                <h3 className="text-[#1a1a2e] text-lg font-bold mb-2">
                                     {step.title}
                                 </h3>
                                 <p className="text-slate-500 text-sm leading-relaxed">
@@ -965,19 +1106,15 @@ function HowWeWorkSection() {
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                         <Link href="/schoollogin">
-                            <button className="group flex items-center justify-center px-2 gap-3 bg-[#0569ff] text-white rounded-full text-lg font-semibold transition-all duration-300 hover:bg-[#0358dd] hover:scale-105">
-                                <span className="px-6 py-4">Get Started Now</span>
-                                <span className="bg-white/20 p-3 rounded-full group-hover:bg-white/30 transition-all">
-                                    <ArrowRight size={20} strokeWidth={3} color="white" className="transition-transform duration-300 group-hover:-rotate-45" />
-                                </span>
+                            <button className="px-8 py-4 bg-[#0569ff] text-white rounded-full font-semibold transition-all duration-300 hover:bg-[#0358dd] hover:shadow-lg flex items-center gap-2">
+                                Get Started Now
+                                <ArrowRight size={18} />
                             </button>
                         </Link>
                         <Link href="/contact">
-                            <button className="group flex items-center justify-center px-2 gap-3 border-2 border-slate-200 text-slate-700 bg-white rounded-full text-lg font-semibold transition-all duration-300 hover:border-slate-300 hover:bg-slate-50 hover:scale-105">
-                                <span className="px-6 py-4">Request a Demo</span>
-                                <span className="bg-slate-100 p-3 rounded-full group-hover:bg-slate-200 transition-all">
-                                    <ArrowRight size={20} strokeWidth={3} className="text-slate-700 transition-transform duration-300 group-hover:-rotate-45" />
-                                </span>
+                            <button className="px-8 py-4 bg-white text-slate-700 rounded-full font-semibold border border-slate-200 transition-all duration-300 hover:border-slate-300 hover:bg-slate-50 flex items-center gap-2">
+                                Request a Demo
+                                <ArrowRight size={18} />
                             </button>
                         </Link>
                     </div>
@@ -1028,7 +1165,7 @@ function SchoolExplorerSection() {
                 />
 
                 {/* Main Card */}
-                <div className="bg-white rounded-[1.5rem] md:rounded-[2.5rem] border border-slate-100 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.08)] overflow-hidden">
+                <div className="bg-white rounded-[1.5rem] md:rounded-[2.5rem] border-2 border-muted overflow-hidden">
                     <div className="grid grid-cols-1 lg:grid-cols-2">
                         {/* Left - Content */}
                         <div className="p-6 md:p-10 lg:p-16 flex flex-col justify-center">
@@ -1272,33 +1409,33 @@ function PricingSection() {
                 />
 
                 {/* Pricing Card - Full Width with Two Columns */}
-                <div className="bg-[#f5f7fa] rounded-[2.5rem] border border-slate-100 overflow-hidden">
+                <div className="bg-gradient-to-br from-[#0569ff] to-[#0145c4] rounded-[2.5rem] overflow-hidden border-2 border-black">
                     <div className="grid grid-cols-1 lg:grid-cols-2">
-                        {/* Left - Pricing Info */}
+                        {/* Left - Pricing Info (Blue gradient background) */}
                         <div className="p-8 md:p-12 lg:p-16">
                             {/* 30% OFF Badge */}
-                            <span className="inline-flex items-center gap-1.5 bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm font-bold mb-6">
+                            <span className="inline-flex items-center gap-1.5 bg-white/20 text-white px-4 py-2 rounded-full text-sm font-bold mb-6 backdrop-blur-sm border border-white/30">
                                 <Zap className="w-4 h-4" />
                                 30% OFF - Limited Time
                             </span>
 
                             {/* Original Price - Strikethrough */}
                             <div className="mb-2">
-                                <span className="text-slate-400 line-through text-xl">₹15,000</span>
-                                <span className="text-slate-400 text-sm ml-2">per 100 students / year</span>
+                                <span className="text-white/60 line-through text-xl">₹15,000</span>
+                                <span className="text-white/60 text-sm ml-2">per 100 students / year</span>
                             </div>
 
                             {/* Main Price */}
                             <div className="mb-8">
                                 <div className="flex items-baseline gap-3">
-                                    <span className="text-6xl md:text-7xl font-black text-[#1a1a2e]">₹105</span>
+                                    <span className="text-6xl md:text-7xl font-black text-white">₹105</span>
                                     <div className="flex flex-col">
-                                        <span className="text-slate-600 text-lg font-semibold">per student</span>
-                                        <span className="text-slate-400 text-sm">per year</span>
+                                        <span className="text-white/90 text-lg font-semibold">per student</span>
+                                        <span className="text-white/60 text-sm">per year</span>
                                     </div>
                                 </div>
-                                <p className="text-[#0569ff] text-base font-semibold mt-4 flex items-center gap-2">
-                                    <span className="w-2 h-2 bg-[#0569ff] rounded-full animate-pulse"></span>
+                                <p className="text-white text-base font-semibold mt-4 flex items-center gap-2">
+                                    <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
                                     Only ₹8.75 per month, billed yearly
                                 </p>
                             </div>
@@ -1306,20 +1443,20 @@ function PricingSection() {
                             {/* CTA Buttons */}
                             <div className="space-y-3">
                                 <Link href="/pricing" className="block">
-                                    <button className="w-full py-4 bg-[#0569ff] text-white font-bold rounded-full hover:bg-[#0358dd] transition-all duration-300 flex items-center justify-center gap-2 group shadow-lg shadow-[#0569ff]/20">
+                                    <button className="w-full py-4 bg-white text-[#0569ff] font-bold rounded-full hover:bg-white/90 transition-all duration-300 flex items-center justify-center gap-2 group shadow-lg">
                                         Calculate Your Price
                                         <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                                     </button>
                                 </Link>
                                 <Link href="/contact" className="block">
-                                    <button className="w-full py-4 bg-white text-slate-700 font-bold rounded-full border border-slate-200 hover:bg-slate-50 transition-all duration-300">
+                                    <button className="w-full py-4 bg-white/10 text-white font-bold rounded-full border border-white/30 hover:bg-white/20 transition-all duration-300 backdrop-blur-sm">
                                         Talk to Sales
                                     </button>
                                 </Link>
                             </div>
 
                             {/* Note */}
-                            <p className="text-slate-400 text-sm mt-6">
+                            <p className="text-white/60 text-sm mt-6">
                                 💡 Billed annually. Minimum 100 students.
                             </p>
                         </div>

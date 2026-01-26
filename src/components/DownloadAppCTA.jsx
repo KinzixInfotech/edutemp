@@ -111,14 +111,25 @@
 
 
 import React from 'react';
+import { InteractiveGridPattern } from './ui/interactive-grid-pattern';
 
 export default function DownloadAppCTA() {
     return (
         <section className="py-32 overflow-visible bg-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Main Card with grid background - overflow-visible is key for the pop-out effect */}
-                <div className="relative bg-blue-600 rounded-[3rem] grid-bg shadow-[0_30px_60px_-15px_rgba(37,99,235,0.3)] overflow-visible">
-                    <div className="flex flex-col lg:flex-row items-center">
+                <div className="relative bg-blue-600 rounded-[3rem] shadow-[0_30px_60px_-15px_rgba(37,99,235,0.3)] overflow-visible">
+
+                    {/* Interactive Grid Pattern Background */}
+                    <InteractiveGridPattern
+                        width={50}
+                        height={50}
+                        squares={[30, 20]}
+                        className="absolute inset-0 z-0 opacity-30 [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,white_20%,transparent_80%)]"
+                        squaresClassName="stroke-white/20 fill-white/5"
+                    />
+
+                    <div className="flex flex-col lg:flex-row items-center relative z-10">
 
                         {/* Left Content Area: Takes 60% width on large screens */}
                         <div className="lg:w-3/5 p-8 md:p-16 lg:py-24 z-10 text-center lg:text-left">
