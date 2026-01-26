@@ -22,19 +22,18 @@ export default function FinalCTA() {
                 <img
                     src="/child.png"
                     alt="Student"
-                    className="w-[200px] lg:w-[280px] xl:w-[320px] h-auto object-contain opacity-90 hover:opacity-100 transition-opacity"
+                    className="w-[100px] lg:w-[180px] xl:w-[280px] h-auto object-contain"
                 />
             </div>
 
             {/* Right Image - School/Min */}
-            <div className="absolute right-0 bottom-0 z-0 hidden lg:block xl:right-10 animate-in fade-in slide-in-from-right-10 duration-1000 delay-200">
+            <div className="absolute right-0 bottom-0 z-0 hidden lg:block animate-in fade-in slide-in-from-right-10 duration-1000 delay-200">
                 <img
-                    src="/schl_min.png"
+                    src="/chil.png"
                     alt="School Management"
-                    className="w-[200px] lg:w-[300px] xl:w-[350px] h-auto object-contain opacity-90 hover:opacity-100 transition-opacity"
+                    className="w-[250px] lg:w-[450px] xl:w-[390px] h-auto object-contain"
                 />
             </div>
-
             <div className="max-w-4xl mx-auto text-center relative z-10">
                 {/* Badge */}
                 <div className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-full text-gray-700 text-sm font-medium mb-6 border border-gray-200 shadow-sm">
