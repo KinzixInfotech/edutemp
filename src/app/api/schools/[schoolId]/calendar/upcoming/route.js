@@ -12,14 +12,15 @@ export async function GET(req, props) {
         const { searchParams } = new URL(req.url);
         const limit = parseInt(searchParams.get('limit') || '10');
 
-        const now = new Date();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
         const upcomingEvents = await prisma.calendarEvent.findMany({
             where: {
                 schoolId,
                 deletedAt: null,
                 status: { not: 'CANCELLED' },
-                startDate: { gte: now },
+                startDate: { gte: today },
             },
             include: {
                 createdBy: {

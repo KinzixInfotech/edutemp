@@ -22,7 +22,19 @@ export async function GET(req, props) {
                             id: true,
                             name: true,
                             email: true,
-                            profilePicture: true
+                            profilePicture: true,
+                            teacher: {
+                                select: {
+                                    designation: true,
+                                    department: { select: { name: true } }
+                                }
+                            },
+                            nonTeachingStaff: {
+                                select: {
+                                    designation: true,
+                                    department: { select: { name: true } }
+                                }
+                            }
                         }
                     },
                     salaryStructure: {
@@ -157,13 +169,29 @@ export async function GET(req, props) {
                     name: profile.user.name,
                     email: profile.user.email,
                     profilePicture: profile.user.profilePicture,
+
+                    // Employment Details
                     employeeType: profile.employeeType,
                     employmentType: profile.employmentType,
                     joiningDate: profile.joiningDate,
+                    confirmationDate: profile.confirmationDate,
+                    designation: profile.user.teacher?.designation || profile.user.nonTeachingStaff?.designation,
+                    department: profile.user.teacher?.department?.name || profile.user.nonTeachingStaff?.department?.name,
+
+                    // Bank Details (Unmasked for user)
                     bankName: profile.bankName,
-                    accountNumber: profile.accountNumber ? '****' + profile.accountNumber.slice(-4) : null,
+                    bankBranch: profile.bankBranch,
+                    accountNumber: profile.accountNumber,
+                    ifscCode: profile.ifscCode,
+                    accountHolder: profile.accountHolder,
+                    upiId: profile.upiId,
+
+                    // Tax & Statutory
+                    panNumber: profile.panNumber,
                     uanNumber: profile.uanNumber,
-                    panNumber: profile.panNumber ? '****' + profile.panNumber.slice(-4) : null
+                    esiNumber: profile.esiNumber,
+                    taxRegime: profile.taxRegime,
+                    taxDeclarations: profile.taxDeclarations
                 },
                 salaryStructure: profile.salaryStructure,
                 latestPayslip: latestPayrollItem ? {

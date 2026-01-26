@@ -19,8 +19,8 @@ export async function GET(req, props) {
     const search = searchParams.get('search');
 
     try {
-        const cacheKey = generateKey('payroll:employees', {
-            schoolId, page, limit, employeeType, isActive, search
+        const cacheKey = generateKey(`payroll:employees:${schoolId}`, {
+            page, limit, employeeType, isActive, search
         });
 
         const result = await remember(cacheKey, async () => {

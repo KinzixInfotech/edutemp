@@ -16,15 +16,29 @@ export async function POST(req, props) {
 
         // Get all teaching staff
         const teachingStaff = await prisma.teachingStaff.findMany({
-            where: { schoolId, isActive: true },
-            select: { userId: true, dateOfJoining: true }
+            where: {
+                schoolId,
+                user: { status: 'ACTIVE' }
+            },
+            select: {
+                userId: true,
+                user: { select: { createdAt: true } }
+            }
         });
 
         // Get all non-teaching staff
         const nonTeachingStaff = await prisma.nonTeachingStaff.findMany({
-            where: { schoolId, isActive: true },
-            select: { userId: true, dateOfJoining: true }
+            where: {
+                schoolId,
+                user: { status: 'ACTIVE' }
+            },
+            select: {
+                userId: true,
+                user: { select: { createdAt: true } }
+            }
         });
+
+        console.log(`[Sync] Found ${teachingStaff.length} teaching staff and ${nonTeachingStaff.length} non-teaching staff for school ${schoolId}`);
 
         // Get existing payroll profiles
         const existingProfiles = await prisma.employeePayrollProfile.findMany({
@@ -49,7 +63,7 @@ export async function POST(req, props) {
                         userId: staff.userId,
                         employeeType: 'TEACHING',
                         employmentType,
-                        joiningDate: joiningDate ? new Date(joiningDate) : staff.dateOfJoining || new Date(),
+                        joiningDate: joiningDate ? new Date(joiningDate) : staff.user?.createdAt || new Date(),
                         salaryStructureId: defaultSalaryStructureId || null,
                         isActive: true
                     }
@@ -70,7 +84,7 @@ export async function POST(req, props) {
                         userId: staff.userId,
                         employeeType: 'NON_TEACHING',
                         employmentType,
-                        joiningDate: joiningDate ? new Date(joiningDate) : staff.dateOfJoining || new Date(),
+                        joiningDate: joiningDate ? new Date(joiningDate) : staff.user?.createdAt || new Date(),
                         salaryStructureId: defaultSalaryStructureId || null,
                         isActive: true
                     }
