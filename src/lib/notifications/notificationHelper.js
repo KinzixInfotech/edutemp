@@ -2,6 +2,7 @@
 // lib/notifications/notificationHelper.js
 import prisma from "@/lib/prisma";
 import { messaging } from "@/lib/firebase-admin";
+import { Client } from "@upstash/qstash";
 
 /**
  * Send notification to users
@@ -24,7 +25,83 @@ import { messaging } from "@/lib/firebase-admin";
  * @param {boolean} params.sendPush - Send push notification (default: true)
  * @returns {Promise<Object>} - Created notifications
  */
-export async function sendNotification({
+
+// Initialize QStash client
+// Fallback to fetch if SDK fails or env vars missing
+let qstashClient;
+try {
+    if (process.env.QSTASH_URL && process.env.QSTASH_TOKEN) {
+        qstashClient = new Client({
+            baseUrl: "https://qstash-us-east-1.upstash.io",
+            token: process.env.QSTASH_TOKEN,
+        });
+    }
+} catch (e) {
+    console.warn("QStash client init failed", e);
+}
+
+/**
+ * Enqueue notification job to background worker
+ */
+export async function enqueueNotificationJob(payload) {
+    try {
+        const baseUrl = process.env.APP_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://edubreezy.com');
+        const workerUrl = `${baseUrl}/api/workers/notification`;
+
+        console.log('[Notification] Enqueuing job to:', workerUrl);
+
+        // Don't send localhost URLs to QStash cloud (it can't reach them)
+        const isLocal = workerUrl.includes('localhost') || workerUrl.includes('127.0.0.1');
+
+        if (qstashClient && !isLocal) {
+            await qstashClient.publishJSON({
+                url: workerUrl,
+                body: payload,
+                retries: 2,
+            });
+        } else {
+            // Fallback: Post directly if QStash not configured or using localhost
+            console.log('[Notification] Direct worker call (async)', isLocal ? '[Localhost Detected]' : '[No QStash]');
+            fetch(workerUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).catch(e => console.error('Direct worker call failed', e));
+        }
+
+        return { success: true, queued: true };
+    } catch (error) {
+        console.error('Failed to enqueue notification job:', error);
+        // Fallback: Run inline if queue fails (safety net)
+        console.log('[Notification] Falling back to inline processing');
+        return processNotificationJob(payload);
+    }
+}
+
+/**
+ * Send notification to users (Wrapper)
+ * Validates inputs and enqueues background job
+ */
+export async function sendNotification(params) {
+    try {
+        // Validate required fields
+        if (!params.schoolId || !params.title || !params.message) {
+            throw new Error('schoolId, title, and message are required');
+        }
+
+        // Enqueue the heavy lifting
+        return enqueueNotificationJob(params);
+    } catch (error) {
+        console.error('Send notification error:', error);
+        throw error;
+    }
+}
+
+/**
+ * Process notification job (Worker Logic)
+ * Contains the original heavy DB and FCM logic
+ */
+export async function processNotificationJob({
     schoolId,
     title,
     message,
@@ -36,14 +113,18 @@ export async function sendNotification({
     icon = '📢',
     actionUrl = null,
     imageUrl = null,
-    sendPush = true
+    sendPush = true,
+    jobType = null, // New field to distinguish job types
+    ...otherParams // catch-all for bulk params
 }) {
-    try {
-        // Validate required fields
-        if (!schoolId || !title || !message) {
-            throw new Error('schoolId, title, and message are required');
-        }
+    // DISPATCHER: Handle different job types
+    if (jobType === 'BULK_ATTENDANCE') {
+        return processBulkAttendanceJob({ ...otherParams, jobType });
+    }
 
+    // STANDARD NOTIFICATION LOGIC
+    console.log(`[Worker] Processing notification: "${title}" for school ${schoolId}`);
+    try {
         // Get target user IDs based on targeting options
         const targetUserIds = await getTargetUserIds(schoolId, targetOptions);
 
@@ -91,8 +172,9 @@ export async function sendNotification({
             count: notifications.count,
             targetUserIds
         };
+
     } catch (error) {
-        console.error('Send notification error:', error);
+        console.error('[Worker] Process notification error:', error);
         throw error;
     }
 }
@@ -1296,177 +1378,186 @@ export async function notifyFormSubmission({
  * @param {string} params.markedBy - Teacher user ID
  * @param {string} params.className - Class name for notification
  */
-export async function notifyBulkAttendanceMarked({
+export async function processBulkAttendanceJob({
     schoolId,
     attendanceRecords,
     date,
     markedBy,
     className = ''
 }) {
-    // Execute in background - don't block the API response
-    setImmediate(async () => {
-        try {
-            console.log(`[Attendance Notification] Starting for ${attendanceRecords.length} students...`);
-            const startTime = Date.now();
+    try {
+        console.log(`[Worker] Starting Bulk Attendance for ${attendanceRecords.length} students...`);
+        const startTime = Date.now();
 
-            if (!attendanceRecords || attendanceRecords.length === 0) {
-                console.log('[Attendance Notification] No records to process');
-                return;
-            }
+        if (!attendanceRecords || attendanceRecords.length === 0) {
+            return;
+        }
 
-            const dateFormatted = new Date(date).toLocaleDateString('en-IN', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric'
-            });
+        const dateFormatted = new Date(date).toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+        });
 
-            // OPTIMIZATION 1: Batch fetch all parent links in ONE query
-            const studentUserIds = attendanceRecords.map(r => r.userId);
+        // OPTIMIZATION 1: Batch fetch all parent links in ONE query
+        const studentUserIds = attendanceRecords.map(r => r.userId);
 
-            const [parentLinks, studentInfo] = await Promise.all([
-                prisma.studentParentLink.findMany({
-                    where: {
-                        student: {
-                            userId: { in: studentUserIds },
-                            schoolId
-                        },
-                        isActive: true
-                    },
-                    select: {
-                        student: {
-                            select: { userId: true, name: true }
-                        },
-                        parent: {
-                            select: { userId: true }
-                        }
-                    }
-                }),
-                prisma.student.findMany({
-                    where: {
+        const [parentLinks, studentInfo] = await Promise.all([
+            prisma.studentParentLink.findMany({
+                where: {
+                    student: {
                         userId: { in: studentUserIds },
                         schoolId
                     },
-                    select: {
-                        userId: true,
-                        name: true
+                    isActive: true
+                },
+                select: {
+                    student: {
+                        select: { userId: true, name: true }
+                    },
+                    parent: {
+                        select: { userId: true }
                     }
-                })
-            ]);
-
-            // Build student name map
-            const studentNameMap = new Map();
-            studentInfo.forEach(s => studentNameMap.set(s.userId, s.name));
-
-            // Build parent-student relationship map
-            const studentToParents = new Map();
-            parentLinks.forEach(link => {
-                const studentId = link.student.userId;
-                if (!studentToParents.has(studentId)) {
-                    studentToParents.set(studentId, []);
                 }
-                studentToParents.get(studentId).push(link.parent.userId);
+            }),
+            prisma.student.findMany({
+                where: {
+                    userId: { in: studentUserIds },
+                    schoolId
+                },
+                select: {
+                    userId: true,
+                    name: true
+                }
+            })
+        ]);
+
+        // Build student name map
+        const studentNameMap = new Map();
+        studentInfo.forEach(s => studentNameMap.set(s.userId, s.name));
+
+        // Build parent-student relationship map
+        const studentToParents = new Map();
+        parentLinks.forEach(link => {
+            const studentId = link.student.userId;
+            if (!studentToParents.has(studentId)) {
+                studentToParents.set(studentId, []);
+            }
+            studentToParents.get(studentId).push(link.parent.userId);
+        });
+
+        // OPTIMIZATION 2: Group records by status for batch processing
+        const recordsByStatus = attendanceRecords.reduce((acc, record) => {
+            const status = record.status;
+            if (!acc[status]) acc[status] = [];
+            acc[status].push({
+                ...record,
+                studentName: record.studentName || studentNameMap.get(record.userId) || 'Student'
             });
+            return acc;
+        }, {});
 
-            // OPTIMIZATION 2: Group records by status for batch processing
-            const recordsByStatus = attendanceRecords.reduce((acc, record) => {
-                const status = record.status;
-                if (!acc[status]) acc[status] = [];
-                acc[status].push({
-                    ...record,
-                    studentName: record.studentName || studentNameMap.get(record.userId) || 'Student'
+        // OPTIMIZATION 3: Prepare all notifications in memory first
+        const allNotifications = [];
+        const allPushTargets = [];
+
+        for (const [status, records] of Object.entries(recordsByStatus)) {
+            for (const record of records) {
+                const statusEmoji = status === 'PRESENT' ? '✅' : status === 'ABSENT' ? '❌' : '⏰';
+                const statusText = status === 'PRESENT' ? 'present' : status === 'ABSENT' ? 'absent' : 'late';
+
+                // Student notification
+                allNotifications.push({
+                    senderId: markedBy,
+                    receiverId: record.userId,
+                    title: `Attendance Marked ${statusEmoji}`,
+                    message: `You have been marked ${statusText} for ${dateFormatted}${className ? ` in ${className}` : ''}`,
+                    type: 'ATTENDANCE',
+                    priority: status === 'ABSENT' ? 'HIGH' : 'NORMAL',
+                    icon: statusEmoji,
+                    actionUrl: '/attendance',
+                    metadata: JSON.stringify({ status, date }),
+                    isRead: false,
+                    schoolId
                 });
-                return acc;
-            }, {});
+                allPushTargets.push(record.userId);
 
-            // OPTIMIZATION 3: Prepare all notifications in memory first
-            const allNotifications = [];
-            const allPushTargets = [];
-
-            for (const [status, records] of Object.entries(recordsByStatus)) {
-                for (const record of records) {
-                    const statusEmoji = status === 'PRESENT' ? '✅' : status === 'ABSENT' ? '❌' : '⏰';
-                    const statusText = status === 'PRESENT' ? 'present' : status === 'ABSENT' ? 'absent' : 'late';
-
-                    // Student notification
+                // Parent notifications (if any linked)
+                const parentIds = studentToParents.get(record.userId) || [];
+                for (const parentId of parentIds) {
                     allNotifications.push({
                         senderId: markedBy,
-                        receiverId: record.userId,
-                        title: `Attendance Marked ${statusEmoji}`,
-                        message: `You have been marked ${statusText} for ${dateFormatted}${className ? ` in ${className}` : ''}`,
+                        receiverId: parentId,
+                        title: `Attendance: ${record.studentName} ${statusEmoji}`,
+                        message: `${record.studentName} was marked ${statusText} on ${dateFormatted}`,
                         type: 'ATTENDANCE',
                         priority: status === 'ABSENT' ? 'HIGH' : 'NORMAL',
                         icon: statusEmoji,
-                        actionUrl: '/attendance',
-                        metadata: JSON.stringify({ status, date }),
+                        actionUrl: '/child/attendance',
+                        metadata: JSON.stringify({ status, date, studentId: record.userId }),
                         isRead: false,
                         schoolId
                     });
-                    allPushTargets.push(record.userId);
-
-                    // Parent notifications (if any linked)
-                    const parentIds = studentToParents.get(record.userId) || [];
-                    for (const parentId of parentIds) {
-                        allNotifications.push({
-                            senderId: markedBy,
-                            receiverId: parentId,
-                            title: `Attendance: ${record.studentName} ${statusEmoji}`,
-                            message: `${record.studentName} was marked ${statusText} on ${dateFormatted}`,
-                            type: 'ATTENDANCE',
-                            priority: status === 'ABSENT' ? 'HIGH' : 'NORMAL',
-                            icon: statusEmoji,
-                            actionUrl: '/child/attendance',
-                            metadata: JSON.stringify({ status, date, studentId: record.userId }),
-                            isRead: false,
-                            schoolId
-                        });
-                        allPushTargets.push(parentId);
-                    }
+                    allPushTargets.push(parentId);
                 }
             }
-
-            // OPTIMIZATION 4: Batch insert notifications (chunks of 100)
-            const BATCH_SIZE = 100;
-            const notificationBatches = [];
-            for (let i = 0; i < allNotifications.length; i += BATCH_SIZE) {
-                notificationBatches.push(allNotifications.slice(i, i + BATCH_SIZE));
-            }
-
-            // Insert all batches in parallel
-            await Promise.allSettled(
-                notificationBatches.map(batch =>
-                    prisma.notification.createMany({ data: batch })
-                        .catch(err => console.error('[Attendance Notification] Batch insert error:', err))
-                )
-            );
-
-            console.log(`[Attendance Notification] Created ${allNotifications.length} notifications`);
-
-            // OPTIMIZATION 5: Send push notifications in background (non-blocking)
-            const uniquePushTargets = [...new Set(allPushTargets)];
-
-            // Batch push notifications too
-            const pushBatches = [];
-            for (let i = 0; i < uniquePushTargets.length; i += 500) {
-                pushBatches.push(uniquePushTargets.slice(i, i + 500));
-            }
-
-            // Process push batches with Promise.allSettled for resilience
-            for (const batch of pushBatches) {
-                sendPushNotificationsOptimized({
-                    userIds: batch,
-                    title: 'Attendance Update',
-                    message: `Attendance has been marked for ${dateFormatted}`,
-                    data: { type: 'ATTENDANCE', date }
-                }).catch(err => console.error('[Attendance Push] Error:', err));
-            }
-
-            const duration = Date.now() - startTime;
-            console.log(`[Attendance Notification] Completed in ${duration}ms for ${attendanceRecords.length} students, ${allNotifications.length} total notifications`);
-
-        } catch (error) {
-            console.error('[Attendance Notification] Background job error:', error);
-            // Don't throw - this runs in background
         }
+
+        // OPTIMIZATION 4: Batch insert notifications (chunks of 100)
+        const BATCH_SIZE = 100;
+        const notificationBatches = [];
+        for (let i = 0; i < allNotifications.length; i += BATCH_SIZE) {
+            notificationBatches.push(allNotifications.slice(i, i + BATCH_SIZE));
+        }
+
+        // Insert all batches in parallel
+        await Promise.allSettled(
+            notificationBatches.map(batch =>
+                prisma.notification.createMany({ data: batch })
+                    .catch(err => console.error('[Attendance Notification] Batch insert error:', err))
+            )
+        );
+
+        console.log(`[Worker] Created ${allNotifications.length} notifications`);
+
+        // OPTIMIZATION 5: Send push notifications in background (non-blocking)
+        const uniquePushTargets = [...new Set(allPushTargets)];
+
+        // Batch push notifications too
+        const pushBatches = [];
+        for (let i = 0; i < uniquePushTargets.length; i += 500) {
+            pushBatches.push(uniquePushTargets.slice(i, i + 500));
+        }
+
+        // Process push batches with Promise.allSettled for resilience
+        for (const batch of pushBatches) {
+            sendPushNotificationsOptimized({
+                userIds: batch,
+                title: 'Attendance Update',
+                message: `Attendance has been marked for ${dateFormatted}`,
+                data: { type: 'ATTENDANCE', date }
+            }).catch(err => console.error('[Attendance Push] Error:', err));
+        }
+
+        const duration = Date.now() - startTime;
+        console.log(`[Worker] Completed Bulk Attendance in ${duration}ms`);
+        return { success: true, count: allNotifications.length };
+
+    } catch (error) {
+        console.error('[Worker] Bulk attendance error:', error);
+        throw error;
+    }
+}
+
+/**
+ * OPTIMIZED: Notify students and parents when attendance is marked
+ * Uses background queue
+ */
+export async function notifyBulkAttendanceMarked(params) {
+    // Wrap params in a job object to distinguish from standard notifications
+    return enqueueNotificationJob({
+        jobType: 'BULK_ATTENDANCE',
+        ...params
     });
 }
 
