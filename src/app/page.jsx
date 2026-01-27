@@ -73,6 +73,7 @@ export default function HomePage() {
             <AboutBriefSection />
             <WebDashboardCTA />
             <BusTrackingSection />
+            <AttendanceSection />
 
             <FeaturesSection />
             <HowWeWorkSection />
@@ -303,6 +304,125 @@ function HeroSection() {
     );
 }
 
+
+function AttendanceSection() {
+    return (
+        <section className="py-20 md:py-28 bg-white relative overflow-hidden">
+            {/* Background Elements */}
+            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#0469ff]/5 rounded-full blur-3xl" />
+
+            <div className="max-w-[1400px] mx-auto px-6 relative z-10">
+                <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
+
+                    {/* Content - Left Side */}
+                    <div className="flex-1 text-center lg:text-left">
+                        {/* Badge */}
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-full border-2 border-[#0469ff]/20 bg-[#0469ff]/5 mb-6">
+                            <CheckCircle className="w-3.5 h-3.5 md:w-4 md:h-4 text-[#0469ff]" />
+                            <span className="text-xs md:text-sm font-semibold text-[#0469ff]">Smart Attendance</span>
+                        </div>
+
+                        {/* Heading */}
+                        <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-[#1a1a2e] mb-6 leading-tight tracking-tight">
+                            Smart Attendance <br /> <span className="text-[#0469ff]">Made Simple</span>
+                        </h2>
+
+                        {/* Description */}
+                        <p className="text-base md:text-lg lg:text-xl text-gray-600 mb-8 leading-relaxed max-w-xl mx-auto lg:mx-0 font-medium">
+                            Ditch the manual registers. Our AI-powered attendance system ensures 100% accuracy with instant notifications for parents. Track daily presence, leaves, and streaks effortlessly.
+                        </p>
+
+                        {/* Features Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 max-w-lg mx-auto lg:mx-0">
+                            {[
+                                "Fast Response Push to Parent",
+                                "Daily Attendance Automation",
+                                "Instant Leave Management",
+                                "Detailed Monthly Analytics"
+                            ].map((feature, i) => (
+                                <div key={i} className="flex items-center gap-3">
+                                    <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                                        <Check className="w-3 h-3 text-green-600" strokeWidth={3} />
+                                    </div>
+                                    <span className="text-gray-700 font-semibold">{feature}</span>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* CTA Buttons */}
+                        <div className="flex flex-col sm:flex-row items-center lg:items-start gap-4 justify-center lg:justify-start">
+                            <Link href="/features/attendance">
+                                <button className="inline-flex items-center gap-3 px-8 py-4 bg-[#0469ff] text-white font-bold rounded-full hover:bg-[#0358dd] transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+                                    Explore Features
+                                    <ArrowRight className="w-5 h-5" />
+                                </button>
+                            </Link>
+                        </div>
+                    </div>
+                    {/* Phone Image - right Side */}
+                    <div className="flex-1 flex justify-center lg:justify-center relative">
+                        {/* Decorative Ring */}
+                        <div className="absolute inset-0 lg:block hidden border-2 border-[#0469ff]/10 rounded-full scale-110 animate-pulse" />
+
+                        <img
+                            src="/mock_att.png"
+                            alt="EduBreezy Attendance Screen"
+                            className="relative w-[280px] md:w-[340px] lg:w-[380px] h-auto drop-shadow-2xl hover:scale-105 transition-transform duration-500"
+                        />
+
+                        {/* Floating Notification Cards */}
+
+                        {/* Card 1: Attendance Marked */}
+                        <motion.div
+                            animate={{ y: [-10, 10, -10] }}
+                            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 0 }}
+                            className="absolute top-[15%] lg:flex hidden -left-4 md:-left-16 bg-white p-3 md:p-4 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-100 flex items-center -z-2 gap-3"
+                        >
+                            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                                <CheckCircle className="w-5 h-5 text-green-600" />
+                            </div>
+                            <div>
+                                <div className="text-[10px] md:text-xs text-gray-500 font-bold uppercase">Status</div>
+                                <div className="text-sm md:text-base font-bold text-[#1a1a2e] whitespace-nowrap">Marked Present</div>
+                            </div>
+                        </motion.div>
+
+                        {/* Card 2: Parent Alert */}
+                        <motion.div
+                            animate={{ y: [10, -10, 10] }}
+                            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                            className="absolute bottom-[20%] lg:flex hidden -right-4 md:-right-20 bg-white p-3 md:p-4 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-100 flex items-center gap-3 z-20"
+                        >
+                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                                <Bell className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div>
+                                <div className="text-[10px] md:text-xs text-gray-500 font-bold uppercase">Parent Alert</div>
+                                <div className="text-sm md:text-base font-bold text-[#1a1a2e] whitespace-nowrap">Push Sent 🚀</div>
+                            </div>
+                        </motion.div>
+
+                        {/* Card 3: Sync Status */}
+                        <motion.div
+                            animate={{ y: [-8, 8, -8] }}
+                            transition={{ duration: 7, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+                            className="absolute -bottom-6 lg:flex hidden left-12 md:bottom-10 md:left-0 bg-white p-3 md:p-4 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-100 flex items-center gap-3 -z-2"
+                        >
+                            <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
+                                <Zap className="w-5 h-5 text-purple-600" />
+                            </div>
+                            <div>
+                                <div className="text-[10px] md:text-xs text-gray-500 font-bold uppercase">System</div>
+                                <div className="text-sm md:text-base font-bold text-[#1a1a2e] whitespace-nowrap">Sync Complete ⚡</div>
+                            </div>
+                        </motion.div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+    )
+}
 // Marquee Banner Section
 function MarqueeBanner() {
     // JSON-based content for easy editing

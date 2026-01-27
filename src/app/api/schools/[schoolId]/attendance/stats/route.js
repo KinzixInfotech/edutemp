@@ -32,7 +32,7 @@ export async function GET(req, props) {
 
         // For full year data (optimized for parent child attendance view)
         if (fullYear && userId) {
-            const cacheKey = generateKey('attendance:fullYear', {
+            const cacheKey = generateKey('attendance:fullYear:v2', {
                 schoolId,
                 userId,
                 academicYearId: academicYear.id
@@ -40,7 +40,7 @@ export async function GET(req, props) {
 
             const result = await remember(cacheKey, async () => {
                 // Fetch ALL attendance records for the academic year in one query
-                const [allAttendance, allMonthlyStats, studentInfo] = await Promise.all([
+                const [allAttendance, /* ignored */, studentInfo] = await Promise.all([
                     prisma.attendance.findMany({
                         where: {
                             userId,
@@ -62,13 +62,10 @@ export async function GET(req, props) {
                     }),
 
                     // Get all monthly stats for the academic year
-                    prisma.attendanceStats.findMany({
-                        where: {
-                            userId,
-                            academicYearId: academicYear.id
-                        },
-                        orderBy: [{ year: 'asc' }, { month: 'asc' }]
-                    }),
+                    // FIX: Process raw attendance to generate monthly stats instead of relying on AttendanceStats table
+                    // prisma.attendanceStats.findMany({ ... }) - REMOVED
+                    Promise.resolve([]) // Placeholder to keep Promise.all structure
+                    ,
 
                     // Get student info (admission date for calculating from join)
                     prisma.student.findUnique({
@@ -87,21 +84,70 @@ export async function GET(req, props) {
                     ? studentInfo.admissionDate
                     : academicYear.startDate;
 
-                // Aggregate all monthly stats for overall calculation
-                const overallStats = allMonthlyStats.reduce((acc, stat) => ({
-                    totalWorkingDays: acc.totalWorkingDays + (stat.totalWorkingDays || 0),
-                    totalPresent: acc.totalPresent + (stat.totalPresent || 0),
-                    totalAbsent: acc.totalAbsent + (stat.totalAbsent || 0),
-                    totalHalfDay: acc.totalHalfDay + (stat.totalHalfDay || 0),
-                    totalLate: acc.totalLate + (stat.totalLate || 0),
-                    totalLeaves: acc.totalLeaves + (stat.totalLeaves || 0),
-                }), {
+                // Aggregate all monthly stats for overall calculation (Dynamically built now)
+                const overallStats = {
                     totalWorkingDays: 0,
                     totalPresent: 0,
                     totalAbsent: 0,
                     totalHalfDay: 0,
                     totalLate: 0,
                     totalLeaves: 0,
+                };
+
+                // Helper to track stats per month
+                const monthlyAggregates = {};
+
+                // Process all raw records to build both Overall and Monthly stats
+                allAttendance.forEach(record => {
+                    const status = record.status;
+                    const d = new Date(record.date);
+                    const monthKey = `${d.getFullYear()}-${d.getMonth() + 1}`; // "2026-1"
+
+                    // Initialize month entry if new
+                    if (!monthlyAggregates[monthKey]) {
+                        monthlyAggregates[monthKey] = {
+                            month: d.getMonth() + 1,
+                            year: d.getFullYear(),
+                            totalWorkingDays: 0,
+                            totalPresent: 0,
+                            totalAbsent: 0,
+                            totalHalfDay: 0,
+                            totalLate: 0,
+                            totalLeaves: 0,
+                            attendancePercentage: 0
+                        };
+                    }
+
+                    // Increment Overall
+                    // Increment Monthly
+                    const bucket = monthlyAggregates[monthKey];
+                    bucket.totalWorkingDays++;
+                    overallStats.totalWorkingDays++;
+
+                    if (status === 'PRESENT') {
+                        overallStats.totalPresent++;
+                        bucket.totalPresent++;
+                    } else if (status === 'ABSENT') {
+                        overallStats.totalAbsent++;
+                        bucket.totalAbsent++;
+                    } else if (status === 'LATE') {
+                        overallStats.totalLate++;
+                        bucket.totalLate++;
+                    } else if (status === 'HALF_DAY') {
+                        overallStats.totalHalfDay++;
+                        bucket.totalHalfDay++;
+                    } else if (status === 'ON_LEAVE') {
+                        overallStats.totalLeaves++;
+                        bucket.totalLeaves++;
+                    }
+                });
+
+                // Calculate percentages for each month
+                const allMonthlyStats = Object.values(monthlyAggregates).map(stat => {
+                    stat.attendancePercentage = stat.totalWorkingDays > 0
+                        ? ((stat.totalPresent + stat.totalLate + (stat.totalHalfDay * 0.5)) / stat.totalWorkingDays) * 100
+                        : 0;
+                    return stat;
                 });
 
                 // Calculate overall attendance percentage

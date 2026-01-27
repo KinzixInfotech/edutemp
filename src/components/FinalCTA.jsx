@@ -36,7 +36,7 @@ export default function FinalCTA() {
             </div>
             <div className="max-w-4xl mx-auto text-center relative z-10">
                 {/* Badge */}
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-full text-gray-700 text-sm font-medium mb-6 border border-gray-200 shadow-sm">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-full text-gray-700 text-sm font-medium mb-6 bxorder border-gray-200 shadow-sm">
                     <Sparkles className="w-4 h-4 text-[#0166f6]" />
                     <span>Ready to transform your school?</span>
                 </div>
@@ -63,7 +63,7 @@ export default function FinalCTA() {
                     </Link>
 
                     <Link href="/contact">
-                        <button className="group flex items-center justify-center gap-2 px-8 py-3.5 border-2 border-gray-300 text-gray-700 bg-white rounded-full font-semibold transition-all duration-300 hover:border-gray-400 hover:bg-gray-50 hover:scale-105">
+                        <button className="group flex items-center justify-center gap-2 px-8 py-3.5 border-2 border -gray-300 text-gray-700 bg-white rounded-full font-semibold transition-all duration-300 hover:border-gray-400 hover:bg-gray-50 hover:scale-105">
                             Request a Demo
                             <ArrowRight size={18} strokeWidth={2.5} className='transition-transform duration-300 group-hover:translate-x-1' />
                         </button>
