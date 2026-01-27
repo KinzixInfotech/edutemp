@@ -45,7 +45,7 @@ try {
  */
 export async function enqueueNotificationJob(payload) {
     try {
-        const baseUrl = process.env.APP_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://edubreezy.com');
+        const baseUrl = process.env.APP_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://www.edubreezy.com');
         const workerUrl = `${baseUrl}/api/workers/notification`;
 
         console.log('[Notification] Enqueuing job to:', workerUrl);

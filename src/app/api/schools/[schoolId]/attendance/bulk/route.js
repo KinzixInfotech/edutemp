@@ -134,16 +134,80 @@ export async function GET(req, props) {
       });
 
       // Format response
-      const studentsWithAttendance = students.map(student => ({
-        userId: student.userId,
-        name: student.name,
-        admissionNo: student.admissionNo,
-        rollNumber: student.rollNumber,
-        className: student.class?.className,
-        sectionName: student.section?.name,
-        attendance: student.user.attendance[0] || null,
-        isMarked: !!student.user.attendance[0],
+      const studentsWithAttendance = await Promise.all(students.map(async (student) => {
+        // Fetch academic year if not already fetched (optimized to fetch once outside loop ideally, but inside remember it's fine)
+        // Actually, let's fetch academic year once before mapping if possible, but inside `remember` callback
+        // To avoid complexity, we can fetch stats in bulk for all these students.
+
+        return {
+          userId: student.userId,
+          name: student.name,
+          admissionNo: student.admissionNo,
+          rollNumber: student.rollNumber,
+          className: student.class?.className,
+          sectionName: student.section?.name,
+          attendance: student.user.attendance[0] || null,
+          isMarked: !!student.user.attendance[0],
+          attendancePercent: 0,
+        };
       }));
+
+      // Calculate YTD stats from raw Attendance records for accuracy
+      const academicYear = await prisma.academicYear.findFirst({
+        where: { schoolId, isActive: true },
+        select: { id: true, startDate: true, endDate: true }
+      });
+
+      if (academicYear) {
+        const studentIds = students.map(s => s.userId);
+
+        // Count Present/Late/HalfDay for YTD
+        const attendanceCounts = await prisma.attendance.groupBy({
+          by: ['userId', 'status'],
+          where: {
+            userId: { in: studentIds },
+            schoolId,
+            date: {
+              gte: academicYear.startDate,
+              lte: academicYear.endDate
+            }
+          },
+          _count: { id: true }
+        });
+
+        // Count total working days up to now (approximate via school calendar or just max potential days)
+        // For percentage, we ideally need total working days. 
+        // A simple approximation is total attendance records marked for the user.
+        // Assuming attendance is marked every working day.
+
+        const statsMap = new Map();
+
+        // Group counts by user
+        const userCounts = {};
+        attendanceCounts.forEach(record => {
+          if (!userCounts[record.userId]) {
+            userCounts[record.userId] = { present: 0, total: 0 };
+          }
+
+          const count = record._count.id;
+          userCounts[record.userId].total += count;
+
+          if (['PRESENT', 'LATE'].includes(record.status)) {
+            userCounts[record.userId].present += count;
+          } else if (record.status === 'HALF_DAY') {
+            userCounts[record.userId].present += (count * 0.5);
+          }
+        });
+
+        studentsWithAttendance.forEach(s => {
+          const stats = userCounts[s.userId];
+          if (stats && stats.total > 0) {
+            s.attendancePercent = Math.round((stats.present / stats.total) * 100);
+          } else {
+            s.attendancePercent = 0;
+          }
+        });
+      }
 
       return {
         students: studentsWithAttendance,
@@ -461,6 +525,16 @@ export async function POST(req, props) {
         return acc;
       }, {});
 
+      // Delete existing bulk attendance record to prevent duplicates and ensure metadata is fresh
+      await tx.bulkAttendance.deleteMany({
+        where: {
+          schoolId,
+          classId: toInt(classId),
+          ...(sectionId && sectionId !== 'all' ? { sectionId: toInt(sectionId) } : {}),
+          date: attendanceDate
+        }
+      });
+
       await tx.bulkAttendance.create({
         data: {
           schoolId,
@@ -510,6 +584,14 @@ export async function POST(req, props) {
         markedBy,
         className: classInfo?.className || ''
       }).catch(err => console.error('Notification dispatch error:', err));
+    }
+
+    // Invalidate cache to ensure "Marked By" and stats are fresh on next fetch
+    try {
+      await invalidatePattern(`attendance-bulk:${schoolId}:*`);
+      await invalidatePattern(`attendance:stats:${schoolId}:*`);
+    } catch (e) {
+      console.error('Cache invalidation error:', e);
     }
 
     return NextResponse.json({

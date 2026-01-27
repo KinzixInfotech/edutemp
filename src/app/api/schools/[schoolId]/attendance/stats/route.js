@@ -199,16 +199,34 @@ export async function GET(req, props) {
                         dayType: 'WORKING_DAY'
                     }
                 });
+                // Calculate real-time stats from recentAttendance
+                const calculatedStats = recentAttendance.reduce((acc, record) => {
+                    const status = record.status;
+                    if (status === 'PRESENT') acc.totalPresent++;
+                    else if (status === 'ABSENT') acc.totalAbsent++;
+                    else if (status === 'LATE') acc.totalLate++;
+                    else if (status === 'HALF_DAY') acc.totalHalfDay++;
+                    else if (status === 'ON_LEAVE') acc.totalLeaves++;
+                    return acc;
+                }, { totalPresent: 0, totalAbsent: 0, totalLate: 0, totalHalfDay: 0, totalLeaves: 0, totalHolidays: 0 });
+
+                // Use working days from calendar, or fallback to record count if calendar is missing/zero
+                const effectiveWorkingDays = workingDays > 0 ? workingDays : recentAttendance.length;
+
+                const percentage = effectiveWorkingDays > 0
+                    ? ((calculatedStats.totalPresent + calculatedStats.totalLate + (calculatedStats.totalHalfDay * 0.5)) / effectiveWorkingDays) * 100
+                    : 0;
+
                 return {
                     userId,
-                    monthlyStats: monthlyStats || {
-                        totalWorkingDays: workingDays,
-                        totalPresent: 0,
-                        totalAbsent: 0,
-                        totalHalfDay: 0,
-                        totalLate: 0,
-                        totalLeaves: 0,
-                        attendancePercentage: 0
+                    monthlyStats: {
+                        totalWorkingDays: effectiveWorkingDays,
+                        totalPresent: calculatedStats.totalPresent,
+                        totalAbsent: calculatedStats.totalAbsent,
+                        totalHalfDay: calculatedStats.totalHalfDay,
+                        totalLate: calculatedStats.totalLate,
+                        totalLeaves: calculatedStats.totalLeaves,
+                        attendancePercentage: percentage
                     },
                     yearlyStats,
                     yearlyAggregate: yearlyStats.reduce((acc, stat) => ({
@@ -228,7 +246,7 @@ export async function GET(req, props) {
                     }),
                     recentAttendance,
                     streak,
-                    workingDaysInMonth: workingDays
+                    workingDaysInMonth: effectiveWorkingDays
                 };
             }
 
