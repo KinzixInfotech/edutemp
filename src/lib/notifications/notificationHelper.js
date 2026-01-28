@@ -79,6 +79,60 @@ export async function enqueueNotificationJob(payload) {
 }
 
 /**
+ * Enqueue a delayed retry job with exponential backoff
+ * @param {Object} payload - Retry job payload
+ * @param {number} attempt - Current attempt number (1, 2, 3...)
+ * @param {number} maxAttempts - Maximum retry attempts (default: 3)
+ */
+export async function enqueueDelayedRetry(payload, attempt = 1, maxAttempts = 3) {
+    if (attempt > maxAttempts) {
+        console.log(`[Retry] Max attempts (${maxAttempts}) reached, giving up on retry`);
+        return { success: false, reason: 'max_attempts_reached' };
+    }
+
+    try {
+        const baseUrl = process.env.APP_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://www.edubreezy.com');
+        const workerUrl = `${baseUrl}/api/workers/notification`;
+
+        // Exponential backoff: 30s, 2min, 8min
+        const delaySeconds = Math.pow(4, attempt - 1) * 30; // 30, 120, 480 seconds
+
+        console.log(`[Retry] Scheduling retry attempt ${attempt}/${maxAttempts} with ${delaySeconds}s delay`);
+
+        const isLocal = workerUrl.includes('localhost') || workerUrl.includes('127.0.0.1');
+
+        if (qstashClient && !isLocal) {
+            await qstashClient.publishJSON({
+                url: workerUrl,
+                body: {
+                    ...payload,
+                    retryAttempt: attempt,
+                    maxAttempts
+                },
+                delay: delaySeconds, // QStash delay in seconds
+                retries: 1,
+            });
+            console.log(`[Retry] ✅ Queued retry ${attempt} with ${delaySeconds}s delay`);
+        } else {
+            // For localhost, use setTimeout (won't survive server restart)
+            console.log(`[Retry] Using setTimeout for local retry (${delaySeconds}s)`);
+            setTimeout(() => {
+                fetch(workerUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...payload, retryAttempt: attempt, maxAttempts })
+                }).catch(e => console.error('[Retry] Local retry failed', e));
+            }, delaySeconds * 1000);
+        }
+
+        return { success: true, scheduled: true, attempt, delaySeconds };
+    } catch (error) {
+        console.error('[Retry] Failed to schedule retry:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
  * Send notification to users (Wrapper)
  * Validates inputs and enqueues background job
  */
@@ -120,6 +174,14 @@ export async function processNotificationJob({
     // DISPATCHER: Handle different job types
     if (jobType === 'BULK_ATTENDANCE') {
         return processBulkAttendanceJob({ ...otherParams, jobType });
+    }
+
+    if (jobType === 'HPC_ASSESSMENT') {
+        return processHPCAssessmentJob({ ...otherParams, jobType });
+    }
+
+    if (jobType === 'PUSH_RETRY') {
+        return processPushRetryJob({ ...otherParams, jobType });
     }
 
     // STANDARD NOTIFICATION LOGIC
@@ -592,8 +654,18 @@ async function getTargetUserIds(schoolId, targetOptions) {
  * @param {string} params.message - Notification body
  * @param {string} params.imageUrl - Optional image URL (must be HTTPS and publicly accessible)
  * @param {Object} params.data - Additional data payload
+ * @param {number} params.retryAttempt - Current retry attempt (0 = first try)
+ * @param {number} params.maxAttempts - Max retry attempts
  */
-async function sendPushNotifications({ userIds, title, message, imageUrl = null, data = {} }) {
+async function sendPushNotifications({
+    userIds,
+    title,
+    message,
+    imageUrl = null,
+    data = {},
+    retryAttempt = 0,
+    maxAttempts = 3
+}) {
     try {
         // Get FCM tokens for users
         const users = await prisma.user.findMany({
@@ -609,7 +681,7 @@ async function sendPushNotifications({ userIds, title, message, imageUrl = null,
 
         if (tokens.length === 0) {
             console.log('No FCM tokens found for push notification');
-            return;
+            return { success: true, sent: 0, failed: 0 };
         }
 
         // Sanitize data (FCM requires all values to be strings)
@@ -625,10 +697,9 @@ async function sendPushNotifications({ userIds, title, message, imageUrl = null,
         });
 
         // Send to Firebase Cloud Messaging
-        console.log(`Sending push notification to ${tokens.length} devices`);
-        console.log(`Targeting User IDs:`, validUsers.map(u => u.id));
-        console.log(`Payload Title: ${title}`);
-        if (imageUrl) console.log(`Image URL: ${imageUrl}`);
+        const attemptLabel = retryAttempt > 0 ? ` (Retry ${retryAttempt})` : '';
+        console.log(`[Push${attemptLabel}] Sending to ${tokens.length} devices`);
+        console.log(`[Push] Targeting User IDs:`, validUsers.map(u => u.id));
 
         // Build FCM message with optional image support
         const fcmMessage = {
@@ -636,14 +707,14 @@ async function sendPushNotifications({ userIds, title, message, imageUrl = null,
             notification: {
                 title,
                 body: message,
-                ...(imageUrl && { image: imageUrl }), // Standard FCM notification image field
+                ...(imageUrl && { image: imageUrl }),
             },
             data: stringifiedData,
             android: {
                 notification: {
                     channelId: 'default',
                     priority: 'high',
-                    ...(imageUrl && { image: imageUrl }), // Android Big Picture style (use 'image')
+                    ...(imageUrl && { image: imageUrl }),
                 },
             },
             apns: {
@@ -651,12 +722,12 @@ async function sendPushNotifications({ userIds, title, message, imageUrl = null,
                     aps: {
                         sound: 'default',
                         contentAvailable: true,
-                        'mutable-content': 1, // Required for iOS image notifications
+                        'mutable-content': 1,
                     },
                 },
                 ...(imageUrl && {
                     fcm_options: {
-                        image: imageUrl, // iOS image support
+                        image: imageUrl,
                     },
                 }),
             },
@@ -664,37 +735,124 @@ async function sendPushNotifications({ userIds, title, message, imageUrl = null,
 
         const response = await messaging.sendEachForMulticast(fcmMessage);
 
-        console.log(`Sent notification to ${response.successCount} parents (Failed: ${response.failureCount})`);
+        console.log(`[Push${attemptLabel}] Sent: ${response.successCount}, Failed: ${response.failureCount}`);
 
-        // Handle failed tokens (Cleanup invalid tokens)
+        // Track failures by type
+        const invalidTokenUserIds = [];  // Invalid/expired tokens - cleanup
+        const retryableUserIds = [];      // Temporary failures - retry
+
         if (response.failureCount > 0) {
-            const invalidConfigs = [];
             response.responses.forEach((resp, idx) => {
                 if (!resp.success) {
+                    const userId = validUsers[idx].id;
                     const errorCode = resp.error?.code;
                     const errorMsg = resp.error?.message;
-                    console.error(`Token for user ${validUsers[idx].id} failed:`, errorCode || errorMsg);
 
+                    console.error(`[Push] Failed for user ${userId}:`, errorCode || errorMsg);
+
+                    // Categorize the failure
                     if (errorCode === 'messaging/registration-token-not-registered' ||
                         errorCode === 'messaging/invalid-registration-token' ||
                         errorMsg?.includes('NotRegistered')) {
-                        invalidConfigs.push(validUsers[idx].id);
+                        // Invalid token - needs cleanup, don't retry
+                        invalidTokenUserIds.push(userId);
+                    } else if (
+                        errorCode === 'messaging/internal-error' ||
+                        errorCode === 'messaging/server-unavailable' ||
+                        errorCode === 'messaging/quota-exceeded' ||
+                        errorCode === 'messaging/too-many-requests' ||
+                        errorMsg?.includes('timeout') ||
+                        errorMsg?.includes('network')
+                    ) {
+                        // Temporary failure - can retry
+                        retryableUserIds.push(userId);
                     }
+                    // Other errors (invalid payload, etc.) - don't retry
                 }
             });
 
-            if (invalidConfigs.length > 0) {
-                console.log(`Removing ${invalidConfigs.length} invalid/expired tokens...`);
+            // Cleanup invalid tokens
+            if (invalidTokenUserIds.length > 0) {
+                console.log(`[Push] Cleaning up ${invalidTokenUserIds.length} invalid tokens`);
                 await prisma.user.updateMany({
-                    where: { id: { in: invalidConfigs } },
+                    where: { id: { in: invalidTokenUserIds } },
                     data: { fcmToken: null }
                 });
             }
+
+            // Queue retry for temporary failures (if not maxed out)
+            if (retryableUserIds.length > 0 && retryAttempt < maxAttempts) {
+                console.log(`[Push] Queueing retry for ${retryableUserIds.length} failed users`);
+
+                await enqueueDelayedRetry({
+                    jobType: 'PUSH_RETRY',
+                    userIds: retryableUserIds,
+                    title,
+                    message,
+                    imageUrl,
+                    data
+                }, retryAttempt + 1, maxAttempts);
+            } else if (retryableUserIds.length > 0) {
+                console.log(`[Push] Max retries reached, ${retryableUserIds.length} users will not receive push`);
+            }
         }
+
+        return {
+            success: true,
+            sent: response.successCount,
+            failed: response.failureCount,
+            invalidTokens: invalidTokenUserIds.length,
+            retryQueued: retryableUserIds.length
+        };
+
     } catch (error) {
-        console.error('Push notification error:', error);
-        // Don't throw error - push notification failure shouldn't break the flow
+        console.error('[Push] Error:', error);
+
+        // Queue retry on total failure (if not maxed out)
+        if (retryAttempt < maxAttempts) {
+            console.log(`[Push] Total failure, queueing retry for all ${userIds.length} users`);
+            await enqueueDelayedRetry({
+                jobType: 'PUSH_RETRY',
+                userIds,
+                title,
+                message,
+                imageUrl,
+                data
+            }, retryAttempt + 1, maxAttempts);
+        }
+
+        return { success: false, error: error.message };
     }
+}
+
+/**
+ * Process push notification retry job
+ * Called by background worker for retry attempts
+ */
+async function processPushRetryJob({
+    userIds,
+    title,
+    message,
+    imageUrl,
+    data,
+    retryAttempt = 1,
+    maxAttempts = 3
+}) {
+    console.log(`[Worker] Processing PUSH_RETRY for ${userIds?.length || 0} users (attempt ${retryAttempt}/${maxAttempts})`);
+
+    if (!userIds || userIds.length === 0) {
+        return { success: true, message: 'No users to retry' };
+    }
+
+    return sendPushNotifications({
+        userIds,
+        title,
+        message,
+        imageUrl,
+        data,
+        retryAttempt,
+        maxAttempts
+    });
 }
 
 /**
@@ -1845,5 +2003,118 @@ export async function notifyApproachingStop({
     } catch (error) {
         console.error('[Approaching Stop] Notification error:', error);
         // Don't throw - notification failure shouldn't block location tracking
+    }
+}
+
+/**
+ * Notify student and their parents when HPC/SEL assessment is updated by teacher
+ * Uses QStash background worker for processing
+ * @param {Object} params
+ * @param {string} params.schoolId - School ID
+ * @param {string} params.studentId - Student ID (from Student table)
+ * @param {string} params.studentName - Student name
+ * @param {string} params.teacherName - Teacher name who assessed
+ * @param {string} params.teacherId - Teacher user ID (for senderId)
+ * @param {number} params.termNumber - Term number (1 or 2)
+ * @param {number} params.assessmentCount - Number of parameters assessed
+ */
+export async function notifyHPCAssessmentUpdated(params) {
+    console.log(`[HPC Notification] Queueing notification for student ${params.studentId}`);
+
+    // Enqueue to background worker via QStash
+    return enqueueNotificationJob({
+        jobType: 'HPC_ASSESSMENT',
+        ...params
+    });
+}
+
+/**
+ * Process HPC Assessment notification job (Worker Logic)
+ * Called by background worker via QStash
+ */
+export async function processHPCAssessmentJob({
+    schoolId,
+    studentId,
+    studentName,
+    teacherName,
+    teacherId,
+    termNumber,
+    assessmentCount
+}) {
+    try {
+        console.log(`[Worker] Processing HPC Assessment notification for student ${studentId}, term ${termNumber}`);
+
+        // Get student's userId and their parent links
+        const student = await prisma.student.findUnique({
+            where: { id: studentId },
+            select: {
+                userId: true,
+                name: true,
+                studentParentLinks: {
+                    where: { isActive: true },
+                    select: {
+                        parent: {
+                            select: { userId: true }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (!student) {
+            console.log(`[Worker] Student not found: ${studentId}`);
+            return { success: false, reason: 'Student not found' };
+        }
+
+        const studentUserId = student.userId;
+        const finalStudentName = studentName || student.name || 'Student';
+        const parentIds = student.studentParentLinks.map(link => link.parent.userId);
+        const allTargetIds = [studentUserId, ...parentIds];
+
+        const termText = termNumber === 1 ? 'Term 1' : 'Term 2';
+        const title = '📊 Progress Report Updated';
+        const message = `${teacherName || 'Teacher'} has updated ${finalStudentName}'s Holistic Progress Card for ${termText}. ${assessmentCount} areas assessed.`;
+
+        // Create in-app notifications
+        await prisma.notification.createMany({
+            data: allTargetIds.map(userId => ({
+                senderId: teacherId || null,
+                receiverId: userId,
+                title,
+                message,
+                type: 'GENERAL',
+                priority: 'NORMAL',
+                icon: '📊',
+                actionUrl: '/hpc',
+                metadata: JSON.stringify({
+                    studentId,
+                    termNumber,
+                    assessmentCount,
+                    eventType: 'HPC_ASSESSMENT_UPDATED'
+                }),
+                isRead: false,
+                schoolId,
+            }))
+        });
+
+        // Send push notifications
+        await sendPushNotificationsOptimized({
+            userIds: allTargetIds,
+            title,
+            message,
+            data: {
+                type: 'HPC',
+                studentId,
+                termNumber: String(termNumber),
+                eventType: 'HPC_ASSESSMENT_UPDATED'
+            }
+        });
+
+        console.log(`[Worker] ✅ HPC notification sent to student and ${parentIds.length} parent(s) for ${finalStudentName}`);
+        return { success: true, count: allTargetIds.length };
+
+    } catch (error) {
+        console.error('[Worker] HPC Assessment notification error:', error);
+        throw error;
     }
 }

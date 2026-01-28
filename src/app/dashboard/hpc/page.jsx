@@ -27,6 +27,7 @@ import {
     Calendar,
     BarChart3,
     X,
+    UserCheck,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -64,6 +65,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import Link from 'next/link';
 
 // SEL Categories
 const SEL_CATEGORIES = ['Behavioral', 'Cognitive', 'Emotional', 'Social'];
@@ -539,11 +541,12 @@ export default function HPCDashboard() {
 
             {/* Main Tabs */}
             <Tabs defaultValue="competencies" className="space-y-4">
-                <TabsList className="grid bg-[#eef1f3] dark:bg-muted border grid-cols-2 lg:grid-cols-5 gap-1">
+                <TabsList className="grid bg-[#eef1f3] dark:bg-muted border grid-cols-2 lg:grid-cols-6 gap-1">
                     <TabsTrigger value="competencies">Competencies</TabsTrigger>
                     <TabsTrigger value="sel">Behavior & SEL</TabsTrigger>
                     <TabsTrigger value="activities">Activities</TabsTrigger>
                     <TabsTrigger value="terms">Term Control</TabsTrigger>
+                    <TabsTrigger value="teachers">Oversight</TabsTrigger>
                     <TabsTrigger value="reports">Reports</TabsTrigger>
                 </TabsList>
 
@@ -814,66 +817,46 @@ export default function HPCDashboard() {
                         <CardHeader className="border-b">
                             <CardTitle className="flex items-center gap-2">
                                 <BarChart3 className="w-5 h-5" />
-                                HPC Reports & Export
+                                HPC Reports & Analytics
                             </CardTitle>
-                            <CardDescription>Generate and download Holistic Progress Cards</CardDescription>
+                            <CardDescription>Generate reports, preview bulk PDFs, and view class analytics</CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-6 pt-6">
-                            {/* Quick Actions */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <Card className="cursor-pointer hover:shadow-md transition-shadow border-2 border-dashed hover:border-purple-300" onClick={() => toast.info('PDF generation coming soon')}>
-                                    <CardContent className="pt-6 text-center">
-                                        <FileText className="w-10 h-10 mx-auto text-purple-500 mb-3" />
-                                        <h4 className="font-medium">Generate HPC PDF</h4>
-                                        <p className="text-sm text-muted-foreground mt-1">
-                                            Single or bulk generation
-                                        </p>
-                                    </CardContent>
-                                </Card>
+                        <CardContent className="py-8 text-center">
+                            <BarChart3 className="w-16 h-16 mx-auto text-indigo-500 mb-4" />
+                            <h3 className="text-lg font-medium mb-2">HPC Reporting Dashboard</h3>
+                            <p className="text-muted-foreground max-w-md mx-auto mb-6">
+                                Access the dedicated reporting section to generate bulk PDFs, export data, and view class performance analytics.
+                            </p>
+                            <Link href="/dashboard/hpc/reports">
+                                <Button size="lg" className="gap-2">
+                                    Open Reports & Analytics <ChevronRight className="w-4 h-4" />
+                                </Button>
+                            </Link>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
 
-                                <Card className="cursor-pointer hover:shadow-md transition-shadow border-2 border-dashed hover:border-blue-300" onClick={() => toast.info('Export coming soon')}>
-                                    <CardContent className="pt-6 text-center">
-                                        <Download className="w-10 h-10 mx-auto text-blue-500 mb-3" />
-                                        <h4 className="font-medium">Export Data</h4>
-                                        <p className="text-sm text-muted-foreground mt-1">
-                                            Excel/CSV export
-                                        </p>
-                                    </CardContent>
-                                </Card>
-
-                                <Card className="cursor-pointer hover:shadow-md transition-shadow border-2 border-dashed hover:border-green-300" onClick={() => toast.info('Class reports coming soon')}>
-                                    <CardContent className="pt-6 text-center">
-                                        <Users className="w-10 h-10 mx-auto text-green-500 mb-3" />
-                                        <h4 className="font-medium">Class Reports</h4>
-                                        <p className="text-sm text-muted-foreground mt-1">
-                                            Class-wise HPC summary
-                                        </p>
-                                    </CardContent>
-                                </Card>
-                            </div>
-
-                            {/* Parent Portal Settings */}
-                            <div className="p-4 border rounded-lg space-y-4">
-                                <h4 className="font-medium">Parent Portal Visibility</h4>
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <Label>Allow parents to view HPC</Label>
-                                        <p className="text-xs text-muted-foreground">
-                                            Parents can see their child's HPC in the app
-                                        </p>
-                                    </div>
-                                    <Switch defaultChecked />
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <Label>Allow HPC download</Label>
-                                        <p className="text-xs text-muted-foreground">
-                                            Parents can download PDF from the app
-                                        </p>
-                                    </div>
-                                    <Switch defaultChecked />
-                                </div>
-                            </div>
+                {/* Teachers Tab */}
+                <TabsContent value="teachers">
+                    <Card>
+                        <CardHeader className="border-b">
+                            <CardTitle className="flex items-center gap-2">
+                                <UserCheck className="w-5 h-5" />
+                                Teacher Oversight
+                            </CardTitle>
+                            <CardDescription>Monitor grading progress and teacher activity</CardDescription>
+                        </CardHeader>
+                        <CardContent className="py-8 text-center">
+                            <UserCheck className="w-16 h-16 mx-auto text-teal-500 mb-4" />
+                            <h3 className="text-lg font-medium mb-2">Teacher Progress Dashboard</h3>
+                            <p className="text-muted-foreground max-w-md mx-auto mb-6">
+                                Track which teachers have completed their HPC assessments and view entry statistics.
+                            </p>
+                            <Link href="/dashboard/hpc/teachers">
+                                <Button size="lg" className="gap-2">
+                                    Open Oversight Dashboard <ChevronRight className="w-4 h-4" />
+                                </Button>
+                            </Link>
                         </CardContent>
                     </Card>
                 </TabsContent>

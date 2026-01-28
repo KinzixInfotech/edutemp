@@ -134,6 +134,24 @@ export default function HPCCompetenciesPage() {
         },
         onError: () => toast.error('Failed to delete competency'),
     });
+    // Seed competencies mutation
+    const seedMutation = useMutation({
+        mutationFn: async () => {
+            const res = await fetch(`/api/schools/${schoolId}/hpc/competencies/seed`, {
+                method: 'POST',
+            });
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.message || 'Failed to seed competencies');
+            }
+            return res.json();
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries(['hpc-competencies']);
+            toast.success(data.message);
+        },
+        onError: (err) => toast.error(err.message),
+    });
 
     const resetForm = () => {
         setFormData({ name: '', description: '', subjectId: '' });
@@ -205,10 +223,16 @@ export default function HPCCompetenciesPage() {
                         </p>
                     </div>
                 </div>
-                <Button onClick={() => { setEditingCompetency(null); resetForm(); setIsAddDialogOpen(true); }}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Competency
-                </Button>
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => seedMutation.mutate()} disabled={seedMutation.isPending}>
+                        {seedMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                        Load Defaults
+                    </Button>
+                    <Button onClick={() => { setEditingCompetency(null); resetForm(); setIsAddDialogOpen(true); }}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Competency
+                    </Button>
+                </div>
             </div>
 
             {/* Filters */}

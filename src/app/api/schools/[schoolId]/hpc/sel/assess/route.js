@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { notifyHPCAssessmentUpdated } from "@/lib/notifications/notificationHelper";
 
 // GET - Fetch SEL assessments for students
 export async function GET(req, props) {
@@ -94,6 +95,34 @@ export async function POST(req, props) {
                 });
             })
         );
+
+        // Send notification to student and parents (non-blocking)
+        if (assessments.length > 0) {
+            const firstAssessment = assessments[0];
+
+            // Get student and teacher names for notification
+            const [student, teacher] = await Promise.all([
+                prisma.student.findUnique({
+                    where: { userId: firstAssessment.studentId },
+                    select: { name: true }
+                }),
+                prisma.user.findUnique({
+                    where: { id: assessedById },
+                    select: { name: true }
+                })
+            ]);
+
+            // Fire and forget - don't wait for notification
+            notifyHPCAssessmentUpdated({
+                schoolId,
+                studentId: firstAssessment.studentId,
+                studentName: student?.name,
+                teacherName: teacher?.name,
+                teacherId: assessedById,
+                termNumber: firstAssessment.termNumber,
+                assessmentCount: results.length
+            }).catch(err => console.error('[HPC API] Notification error:', err));
+        }
 
         return NextResponse.json({
             message: "SEL assessments recorded successfully",

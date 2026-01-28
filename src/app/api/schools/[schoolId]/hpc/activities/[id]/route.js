@@ -14,7 +14,7 @@ export async function PATCH(req, props) {
 
     try {
         const updated = await prisma.activityCategory.update({
-            where: { id: Number(id) },
+            where: { id },
             data: {
                 ...(name && { name }),
                 ...(description !== undefined && { description }),
@@ -44,11 +44,11 @@ export async function DELETE(req, props) {
         // Soft delete category and its activities
         await prisma.$transaction([
             prisma.activityCategory.update({
-                where: { id: Number(id) },
+                where: { id },
                 data: { isActive: false }
             }),
             prisma.activity.updateMany({
-                where: { categoryId: Number(id) },
+                where: { categoryId: id },
                 data: { isActive: false }
             })
         ]);
