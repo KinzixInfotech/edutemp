@@ -122,8 +122,12 @@ model School {
   subscription    SchoolSubscription?
 
   // School Onboarding
-  onboardingComplete  Boolean @default(false)
-  onboardingDismissed Boolean @default(false)
+  onboardingComplete  Boolean            @default(false)
+  onboardingDismissed Boolean            @default(false)
+  activityCategories  ActivityCategory[]
+  selparameters       SELParameter[]
+  hpcreports          HPCReport[]
+  termLocks           TermLock[]
 
   @@index([name])
 }
@@ -1736,12 +1740,16 @@ model User {
   aiUsageLogs AiUsageLog[]
 
   // Hall Ticket & Attendance Lock Management
-  hallTicketOverrides     AdmitCard[]           @relation("HallTicketOverride")
-  attendanceLocksLocked   AttendanceLock[]      @relation("AttendanceLockedBy")
-  attendanceLocksUnlocked AttendanceLock[]      @relation("AttendanceUnlockedBy")
+  hallTicketOverrides     AdmitCard[]             @relation("HallTicketOverride")
+  attendanceLocksLocked   AttendanceLock[]        @relation("AttendanceLockedBy")
+  attendanceLocksUnlocked AttendanceLock[]        @relation("AttendanceUnlockedBy")
   admitCards              AdmitCard[]
   schoolCarouselImages    SchoolCarouselImage[]
-  uploadedCarouselImages  SchoolCarouselImage[] @relation("UserUploadedCarouselImages")
+  uploadedCarouselImages  SchoolCarouselImage[]   @relation("UserUploadedCarouselImages")
+  competencyAssessments   CompetencyAssessment[]  @relation("CompetencyAssessor")
+  studentActivityRecords  StudentActivityRecord[] @relation("ActivityRecorder")
+  selassessments          SELAssessment[]         @relation("SELAssessor")
+  hpcreports              HPCReport[]             @relation("HPCGenerator")
 
   @@index([schoolId])
   @@index([roleId])
@@ -1880,6 +1888,13 @@ model Student {
   studentTransportFees   StudentTransportFee[]
   busRequests            BusRequest[]
   receipts               Receipt[]
+  competencyAssessments  CompetencyAssessment[]
+  studentActivityRecords StudentActivityRecord[]
+  selassessments         SELAssessment[]
+  studentReflections     StudentReflection[]
+  teacherFeedbacks       TeacherFeedback[]
+  parentFeedbacks        ParentFeedback[]
+  hpcreports             HPCReport[]
 
   @@index([classId])
   @@index([sectionId])
@@ -1926,11 +1941,12 @@ model Parent {
   status    UserStatus @default(ACTIVE)
 
   // Relations
-  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  school       School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  studentLinks StudentParentLink[]
-  busRequests  BusRequest[]
-  receipts     Receipt[]
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school          School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  studentLinks    StudentParentLink[]
+  busRequests     BusRequest[]
+  receipts        Receipt[]
+  parentFeedbacks ParentFeedback[]
 
   @@index([schoolId])
   @@index([contactNumber])
@@ -2075,6 +2091,7 @@ model TeachingStaff {
   examHallInvigilators  ExamHallInvigilator[]
   teacherShifts         TeacherShift[]
   examEvaluators        ExamEvaluator[]         @relation("EvaluatorAssignments")
+  teacherFeedbacks      TeacherFeedback[]
 
   @@index([departmentId])
 }
@@ -2363,6 +2380,7 @@ model Subject {
   teacherShifts         TeacherShift[]
   examEvaluators        ExamEvaluator[]
   examHallInvigilators  ExamHallInvigilator[]
+  competencies          Competency[]
 
   @@index([classId])
   @@index([departmentId])
@@ -2445,15 +2463,16 @@ model Exam {
   subjects        ExamSubject[]
   seatAllocations SeatAllocation[]
 
-  securitySettings Json? // Security settings for online exams (lockScreen, tabMonitoring)
-  duration         Int? // Exam duration in minutes
-  enableTimer      Boolean               @default(false) // Whether to enable timer for this exam[]
-  questions        OnlineExamQuestion[]
-  attempts         StudentExamAttempt[]
-  invigilators     ExamHallInvigilator[]
-  attendance       HallAttendance[]
-  examEvaluators   ExamEvaluator[]
-  marksSubmissions MarksSubmission[]
+  securitySettings      Json? // Security settings for online exams (lockScreen, tabMonitoring)
+  duration              Int? // Exam duration in minutes
+  enableTimer           Boolean                @default(false) // Whether to enable timer for this exam[]
+  questions             OnlineExamQuestion[]
+  attempts              StudentExamAttempt[]
+  invigilators          ExamHallInvigilator[]
+  attendance            HallAttendance[]
+  examEvaluators        ExamEvaluator[]
+  marksSubmissions      MarksSubmission[]
+  competencyAssessments CompetencyAssessment[]
 
   @@index([schoolId])
 }
@@ -2555,21 +2574,21 @@ enum HallTicketStatus {
 }
 
 model AcademicYear {
-  id                     String               @id @default(uuid()) @db.Uuid
+  id                     String                  @id @default(uuid()) @db.Uuid
   name                   String
   startDate              DateTime
   endDate                DateTime
-  isActive               Boolean              @default(false)
+  isActive               Boolean                 @default(false)
   // Setup tracking for year rollover
-  setupComplete          Boolean              @default(false)
-  studentsPromoted       Boolean              @default(false)
-  feesConfigured         Boolean              @default(false)
-  classesConfigured      Boolean              @default(false)
-  timetableConfigured    Boolean              @default(false)
-  subjectsConfigured     Boolean              @default(false)
-  createdAt              DateTime             @default(now())
-  schoolId               String               @db.Uuid
-  school                 School               @relation(fields: [schoolId], references: [id])
+  setupComplete          Boolean                 @default(false)
+  studentsPromoted       Boolean                 @default(false)
+  feesConfigured         Boolean                 @default(false)
+  classesConfigured      Boolean                 @default(false)
+  timetableConfigured    Boolean                 @default(false)
+  subjectsConfigured     Boolean                 @default(false)
+  createdAt              DateTime                @default(now())
+  schoolId               String                  @db.Uuid
+  school                 School                  @relation(fields: [schoolId], references: [id])
   classes                Class[]
   FeePayments            FeePayment[]
   FeeStructures          FeeStructure[]
@@ -2584,9 +2603,17 @@ model AcademicYear {
   attendanceStats        AttendanceStats[]
   exams                  Exam[]
   timetableTemplates     TimetableTemplate[]
-  promotionHistoriesFrom PromotionHistory[]   @relation("PromotionFromYear")
-  promotionHistoriesTo   PromotionHistory[]   @relation("PromotionToYear")
+  promotionHistoriesFrom PromotionHistory[]      @relation("PromotionFromYear")
+  promotionHistoriesTo   PromotionHistory[]      @relation("PromotionToYear")
   transportFees          TransportFee[]
+  competencyAssessments  CompetencyAssessment[]
+  studentActivityRecords StudentActivityRecord[]
+  selassessments         SELAssessment[]
+  studentReflections     StudentReflection[]
+  teacherFeedbacks       TeacherFeedback[]
+  parentFeedbacks        ParentFeedback[]
+  hpcreports             HPCReport[]
+  termLocks              TermLock[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -5675,5 +5702,261 @@ model SchoolCarouselImage {
   user      User?    @relation(fields: [userId], references: [id])
   userId    String?  @db.Uuid
 
+  @@index([schoolId])
+}
+
+// ============================================
+// HPC MODULE - NEP 2020 HOLISTIC PROGRESS CARD
+// ============================================
+
+// Subject Competencies (Academic Assessment Upgrade)
+model Competency {
+  id          String  @id @default(uuid()) @db.Uuid
+  subjectId   Int
+  name        String // "Conceptual Understanding", "Problem Solving"
+  description String?
+  order       Int     @default(0)
+  isActive    Boolean @default(true)
+
+  subject     Subject                @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  assessments CompetencyAssessment[]
+
+  @@unique([subjectId, name])
+  @@index([subjectId])
+}
+
+model CompetencyAssessment {
+  id             String  @id @default(uuid()) @db.Uuid
+  studentId      String  @db.Uuid
+  competencyId   String  @db.Uuid
+  examId         String? @db.Uuid
+  academicYearId String  @db.Uuid
+  termNumber     Int // 1, 2, 3
+
+  grade        String? // A, B, C, D, E or 1-5 scale
+  remarks      String?
+  assessedById String   @db.Uuid
+  assessedAt   DateTime @default(now())
+
+  student      Student      @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  competency   Competency   @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+  exam         Exam?        @relation(fields: [examId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  assessedBy   User         @relation("CompetencyAssessor", fields: [assessedById], references: [id])
+
+  @@unique([studentId, competencyId, academicYearId, termNumber])
+  @@index([studentId])
+  @@index([competencyId])
+  @@index([examId])
+}
+
+// Co-Curricular Activities & Life Skills
+model ActivityCategory {
+  id          String  @id @default(uuid()) @db.Uuid
+  schoolId    String  @db.Uuid
+  name        String // "Sports", "Arts", "Leadership", "Community Service"
+  description String?
+  icon        String?
+  order       Int     @default(0)
+  isActive    Boolean @default(true)
+
+  school     School     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  activities Activity[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+}
+
+model Activity {
+  id          String  @id @default(uuid()) @db.Uuid
+  categoryId  String  @db.Uuid
+  name        String // "Cricket", "Debate", "Art Club"
+  description String?
+  isActive    Boolean @default(true)
+
+  category       ActivityCategory        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  participations StudentActivityRecord[]
+
+  @@index([categoryId])
+}
+
+model StudentActivityRecord {
+  id             String @id @default(uuid()) @db.Uuid
+  studentId      String @db.Uuid
+  activityId     String @db.Uuid
+  academicYearId String @db.Uuid
+  termNumber     Int
+
+  participationRating Int     @default(0) // 1-5 stars
+  consistencyRating   Int     @default(0) // 1-5 stars
+  attitudeRating      Int     @default(0) // 1-5 stars
+  remarks             String?
+  achievements        String? // "Won 1st place in inter-school"
+
+  recordedById String   @db.Uuid
+  recordedAt   DateTime @default(now())
+
+  student      Student      @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  activity     Activity     @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  recordedBy   User         @relation("ActivityRecorder", fields: [recordedById], references: [id])
+
+  @@unique([studentId, activityId, academicYearId, termNumber])
+  @@index([studentId])
+  @@index([activityId])
+}
+
+// Behavior & Social-Emotional Learning (SEL)
+model SELParameter {
+  id          String  @id @default(uuid()) @db.Uuid
+  schoolId    String  @db.Uuid
+  name        String // "Discipline", "Empathy", "Communication"
+  description String?
+  category    String? // "Social", "Emotional", "Behavioral"
+  order       Int     @default(0)
+  isActive    Boolean @default(true)
+
+  school      School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  assessments SELAssessment[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+}
+
+enum SELGrade {
+  NEEDS_IMPROVEMENT
+  DEVELOPING
+  PROFICIENT
+  EXCELLENT
+}
+
+model SELAssessment {
+  id             String @id @default(uuid()) @db.Uuid
+  studentId      String @db.Uuid
+  parameterId    String @db.Uuid
+  academicYearId String @db.Uuid
+  termNumber     Int
+
+  grade   SELGrade
+  remarks String?
+
+  assessedById String   @db.Uuid
+  assessedAt   DateTime @default(now())
+
+  student      Student      @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  parameter    SELParameter @relation(fields: [parameterId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  assessedBy   User         @relation("SELAssessor", fields: [assessedById], references: [id])
+
+  @@unique([studentId, parameterId, academicYearId, termNumber])
+  @@index([studentId])
+  @@index([parameterId])
+}
+
+// Student Self-Reflection
+model StudentReflection {
+  id             String @id @default(uuid()) @db.Uuid
+  studentId      String @db.Uuid
+  academicYearId String @db.Uuid
+  termNumber     Int
+
+  learnedWell     String  @db.Text // "What did you learn well?"
+  foundDifficult  String? @db.Text // "What was difficult?"
+  wantToImprove   String? @db.Text // "What do you want to improve?"
+  favoriteSubject String?
+  goals           String? @db.Text // "Goals for next term"
+
+  submittedAt DateTime @default(now())
+
+  student      Student      @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  @@unique([studentId, academicYearId, termNumber])
+  @@index([studentId])
+}
+
+// Teacher Narrative Feedback
+model TeacherFeedback {
+  id             String @id @default(uuid()) @db.Uuid
+  studentId      String @db.Uuid
+  teacherId      String @db.Uuid
+  academicYearId String @db.Uuid
+  termNumber     Int
+
+  strengths      String  @db.Text // "Key strengths observed"
+  areasToImprove String? @db.Text // "Areas needing improvement"
+  suggestions    String? @db.Text // "Suggested actions"
+  overallRemarks String? @db.Text
+
+  submittedAt DateTime @default(now())
+
+  student      Student       @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  teacher      TeachingStaff @relation(fields: [teacherId], references: [userId])
+  academicYear AcademicYear  @relation(fields: [academicYearId], references: [id])
+
+  @@unique([studentId, teacherId, academicYearId, termNumber])
+  @@index([studentId])
+  @@index([teacherId])
+}
+
+// Parent Feedback (Optional)
+model ParentFeedback {
+  id             String @id @default(uuid()) @db.Uuid
+  studentId      String @db.Uuid
+  parentId       String @db.Uuid
+  academicYearId String @db.Uuid
+  termNumber     Int
+
+  childInterest     String? // "High", "Moderate", "Low"
+  homeParticipation String? // "Active", "Needs Encouragement"
+  observations      String? @db.Text
+  suggestions       String? @db.Text
+
+  submittedAt DateTime @default(now())
+
+  student      Student      @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  parent       Parent       @relation(fields: [parentId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  @@unique([studentId, parentId, academicYearId, termNumber])
+  @@index([studentId])
+  @@index([parentId])
+}
+
+// HPC Generation Record
+model HPCReport {
+  id             String @id @default(uuid()) @db.Uuid
+  studentId      String @db.Uuid
+  academicYearId String @db.Uuid
+  termNumber     Int
+  schoolId       String @db.Uuid
+
+  pdfUrl        String?
+  generatedAt   DateTime @default(now())
+  generatedById String   @db.Uuid
+
+  student      Student      @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  school       School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  generatedBy  User         @relation("HPCGenerator", fields: [generatedById], references: [id])
+
+  @@unique([studentId, academicYearId, termNumber])
+  @@index([studentId])
+  @@index([schoolId])
+}
+
+model TermLock {
+  id             String   @id @default(uuid()) @db.Uuid
+  schoolId       String   @db.Uuid
+  academicYearId String   @db.Uuid
+  termNumber     Int
+  isLocked       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  school       School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, academicYearId, termNumber])
   @@index([schoolId])
 }

@@ -14,7 +14,7 @@ const createPrincipalSchema = z.object({
 // GET - Fetch current principal for the school
 export async function GET(req, { params }) {
     try {
-        const { schoolId } = params;
+        const { schoolId } = await params;
 
         if (!schoolId) {
             return NextResponse.json({ error: "School ID required" }, { status: 400 });
@@ -63,7 +63,7 @@ export async function POST(req, { params }) {
     let createdUserId = null;
 
     try {
-        const { schoolId } = params;
+        const { schoolId } = await params;
         const body = await req.json();
 
         if (!schoolId) {
@@ -116,7 +116,7 @@ export async function POST(req, { params }) {
                     password: parsed.password, // Store for reference (Supabase handles auth)
                     school: { connect: { id: schoolId } },
                     role: { connect: { id: principalRole.id } },
-                    Principal: {
+                    principal: {
                         create: {
                             schoolId: schoolId,
                             joinDate: new Date(),
@@ -124,7 +124,7 @@ export async function POST(req, { params }) {
                     },
                 },
                 include: {
-                    Principal: true,
+                    principal: true,
                 },
             });
 
@@ -135,7 +135,7 @@ export async function POST(req, { params }) {
             success: true,
             message: "Principal created successfully",
             principal: {
-                id: result.Principal.id,
+                id: result.principal.id,
                 userId: result.id,
                 name: result.name,
                 email: result.email,
@@ -171,7 +171,7 @@ export async function POST(req, { params }) {
 // DELETE - Remove existing principal
 export async function DELETE(req, { params }) {
     try {
-        const { schoolId } = params;
+        const { schoolId } = await params;
 
         if (!schoolId) {
             return NextResponse.json({ error: "School ID required" }, { status: 400 });

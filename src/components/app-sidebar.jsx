@@ -597,6 +597,24 @@ export const SidebarData = [
             },
         ],
     },
+    {
+        title: "Holistic Progress Card",
+        items: [
+            {
+                label: "HPC Management",
+                icon: GraduationCap,
+                roles: ["ADMIN"],
+                submenu: [
+                    { label: "Overview", url: "/dashboard/hpc", roles: ["ADMIN"] },
+                    { label: "Competencies", url: "/dashboard/hpc/competencies", roles: ["ADMIN"] },
+                    { label: "SEL Parameters", url: "/dashboard/hpc/sel", roles: ["ADMIN"] },
+                    { label: "Activities", url: "/dashboard/hpc/activities", roles: ["ADMIN"] },
+                    { label: "Term Control", url: "/dashboard/hpc/terms", roles: ["ADMIN"] },
+                    { label: "Reports", url: "/dashboard/hpc/reports", roles: ["ADMIN"] },
+                ],
+            },
+        ],
+    },
 
     {
         title: "Edu Employees",
