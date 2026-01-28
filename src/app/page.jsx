@@ -11,7 +11,7 @@ import {
     Pencil, BookMarked, Ruler, Calculator, Highlighter as HighlighterIcon, School,
     Home, Bus, Smartphone, MapPin, Plane, Globe, MessageCircle, Laptop, Wifi,
     UserPlus, Building2, MessageSquare, Sparkles, Library, Award, Trophy,
-    Microscope, Clipboard, Bell, Zap, ClipboardCheck, FileCheck, Handshake
+    Microscope, Clipboard, Bell, Zap, ClipboardCheck, FileCheck, Handshake, Heart
 } from 'lucide-react';
 import Header from './components/Header';
 import { DotPattern } from '@/components/ui/dot-pattern';
@@ -74,7 +74,7 @@ export default function HomePage() {
             <WebDashboardCTA />
             <BusTrackingSection />
             <AttendanceSection />
-
+            <HPCSection />
             <FeaturesSection />
             <HowWeWorkSection />
 
@@ -727,6 +727,76 @@ function AboutBriefSection() {
     );
 }
 
+// HPC Section - NEP 2020 Compliance
+function HPCSection() {
+    return (
+        <section className="py-20 md:py-28 bg-[#f5f7fa]">
+            <div className="max-w-[1400px] mx-auto px-6">
+                <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
+
+                    {/* Phone Image - Left Side */}
+                    <div className="flex-1 flex justify-center lg:justify-center">
+                        <img
+                            src="/HPC.png"
+                            alt="NEP 2020 Holistic Progress Card"
+                            className="w-[300px] md:w-[350px] lg:w-[400px] h-auto drop-shadow-2xl hover:scale-105 transition-transform duration-500"
+                        />
+                    </div>
+
+                    {/* Content - Right Side */}
+                    <div className="flex-1 text-center lg:text-left">
+                        {/* Badge */}
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-full border-2 border-[#0e66fe]/20 bg-[#0e66fe]/5 mb-4 md:mb-6">
+                            <Sparkles className="w-3.5 h-3.5 md:w-4 md:h-4 text-[#0e66fe]" />
+                            <span className="text-xs md:text-sm font-semibold text-[#0e66fe]">NEP 2020 Compliant</span>
+                        </div>
+
+                        {/* Heading */}
+                        <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-[#1a1a2e] mb-4 md:mb-6 leading-tight tracking-tight">
+                            The Perfect <span className="text-[#0e66fe]">Holistic Progress Card</span> System
+                        </h2>
+
+                        {/* Description */}
+                        <p className="text-base md:text-lg lg:text-xl text-gray-600 font-medium mb-6 md:mb-8 leading-relaxed">
+                            Go beyond just marks. Our 360-degree assessment covers academics, social-emotional learning (SEL), and co-curricular activities, giving you a complete picture of your child's growth.
+                        </p>
+
+                        {/* Features List */}
+                        <div className="w-fit mx-auto lg:mx-0 space-y-4 mb-8">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-full bg-[#EC4899]/10 flex items-center justify-center shrink-0">
+                                    <Heart className="w-5 h-5 text-[#EC4899]" />
+                                </div>
+                                <span className="text-gray-700 font-medium text-lg text-left">Behavior & SEL Tracking</span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-full bg-[#10B981]/10 flex items-center justify-center shrink-0">
+                                    <Users className="w-5 h-5 text-[#10B981]" />
+                                </div>
+                                <span className="text-gray-700 font-medium text-lg text-left">Teacher, Parent & Peer Feedback</span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-full bg-[#F59E0B]/10 flex items-center justify-center shrink-0">
+                                    <Award className="w-5 h-5 text-[#F59E0B]" />
+                                </div>
+                                <span className="text-gray-700 font-medium text-lg text-left">360° Skills Assessment</span>
+                            </div>
+                        </div>
+
+                        {/* CTA */}
+                        <Link href="/features">
+                            <button className="inline-flex items-center gap-3 px-8 py-4 bg-[#0e66fe] text-white font-bold rounded-full hover:bg-[#0b53cb] transition-all duration-300 hover:shadow-lg">
+                                Explore HPC
+                                <ArrowRight className="w-5 h-5" />
+                            </button>
+                        </Link>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+    );
+}
 // Why EduBreezy Section
 function WhyEduBreezySection() {
     const [showAll, setShowAll] = useState(false);
