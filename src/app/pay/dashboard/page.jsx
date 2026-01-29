@@ -8,6 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from "@/components/ui/dialog";
 import { toast } from 'sonner';
 import {
     Loader2,
@@ -100,6 +108,10 @@ export default function PayDashboardPage() {
 
     const [processingPayment, setProcessingPayment] = useState(false);
 
+    // Payment Confirmation State
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [pendingOrder, setPendingOrder] = useState(null);
+
     const handleProceedToCheckout = async () => {
         if (selectedInstallments.length === 0) {
             toast.error('Please select at least one installment to pay');
@@ -144,8 +156,29 @@ export default function PayDashboardPage() {
             }
 
             if (result.success) {
-                // Check payment flow type
-                if (result.type === 'UPI_COLLECT') {
+                // Check for Razorpay Order
+                if (result.type === 'RAZORPAY') {
+                    setPendingOrder({
+                        keyId: result.keyId,
+                        amount: result.order.amount,
+                        currency: result.order.currency,
+                        orderId: result.order.id,
+                        schoolName: school?.name || "School Fees",
+                        description: "Fee Payment",
+                        image: school?.profilePicture || "https://example.com/your_logo",
+                        prefill: {
+                            name: student?.name || "",
+                            email: student?.email || "parent@example.com",
+                            contact: student?.contactNumber || "9999999999"
+                        }
+                    });
+                    setShowConfirmModal(true);
+                    setProcessingPayment(false); // Pause loading while user confirms
+                    return;
+                }
+
+                // Existing ICICI / Redirect Flows
+                else if (result.type === 'UPI_COLLECT') {
                     // UPI Collection Flow (ICICI)
                     toast.success(result.message || 'Payment request sent to your UPI app');
                     console.log('📱 UPI Collection:', result);
@@ -214,6 +247,86 @@ export default function PayDashboardPage() {
             toast.error('An error occurred. Please try again.');
             setProcessingPayment(false);
         }
+    };
+
+    // Proceed to open Razorpay Modal
+    const proceedToRazorpay = () => {
+        if (!pendingOrder) return;
+
+        setShowConfirmModal(false);
+        setProcessingPayment(true);
+
+        const options = {
+            key: pendingOrder.keyId,
+            amount: pendingOrder.amount,
+            currency: pendingOrder.currency,
+            name: pendingOrder.schoolName,
+            description: pendingOrder.description,
+            image: pendingOrder.image,
+            order_id: pendingOrder.orderId,
+            handler: async function (response) {
+                // Verify Payment
+                try {
+                    const verifyRes = await fetch('/api/payment/razorpay/verify', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_signature: response.razorpay_signature,
+                            schoolId: school.id
+                        }),
+                    });
+                    const verifyData = await verifyRes.json();
+                    if (verifyData.success) {
+                        toast.success("Payment Successful!");
+
+                        // Show Receipt details
+                        toast.success(`Receipt Generated: ${verifyData.payment?.receiptNumber || 'N/A'}`, {
+                            description: `Amount: ₹${verifyData.payment?.amount?.toLocaleString()}`,
+                            duration: 5000
+                        });
+
+                        // Reload data or redirect
+                        router.refresh();
+                        // Clear selection
+                        setSelectedInstallments([]);
+                    } else {
+                        toast.error("Payment Verification Failed: " + verifyData.error);
+                    }
+                } catch (err) {
+                    console.error("Verification Error", err);
+                    toast.error("Payment verification failed locally.");
+                }
+                setProcessingPayment(false);
+            },
+            prefill: pendingOrder.prefill,
+            notes: {
+                address: "School Fee Payment"
+            },
+            theme: {
+                color: "#3399cc"
+            },
+            modal: {
+                ondismiss: function () {
+                    setProcessingPayment(false);
+                }
+            }
+        };
+
+        // Lazy load Razorpay
+        const script = document.createElement('script');
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        script.async = true;
+        script.onload = () => {
+            const rzp1 = new window.Razorpay(options);
+            rzp1.on('payment.failed', function (response) {
+                toast.error("Payment Failed: " + response.error.description);
+                setProcessingPayment(false);
+            });
+            rzp1.open();
+        };
+        document.body.appendChild(script);
     };
 
     // Get relative due date text
@@ -966,6 +1079,61 @@ export default function PayDashboardPage() {
                     </p>
                 </div>
             </footer>
+            {/* Confirmation Modal */}
+            <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Confirm Payment</DialogTitle>
+                        <DialogDescription>
+                            Review the details before proceeding with Razorpay.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="flex flex-col items-center gap-4 py-4">
+                        {pendingOrder?.image && (
+                            <img src={pendingOrder.image} alt="School Logo" className="w-16 h-16 rounded-full object-cover border" />
+                        )}
+                        <h3 className="font-semibold text-lg">{pendingOrder?.schoolName}</h3>
+
+                        <div className="w-full space-y-3 mt-2">
+                            <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">Order ID</span>
+                                <span className="font-mono">{pendingOrder?.orderId}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">Student</span>
+                                <span className="font-medium">{pendingOrder?.prefill?.name}</span>
+                            </div>
+                            <Separator />
+                            <div className="flex justify-between items-center">
+                                <span className="font-semibold">Total Amount</span>
+                                <span className="text-xl font-bold text-blue-600">
+                                    ₹{pendingOrder?.amount ? (pendingOrder.amount / 100).toLocaleString() : '0'}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-slate-50 p-2 rounded w-full justify-center">
+                            <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                            Secure payment via Razorpay
+                        </div>
+                    </div>
+
+                    <DialogFooter className="sm:justify-end gap-2">
+                        <Button variant="outline" onClick={() => setShowConfirmModal(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={proceedToRazorpay}
+                            disabled={processingPayment}
+                            className="bg-[#0168fb] hover:bg-[#0855d4]"
+                        >
+                            {processingPayment ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                            Proceed to Pay
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

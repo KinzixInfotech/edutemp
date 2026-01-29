@@ -1,5 +1,6 @@
 import { MockAdapter } from './adapters/MockAdapter';
 import { ICICIAdapter } from './adapters/ICICIAdapter';
+import { RazorpayAdapter } from './adapters/RazorpayAdapter';
 
 import { HDFCAdapter } from './adapters/HDFCAdapter';
 import { AxisAdapter } from './adapters/AxisAdapter';
@@ -7,7 +8,13 @@ import { SBIAdapter } from './adapters/SBIAdapter';
 
 export class PaymentGatewayFactory {
     static getAdapter(provider, config) {
+        // Razorpay handles its own Test/Live mode via keys, so we always use the real adapter
+        if (provider === 'RAZORPAY') {
+            return new RazorpayAdapter(config);
+        }
+
         // If testMode is enabled (default), always use MockAdapter for simulation
+        // (Except for Razorpay as handled above)
         if (config.testMode !== false) {
             return new MockAdapter({ ...config, provider });
         }

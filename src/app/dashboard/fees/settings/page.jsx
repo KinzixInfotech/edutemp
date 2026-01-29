@@ -1093,81 +1093,119 @@ export default function FeeSettings() {
                                         }}>
                                             <SelectTrigger><SelectValue /></SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="ICICI_EAZYPAY">ICICI Eazypay</SelectItem>
+                                                <SelectItem value="ICICI_EAZYPAY">ICICI Eazypay (UPI/Cards)</SelectItem>
+                                                <SelectItem value="RAZORPAY">Razorpay (All Modes)</SelectItem>
                                                 {/* Other banks - Coming soon */}
                                                 {/* <SelectItem value="SBI_COLLECT">SBI Collect</SelectItem> */}
-                                                {/* <SelectItem value="HDFC_SMARTHUB">HDFC SmartHub</SelectItem> */}
-                                                {/* <SelectItem value="AXIS_EASYPAY">Axis EasyPay</SelectItem> */}
                                             </SelectContent>
                                         </Select>
                                         <p className="text-xs text-muted-foreground mt-1 text-blue-600 flex items-center gap-1">
                                             <ShieldCheck className="w-3 h-3" />
-                                            This gateway is provided by your bank and settles payments directly into the school’s account.
+                                            Select the payment gateway provider associated with your school account.
                                         </p>
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 border rounded-xl bg-slate-50 dark:bg-slate-900/50">
-                                        {activeFields.merchantId && (
-                                            <div className="space-y-2">
-                                                <Label>{activeFields.labels.merchantId || 'Merchant ID'}</Label>
-                                                <Input
-                                                    value={merchantId}
-                                                    onChange={e => { setMerchantId(e.target.value); setVerificationStatus(null); }}
-                                                    placeholder="Enter ID provided by bank"
-                                                />
-                                            </div>
-                                        )}
-
-                                        {activeFields.secretKey && (
-                                            <div className="space-y-2">
-                                                <Label>{activeFields.labels.secretKey || 'Secret Key'}</Label>
-                                                <div className="relative">
+                                        {/* Dynamic Fields based on Provider */}
+                                        {paymentGateway === 'RAZORPAY' ? (
+                                            <>
+                                                <div className="space-y-2">
+                                                    <Label>Razorpay Key ID</Label>
                                                     <Input
-                                                        value={secretKey}
-                                                        onChange={e => { setSecretKey(e.target.value); setVerificationStatus(null); }}
-                                                        type={showSecrets ? "text" : "password"}
-                                                        placeholder="••••••••••••••••"
+                                                        value={merchantId} // Reuse merchantId for Key ID
+                                                        onChange={e => { setMerchantId(e.target.value); setVerificationStatus(null); }}
+                                                        placeholder="rzp_test_..."
                                                     />
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 text-gray-400"
-                                                        onClick={() => setShowSecrets(!showSecrets)}
-                                                    >
-                                                        {showSecrets ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                                    </Button>
+                                                    <p className="text-xs text-muted-foreground">Found in Razorpay Dashboard &rarr; Settings &rarr; API Keys</p>
                                                 </div>
-                                            </div>
-                                        )}
 
-                                        {activeFields.workingKey && (
-                                            <div className="space-y-2">
-                                                <Label>{activeFields.labels.workingKey || 'Working Key'}</Label>
-                                                <div className="relative">
-                                                    <Input
-                                                        value={workingKey}
-                                                        onChange={e => { setWorkingKey(e.target.value); setVerificationStatus(null); }}
-                                                        type={showSecrets ? "text" : "password"}
-                                                    />
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 text-gray-400"
-                                                        onClick={() => setShowSecrets(!showSecrets)}
-                                                    >
-                                                        {showSecrets ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                                    </Button>
+                                                <div className="space-y-2">
+                                                    <Label>Razorpay Key Secret</Label>
+                                                    <div className="relative">
+                                                        <Input
+                                                            value={secretKey} // Reuse secretKey for Key Secret
+                                                            onChange={e => { setSecretKey(e.target.value); setVerificationStatus(null); }}
+                                                            type={showSecrets ? "text" : "password"}
+                                                            placeholder="••••••••••••••••"
+                                                        />
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 text-gray-400"
+                                                            onClick={() => setShowSecrets(!showSecrets)}
+                                                        >
+                                                            {showSecrets ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                        </Button>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        )}
+                                            </>
+                                        ) : (
+                                            /* Existing ICICI/Other fields logic */
+                                            <>
+                                                {activeFields.merchantId && (
+                                                    <div className="space-y-2">
+                                                        <Label>{activeFields.labels.merchantId || 'Merchant ID'}</Label>
+                                                        <Input
+                                                            value={merchantId}
+                                                            onChange={e => { setMerchantId(e.target.value); setVerificationStatus(null); }}
+                                                            placeholder="Enter ID provided by bank"
+                                                        />
+                                                    </div>
+                                                )}
 
-                                        {activeFields.accessCode && (
-                                            <div className="space-y-2">
-                                                <Label>Access Code</Label>
-                                                <Input value={accessCode} onChange={e => setAccessCode(e.target.value)} />
-                                            </div>
+                                                {activeFields.secretKey && (
+                                                    <div className="space-y-2">
+                                                        <Label>{activeFields.labels.secretKey || 'Secret Key'}</Label>
+                                                        <div className="relative">
+                                                            <Input
+                                                                value={secretKey}
+                                                                onChange={e => { setSecretKey(e.target.value); setVerificationStatus(null); }}
+                                                                type={showSecrets ? "text" : "password"}
+                                                                placeholder="••••••••••••••••"
+                                                            />
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 text-gray-400"
+                                                                onClick={() => setShowSecrets(!showSecrets)}
+                                                            >
+                                                                {showSecrets ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {activeFields.workingKey && (
+                                                    <div className="space-y-2">
+                                                        <Label>{activeFields.labels.workingKey || 'Working Key'}</Label>
+                                                        <div className="relative">
+                                                            <Input
+                                                                value={workingKey}
+                                                                onChange={e => { setWorkingKey(e.target.value); setVerificationStatus(null); }}
+                                                                type={showSecrets ? "text" : "password"}
+                                                            />
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 text-gray-400"
+                                                                onClick={() => setShowSecrets(!showSecrets)}
+                                                            >
+                                                                {showSecrets ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {activeFields.accessCode && (
+                                                    <div className="space-y-2">
+                                                        <Label>Access Code</Label>
+                                                        <Input value={accessCode} onChange={e => setAccessCode(e.target.value)} />
+                                                    </div>
+                                                )}
+                                            </>
                                         )}
                                     </div>
 

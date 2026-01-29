@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { sendNotification } from '@/lib/notifications/notificationHelper';
 
 // GET - Fetch student reflections
 export async function GET(req, props) {
@@ -52,9 +53,14 @@ export async function POST(req, props) {
     }
 
     try {
-        // Verify student belongs to school
+        // Verify student belongs to school and get teacher info for notification
         const student = await prisma.student.findFirst({
-            where: { userId: studentId, schoolId }
+            where: { userId: studentId, schoolId },
+            include: {
+                user: { select: { name: true } },
+                class: { select: { teachingStaffUserId: true, name: true } },
+                section: { select: { teachingStaffUserId: true, name: true } }
+            }
         });
 
         if (!student) {
@@ -91,6 +97,37 @@ export async function POST(req, props) {
                 goals: goals || null
             }
         });
+
+        // Send Notification to Class Teacher
+        try {
+            // Prioritize Section Teacher, then Class Teacher
+            const teacherUserId = student.section?.teachingStaffUserId || student.class?.teachingStaffUserId;
+            const studentName = student.user?.name || 'Student';
+            const className = `${student.class?.name || ''} ${student.section?.name || ''}`.trim();
+
+            if (teacherUserId) {
+                await sendNotification({
+                    schoolId,
+                    title: `New Student Reflection`,
+                    message: `${studentName} (${className}) has submitted their self-reflection.`,
+                    type: 'HPC_REFLECTION',
+                    priority: 'HIGH',
+                    targetOptions: {
+                        userIds: [teacherUserId]
+                    },
+                    senderId: studentId,
+                    metadata: {
+                        studentId,
+                        termNumber,
+                        feedbackType: 'STUDENT'
+                    },
+                    actionUrl: `/hpc/teacher-narrative?studentId=${studentId}&termNumber=${termNumber}`
+                });
+            }
+        } catch (notifError) {
+            console.error('Failed to send teacher notification:', notifError);
+            // Don't fail the request if notification fails
+        }
 
         return NextResponse.json({
             message: "Reflection submitted successfully",

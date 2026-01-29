@@ -67,11 +67,29 @@ export async function POST(req) {
             email: "parent@example.com", // Fetch if needed
             phone: "9999999999", // Fetch if needed
             upiId: body.upiId, // For ICICI UPI collection
-            returnUrl: returnUrl
+            returnUrl: returnUrl,
+            studentId,
+            schoolId
         });
 
         // Check if this is a redirect-based flow (old adapters) or API-based flow (ICICI)
-        if (result.type === 'UPI_COLLECT') {
+        if (result.type === 'RAZORPAY') {
+
+            // CRITICAL FIX: Update the internal 'ORD_...' with the actual Razorpay Order ID ('order_...')
+            // This ensures the verify route (which looks up by razorpay_order_id) can find the record.
+            await prisma.feePayment.update({
+                where: { id: payment.id },
+                data: { gatewayOrderId: result.order.id }
+            });
+
+            return NextResponse.json({
+                success: true,
+                type: 'RAZORPAY',
+                order: result.order,
+                keyId: result.keyId,
+                orderId: orderId
+            });
+        } else if (result.type === 'UPI_COLLECT') {
             // UPI Collection Flow (ICICI Collect Pay)
             // Payment request sent to UPI app, no browser redirect needed
             return NextResponse.json({

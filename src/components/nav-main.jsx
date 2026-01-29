@@ -166,6 +166,9 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                             {item.label === "Manage Library" && unseenRequestsCount > 0 && (
                                                                 <span className="absolute top-1 right-1 h-2 w-2 bg-yellow-500 rounded-full" />
                                                             )}
+                                                            {item.showNew && (
+                                                                <span className="absolute top-0 right-0 h-2 w-2 bg-purple-500 rounded-full" />
+                                                            )}
                                                         </SidebarMenuButton>
                                                     </SidebarMenuItem>
                                                 </TooltipTrigger>
@@ -208,6 +211,9 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                         <div className="flex items-center gap-2">
                                                             {item.icon && <item.icon className="w-4 h-4" />}
                                                             <span>{item.label}</span>
+                                                            {item.showNew && (
+                                                                <span className="px-1.5 py-0.5 text-[10px] bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 rounded-md font-bold ml-1">NEW</span>
+                                                            )}
                                                             {/* Yellow dot indicator for library requests */}
                                                             {item.label === "Manage Library" && unseenRequestsCount > 0 && (
                                                                 <span className="h-2 w-2 bg-yellow-500 rounded-full ml-1" />
@@ -239,6 +245,9 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                                         <div className="flex items-center gap-2">
                                                                             {sub.icon && <sub.icon className="w-4 h-4" />}
                                                                             <span className="">{sub.label}</span>
+                                                                            {sub.showNew && (
+                                                                                <span className="px-1.5 py-0.5 text-[10px] bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 rounded-md font-bold">NEW</span>
+                                                                            )}
                                                                         </div>
                                                                         {/* Modern circular badge for Book Requests */}
                                                                         {sub.label === "Book Requests" && unseenRequestsCount > 0 && (
@@ -280,6 +289,9 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                                     <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                                                                 </span>
                                                             )}
+                                                            {item.showNew && (
+                                                                <span className="absolute top-0 right-0 h-2 w-2 bg-purple-500 rounded-full" />
+                                                            )}
                                                         </Link>
                                                     </SidebarMenuButton>
                                                 </SidebarMenuItem>
@@ -311,6 +323,9 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                                             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                                                         </span>
+                                                    )}
+                                                    {item.showNew && (
+                                                        <span className="px-1.5 py-0.5 text-[10px] bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 rounded-md font-bold">NEW</span>
                                                     )}
                                                 </div>
                                                 {/* Badge for Noticeboard */}

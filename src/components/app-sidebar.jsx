@@ -609,6 +609,7 @@ export const SidebarData = [
                     { label: "Competencies", url: "/dashboard/hpc/competencies", roles: ["ADMIN"] },
                     { label: "SEL Parameters", url: "/dashboard/hpc/sel", roles: ["ADMIN"] },
                     { label: "Activities", url: "/dashboard/hpc/activities", roles: ["ADMIN"] },
+                    { label: "Stage Templates", url: "/dashboard/hpc/templates", roles: ["ADMIN"] },
                     { label: "Term Control", url: "/dashboard/hpc/terms", roles: ["ADMIN"] },
                     { label: "Reports", url: "/dashboard/hpc/reports", roles: ["ADMIN"] },
                 ],
