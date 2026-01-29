@@ -130,7 +130,7 @@ export async function POST(req, props) {
                 where: { userId: studentId },
                 include: {
                     user: { select: { name: true } },
-                    class: { select: { teachingStaffUserId: true, name: true } },
+                    class: { select: { teachingStaffUserId: true, className: true } },
                     section: { select: { teachingStaffUserId: true, name: true } }
                 }
             });
@@ -139,7 +139,7 @@ export async function POST(req, props) {
                 // Prioritize Section Teacher, then Class Teacher
                 const teacherUserId = student.section?.teachingStaffUserId || student.class?.teachingStaffUserId;
                 const studentName = student.user?.name || 'Student';
-                const className = `${student.class?.name || ''} ${student.section?.name || ''}`.trim();
+                const className = `${student.class?.className || ''} ${student.section?.name || ''}`.trim();
 
                 if (teacherUserId) {
                     await sendNotification({
