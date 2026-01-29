@@ -752,8 +752,8 @@ function HPCSection() {
                         </div>
 
                         {/* Heading */}
-                        <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-[#1a1a2e] mb-4 md:mb-6 leading-tight tracking-tight">
-                            The Perfect <span className="text-[#0e66fe]">Holistic Progress Card</span> System
+                        <h2 className="text-4xl md:text-5xl lg:text-5xl font-black text-[#1a1a2e] mb-4 md:mb-6 leading-tight tracking-tight">
+                            New Education Policy 2020 Based <span className="text-[#0e66fe]"> HOLISTIC PROGRESS CARD</span>
                         </h2>
 
                         {/* Description */}
