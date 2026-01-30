@@ -59,7 +59,7 @@ export async function GET(request, { params }) {
             });
 
             return enhancedBooks;
-        }, 300);
+        }, 5);
 
         // Return data array
         return NextResponse.json(result);

@@ -213,7 +213,7 @@ export async function GET(req, props) {
                     latestResultDate,
                 }
             };
-        }, 300);
+        }, 5);
 
         return NextResponse.json(result);
 
