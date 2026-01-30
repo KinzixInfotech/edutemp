@@ -81,6 +81,14 @@ export default function PayrollSettings() {
             overtimeRate: parseFloat(formData.get("overtimeRate")) || 1.5,
             lateGraceMinutes: parseInt(formData.get("lateGraceMinutes")) || 15,
             halfDayThreshold: parseFloat(formData.get("halfDayThreshold")) || 4,
+            // Loan & Advance Settings
+            enableLoanApplications: formData.get("enableLoanApplications") === "on",
+            enableSalaryAdvanceApplications: formData.get("enableSalaryAdvanceApplications") === "on",
+            maxLoanAmount: parseFloat(formData.get("maxLoanAmount")) || null,
+            maxAdvancePercent: parseFloat(formData.get("maxAdvancePercent")) || 50,
+            // Automation Settings
+            autoSyncNewStaff: formData.get("autoSyncNewStaff") === "on",
+            requireDirectorApproval: formData.get("requireDirectorApproval") === "on",
         });
     };
 
@@ -125,6 +133,9 @@ export default function PayrollSettings() {
                             </TabsTrigger>
                             <TabsTrigger value="attendance">
                                 <Clock className="h-4 w-4 mr-2" /> Attendance
+                            </TabsTrigger>
+                            <TabsTrigger value="loans">
+                                <Wallet className="h-4 w-4 mr-2" /> Loans & Automation
                             </TabsTrigger>
                         </TabsList>
 
@@ -366,6 +377,74 @@ export default function PayrollSettings() {
                                             placeholder="Per day rate"
                                             defaultValue={config?.leaveEncashmentRate || ""}
                                         />
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+
+                        {/* Loans & Automation Settings */}
+                        <TabsContent value="loans" className="space-y-6">
+                            <Card className="border bg-white dark:bg-muted">
+                                <CardHeader>
+                                    <CardTitle>Loan & Advance Settings</CardTitle>
+                                    <CardDescription>Configure employee loan and salary advance options</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="font-medium">Enable Loan Applications</p>
+                                            <p className="text-sm text-muted-foreground">Allow teachers to apply for loans through the app</p>
+                                        </div>
+                                        <Switch name="enableLoanApplications" defaultChecked={config?.enableLoanApplications} />
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="font-medium">Enable Salary Advance</p>
+                                            <p className="text-sm text-muted-foreground">Allow teachers to request salary advances</p>
+                                        </div>
+                                        <Switch name="enableSalaryAdvanceApplications" defaultChecked={config?.enableSalaryAdvanceApplications} />
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+                                        <div>
+                                            <Label>Maximum Loan Amount (₹)</Label>
+                                            <Input
+                                                name="maxLoanAmount"
+                                                type="number"
+                                                placeholder="No limit"
+                                                defaultValue={config?.maxLoanAmount || ""}
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Max Advance (% of Salary)</Label>
+                                            <Input
+                                                name="maxAdvancePercent"
+                                                type="number"
+                                                defaultValue={config?.maxAdvancePercent || 50}
+                                            />
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="border bg-white dark:bg-muted">
+                                <CardHeader>
+                                    <CardTitle>Automation Settings</CardTitle>
+                                    <CardDescription>Configure payroll automation and approval workflows</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="font-medium">Auto-Sync New Staff</p>
+                                            <p className="text-sm text-muted-foreground">Automatically add new staff to payroll system</p>
+                                        </div>
+                                        <Switch name="autoSyncNewStaff" defaultChecked={config?.autoSyncNewStaff ?? true} />
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="font-medium">Require Director Approval</p>
+                                            <p className="text-sm text-muted-foreground">Director must approve payroll before payment</p>
+                                        </div>
+                                        <Switch name="requireDirectorApproval" defaultChecked={config?.requireDirectorApproval} />
                                     </div>
                                 </CardContent>
                             </Card>

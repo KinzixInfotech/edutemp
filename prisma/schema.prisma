@@ -4709,6 +4709,16 @@ model PayrollConfig {
   lateGraceMinutes Int   @default(15)
   halfDayThreshold Float @default(4) // Hours for half day
 
+  // Loan & Advance Settings
+  enableLoanApplications          Boolean @default(false) // Teachers can apply for loans
+  enableSalaryAdvanceApplications Boolean @default(false) // Teachers can request salary advance
+  maxLoanAmount                   Float? // Maximum loan amount
+  maxAdvancePercent               Float   @default(50) // Max % of salary for advance
+
+  // Automation Settings
+  autoSyncNewStaff        Boolean @default(true) // Auto-create payroll profile for new staff
+  requireDirectorApproval Boolean @default(false) // Director must approve before payment
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -4841,6 +4851,12 @@ model PayrollPeriod {
   approvedAt  DateTime?
   approvedBy  String?       @db.Uuid
   paidAt      DateTime?
+
+  // Bank Settlement Tracking
+  bankSlipGeneratedAt   DateTime?
+  bankTransferReference String?
+  settlementConfirmedAt DateTime?
+  settlementConfirmedBy String?   @db.Uuid
 
   // Summary
   totalEmployees   Int   @default(0)

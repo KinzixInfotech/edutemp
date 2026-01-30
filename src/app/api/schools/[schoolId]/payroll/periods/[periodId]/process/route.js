@@ -4,6 +4,7 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { invalidatePattern } from "@/lib/cache";
+import { sendNotification } from '@/lib/notifications/notificationHelper';
 
 // POST - Process payroll for the period
 export async function POST(req, props) {
@@ -354,6 +355,34 @@ export async function POST(req, props) {
 
         // Invalidate cache
         await invalidatePattern(`payroll:periods:${schoolId}*`);
+
+        // Send notification to director/admin for approval
+        const monthName = new Date(period.year, period.month - 1).toLocaleString('default', { month: 'long' });
+
+        try {
+            await sendNotification({
+                schoolId,
+                title: '📋 Payroll Ready for Approval',
+                message: `Payroll for ${monthName} ${period.year} has been processed. Total: ₹${totalNetSalary.toLocaleString('en-IN')} for ${results.success.length} employees. Please review and approve.`,
+                type: 'PAYROLL',
+                priority: 'HIGH',
+                targetOptions: {
+                    roleNames: ['DIRECTOR', 'ADMIN', 'PRINCIPAL']
+                },
+                senderId: processedBy,
+                metadata: {
+                    type: 'PAYROLL_APPROVAL_REQUEST',
+                    periodId,
+                    month: period.month,
+                    year: period.year,
+                    totalAmount: totalNetSalary
+                },
+                actionUrl: `/dashboard/payroll/process`
+            });
+        } catch (notifError) {
+            console.error('Notification failed:', notifError);
+            // Don't fail the request if notification fails
+        }
 
         return NextResponse.json({
             success: true,
