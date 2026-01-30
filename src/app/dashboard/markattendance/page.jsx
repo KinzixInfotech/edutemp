@@ -26,10 +26,39 @@ export default function SelfAttendancePage() {
     const queryClient = useQueryClient();
     const [currentTime, setCurrentTime] = useState(new Date());
 
+    // Geofencing state
+    const [userLocation, setUserLocation] = useState(null);
+    const [locationError, setLocationError] = useState(null);
+    const [isGettingLocation, setIsGettingLocation] = useState(false);
+    const [distanceToSchool, setDistanceToSchool] = useState(null);
+    const [isWithinRadius, setIsWithinRadius] = useState(true);
+
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         return () => clearInterval(timer);
     }, []);
+
+    // Haversine distance calculation
+    const calculateDistance = (lat1, lon1, lat2, lon2) => {
+        const R = 6371e3; // Earth's radius in meters
+        const φ1 = lat1 * Math.PI / 180;
+        const φ2 = lat2 * Math.PI / 180;
+        const Δφ = (lat2 - lat1) * Math.PI / 180;
+        const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+        const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c;
+    };
+
+    // Format distance for display
+    const formatDistance = (meters) => {
+        if (meters < 1000) return `${Math.round(meters)}m`;
+        return `${(meters / 1000).toFixed(1)}km`;
+    };
 
     // Fetch attendance data using React Query
     const { data, isLoading, error, refetch } = useQuery({
@@ -89,28 +118,104 @@ export default function SelfAttendancePage() {
         }
     });
 
+    // Get user location when geofencing is enabled
+    useEffect(() => {
+        const getLocation = async () => {
+            if (!data?.config?.enableGeoFencing) {
+                setIsWithinRadius(true);
+                return;
+            }
+
+            setIsGettingLocation(true);
+            setLocationError(null);
+
+            try {
+                const pos = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    });
+                });
+
+                const location = {
+                    latitude: pos.coords.latitude,
+                    longitude: pos.coords.longitude,
+                };
+                setUserLocation(location);
+
+                // Calculate distance if school coordinates exist
+                if (data.config.schoolLatitude && data.config.schoolLongitude) {
+                    const distance = calculateDistance(
+                        location.latitude,
+                        location.longitude,
+                        data.config.schoolLatitude,
+                        data.config.schoolLongitude
+                    );
+                    setDistanceToSchool(Math.round(distance));
+
+                    const allowedRadius = data.config.allowedRadius || 500;
+                    setIsWithinRadius(distance <= allowedRadius);
+                } else {
+                    // No school coordinates configured - allow attendance
+                    setIsWithinRadius(true);
+                }
+            } catch (error) {
+                console.error('Location error:', error);
+                setLocationError(error.message || 'Failed to get location');
+                setIsWithinRadius(false);
+            } finally {
+                setIsGettingLocation(false);
+            }
+        };
+
+        if (data?.config?.enableGeoFencing) {
+            getLocation();
+        }
+    }, [data?.config?.enableGeoFencing, data?.config?.schoolLatitude, data?.config?.schoolLongitude, data?.config?.allowedRadius]);
+
     const handleMarkAttendance = async (type) => {
         let location = null;
 
-        // Always attempt to get location for tracking/audit purposes
-        try {
-            const pos = await new Promise((resolve, reject) => {
-                navigator.geolocation.getCurrentPosition(resolve, reject, {
-                    enableHighAccuracy: true,
-                    timeout: 5000,
-                    maximumAge: 0
-                });
-            });
-            location = {
-                latitude: pos.coords.latitude,
-                longitude: pos.coords.longitude,
-            };
-        } catch (locError) {
-            console.warn("Location tracking failed:", locError);
-            // Only block if geofencing is strictly enabled
-            if (data?.config?.enableGeoFencing) {
+        // If geofencing is enabled, validate location first
+        if (data?.config?.enableGeoFencing) {
+            if (locationError) {
                 toast.error("Location access is required to mark attendance.");
                 return;
+            }
+
+            if (!isWithinRadius) {
+                const radius = data?.config?.allowedRadius || 500;
+                toast.error(`You are too far from school. Please be within ${radius}m to mark attendance.`);
+                return;
+            }
+
+            if (userLocation) {
+                location = userLocation;
+            }
+        }
+
+        // If no location yet, try to get it
+        if (!location) {
+            try {
+                const pos = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        enableHighAccuracy: true,
+                        timeout: 5000,
+                        maximumAge: 0
+                    });
+                });
+                location = {
+                    latitude: pos.coords.latitude,
+                    longitude: pos.coords.longitude,
+                };
+            } catch (locError) {
+                console.warn("Location tracking failed:", locError);
+                // Only block if geofencing is strictly enabled
+                if (data?.config?.enableGeoFencing) {
+                    toast.error("Location access is required to mark attendance.");
+                    return;
+                }
             }
         }
 
@@ -121,8 +226,10 @@ export default function SelfAttendancePage() {
     const isCheckedIn = !!attendance?.checkInTime;
     const isCheckedOut = !!attendance?.checkOutTime;
 
-    const canCheckIn = isWorkingDay && windows?.checkIn?.isOpen && !isCheckedIn;
-    const canCheckOut = isWorkingDay && windows?.checkOut?.isOpen && isCheckedIn && !isCheckedOut;
+    // Include geofencing check in canCheckIn/canCheckOut
+    const geofenceBlocking = config?.enableGeoFencing && (!isWithinRadius || locationError);
+    const canCheckIn = isWorkingDay && windows?.checkIn?.isOpen && !isCheckedIn && !geofenceBlocking;
+    const canCheckOut = isWorkingDay && windows?.checkOut?.isOpen && isCheckedIn && !isCheckedOut && !geofenceBlocking;
 
     // Helper to calculate time status and progress
     const timeStatus = useMemo(() => {
@@ -286,14 +393,60 @@ export default function SelfAttendancePage() {
                         </h1>
                         <p className="text-muted-foreground">Mark your daily attendance and view your statistics.</p>
                     </div>
-                    <Button variant="outline" asChild>
-                        <Link href="/dashboard/markattendance/report">
-                            <FileText className="mr-2 h-4 w-4" />
-                            View Full Report
-                        </Link>
-
-                    </Button>
+                    <div className="flex items-center gap-3">
+                        {/* Location Status Badge */}
+                        {config?.enableGeoFencing && (
+                            <div className={cn(
+                                "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium",
+                                isGettingLocation && "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
+                                !isGettingLocation && isWithinRadius && !locationError && "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
+                                !isGettingLocation && (!isWithinRadius || locationError) && "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300",
+                            )}>
+                                {isGettingLocation ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        Getting location...
+                                    </>
+                                ) : locationError ? (
+                                    <>
+                                        <XCircle className="w-4 h-4" />
+                                        Location unavailable
+                                    </>
+                                ) : isWithinRadius ? (
+                                    <>
+                                        <MapPin className="w-4 h-4" />
+                                        GPS Ready {distanceToSchool && `(${formatDistance(distanceToSchool)})`}
+                                    </>
+                                ) : (
+                                    <>
+                                        <AlertTriangle className="w-4 h-4" />
+                                        Too far {distanceToSchool && `(${formatDistance(distanceToSchool)})`}
+                                    </>
+                                )}
+                            </div>
+                        )}
+                        <Button variant="outline" asChild>
+                            <Link href="/dashboard/markattendance/report">
+                                <FileText className="mr-2 h-4 w-4" />
+                                View Full Report
+                            </Link>
+                        </Button>
+                    </div>
                 </div>
+
+                {/* Geofencing Alert */}
+                {config?.enableGeoFencing && !isWithinRadius && !isGettingLocation && (
+                    <Alert variant="destructive" className="bg-rose-50 border-rose-200 dark:bg-rose-950/30 dark:border-rose-900/50">
+                        <MapPin className="h-4 w-4" />
+                        <AlertTitle className="text-rose-800 dark:text-rose-200">Location Restriction</AlertTitle>
+                        <AlertDescription className="text-rose-700 dark:text-rose-300">
+                            {locationError
+                                ? "Unable to access your location. Please enable location services and refresh the page."
+                                : `You are ${distanceToSchool ? formatDistance(distanceToSchool) : 'too far'} from school. You need to be within ${config?.allowedRadius || 500}m to mark attendance.`
+                            }
+                        </AlertDescription>
+                    </Alert>
+                )}
 
                 {/* Stats Cards - Like Noticeboard */}
                 <div className="grid gap-4 md:grid-cols-4">

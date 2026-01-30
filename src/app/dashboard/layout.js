@@ -1,6 +1,7 @@
 import './dashboard.css';
 import { AuthProvider } from "@/context/AuthContext";
 import { LibraryNotificationProvider } from "@/context/LibraryNotificationContext";
+import { AttendanceReminderProvider } from "@/context/AttendanceReminderContext";
 import { ThemeProvider } from "@/components/theme-provider";
 import ClientLayout from "@/components/layout/client-layout"; // <- New
 import { Toaster } from "@/components/ui/sonner"
@@ -17,28 +18,30 @@ export default async function RootLayout({ children }) {
     return (
         <AuthProvider>
             <LibraryNotificationProvider>
-                <SettingsDialogProvider>
-                    <CommandMenuProvider>
-                        <LoaderProvider>
-                            <ThemeProvider attribute="class" defaultTheme="system" enableSystem >
-                                <ClientLayout>{children}</ClientLayout>
-                                <Toaster
-                                    theme="system"
-                                    toastOptions={{
-                                        classNames: {
-                                            description: "text-black dark:text-white"
-                                        }
-                                    }}
+                <AttendanceReminderProvider>
+                    <SettingsDialogProvider>
+                        <CommandMenuProvider>
+                            <LoaderProvider>
+                                <ThemeProvider attribute="class" defaultTheme="system" enableSystem >
+                                    <ClientLayout>{children}</ClientLayout>
+                                    <Toaster
+                                        theme="system"
+                                        toastOptions={{
+                                            classNames: {
+                                                description: "text-black dark:text-white"
+                                            }
+                                        }}
 
-                                />
-                                <SecurityAlertBanner />
-                                <CommandMenu />
-                            </ThemeProvider>
-                        </LoaderProvider>
-                    </CommandMenuProvider>
-                    {/* <SettingsDialog /> */}
-                    <Profile />
-                </SettingsDialogProvider>
+                                    />
+                                    <SecurityAlertBanner />
+                                    <CommandMenu />
+                                </ThemeProvider>
+                            </LoaderProvider>
+                        </CommandMenuProvider>
+                        {/* <SettingsDialog /> */}
+                        <Profile />
+                    </SettingsDialogProvider>
+                </AttendanceReminderProvider>
             </LibraryNotificationProvider>
         </AuthProvider>
     );
