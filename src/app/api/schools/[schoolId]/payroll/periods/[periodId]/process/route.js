@@ -118,6 +118,39 @@ export async function POST(req, props) {
                     }
                 });
 
+                // Get leave requests for this period (to check paid vs unpaid leave)
+                const leaveRequests = await prisma.leaveRequest.findMany({
+                    where: {
+                        userId: employee.userId,
+                        schoolId,
+                        status: 'APPROVED',
+                        OR: [
+                            {
+                                startDate: { gte: period.startDate, lte: period.endDate }
+                            },
+                            {
+                                endDate: { gte: period.startDate, lte: period.endDate }
+                            }
+                        ]
+                    },
+                    select: {
+                        startDate: true,
+                        endDate: true,
+                        leaveType: true,
+                        isHalfDay: true,
+                        numberOfDays: true
+                    }
+                });
+
+                // Count unpaid leave days from leave requests
+                let unpaidLeaveDays = 0;
+                for (const leave of leaveRequests) {
+                    // Check if this leave type is unpaid (LOP/UNPAID types)
+                    if (leave.leaveType === 'UNPAID' || leave.leaveType === 'LOP') {
+                        unpaidLeaveDays += leave.isHalfDay ? 0.5 : (leave.numberOfDays || 1);
+                    }
+                }
+
                 // Calculate attendance stats
                 let daysWorked = 0;
                 let daysAbsent = 0;
@@ -166,11 +199,17 @@ export async function POST(req, props) {
                 const specialEarned = structure.specialAllowance * workFactor;
                 const grossEarnings = basicEarned + hraEarned + daEarned + taEarned + medicalEarned + specialEarned;
 
-                // Calculate Loss of Pay
-                // NOTE: Since earnings are already pro-rated based on worked days (workFactor),
-                // we don't need to deduct LOP separately - that would be double-counting.
-                // LOP is only applicable if there are unpaid leave days beyond normal absence.
-                let lossOfPay = 0;
+                // Calculate Loss of Pay for unpaid leaves
+                // Per-day salary = gross / working days
+                const perDaySalary = structure.grossSalary / workingDays;
+                let lossOfPay = unpaidLeaveDays * perDaySalary;
+
+                // Also add LOP for late penalties if configured
+                if (config.latePenaltyEnabled && lateCount > config.allowedLateCount) {
+                    const excessLates = lateCount - config.allowedLateCount;
+                    const latePenaltyDays = Math.floor(excessLates / (config.latesPerLop || 3)); // Default: 3 lates = 1 day LOP
+                    lossOfPay += latePenaltyDays * perDaySalary;
+                }
 
                 // Calculate statutory deductions
                 let pfEmployee = 0;

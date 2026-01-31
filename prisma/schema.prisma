@@ -3159,6 +3159,7 @@ enum NotificationPriority {
   LOW
   NORMAL
   HIGH
+
   URGENT
 }
 
@@ -4716,8 +4717,8 @@ model PayrollConfig {
   maxAdvancePercent               Float   @default(50) // Max % of salary for advance
 
   // Automation Settings
-  autoSyncNewStaff        Boolean @default(true) // Auto-create payroll profile for new staff
-  requireDirectorApproval Boolean @default(false) // Director must approve before payment
+  autoSyncNewStaff         Boolean @default(true) // Auto-create payroll profile for new staff
+  enableAutoPeriodCreation Boolean @default(false) // Auto-create payroll period on pay cycle day
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -4863,6 +4864,12 @@ model PayrollPeriod {
   totalGrossSalary Float @default(0)
   totalDeductions  Float @default(0)
   totalNetSalary   Float @default(0)
+
+  // Lock Status (prevent modifications after payout)
+  isLocked     Boolean   @default(false)
+  lockedAt     DateTime?
+  lockedBy     String?   @db.Uuid
+  lockedReason String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

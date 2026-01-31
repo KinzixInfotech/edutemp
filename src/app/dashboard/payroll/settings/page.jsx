@@ -88,7 +88,7 @@ export default function PayrollSettings() {
             maxAdvancePercent: parseFloat(formData.get("maxAdvancePercent")) || 50,
             // Automation Settings
             autoSyncNewStaff: formData.get("autoSyncNewStaff") === "on",
-            requireDirectorApproval: formData.get("requireDirectorApproval") === "on",
+            enableAutoPeriodCreation: formData.get("enableAutoPeriodCreation") === "on",
         });
     };
 
@@ -429,7 +429,7 @@ export default function PayrollSettings() {
                             <Card className="border bg-white dark:bg-muted">
                                 <CardHeader>
                                     <CardTitle>Automation Settings</CardTitle>
-                                    <CardDescription>Configure payroll automation and approval workflows</CardDescription>
+                                    <CardDescription>Configure payroll automation workflows</CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <div className="flex items-center justify-between">
@@ -441,10 +441,16 @@ export default function PayrollSettings() {
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <p className="font-medium">Require Director Approval</p>
-                                            <p className="text-sm text-muted-foreground">Director must approve payroll before payment</p>
+                                            <p className="font-medium">Auto Period Creation</p>
+                                            <p className="text-sm text-muted-foreground">Automatically create payroll period on Pay Cycle Day (configured in General tab)</p>
                                         </div>
-                                        <Switch name="requireDirectorApproval" defaultChecked={config?.requireDirectorApproval} />
+                                        <Switch name="enableAutoPeriodCreation" defaultChecked={config?.enableAutoPeriodCreation} />
+                                    </div>
+                                    <div className="pt-4 border-t bg-muted/50 -mx-6 px-6 py-4 rounded-b-lg">
+                                        <div className="flex items-center gap-2 text-sm">
+                                            <span className="font-medium text-primary">ℹ️ Note:</span>
+                                            <span className="text-muted-foreground">Director approval is mandatory. Payroll cannot be settled without director approving it first.</span>
+                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>

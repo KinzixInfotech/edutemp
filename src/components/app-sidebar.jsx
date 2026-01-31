@@ -486,6 +486,7 @@ export const SidebarData = [
                     { label: "Employees", url: "/dashboard/payroll/employees", roles: ["ADMIN"] },
                     { label: "Salary Structures", url: "/dashboard/payroll/salary-structures", roles: ["ADMIN"] },
                     { label: "Run Payroll", url: "/dashboard/payroll/process", roles: ["ADMIN"] },
+                    { label: "History", url: "/dashboard/payroll/history", roles: ["ADMIN"] },
                     { label: "Payslips", url: "/dashboard/payroll/payslips", roles: ["ADMIN"] },
                     { label: "Loans & Advances", url: "/dashboard/payroll/loans", roles: ["ADMIN"] },
                     { label: "Reports", url: "/dashboard/payroll/reports", roles: ["ADMIN"] },

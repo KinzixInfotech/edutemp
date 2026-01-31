@@ -30,7 +30,11 @@ import {
     XCircle,
     Clock,
     Eye,
-    AlertCircle
+    AlertCircle,
+    FileSpreadsheet,
+    CheckSquare,
+    Banknote,
+    Download
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -126,6 +130,83 @@ export default function PayrollProcess() {
         }
     });
 
+    // Approve payroll mutation
+    const approvePayroll = useMutation({
+        mutationFn: async (periodId) => {
+            const res = await fetch(`/api/schools/${schoolId}/payroll/periods/${periodId}/approve`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ approvedBy: fullUser?.id })
+            });
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.error || "Failed to approve payroll");
+            }
+            return res.json();
+        },
+        onSuccess: () => {
+            toast.success("Payroll approved successfully");
+            queryClient.invalidateQueries(["payroll-periods"]);
+        },
+        onError: (error) => {
+            toast.error(error.message);
+        }
+    });
+
+    // Confirm settlement mutation
+    const confirmSettlement = useMutation({
+        mutationFn: async (periodId) => {
+            const res = await fetch(`/api/schools/${schoolId}/payroll/periods/${periodId}/settlement`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    confirmedBy: fullUser?.id,
+                    bankTransferReference: `REF-${Date.now()}`
+                })
+            });
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.error || "Failed to confirm settlement");
+            }
+            return res.json();
+        },
+        onSuccess: () => {
+            toast.success("Settlement confirmed! Employees notified.");
+            queryClient.invalidateQueries(["payroll-periods"]);
+        },
+        onError: (error) => {
+            toast.error(error.message);
+        }
+    });
+
+    // Bank slip download handler
+    const downloadBankSlip = async (periodId, periodLabel) => {
+        try {
+            toast.loading("Generating bank slip...");
+            const res = await fetch(`/api/schools/${schoolId}/payroll/periods/${periodId}/bank-slip?format=csv`);
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.error || "Failed to generate bank slip");
+            }
+
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `BankSlip_${periodLabel.replace(' ', '_')}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
+            toast.dismiss();
+            toast.success("Bank slip downloaded!");
+        } catch (error) {
+            toast.dismiss();
+            toast.error(error.message);
+        }
+    };
+
     const months = [
         "January", "February", "March", "April", "May", "June",
         "July", "August", "September", "October", "November", "December"
@@ -210,24 +291,76 @@ export default function PayrollProcess() {
                                         </div>
                                     </div>
 
-                                    {/* Action Buttons */}
-                                    <div className="flex gap-2">
-                                        {period.status === "DRAFT" && (
-                                            <Button
-                                                size="sm"
-                                                className="flex-1"
-                                                onClick={() => processPayroll.mutate(period.id)}
-                                                disabled={processPayroll.isPending}
-                                            >
-                                                <Play className="h-4 w-4 mr-1" />
-                                                {processPayroll.isPending ? "Processing..." : "Process"}
-                                            </Button>
+                                    {/* Action Buttons - Status Based */}
+                                    <div className="flex flex-col gap-2">
+                                        {/* Primary Actions Row */}
+                                        <div className="flex gap-2">
+                                            {period.status === "DRAFT" && (
+                                                <Button
+                                                    size="sm"
+                                                    className="flex-1"
+                                                    onClick={() => processPayroll.mutate(period.id)}
+                                                    disabled={processPayroll.isPending}
+                                                >
+                                                    <Play className="h-4 w-4 mr-1" />
+                                                    {processPayroll.isPending ? "Processing..." : "Process"}
+                                                </Button>
+                                            )}
+
+                                            {period.status === "PENDING_APPROVAL" && (
+                                                <Button
+                                                    size="sm"
+                                                    className="flex-1 bg-orange-500 hover:bg-orange-600"
+                                                    onClick={() => approvePayroll.mutate(period.id)}
+                                                    disabled={approvePayroll.isPending}
+                                                >
+                                                    <CheckSquare className="h-4 w-4 mr-1" />
+                                                    {approvePayroll.isPending ? "Approving..." : "Approve"}
+                                                </Button>
+                                            )}
+
+                                            {period.status === "APPROVED" && (
+                                                <>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="flex-1"
+                                                        onClick={() => downloadBankSlip(period.id, period.periodLabel)}
+                                                    >
+                                                        <FileSpreadsheet className="h-4 w-4 mr-1" />
+                                                        Bank Slip
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        className="flex-1 bg-green-600 hover:bg-green-700"
+                                                        onClick={() => confirmSettlement.mutate(period.id)}
+                                                        disabled={confirmSettlement.isPending}
+                                                    >
+                                                        <Banknote className="h-4 w-4 mr-1" />
+                                                        {confirmSettlement.isPending ? "Confirming..." : "Settle"}
+                                                    </Button>
+                                                </>
+                                            )}
+
+                                            {period.status === "PAID" && (
+                                                <div className="flex-1 text-center py-1.5 text-sm text-green-600 font-medium bg-green-50 rounded-md">
+                                                    ✓ Settled
+                                                </div>
+                                            )}
+
+                                            <Link href={`/dashboard/payroll/process/${period.id}`} className={period.status === "PAID" ? "flex-1" : ""}>
+                                                <Button variant="outline" size="sm" className="w-full">
+                                                    <Eye className="h-4 w-4 mr-1" /> View
+                                                </Button>
+                                            </Link>
+                                        </div>
+
+                                        {/* Status Info */}
+                                        {period.processedAt && (
+                                            <p className="text-xs text-muted-foreground">
+                                                Processed: {new Date(period.processedAt).toLocaleDateString('en-IN')}
+                                            </p>
                                         )}
-                                        <Link href={`/dashboard/payroll/process/${period.id}`} className="flex-1">
-                                            <Button variant="outline" size="sm" className="w-full">
-                                                <Eye className="h-4 w-4 mr-1" /> View
-                                            </Button>
-                                        </Link>
                                     </div>
                                 </CardContent>
                             </Card>

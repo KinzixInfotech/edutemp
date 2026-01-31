@@ -26,7 +26,13 @@ import {
     Users,
     Calendar,
     FileText,
-    Download
+    Download,
+    FileSpreadsheet,
+    Banknote,
+    FileDown,
+    Lock,
+    Unlock,
+    AlertTriangle
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -122,6 +128,128 @@ export default function PayrollPeriodDetailPage({ params }) {
         }
     });
 
+    // Settlement mutation
+    const settlementMutation = useMutation({
+        mutationFn: async () => {
+            const res = await fetch(`/api/schools/${schoolId}/payroll/periods/${periodId}/settlement`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    confirmedBy: fullUser?.id,
+                    bankTransferReference: `REF-${Date.now()}`
+                })
+            });
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.error || "Failed to confirm settlement");
+            }
+            return res.json();
+        },
+        onSuccess: () => {
+            toast.success("Settlement confirmed! Employees notified.");
+            queryClient.invalidateQueries(["payroll-period", schoolId, periodId]);
+        },
+        onError: (error) => {
+            toast.error(error.message);
+        }
+    });
+
+    // Lock/Unlock mutation
+    const lockMutation = useMutation({
+        mutationFn: async (lock) => {
+            const url = `/api/schools/${schoolId}/payroll/periods/${periodId}/lock`;
+            if (lock) {
+                const res = await fetch(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        userId: fullUser?.id,
+                        userName: fullUser?.name,
+                        reason: "Payroll finalized"
+                    })
+                });
+                if (!res.ok) {
+                    const error = await res.json();
+                    throw new Error(error.error || "Failed to lock payroll");
+                }
+                return res.json();
+            } else {
+                const res = await fetch(
+                    `${url}?userId=${fullUser?.id}&userName=${encodeURIComponent(fullUser?.name)}&reason=Re-processing required`,
+                    { method: "DELETE" }
+                );
+                if (!res.ok) {
+                    const error = await res.json();
+                    throw new Error(error.error || "Failed to unlock payroll");
+                }
+                return res.json();
+            }
+        },
+        onSuccess: (_, lock) => {
+            toast.success(lock ? "Payroll locked" : "Payroll unlocked");
+            queryClient.invalidateQueries(["payroll-period", schoolId, periodId]);
+        },
+        onError: (error) => {
+            toast.error(error.message);
+        }
+    });
+
+    // Bank slip download handler
+    const downloadBankSlip = async () => {
+        try {
+            toast.loading("Generating bank slip...");
+            const res = await fetch(`/api/schools/${schoolId}/payroll/periods/${periodId}/bank-slip?format=csv`);
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.error || "Failed to generate bank slip");
+            }
+
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `BankSlip_${period?.periodLabel?.replace(' ', '_') || periodId}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
+            toast.dismiss();
+            toast.success("Bank slip downloaded!");
+        } catch (error) {
+            toast.dismiss();
+            toast.error(error.message);
+        }
+    };
+
+    // PDF payslip download handler
+    const downloadPayslipPDF = async (payslipId, employeeName) => {
+        try {
+            toast.loading(`Generating payslip for ${employeeName}...`);
+            const res = await fetch(`/api/schools/${schoolId}/payroll/payslips/${payslipId}/pdf`);
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.error || "Failed to generate PDF");
+            }
+
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Payslip_${employeeName?.replace(/\s/g, '_')}_${period?.periodLabel?.replace(' ', '_')}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
+            toast.dismiss();
+            toast.success("Payslip downloaded!");
+        } catch (error) {
+            toast.dismiss();
+            toast.error(error.message);
+        }
+    };
+
     if (!schoolId) {
         return (
             <div className="p-6">
@@ -184,7 +312,7 @@ export default function PayrollPeriodDetailPage({ params }) {
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                     {period.status === "DRAFT" && (
                         <Button
                             onClick={() => processMutation.mutate()}
@@ -194,7 +322,7 @@ export default function PayrollPeriodDetailPage({ params }) {
                             {processMutation.isPending ? "Processing..." : "Process Payroll"}
                         </Button>
                     )}
-                    {period.status === "PROCESSED" && (
+                    {(period.status === "PROCESSED" || period.status === "PENDING_APPROVAL") && (
                         <>
                             <Button
                                 variant="destructive"
@@ -212,9 +340,54 @@ export default function PayrollPeriodDetailPage({ params }) {
                         </>
                     )}
                     {period.status === "APPROVED" && (
-                        <Button variant="outline">
-                            <Download className="mr-2 h-4 w-4" /> Download Report
-                        </Button>
+                        <>
+                            <Button variant="outline" onClick={downloadBankSlip}>
+                                <FileSpreadsheet className="mr-2 h-4 w-4" /> Bank Slip
+                            </Button>
+                            <Button
+                                className="bg-green-600 hover:bg-green-700"
+                                onClick={() => settlementMutation.mutate()}
+                                disabled={settlementMutation.isPending}
+                            >
+                                <Banknote className="mr-2 h-4 w-4" />
+                                {settlementMutation.isPending ? "Confirming..." : "Confirm Settlement"}
+                            </Button>
+                        </>
+                    )}
+                    {period.status === "PAID" && (
+                        <div className="flex items-center gap-2">
+                            <span className="px-3 py-1.5 text-sm font-medium text-green-600 bg-green-50 rounded-md">
+                                ✓ Settlement Confirmed
+                            </span>
+                            {period.isLocked && (
+                                <span className="px-3 py-1.5 text-sm font-medium text-orange-600 bg-orange-50 rounded-md flex items-center gap-1">
+                                    <Lock className="h-3 w-3" /> Locked
+                                </span>
+                            )}
+                            <Button variant="outline" onClick={downloadBankSlip}>
+                                <FileSpreadsheet className="mr-2 h-4 w-4" /> Bank Slip
+                            </Button>
+                            {!period.isLocked ? (
+                                <Button
+                                    variant="outline"
+                                    className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                                    onClick={() => lockMutation.mutate(true)}
+                                    disabled={lockMutation.isPending}
+                                >
+                                    <Lock className="mr-2 h-4 w-4" />
+                                    {lockMutation.isPending ? "Locking..." : "Lock Payroll"}
+                                </Button>
+                            ) : (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => lockMutation.mutate(false)}
+                                    disabled={lockMutation.isPending}
+                                >
+                                    <Unlock className="mr-2 h-4 w-4" />
+                                    {lockMutation.isPending ? "Unlocking..." : "Unlock"}
+                                </Button>
+                            )}
+                        </div>
                     )}
                 </div>
             </div>
@@ -294,6 +467,7 @@ export default function PayrollPeriodDetailPage({ params }) {
                                     <TableHead className="text-right">Deductions</TableHead>
                                     <TableHead className="text-right">Net Salary</TableHead>
                                     <TableHead>Status</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -329,9 +503,21 @@ export default function PayrollPeriodDetailPage({ params }) {
                                             {formatCurrency(item.netSalary)}
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant={item.paymentStatus === "PAID" ? "success" : "secondary"}>
+                                            <Badge variant={item.paymentStatus === "PAID" || item.paymentStatus === "PROCESSED" ? "success" : "secondary"}>
                                                 {item.paymentStatus}
                                             </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {item.payslipId && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => downloadPayslipPDF(item.payslipId, item.employeeName)}
+                                                    title="Download Payslip PDF"
+                                                >
+                                                    <FileDown className="h-4 w-4" />
+                                                </Button>
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ))}
