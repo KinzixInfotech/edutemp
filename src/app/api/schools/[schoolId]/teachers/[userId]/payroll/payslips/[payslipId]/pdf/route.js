@@ -1,5 +1,5 @@
 // Teacher Payslip PDF Download API
-// GET /api/schools/[schoolId]/teachers/[teacherId]/payroll/payslips/[payslipId]/pdf
+// GET /api/schools/[schoolId]/teachers/[userId]/payroll/payslips/[payslipId]/pdf
 
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
@@ -7,7 +7,7 @@ import { generatePayslipPDF, getPayslipFilename } from '@/lib/payroll/generatePa
 
 export async function GET(req, props) {
     const params = await props.params;
-    const { schoolId, teacherId, payslipId } = params;
+    const { schoolId, userId, payslipId } = params;
 
     try {
         // Get the payslip with related data
@@ -35,7 +35,7 @@ export async function GET(req, props) {
 
         // Verify the teacher has access to this payslip
         const employeeUserId = payslip.payrollItem.employee.userId;
-        if (employeeUserId !== teacherId) {
+        if (employeeUserId !== userId) {
             return NextResponse.json({ error: 'Unauthorized - this is not your payslip' }, { status: 403 });
         }
 
@@ -55,8 +55,9 @@ export async function GET(req, props) {
         });
 
         // Get staff details (teaching staff)
+        // Note: We use userId here
         const staff = await prisma.teachingStaff.findUnique({
-            where: { userId: teacherId },
+            where: { userId: userId },
             select: {
                 employeeId: true,
                 designation: true,
