@@ -52,7 +52,7 @@ const Hero = () => {
     };
 
     return (
-        <section className="relative min-h-screen mt-18 border-b flex overflow-hidden bg-white">
+        <section className="relative min-h-screen mt-6 md:mt-18 border-b flex overflow-hidden bg-white">
             {/* LEFT SIDE - Decorative */}
             <div className="hidden lg:flex flex-1 relative items-center justify-center bg-[#f5f7fa]">
                 {/* Interactive Grid Pattern Background */}
@@ -81,22 +81,22 @@ const Hero = () => {
             </div>
 
             {/* RIGHT SIDE - Login Form */}
-            <div className="flex-1 flex items-center justify-center px-6 py-12 lg:py-0">
+            <div className="flex-1 flex items-center justify-center px-4 md:px-6 py-8 md:py-12 lg:py-0">
                 <div className="w-full max-w-md">
                     {/* Clean Form - No Card */}
-                    <div className="space-y-5">
+                    <div className="space-y-4 md:space-y-5">
                         <label className="block text-sm font-semibold text-[#1a1a2e]">
                             School Code *
                         </label>
 
                         {/* Input Group */}
-                        <div className={`flex items-center gap-3 bg-[#f8f9fb] border rounded-xl px-4 py-4 transition-all ${error
+                        <div className={`flex items-center gap-2 md:gap-3 bg-[#f8f9fb] border rounded-xl px-3 py-3 md:px-4 md:py-4 transition-all ${error
                             ? 'border-red-300 ring-2 ring-red-100'
                             : schoolFound
                                 ? 'border-green-300 ring-2 ring-green-100'
                                 : 'border-gray-200 focus-within:ring-2 focus-within:ring-[#0569ff]/20 focus-within:border-[#0569ff]'
                             }`}>
-                            <div className="text-white px-4 py-2 rounded-lg font-bold text-sm bg-[#0569ff] shrink-0">
+                            <div className="text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold text-xs md:text-sm bg-[#0569ff] shrink-0">
                                 EB -
                             </div>
                             <input
@@ -111,14 +111,14 @@ const Hero = () => {
                                 }}
                                 onKeyDown={handleKeyDown}
                                 disabled={isChecking}
-                                className="flex-1 bg-transparent text-lg font-semibold outline-none text-[#1a1a2e] placeholder:text-gray-400 placeholder:font-normal disabled:opacity-50"
+                                className="flex-1 bg-transparent text-base md:text-lg font-semibold outline-none text-[#1a1a2e] placeholder:text-gray-400 placeholder:font-normal disabled:opacity-50 min-w-0"
                             />
                             {/* Status Icons */}
                             {isChecking && (
-                                <Loader2 className="w-5 h-5 text-[#0569ff] animate-spin shrink-0" />
+                                <Loader2 className="w-4 h-4 md:w-5 md:h-5 text-[#0569ff] animate-spin shrink-0" />
                             )}
                             {schoolFound && !isChecking && (
-                                <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />
+                                <CheckCircle className="w-4 h-4 md:w-5 md:h-5 text-green-500 shrink-0" />
                             )}
                         </div>
 
@@ -145,7 +145,7 @@ const Hero = () => {
                         <button
                             onClick={handleContinue}
                             disabled={!code || isChecking}
-                            className={`group w-full relative px-8 py-4 rounded-xl font-bold text-base transition-all duration-300 overflow-hidden flex items-center justify-center gap-3 ${code && !isChecking
+                            className={`group w-full relative px-6 py-3.5 md:px-8 md:py-4 rounded-xl font-bold text-base transition-all duration-300 overflow-hidden flex items-center justify-center gap-3 ${code && !isChecking
                                 ? 'bg-[#0569ff] text-white shadow-[0_4px_20px_rgba(5,105,255,0.3)] hover:shadow-[0_8px_30px_rgba(5,105,255,0.4)]'
                                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                 }`}
@@ -168,14 +168,6 @@ const Hero = () => {
                                 </>
                             )}
                         </button>
-
-                        {/* Helper Text */}
-                        <p className="text-sm text-gray-500 text-center">
-                            Don't know your code?{" "}
-                            <Link href="/contact" className="font-semibold text-[#0569ff] hover:underline">
-                                Contact your school administration
-                            </Link>
-                        </p>
                     </div>
 
                 </div>
