@@ -41,7 +41,7 @@ export async function GET(req, props) {
         // Get school details
         const school = await prisma.school.findUnique({
             where: { id: schoolId },
-            select: { id: true, name: true, code: true }
+            select: { id: true, name: true, schoolCode: true }
         });
 
         // Get payroll items with employee bank details (only READY employees)
@@ -84,11 +84,29 @@ export async function GET(req, props) {
             school
         );
 
+        // DEBUG LOGGING
+        console.log(`[Bank Slip] Period: ${period.month}/${period.year} (${period.status})`);
+        console.log(`[Bank Slip] Total Items: ${summary.totalEmployees}`);
+        console.log(`[Bank Slip] Valid (Included): ${rows.length}`);
+        console.log(`[Bank Slip] Skipped - Zero Salary: ${summary.skippedZeroSalary}`);
+        console.log(`[Bank Slip] Skipped - Missing Bank: ${summary.skippedMissingBank}`);
+
         // Check if any valid rows
         if (rows.length === 0) {
+            let errorMessage = 'No eligible employees found for bank transfer.';
+
+            if (summary.skippedZeroSalary > 0 && summary.skippedMissingBank === 0) {
+                errorMessage = `No payable employees found. ${summary.skippedZeroSalary} employees have ₹0 net salary.`;
+            } else if (summary.skippedMissingBank > 0) {
+                errorMessage = `No valid bank details found. ${summary.skippedMissingBank} employees missing bank info.`;
+            }
+
             return NextResponse.json({
-                error: 'No employees with valid bank details found',
-                details: `${summary.skipped} employees skipped due to missing bank details`
+                error: errorMessage,
+                details: {
+                    skippedZeroSalary: summary.skippedZeroSalary,
+                    skippedMissingBank: summary.skippedMissingBank
+                }
             }, { status: 400 });
         }
 

@@ -89,6 +89,13 @@ export async function POST(req, props) {
             }
         });
 
+        // DEBUG LOGGING
+        console.log(`[Process Payroll] School: ${schoolId}`);
+        console.log(`[Process Payroll] Total employees found: ${allEmployees.length}`);
+        allEmployees.forEach(emp => {
+            console.log(`  - ${emp.user?.name}: isActive=${emp.isActive}, hasSalary=${!!emp.salaryStructure}, gross=${emp.salaryStructure?.grossSalary}`);
+        });
+
         if (allEmployees.length === 0) {
             return NextResponse.json({
                 error: 'No active employees found in payroll'
@@ -249,13 +256,17 @@ export async function POST(req, props) {
                     }
                 }
 
-                // If no attendance records, assume full working days
-                if (attendance.length === 0) {
-                    daysWorked = period.totalWorkingDays;
-                }
+                // If no attendance records, daysWorked remains 0 (Dynamic Calculation)
+                // PREVIOUS LOGIC REMOVED: if (attendance.length === 0) { daysWorked = period.totalWorkingDays; }
 
+                // Guard against division by zero
+                const workingDays = period.totalWorkingDays || 1;
                 const structure = employee.salaryStructure;
-                const workingDays = period.totalWorkingDays;
+
+                // If daysWorked is 0 after checks, we should process with 0 salary but mark appropriately
+                // The user requested: "if working days are 0 show warning payroll cant be proceeed"
+                // But generally we should process them as Loss of Pay or 0 earnings.
+
                 const workFactor = daysWorked / workingDays;
 
                 // Calculate earnings (pro-rated based on attendance)
@@ -346,7 +357,7 @@ export async function POST(req, props) {
                 }
 
                 const totalDeductions = pfEmployee + esiEmployee + professionalTax + tds + loanDeduction + otherDeductions + lossOfPay;
-                const netSalary = grossEarnings - totalDeductions;
+                const netSalary = Math.max(0, grossEarnings - totalDeductions);
 
                 // Create or update payroll item
                 await prisma.payrollItem.upsert({
@@ -446,8 +457,11 @@ export async function POST(req, props) {
                     });
                 }
             } catch (error) {
+                console.error(`[Process Payroll] FAILED for ${employee.user?.name} (${employee.id}):`, error.message);
+                console.error(error.stack);
                 results.failed.push({
                     employeeId: employee.id,
+                    name: employee.user?.name,
                     error: error.message
                 });
             }

@@ -55,6 +55,26 @@ export async function GET(req, props) {
             }, { status: 403 });
         }
 
+        // Get IDs of employees already in this payroll
+        const includedEmployeeIds = period.payrollItems.map(item => item.employeeId);
+
+        // Find employees NOT included in this payroll period
+        const missingEmployees = await prisma.employeePayrollProfile.findMany({
+            where: {
+                schoolId,
+                id: { notIn: includedEmployeeIds },
+                isActive: true
+            },
+            include: {
+                user: {
+                    select: { id: true, name: true, email: true, profilePicture: true }
+                },
+                salaryStructure: {
+                    select: { name: true, grossSalary: true }
+                }
+            }
+        });
+
         // Transform payroll items
         const formattedItems = period.payrollItems.map(item => ({
             ...item,
@@ -65,11 +85,69 @@ export async function GET(req, props) {
             expectedGross: item.employee.salaryStructure?.grossSalary
         }));
 
+        // Determine exclusion reason for missing employees
+        const getExclusionReason = (emp) => {
+            // Check if profile was created after payroll was processed
+            if (emp.createdAt > period.processedAt) {
+                return {
+                    code: 'ADDED_AFTER_PROCESSING',
+                    message: 'Profile was added after payroll was processed'
+                };
+            }
+
+            // Check if bank details were pending approval
+            if (emp.pendingApprovedAt && emp.pendingApprovedAt > period.processedAt) {
+                return {
+                    code: 'BANK_PENDING_DURING_PROCESSING',
+                    message: 'Bank details were pending approval when payroll was processed'
+                };
+            }
+
+            // Check if no salary structure
+            if (!emp.salaryStructure) {
+                return {
+                    code: 'NO_SALARY_STRUCTURE',
+                    message: 'No salary structure assigned'
+                };
+            }
+
+            // Default - was inactive or other reason
+            return {
+                code: 'NOT_ACTIVE_DURING_PROCESSING',
+                message: 'Was not active when payroll was processed'
+            };
+        };
+
+        // Format missing employees with exclusion reason
+        const formattedMissing = missingEmployees.map(emp => {
+            const exclusionReason = getExclusionReason(emp);
+            return {
+                id: emp.id,
+                employeeId: emp.id,
+                employeeName: emp.user.name,
+                employeeEmail: emp.user.email,
+                profilePicture: emp.user.profilePicture,
+                salaryStructureName: emp.salaryStructure?.name,
+                expectedGross: emp.salaryStructure?.grossSalary || 0,
+                grossEarnings: emp.salaryStructure?.grossSalary || 0,
+                totalDeductions: 0,
+                netSalary: emp.salaryStructure?.grossSalary || 0,
+                readiness: emp.salaryStructure ? 'NOT_PROCESSED' : 'SKIPPED_NO_STRUCTURE',
+                paymentStatus: 'NOT_IN_PERIOD',
+                isMissing: true,
+                exclusionReason: exclusionReason.code,
+                exclusionMessage: exclusionReason.message
+            };
+        });
+
         return NextResponse.json({
             ...period,
             payrollItems: formattedItems,
+            missingEmployees: formattedMissing,
             summary: {
                 totalEmployees: formattedItems.length,
+                totalActiveEmployees: formattedItems.length + formattedMissing.length,
+                missingCount: formattedMissing.length,
                 totalGross: formattedItems.reduce((sum, i) => sum + i.grossEarnings, 0),
                 totalDeductions: formattedItems.reduce((sum, i) => sum + i.totalDeductions, 0),
                 totalNet: formattedItems.reduce((sum, i) => sum + i.netSalary, 0),
@@ -81,7 +159,8 @@ export async function GET(req, props) {
                 onHoldBank: formattedItems.filter(i => i.readiness === 'ON_HOLD_BANK').length,
                 onHoldApproval: formattedItems.filter(i => i.readiness === 'ON_HOLD_APPROVAL').length,
                 skippedNoStructure: formattedItems.filter(i => i.readiness === 'SKIPPED_NO_STRUCTURE').length,
-                total: formattedItems.length
+                notProcessed: formattedMissing.filter(e => e.readiness === 'NOT_PROCESSED').length,
+                total: formattedItems.length + formattedMissing.length
             }
         });
     } catch (error) {

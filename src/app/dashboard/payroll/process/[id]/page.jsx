@@ -32,7 +32,11 @@ import {
     FileDown,
     Lock,
     Unlock,
-    AlertTriangle
+    AlertTriangle,
+    Info,
+    AlertCircle,
+    UserCheck,
+    UserX
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -82,6 +86,17 @@ export default function PayrollPeriodDetailPage({ params }) {
         enabled: !!schoolId && !!periodId,
     });
 
+    // Fetch preview data (shows all employees with expected payroll)
+    const { data: previewData, isLoading: previewLoading } = useQuery({
+        queryKey: ["payroll-preview", schoolId, periodId],
+        queryFn: async () => {
+            const res = await fetch(`/api/schools/${schoolId}/payroll/periods/${periodId}/preview`);
+            if (!res.ok) throw new Error("Failed to fetch preview");
+            return res.json();
+        },
+        enabled: !!schoolId && !!periodId,
+    });
+
     // Process payroll mutation
     const processMutation = useMutation({
         mutationFn: async () => {
@@ -96,9 +111,14 @@ export default function PayrollPeriodDetailPage({ params }) {
             }
             return res.json();
         },
-        onSuccess: () => {
-            toast.success("Payroll processed successfully");
+        onSuccess: (data) => {
+            if (data.results?.failed?.length > 0) {
+                toast.warning(`Payroll processed with ${data.results.failed.length} failures`);
+            } else {
+                toast.success("Payroll processed successfully");
+            }
             queryClient.invalidateQueries(["payroll-period", schoolId, periodId]);
+            queryClient.invalidateQueries(["payroll-preview", schoolId, periodId]);
         },
         onError: (error) => {
             toast.error(error.message);
@@ -402,7 +422,17 @@ export default function PayrollPeriodDetailPage({ params }) {
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">Employees</p>
-                                <p className="text-2xl font-bold">{period.summary?.totalEmployees || 0}</p>
+                                <p className="text-2xl font-bold">
+                                    {period.status === 'DRAFT' && previewData ?
+                                        previewData.summary.totalEmployees :
+                                        (period.summary?.totalEmployees || 0)
+                                    }
+                                    {!previewData && period.summary?.missingCount > 0 && (
+                                        <span className="text-sm font-normal text-muted-foreground ml-1">
+                                            / {period.summary?.totalActiveEmployees}
+                                        </span>
+                                    )}
+                                </p>
                             </div>
                         </div>
                     </CardContent>
@@ -448,8 +478,8 @@ export default function PayrollPeriodDetailPage({ params }) {
                 </Card>
             </div>
 
-            {/* Validation Summary - Shows employee readiness status */}
-            {period.validationSummary && (period.validationSummary.onHoldBank > 0 || period.validationSummary.onHoldApproval > 0 || period.validationSummary.skippedNoStructure > 0) && (
+            {/* Validation Summary - Shows employee readiness status (Only post-processing) */}
+            {period.validationSummary && period.status !== 'DRAFT' && (
                 <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950/20">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-base flex items-center gap-2 text-orange-700 dark:text-orange-400">
@@ -458,7 +488,7 @@ export default function PayrollPeriodDetailPage({ params }) {
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                             <div className="p-3 bg-white dark:bg-muted rounded-lg border">
                                 <p className="text-2xl font-bold text-green-600">{period.validationSummary.ready || 0}</p>
                                 <p className="text-sm text-muted-foreground">Ready to Pay</p>
@@ -475,10 +505,22 @@ export default function PayrollPeriodDetailPage({ params }) {
                                 <p className="text-2xl font-bold text-red-500">{period.validationSummary.skippedNoStructure || 0}</p>
                                 <p className="text-sm text-muted-foreground">No Salary Structure</p>
                             </div>
+                            {period.summary?.missingCount > 0 && (
+                                <div className="p-3 bg-white dark:bg-muted rounded-lg border border-blue-200">
+                                    <p className="text-2xl font-bold text-blue-500">{period.summary.missingCount}</p>
+                                    <p className="text-sm text-muted-foreground">Not in Payroll</p>
+                                </div>
+                            )}
                         </div>
                         {(period.validationSummary.onHoldBank > 0 || period.validationSummary.onHoldApproval > 0) && (
                             <p className="text-sm text-orange-700 dark:text-orange-400 mt-3">
                                 ⚠️ On-hold employees will be excluded from the bank slip file
+                            </p>
+                        )}
+                        {period.summary?.missingCount > 0 && (
+                            <p className="text-sm text-blue-700 dark:text-blue-400 mt-2">
+                                ℹ️ {period.summary.missingCount} active employee(s) were not included when this payroll was processed.
+                                {period.status === 'DRAFT' ? ' Re-process the payroll to include them.' : ''}
                             </p>
                         )}
                     </CardContent>
@@ -494,106 +536,270 @@ export default function PayrollPeriodDetailPage({ params }) {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {period.payrollItems?.length > 0 ? (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Employee</TableHead>
-                                    <TableHead>Working Days</TableHead>
-                                    <TableHead className="text-right">Gross</TableHead>
-                                    <TableHead className="text-right">Deductions</TableHead>
-                                    <TableHead className="text-right">Net Salary</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {period.payrollItems.map(item => (
-                                    <TableRow key={item.id}>
-                                        <TableCell>
-                                            <div className="flex items-center gap-3">
-                                                <Avatar className="h-10 w-10">
-                                                    <AvatarImage src={item.profilePicture} />
-                                                    <AvatarFallback>{item.employeeName?.charAt(0)}</AvatarFallback>
-                                                </Avatar>
-                                                <div>
-                                                    <p className="font-medium">{item.employeeName}</p>
-                                                    <p className="text-sm text-muted-foreground">{item.salaryStructureName}</p>
-                                                </div>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div>
-                                                <p className="font-medium">{item.daysWorked || 0} / {period.totalWorkingDays || 0}</p>
-                                                <p className="text-sm text-muted-foreground">
-                                                    {item.daysAbsent > 0 && <span className="text-orange-500">Absent: {item.daysAbsent}</span>}
-                                                </p>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-right font-medium">
-                                            {formatCurrency(item.grossEarnings)}
-                                        </TableCell>
-                                        <TableCell className="text-right text-orange-500">
-                                            -{formatCurrency(item.totalDeductions)}
-                                        </TableCell>
-                                        <TableCell className="text-right font-bold text-primary">
-                                            {formatCurrency(item.netSalary)}
-                                        </TableCell>
-                                        <TableCell>
-                                            {/* Readiness Status */}
-                                            {item.readiness === 'READY' ? (
-                                                <Badge variant="success" className="bg-green-100 text-green-700">
-                                                    ✓ Ready
-                                                </Badge>
-                                            ) : item.readiness === 'ON_HOLD_BANK' ? (
-                                                <Badge variant="warning" className="bg-orange-100 text-orange-700">
-                                                    ⚠ Bank Missing
-                                                </Badge>
-                                            ) : item.readiness === 'ON_HOLD_APPROVAL' ? (
-                                                <Badge variant="secondary" className="bg-yellow-100 text-yellow-700">
-                                                    ⏳ Pending Approval
-                                                </Badge>
-                                            ) : item.readiness === 'SKIPPED_NO_STRUCTURE' ? (
-                                                <Badge variant="destructive" className="bg-red-100 text-red-700">
-                                                    ✗ No Structure
-                                                </Badge>
-                                            ) : (
-                                                <Badge variant={item.paymentStatus === "PAID" ? "success" : "secondary"}>
-                                                    {item.paymentStatus}
-                                                </Badge>
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            {item.payslipId && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => downloadPayslipPDF(item.payslipId, item.employeeName)}
-                                                    title="Download Payslip PDF"
-                                                >
-                                                    <FileDown className="h-4 w-4" />
-                                                </Button>
-                                            )}
-                                        </TableCell>
+                    {/* Logic for DRAFT status - Show Preview Data */}
+                    {period.status === 'DRAFT' && previewData ? (
+                        <>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                                <div className="p-3 bg-muted/50 rounded-lg border">
+                                    <p className="text-2xl font-bold">{previewData.summary.totalEmployees}</p>
+                                    <p className="text-sm text-muted-foreground">Total Active Employees</p>
+                                </div>
+                                <div className="p-3 bg-green-50 rounded-lg border border-green-100">
+                                    <p className="text-2xl font-bold text-green-600">{previewData.summary.readyToProcess}</p>
+                                    <p className="text-sm text-green-700">Ready to Process</p>
+                                </div>
+                                <div className="p-3 bg-red-50 rounded-lg border border-red-100">
+                                    <p className="text-2xl font-bold text-red-600">{previewData.summary.noStructure}</p>
+                                    <p className="text-sm text-red-700">No Salary Structure</p>
+                                </div>
+                                <div className="p-3 bg-orange-50 rounded-lg border border-orange-100">
+                                    <p className="text-2xl font-bold text-orange-600">
+                                        {previewData.summary.noBankDetails + previewData.summary.pendingApproval}
+                                    </p>
+                                    <p className="text-sm text-orange-700">Missing Info / Pending</p>
+                                </div>
+                            </div>
+
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Employee</TableHead>
+                                        <TableHead>Working Days</TableHead>
+                                        <TableHead className="text-right">Expected Gross</TableHead>
+                                        <TableHead className="text-right">Deductions</TableHead>
+                                        <TableHead className="text-right">Net Salary</TableHead>
+                                        <TableHead>Readiness</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    ) : (
-                        <div className="text-center py-12 text-muted-foreground">
-                            <FileText className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                            <p>No payroll items yet</p>
-                            {period.status === "DRAFT" && (
-                                <Button
-                                    variant="link"
-                                    onClick={() => processMutation.mutate()}
-                                    disabled={processMutation.isPending}
-                                >
-                                    Process payroll to generate items
-                                </Button>
+                                </TableHeader>
+                                <TableBody>
+                                    {previewData.employees.map(emp => (
+                                        <TableRow key={emp.id} className={emp.readiness !== 'READY' ? 'bg-muted/30' : ''}>
+                                            <TableCell>
+                                                <div className="flex items-center gap-3">
+                                                    <Avatar className="h-10 w-10">
+                                                        <AvatarImage src={emp.profilePicture} />
+                                                        <AvatarFallback>{emp.name?.charAt(0)}</AvatarFallback>
+                                                    </Avatar>
+                                                    <div>
+                                                        <p className="font-medium">{emp.name}</p>
+                                                        <p className="text-sm text-muted-foreground">{emp.designation}</p>
+                                                        {emp.salaryStructureName && (
+                                                            <p className="text-xs text-muted-foreground mt-0.5">{emp.salaryStructureName}</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div>
+                                                    <p className="font-medium">
+                                                        {emp.workingDays} / {emp.totalPeriodDays || '-'}
+                                                    </p>
+                                                    {emp.warnings?.some(w => w.includes('No attendance')) && (
+                                                        <span className="text-xs text-orange-600 flex items-center gap-1">
+                                                            <Info className="h-3 w-3" /> No Attendance Data
+                                                        </span>
+                                                    )}
+                                                    {emp.workingDays === 0 && (
+                                                        <span className="text-xs text-red-600 flex items-center gap-1">
+                                                            <AlertCircle className="h-3 w-3" /> 0 Working Days
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-right font-medium">
+                                                {formatCurrency(emp.expectedGross)}
+                                            </TableCell>
+                                            <TableCell className="text-right text-muted-foreground">
+                                                -
+                                            </TableCell>
+                                            <TableCell className="text-right font-bold text-primary">
+                                                {formatCurrency(emp.expectedNet)}
+                                            </TableCell>
+                                            <TableCell>
+                                                {emp.readiness === 'READY' ? (
+                                                    <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
+                                                        <CheckCircle className="h-3 w-3 mr-1" /> Ready
+                                                    </Badge>
+                                                ) : emp.readiness === 'NO_STRUCTURE' ? (
+                                                    <Badge variant="destructive" className="bg-red-100 text-red-700 hover:bg-red-100">
+                                                        <XCircle className="h-3 w-3 mr-1" /> No Structure
+                                                    </Badge>
+                                                ) : emp.readiness === 'NO_BANK' ? (
+                                                    <Badge variant="warning" className="bg-orange-100 text-orange-700 hover:bg-orange-100">
+                                                        <AlertTriangle className="h-3 w-3 mr-1" /> No Bank Details
+                                                    </Badge>
+                                                ) : emp.readiness === 'PENDING_APPROVAL' ? (
+                                                    <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">
+                                                        <Clock className="h-3 w-3 mr-1" /> Pending Approval
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge variant="outline">{emp.readinessMessage}</Badge>
+                                                )}
+                                                {emp.readiness !== 'READY' && (
+                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                        {emp.readinessMessage}
+                                                    </p>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                {/* Actions if needed */}
+                                                {(emp.readiness === 'NO_STRUCTURE' || emp.readiness === 'NO_BANK') && (
+                                                    <Link href={`/dashboard/staff/${emp.employeeType === 'TEACHING' ? 'teaching' : 'non-teaching'}`}>
+                                                        <Button variant="link" size="sm" className="h-auto p-0 text-xs">
+                                                            Fix in Profile
+                                                        </Button>
+                                                    </Link>
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                            {/* Validation warning if 0 ready employees */}
+                            {previewData.summary.readyToProcess === 0 && (
+                                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md text-red-800 flex items-center gap-3">
+                                    <AlertTriangle className="h-5 w-5" />
+                                    <div>
+                                        <p className="font-bold">Cannot process payroll</p>
+                                        <p className="text-sm">No employees are ready to be processed. Please assign salary structures or approve banking details.</p>
+                                    </div>
+                                </div>
                             )}
-                        </div>
-                    )}
+                        </>
+                    ) : (
+                        // Standard view for processed/other states
+                        (period.payrollItems?.length > 0 || period.missingEmployees?.length > 0) ? (
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Employee</TableHead>
+                                        <TableHead>Working Days</TableHead>
+                                        <TableHead className="text-right">Gross</TableHead>
+                                        <TableHead className="text-right">Deductions</TableHead>
+                                        <TableHead className="text-right">Net Salary</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {/* Combined Processed & Missing Employees Table */}
+                                    {[...(period.payrollItems || []), ...(period.missingEmployees || [])]
+                                        .sort((a, b) => (a.employeeName || '').localeCompare(b.employeeName || ''))
+                                        .map(item => {
+                                            const isMissing = !!item.isMissing;
+                                            return (
+                                                <TableRow key={item.id} className={isMissing ? "bg-muted/30 dark:bg-muted/10" : ""}>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-3">
+                                                            <Avatar className="h-10 w-10">
+                                                                <AvatarImage src={item.profilePicture} />
+                                                                <AvatarFallback>{item.employeeName?.charAt(0)}</AvatarFallback>
+                                                            </Avatar>
+                                                            <div>
+                                                                <p className="font-medium">{item.employeeName}</p>
+                                                                <p className="text-sm text-muted-foreground">
+                                                                    {item.salaryStructureName || <span className="text-red-500">No structure</span>}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {!isMissing ? (
+                                                            <div>
+                                                                <p className="font-medium">{item.daysWorked || 0} / {period.totalWorkingDays || 0}</p>
+                                                                {item.daysWorked === 0 && (
+                                                                    <p className="text-xs text-red-500 flex items-center gap-1">
+                                                                        <AlertCircle className="h-3 w-3" /> 0 Days
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-muted-foreground">-</span>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-medium">
+                                                        {formatCurrency(item.grossEarnings || item.expectedGross || 0)}
+                                                    </TableCell>
+                                                    <TableCell className="text-right text-muted-foreground">
+                                                        {isMissing ? '-' : (
+                                                            <span className={item.totalDeductions > 0 ? "text-orange-500" : ""}>
+                                                                {item.totalDeductions > 0 ? `-${formatCurrency(item.totalDeductions)}` : '0'}
+                                                            </span>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-bold text-primary">
+                                                        {isMissing ? '-' : formatCurrency(item.netSalary)}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {!isMissing ? (
+                                                            item.readiness === 'READY' ? (
+                                                                <Badge variant="success" className="bg-green-100 text-green-700 hover:bg-green-100">
+                                                                    ✓ Processed
+                                                                </Badge>
+                                                            ) : item.readiness === 'ON_HOLD_BANK' ? (
+                                                                <Badge variant="warning" className="bg-orange-100 text-orange-700 hover:bg-orange-100">
+                                                                    ⚠ Bank Missing
+                                                                </Badge>
+                                                            ) : item.readiness === 'ON_HOLD_APPROVAL' ? (
+                                                                <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">
+                                                                    ⏳ Pending Approval
+                                                                </Badge>
+                                                            ) : item.readiness === 'SKIPPED_NO_STRUCTURE' ? (
+                                                                <Badge variant="destructive" className="bg-red-100 text-red-700 hover:bg-red-100">
+                                                                    ✗ No Structure
+                                                                </Badge>
+                                                            ) : (
+                                                                <Badge variant={item.paymentStatus === "PAID" ? "success" : "secondary"}>
+                                                                    {item.paymentStatus}
+                                                                </Badge>
+                                                            )
+                                                        ) : (
+                                                            <div className="flex flex-col gap-1">
+                                                                <Badge variant="outline" className="text-muted-foreground border-muted-foreground/30 w-fit">
+                                                                    Not Included
+                                                                </Badge>
+                                                                {item.exclusionMessage && (
+                                                                    <span className="text-xs text-muted-foreground">
+                                                                        {item.exclusionMessage}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        {!isMissing && item.payslipId && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => downloadPayslipPDF(item.payslipId, item.employeeName)}
+                                                                title="Download Payslip PDF"
+                                                            >
+                                                                <FileDown className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                </TableBody>
+                            </Table>
+                        ) : (
+                            <div className="text-center py-12 text-muted-foreground">
+                                <FileText className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                                <p>No payroll items yet</p>
+                                {period.status === "DRAFT" && (
+                                    <Button
+                                        variant="link"
+                                        onClick={() => processMutation.mutate()}
+                                        disabled={processMutation.isPending}
+                                    >
+                                        Process payroll to generate items
+                                    </Button>
+                                )}
+                            </div>
+                        ))
+                    }
                 </CardContent>
             </Card>
 
@@ -623,6 +829,6 @@ export default function PayrollPeriodDetailPage({ params }) {
                     </div>
                 </CardContent>
             </Card>
-        </div>
+        </div >
     );
 }

@@ -13,12 +13,25 @@ export function generateBankSlipData(payrollItems, period, school) {
     const reference = `SAL-${school.code || 'SCH'}-${period.month.toString().padStart(2, '0')}${period.year}`;
 
     // Filter valid items with bank details
-    const validItems = payrollItems.filter(item =>
-        item.employee?.accountNumber &&
-        item.employee?.ifscCode &&
-        item.netSalary > 0 &&
-        item.paymentStatus !== 'PROCESSED'
-    );
+    const validItems = [];
+    let skippedZeroSalary = 0;
+    let skippedMissingBank = 0;
+
+    payrollItems.forEach(item => {
+        const hasBank = item.employee?.accountNumber && item.employee?.ifscCode;
+        if (!hasBank) {
+            skippedMissingBank++;
+        } else if (item.netSalary <= 0) {
+            skippedZeroSalary++;
+        } else {
+            validItems.push(item);
+        }
+    });
+
+    // Calculate totals
+    const totalAmount = validItems.reduce((sum, item) => sum + item.netSalary, 0);
+    const neftCount = validItems.filter(item => item.netSalary < 200000).length;
+    const rtgsCount = validItems.filter(item => item.netSalary >= 200000).length;
 
     // CSV Headers (Bank transfer format)
     const headers = [
@@ -53,11 +66,6 @@ export function generateBankSlipData(payrollItems, period, school) {
         ];
     });
 
-    // Calculate totals
-    const totalAmount = validItems.reduce((sum, item) => sum + item.netSalary, 0);
-    const neftCount = validItems.filter(item => item.netSalary < 200000).length;
-    const rtgsCount = validItems.filter(item => item.netSalary >= 200000).length;
-
     return {
         headers,
         rows,
@@ -67,6 +75,8 @@ export function generateBankSlipData(payrollItems, period, school) {
             neftCount,
             rtgsCount,
             skipped: payrollItems.length - validItems.length,
+            skippedZeroSalary,
+            skippedMissingBank,
             reference,
             period: `${monthName} ${period.year}`
         },

@@ -80,6 +80,19 @@ export default function PayrollOverview() {
         staleTime: 1000 * 60 * 2, // 2 minute stale time
     });
 
+    // Fetch pending requests count
+    const { data: requestData } = useQuery({
+        queryKey: ["payroll-requests", schoolId],
+        queryFn: async () => {
+            const res = await fetch(`/api/schools/${schoolId}/payroll/requests`);
+            if (!res.ok) return { pendingCount: 0 };
+            return res.json();
+        },
+        enabled: !!schoolId,
+    });
+
+    const pendingRequestCount = requestData?.pendingCount || 0;
+
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-screen">
@@ -100,19 +113,6 @@ export default function PayrollOverview() {
         upcomingBirthdays,
         upcomingAnniversaries
     } = stats || {};
-
-    // Fetch pending requests count
-    const { data: requestData } = useQuery({
-        queryKey: ["payroll-requests", schoolId],
-        queryFn: async () => {
-            const res = await fetch(`/api/schools/${schoolId}/payroll/requests`);
-            if (!res.ok) return { pendingCount: 0 };
-            return res.json();
-        },
-        enabled: !!schoolId,
-    });
-
-    const pendingRequestCount = requestData?.pendingCount || 0;
 
     return (
         <div className="p-4 sm:p-6 lg:p-8 space-y-6">

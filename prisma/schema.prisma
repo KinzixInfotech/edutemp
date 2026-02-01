@@ -129,6 +129,7 @@ model School {
   hpcreports          HPCReport[]
   termLocks           TermLock[]
   hpcstageTemplates   HPCStageTemplate[]
+  payrollSettings     PayrollSettings?
 
   @@index([name])
 }
@@ -4899,6 +4900,26 @@ enum PayrollStatus {
   APPROVED
   PAID
   CANCELLED
+}
+
+// School-level Payroll Settings
+model PayrollSettings {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @unique @db.Uuid
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  // Approval Settings
+  requireDirectorApproval Boolean @default(true)
+  allowAdminToRunPayroll  Boolean @default(true)
+  autoEmailPayslips       Boolean @default(false)
+
+  // Thresholds
+  maxSalaryWithoutApproval Float? // Optional: Auto-approve below this amount
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([schoolId])
 }
 
 // Individual Payroll Entry for each employee
