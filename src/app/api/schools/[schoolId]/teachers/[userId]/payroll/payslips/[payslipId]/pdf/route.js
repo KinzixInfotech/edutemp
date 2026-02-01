@@ -1,5 +1,6 @@
 // Teacher Payslip PDF Download API
 // GET /api/schools/[schoolId]/teachers/[userId]/payroll/payslips/[payslipId]/pdf
+// Note: payslipId is actually a PayrollItem ID, not a Payslip ID
 
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
@@ -10,31 +11,31 @@ export async function GET(req, props) {
     const { schoolId, userId, payslipId } = params;
 
     try {
-        // Get the payslip with related data
-        const payslip = await prisma.payslip.findUnique({
+        // Note: payslipId here is actually a PayrollItem ID (from the payslips list API)
+        console.log(`[Payslip PDF] Looking for PayrollItem: ${payslipId}, user: ${userId}`);
+
+        // Get the payroll item with related data
+        const payrollItem = await prisma.payrollItem.findUnique({
             where: { id: payslipId },
             include: {
-                payrollItem: {
+                period: true,
+                employee: {
                     include: {
-                        period: true,
-                        employee: {
-                            include: {
-                                user: {
-                                    select: { id: true, name: true, email: true }
-                                }
-                            }
+                        user: {
+                            select: { id: true, name: true, email: true }
                         }
                     }
                 }
             }
         });
 
-        if (!payslip) {
-            return NextResponse.json({ error: 'Payslip not found' }, { status: 404 });
+        if (!payrollItem) {
+            console.log(`[Payslip PDF] PayrollItem not found: ${payslipId}`);
+            return NextResponse.json({ error: 'Payroll record not found' }, { status: 404 });
         }
 
         // Verify the teacher has access to this payslip
-        const employeeUserId = payslip.payrollItem.employee.userId;
+        const employeeUserId = payrollItem.employee.userId;
         if (employeeUserId !== userId) {
             return NextResponse.json({ error: 'Unauthorized - this is not your payslip' }, { status: 403 });
         }
@@ -44,39 +45,44 @@ export async function GET(req, props) {
             where: { id: schoolId },
             select: {
                 name: true,
-                address: true,
-                city: true,
-                state: true,
-                pincode: true,
-                phone: true,
-                email: true,
-                logo: true
+                location: true,
+                contactNumber: true,
+                profilePicture: true
             }
         });
 
-        // Get staff details (teaching staff)
-        // Note: We use userId here
-        const staff = await prisma.teachingStaff.findUnique({
+        // Get staff details (teaching staff or non-teaching)
+        let staff = await prisma.teachingStaff.findUnique({
             where: { userId: userId },
             select: {
                 employeeId: true,
                 designation: true,
-                joiningDate: true,
                 department: { select: { name: true } }
             }
         });
 
-        const item = payslip.payrollItem;
-        const profile = item.employee;
+        if (!staff) {
+            staff = await prisma.nonTeachingStaff.findUnique({
+                where: { userId: userId },
+                select: {
+                    employeeId: true,
+                    designation: true,
+                    department: { select: { name: true } }
+                }
+            });
+        }
+
+        const profile = payrollItem.employee;
+        const item = payrollItem;
 
         // Build earnings array
         const earnings = [
-            { label: 'Basic Salary', amount: item.basicEarned },
-            { label: 'HRA', amount: item.hraEarned },
-            { label: 'DA', amount: item.daEarned },
-            { label: 'TA', amount: item.taEarned },
-            { label: 'Medical', amount: item.medicalEarned },
-            { label: 'Special', amount: item.specialEarned },
+            { label: 'Basic Salary', amount: item.basicEarned || 0 },
+            { label: 'HRA', amount: item.hraEarned || 0 },
+            { label: 'DA', amount: item.daEarned || 0 },
+            { label: 'TA', amount: item.taEarned || 0 },
+            { label: 'Medical', amount: item.medicalEarned || 0 },
+            { label: 'Special', amount: item.specialEarned || 0 },
         ].filter(e => e.amount > 0);
 
         if (item.overtimeEarned > 0) earnings.push({ label: 'Overtime', amount: item.overtimeEarned });
@@ -97,28 +103,27 @@ export async function GET(req, props) {
             payslip: {
                 month: item.period.month,
                 year: item.period.year,
-                daysWorked: item.daysWorked,
-                daysAbsent: item.daysAbsent,
-                totalWorkingDays: item.period.totalWorkingDays,
-                grossEarnings: item.grossEarnings,
-                totalDeductions: item.totalDeductions,
-                netSalary: item.netSalary,
+                daysWorked: item.daysWorked || 0,
+                daysAbsent: item.daysAbsent || 0,
+                totalWorkingDays: item.period.totalWorkingDays || 0,
+                grossEarnings: item.grossEarnings || 0,
+                totalDeductions: item.totalDeductions || 0,
+                netSalary: item.netSalary || 0,
                 earnings,
                 deductions
             },
             school: {
                 name: school?.name || 'School',
-                address: [school?.address, school?.city, school?.state, school?.pincode].filter(Boolean).join(', '),
-                phone: school?.phone,
-                email: school?.email,
-                logo: school?.logo
+                address: school?.location || '',
+                phone: school?.contactNumber,
+                email: null,
+                logo: school?.profilePicture
             },
             employee: {
                 name: profile.user?.name || 'Employee',
                 employeeId: staff?.employeeId || profile.userId?.substring(0, 8),
-                designation: staff?.designation || 'Teacher',
+                designation: staff?.designation || 'Staff',
                 department: staff?.department?.name || 'General',
-                joiningDate: staff?.joiningDate,
                 panNumber: profile.panNumber,
                 uanNumber: profile.uanNumber,
                 bankName: profile.bankName,

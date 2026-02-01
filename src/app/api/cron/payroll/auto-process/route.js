@@ -120,7 +120,7 @@ export async function POST(req) {
                     schoolId: config.schoolId,
                     title: '📅 New Payroll Period Created',
                     message: `Payroll period for ${monthName} ${currentYear} has been created. Please process payroll at your convenience.`,
-                    type: 'PAYROLL',
+                    type: 'FEE',
                     priority: 'NORMAL',
                     targetOptions: {
                         roleNames: ['ADMIN', 'PRINCIPAL', 'DIRECTOR']

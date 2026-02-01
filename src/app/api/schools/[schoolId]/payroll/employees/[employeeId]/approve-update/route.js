@@ -92,7 +92,7 @@ export async function POST(req, props) {
                     schoolId,
                     title: '✅ Profile Update Approved',
                     message: 'Your profile updates have been approved and are now active.',
-                    type: 'PAYROLL',
+                    type: 'FEE',
                     priority: 'NORMAL',
                     targetOptions: {
                         userIds: [profile.userId]
@@ -136,7 +136,7 @@ export async function POST(req, props) {
                     schoolId,
                     title: '❌ Profile Update Rejected',
                     message: `Your profile update request was rejected. Reason: ${rejectionReason}`,
-                    type: 'PAYROLL',
+                    type: 'FEE',
                     priority: 'NORMAL',
                     targetOptions: {
                         userIds: [profile.userId]

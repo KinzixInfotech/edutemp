@@ -85,25 +85,31 @@ export async function GET(req, props) {
             expectedGross: item.employee.salaryStructure?.grossSalary
         }));
 
+        // Get attendance records for missing employees during the period
+        const missingUserIds = missingEmployees.map(e => e.userId);
+        const attendanceRecords = await prisma.attendance.groupBy({
+            by: ['userId'],
+            where: {
+                userId: { in: missingUserIds },
+                schoolId,
+                date: {
+                    gte: period.startDate,
+                    lte: period.endDate
+                },
+                status: { in: ['PRESENT', 'LATE', 'HALF_DAY'] }
+            },
+            _count: { id: true }
+        });
+
+        // Create a map of userId -> attendance count
+        const attendanceByUser = {};
+        for (const record of attendanceRecords) {
+            attendanceByUser[record.userId] = record._count.id;
+        }
+
         // Determine exclusion reason for missing employees
         const getExclusionReason = (emp) => {
-            // Check if profile was created after payroll was processed
-            if (emp.createdAt > period.processedAt) {
-                return {
-                    code: 'ADDED_AFTER_PROCESSING',
-                    message: 'Profile was added after payroll was processed'
-                };
-            }
-
-            // Check if bank details were pending approval
-            if (emp.pendingApprovedAt && emp.pendingApprovedAt > period.processedAt) {
-                return {
-                    code: 'BANK_PENDING_DURING_PROCESSING',
-                    message: 'Bank details were pending approval when payroll was processed'
-                };
-            }
-
-            // Check if no salary structure
+            // Check if no salary structure (most common reason)
             if (!emp.salaryStructure) {
                 return {
                     code: 'NO_SALARY_STRUCTURE',
@@ -111,10 +117,43 @@ export async function GET(req, props) {
                 };
             }
 
-            // Default - was inactive or other reason
+            // Check if employee was marked inactive
+            if (!emp.isActive) {
+                return {
+                    code: 'WAS_INACTIVE',
+                    message: 'Employee was inactive when payroll was processed'
+                };
+            }
+
+            // Check if employee had 0 attendance/working days
+            const attendanceCount = attendanceByUser[emp.userId] || 0;
+            if (attendanceCount === 0 && period.processedAt) {
+                return {
+                    code: 'NO_ATTENDANCE',
+                    message: 'Had 0 working days when payroll was processed'
+                };
+            }
+
+            // Check if profile was created after payroll was processed
+            if (period.processedAt && emp.createdAt > period.processedAt) {
+                return {
+                    code: 'ADDED_AFTER_PROCESSING',
+                    message: 'Profile was added after payroll was processed'
+                };
+            }
+
+            // Check if bank details were pending approval
+            if (period.processedAt && emp.pendingApprovedAt && emp.pendingApprovedAt > period.processedAt) {
+                return {
+                    code: 'BANK_PENDING_DURING_PROCESSING',
+                    message: 'Bank details were pending approval when payroll was processed'
+                };
+            }
+
+            // Default - unknown reason (shouldn't happen for valid data)
             return {
-                code: 'NOT_ACTIVE_DURING_PROCESSING',
-                message: 'Was not active when payroll was processed'
+                code: 'UNKNOWN',
+                message: 'Unknown reason - please re-process payroll to include'
             };
         };
 
@@ -145,8 +184,9 @@ export async function GET(req, props) {
             payrollItems: formattedItems,
             missingEmployees: formattedMissing,
             summary: {
-                totalEmployees: formattedItems.length,
-                totalActiveEmployees: formattedItems.length + formattedMissing.length,
+                // Total should include both processed AND missing employees
+                totalEmployees: formattedItems.length + formattedMissing.length,
+                processedCount: formattedItems.length,
                 missingCount: formattedMissing.length,
                 totalGross: formattedItems.reduce((sum, i) => sum + i.grossEarnings, 0),
                 totalDeductions: formattedItems.reduce((sum, i) => sum + i.totalDeductions, 0),

@@ -333,15 +333,27 @@ export default function PayrollPeriodDetailPage({ params }) {
                     </div>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap">
-                    {period.status === "DRAFT" && (
-                        <Button
-                            onClick={() => processMutation.mutate()}
-                            disabled={processMutation.isPending}
-                        >
-                            <Play className="mr-2 h-4 w-4" />
-                            {processMutation.isPending ? "Processing..." : "Process Payroll"}
-                        </Button>
-                    )}
+                    {period.status === "DRAFT" && (() => {
+                        // Check if any employees are ready for payroll
+                        const readyEmployees = previewData?.employees?.filter(e =>
+                            e.status !== 'missing' && (e.daysWorked > 0 || e.daysPresent > 0)
+                        ) || [];
+                        const isDisabled = processMutation.isPending || readyEmployees.length === 0;
+                        const disabledReason = readyEmployees.length === 0
+                            ? "No employees ready - check attendance and payroll profiles"
+                            : null;
+
+                        return (
+                            <Button
+                                onClick={() => processMutation.mutate()}
+                                disabled={isDisabled}
+                                title={disabledReason}
+                            >
+                                <Play className="mr-2 h-4 w-4" />
+                                {processMutation.isPending ? "Processing..." : "Process Payroll"}
+                            </Button>
+                        );
+                    })()}
                     {(period.status === "PROCESSED" || period.status === "PENDING_APPROVAL") && (
                         <>
                             <Button
@@ -371,6 +383,14 @@ export default function PayrollPeriodDetailPage({ params }) {
                             >
                                 <Banknote className="mr-2 h-4 w-4" />
                                 {settlementMutation.isPending ? "Confirming..." : "Confirm Settlement"}
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="text-muted-foreground opacity-50 border-dashed"
+                                disabled
+                                title="Confirm settlement to enable locking"
+                            >
+                                <Lock className="mr-2 h-4 w-4" /> Lock Payroll
                             </Button>
                         </>
                     )}
@@ -633,6 +653,10 @@ export default function PayrollPeriodDetailPage({ params }) {
                                                     <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">
                                                         <Clock className="h-3 w-3 mr-1" /> Pending Approval
                                                     </Badge>
+                                                ) : emp.readiness === 'NO_ATTENDANCE' ? (
+                                                    <Badge variant="destructive" className="bg-red-100 text-red-700 hover:bg-red-100">
+                                                        <AlertCircle className="h-3 w-3 mr-1" /> 0 Days
+                                                    </Badge>
                                                 ) : (
                                                     <Badge variant="outline">{emp.readinessMessage}</Badge>
                                                 )}
@@ -715,7 +739,10 @@ export default function PayrollPeriodDetailPage({ params }) {
                                                                 )}
                                                             </div>
                                                         ) : (
-                                                            <span className="text-muted-foreground">-</span>
+                                                            <div>
+                                                                <p className="font-medium text-muted-foreground">- / {period.totalWorkingDays || 0}</p>
+                                                                <p className="text-xs text-muted-foreground">Not in payroll</p>
+                                                            </div>
                                                         )}
                                                     </TableCell>
                                                     <TableCell className="text-right font-medium">
@@ -749,6 +776,15 @@ export default function PayrollPeriodDetailPage({ params }) {
                                                                 <Badge variant="destructive" className="bg-red-100 text-red-700 hover:bg-red-100">
                                                                     ✗ No Structure
                                                                 </Badge>
+                                                            ) : item.readiness === 'FAILED' ? (
+                                                                <div className="flex flex-col gap-1">
+                                                                    <Badge variant="destructive" className="bg-red-100 text-red-700 hover:bg-red-100">
+                                                                        ✗ Failed
+                                                                    </Badge>
+                                                                    {item.holdReason && (
+                                                                        <span className="text-xs text-red-500">{item.holdReason}</span>
+                                                                    )}
+                                                                </div>
                                                             ) : (
                                                                 <Badge variant={item.paymentStatus === "PAID" ? "success" : "secondary"}>
                                                                     {item.paymentStatus}

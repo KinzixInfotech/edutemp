@@ -212,8 +212,7 @@ export async function POST(req, props) {
                         startDate: true,
                         endDate: true,
                         leaveType: true,
-                        isHalfDay: true,
-                        numberOfDays: true
+                        totalDays: true
                     }
                 });
 
@@ -222,7 +221,7 @@ export async function POST(req, props) {
                 for (const leave of leaveRequests) {
                     // Check if this leave type is unpaid (LOP/UNPAID types)
                     if (leave.leaveType === 'UNPAID' || leave.leaveType === 'LOP') {
-                        unpaidLeaveDays += leave.isHalfDay ? 0.5 : (leave.numberOfDays || 1);
+                        unpaidLeaveDays += leave.totalDays || 1;
                     }
                 }
 
@@ -359,6 +358,16 @@ export async function POST(req, props) {
                 const totalDeductions = pfEmployee + esiEmployee + professionalTax + tds + loanDeduction + otherDeductions + lossOfPay;
                 const netSalary = Math.max(0, grossEarnings - totalDeductions);
 
+                // DEBUG: Log detailed info for each employee before upsert
+                console.log(`[Process Payroll] Processing ${employee.user?.name}:`);
+                console.log(`  - Employee ID: ${employee.id}`);
+                console.log(`  - Has salary structure: ${!!employee.salaryStructure}`);
+                console.log(`  - Days worked: ${daysWorked} / ${workingDays}`);
+                console.log(`  - Gross earnings: ${grossEarnings}`);
+                console.log(`  - Net salary: ${netSalary}`);
+                console.log(`  - Readiness: ${readiness}`);
+                console.log(`  - Hold reason: ${holdReason}`);
+
                 // Create or update payroll item
                 await prisma.payrollItem.upsert({
                     where: {
@@ -429,6 +438,8 @@ export async function POST(req, props) {
                     }
                 });
 
+                console.log(`  ✓ Payroll item created/updated for ${employee.user?.name}`);
+
                 // Mark loan repayments as deducted
                 for (const loan of employee.loans) {
                     for (const repayment of loan.repayments) {
@@ -459,6 +470,37 @@ export async function POST(req, props) {
             } catch (error) {
                 console.error(`[Process Payroll] FAILED for ${employee.user?.name} (${employee.id}):`, error.message);
                 console.error(error.stack);
+
+                // IMPORTANT: Still create a payroll item with FAILED status
+                // Otherwise the employee becomes orphaned as "missing"
+                try {
+                    await prisma.payrollItem.upsert({
+                        where: {
+                            periodId_employeeId: { periodId, employeeId: employee.id }
+                        },
+                        update: {
+                            readiness: 'ON_HOLD_BANK',
+                            holdReason: `Processing error - please retry`,
+                            netSalary: 0,
+                            grossEarnings: employee.salaryStructure?.grossSalary || 0,
+                            totalDeductions: 0,
+                            daysWorked: 0
+                        },
+                        create: {
+                            periodId,
+                            employeeId: employee.id,
+                            readiness: 'ON_HOLD_BANK',
+                            holdReason: `Processing error - please retry`,
+                            netSalary: 0,
+                            grossEarnings: employee.salaryStructure?.grossSalary || 0,
+                            totalDeductions: 0,
+                            daysWorked: 0
+                        }
+                    });
+                } catch (upsertError) {
+                    console.error(`[Process Payroll] Failed to create fallback item:`, upsertError.message);
+                }
+
                 results.failed.push({
                     employeeId: employee.id,
                     name: employee.user?.name,
@@ -516,7 +558,7 @@ export async function POST(req, props) {
                 schoolId,
                 title: '📋 Payroll Processed - Review Required',
                 message: adminMessage,
-                type: 'PAYROLL',
+                type: 'FEE',
                 priority: 'HIGH',
                 targetOptions: {
                     roleNames: ['DIRECTOR', 'ADMIN', 'PRINCIPAL', 'ACCOUNTANT']
@@ -544,7 +586,7 @@ export async function POST(req, props) {
                     schoolId,
                     title: '💰 Salary Processed',
                     message: `Your salary for ${monthName} ${period.year} has been calculated and is pending approval.`,
-                    type: 'PAYROLL',
+                    type: 'FEE',
                     priority: 'NORMAL',
                     targetOptions: {
                         userIds: readyEmployeeUserIds
@@ -571,7 +613,7 @@ export async function POST(req, props) {
                     schoolId,
                     title: '⚠️ Payroll On Hold - Bank Details Missing',
                     message: `Your ${monthName} ${period.year} salary was calculated but payment is on hold. Please update your bank details.`,
-                    type: 'PAYROLL',
+                    type: 'FEE',
                     priority: 'HIGH',
                     targetOptions: {
                         userIds: onHoldBankEmployees

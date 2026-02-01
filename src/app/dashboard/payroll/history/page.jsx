@@ -59,7 +59,8 @@ export default function PayrollHistory() {
         enabled: !!schoolId
     });
 
-    const periods = data?.periods || [];
+    // API returns array directly, not wrapped in {periods: [...]}
+    const periods = Array.isArray(data) ? data : (data?.periods || []);
 
     // Create a calendar view of the year
     const calendarData = months.map((month, idx) => {
@@ -138,58 +139,58 @@ export default function PayrollHistory() {
             {/* Year Summary Stats */}
             {!isLoading && periods.length > 0 && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <Card>
-                        <CardContent className="pt-4">
+                    <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/20 dark:to-blue-900/10 border-blue-200/50">
+                        <CardContent className="pt-4 pb-4">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-blue-500/10 rounded-lg">
-                                    <Calendar className="h-5 w-5 text-blue-500" />
+                                    <Calendar className="h-5 w-5 text-blue-600" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Periods</p>
-                                    <p className="text-xl font-bold">{periods.length}</p>
+                                    <p className="text-2xl font-bold">{periods.length}</p>
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
-                    <Card>
-                        <CardContent className="pt-4">
+                    <Card className="bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950/20 dark:to-green-900/10 border-green-200/50">
+                        <CardContent className="pt-4 pb-4">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-green-500/10 rounded-lg">
-                                    <IndianRupee className="h-5 w-5 text-green-500" />
+                                    <IndianRupee className="h-5 w-5 text-green-600" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Total Paid</p>
                                     <p className="text-xl font-bold">
-                                        {formatCurrency(periods.filter(p => p.status === 'PAID').reduce((s, p) => s + p.totalNetSalary, 0))}
+                                        {formatCurrency(periods.filter(p => p.status === 'PAID').reduce((s, p) => s + (p.totalNetSalary || 0), 0))}
                                     </p>
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
-                    <Card>
-                        <CardContent className="pt-4">
+                    <Card className="bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-950/20 dark:to-purple-900/10 border-purple-200/50">
+                        <CardContent className="pt-4 pb-4">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-purple-500/10 rounded-lg">
-                                    <Users className="h-5 w-5 text-purple-500" />
+                                    <Users className="h-5 w-5 text-purple-600" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Avg Employees/Month</p>
-                                    <p className="text-xl font-bold">
-                                        {Math.round(periods.reduce((s, p) => s + p.totalEmployees, 0) / (periods.length || 1))}
+                                    <p className="text-2xl font-bold">
+                                        {Math.round(periods.reduce((s, p) => s + (p.employeeCount || p.totalEmployees || 0), 0) / (periods.length || 1))}
                                     </p>
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
-                    <Card>
-                        <CardContent className="pt-4">
+                    <Card className="bg-gradient-to-br from-orange-50 to-orange-100/50 dark:from-orange-950/20 dark:to-orange-900/10 border-orange-200/50">
+                        <CardContent className="pt-4 pb-4">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-orange-500/10 rounded-lg">
-                                    <Lock className="h-5 w-5 text-orange-500" />
+                                    <Lock className="h-5 w-5 text-orange-600" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground">Locked Periods</p>
-                                    <p className="text-xl font-bold">
+                                    <p className="text-2xl font-bold">
                                         {periods.filter(p => p.isLocked).length}
                                     </p>
                                 </div>
@@ -218,28 +219,41 @@ export default function PayrollHistory() {
                                 const status = item.period?.status;
                                 const config = status ? statusConfig[status] : null;
 
+                                // Dynamic background based on status
+                                const getBgClass = () => {
+                                    if (!item.period) return 'bg-muted/30 hover:bg-muted/50 border-dashed';
+                                    if (item.period.isLocked) return 'bg-gradient-to-br from-orange-50 to-amber-100/50 dark:from-orange-950/20 dark:to-amber-900/10 border-orange-200';
+                                    switch (status) {
+                                        case 'PAID': return 'bg-gradient-to-br from-green-50 to-emerald-100/50 dark:from-green-950/20 dark:to-emerald-900/10 border-green-200/50';
+                                        case 'APPROVED': return 'bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/20 dark:to-blue-900/10 border-blue-200/50';
+                                        case 'PENDING_APPROVAL': return 'bg-gradient-to-br from-yellow-50 to-amber-100/50 dark:from-yellow-950/20 dark:to-amber-900/10 border-yellow-200/50';
+                                        default: return 'bg-white dark:bg-muted border-gray-200';
+                                    }
+                                };
+
                                 return (
                                     <div
                                         key={item.month}
-                                        className={`p-3 rounded-lg border ${item.period ? 'bg-white dark:bg-muted' : 'bg-muted/30'} ${item.period?.isLocked ? 'border-orange-300' : 'border-gray-200'}`}
+                                        className={`p-3 rounded-xl border transition-all cursor-pointer hover:shadow-md ${getBgClass()}`}
+                                        onClick={() => item.period && window.location.assign(`/dashboard/payroll/process/${item.period.id}`)}
                                     >
                                         <div className="flex items-center justify-between mb-2">
-                                            <span className="font-medium text-sm">{item.monthName}</span>
+                                            <span className="font-semibold text-sm">{item.monthName}</span>
                                             {item.period?.isLocked && (
-                                                <Lock className="h-3 w-3 text-orange-500" />
+                                                <Lock className="h-3.5 w-3.5 text-orange-500" />
                                             )}
                                         </div>
                                         {item.period ? (
                                             <>
-                                                <Badge variant="secondary" className={`text-xs ${config?.color}`}>
+                                                <Badge variant="secondary" className={`text-xs font-medium ${config?.color}`}>
                                                     {config?.label}
                                                 </Badge>
-                                                <p className="text-xs text-muted-foreground mt-1">
-                                                    {item.period.totalEmployees} employees
+                                                <p className="text-xs text-muted-foreground mt-1.5">
+                                                    {item.period.employeeCount || item.period.totalEmployees || 0} employees
                                                 </p>
                                             </>
                                         ) : (
-                                            <p className="text-xs text-muted-foreground">No payroll</p>
+                                            <p className="text-xs text-muted-foreground italic">No payroll</p>
                                         )}
                                     </div>
                                 );
@@ -292,7 +306,7 @@ export default function PayrollHistory() {
                                                 <TableCell className="font-medium">
                                                     {fullMonths[period.month - 1]} {period.year}
                                                 </TableCell>
-                                                <TableCell>{period.totalEmployees}</TableCell>
+                                                <TableCell>{period.employeeCount || period.totalEmployees || 0}</TableCell>
                                                 <TableCell>{formatCurrency(period.totalGrossSalary)}</TableCell>
                                                 <TableCell className="text-red-600">-{formatCurrency(period.totalDeductions)}</TableCell>
                                                 <TableCell className="font-semibold">{formatCurrency(period.totalNetSalary)}</TableCell>
@@ -326,6 +340,17 @@ export default function PayrollHistory() {
                                                                 title="Lock payroll"
                                                             >
                                                                 <Lock className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
+                                                        {period.status !== 'PAID' && !period.isLocked && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                disabled
+                                                                className="opacity-50"
+                                                                title="Settle payment to enable locking"
+                                                            >
+                                                                <Lock className="h-4 w-4 text-muted-foreground" />
                                                             </Button>
                                                         )}
                                                         {period.isLocked && (

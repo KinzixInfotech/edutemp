@@ -161,6 +161,14 @@ export async function GET(req, props) {
                 daysWorked = 0; // Dynamic: 0 attendance = 0 days
             }
 
+            // Check 6: Zero working days (employee has attendance but all absent/leave)
+            // Employees with 0 working days should NOT be marked as Ready
+            if (daysWorked === 0 && readiness === 'READY' && !isProcessed) {
+                readiness = 'NO_ATTENDANCE';
+                readinessMessage = '0 working days - cannot process';
+                warnings.push('Cannot process with 0 working days');
+            }
+
             // Count ready employees
             if (readiness === 'READY') {
                 summary.readyToProcess++;

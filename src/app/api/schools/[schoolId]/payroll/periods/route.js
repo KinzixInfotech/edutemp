@@ -40,10 +40,19 @@ export async function GET(req, props) {
             take: limit
         });
 
+        // Get active employee count for all periods
+        const activeEmployeeCount = await prisma.employeePayrollProfile.count({
+            where: { schoolId, isActive: true }
+        });
+
         // Format periods
         const formattedPeriods = periods.map(p => ({
             ...p,
-            employeeCount: p._count.payrollItems,
+            // Always show active employees count for consistency
+            // (processed count is misleading - it excludes missing employees)
+            employeeCount: activeEmployeeCount,
+            processedCount: p._count.payrollItems,
+            isLocked: p.isLocked || false,
             monthName: new Date(p.year, p.month - 1).toLocaleString('default', { month: 'long' }),
             periodLabel: `${new Date(p.year, p.month - 1).toLocaleString('default', { month: 'short' })} ${p.year}`
         }));
