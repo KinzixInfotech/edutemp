@@ -44,11 +44,12 @@ export async function GET(req, props) {
             select: { id: true, name: true, code: true }
         });
 
-        // Get payroll items with employee bank details
+        // Get payroll items with employee bank details (only READY employees)
         const payrollItems = await prisma.payrollItem.findMany({
             where: {
                 periodId,
-                paymentStatus: { in: ['PENDING', 'PROCESSING'] }
+                paymentStatus: { in: ['PENDING', 'PROCESSING'] },
+                readiness: 'READY' // Only include employees ready for payout
             },
             include: {
                 employee: {
@@ -60,6 +61,14 @@ export async function GET(req, props) {
                 }
             },
             orderBy: { employee: { user: { name: 'asc' } } }
+        });
+
+        // Also get count of excluded (on-hold) employees for info
+        const excludedCount = await prisma.payrollItem.count({
+            where: {
+                periodId,
+                readiness: { not: 'READY' }
+            }
         });
 
         if (payrollItems.length === 0) {

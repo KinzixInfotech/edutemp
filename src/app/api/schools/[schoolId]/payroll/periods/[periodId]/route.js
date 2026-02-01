@@ -75,6 +75,13 @@ export async function GET(req, props) {
                 totalNet: formattedItems.reduce((sum, i) => sum + i.netSalary, 0),
                 pending: formattedItems.filter(i => i.paymentStatus === 'PENDING').length,
                 processed: formattedItems.filter(i => i.paymentStatus === 'PROCESSED').length
+            },
+            validationSummary: {
+                ready: formattedItems.filter(i => i.readiness === 'READY').length,
+                onHoldBank: formattedItems.filter(i => i.readiness === 'ON_HOLD_BANK').length,
+                onHoldApproval: formattedItems.filter(i => i.readiness === 'ON_HOLD_APPROVAL').length,
+                skippedNoStructure: formattedItems.filter(i => i.readiness === 'SKIPPED_NO_STRUCTURE').length,
+                total: formattedItems.length
             }
         });
     } catch (error) {

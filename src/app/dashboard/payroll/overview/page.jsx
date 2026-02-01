@@ -101,6 +101,19 @@ export default function PayrollOverview() {
         upcomingAnniversaries
     } = stats || {};
 
+    // Fetch pending requests count
+    const { data: requestData } = useQuery({
+        queryKey: ["payroll-requests", schoolId],
+        queryFn: async () => {
+            const res = await fetch(`/api/schools/${schoolId}/payroll/requests`);
+            if (!res.ok) return { pendingCount: 0 };
+            return res.json();
+        },
+        enabled: !!schoolId,
+    });
+
+    const pendingRequestCount = requestData?.pendingCount || 0;
+
     return (
         <div className="p-4 sm:p-6 lg:p-8 space-y-6">
             {/* Header */}
@@ -134,6 +147,28 @@ export default function PayrollOverview() {
                     </Link>
                 </div>
             </div>
+
+            {/* Pending Requests Alert */}
+            {pendingRequestCount > 0 && (
+                <Link href="/dashboard/payroll/requests">
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 flex items-center justify-between hover:bg-orange-100 transition-colors cursor-pointer">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-orange-100 p-2 rounded-full">
+                                <AlertCircle className="w-5 h-5 text-orange-600" />
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-orange-900">Pending Profile Updates</h3>
+                                <p className="text-sm text-orange-700">
+                                    {pendingRequestCount} employee{pendingRequestCount !== 1 ? 's have' : ' has'} requested updates to their bank or ID details.
+                                </p>
+                            </div>
+                        </div>
+                        <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white border-none shadow-sm">
+                            Review Requests <ArrowRight className="ml-2 w-4 h-4" />
+                        </Button>
+                    </div>
+                </Link>
+            )}
 
             {/* Summary Cards - Gradient Style */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

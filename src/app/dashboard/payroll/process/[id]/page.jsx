@@ -448,6 +448,43 @@ export default function PayrollPeriodDetailPage({ params }) {
                 </Card>
             </div>
 
+            {/* Validation Summary - Shows employee readiness status */}
+            {period.validationSummary && (period.validationSummary.onHoldBank > 0 || period.validationSummary.onHoldApproval > 0 || period.validationSummary.skippedNoStructure > 0) && (
+                <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950/20">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-base flex items-center gap-2 text-orange-700 dark:text-orange-400">
+                            <AlertTriangle className="h-5 w-5" />
+                            Employee Validation Summary
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="p-3 bg-white dark:bg-muted rounded-lg border">
+                                <p className="text-2xl font-bold text-green-600">{period.validationSummary.ready || 0}</p>
+                                <p className="text-sm text-muted-foreground">Ready to Pay</p>
+                            </div>
+                            <div className="p-3 bg-white dark:bg-muted rounded-lg border">
+                                <p className="text-2xl font-bold text-orange-500">{period.validationSummary.onHoldBank || 0}</p>
+                                <p className="text-sm text-muted-foreground">Missing Bank Details</p>
+                            </div>
+                            <div className="p-3 bg-white dark:bg-muted rounded-lg border">
+                                <p className="text-2xl font-bold text-yellow-600">{period.validationSummary.onHoldApproval || 0}</p>
+                                <p className="text-sm text-muted-foreground">Pending Approval</p>
+                            </div>
+                            <div className="p-3 bg-white dark:bg-muted rounded-lg border">
+                                <p className="text-2xl font-bold text-red-500">{period.validationSummary.skippedNoStructure || 0}</p>
+                                <p className="text-sm text-muted-foreground">No Salary Structure</p>
+                            </div>
+                        </div>
+                        {(period.validationSummary.onHoldBank > 0 || period.validationSummary.onHoldApproval > 0) && (
+                            <p className="text-sm text-orange-700 dark:text-orange-400 mt-3">
+                                ⚠️ On-hold employees will be excluded from the bank slip file
+                            </p>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Payroll Items Table */}
             <Card className="border bg-white dark:bg-muted">
                 <CardHeader>
@@ -503,9 +540,28 @@ export default function PayrollPeriodDetailPage({ params }) {
                                             {formatCurrency(item.netSalary)}
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant={item.paymentStatus === "PAID" || item.paymentStatus === "PROCESSED" ? "success" : "secondary"}>
-                                                {item.paymentStatus}
-                                            </Badge>
+                                            {/* Readiness Status */}
+                                            {item.readiness === 'READY' ? (
+                                                <Badge variant="success" className="bg-green-100 text-green-700">
+                                                    ✓ Ready
+                                                </Badge>
+                                            ) : item.readiness === 'ON_HOLD_BANK' ? (
+                                                <Badge variant="warning" className="bg-orange-100 text-orange-700">
+                                                    ⚠ Bank Missing
+                                                </Badge>
+                                            ) : item.readiness === 'ON_HOLD_APPROVAL' ? (
+                                                <Badge variant="secondary" className="bg-yellow-100 text-yellow-700">
+                                                    ⏳ Pending Approval
+                                                </Badge>
+                                            ) : item.readiness === 'SKIPPED_NO_STRUCTURE' ? (
+                                                <Badge variant="destructive" className="bg-red-100 text-red-700">
+                                                    ✗ No Structure
+                                                </Badge>
+                                            ) : (
+                                                <Badge variant={item.paymentStatus === "PAID" ? "success" : "secondary"}>
+                                                    {item.paymentStatus}
+                                                </Badge>
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {item.payslipId && (

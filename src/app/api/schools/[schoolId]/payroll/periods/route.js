@@ -22,25 +22,23 @@ export async function GET(req, props) {
         // Parse comma-separated status values
         const statusArray = status ? status.split(',').map(s => s.trim()) : null;
 
-        const periods = await remember(cacheKey, async () => {
-            return prisma.payrollPeriod.findMany({
-                where: {
-                    schoolId,
-                    ...(year && { year: parseInt(year) }),
-                    ...(statusArray && { status: { in: statusArray } })
-                },
-                include: {
-                    _count: {
-                        select: { payrollItems: true }
-                    }
-                },
-                orderBy: [
-                    { year: 'desc' },
-                    { month: 'desc' }
-                ],
-                take: limit
-            });
-        }, 300);
+        const periods = await prisma.payrollPeriod.findMany({
+            where: {
+                schoolId,
+                ...(year && { year: parseInt(year) }),
+                ...(statusArray && { status: { in: statusArray } })
+            },
+            include: {
+                _count: {
+                    select: { payrollItems: true }
+                }
+            },
+            orderBy: [
+                { year: 'desc' },
+                { month: 'desc' }
+            ],
+            take: limit
+        });
 
         // Format periods
         const formattedPeriods = periods.map(p => ({
@@ -151,7 +149,7 @@ export async function POST(req, props) {
         });
 
         // Invalidate cache
-        await invalidatePattern(`payroll:periods:${schoolId}*`);
+        await invalidatePattern(`payroll:periods:*schoolId:${schoolId}*`);
 
         return NextResponse.json({
             success: true,

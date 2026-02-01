@@ -53,15 +53,15 @@ export async function POST(req, props) {
             }, { status: 400 });
         }
 
-        // Get all active employees with salary structures
-        const employees = await prisma.employeePayrollProfile.findMany({
+        // Get ALL active employees (including those without salary structures for proper validation)
+        const allEmployees = await prisma.employeePayrollProfile.findMany({
             where: {
                 schoolId,
                 isActive: true,
-                salaryStructureId: { not: null }
             },
             include: {
                 salaryStructure: true,
+                user: { select: { name: true } },
                 loans: {
                     where: {
                         status: 'ACTIVE'
@@ -89,11 +89,19 @@ export async function POST(req, props) {
             }
         });
 
-        if (employees.length === 0) {
+        if (allEmployees.length === 0) {
             return NextResponse.json({
-                error: 'No active employees with salary structures found'
+                error: 'No active employees found in payroll'
             }, { status: 400 });
         }
+
+        // Validation summary tracking
+        const validationSummary = {
+            ready: 0,
+            onHoldBank: 0,
+            onHoldApproval: 0,
+            skippedNoStructure: 0
+        };
 
         // Update period status to processing
         await prisma.payrollPeriod.update({
@@ -101,11 +109,71 @@ export async function POST(req, props) {
             data: { status: 'PROCESSING' }
         });
 
-        const results = { success: [], failed: [] };
+        const results = { success: [], failed: [], skipped: [], onHold: [] };
 
         // Process each employee
-        for (const employee of employees) {
+        for (const employee of allEmployees) {
             try {
+                // === VALIDATION: Check employee readiness ===
+                let readiness = 'READY';
+                let holdReason = null;
+
+                // Check 1: Salary structure assigned?
+                if (!employee.salaryStructureId || !employee.salaryStructure) {
+                    readiness = 'SKIPPED_NO_STRUCTURE';
+                    holdReason = 'No salary structure assigned';
+                    validationSummary.skippedNoStructure++;
+
+                    // Create a payroll item with SKIPPED status (no salary calculation)
+                    await prisma.payrollItem.upsert({
+                        where: {
+                            periodId_employeeId: { periodId, employeeId: employee.id }
+                        },
+                        update: {
+                            readiness,
+                            holdReason,
+                            netSalary: 0,
+                            grossEarnings: 0,
+                            totalDeductions: 0
+                        },
+                        create: {
+                            periodId,
+                            employeeId: employee.id,
+                            readiness,
+                            holdReason,
+                            netSalary: 0,
+                            grossEarnings: 0,
+                            totalDeductions: 0
+                        }
+                    });
+
+                    results.skipped.push({
+                        employeeId: employee.id,
+                        name: employee.user?.name,
+                        reason: holdReason
+                    });
+                    continue;
+                }
+
+                // Check 2: Bank details present?
+                const hasBankDetails = employee.accountNumber && employee.ifscCode;
+                if (!hasBankDetails) {
+                    readiness = 'ON_HOLD_BANK';
+                    holdReason = 'Bank details missing';
+                    validationSummary.onHoldBank++;
+                }
+
+                // Check 3: Pending profile updates awaiting approval?
+                if (employee.pendingBankDetails || employee.pendingIdDetails) {
+                    readiness = 'ON_HOLD_APPROVAL';
+                    holdReason = 'Profile updates pending admin approval';
+                    validationSummary.onHoldApproval++;
+                }
+
+                // If READY, increment counter
+                if (readiness === 'READY') {
+                    validationSummary.ready++;
+                }
                 // Get attendance data for the period
                 const attendance = await prisma.attendance.findMany({
                     where: {
@@ -313,7 +381,9 @@ export async function POST(req, props) {
                         otherDeductions: otherDeductionsList.length > 0 ? otherDeductionsList : null,
                         totalDeductions,
                         netSalary,
-                        paymentStatus: 'PENDING'
+                        paymentStatus: 'PENDING',
+                        readiness,
+                        holdReason
                     },
                     create: {
                         periodId,
@@ -342,7 +412,9 @@ export async function POST(req, props) {
                         otherDeductions: otherDeductionsList.length > 0 ? otherDeductionsList : null,
                         totalDeductions,
                         netSalary,
-                        paymentStatus: 'PENDING'
+                        paymentStatus: 'PENDING',
+                        readiness,
+                        holdReason
                     }
                 });
 
@@ -359,8 +431,20 @@ export async function POST(req, props) {
                 results.success.push({
                     employeeId: employee.id,
                     name: employee.user?.name,
-                    netSalary
+                    netSalary,
+                    readiness,
+                    holdReason
                 });
+
+                // Track on-hold employees separately for easy UI display
+                if (readiness === 'ON_HOLD_BANK' || readiness === 'ON_HOLD_APPROVAL') {
+                    results.onHold.push({
+                        employeeId: employee.id,
+                        name: employee.user?.name,
+                        netSalary,
+                        reason: holdReason
+                    });
+                }
             } catch (error) {
                 results.failed.push({
                     employeeId: employee.id,
@@ -399,14 +483,29 @@ export async function POST(req, props) {
         const monthName = new Date(period.year, period.month - 1).toLocaleString('default', { month: 'long' });
 
         try {
+            // Build validation summary message for admin
+            let adminMessage = `Payroll for ${monthName} ${period.year} processed. `;
+            adminMessage += `✅ Ready: ${validationSummary.ready} | `;
+            if (validationSummary.onHoldBank > 0) {
+                adminMessage += `⚠️ Missing Bank: ${validationSummary.onHoldBank} | `;
+            }
+            if (validationSummary.onHoldApproval > 0) {
+                adminMessage += `⏳ Pending Approval: ${validationSummary.onHoldApproval} | `;
+            }
+            if (validationSummary.skippedNoStructure > 0) {
+                adminMessage += `❌ No Structure: ${validationSummary.skippedNoStructure} | `;
+            }
+            adminMessage += `Net: ₹${totalNetSalary.toLocaleString('en-IN')}`;
+
+            // Notify admin/director/principal
             await sendNotification({
                 schoolId,
-                title: '📋 Payroll Ready for Approval',
-                message: `Payroll for ${monthName} ${period.year} has been processed. Total: ₹${totalNetSalary.toLocaleString('en-IN')} for ${results.success.length} employees. Please review and approve.`,
+                title: '📋 Payroll Processed - Review Required',
+                message: adminMessage,
                 type: 'PAYROLL',
                 priority: 'HIGH',
                 targetOptions: {
-                    roleNames: ['DIRECTOR', 'ADMIN', 'PRINCIPAL']
+                    roleNames: ['DIRECTOR', 'ADMIN', 'PRINCIPAL', 'ACCOUNTANT']
                 },
                 senderId: processedBy,
                 metadata: {
@@ -414,10 +513,66 @@ export async function POST(req, props) {
                     periodId,
                     month: period.month,
                     year: period.year,
-                    totalAmount: totalNetSalary
+                    totalAmount: totalNetSalary,
+                    validationSummary
                 },
-                actionUrl: `/dashboard/payroll/process`
+                actionUrl: `/dashboard/payroll/process/${periodId}`
             });
+
+            // Notify all READY employees that their salary has been calculated
+            const readyEmployeeUserIds = results.success
+                .filter(e => e.readiness === 'READY')
+                .map(e => allEmployees.find(emp => emp.id === e.employeeId)?.userId)
+                .filter(Boolean);
+
+            if (readyEmployeeUserIds.length > 0) {
+                await sendNotification({
+                    schoolId,
+                    title: '💰 Salary Processed',
+                    message: `Your salary for ${monthName} ${period.year} has been calculated and is pending approval.`,
+                    type: 'PAYROLL',
+                    priority: 'NORMAL',
+                    targetOptions: {
+                        userIds: readyEmployeeUserIds
+                    },
+                    senderId: processedBy,
+                    metadata: {
+                        type: 'PAYROLL_PROCESSED',
+                        periodId,
+                        month: period.month,
+                        year: period.year
+                    },
+                    actionUrl: '/my-payroll'
+                });
+            }
+
+            // Notify ON_HOLD employees about their issue
+            const onHoldBankEmployees = results.success
+                .filter(e => e.readiness === 'ON_HOLD_BANK')
+                .map(e => allEmployees.find(emp => emp.id === e.employeeId)?.userId)
+                .filter(Boolean);
+
+            if (onHoldBankEmployees.length > 0) {
+                await sendNotification({
+                    schoolId,
+                    title: '⚠️ Payroll On Hold - Bank Details Missing',
+                    message: `Your ${monthName} ${period.year} salary was calculated but payment is on hold. Please update your bank details.`,
+                    type: 'PAYROLL',
+                    priority: 'HIGH',
+                    targetOptions: {
+                        userIds: onHoldBankEmployees
+                    },
+                    senderId: processedBy,
+                    metadata: {
+                        type: 'PAYROLL_ON_HOLD',
+                        reason: 'BANK_DETAILS_MISSING',
+                        periodId,
+                        month: period.month,
+                        year: period.year
+                    },
+                    actionUrl: '/my-payroll'
+                });
+            }
         } catch (notifError) {
             console.error('Notification failed:', notifError);
             // Don't fail the request if notification fails
@@ -429,9 +584,18 @@ export async function POST(req, props) {
             summary: {
                 processed: results.success.length,
                 failed: results.failed.length,
+                skipped: results.skipped.length,
+                onHold: results.onHold.length,
                 totalGross: totalGrossSalary,
                 totalDeductions,
                 totalNet: totalNetSalary
+            },
+            validationSummary: {
+                ready: validationSummary.ready,
+                onHoldBank: validationSummary.onHoldBank,
+                onHoldApproval: validationSummary.onHoldApproval,
+                skippedNoStructure: validationSummary.skippedNoStructure,
+                total: allEmployees.length
             },
             results
         });

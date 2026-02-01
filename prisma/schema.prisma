@@ -4763,6 +4763,16 @@ model EmployeePayrollProfile {
   // Status
   isActive Boolean @default(true)
 
+  // Pending Updates (Self-Service - Requires Admin Approval)
+  pendingBankDetails     Json? // {bankName, accountNumber, ifscCode, accountHolder}
+  pendingIdDetails       Json? // {panNumber, aadharNumber, uanNumber, esiNumber}
+  pendingSubmittedAt     DateTime?
+  pendingApprovedAt      DateTime?
+  pendingApprovedBy      String?   @db.Uuid
+  pendingRejectedAt      DateTime?
+  pendingRejectedBy      String?   @db.Uuid
+  pendingRejectionReason String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -4938,6 +4948,10 @@ model PayrollItem {
   // Net Salary
   netSalary Float @default(0)
 
+  // Readiness Status (for validation)
+  readiness  PayrollReadiness @default(READY)
+  holdReason String? // Reason if ON_HOLD or SKIPPED
+
   // Payment Status
   paymentStatus  PayrollPaymentStatus  @default(PENDING)
   paymentMethod  PayrollPaymentMethod?
@@ -4955,6 +4969,14 @@ model PayrollItem {
   @@index([periodId])
   @@index([employeeId])
   @@index([paymentStatus])
+  @@index([readiness])
+}
+
+enum PayrollReadiness {
+  READY // Fully configured, can be paid
+  ON_HOLD_BANK // Salary calculated but bank details missing
+  ON_HOLD_APPROVAL // Profile changes pending approval
+  SKIPPED_NO_STRUCTURE // No salary structure assigned
 }
 
 enum PayrollPaymentStatus {
@@ -5006,6 +5028,10 @@ model Payslip {
   status       PayslipStatus @default(GENERATED)
   sentAt       DateTime?
   downloadedAt DateTime?
+
+  // Email Tracking
+  emailedAt DateTime?
+  emailId   String? // Email service ID for tracking
 
   createdAt DateTime @default(now())
 
