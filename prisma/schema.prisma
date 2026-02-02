@@ -122,6 +122,13 @@ model School {
   attendanceLocks AttendanceLock[]
   subscription    SchoolSubscription?
 
+  // Biometric System
+  biometricDevices       BiometricDevice[]
+  biometricIdentityMaps  BiometricIdentityMap[]
+  rfidIdentityMaps       RfidIdentityMap[]
+  temporaryMappingStates TemporaryMappingState[]
+  biometricEvents        BiometricAttendanceEvent[]
+
   // School Onboarding
   onboardingComplete  Boolean            @default(false)
   onboardingDismissed Boolean            @default(false)
@@ -1755,9 +1762,12 @@ model User {
   hpcreports              HPCReport[]             @relation("HPCGenerator")
 
   // Gallery System
-  createdGalleryAlbums  GalleryAlbum[] @relation("GalleryAlbumCreator")
-  uploadedGalleryImages GalleryImage[] @relation("GalleryImageUploader")
-  approvedGalleryImages GalleryImage[] @relation("GalleryImageApprover")
+  createdGalleryAlbums  GalleryAlbum[]             @relation("GalleryAlbumCreator")
+  uploadedGalleryImages GalleryImage[]             @relation("GalleryImageUploader")
+  approvedGalleryImages GalleryImage[]             @relation("GalleryImageApprover")
+  biometricIdentityMaps BiometricIdentityMap[]
+  rfidIdentityMaps      RfidIdentityMap[]
+  biometricEvents       BiometricAttendanceEvent[] @relation("ResolvedBiometricEvents")
 
   @@index([schoolId])
   @@index([roleId])
@@ -6205,4 +6215,195 @@ model HPCStageTemplate {
 
   @@unique([schoolId, stage])
   @@index([schoolId])
+}
+
+// ============================================
+// BIOMETRIC SYSTEM - DEVICE & ATTENDANCE INTEGRATION
+// ============================================
+
+enum BiometricDeviceType {
+  FINGERPRINT
+  RFID
+  COMBO
+}
+
+enum ConnectionType {
+  HTTP
+  HTTPS
+}
+
+enum SyncStatus {
+  SUCCESS
+  FAILED
+  PARTIAL
+  NEVER_SYNCED
+}
+
+enum RfidCardType {
+  MIFARE
+  EM4100
+  HID
+  OTHER
+}
+
+enum MappingType {
+  RFID_ENROLL
+  FINGERPRINT_ENROLL
+}
+
+enum MappingStatus {
+  PENDING
+  COMPLETED
+  EXPIRED
+  CANCELLED
+}
+
+// Biometric Device Configuration
+model BiometricDevice {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @db.Uuid
+
+  // Device Configuration
+  name       String // e.g., "Main Gate Entry"
+  deviceType BiometricDeviceType
+  ipAddress  String
+  port       Int                 @default(80)
+  username   String // Credentials for ISAPI auth
+  password   String // Encrypted/hashed
+
+  // Connection Settings
+  connectionType   ConnectionType @default(HTTP)
+  isEnabled        Boolean        @default(true)
+  pollingInterval  Int            @default(60) // seconds
+  lastSyncedAt     DateTime?
+  lastSyncStatus   SyncStatus?
+  lastErrorMessage String?
+
+  // Capabilities (internal metadata)
+  supportsFingerprint Boolean @default(true)
+  supportsRfid        Boolean @default(true)
+  supportsFace        Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school       School                     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  identityMaps BiometricIdentityMap[]
+  rfidMaps     RfidIdentityMap[]
+  events       BiometricAttendanceEvent[]
+
+  @@unique([schoolId, ipAddress, port])
+  @@index([schoolId])
+  @@index([isEnabled])
+}
+
+// User-to-Device Identity Mapping
+model BiometricIdentityMap {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @db.Uuid
+  userId   String @db.Uuid
+  deviceId String @db.Uuid
+
+  // Device User ID (employeeNo in Hikvision)
+  deviceUserId String
+
+  // Enrollment Status (polled from device)
+  fingerprintCount Int     @default(0)
+  hasCard          Boolean @default(false)
+  hasFace          Boolean @default(false)
+
+  isActive   Boolean  @default(true)
+  enrolledAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  school School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device BiometricDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceId])
+  @@unique([deviceId, deviceUserId])
+  @@index([schoolId])
+  @@index([userId])
+}
+
+// RFID Card Identity Mapping
+model RfidIdentityMap {
+  id       String  @id @default(uuid()) @db.Uuid
+  schoolId String  @db.Uuid
+  userId   String  @db.Uuid
+  deviceId String? @db.Uuid // Optional - synced to specific device
+
+  // Card Details
+  cardUid    String // Raw UID from card
+  cardNumber String? // Printed number if different
+  cardType   RfidCardType @default(MIFARE)
+
+  isActive     Boolean   @default(true)
+  isPrimary    Boolean   @default(true) // For handling replacements
+  assignedAt   DateTime  @default(now())
+  revokedAt    DateTime?
+  revokedBy    String?   @db.Uuid
+  revokeReason String?
+
+  school School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device BiometricDevice? @relation(fields: [deviceId], references: [id])
+
+  @@unique([cardUid]) // Globally unique card
+  @@index([schoolId])
+  @@index([userId])
+  @@index([cardUid])
+}
+
+// Temporary State for Enrollment Sessions
+model TemporaryMappingState {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @db.Uuid
+  userId   String @db.Uuid
+  deviceId String @db.Uuid
+
+  mappingType MappingType // RFID_ENROLL, FINGERPRINT_ENROLL
+  status      MappingStatus @default(PENDING)
+
+  expiresAt   DateTime // Auto-cleanup stale states
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceId, mappingType])
+  @@index([schoolId])
+  @@index([expiresAt])
+}
+
+// Raw Attendance Events from Biometric Devices
+model BiometricAttendanceEvent {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @db.Uuid
+  deviceId String @db.Uuid
+
+  // Event Data (from device)
+  deviceUserId String // employeeNo
+  eventType    String // verifyFingerprint, verifyCard, etc.
+  eventTime    DateTime
+  rawEventId   String // Original event ID from device
+  rawPayload   Json // Full event for audit
+
+  // Resolution
+  resolvedUserId  String?   @db.Uuid
+  processedAt     DateTime?
+  processingError String?
+
+  // Deduplication
+  eventHash String @unique // device_id + deviceUserId + timestamp hash
+
+  createdAt DateTime @default(now())
+
+  school       School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  device       BiometricDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  resolvedUser User?           @relation("ResolvedBiometricEvents", fields: [resolvedUserId], references: [id])
+
+  @@index([schoolId, eventTime])
+  @@index([deviceId, eventTime])
+  @@index([resolvedUserId])
 }
