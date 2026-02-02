@@ -102,6 +102,7 @@ export const SidebarData = [
         title: "School APP",
         items: [
             { label: "App Carousel", url: "/dashboard/schools/carousel", icon: Images, roles: ['ADMIN'] },
+            { label: "School Gallery", url: "/dashboard/schools/gallery", icon: Images, roles: ['ADMIN'] },
         ]
     },
     {

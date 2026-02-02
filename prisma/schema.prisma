@@ -32,7 +32,8 @@ model School {
   examHalls              ExamHall[]
   FeePayment             FeePayment[]
   FeeStructure           FeeStructure[]
-  galleries              Gallery[]
+  gallerySettings        GallerySettings?
+  galleryAlbums          GalleryAlbum[]
   InventoryItem          InventoryItem[]
   libraryBooks           LibraryBook[]
   libraryBookRequests    LibraryBookRequest[]
@@ -1753,6 +1754,11 @@ model User {
   selassessments          SELAssessment[]         @relation("SELAssessor")
   hpcreports              HPCReport[]             @relation("HPCGenerator")
 
+  // Gallery System
+  createdGalleryAlbums  GalleryAlbum[] @relation("GalleryAlbumCreator")
+  uploadedGalleryImages GalleryImage[] @relation("GalleryImageUploader")
+  approvedGalleryImages GalleryImage[] @relation("GalleryImageApprover")
+
   @@index([schoolId])
   @@index([roleId])
 }
@@ -3356,13 +3362,141 @@ model Upload {
   schoolId  String?  @db.Uuid
 }
 
-model Gallery {
-  id       Int    @id @default(autoincrement())
-  schoolId String @db.Uuid
-  title    String
-  school   School @relation(fields: [schoolId], references: [id])
+// ============================================
+// SCHOOL GALLERY SYSTEM
+// ============================================
+
+enum GalleryCategory {
+  ANNUAL_DAY
+  SPORTS_DAY
+  CULTURAL
+  GRADUATION
+  FIELD_TRIP
+  CLASSROOM
+  INFRASTRUCTURE
+  AWARDS
+  GENERAL
+}
+
+enum GalleryVisibility {
+  ALL // Everyone
+  PARENTS_ONLY // Parents and staff
+  STAFF_ONLY // Teachers, admin, principal
+  CLASS_SPECIFIC // Specific classes only
+}
+
+enum ImageProcessingStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ImageApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model GallerySettings {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @unique @db.Uuid
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  // Storage Quota (in bytes)
+  storageQuota     BigInt @default(524288000) // 500MB default
+  storageUsed      BigInt @default(0)
+  maxImageSize     Int    @default(10485760) // 10MB max per image
+  dailyUploadLimit Int    @default(50) // Max uploads per day
+
+  // Feature Toggles
+  requireApproval Boolean @default(false) // Require admin approval before public
+  allowPublicView Boolean @default(true) // Allow unauthenticated viewing
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([schoolId])
+}
+
+model GalleryAlbum {
+  id       String @id @default(uuid()) @db.Uuid
+  schoolId String @db.Uuid
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+  coverImage  String? // URL to cover image
+  eventDate   DateTime? // Date of event (if applicable)
+  category    GalleryCategory @default(GENERAL)
+
+  // Access Control
+  isPublic   Boolean           @default(true)
+  visibility GalleryVisibility @default(ALL)
+
+  // Metadata
+  imageCount  Int       @default(0)
+  createdById String    @db.Uuid
+  createdBy   User      @relation("GalleryAlbumCreator", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  images GalleryImage[]
+
+  @@index([schoolId])
+  @@index([category])
+  @@index([eventDate])
+  @@index([visibility])
+}
+
+model GalleryImage {
+  id       String       @id @default(uuid()) @db.Uuid
+  albumId  String       @db.Uuid
+  album    GalleryAlbum @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  schoolId String       @db.Uuid
+
+  // Image URLs (UploadThing)
+  originalUrl  String // Original uploaded image
+  thumbnailUrl String? // Generated thumbnail (300px)
+  optimizedUrl String? // WebP compressed version
+
+  // Metadata
+  fileName      String
+  fileSize      Int // Original size in bytes
+  optimizedSize Int? // Compressed size
+  mimeType      String
+  width         Int?
+  height        Int?
+  caption       String?
+  altText       String?
+
+  // Processing Status
+  processingStatus ImageProcessingStatus @default(PENDING)
+  processingError  String?
+
+  // Approval Workflow
+  approvalStatus  ImageApprovalStatus @default(APPROVED)
+  approvedById    String?             @db.Uuid
+  approvedBy      User?               @relation("GalleryImageApprover", fields: [approvedById], references: [id])
+  approvedAt      DateTime?
+  rejectionReason String?
+
+  // Soft Delete
+  isActive    Boolean   @default(true)
+  deletedAt   DateTime?
+  deletedById String?   @db.Uuid
+
+  // Uploader Info
+  uploadedById String   @db.Uuid
+  uploadedBy   User     @relation("GalleryImageUploader", fields: [uploadedById], references: [id])
+  uploadedAt   DateTime @default(now())
+
+  @@index([albumId])
+  @@index([schoolId])
+  @@index([approvalStatus])
+  @@index([processingStatus])
+  @@index([isActive])
 }
 
 // certificates generation models

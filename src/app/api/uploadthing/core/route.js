@@ -233,4 +233,118 @@ export const ourFileRouter = {
 
             return { url: file.ufsUrl };
         }),
+
+    // Gallery image upload with quota validation
+    galleryImageUpload: f({ image: { maxFileSize: "10MB", maxFileCount: 20 } })
+        .input(z.object({
+            schoolId: z.string(),
+            albumId: z.string(),
+            uploadedById: z.string(),
+        }))
+        .middleware(async ({ input }) => {
+            // Check quota before allowing upload
+            const settings = await prisma.gallerySettings.findUnique({
+                where: { schoolId: input.schoolId }
+            });
+
+            if (settings) {
+                if (settings.storageUsed >= settings.storageQuota) {
+                    throw new Error('QUOTA_EXCEEDED: Storage quota has been reached');
+                }
+
+                // Check daily limit
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const todayCount = await prisma.galleryImage.count({
+                    where: {
+                        schoolId: input.schoolId,
+                        uploadedAt: { gte: today }
+                    }
+                });
+
+                if (todayCount >= settings.dailyUploadLimit) {
+                    throw new Error('DAILY_LIMIT_EXCEEDED: Daily upload limit reached');
+                }
+            }
+
+            return input;
+        })
+        .onUploadComplete(async ({ metadata, file }) => {
+            try {
+                console.log("Gallery image uploaded for school:", metadata.schoolId);
+
+                // Get settings for approval status
+                const settings = await prisma.gallerySettings.findUnique({
+                    where: { schoolId: metadata.schoolId }
+                });
+
+                const approvalStatus = settings?.requireApproval ? 'PENDING' : 'APPROVED';
+
+                // Create image record with PENDING processing status
+                const image = await prisma.galleryImage.create({
+                    data: {
+                        albumId: metadata.albumId,
+                        schoolId: metadata.schoolId,
+                        originalUrl: file.ufsUrl,
+                        fileName: file.name,
+                        fileSize: file.size,
+                        mimeType: file.type,
+                        uploadedById: metadata.uploadedById,
+                        processingStatus: 'PENDING',
+                        approvalStatus,
+                    }
+                });
+
+                // Queue background processing via QStash
+                // Note: In production, uncomment and configure QStash
+                /*
+                const { Client } = await import("@upstash/qstash");
+                const qstash = new Client({ token: process.env.QSTASH_TOKEN });
+                await qstash.publishJSON({
+                    url: `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/workers/gallery`,
+                    body: {
+                        jobType: 'IMAGE_PROCESS',
+                        imageId: image.id,
+                        schoolId: metadata.schoolId,
+                        originalUrl: file.ufsUrl,
+                    },
+                    retries: 3,
+                });
+                */
+
+                // For now, mark as completed and update quota directly
+                // (Remove this block when QStash worker is active)
+                await prisma.$transaction([
+                    prisma.galleryImage.update({
+                        where: { id: image.id },
+                        data: {
+                            processingStatus: 'COMPLETED',
+                            optimizedUrl: file.ufsUrl,
+                            thumbnailUrl: file.ufsUrl, // Same URL for now
+                            optimizedSize: file.size,
+                        }
+                    }),
+                    prisma.gallerySettings.upsert({
+                        where: { schoolId: metadata.schoolId },
+                        update: {
+                            storageUsed: { increment: file.size }
+                        },
+                        create: {
+                            schoolId: metadata.schoolId,
+                            storageUsed: file.size
+                        }
+                    }),
+                    prisma.galleryAlbum.update({
+                        where: { id: metadata.albumId },
+                        data: { imageCount: { increment: 1 } }
+                    })
+                ]);
+
+                console.log("Gallery image record created:", image.id);
+                return { imageId: image.id, url: file.ufsUrl };
+            } catch (error) {
+                console.error("ERROR in galleryImageUpload onUploadComplete:", error);
+                throw error;
+            }
+        }),
 }
