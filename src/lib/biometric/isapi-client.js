@@ -509,58 +509,80 @@ export class ISAPIClient {
     /**
      * Get ALL types of access events (fingerprint + card + face)
      */
-    async getAllAcsEvents(sinceTime, maxResults = 100) {
+    async getAllAcsEvents(sinceTime, maxResults = 500) {
         try {
             // Format times in IST for Hikvision device (device is configured for IST)
+            // CRITICAL: Node.js Date uses UTC internally, so we need to convert to IST
             const formatIST = (date) => {
                 const pad = (n) => n.toString().padStart(2, '0');
-                // Use the date as-is since server is already in IST
-                return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}+05:30`;
+                // Convert UTC to IST (add 5 hours 30 minutes)
+                const istDate = new Date(date.getTime() + (5.5 * 60 * 60 * 1000));
+                return `${istDate.getUTCFullYear()}-${pad(istDate.getUTCMonth() + 1)}-${pad(istDate.getUTCDate())}T${pad(istDate.getUTCHours())}:${pad(istDate.getUTCMinutes())}:${pad(istDate.getUTCSeconds())}+05:30`;
             };
 
             const startTimeStr = formatIST(sinceTime);
             const endTimeStr = formatIST(new Date());
 
-            const searchCond = {
-                AcsEventCond: {
-                    searchID: crypto.randomBytes(4).toString('hex'),
-                    searchResultPosition: 0,
-                    maxResults: maxResults,
-                    major: 0,  // All major types
-                    minor: 0,  // All minor types
-                    startTime: startTimeStr,
-                    endTime: endTimeStr,
-                },
-            };
-
             console.log('[ISAPI] Fetching ALL events from', startTimeStr, 'to', endTimeStr);
 
-            const result = await this.request(
-                'POST',
-                '/ISAPI/AccessControl/AcsEvent?format=json',
-                searchCond
-            );
+            const allEvents = [];
+            let searchPosition = 0;
+            const pageSize = 100; // Fetch 100 events per page
+            let hasMore = true;
+            const searchID = crypto.randomBytes(4).toString('hex');
 
-            console.log('[ISAPI] Events response:', JSON.stringify(result).substring(0, 300));
+            while (hasMore && allEvents.length < maxResults) {
+                const searchCond = {
+                    AcsEventCond: {
+                        searchID: searchID,
+                        searchResultPosition: searchPosition,
+                        maxResults: Math.min(pageSize, maxResults - allEvents.length),
+                        major: 0,  // All major types
+                        minor: 0,  // All minor types
+                        startTime: startTimeStr,
+                        endTime: endTimeStr,
+                    },
+                };
 
-            if (!result.AcsEvent?.InfoList) {
-                return { events: [], hasMore: false };
+                console.log(`[ISAPI] Fetching page at position ${searchPosition}...`);
+
+                const result = await this.request(
+                    'POST',
+                    '/ISAPI/AccessControl/AcsEvent?format=json',
+                    searchCond
+                );
+
+                console.log('[ISAPI] Events response status:', result.AcsEvent?.responseStatusStrg,
+                    'numOfMatches:', result.AcsEvent?.numOfMatches,
+                    'totalMatches:', result.AcsEvent?.totalMatches);
+
+                if (!result.AcsEvent?.InfoList || result.AcsEvent.InfoList.length === 0) {
+                    hasMore = false;
+                    break;
+                }
+
+                const pageEvents = result.AcsEvent.InfoList.map((event) => ({
+                    rawEventId: event.serialNo?.toString() || crypto.randomBytes(8).toString('hex'),
+                    eventType: this.parseEventType(event.major, event.minor),
+                    deviceUserId: event.employeeNoString || event.employeeNo?.toString(),
+                    eventTime: new Date(event.time),
+                    cardNo: event.cardNo,
+                    name: event.name,
+                    doorName: event.doorName,
+                    raw: event,
+                }));
+
+                allEvents.push(...pageEvents);
+                searchPosition += pageEvents.length;
+
+                // Check if there are more results
+                hasMore = result.AcsEvent.responseStatusStrg === 'MORE';
+
+                console.log(`[ISAPI] Fetched ${pageEvents.length} events, total so far: ${allEvents.length}`);
             }
 
-            const events = result.AcsEvent.InfoList.map((event) => ({
-                rawEventId: event.serialNo?.toString() || crypto.randomBytes(8).toString('hex'),
-                eventType: this.parseEventType(event.major, event.minor),
-                deviceUserId: event.employeeNoString || event.employeeNo?.toString(),
-                eventTime: new Date(event.time),
-                cardNo: event.cardNo,
-                name: event.name,
-                doorName: event.doorName,
-                raw: event,
-            }));
-
-            const hasMore = result.AcsEvent.numOfMatches > events.length;
-
-            return { events, hasMore };
+            console.log(`[ISAPI] Total events fetched: ${allEvents.length}`);
+            return { events: allEvents, hasMore: false };
         } catch (error) {
             console.error('[ISAPI] getAllAcsEvents error:', error.message);
             throw error;

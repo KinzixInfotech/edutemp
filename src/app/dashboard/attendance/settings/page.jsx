@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-    Settings, Clock, MapPin, Bell, CheckCircle, AlertCircle, Save, Loader2
+    Settings, Clock, MapPin, Bell, CheckCircle, AlertCircle, Save, Loader2, Fingerprint, ExternalLink
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -172,6 +172,7 @@ export default function AttendanceSettings() {
                     <TabsTrigger value="working-hours">Working Hours</TabsTrigger>
                     <TabsTrigger value="geofencing">Geofencing</TabsTrigger>
                     <TabsTrigger value="auto-marking">Auto-marking</TabsTrigger>
+                    <TabsTrigger value="biometric">Biometric</TabsTrigger>
                     <TabsTrigger value="notifications">Notifications</TabsTrigger>
                     <TabsTrigger value="approvals">Approvals</TabsTrigger>
                 </TabsList>
@@ -527,6 +528,73 @@ export default function AttendanceSettings() {
                                     Alert when attendance falls below this percentage
                                 </p>
                             </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* Biometric Attendance */}
+                <TabsContent value="biometric">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Fingerprint className="w-5 h-5" />
+                                Biometric Attendance
+                            </CardTitle>
+                            <CardDescription>Configure biometric device integration for automatic attendance marking</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="flex items-center justify-between p-4 border rounded-lg">
+                                <div>
+                                    <Label className="text-base">Enable Biometric Attendance</Label>
+                                    <p className="text-sm text-muted-foreground">
+                                        Automatically mark attendance from biometric device punches
+                                    </p>
+                                </div>
+                                <Switch
+                                    checked={settings.enableBiometricAttendance || false}
+                                    onCheckedChange={(checked) => handleChange('enableBiometricAttendance', checked)}
+                                />
+                            </div>
+
+                            {settings.enableBiometricAttendance && (
+                                <>
+                                    <div className="space-y-4 p-4 bg-muted/30 rounded-lg border border-dashed">
+                                        <div className="flex items-start gap-3 p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+                                            <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
+                                            <div className="text-sm">
+                                                <p className="font-medium text-green-900 dark:text-green-100">How Biometric Attendance Works</p>
+                                                <ul className="text-green-700 dark:text-green-300 mt-1 list-disc list-inside space-y-1">
+                                                    <li><strong>CRON 1:</strong> Syncs raw punches from devices every 2-5 minutes</li>
+                                                    <li><strong>CRON 2:</strong> Finalizes attendance at 6-8 PM daily</li>
+                                                    <li>First punch = Check-in, Last punch = Check-out</li>
+                                                    <li>Late/half-day rules from Working Hours settings apply</li>
+                                                    <li>Users with no punches are marked absent</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                                            <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                                            <div className="text-sm">
+                                                <p className="font-medium text-blue-900 dark:text-blue-100">Prerequisites</p>
+                                                <ul className="text-blue-700 dark:text-blue-300 mt-1 list-disc list-inside space-y-1">
+                                                    <li>At least one biometric device must be configured</li>
+                                                    <li>Users must be mapped to device IDs in User Mapping</li>
+                                                    <li>Working hours must be configured correctly</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <a
+                                        href="/dashboard/attendance/user-mapping"
+                                        className="flex items-center gap-2 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                                    >
+                                        <ExternalLink className="w-4 h-4" />
+                                        Go to User Mapping & Device Configuration
+                                    </a>
+                                </>
+                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>

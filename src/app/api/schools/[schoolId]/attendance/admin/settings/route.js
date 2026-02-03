@@ -20,6 +20,7 @@ const DEFAULT_ATTENDANCE_CONFIG = {
   sendDailyReminders: true,
   reminderTime: '08:30',
   notifyParents: true,
+  enableBiometricAttendance: false,
   calculateOnWeekends: false,
   minAttendancePercent: 75,
 };
@@ -74,6 +75,9 @@ export async function GET(req, props) {
         sendDailyReminders: config.sendDailyReminders,
         reminderTime: config.reminderTime,
         notifyParents: config.notifyParents,
+
+        // Biometric
+        enableBiometricAttendance: config.enableBiometricAttendance,
 
         // Stats
         calculateOnWeekends: config.calculateOnWeekends,

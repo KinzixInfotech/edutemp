@@ -2728,7 +2728,13 @@ model Attendance {
   markedAt      DateTime @default(now())
   isLateCheckIn Boolean  @default(false)
   lateByMinutes Int?
-  remarks       String?
+
+  // Biometric Attendance Tracking
+  isBiometricEntry     Boolean   @default(false) // True if created from biometric punch
+  isBiometricFinalized Boolean   @default(false) // True after night finalization
+  biometricFinalizedAt DateTime? // When finalization ran
+
+  remarks String?
 
   // Approval System
   requiresApproval Boolean        @default(false)
@@ -2897,6 +2903,9 @@ model AttendanceConfig {
   sendDailyReminders Boolean @default(true)
   reminderTime       String  @default("08:30")
   notifyParents      Boolean @default(true)
+
+  // Biometric Attendance Settings
+  enableBiometricAttendance Boolean @default(false)
 
   // Stats Calculation
   calculateOnWeekends  Boolean @default(false)

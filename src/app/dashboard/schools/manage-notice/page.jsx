@@ -483,7 +483,7 @@ export default function NoticeAdminPage() {
                                     <TableHead>Notice</TableHead>
                                     <TableHead>Category</TableHead>
                                     <TableHead>Audience</TableHead>
-                                    <TableHead>Priority</TableHead>
+                                    <TableHead>Priority</TableHead>z
                                     <TableHead>Status</TableHead>
                                     <TableHead>Views</TableHead>
                                     <TableHead>Date</TableHead>

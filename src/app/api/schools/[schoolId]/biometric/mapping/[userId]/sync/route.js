@@ -78,15 +78,20 @@ export async function POST(req, props) {
                     console.log('[Sync] Using UserInfo FP count:', fpCount, 'for user:', mapping.deviceUserId);
 
                     // Update mapping with actual enrollment data
-                    await prisma.biometricIdentityMap.update({
+                    const hasCardValue = !!userCard || (userInfo.cards || 0) > 0;
+                    console.log(`[Sync] 📝 Updating mapping ID: ${mapping.id}, hasCard: ${hasCardValue}, fpCount: ${fpCount}`);
+
+                    const updateResult = await prisma.biometricIdentityMap.update({
                         where: { id: mapping.id },
                         data: {
                             fingerprintCount: fpCount,
                             // Priority: Card search result (userCard) > UserInfo count (unreliable)
-                            hasCard: !!userCard || (userInfo.cards || 0) > 0,
+                            hasCard: hasCardValue,
                             hasFace: (userInfo.faces || 0) > 0,
                         },
                     });
+
+                    console.log(`[Sync] ✅ DB Updated! Record ID: ${updateResult.id}, hasCard: ${updateResult.hasCard}`);
 
                     results.push({
                         deviceId: device.id,

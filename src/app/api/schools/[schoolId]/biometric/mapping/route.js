@@ -73,8 +73,8 @@ export async function GET(req, props) {
                 deviceId: m.deviceId,
                 deviceUserId: m.deviceUserId,
                 fingerprintCount: m.fingerprintCount,
-                // Use actual RFID card count instead of cached hasCard field
-                hasCard: (m.user.rfidIdentityMaps?.length || 0) > 0,
+                // Use device-synced hasCard OR actual RFID card records
+                hasCard: m.hasCard || (m.user.rfidIdentityMaps?.length || 0) > 0,
                 hasFace: m.hasFace,
                 isActive: m.isActive,
                 enrolledAt: m.enrolledAt,

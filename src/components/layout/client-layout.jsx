@@ -182,25 +182,6 @@ export default function ClientLayout({ children }) {
         };
     }, []);
 
-    // Report outage effect
-    useEffect(() => {
-        if (isDbDown) {
-            // Fire and forget
-            fetch('/api/report-outage', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    type: 'DATABASE_DOWN',
-                    error: 'Client detected 500/503 error'
-                })
-            }).then(() => {
-                toast.error("System Outage Reported", {
-                    description: "Engineering team has been notified.",
-                    duration: 5000,
-                });
-            }).catch(console.error);
-        }
-    }, [isDbDown]);
 
     // Create a single QueryClient instance for the whole app
     const [queryClient] = useState(() => new QueryClient({

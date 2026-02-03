@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { createISAPIClient } from '@/lib/biometric/isapi-client';
 import { getCache, setCache, generateKey } from '@/lib/cache';
+import { sendNotification } from '@/lib/notifications/notificationHelper';
 import crypto from 'crypto';
 
 // Configuration
@@ -49,9 +50,16 @@ export async function GET(request) {
 
         console.log('[Biometric Sync] Starting poll...');
 
-        // Get all enabled devices
+        // Get all enabled devices for schools with biometric attendance enabled
         const devices = await prisma.biometricDevice.findMany({
-            where: { isEnabled: true },
+            where: {
+                isEnabled: true,
+                school: {
+                    attendanceConfig: {
+                        enableBiometricAttendance: true
+                    }
+                }
+            },
             select: {
                 id: true,
                 schoolId: true,
@@ -178,7 +186,6 @@ async function pollDevice(device) {
         // Process events
         let newEvents = 0;
         let processedEvents = 0;
-        let attendanceCreated = 0;
 
         for (const event of events) {
             if (!event.deviceUserId) continue;
@@ -203,7 +210,7 @@ async function pollDevice(device) {
             });
 
             // Store raw event
-            const storedEvent = await prisma.biometricAttendanceEvent.create({
+            await prisma.biometricAttendanceEvent.create({
                 data: {
                     schoolId: device.schoolId,
                     deviceId: device.id,
@@ -219,17 +226,9 @@ async function pollDevice(device) {
                 },
             });
 
-            // Create attendance record if user is mapped
+            // Update live attendance immediately if user is mapped
             if (mapping) {
-                const attendanceResult = await processAttendanceEvent(
-                    device.schoolId,
-                    mapping.userId,
-                    event.eventTime,
-                    storedEvent.id
-                );
-                if (attendanceResult.created || attendanceResult.updated) {
-                    attendanceCreated++;
-                }
+                await updateLiveAttendance(device.schoolId, mapping.userId, event.eventTime);
             }
 
             processedEvents++;
@@ -249,7 +248,6 @@ async function pollDevice(device) {
             success: true,
             eventsProcessed: processedEvents,
             newEvents,
-            attendanceCreated,
             hasMore,
         };
     } catch (error) {
@@ -266,80 +264,170 @@ async function pollDevice(device) {
 }
 
 /**
- * Process attendance event - create check-in or check-out
+ * Update live attendance - create/update attendance record immediately
+ * Students: Only P/A (Present/Absent) - first punch marks present, subsequent ignored
+ * Staff: Check-in/Check-out times - first punch = in, subsequent = out
  */
-async function processAttendanceEvent(schoolId, userId, eventTime, biometricEventId) {
-    const eventDate = getISTDate();
+async function updateLiveAttendance(schoolId, userId, eventTime) {
+    // Get date in IST
     const eventTimeIST = new Date(eventTime.getTime() + IST_OFFSET_MS);
+    const dateStr = eventTimeIST.toISOString().split('T')[0];
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const eventDate = new Date(Date.UTC(y, m - 1, d));
 
-    // Check existing attendance for today
-    const existingAttendance = await prisma.attendance.findUnique({
-        where: {
-            userId_schoolId_date: {
-                userId,
-                schoolId,
-                date: eventDate,
-            },
-        },
+    // Format time for notification (e.g., "9:05 AM")
+    const timeFormatted = eventTimeIST.toLocaleTimeString('en-IN', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'Asia/Kolkata'
     });
 
-    // Get attendance config for grace period
-    const config = await getCachedAttendanceConfig(schoolId);
+    try {
+        // Get user info - check if student or staff
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                name: true,
+                role: { select: { name: true } },
+                student: {
+                    select: {
+                        id: true, // Check if student record exists
+                        studentParentLinks: {
+                            where: { isActive: true },
+                            select: { parent: { select: { userId: true } } }
+                        }
+                    }
+                }
+            }
+        });
 
-    if (!existingAttendance) {
-        // First event of day = Check-in
-        const startTime = config?.defaultStartTime || '09:00';
-        const [startHour, startMin] = startTime.split(':').map(Number);
-        const gracePeriod = config?.gracePeriodMinutes || 15;
+        const userName = user?.name || 'User';
+        const isStudent = !!user?.student?.id; // True if student record exists
+        const roleName = user?.role?.name?.toUpperCase() || '';
+        const isStudentRole = roleName === 'STUDENT';
 
-        const scheduledStart = new Date(eventDate);
-        scheduledStart.setHours(startHour, startMin, 0, 0);
-        scheduledStart.setTime(scheduledStart.getTime() + IST_OFFSET_MS);
+        // Final check: is this a student?
+        const isStudentUser = isStudent || isStudentRole;
 
-        const lateThreshold = new Date(scheduledStart.getTime() + gracePeriod * 60 * 1000);
-        const isLate = eventTimeIST > lateThreshold;
-        const lateByMinutes = isLate
-            ? Math.floor((eventTimeIST - scheduledStart) / (60 * 1000))
-            : 0;
+        // Get parent IDs for notification (students only)
+        const parentIds = user?.student?.studentParentLinks?.map(l => l.parent.userId) || [];
 
-        await prisma.attendance.create({
-            data: {
-                userId,
+        // Check existing attendance for today
+        const existingAttendance = await prisma.attendance.findUnique({
+            where: {
+                userId_schoolId_date: {
+                    userId,
+                    schoolId,
+                    date: eventDate,
+                },
+            },
+        });
+
+        if (!existingAttendance) {
+            // First punch of day - mark present (for all)
+            await prisma.attendance.create({
+                data: {
+                    userId,
+                    schoolId,
+                    date: eventDate,
+                    status: 'PRESENT',
+                    checkInTime: isStudentUser ? null : eventTime, // Only staff get check-in time
+                    markedAt: new Date(),
+                    remarks: isStudentUser ? 'Biometric present (live)' : 'Biometric check-in (live)',
+                    deviceInfo: { source: 'biometric', live: true, isStudent: isStudentUser },
+                    requiresApproval: false,
+                    approvalStatus: 'NOT_REQUIRED',
+                    isBiometricEntry: true,
+                    isBiometricFinalized: false,
+                },
+            });
+            console.log(`[Live Attendance] Created ${isStudentUser ? 'present' : 'check-in'} for user ${userId}`);
+
+            // Notify user (and parents if student)
+            if (isStudentUser) {
+                // Student: "Marked Present" notification
+                await sendNotification({
+                    schoolId,
+                    title: `✅ Marked Present`,
+                    message: `${userName} has been marked present today`,
+                    type: 'ATTENDANCE',
+                    priority: 'NORMAL',
+                    icon: '✅',
+                    targetOptions: {
+                        userIds: [userId, ...parentIds]
+                    },
+                    metadata: {
+                        eventType: 'BIOMETRIC_PRESENT',
+                        userId
+                    },
+                    actionUrl: '/attendance'
+                });
+            } else {
+                // Staff: "Checked In at time" notification
+                await sendNotification({
+                    schoolId,
+                    title: `✅ Checked In`,
+                    message: `${userName} checked in at ${timeFormatted}`,
+                    type: 'ATTENDANCE',
+                    priority: 'NORMAL',
+                    icon: '✅',
+                    targetOptions: {
+                        userIds: [userId]
+                    },
+                    metadata: {
+                        eventType: 'BIOMETRIC_CHECK_IN',
+                        time: timeFormatted,
+                        userId
+                    },
+                    actionUrl: '/attendance'
+                });
+            }
+
+        } else if (!existingAttendance.isBiometricFinalized && !isStudentUser) {
+            // ONLY for staff: Update check-out time on subsequent punches
+            // Students are ignored after first punch (already marked present)
+
+            const checkInTime = existingAttendance.checkInTime;
+            const workingHours = checkInTime
+                ? (eventTime - new Date(checkInTime)) / (1000 * 60 * 60)
+                : 0;
+
+            await prisma.attendance.update({
+                where: { id: existingAttendance.id },
+                data: {
+                    checkOutTime: eventTime,
+                    workingHours: Math.round(workingHours * 100) / 100,
+                },
+            });
+            console.log(`[Live Attendance] Updated check-out for staff ${userId}`);
+
+            // Staff: "Checked Out at time" notification
+            await sendNotification({
                 schoolId,
-                date: eventDate,
-                status: 'PRESENT',
-                checkInTime: eventTime,
-                isLateCheckIn: isLate,
-                lateByMinutes,
-                markedAt: new Date(),
-                remarks: 'Biometric check-in',
-                deviceInfo: { source: 'biometric', eventId: biometricEventId },
-                requiresApproval: false,
-                approvalStatus: 'NOT_REQUIRED',
-            },
-        });
-
-        return { created: true };
-    } else if (!existingAttendance.checkOutTime) {
-        // Has check-in, no check-out = This is check-out
-        const checkInTime = existingAttendance.checkInTime;
-        const workingHours = checkInTime
-            ? (eventTime - checkInTime) / (1000 * 60 * 60)
-            : 0;
-
-        await prisma.attendance.update({
-            where: { id: existingAttendance.id },
-            data: {
-                checkOutTime: eventTime,
-                workingHours: Math.round(workingHours * 100) / 100,
-            },
-        });
-
-        return { updated: true };
+                title: `👋 Checked Out`,
+                message: `${userName} checked out at ${timeFormatted}`,
+                type: 'ATTENDANCE',
+                priority: 'NORMAL',
+                icon: '👋',
+                targetOptions: {
+                    userIds: [userId]
+                },
+                metadata: {
+                    eventType: 'BIOMETRIC_CHECK_OUT',
+                    time: timeFormatted,
+                    userId,
+                    workingHours: Math.round(workingHours * 100) / 100
+                },
+                actionUrl: '/attendance'
+            });
+        }
+        // Students with existing attendance: ignore subsequent punches (already present)
+        // If already finalized, ignore new punches (shouldn't happen during day)
+    } catch (error) {
+        console.error(`[Live Attendance] Error for user ${userId}:`, error.message);
+        // Don't throw - we still want to store the raw event even if attendance update fails
     }
-
-    // Already has both check-in and check-out - ignore
-    return { ignored: true };
 }
 
 /**
