@@ -30,6 +30,8 @@ import axios from "axios";
 import { toast } from "sonner";
 import { WebPushListener } from "@/components/web-push-listener";
 import { PiGraduationCapDuotone } from "react-icons/pi";
+import { ApiProgressBar } from "@/components/ui/api-progress-bar";
+import { apiLoader } from "@/lib/api-loader";
 
 const TopProgressBar = dynamic(() => import("@/app/components/TopProgressBar"), {
     ssr: false,
@@ -102,12 +104,28 @@ export default function ClientLayout({ children }) {
         setIsNavigating(false);
     }, [pathname]);
 
-    // Global Error Interceptor for Fetch and Axios
+    // Global Error Interceptor and Loading State for Fetch and Axios
     useEffect(() => {
-        // 1. Intercept Axios
-        const interceptor = axios.interceptors.response.use(
-            (response) => response,
+        // 1. Intercept Axios Request
+        const reqInterceptor = axios.interceptors.request.use(
+            (config) => {
+                apiLoader.start();
+                return config;
+            },
             (error) => {
+                apiLoader.stop();
+                return Promise.reject(error);
+            }
+        );
+
+        // 2. Intercept Axios Response
+        const resInterceptor = axios.interceptors.response.use(
+            (response) => {
+                apiLoader.stop();
+                return response;
+            },
+            (error) => {
+                apiLoader.stop();
                 // Only trigger DB Error Dialog for specific database connection issues
                 const errorMessage = error.response?.data?.error || error.response?.data?.message || '';
                 const isDatabaseError =
@@ -123,9 +141,10 @@ export default function ClientLayout({ children }) {
             }
         );
 
-        // 2. Intercept Global Fetch
+        // 3. Intercept Global Fetch
         const originalFetch = window.fetch;
         window.fetch = async (...args) => {
+            apiLoader.start();
             try {
                 const response = await originalFetch(...args);
                 // clone response to read text without consuming body for caller
@@ -150,12 +169,15 @@ export default function ClientLayout({ children }) {
                 return response;
             } catch (error) {
                 throw error;
+            } finally {
+                apiLoader.stop();
             }
         };
 
         return () => {
             // Cleanup
-            axios.interceptors.response.eject(interceptor);
+            axios.interceptors.request.eject(reqInterceptor);
+            axios.interceptors.response.eject(resInterceptor);
             window.fetch = originalFetch;
         };
     }, []);
@@ -239,6 +261,7 @@ export default function ClientLayout({ children }) {
                                 {!hideUI && <SetupHelperButton />}
                                 {!hideUI && <AppSidebar />}
                                 <TopProgressBar />
+                                <ApiProgressBar />
 
                                 <SidebarInset className={'bg-[#f9fafb] dark:bg-black'}>
                                     {!hideUI && <SiteHeader fullUser={fullUser} />}
