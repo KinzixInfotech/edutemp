@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertCircleIcon, CalendarCheck, CheckCircle2Icon, Copy, Loader2, Mail, Phone, RefreshCw, MessageSquare, Image, Download, ZoomIn, X, FileText, Video, Music } from "lucide-react";
+import { AlertCircleIcon, CalendarCheck, CheckCircle2Icon, Copy, Loader2, Mail, Phone, RefreshCw, MessageSquare, Image, Download, ZoomIn, X, FileText, Video, Music, ChevronRight, Home, ArrowLeft, Clock, History } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useParams } from "next/navigation";
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -841,270 +842,290 @@ export default function ApplicationDetails() {
             case "TEST":
             case "INTERVIEW":
             case "TESTINTERVIEW":
-
                 return (
-                    <div className="space-y-4">
-                        {/* Schedule Test Button */}
-
-                        <Dialog open={scopen} onOpenChange={setScopen}>
-                            <DialogTrigger asChild>
-                                <Button variant={'outline'} className="w-fit inline-flex items-center justify-center">
-                                    <CalendarCheck />
-                                    {test ? ('Update Scheduled Test') : "Schedule Test"}
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent className="bg-white max-h-[95vh]   overflow-y-auto shadow-none dark:bg-[#171717] w-[384px] h-fit p-0 text-foreground space-y-0 gap-0 rounded-md ">
-                                <div className="space-y-4 mt-4">
-                                    <div>
-                                        <DialogHeader className='border-b  py-2  h-min flex  justify-center px-3.5'>
-                                            <DialogTitle className="flex text-lg tracking-tight leading-tight dark:text-white text-black font-semibold">
-                                                Schedule Test
-                                            </DialogTitle>
-                                        </DialogHeader>
-                                        <div className="px-3.5 py-3.5">
-                                            <div className="space-y-4">
-                                                <div>
-                                                    <Label className={'mb-3'}>Test Date</Label>
-                                                    <Input
-                                                        type="date"
-                                                        className="bg-background"
-                                                        value={stageData.testDate || ""}
-                                                        onChange={(e) => handleStageDataChange("testDate", e.target.value)}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    {/* <Label className={'mb-3'}>Test Time</Label> */}
-                                                    <div className="grid grid-cols-2 gap-2.5">
-                                                        <div>
-                                                            <Label className={'mb-3'}>Start Time</Label>
-                                                            <Input
-                                                                type="time"
-                                                                className="bg-background"
-                                                                value={stageData.testStartTime || new Date(Date.now()).toTimeString().slice(0, 5)}
-                                                                onChange={(e) => handleStageDataChange("testDate", e.target.value)}
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <Label className={'mb-3'}>End Time</Label>
-                                                            <Input
-                                                                type="time"
-                                                                className="bg-background"
-                                                                value={stageData.testEndTime || new Date(Date.now() + 2 * 60 * 60 * 1000).toTimeString().slice(0, 5)}
-                                                                onChange={(e) => handleStageDataChange("testDate", e.target.value)}
-                                                            />
+                    <div className="space-y-6">
+                        {/* Step 1: Schedule Test */}
+                        <div className="rounded-lg border bg-card p-4">
+                            <div className="flex items-start gap-4">
+                                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${test ? 'bg-green-100 text-green-700' : 'bg-primary text-primary-foreground'}`}>
+                                    {test ? <CheckCircle2 className="h-4 w-4" /> : '1'}
+                                </div>
+                                <div className="flex-1 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h4 className="font-medium">Schedule Test</h4>
+                                            <p className="text-sm text-muted-foreground">
+                                                {test ? 'Test scheduled successfully' : 'Set date, time and venue for the test'}
+                                            </p>
+                                        </div>
+                                        <Dialog open={scopen} onOpenChange={setScopen}>
+                                            <DialogTrigger asChild>
+                                                <Button variant={test ? 'outline' : 'default'} size="sm">
+                                                    <CalendarCheck className="h-4 w-4 mr-2" />
+                                                    {test ? 'Update Schedule' : 'Schedule Test'}
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogContent className="bg-white max-h-[95vh] overflow-y-auto shadow-none dark:bg-[#171717] w-[384px] h-fit p-0 text-foreground space-y-0 gap-0 rounded-md">
+                                                <div className="space-y-4 mt-4">
+                                                    <div>
+                                                        <DialogHeader className='border-b py-2 h-min flex justify-center px-3.5'>
+                                                            <DialogTitle className="flex text-lg tracking-tight leading-tight dark:text-white text-black font-semibold">
+                                                                Schedule Test
+                                                            </DialogTitle>
+                                                        </DialogHeader>
+                                                        <div className="px-3.5 py-3.5">
+                                                            <div className="space-y-4">
+                                                                <div>
+                                                                    <Label className={'mb-3'}>Test Date</Label>
+                                                                    <Input
+                                                                        type="date"
+                                                                        className="bg-background"
+                                                                        value={stageData.testDate || ""}
+                                                                        onChange={(e) => handleStageDataChange("testDate", e.target.value)}
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <div className="grid grid-cols-2 gap-2.5">
+                                                                        <div>
+                                                                            <Label className={'mb-3'}>Start Time</Label>
+                                                                            <Input
+                                                                                type="time"
+                                                                                className="bg-background"
+                                                                                value={stageData.testStartTime || new Date(Date.now()).toTimeString().slice(0, 5)}
+                                                                                onChange={(e) => handleStageDataChange("testStartTime", e.target.value)}
+                                                                            />
+                                                                        </div>
+                                                                        <div>
+                                                                            <Label className={'mb-3'}>End Time</Label>
+                                                                            <Input
+                                                                                type="time"
+                                                                                className="bg-background"
+                                                                                value={stageData.testEndTime || new Date(Date.now() + 2 * 60 * 60 * 1000).toTimeString().slice(0, 5)}
+                                                                                onChange={(e) => handleStageDataChange("testEndTime", e.target.value)}
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div>
+                                                                    <LocationInput queryClient={queryClient} stageData={stageData} handleStageDataChange={handleStageDataChange} />
+                                                                </div>
+                                                                <div>
+                                                                    <Label className={'mb-3'}>Custom Message (Optional)</Label>
+                                                                    <Textarea className={'shadow-none'} placeholder="Custom Message...." />
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     </div>
-
                                                 </div>
+                                                <DialogFooter className="mb-4 px-4 border-t pt-3.5">
+                                                    <Button
+                                                        disabled={isLoading}
+                                                        onClick={() => {
+                                                            scheduleTest({
+                                                                applicationId: applicationId,
+                                                                stageId: application.currentStage?.id,
+                                                                movedById,
+                                                                testDate: stageData.testDate,
+                                                                testStartTime: stageData.testStartTime,
+                                                                testEndTime: stageData.testEndTime,
+                                                                testVenue: stageData.testVenue,
+                                                                customMessage: stageData.customMessage,
+                                                            });
+                                                        }}
+                                                        className="inline-flex w-full justify-center items-center"
+                                                    >
+                                                        <Mail strokeWidth={2} className="h-4 w-4 mr-2" />
+                                                        {isLoading ? "Scheduling..." : "Schedule & Notify via SMS"}
+                                                    </Button>
+                                                </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
+                                    </div>
 
-                                                <div>
-                                                    <LocationInput queryClient={queryClient} stageData={stageData} handleStageDataChange={handleStageDataChange} />
-                                                </div>
-
-                                                <div>
-                                                    <Label className={'mb-3'}>Custom Message (Optional)</Label>
-                                                    <Textarea className={'shadow-none'} placeholder="Custom Message...." />
-                                                    {/* <Input
-                                                        placeholder="Enter test venue or location"
-                                                        className="bg-background"
-                                                        value={stageData.testVenue || ""}
-                                                        onChange={(e) => handleStageDataChange("testVenue", e.target.value)}
-                                                    /> */}
-                                                </div>
+                                    {/* Show scheduled test info */}
+                                    {test && (
+                                        <div className="text-sm bg-green-50 dark:bg-green-950/20 rounded-md p-3 border border-green-200">
+                                            <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                                <span><strong>Date:</strong> {new Date(test.testDate).toLocaleDateString()}</span>
+                                                <span><strong>Time:</strong> {new Date(test.testStartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {new Date(test.testEndTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                {test.testVenue && <span><strong>Venue:</strong> {test.testVenue}</span>}
                                             </div>
-                                        </div>
-                                    </div>
-
-                                </div>
-
-                                <DialogFooter className="mb-4 px-4 border-t pt-3.5">
-
-                                    <Button
-                                        disabled={isLoading}
-                                        onClick={() => {
-                                            scheduleTest({
-                                                applicationId: applicationId,
-                                                stageId: application.currentStage?.id,
-                                                movedById,
-                                                testDate: stageData.testDate,
-                                                testStartTime: stageData.testStartTime,
-                                                testEndTime: stageData.testEndTime,
-                                                testVenue: stageData.testVenue,
-                                                customMessage: stageData.customMessage,
-                                            });
-                                        }}
-                                        className="inline-flex w-full justify-center items-center"
-                                    >
-                                        <Mail strokeWidth={2} />
-                                        {isLoading ? "Scheduling..." : "Inform & Save"}
-                                    </Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-                        {/* Test Score */}
-                        <div>
-                            <Label className="mb-4">Test Result</Label>
-                            <Select
-                                value={stageData.testResult || ""}
-                                onValueChange={(value) => handleStageDataChange("testResult", value)}
-                            >
-                                <SelectTrigger className="bg-background w-full">
-                                    <SelectValue placeholder="Select result" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="pass">Pass</SelectItem>
-                                    <SelectItem value="fail">Fail</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div>
-                            <Label className="mb-4">Test Score</Label>
-                            <Input
-                                className="bg-background"
-                                type="number"
-                                placeholder="Enter test score"
-                                value={stageData.testScore || ""}
-                                onChange={(e) => handleStageDataChange("testScore", e.target.value)}
-                            />
-                        </div>
-                        {/* Comments */}
-                        <div>
-                            <Label className="mb-4">Comments</Label>
-                            <Input
-                                className="bg-background"
-                                placeholder="Add comments"
-                                value={stageData.notes || ""}
-                                onChange={(e) => handleStageDataChange("notes", e.target.value)}
-                            />
-                        </div>
-                        <Dialog open={smsDialogOpen} onOpenChange={setSmsDialogOpen}>
-                            <DialogTrigger asChild>
-                                <Button variant="outline" className="inline-flex gap-2">
-                                    <MessageSquare className="w-4 h-4" /> Send SMS to Candidate
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-md">
-                                <DialogHeader>
-                                    <DialogTitle>Send SMS to Candidate</DialogTitle>
-                                    <DialogDescription>
-                                        Send a notification SMS to {application.applicantName}
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <div className="space-y-4 py-4">
-                                    <div>
-                                        <Label className="mb-2">Recipient Phone</Label>
-                                        <Input
-                                            value={application.data?.phone?.value || application.data?.mobile?.value || application.data?.contactNumber?.value || ""}
-                                            disabled
-                                            className="bg-muted"
-                                        />
-                                        {!application.data?.phone?.value && !application.data?.mobile?.value && (
-                                            <p className="text-xs text-amber-500 mt-1">No phone number found in application data</p>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <Label className="mb-2">Message Template</Label>
-                                        <Select value={smsMessage} onValueChange={setSmsMessage}>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select message type" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="test_scheduled">Test Scheduled Notification</SelectItem>
-                                                <SelectItem value="interview_scheduled">Interview Scheduled Notification</SelectItem>
-                                                <SelectItem value="result_pass">Result: Passed</SelectItem>
-                                                <SelectItem value="result_fail">Result: Not Selected</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    {smsMessage && (
-                                        <div className="p-3 bg-muted rounded-lg text-sm">
-                                            <p className="font-medium mb-1">Preview:</p>
-                                            <p className="text-muted-foreground">
-                                                {smsMessage === "test_scheduled" && `Dear ${application.applicantName}, your admission test has been scheduled${stageData.testDate ? ` on ${stageData.testDate}` : ""}${stageData.testVenue ? ` at ${stageData.testVenue}` : ""}. - St Xavier's School`}
-                                                {smsMessage === "interview_scheduled" && `Dear ${application.applicantName}, your interview has been scheduled. Please check your email for details. - St Xavier's School`}
-                                                {smsMessage === "result_pass" && `Congratulations ${application.applicantName}! You have passed the admission test. Please proceed with the next steps. - St Xavier's School`}
-                                                {smsMessage === "result_fail" && `Dear ${application.applicantName}, thank you for your interest. Unfortunately, you were not selected at this time. - St Xavier's School`}
-                                            </p>
                                         </div>
                                     )}
                                 </div>
-                                <DialogFooter>
-                                    <Button variant="outline" onClick={() => setSmsDialogOpen(false)}>Cancel</Button>
+                            </div>
+                        </div>
+
+                        {/* Step 2: Enter Test Results */}
+                        <div className={`rounded-lg border bg-card p-4 ${!test ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <div className="flex items-start gap-4">
+                                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${stageData.testResult ? 'bg-green-100 text-green-700' : test ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                                    {stageData.testResult ? <CheckCircle2 className="h-4 w-4" /> : '2'}
+                                </div>
+                                <div className="flex-1 space-y-4">
+                                    <div>
+                                        <h4 className="font-medium">Enter Test Results</h4>
+                                        <p className="text-sm text-muted-foreground">
+                                            {!test ? 'Schedule test first' : stageData.testResult ? 'Results recorded' : 'Add the test score and result'}
+                                        </p>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <Label className="mb-2">Test Result</Label>
+                                            <Select
+                                                value={stageData.testResult || ""}
+                                                onValueChange={(value) => handleStageDataChange("testResult", value)}
+                                            >
+                                                <SelectTrigger className="bg-background w-full">
+                                                    <SelectValue placeholder="Select result" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="pass">Pass</SelectItem>
+                                                    <SelectItem value="fail">Fail</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div>
+                                            <Label className="mb-2">Test Score</Label>
+                                            <Input
+                                                className="bg-background"
+                                                type="number"
+                                                placeholder="Enter score"
+                                                value={stageData.testScore || ""}
+                                                onChange={(e) => handleStageDataChange("testScore", e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <Label className="mb-2">Comments</Label>
+                                        <Input
+                                            className="bg-background"
+                                            placeholder="Add comments (optional)"
+                                            value={stageData.notes || ""}
+                                            onChange={(e) => handleStageDataChange("notes", e.target.value)}
+                                        />
+                                    </div>
+
                                     <Button
-                                        disabled={smsSending || !smsMessage}
-                                        onClick={async () => {
-                                            const phoneNumber = application.data?.phone?.value || application.data?.mobile?.value || application.data?.contactNumber?.value;
-                                            if (!phoneNumber) {
-                                                toast.error("No phone number found in application");
-                                                return;
-                                            }
-                                            setSmsSending(true);
-                                            try {
-                                                // For now, show success - integrate with actual SMS API when templates are set up
-                                                toast.success("SMS functionality ready - configure SMS templates in Settings > SMS to enable sending");
-                                                setSmsDialogOpen(false);
-                                            } catch (error) {
-                                                toast.error("Failed to send SMS");
-                                            } finally {
-                                                setSmsSending(false);
-                                            }
-                                        }}
+                                        onClick={() =>
+                                            updateTestResult({
+                                                applicationId: applicationId,
+                                                stageId: application.currentStage?.id,
+                                                testResult: stageData.testResult,
+                                                testScore: Number(stageData.testScore),
+                                                notes: stageData.notes,
+                                            }).then(() => {
+                                                queryClient.invalidateQueries(["applicationTest", applicationId, activeStep]);
+                                            })
+                                        }
+                                        className="w-full"
+                                        disabled={isLoadingtestRes || !isStageDataChanged() || !stageData.testResult}
                                     >
-                                        {smsSending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Sending...</> : "Send SMS"}
+                                        {isLoadingtestRes ? (
+                                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
+                                        ) : (
+                                            <><CheckCircle2 className="h-4 w-4 mr-2" /> Save Results</>
+                                        )}
                                     </Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-                        <Button
-                            onClick={() =>
-                                updateTestResult({
-                                    applicationId: applicationId,
-                                    stageId: application.currentStage?.id,
-                                    testResult: stageData.testResult,
-                                    testScore: Number(stageData.testScore),
-                                    notes: stageData.notes,
-                                }).then(() => {
-                                    // Invalidate the cached query so react-query refetches fresh data
-                                    queryClient.invalidateQueries(["applicationTest", applicationId, activeStep]);
-                                })
-                            }
-                            className="w-full inline-flex items-center justify-center"
-                            disabled={isLoadingtestRes || !isStageDataChanged()}
-                        >
-                            {isLoadingtestRes ? "Saving..." : "Save"}
-                        </Button>
-
-
-                    </div >
-                );
-                return (
-                    <div className="space-y-4">
-
-                        <div>
-                            <Label className='mb-4'>Test Score</Label>
-                            <Input className='bg-background'
-                                type="number"
-                                placeholder="Enter test score"
-                                value={stageData.testScore || ""}
-                                onChange={(e) => handleStageDataChange("testScore", e.target.value)}
-                            />
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <Label className='mb-4'>Interview Date</Label>
-                            <Input className='bg-background'
-                                type="date"
-                                value={stageData.interviewDate || ""}
-                                onChange={(e) => handleStageDataChange("interviewDate", e.target.value)}
-                            />
-                        </div>
-                        <div>
-                            <Label className='mb-4'>Comments</Label>
-                            <Input className='bg-background'
-                                placeholder="Add comments"
-                                value={stageData.notes || ""}
-                                onChange={(e) => handleStageDataChange("notes", e.target.value)}
-                            />
+
+                        {/* Step 3: Send Notification */}
+                        <div className={`rounded-lg border bg-card p-4 ${!stageData.testResult ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <div className="flex items-start gap-4">
+                                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${stageData.testResult ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                                    3
+                                </div>
+                                <div className="flex-1 space-y-3">
+                                    <div>
+                                        <h4 className="font-medium">Send Result Notification</h4>
+                                        <p className="text-sm text-muted-foreground">
+                                            {!stageData.testResult ? 'Enter results first' : 'Notify the candidate about their test result'}
+                                        </p>
+                                    </div>
+
+                                    <Dialog open={smsDialogOpen} onOpenChange={setSmsDialogOpen}>
+                                        <DialogTrigger asChild>
+                                            <Button variant="outline" className="w-full sm:w-auto">
+                                                <MessageSquare className="w-4 h-4 mr-2" /> Send SMS to Candidate
+                                            </Button>
+                                        </DialogTrigger>
+                                        <DialogContent className="sm:max-w-md">
+                                            <DialogHeader>
+                                                <DialogTitle>Send SMS to Candidate</DialogTitle>
+                                                <DialogDescription>
+                                                    Send a notification SMS to {application.applicantName}
+                                                </DialogDescription>
+                                            </DialogHeader>
+                                            <div className="space-y-4 py-4">
+                                                <div>
+                                                    <Label className="mb-2">Recipient Phone</Label>
+                                                    <Input
+                                                        value={application.data?.phone?.value || application.data?.mobile?.value || application.data?.contactNumber?.value || ""}
+                                                        disabled
+                                                        className="bg-muted"
+                                                    />
+                                                    {!application.data?.phone?.value && !application.data?.mobile?.value && (
+                                                        <p className="text-xs text-amber-500 mt-1">No phone number found in application data</p>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <Label className="mb-2">Message Template</Label>
+                                                    <Select value={smsMessage} onValueChange={setSmsMessage}>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select message type" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="test_scheduled">Test Scheduled Notification</SelectItem>
+                                                            <SelectItem value="interview_scheduled">Interview Scheduled Notification</SelectItem>
+                                                            <SelectItem value="result_pass">Result: Passed</SelectItem>
+                                                            <SelectItem value="result_fail">Result: Not Selected</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                                {smsMessage && (
+                                                    <div className="p-3 bg-muted rounded-lg text-sm">
+                                                        <p className="font-medium mb-1">Preview:</p>
+                                                        <p className="text-muted-foreground">
+                                                            {smsMessage === "test_scheduled" && `Dear ${application.applicantName}, your admission test has been scheduled${stageData.testDate ? ` on ${stageData.testDate}` : ""}${stageData.testVenue ? ` at ${stageData.testVenue}` : ""}. - St Xavier's School`}
+                                                            {smsMessage === "interview_scheduled" && `Dear ${application.applicantName}, your interview has been scheduled. Please check your email for details. - St Xavier's School`}
+                                                            {smsMessage === "result_pass" && `Congratulations ${application.applicantName}! You have passed the admission test. Please proceed with the next steps. - St Xavier's School`}
+                                                            {smsMessage === "result_fail" && `Dear ${application.applicantName}, thank you for your interest. Unfortunately, you were not selected at this time. - St Xavier's School`}
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <DialogFooter>
+                                                <Button variant="outline" onClick={() => setSmsDialogOpen(false)}>Cancel</Button>
+                                                <Button
+                                                    disabled={smsSending || !smsMessage}
+                                                    onClick={async () => {
+                                                        const phoneNumber = application.data?.phone?.value || application.data?.mobile?.value || application.data?.contactNumber?.value;
+                                                        if (!phoneNumber) {
+                                                            toast.error("No phone number found in application");
+                                                            return;
+                                                        }
+                                                        setSmsSending(true);
+                                                        try {
+                                                            toast.success("SMS functionality ready - configure SMS templates in Settings > SMS to enable sending");
+                                                            setSmsDialogOpen(false);
+                                                        } catch (error) {
+                                                            toast.error("Failed to send SMS");
+                                                        } finally {
+                                                            setSmsSending(false);
+                                                        }
+                                                    }}
+                                                >
+                                                    {smsSending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Sending...</> : "Send SMS"}
+                                                </Button>
+                                            </DialogFooter>
+                                        </DialogContent>
+                                    </Dialog>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 );
@@ -1500,213 +1521,294 @@ export default function ApplicationDetails() {
 
     return (
         <>
-            <div className="p-4 space-y-4">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center px-4 justify-between">
-                    <Card className="shadow-md w-full">
-                        {/* Header for Primary Info (Name, Email) and Action Button 
-            -----------------------------------------------------------
-            */}
-                        <CardHeader className="flex flex-row items-start justify-between">
-                            <div className="space-y-1">
-                                {/* Name as the main title */}
-                                <CardTitle className="text-2xl font-medium  tracking-tight">
-                                    {application.applicantName}
-                                </CardTitle>
-                                {/* Email as the description, styled as a clickable link */}
-                                <CardDescription className="text-base text-blue-600 hover:text-blue-700 cursor-pointer">
-                                    {application.applicantEmail}
-                                </CardDescription>
-                            </div>
-
-                            {/* Action Button */}
-
-                            {/* <Button className="ml-4" variant="default">
-                            <Phone className="mr-2 h-4 w-4" /> Call Candidate
-                        </Button> */}
-                        </CardHeader>
-
-                        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 pt-4">
-
-                            {/* 1. Application ID */}
-                            <div className="flex w flex-col space-y-1">
-                                <span className="text-xs font-semibold uppercase text-muted-foreground">Application ID</span>
-                                <div className="flex items-center w-full space-x-2">
-                                    {/* Use a Badge for visual distinction and allow copying */}
-                                    <Badge variant="secondary" className="font-mono text-sm py-1 px-3">
-                                        {applicationId}
-                                    </Badge>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopy}>
-                                        <Copy className="h-4 w-4 text-muted-foreground" />
-                                    </Button>
-                                </div>
-                            </div>
-
-                            {/* 2. Submitted On */}
-                            <div className="flex flex-col space-y-1">
-                                <span className="text-xs font-semibold uppercase text-muted-foreground">Submitted On</span>
-                                <span className="text-base font-medium text-foreground">
-                                    {formatDate(application.submittedAt)}
-                                </span>
-                            </div>
-
-                            {/* 3. Current Stage */}
-                            <div className="flex flex-col space-y-1">
-                                <span className="text-xs font-semibold uppercase text-muted-foreground">Current Stage</span>
-                                {/* <Badge variant="default" className="bg-blue-500 hover:bg-blue-600 w-fit text-base">
-                                {application.currentStage?.name || "N/A"}
-                            </Badge> */}
-                                <Badge
-                                    className={`px-2 py-1 text-sm font-medium ${getStageStyle(application.currentStage?.name)} capitalize`}
-                                >
-                                    {application.currentStage?.name.replace("_", " & ")}
-                                </Badge>
-                            </div>
-
-                        </CardContent>
-                    </Card>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 bg-white dark:bg-background p-4 rounded-md">
-                    {
-                        test && (
-                            <Alert className="flex transition-all items-start gap-2 mb-2.5 border-green-400 shadow-sm bg-green-50  text-green-800">
-                                <CheckCircle2Icon />
-
-                                <div>
-                                    <AlertTitle>Scheduled Test Details</AlertTitle>
-                                    {/* <AlertTitle>Test Scheduled</AlertTitle> */}
-                                    <AlertDescription className="space-y-1 mt-2.5" >
-                                        <ul className="space-y-1 font-normal text-black text-sm">
-                                            <li> <span className="font-semibold">Test Date: </span>{new Date(test.testDate).toLocaleDateString()}</li>
-                                            <li>
-                                                <span className="font-semibold">Test Time: </span>{" "}
-                                                {new Date(test.testStartTime).toLocaleTimeString([], {
-                                                    hour: "2-digit",
-                                                    minute: "2-digit",
-                                                })}{" "}
-                                                –{" "}
-                                                {new Date(test.testEndTime).toLocaleTimeString([], {
-                                                    hour: "2-digit",
-                                                    minute: "2-digit",
-                                                })}
-                                            </li>
-                                            <li className="flex items-center gap-1">
-                                                <span className="font-semibold">Test Venue: </span>
-                                                <span>{test.testVenue}</span>
-                                            </li>
-                                        </ul>
-                                    </AlertDescription>
-                                </div>
-                            </Alert>
+            <div className="p-6 space-y-6">
+                {/* Header with Breadcrumb */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                            <a href="/dashboard/schools/admissions/overview" className="hover:text-foreground transition-colors flex items-center gap-1">
+                                <Home className="h-4 w-4" />
+                                Admissions
+                            </a>
+                            <ChevronRight className="h-4 w-4" />
+                            <a href="/dashboard/schools/admissions/applications" className="hover:text-foreground transition-colors">
+                                Applications
+                            </a>
+                            <ChevronRight className="h-4 w-4" />
+                            <span className="text-foreground">{application.applicantName}</span>
+                        </nav>
+                        <h1 className="text-2xl font-bold tracking-tight">{application.applicantName}</h1>
+                        <p className="text-muted-foreground mt-1">
+                            Application submitted on {new Date(application.submittedAt).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" asChild>
+                            <a href={`mailto:${application.applicantEmail}`}>
+                                <Mail className="h-4 w-4 mr-2" />
+                                Email
+                            </a>
+                        </Button>
+                        {(application.data?.phone?.value || application.data?.mobile?.value) && (
+                            <Button variant="outline" size="sm" asChild>
+                                <a href={`tel:${application.data?.phone?.value || application.data?.mobile?.value}`}>
+                                    <Phone className="h-4 w-4 mr-2" />
+                                    Call
+                                </a>
+                            </Button>
                         )}
-                    <Stepper.Provider variant="horizontal" labelOrientation="vertical" initialStep={stages[currentStageIndex]?.id}>
-                        {({ methods }) => {
-                            // store methods in ref
-                            stepperMethodsRef.current = methods;
+                        <Button variant="ghost" size="icon" onClick={handleCopy} title="Copy Application ID">
+                            <Copy className="h-4 w-4" />
+                        </Button>
+                    </div>
+                </div>
 
-                            // update state whenever current step changes
-                            useEffect(() => {
-                                if (methods?.current?.id && methods.current.id !== activeStep) {
-                                    console.log("Active step changed:", methods.current.id);
-                                    setActiveStep(methods.current.id);
-                                }
-                            }, [methods?.current?.id, activeStep]);
+                {/* Rejected Application Alert */}
+                {application.currentStage?.name === 'REJECTED' && (
+                    <Alert variant="destructive">
+                        <AlertCircleIcon className="h-4 w-4" />
+                        <AlertTitle>Application Rejected</AlertTitle>
+                        <AlertDescription className="flex items-center justify-between">
+                            <span>Reason: {application.data?.[application.currentStage?.id]?.rejectionReason || 'No reason provided'}</span>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                    const reviewStage = filteredStages.find(s => s.name?.toUpperCase() === 'REVIEW');
+                                    if (reviewStage) {
+                                        moveMutation.mutate({ id: applicationId, stageId: reviewStage.id, movedById, stageData });
+                                    }
+                                }}
+                                disabled={moveMutation.isPending}
+                            >
+                                {moveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                                Reactivate
+                            </Button>
+                        </AlertDescription>
+                    </Alert>
+                )}
 
-                            return (
-                                <>
-                                    {application.currentStage?.name === 'REJECTED' ? (
-                                        <div className="flex  w-full h-max mt-4 p-4 bg-muted  border rounded-md  flex-col gap-2.5">
-                                            <Alert variant="destructive"  >
-                                                <AlertCircleIcon />
+                {/* Main Content Grid - Split View Layout */}
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    {/* Left Sidebar - Step Progress & Applicant Info */}
+                    <div className="lg:col-span-1 space-y-6">
+                        {/* Step Progress Card */}
+                        <Card>
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-base font-semibold">Application Progress</CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <div className="relative">
+                                    {filteredStages.map((stage, index) => {
+                                        const isCompleted = index < currentStageIndex;
+                                        const isCurrent = index === currentStageIndex;
+                                        const isUpcoming = index > currentStageIndex;
 
-                                                <AlertTitle>Application Rejected.</AlertTitle>
-                                                <AlertDescription>
-                                                    <p>Reason: {application.data?.[application.currentStage?.id]?.rejectionReason}</p>
-                                                </AlertDescription>
-
-                                            </Alert>
-                                            <div>
-                                                <Button
-                                                    className="w-full"
-                                                    onClick={() => {
-                                                        if (rejectedStage) {
-                                                            moveMutation.mutate({
-                                                                id: applicationId,
-                                                                stageId: "670a599b-b5b9-4c4c-9f50-4b4d31ae0cf5",
-                                                                movedById,
-                                                                stageData,
-                                                            });
-                                                        } else {
-                                                            toast.error("Rejected stage not found");
-                                                        }
-                                                    }}
-                                                    disabled={!rejectedStage || moveMutation.isPending}
-                                                    variant="outline"
-                                                >
-                                                    {moveMutation.isPending ? (
-                                                        <span className="flex items-center justify-center gap-2">
-                                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                                            Activating...
-                                                        </span>
-                                                    ) : (
-                                                        "Activate"
-                                                    )}
-                                                </Button>
-
+                                        return (
+                                            <div
+                                                key={stage.id}
+                                                className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors border-l-2 ${isCurrent
+                                                    ? 'bg-primary/5 border-l-primary'
+                                                    : isCompleted
+                                                        ? 'hover:bg-muted/50 border-l-green-500'
+                                                        : 'hover:bg-muted/50 border-l-transparent opacity-60'
+                                                    }`}
+                                                onClick={() => {
+                                                    if (!isUpcoming && stepperMethodsRef.current) {
+                                                        stepperMethodsRef.current.goTo(stage.id);
+                                                    }
+                                                }}
+                                            >
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${isCompleted
+                                                    ? 'bg-green-100 text-green-700'
+                                                    : isCurrent
+                                                        ? 'bg-primary text-primary-foreground'
+                                                        : 'bg-muted text-muted-foreground'
+                                                    }`}>
+                                                    {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className={`text-sm font-medium truncate ${isCurrent ? 'text-primary' : ''}`}>
+                                                        {stage.name?.replace('_', ' & ')}
+                                                    </p>
+                                                    {isCurrent && <p className="text-xs text-muted-foreground">Current stage</p>}
+                                                </div>
                                             </div>
+                                        );
+                                    })}
+                                </div>
+                            </CardContent>
+                        </Card>
 
+                        {/* Applicant Summary Card */}
+                        <Card>
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-base font-semibold">Quick Info</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <div>
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Email</p>
+                                    <p className="text-sm font-medium truncate">{application.applicantEmail}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Application ID</p>
+                                    <p className="text-sm font-mono text-muted-foreground truncate">{applicationId}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Form</p>
+                                    <p className="text-sm font-medium">{application.form?.title || 'Unknown'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Status</p>
+                                    <Badge className={`mt-1 ${getStageStyle(application.currentStage?.name)}`}>
+                                        {application.currentStage?.name?.replace('_', ' & ')}
+                                    </Badge>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Stage History */}
+                        {application.stageHistory && application.stageHistory.length > 0 && (
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-base font-semibold flex items-center gap-2">
+                                        <History className="h-4 w-4" />
+                                        History
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-2">
+                                    {application.stageHistory.slice(0, 5).map((history, index) => (
+                                        <div key={history.id || index} className="flex items-center justify-between text-sm">
+                                            <span className="font-medium">{history.stage?.name?.replace('_', ' & ')}</span>
+                                            <span className="text-muted-foreground text-xs">
+                                                {new Date(history.movedAt).toLocaleDateString()}
+                                            </span>
                                         </div>
-                                    ) : (
+                                    ))}
+                                </CardContent>
+                            </Card>
+                        )}
+                    </div>
+
+                    {/* Main Content Area */}
+                    <div className="lg:col-span-3 space-y-6">
+                        {/* Stage Content with Stepper */}
+                        {application.currentStage?.name !== 'REJECTED' && (
+                            <Stepper.Provider variant="horizontal" labelOrientation="vertical" initialStep={filteredStages[currentStageIndex]?.id}>
+                                {({ methods }) => {
+                                    stepperMethodsRef.current = methods;
+
+                                    useEffect(() => {
+                                        if (methods?.current?.id && methods.current.id !== activeStep) {
+                                            setActiveStep(methods.current.id);
+                                        }
+                                    }, [methods?.current?.id, activeStep]);
+
+                                    return (
                                         <>
-                                            <Stepper.Navigation className='border p-4 shadow-md bg-white dark:bg-muted  rounded-md overflow-x-auto overflow-hidden'>
-                                                {methods.all.map((step) => (
-                                                    <Stepper.Step
-                                                        key={step.id}
-                                                        of={step.id}
-                                                        onClick={() => methods.goTo(step.id)}
-                                                        disabled={stages.findIndex(s => s.id === step.id) > currentStageIndex && !methods.isLast}
+                                            {/* Horizontal Stepper Navigation */}
+                                            <Card>
+                                                <CardContent className="p-4">
+                                                    <Stepper.Navigation className="overflow-x-auto">
+                                                        {methods.all.map((step) => (
+                                                            <Stepper.Step
+                                                                key={step.id}
+                                                                of={step.id}
+                                                                onClick={() => methods.goTo(step.id)}
+                                                                disabled={filteredStages.findIndex(s => s.id === step.id) > currentStageIndex}
+                                                            >
+                                                                <Stepper.Title>
+                                                                    {step.title
+                                                                        .replace('_', ' ')
+                                                                        .toLowerCase()
+                                                                        .replace(/^\w/, (c) => c.toUpperCase())
+                                                                    }
+                                                                </Stepper.Title>
+                                                                <Stepper.Description>{step.description}</Stepper.Description>
+                                                            </Stepper.Step>
+                                                        ))}
+                                                    </Stepper.Navigation>
+                                                </CardContent>
+                                            </Card>
+
+                                            {/* Stage Content Card */}
+                                            <Card>
+                                                <CardHeader className="border-b">
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <CardTitle className="text-lg">
+                                                                {methods.current?.title?.replace('_', ' & ') || 'Stage Details'}
+                                                            </CardTitle>
+                                                            <CardDescription>
+                                                                {methods.current?.description || 'Complete the required actions for this stage'}
+                                                            </CardDescription>
+                                                        </div>
+                                                        <Badge variant="outline" className="text-xs">
+                                                            Step {filteredStages.findIndex(s => s.id === methods.current?.id) + 1} of {filteredStages.length}
+                                                        </Badge>
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent className="pt-6">
+                                                    {methods.current ? (
+                                                        renderFieldsForStage(methods.current.title, methods)
+                                                    ) : (
+                                                        <div className="space-y-4">
+                                                            <Skeleton className="h-6 w-1/3" />
+                                                            <Skeleton className="h-10 w-full" />
+                                                            <Skeleton className="h-10 w-full" />
+                                                            <Skeleton className="h-10 w-2/3" />
+                                                        </div>
+                                                    )}
+                                                </CardContent>
+                                            </Card>
+
+                                            {/* Navigation & Actions */}
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex gap-2">
+                                                    <Button
+                                                        variant="outline"
+                                                        onClick={methods.prev}
+                                                        disabled={methods.isFirst}
                                                     >
-                                                        <Stepper.Title>
-                                                            {step.title
-                                                                .replace("_", " ")                       // replace underscore with space
-                                                                .toLowerCase()                           // convert all to lowercase
-                                                                .replace(/^\w/, (c) => c.toUpperCase()) // capitalize first letter
-                                                            }
-                                                        </Stepper.Title>
-
-                                                        <Stepper.Description>{step.description}</Stepper.Description>
-                                                    </Stepper.Step>
-                                                ))}
-                                            </Stepper.Navigation>
-
-                                            <div className="mt-4 p-4 bg-white shadow-md dark:bg-muted border rounded-md">
-                                                {methods.current ? renderFieldsForStage(methods.current.title, methods) : <div>Loading stage...</div>}
-                                            </div>
-
-                                            <Stepper.Controls className="mt-4 w-full flex justify-between ">
-                                                {/* <div></div> */}
-                                                <div className="flex gap-3">
-                                                    <Button type="button" variant="secondary" onClick={methods.prev} disabled={methods.isFirst}>
+                                                        <ArrowLeft className="h-4 w-4 mr-2" />
                                                         Previous
                                                     </Button>
-                                                    <Button type="button" variant="secondary" onClick={methods.isLast ? methods.reset : methods.next} disabled={methods.isLast}>
-                                                        {methods.isLast ? "Reset" : "Next"}
+                                                    <Button
+                                                        variant="outline"
+                                                        onClick={methods.next}
+                                                        disabled={methods.isLast}
+                                                    >
+                                                        Next
+                                                        <ChevronRight className="h-4 w-4 ml-2" />
                                                     </Button>
                                                 </div>
                                                 <Button
                                                     onClick={() => moveMutation.mutate({ id: applicationId, stageId: methods.current?.id, movedById, stageData })}
-                                                    disabled={!methods.current || application.currentStage?.id === methods.current.id}
+                                                    disabled={!methods.current || application.currentStage?.id === methods.current.id || moveMutation.isPending}
                                                 >
-                                                    {methods.current && application.currentStage?.id === methods.current.id
-                                                        ? 'Marked'
-                                                        : `Mark`}
+                                                    {moveMutation.isPending ? (
+                                                        <>
+                                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                            Saving...
+                                                        </>
+                                                    ) : application.currentStage?.id === methods.current?.id ? (
+                                                        <>
+                                                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                                                            Current Stage
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            Move to {methods.current?.title?.replace('_', ' & ')}
+                                                        </>
+                                                    )}
                                                 </Button>
-                                            </Stepper.Controls>
+                                            </div>
                                         </>
-                                    )}
-                                </>
-                            );
-                        }}
-                    </Stepper.Provider>
+                                    );
+                                }}
+                            </Stepper.Provider>
+                        )}
+                    </div>
                 </div>
             </div>
 

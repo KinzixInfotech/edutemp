@@ -123,7 +123,7 @@ export const SidebarData = [
                     {
                         label: "OverView", url: "/dashboard/schools/admissions/overview", roles: ["ADMIN"]
                     },
-                    { label: "Settings", url: "/dashboard/schools/admissions/form-settings", roles: ["ADMIN"] },
+                    { label: "Forms", url: "/dashboard/schools/admissions/form-settings", roles: ["ADMIN"] },
                     // { label: "Registration Fee", url: "/dashboard/schools/admissions/fees-verification", roles: ["ADMIN"] },
                     { label: "All Applications", url: "/dashboard/schools/admissions/applications", roles: ["ADMIN"] },
                     { label: "Enrolled Students", url: "/dashboard/schools/admissions/enrolled", roles: ["ADMIN"] },
