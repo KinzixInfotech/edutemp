@@ -429,36 +429,8 @@ export class ISAPIClient {
     }
 
     async searchFingerprints(maxResults = 50) {
-        try {
-            const result = await this.request(
-                'POST',
-                '/ISAPI/AccessControl/FingerPrint/Search?format=json',
-                {
-                    FingerPrintSearchCond: {
-                        searchID: '1',
-                        searchResultPosition: 0,
-                        maxResults: maxResults,
-                    },
-                }
-            );
-
-            let fpList = result.FingerPrintSearch?.FingerPrint || [];
-            if (!Array.isArray(fpList)) {
-                fpList = [fpList];
-            }
-
-            return {
-                fingerprints: fpList.map(fp => ({
-                    employeeNo: fp.employeeNo,
-                    cardReaderNo: fp.cardReaderNo,
-                    fingerPrintID: fp.fingerPrintID
-                })),
-                total: result.FingerPrintSearch?.totalMatches || 0
-            };
-        } catch (error) {
-            console.error('[ISAPI] searchFingerprints error:', error.message);
-            return { fingerprints: [], error: error.message };
-        }
+        console.warn('[ISAPI] searchFingerprints is NOT supported on this device model. Using getUserInfo() instead.');
+        return { fingerprints: [], error: 'Operation not supported by device' };
     }
 
     async assignCard(employeeNo, cardNo) {
@@ -539,6 +511,16 @@ export class ISAPIClient {
      */
     async getAllAcsEvents(sinceTime, maxResults = 100) {
         try {
+            // Format times in IST for Hikvision device (device is configured for IST)
+            const formatIST = (date) => {
+                const pad = (n) => n.toString().padStart(2, '0');
+                // Use the date as-is since server is already in IST
+                return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}+05:30`;
+            };
+
+            const startTimeStr = formatIST(sinceTime);
+            const endTimeStr = formatIST(new Date());
+
             const searchCond = {
                 AcsEventCond: {
                     searchID: crypto.randomBytes(4).toString('hex'),
@@ -546,12 +528,12 @@ export class ISAPIClient {
                     maxResults: maxResults,
                     major: 0,  // All major types
                     minor: 0,  // All minor types
-                    startTime: sinceTime.toISOString().replace('Z', '+00:00'),
-                    endTime: new Date().toISOString().replace('Z', '+00:00'),
+                    startTime: startTimeStr,
+                    endTime: endTimeStr,
                 },
             };
 
-            console.log('[ISAPI] Fetching ALL events since:', sinceTime.toISOString());
+            console.log('[ISAPI] Fetching ALL events from', startTimeStr, 'to', endTimeStr);
 
             const result = await this.request(
                 'POST',
@@ -642,11 +624,41 @@ export class ISAPIClient {
         try {
             // First GET current time to understand the device's format
             const currentTimeXml = await this.request('GET', '/ISAPI/System/time');
-            console.log('[ISAPI] Current time XML:', typeof currentTimeXml === 'string' ? currentTimeXml.substring(0, 500) : JSON.stringify(currentTimeXml));
+            console.log('[ISAPI] Current device time XML:', typeof currentTimeXml === 'string' ? currentTimeXml.substring(0, 800) : JSON.stringify(currentTimeXml));
 
-            // Format time - Hikvision expects YYYY-MM-DDTHH:mm:ss+TZ:00 format
+            // Extract device's timezone from response
+            let deviceTimezone = '+05:30'; // Default to IST
+            if (typeof currentTimeXml === 'string') {
+                const tzMatch = currentTimeXml.match(/<timeZone>([^<]+)<\/timeZone>/);
+                if (tzMatch) {
+                    console.log('[ISAPI] Device timezone setting:', tzMatch[1]);
+                }
+                // Also check the localTime format for offset
+                const localTimeMatch = currentTimeXml.match(/<localTime>([^<]+)<\/localTime>/);
+                if (localTimeMatch) {
+                    console.log('[ISAPI] Current device localTime:', localTimeMatch[1]);
+                    // Extract timezone offset from existing localTime (e.g., +05:30 or +00:00)
+                    const offsetMatch = localTimeMatch[1].match(/([+-]\d{2}:\d{2})$/);
+                    if (offsetMatch) {
+                        deviceTimezone = offsetMatch[1];
+                        console.log('[ISAPI] Extracted timezone offset:', deviceTimezone);
+                    }
+                }
+            }
+
+            // Always use IST timezone (UTC+5:30) for the device
+            // This ensures the device shows the correct local time for India
+            const IST_TIMEZONE = '+05:30';
+            const IST_TZ_STRING = 'CST-5:30:00'; // Hikvision format for IST
+
+            // Use the server's current local time (which is in IST)
+            // Format: YYYY-MM-DDTHH:mm:ss+TZ:00
             const pad = (n) => n.toString().padStart(2, '0');
-            const localTimeStr = `${time.getFullYear()}-${pad(time.getMonth() + 1)}-${pad(time.getDate())}T${pad(time.getHours())}:${pad(time.getMinutes())}:${pad(time.getSeconds())}+05:30`;
+            const localTimeStr = `${time.getFullYear()}-${pad(time.getMonth() + 1)}-${pad(time.getDate())}T${pad(time.getHours())}:${pad(time.getMinutes())}:${pad(time.getSeconds())}${IST_TIMEZONE}`;
+
+            console.log('[ISAPI] Will set device time to:', localTimeStr);
+            console.log('[ISAPI] Will set device timezone to:', IST_TZ_STRING);
+            console.log('[ISAPI] Server Date object:', time.toString());
 
             // If we got XML back, modify it and send it back
             if (typeof currentTimeXml === 'string' && currentTimeXml.includes('<Time')) {
@@ -659,6 +671,11 @@ export class ISAPIClient {
                 updatedXml = updatedXml.replace(
                     /<timeMode>[^<]*<\/timeMode>/,
                     '<timeMode>manual</timeMode>'
+                );
+                // Update timezone to IST
+                updatedXml = updatedXml.replace(
+                    /<timeZone>[^<]*<\/timeZone>/,
+                    `<timeZone>${IST_TZ_STRING}</timeZone>`
                 );
 
                 // Set time format if specified
@@ -750,12 +767,14 @@ ${timeFormatTag}${dateFormatTag}</Time>`;
             body: xmlBody
         });
 
+        const responseText = await authRes.text();
+        console.log(`[ISAPI] XML ${method} response (${authRes.status}):`, responseText.substring(0, 500));
+
         if (!authRes.ok) {
-            const errorText = await authRes.text();
-            throw new Error(`HTTP ${authRes.status}: ${errorText}`);
+            throw new Error(`HTTP ${authRes.status}: ${responseText}`);
         }
 
-        return await authRes.text();
+        return responseText;
     }
 
     /**

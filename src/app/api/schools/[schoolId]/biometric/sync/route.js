@@ -47,7 +47,8 @@ export async function POST(req, props) {
         for (const device of devices) {
             try {
                 const client = createISAPIClient(device);
-                const { events } = await client.getAcsEvents(sinceTime, 500);
+                // Use getAllAcsEvents to include fingerprint, card, and face events
+                const { events } = await client.getAllAcsEvents(sinceTime, 500);
 
                 let newEvents = 0;
                 let duplicates = 0;

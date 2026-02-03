@@ -89,6 +89,9 @@ export async function POST(req, props) {
         if (timeFormat) options.timeFormat = timeFormat;
         if (dateFormat) options.dateFormat = dateFormat;
 
+        console.log('[Calibrate API] Received body:', { timeFormat, dateFormat });
+        console.log('[Calibrate API] Options to send:', options);
+
         const result = await client.setDeviceTime(serverTime, options);
 
         if (!result.success) {

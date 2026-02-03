@@ -431,14 +431,15 @@ export const SidebarData = [
                     {
                         label: "Attendance Reports", url: "/dashboard/attendance/reports/", roles: ["ADMIN"]
                     },
-                    {
-                        label: "Settings", url: "/dashboard/attendance/settings/", roles: ["ADMIN"]
-                    },
+
                     {
                         label: "Biometric Devices", url: "/dashboard/attendance/biometric/", roles: ["ADMIN"]
                     },
                     {
                         label: "User Mapping", url: "/dashboard/attendance/user-mapping/", roles: ["ADMIN"]
+                    },
+                    {
+                        label: "Settings", url: "/dashboard/attendance/settings/", roles: ["ADMIN"]
                     },
 
                 ],

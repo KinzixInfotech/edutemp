@@ -47,33 +47,43 @@ export async function POST(req, props) {
 
                 if (userInfo.found) {
                     // 1. Check Cards
+                    // Correct flow: Check CardInfo/Search for card existence (userInfo.cards is unreliable)
                     let userCard = null;
                     try {
                         const cardResult = await client.searchCards();
-                        if (cardResult.cards) {
+                        console.log(`[Sync] searchCards result: found ${cardResult.cards?.length || 0} cards total.`);
+
+                        if (cardResult.cards && cardResult.cards.length > 0) {
+                            // Log the first few cards to see format (debug only)
+                            if (cardResult.cards.length > 0) {
+                                console.log('[Sync] Sample card data:', JSON.stringify(cardResult.cards[0]));
+                            }
+
                             userCard = cardResult.cards.find(c => c.employeeNo === mapping.deviceUserId);
+                            if (userCard) {
+                                console.log('[Sync] ✅ Found card for user:', userCard.cardNo);
+                            } else {
+                                console.warn(`[Sync] ❌ User ${mapping.deviceUserId} NOT found in card list of ${cardResult.cards.length} cards.`);
+                            }
+                        } else {
+                            console.warn('[Sync] ⚠️ No cards returned from device search.');
                         }
                     } catch (e) {
-                        console.error('Card search failed', e);
+                        console.warn('[Sync] Card search failed:', e.message);
                     }
 
                     // 2. Check Fingerprints
-                    let fpCount = 0;
-                    try {
-                        const fpResult = await client.searchFingerprints();
-                        const userFps = fpResult.fingerprints?.filter(fp => fp.employeeNo === mapping.deviceUserId) || [];
-                        fpCount = userFps.length;
-                    } catch (e) {
-                        console.error('Fingerprint search failed', e);
-                        fpCount = userInfo.fingerprints || 0;
-                    }
+                    // Search is NOT supported on this device (400 Invalid Operation) - trust userInfo count
+                    const fpCount = userInfo.fingerprints || 0;
+                    console.log('[Sync] Using UserInfo FP count:', fpCount, 'for user:', mapping.deviceUserId);
 
                     // Update mapping with actual enrollment data
                     await prisma.biometricIdentityMap.update({
                         where: { id: mapping.id },
                         data: {
                             fingerprintCount: fpCount,
-                            hasCard: !!userCard,
+                            // Priority: Card search result (userCard) > UserInfo count (unreliable)
+                            hasCard: !!userCard || (userInfo.cards || 0) > 0,
                             hasFace: (userInfo.faces || 0) > 0,
                         },
                     });
@@ -86,7 +96,8 @@ export async function POST(req, props) {
                         userFound: true,
                         enrollment: {
                             fingerprints: fpCount,
-                            cards: userCard ? 1 : 0,
+                            // Return explicit 1 if card found, else use UserInfo fallback
+                            cards: userCard ? 1 : (userInfo.cards || 0),
                             faces: userInfo.faces || 0,
                             name: userInfo.user?.name,
                             cardNo: userCard?.cardNo,

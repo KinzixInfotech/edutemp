@@ -42,6 +42,23 @@ export async function POST(req, props) {
             try {
                 const client = createISAPIClient(device);
 
+                // STEP 1: Fetch ALL cards for device (CardInfo/Search)
+                // This is the reliable source for card existance, ignore UserInfo.cards
+                const cardMap = new Map();
+                try {
+                    const cardSearch = await client.searchCards();
+                    if (cardSearch.cards) {
+                        for (const card of cardSearch.cards) {
+                            if (!cardMap.has(card.employeeNo)) {
+                                cardMap.set(card.employeeNo, []);
+                            }
+                            cardMap.get(card.employeeNo).push(card.cardNo);
+                        }
+                    }
+                } catch (cardError) {
+                    console.warn(`[Bulk Sync] Failed to fetch cards for device ${device.id}:`, cardError.message);
+                }
+
                 // 2. Iterate mappings for this device
                 for (const mapping of device.identityMaps) {
                     deviceResult.processed++;
@@ -62,31 +79,12 @@ export async function POST(req, props) {
                         }
 
                         // B. Pull Enrollment Status
-                        // Cards
-                        let hasCard = false;
-                        try {
-                            // Try global search (or filtered if supported)
-                            // We use searchCards with generous limit, filtering locally
-                            // Optimization: In a real bulk sync, we should fetch ALL cards once.
-                            // For reliable per-user sync, we trigger search here.
-                            const cardResult = await client.searchCards(100);
-                            if (cardResult.cards) {
-                                hasCard = cardResult.cards.some(c => c.employeeNo === deviceUserId);
-                            }
-                        } catch (e) {
-                            // Ignore card search error
-                        }
+                        // Cards: Check against the CardInfo map we built
+                        const userCards = cardMap.get(deviceUserId) || [];
+                        const hasCard = userCards.length > 0;
 
-                        // Fingerprints
-                        let fpCount = 0;
-                        try {
-                            const fpResult = await client.searchFingerprints(100);
-                            const userFps = fpResult.fingerprints?.filter(fp => fp.employeeNo === deviceUserId) || [];
-                            fpCount = userFps.length;
-                        } catch (e) {
-                            // Fallback
-                            fpCount = userCheck.fingerprints || 0;
-                        }
+                        // Fingerprints: Check UserInfo (numOfFP) - reliable on DS-K1
+                        const fpCount = userCheck.fingerprints || 0;
 
                         // C. Update DB
                         await prisma.biometricIdentityMap.update({

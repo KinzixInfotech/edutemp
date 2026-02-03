@@ -197,6 +197,35 @@ export default function UserMapping() {
         onError: (error) => {
             toast.error(error.message);
         }
+
+    });
+
+    // Single User Sync Mutation
+    const syncSingleUserMutation = useMutation({
+        mutationFn: async (mappingId) => {
+            const res = await fetch(`/api/schools/${schoolId}/biometric/mapping/${mappingId}/sync`, {
+                method: 'POST',
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Sync failed');
+            return data;
+        },
+        onSuccess: (data) => {
+            const result = data.syncResults?.[0];
+            if (result) {
+                if (result.success && result.userFound) {
+                    toast.success(`Synced: ${result.enrollment.fingerprints} FPs, ${result.enrollment.cards} Cards`);
+                } else {
+                    toast.warning(result.message || 'User synced but not found on device');
+                }
+            } else {
+                toast.success('Sync completed');
+            }
+            queryClient.invalidateQueries({ queryKey: ['biometric-mappings'] });
+        },
+        onError: (error) => {
+            toast.error(error.message);
+        }
     });
 
     // Sync Events from device mutation
@@ -365,10 +394,13 @@ export default function UserMapping() {
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => syncUsersMutation.mutate()}
-                                    disabled={syncUsersMutation.isPending || mappings.length === 0}
+                                    onClick={() => {
+                                        const mapping = filteredMappings[0];
+                                        if (mapping) syncSingleUserMutation.mutate(mapping.userId);
+                                    }}
+                                    disabled={syncSingleUserMutation.isPending || filteredMappings.length === 0}
                                 >
-                                    <RefreshCw className={`w-3.5 h-3.5 mr-2 ${syncUsersMutation.isPending ? 'animate-spin' : ''}`} />
+                                    <RefreshCw className={`w-3.5 h-3.5 mr-2 ${syncSingleUserMutation.isPending ? 'animate-spin' : ''}`} />
                                     Sync Status
                                 </Button>
                             </div>

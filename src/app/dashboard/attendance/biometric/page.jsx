@@ -252,10 +252,16 @@ export default function BiometricSettings() {
         try {
             const res = await fetch(`/api/schools/${schoolId}/biometric/devices/${device.id}/calibrate`);
             const data = await res.json();
+            console.log('Device time settings from API:', data);
             if (data.success) {
+                // Use default values if device doesn't report format settings
                 setSettingsData({
-                    timeFormat: data.timeFormat || '24hour',
-                    dateFormat: data.dateFormat || 'YYYY-MM-DD',
+                    timeFormat: data.timeFormat || '24hour',  // Default to 24-hour
+                    dateFormat: data.dateFormat || 'DD-MM-YYYY',  // Default to DD-MM-YYYY
+                    deviceTime: data.deviceTime,
+                    serverTime: data.serverTime,
+                    timeDiff: data.timeDiff,
+                    supportsFormats: !!(data.timeFormat || data.dateFormat),
                 });
             }
         } catch (e) {
@@ -828,16 +834,16 @@ export default function BiometricSettings() {
                 </DialogContent>
             </Dialog>
 
-            {/* Device Time/Date Settings Modal */}
+            {/* Device Time Sync Modal */}
             <Dialog open={!!settingsDevice} onOpenChange={() => setSettingsDevice(null)}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <Clock className="w-5 h-5" />
-                            Time & Date Settings
+                            Sync Device Time
                         </DialogTitle>
                         <DialogDescription>
-                            Configure time and date display format for "{settingsDevice?.name}"
+                            Synchronize "{settingsDevice?.name}" with server time (IST)
                         </DialogDescription>
                     </DialogHeader>
                     {loadingSettings ? (
@@ -846,43 +852,40 @@ export default function BiometricSettings() {
                         </div>
                     ) : (
                         <div className="space-y-4 py-4">
-                            <div>
-                                <Label>Time Format</Label>
-                                <Select
-                                    value={settingsData.timeFormat}
-                                    onValueChange={(value) => setSettingsData({ ...settingsData, timeFormat: value })}
-                                >
-                                    <SelectTrigger className="mt-1">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="24hour">24-Hour (14:30)</SelectItem>
-                                        <SelectItem value="12hour">12-Hour (2:30 PM)</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                            {/* Current Device Time */}
+                            <div className="bg-blue-50 dark:bg-blue-950/30 p-4 rounded-lg">
+                                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Device Time</p>
+                                <p className="text-xl font-mono text-blue-700 dark:text-blue-300 mt-1">
+                                    {settingsData.deviceTime ? new Date(settingsData.deviceTime).toLocaleString('en-IN', {
+                                        dateStyle: 'medium',
+                                        timeStyle: 'medium'
+                                    }) : 'Unable to read'}
+                                </p>
+                                {settingsData.timeDiff !== null && settingsData.timeDiff > 5 ? (
+                                    <p className="text-sm text-orange-600 dark:text-orange-400 mt-2">
+                                        ⚠️ Device is {Math.round(settingsData.timeDiff)}s off from server
+                                    </p>
+                                ) : settingsData.timeDiff !== null && (
+                                    <p className="text-sm text-green-600 dark:text-green-400 mt-2">
+                                        ✓ Device time is synchronized
+                                    </p>
+                                )}
                             </div>
-                            <div>
-                                <Label>Date Format</Label>
-                                <Select
-                                    value={settingsData.dateFormat}
-                                    onValueChange={(value) => setSettingsData({ ...settingsData, dateFormat: value })}
-                                >
-                                    <SelectTrigger className="mt-1">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="YYYY-MM-DD">YYYY-MM-DD (2026-02-03)</SelectItem>
-                                        <SelectItem value="DD-MM-YYYY">DD-MM-YYYY (03-02-2026)</SelectItem>
-                                        <SelectItem value="MM-DD-YYYY">MM-DD-YYYY (02-03-2026)</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="bg-muted/50 p-3 rounded-lg text-sm">
-                                <p className="font-medium">Note:</p>
-                                <p className="text-muted-foreground">
-                                    Applying settings will also sync the device time with the server.
+
+                            {/* Server Time */}
+                            <div className="bg-muted/50 p-4 rounded-lg">
+                                <p className="text-sm font-medium">Server Time (IST)</p>
+                                <p className="text-lg font-mono text-muted-foreground mt-1">
+                                    {new Date().toLocaleString('en-IN', {
+                                        dateStyle: 'medium',
+                                        timeStyle: 'medium'
+                                    })}
                                 </p>
                             </div>
+
+                            <p className="text-xs text-muted-foreground">
+                                Clicking sync will set the device clock to match server time in IST timezone.
+                            </p>
                         </div>
                     )}
                     <DialogFooter>
@@ -892,17 +895,20 @@ export default function BiometricSettings() {
                         <Button
                             onClick={() => applySettingsMutation.mutate({
                                 deviceId: settingsDevice?.id,
-                                settings: settingsData,
+                                settings: {},
                             })}
                             disabled={applySettingsMutation.isPending || loadingSettings}
                         >
                             {applySettingsMutation.isPending ? (
                                 <>
                                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    Applying...
+                                    Syncing...
                                 </>
                             ) : (
-                                'Apply Settings'
+                                <>
+                                    <Clock className="w-4 h-4 mr-2" />
+                                    Sync Now
+                                </>
                             )}
                         </Button>
                     </DialogFooter>

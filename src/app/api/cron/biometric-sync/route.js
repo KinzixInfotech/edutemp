@@ -157,8 +157,8 @@ async function pollDevice(device) {
     }
 
     try {
-        // Fetch events from device
-        const { events, hasMore } = await client.getAcsEvents(sinceTime, CONFIG.MAX_EVENTS_PER_POLL);
+        // Fetch ALL types of events (fingerprint + card + face)
+        const { events, hasMore } = await client.getAllAcsEvents(sinceTime, CONFIG.MAX_EVENTS_PER_POLL);
 
         console.log(`[Device ${device.id}] Fetched ${events.length} events (hasMore: ${hasMore})`);
 
