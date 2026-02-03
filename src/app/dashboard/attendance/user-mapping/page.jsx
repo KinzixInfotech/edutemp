@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-    Users, UserPlus, CreditCard, Fingerprint, Loader2, Search, CheckCircle, XCircle, RefreshCw
+    Users, UserPlus, CreditCard, Fingerprint, Loader2, Search, CheckCircle, XCircle, RefreshCw, Terminal, Activity, AlertCircle
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,7 @@ export default function UserMapping() {
     const [isRfidOpen, setIsRfidOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
     const [rfidInput, setRfidInput] = useState('');
+    const [activeTab, setActiveTab] = useState('mapped');
 
     // Fetch devices
     const { data: devicesData } = useQuery({
@@ -69,6 +70,20 @@ export default function UserMapping() {
             return res.json();
         },
         enabled: !!schoolId,
+    });
+
+    // Fetch ACS Events (for terminal logs)
+    const { data: eventsData, isLoading: eventsLoading, refetch: refetchEvents } = useQuery({
+        queryKey: ['biometric-events', schoolId, selectedDevice],
+        queryFn: async () => {
+            const params = new URLSearchParams({ limit: '100' });
+            if (selectedDevice !== 'all') params.append('deviceId', selectedDevice);
+            const res = await fetch(`/api/schools/${schoolId}/biometric/events?${params}`);
+            if (!res.ok) throw new Error('Failed to fetch events');
+            return res.json();
+        },
+        enabled: !!schoolId && activeTab === 'logs',
+        refetchInterval: activeTab === 'logs' ? 10000 : false, // Auto-refresh every 10s when on logs tab
     });
 
     // Create mapping mutation
@@ -107,13 +122,24 @@ export default function UserMapping() {
             return data;
         },
         onSuccess: (response) => {
-            toast.success('RFID card assigned', { description: response.userName });
+            // Show detailed sync feedback
+            if (response.syncResult?.success) {
+                toast.success('RFID card assigned & synced to device', {
+                    description: `Card assigned to ${response.userName}`
+                });
+            } else if (response.syncResult?.error) {
+                toast.warning('Card assigned but not synced', {
+                    description: response.syncResult.error
+                });
+            } else {
+                toast.success('RFID card assigned', { description: response.userName });
+            }
             queryClient.invalidateQueries({ queryKey: ['biometric-mappings'] });
             setIsRfidOpen(false);
             setRfidInput('');
         },
         onError: (error) => {
-            toast.error(error.message);
+            toast.error('Failed to assign RFID', { description: error.message });
         },
     });
 
@@ -124,16 +150,32 @@ export default function UserMapping() {
                 `/api/schools/${schoolId}/biometric/mapping/${userId}?deviceId=${deviceId}&removeFromDevice=true`,
                 { method: 'DELETE' }
             );
-            if (!res.ok) throw new Error('Failed to remove mapping');
-            return res.json();
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to remove mapping');
+            return data;
         },
         onSuccess: (response) => {
-            toast.success(response.message);
+            // Show device sync results
+            const deviceResults = response.deviceResults || [];
+            const syncedDevices = deviceResults.filter(r => r.success);
+            const failedDevices = deviceResults.filter(r => !r.success);
+
+            if (failedDevices.length > 0) {
+                toast.warning('User removed from database', {
+                    description: `Failed to remove from device: ${failedDevices.map(d => d.deviceName).join(', ')}`
+                });
+            } else if (syncedDevices.length > 0) {
+                toast.success('User removed from database & device', {
+                    description: `Removed from: ${syncedDevices.map(d => d.deviceName).join(', ')}`
+                });
+            } else {
+                toast.success(response.message || 'User mapping removed');
+            }
             queryClient.invalidateQueries({ queryKey: ['biometric-mappings'] });
             refetchUnmapped();
         },
         onError: (error) => {
-            toast.error(error.message);
+            toast.error('Failed to remove user', { description: error.message });
         },
     });
 
@@ -154,6 +196,30 @@ export default function UserMapping() {
         },
         onError: (error) => {
             toast.error(error.message);
+        }
+    });
+
+    // Sync Events from device mutation
+    const syncEventsMutation = useMutation({
+        mutationFn: async () => {
+            const res = await fetch(`/api/schools/${schoolId}/biometric/sync`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    deviceId: selectedDevice !== 'all' ? selectedDevice : undefined,
+                    sinceDays: 1
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Sync failed');
+            return data;
+        },
+        onSuccess: (data) => {
+            toast.success(`Fetched ${data.summary?.newEventsTotal || 0} new events`);
+            refetchEvents();
+        },
+        onError: (error) => {
+            toast.error('Failed to sync events', { description: error.message });
         }
     });
 
@@ -192,7 +258,7 @@ export default function UserMapping() {
                 </div>
                 <div className="flex items-center gap-2">
                     <Select value={selectedDevice} onValueChange={setSelectedDevice}>
-                        <SelectTrigger className="w-[200px]">
+                        <SelectTrigger className="w-[200px] bg-white dark:bg-muted border">
                             <SelectValue placeholder="Filter by device" />
                         </SelectTrigger>
                         <SelectContent>
@@ -209,7 +275,7 @@ export default function UserMapping() {
             <div className="relative max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                    className="pl-10"
+                    className="pl-10 bg-white dark:bg-muted border"
                     placeholder="Search users..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
@@ -277,10 +343,13 @@ export default function UserMapping() {
             </div>
 
             {/* Tabs */}
-            <Tabs defaultValue="mapped">
-                <TabsList>
-                    <TabsTrigger value="mapped">Mapped Users ({mappings.length})</TabsTrigger>
-                    <TabsTrigger value="unmapped">Unmapped Users ({unmappedUsers.length})</TabsTrigger>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="grid bg-[#eef1f3] dark:bg-muted border grid-cols-3 gap-1">
+                    <TabsTrigger value="mapped">Mapped ({mappings.length})</TabsTrigger>
+                    <TabsTrigger value="unmapped">Unmapped ({unmappedUsers.length})</TabsTrigger>
+                    <TabsTrigger value="logs" className="flex items-center gap-1.5">
+                        <Terminal className="w-3.5 h-3.5" /> Logs
+                    </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="mapped" className="mt-4">
@@ -483,6 +552,104 @@ export default function UserMapping() {
                                     </Table>
                                 </div>
                             )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+                {/* Logs Tab - Terminal Style ACS Events */}
+                <TabsContent value="logs" className="mt-4">
+                    <Card className="bg-white dark:bg-[#1e1e1e] border-gray-200 dark:border-zinc-700">
+                        <CardHeader className="border-b border-gray-200 dark:border-zinc-700 pb-4">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <Terminal className="w-5 h-5 text-green-600 dark:text-green-400" />
+                                        ACS Event Logs
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Real-time access control events from biometric devices
+                                    </CardDescription>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="default"
+                                        size="sm"
+                                        onClick={() => syncEventsMutation.mutate()}
+                                        disabled={syncEventsMutation.isPending}
+                                    >
+                                        {syncEventsMutation.isPending ? (
+                                            <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                                        ) : (
+                                            <RefreshCw className="w-3.5 h-3.5 mr-2" />
+                                        )}
+                                        Sync from Device
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => refetchEvents()}
+                                        disabled={eventsLoading}
+                                    >
+                                        <RefreshCw className={`w-3.5 h-3.5 mr-2 ${eventsLoading ? 'animate-spin' : ''}`} />
+                                        Refresh
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <div className="h-[400px] overflow-y-auto font-mono text-sm">
+                                {eventsLoading || syncEventsMutation.isPending ? (
+                                    <div className="flex justify-center items-center h-full">
+                                        <Loader2 className="w-8 h-8 animate-spin text-green-600 dark:text-green-400" />
+                                    </div>
+                                ) : (eventsData?.events?.length || 0) === 0 ? (
+                                    <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-zinc-500">
+                                        <Terminal className="w-12 h-12 mb-4" />
+                                        <p>No events recorded yet</p>
+                                        <p className="text-xs mt-1">Click "Sync from Device" to fetch card swipes from the machine</p>
+                                    </div>
+                                ) : (
+                                    <div className="divide-y divide-gray-100 dark:divide-zinc-800">
+                                        {eventsData.events.map((event, idx) => (
+                                            <div key={event.id} className="px-4 py-2 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors">
+                                                <div className="flex items-start gap-3">
+                                                    <span className="text-gray-500 dark:text-zinc-500 text-xs w-20 shrink-0">
+                                                        {new Date(event.eventTime).toLocaleTimeString()}
+                                                    </span>
+                                                    <span className={`px-2 py-0.5 rounded text-xs font-medium shrink-0 ${event.eventType === 'CHECK_IN'
+                                                        ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400'
+                                                        : 'bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-400'
+                                                        }`}>
+                                                        {event.eventType === 'CHECK_IN' ? 'IN' : 'OUT'}
+                                                    </span>
+                                                    <div className="flex-1 min-w-0">
+                                                        {event.isResolved ? (
+                                                            <span className="text-green-700 dark:text-green-400">
+                                                                {event.resolvedUser?.name || 'Unknown User'}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-yellow-600 dark:text-yellow-400 flex items-center gap-1.5">
+                                                                <AlertCircle className="w-3.5 h-3.5" />
+                                                                Unresolved (ID: {event.deviceUserId})
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-gray-500 dark:text-zinc-500 text-xs shrink-0">
+                                                        {event.deviceName}
+                                                    </span>
+                                                </div>
+                                                {event.error && (
+                                                    <div className="mt-1 ml-20 text-red-600 dark:text-red-400 text-xs">
+                                                        ⚠ {event.error}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="border-t border-gray-200 dark:border-zinc-700 px-4 py-2 bg-gray-50 dark:bg-zinc-900/50 text-xs text-gray-500 dark:text-zinc-500">
+                                Showing latest {eventsData?.events?.length || 0} events • Auto-refresh every 10s
+                            </div>
                         </CardContent>
                     </Card>
                 </TabsContent>

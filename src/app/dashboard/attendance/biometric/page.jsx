@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     Fingerprint, Wifi, WifiOff, Plus, Settings, Trash2, RefreshCw, Loader2,
-    CheckCircle, AlertCircle, Server, CreditCard, Pencil
+    CheckCircle, AlertCircle, Server, CreditCard, Pencil, Clock
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,6 +39,13 @@ export default function BiometricSettings() {
     const [editDevice, setEditDevice] = useState(null);
     const [deleteDevice, setDeleteDevice] = useState(null);
     const [testingDevice, setTestingDevice] = useState(null);
+    const [calibratingDevice, setCalibratingDevice] = useState(null);
+    const [settingsDevice, setSettingsDevice] = useState(null);
+    const [settingsData, setSettingsData] = useState({
+        timeFormat: '24hour',
+        dateFormat: 'YYYY-MM-DD',
+    });
+    const [loadingSettings, setLoadingSettings] = useState(false);
 
     // Form state for new device
     const [formData, setFormData] = useState({
@@ -187,6 +194,75 @@ export default function BiometricSettings() {
             toast.error(error.message);
         },
     });
+
+    // Calibrate device (sync time) mutation
+    const calibrateMutation = useMutation({
+        mutationFn: async (deviceId) => {
+            setCalibratingDevice(deviceId);
+            const res = await fetch(`/api/schools/${schoolId}/biometric/devices/${deviceId}/calibrate`, {
+                method: 'POST',
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Calibration failed');
+            return data;
+        },
+        onSuccess: (response) => {
+            const diffBefore = response.before?.timeDiff;
+            const diffAfter = response.after?.timeDiff;
+            toast.success('Device time synchronized', {
+                description: diffBefore !== null
+                    ? `Time diff: ${Math.abs(diffBefore)}s → ${Math.abs(diffAfter || 0)}s`
+                    : 'Device time synced with server',
+            });
+            setCalibratingDevice(null);
+        },
+        onError: (error) => {
+            toast.error('Calibration failed', { description: error.message });
+            setCalibratingDevice(null);
+        },
+    });
+
+    // Apply settings mutation
+    const applySettingsMutation = useMutation({
+        mutationFn: async ({ deviceId, settings }) => {
+            const res = await fetch(`/api/schools/${schoolId}/biometric/devices/${deviceId}/calibrate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to apply settings');
+            return data;
+        },
+        onSuccess: (response) => {
+            toast.success('Settings applied', {
+                description: 'Time synced and format settings updated',
+            });
+            setSettingsDevice(null);
+        },
+        onError: (error) => {
+            toast.error('Failed to apply settings', { description: error.message });
+        },
+    });
+
+    // Open settings modal
+    const openSettingsModal = async (device) => {
+        setSettingsDevice(device);
+        setLoadingSettings(true);
+        try {
+            const res = await fetch(`/api/schools/${schoolId}/biometric/devices/${device.id}/calibrate`);
+            const data = await res.json();
+            if (data.success) {
+                setSettingsData({
+                    timeFormat: data.timeFormat || '24hour',
+                    dateFormat: data.dateFormat || 'YYYY-MM-DD',
+                });
+            }
+        } catch (e) {
+            console.error('Failed to load settings:', e);
+        }
+        setLoadingSettings(false);
+    };
 
     // Sync all mutation
     const syncMutation = useMutation({
@@ -592,6 +668,27 @@ export default function BiometricSettings() {
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
+                                                        onClick={() => calibrateMutation.mutate(device.id)}
+                                                        disabled={calibratingDevice === device.id}
+                                                        title="Sync device time"
+                                                    >
+                                                        {calibratingDevice === device.id ? (
+                                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                                        ) : (
+                                                            <Clock className="w-4 h-4" />
+                                                        )}
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => openSettingsModal(device)}
+                                                        title="Time/Date Settings"
+                                                    >
+                                                        <Settings className="w-4 h-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
                                                         className="text-red-500 hover:text-red-600"
                                                         onClick={() => setDeleteDevice(device)}
                                                         title="Delete device"
@@ -725,6 +822,87 @@ export default function BiometricSettings() {
                                 </>
                             ) : (
                                 'Save Changes'
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Device Time/Date Settings Modal */}
+            <Dialog open={!!settingsDevice} onOpenChange={() => setSettingsDevice(null)}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Clock className="w-5 h-5" />
+                            Time & Date Settings
+                        </DialogTitle>
+                        <DialogDescription>
+                            Configure time and date display format for "{settingsDevice?.name}"
+                        </DialogDescription>
+                    </DialogHeader>
+                    {loadingSettings ? (
+                        <div className="flex items-center justify-center py-8">
+                            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                        </div>
+                    ) : (
+                        <div className="space-y-4 py-4">
+                            <div>
+                                <Label>Time Format</Label>
+                                <Select
+                                    value={settingsData.timeFormat}
+                                    onValueChange={(value) => setSettingsData({ ...settingsData, timeFormat: value })}
+                                >
+                                    <SelectTrigger className="mt-1">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="24hour">24-Hour (14:30)</SelectItem>
+                                        <SelectItem value="12hour">12-Hour (2:30 PM)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div>
+                                <Label>Date Format</Label>
+                                <Select
+                                    value={settingsData.dateFormat}
+                                    onValueChange={(value) => setSettingsData({ ...settingsData, dateFormat: value })}
+                                >
+                                    <SelectTrigger className="mt-1">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="YYYY-MM-DD">YYYY-MM-DD (2026-02-03)</SelectItem>
+                                        <SelectItem value="DD-MM-YYYY">DD-MM-YYYY (03-02-2026)</SelectItem>
+                                        <SelectItem value="MM-DD-YYYY">MM-DD-YYYY (02-03-2026)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="bg-muted/50 p-3 rounded-lg text-sm">
+                                <p className="font-medium">Note:</p>
+                                <p className="text-muted-foreground">
+                                    Applying settings will also sync the device time with the server.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setSettingsDevice(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={() => applySettingsMutation.mutate({
+                                deviceId: settingsDevice?.id,
+                                settings: settingsData,
+                            })}
+                            disabled={applySettingsMutation.isPending || loadingSettings}
+                        >
+                            {applySettingsMutation.isPending ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Applying...
+                                </>
+                            ) : (
+                                'Apply Settings'
                             )}
                         </Button>
                     </DialogFooter>

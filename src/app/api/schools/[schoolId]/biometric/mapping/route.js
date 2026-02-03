@@ -45,6 +45,11 @@ export async function GET(req, props) {
                             teacher: {
                                 select: { department: true },
                             },
+                            // Include actual RFID cards for this user
+                            rfidIdentityMaps: {
+                                where: { isActive: true },
+                                select: { id: true },
+                            },
                         },
                     },
                     device: {
@@ -68,7 +73,8 @@ export async function GET(req, props) {
                 deviceId: m.deviceId,
                 deviceUserId: m.deviceUserId,
                 fingerprintCount: m.fingerprintCount,
-                hasCard: m.hasCard,
+                // Use actual RFID card count instead of cached hasCard field
+                hasCard: (m.user.rfidIdentityMaps?.length || 0) > 0,
                 hasFace: m.hasFace,
                 isActive: m.isActive,
                 enrolledAt: m.enrolledAt,

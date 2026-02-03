@@ -586,6 +586,179 @@ export class ISAPIClient {
     }
 
     /**
+     * Get device system time and format settings
+     * @returns {Promise<{success: boolean, deviceTime?: Date, timezone?: string, timeFormat?: string, dateFormat?: string, error?: string}>}
+     */
+    async getDeviceTime() {
+        try {
+            const result = await this.request('GET', '/ISAPI/System/time');
+
+            // Parse XML or JSON response
+            let deviceTime, timezone, timeFormat, dateFormat;
+
+            if (typeof result === 'string') {
+                // XML response - parse manually
+                const timeMatch = result.match(/<localTime>([^<]+)<\/localTime>/);
+                const tzMatch = result.match(/<timeZone>([^<]+)<\/timeZone>/);
+                const tfMatch = result.match(/<timeFormat>([^<]+)<\/timeFormat>/);
+                const dfMatch = result.match(/<dateFormat>([^<]+)<\/dateFormat>/);
+                if (timeMatch) {
+                    deviceTime = new Date(timeMatch[1]);
+                }
+                timezone = tzMatch ? tzMatch[1] : null;
+                timeFormat = tfMatch ? tfMatch[1] : null;
+                dateFormat = dfMatch ? dfMatch[1] : null;
+            } else if (result.Time) {
+                // JSON response
+                deviceTime = new Date(result.Time.localTime);
+                timezone = result.Time.timeZone;
+                timeFormat = result.Time.timeFormat;
+                dateFormat = result.Time.dateFormat;
+            }
+
+            return {
+                success: true,
+                deviceTime,
+                timezone,
+                timeFormat,
+                dateFormat,
+                raw: result
+            };
+        } catch (error) {
+            console.error('[ISAPI] getDeviceTime error:', error.message);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Set device system time to current server time (sync with server)
+     * @param {Date} time - Optional time to set, defaults to current server time
+     * @param {Object} options - Optional settings for time/date format
+     * @param {string} options.timeFormat - '12hour' or '24hour'
+     * @param {string} options.dateFormat - 'DD-MM-YYYY', 'MM-DD-YYYY', 'YYYY-MM-DD'
+     * @returns {Promise<{success: boolean, error?: string}>}
+     */
+    async setDeviceTime(time = new Date(), options = {}) {
+        try {
+            // First GET current time to understand the device's format
+            const currentTimeXml = await this.request('GET', '/ISAPI/System/time');
+            console.log('[ISAPI] Current time XML:', typeof currentTimeXml === 'string' ? currentTimeXml.substring(0, 500) : JSON.stringify(currentTimeXml));
+
+            // Format time - Hikvision expects YYYY-MM-DDTHH:mm:ss+TZ:00 format
+            const pad = (n) => n.toString().padStart(2, '0');
+            const localTimeStr = `${time.getFullYear()}-${pad(time.getMonth() + 1)}-${pad(time.getDate())}T${pad(time.getHours())}:${pad(time.getMinutes())}:${pad(time.getSeconds())}+05:30`;
+
+            // If we got XML back, modify it and send it back
+            if (typeof currentTimeXml === 'string' && currentTimeXml.includes('<Time')) {
+                // Replace localTime value in existing XML
+                let updatedXml = currentTimeXml.replace(
+                    /<localTime>[^<]*<\/localTime>/,
+                    `<localTime>${localTimeStr}</localTime>`
+                );
+                // Ensure timeMode is manual
+                updatedXml = updatedXml.replace(
+                    /<timeMode>[^<]*<\/timeMode>/,
+                    '<timeMode>manual</timeMode>'
+                );
+
+                // Set time format if specified
+                if (options.timeFormat) {
+                    if (updatedXml.includes('<timeFormat>')) {
+                        updatedXml = updatedXml.replace(
+                            /<timeFormat>[^<]*<\/timeFormat>/,
+                            `<timeFormat>${options.timeFormat}</timeFormat>`
+                        );
+                    } else {
+                        // Add timeFormat before closing Time tag
+                        updatedXml = updatedXml.replace(
+                            /<\/Time>/,
+                            `<timeFormat>${options.timeFormat}</timeFormat>\n</Time>`
+                        );
+                    }
+                }
+
+                // Set date format if specified
+                if (options.dateFormat) {
+                    if (updatedXml.includes('<dateFormat>')) {
+                        updatedXml = updatedXml.replace(
+                            /<dateFormat>[^<]*<\/dateFormat>/,
+                            `<dateFormat>${options.dateFormat}</dateFormat>`
+                        );
+                    } else {
+                        // Add dateFormat before closing Time tag
+                        updatedXml = updatedXml.replace(
+                            /<\/Time>/,
+                            `<dateFormat>${options.dateFormat}</dateFormat>\n</Time>`
+                        );
+                    }
+                }
+
+                console.log('[ISAPI] Setting time with XML:', updatedXml.substring(0, 800));
+                await this.requestXML('PUT', '/ISAPI/System/time', updatedXml);
+                return { success: true, syncedTo: time };
+            }
+
+            // Fallback: try minimal XML format
+            console.log('[ISAPI] Using minimal XML format...');
+            const timeFormatTag = options.timeFormat ? `<timeFormat>${options.timeFormat}</timeFormat>\n` : '';
+            const dateFormatTag = options.dateFormat ? `<dateFormat>${options.dateFormat}</dateFormat>\n` : '';
+            const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
+<Time version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<timeMode>manual</timeMode>
+<localTime>${localTimeStr}</localTime>
+<timeZone>CST-5:30:00</timeZone>
+${timeFormatTag}${dateFormatTag}</Time>`;
+
+            await this.requestXML('PUT', '/ISAPI/System/time', xmlBody);
+            return { success: true, syncedTo: time };
+        } catch (error) {
+            console.error('[ISAPI] setDeviceTime error:', error.message);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Make XML request (for endpoints that don't support JSON)
+     */
+    async requestXML(method, endpoint, xmlBody) {
+        const uri = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+        const url = `${this.baseUrl}${uri}`;
+
+        // First request to get the Digest challenge
+        const initialRes = await fetch(url, { method });
+
+        if (initialRes.status !== 401) {
+            const errorText = await initialRes.text();
+            throw new Error(`HTTP ${initialRes.status}: ${errorText}`);
+        }
+
+        const authHeader = initialRes.headers.get('www-authenticate');
+        const challenge = this.parseDigestChallenge(authHeader);
+        const nc = '00000001';
+        const cnonce = crypto.randomBytes(8).toString('hex');
+        const digestHeader = this.generateDigestAuth(
+            method, uri, challenge.realm, challenge.nonce,
+            challenge.qop || 'auth', nc, cnonce
+        );
+
+        const authRes = await fetch(url, {
+            method,
+            headers: {
+                'Authorization': digestHeader,
+                'Content-Type': 'application/xml'
+            },
+            body: xmlBody
+        });
+
+        if (!authRes.ok) {
+            const errorText = await authRes.text();
+            throw new Error(`HTTP ${authRes.status}: ${errorText}`);
+        }
+
+        return await authRes.text();
+    }
+
+    /**
      * Parse Hikvision event type codes
      */
     parseEventType(major, minor) {
