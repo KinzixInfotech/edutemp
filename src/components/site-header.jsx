@@ -41,7 +41,7 @@ export function SiteHeader({ fullUser }) {
         .sort((a, b) => b.url.length - a.url.length)[0]
     return (
         <header
-            className="flex sticky z-50 h-[var(--header-height)] shrink-0 items-center gap-2 border-b bg-[#ffffffa3] dark:bg-[#09090b94] backdrop-blur-sm transition-[width,height,top] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-[var(--header-height)]"
+            className="flex sticky z-50 h-[var(--header-height)] shrink-0 items-center gap-2 border-b bg-[#ffffffeb] dark:bg-[#09090b94] backdrop-blur-sm transition-[width,height,top] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-[var(--header-height)]"
             style={{ top: "calc(var(--network-banner-height, 0px) + var(--onboarding-banner-height, 0px) + var(--setup-banner-height, 0px))" }}
         >
             <div className="flex w-full items-center gap-2 px-4 lg:gap-3 lg:px-6 relative">

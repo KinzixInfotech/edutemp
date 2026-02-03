@@ -15,7 +15,7 @@ export function BreadcrumbHeader({ className, schoolName }) {
 
     return (
         <div
-            className="flex sticky z-20 shrink-0 items-center gap-2 border-b bg-[#ffffffa3] dark:bg-[#09090b94] backdrop-blur-sm transition-[width,height,top] ease-linear"
+            className="flex sticky z-20 shrink-0 items-center gap-2 border-b bg-[#ffffffeb] dark:bg-[#09090b94] backdrop-blur-sm transition-[width,height,top] ease-linear"
             style={{ top: "calc(var(--network-banner-height, 0px) + var(--onboarding-banner-height, 0px) + var(--setup-banner-height, 0px) + var(--header-height))" }}
         >
             {/* Horizontal scrollable breadcrumb container */}

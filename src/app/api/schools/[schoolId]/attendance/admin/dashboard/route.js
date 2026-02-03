@@ -228,8 +228,8 @@ export async function GET(req, props) {
         },
         select: {
           attendancePercentage: true,
-          presentDays: true,
-          absentDays: true,
+          totalPresent: true,
+          totalAbsent: true,
           user: {
             select: {
               id: true,
