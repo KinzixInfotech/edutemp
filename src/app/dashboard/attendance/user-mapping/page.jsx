@@ -1012,184 +1012,233 @@ export default function UserMapping() {
                 <TabsContent value="agent" className="mt-4 space-y-4">
                     <Card>
                         <CardHeader className="pb-3">
-                            <CardTitle className="flex items-center gap-2">
-                                Local Biometric Agent
-                                {agentData?.agent?.status === 'CONNECTED' && <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Live</Badge>}
-                                {agentData?.agent?.status === 'RECENT' && <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Recent</Badge>}
-                                {agentData?.agent?.status === 'STALE' && <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100">Stale</Badge>}
-                                {agentData?.agent?.status === 'OFFLINE' && <Badge variant="destructive">Offline</Badge>}
-                                {agentData?.agent?.status === 'NOT_CONFIGURED' && <Badge variant="outline">Not Configured</Badge>}
-                            </CardTitle>
-                            <CardDescription>
-                                Monitor and configure the local agent running in your school network
-                            </CardDescription>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <Wifi className="w-5 h-5" />
+                                        Local Biometric Agent
+                                        {agentData?.agent?.status === 'CONNECTED' && <Badge className="bg-green-100 text-green-700 hover:bg-green-100">● Live</Badge>}
+                                        {agentData?.agent?.status === 'RECENT' && <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">● Recent</Badge>}
+                                        {agentData?.agent?.status === 'STALE' && <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100">● Stale</Badge>}
+                                        {agentData?.agent?.status === 'OFFLINE' && <Badge variant="destructive">● Offline</Badge>}
+                                        {agentData?.agent?.status === 'WAITING' && <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">● Waiting</Badge>}
+                                        {agentData?.agent?.status === 'NOT_CONFIGURED' && <Badge variant="outline">Not Configured</Badge>}
+                                    </CardTitle>
+                                    <CardDescription className="mt-1">
+                                        {agentData?.agent?.statusMessage || 'Loading...'}
+                                    </CardDescription>
+                                </div>
+                                <Button variant="outline" size="sm" onClick={() => refetchAgent()}>
+                                    <RefreshCw className="w-4 h-4 mr-2" />
+                                    Refresh
+                                </Button>
+                            </div>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                            {/* Status Overview */}
-                            <div className="grid md:grid-cols-2 gap-4">
-                                <div className="border rounded-lg p-4 bg-muted/30">
-                                    <h3 className="font-medium mb-3 flex items-center gap-2">
-                                        <Activity className="w-4 h-4" /> Agent Status
-                                    </h3>
-                                    <div className="space-y-3 text-sm">
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Connection:</span>
-                                            <span className="font-medium">{agentData?.agent?.statusMessage || 'Loading...'}</span>
+
+                            {/* Step 1: Generate Key */}
+                            <div className="border rounded-lg p-4">
+                                <h3 className="font-semibold mb-3 flex items-center gap-2 text-base">
+                                    <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-sm">1</span>
+                                    Agent API Key
+                                </h3>
+
+                                {!agentData?.agent?.enabled ? (
+                                    <div className="bg-muted/50 rounded-lg p-4 text-center">
+                                        <p className="text-muted-foreground mb-3">Generate an API key to authenticate the local agent</p>
+                                        <Button
+                                            onClick={() => generateKeyMutation.mutate({ regenerate: false })}
+                                            disabled={generateKeyMutation.isPending}
+                                        >
+                                            {generateKeyMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                            <Key className="w-4 h-4 mr-2" />
+                                            Generate Agent Key
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <code className="flex-1 bg-muted px-3 py-2 rounded font-mono text-sm break-all">
+                                                {agentData.agent.fullKey || agentData.agent.maskedKey}
+                                            </code>
+                                            <Button
+                                                variant="outline"
+                                                size="icon"
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(agentData.agent.fullKey || agentData.agent.maskedKey);
+                                                    toast.success('Key copied to clipboard');
+                                                }}
+                                            >
+                                                <Copy className="w-4 h-4" />
+                                            </Button>
                                         </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Last Activity:</span>
-                                            <span>
-                                                {agentData?.agent?.lastActivity
-                                                    ? new Date(agentData.agent.lastActivity).toLocaleString()
-                                                    : 'Never'}
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                variant="destructive"
+                                                size="sm"
+                                                disabled={generateKeyMutation.isPending}
+                                                onClick={() => {
+                                                    if (confirm('Regenerate key? This will disconnect any existing agents.')) {
+                                                        generateKeyMutation.mutate({ regenerate: true });
+                                                    }
+                                                }}
+                                            >
+                                                <RefreshCw className="w-3 h-3 mr-1" />
+                                                Regenerate
+                                            </Button>
+                                            <span className="text-xs text-muted-foreground">
+                                                Keep this key secret. Use it in the agent's config.json
                                             </span>
                                         </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Agent Key:</span>
+                                    </div>
+                                )}
+                            </div>
 
-                                            {agentData?.agent?.enabled ? (
-                                                <div className="flex items-center gap-2">
-                                                    <code className="bg-muted px-1.5 py-0.5 rounded text-xs">
-                                                        {agentData.agent.maskedKey}
-                                                    </code>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-6 w-6"
-                                                        onClick={() => {
-                                                            navigator.clipboard.writeText(agentData.agent.maskedKey);
-                                                            toast.success('Key copied to clipboard');
-                                                        }}
-                                                    >
-                                                        <Copy className="w-3 h-3" />
-                                                    </Button>
-                                                </div>
-                                            ) : (
-                                                <span className="text-muted-foreground italic">Not generated</span>
-                                            )}
+                            {/* Step 2: Download Config */}
+                            {agentData?.agent?.enabled && (
+                                <div className="border rounded-lg p-4">
+                                    <h3 className="font-semibold mb-3 flex items-center gap-2 text-base">
+                                        <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-sm">2</span>
+                                        Download Configuration
+                                    </h3>
+
+                                    <div className="bg-muted/50 rounded-lg p-4 mb-4">
+                                        <div className="grid gap-3 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">School ID:</span>
+                                                <code className="bg-background px-2 py-0.5 rounded">{agentData.config.schoolId}</code>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Cloud URL:</span>
+                                                <code className="bg-background px-2 py-0.5 rounded">{agentData.config.cloudUrl}</code>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-muted-foreground">Poll Interval:</span>
+                                                <span>{Math.floor(agentData.config.pollIntervalMs / 1000 / 60)} minutes</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Devices:</span>
+                                                <span>{agentData.devices?.length || 0} configured</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <Button
+                                        className="w-full"
+                                        onClick={() => {
+                                            const config = {
+                                                schoolId: agentData.config.schoolId,
+                                                cloudUrl: agentData.config.cloudUrl,
+                                                agentKey: agentData.agent.fullKey,
+                                                pollIntervalMs: agentData.config.pollIntervalMs,
+                                                devices: agentData.devices.map(d => ({
+                                                    id: d.id,
+                                                    name: d.name,
+                                                    ip: d.ip,
+                                                    port: d.port,
+                                                    username: d.username,
+                                                    password: d.password
+                                                }))
+                                            };
+                                            const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+                                            const url = URL.createObjectURL(blob);
+                                            const a = document.createElement('a');
+                                            a.href = url;
+                                            a.download = 'config.json';
+                                            a.click();
+                                            toast.success('Config downloaded! Place it in the biometric-agent folder.');
+                                        }}
+                                    >
+                                        <Download className="w-4 h-4 mr-2" />
+                                        Download config.json
+                                    </Button>
+
+                                    {agentData.devices?.some(d => !d.password) && (
+                                        <div className="mt-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-3 rounded text-xs text-yellow-800 dark:text-yellow-200">
+                                            <strong>⚠ Warning:</strong> Some devices have no password configured. Please add device credentials in the <strong>Settings &gt; Biometric</strong> page.
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Step 3: Install Agent */}
+                            {agentData?.agent?.enabled && (
+                                <div className="border rounded-lg p-4">
+                                    <h3 className="font-semibold mb-3 flex items-center gap-2 text-base">
+                                        <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-sm">3</span>
+                                        Install &amp; Run Agent
+                                    </h3>
+                                    <div className="bg-muted/50 rounded-lg p-4 text-sm space-y-2">
+                                        <p>1. Download the <code>biometric-agent</code> folder to a school computer</p>
+                                        <p>2. Place <code>config.json</code> in the folder</p>
+                                        <p>3. Run:</p>
+                                        <div className="bg-black text-green-400 p-2 rounded font-mono text-xs">
+                                            <p># Windows</p>
+                                            <p>install-windows.bat</p>
+                                            <p className="mt-2"># Linux</p>
+                                            <p>sudo ./install-linux.sh</p>
                                         </div>
                                     </div>
                                 </div>
+                            )}
 
-                                <div className="border rounded-lg p-4 bg-muted/30">
-                                    <h3 className="font-medium mb-3 flex items-center gap-2">
-                                        <Key className="w-4 h-4" /> Configuration
+                            {/* Device Sync Status */}
+                            <div className="border rounded-lg overflow-hidden">
+                                <div className="bg-muted/30 px-4 py-3 border-b">
+                                    <h3 className="font-semibold flex items-center gap-2">
+                                        <Fingerprint className="w-4 h-4" />
+                                        Device Sync Status
                                     </h3>
-                                    <div className="space-y-3">
-                                        {!agentData?.agent?.enabled ? (
-                                            <div className="text-center py-2">
-                                                <Button
-                                                    onClick={() => generateKeyMutation.mutate({ regenerate: false })}
-                                                    disabled={generateKeyMutation.isPending}
-                                                >
-                                                    {generateKeyMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                                    Generate Agent Key
-                                                </Button>
-                                                <p className="text-xs text-muted-foreground mt-2">
-                                                    Required to connect the local agent
-                                                </p>
-                                            </div>
-                                        ) : (
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <Button
-                                                    variant="outline"
-                                                    className="w-full"
-                                                    onClick={() => {
-                                                        const config = {
-                                                            schoolId: agentData.config.schoolId,
-                                                            cloudUrl: agentData.config.cloudUrl,
-                                                            agentKey: "REPLACE_WITH_YOUR_KEY",
-                                                            pollIntervalMs: agentData.config.pollIntervalMs,
-                                                            devices: agentData.devices.map(d => ({
-                                                                id: d.id,
-                                                                name: d.name,
-                                                                ip: "192.168.1.100",
-                                                                port: 80,
-                                                                username: "admin",
-                                                                password: "PASSWORD"
-                                                            }))
-                                                        };
-                                                        const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
-                                                        const url = URL.createObjectURL(blob);
-                                                        const a = document.createElement('a');
-                                                        a.href = url;
-                                                        a.download = 'config.json';
-                                                        a.click();
-                                                    }}
-                                                >
-                                                    <Download className="w-4 h-4 mr-2" />
-                                                    Download Config
-                                                </Button>
-                                                <Button
-                                                    variant="destructive"
-                                                    className="w-full"
-                                                    disabled={generateKeyMutation.isPending}
-                                                    onClick={() => {
-                                                        if (confirm('Are you sure? This will disconnect existing agents.')) {
-                                                            generateKeyMutation.mutate({ regenerate: true });
-                                                        }
-                                                    }}
-                                                >
-                                                    <RefreshCw className="w-4 h-4 mr-2" />
-                                                    Regenerate Key
-                                                </Button>
-                                            </div>
-                                        )}
-
-                                        {agentData?.agent?.enabled && (
-                                            <div className="bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded text-xs text-yellow-800 dark:text-yellow-200 mt-2">
-                                                <strong>Note:</strong> Used to connect the local Windows/Linux agent.
-                                            </div>
-                                        )}
-                                    </div>
                                 </div>
-                            </div>
-
-                            {/* Devices List */}
-                            <div className="mt-4">
-                                <h3 className="font-medium mb-3">Device Sync Status</h3>
-                                <div className="border rounded-lg overflow-hidden">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Device Name</TableHead>
-                                                <TableHead>Status</TableHead>
-                                                <TableHead>Last Sync</TableHead>
-                                                <TableHead>Message</TableHead>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Device</TableHead>
+                                            <TableHead>IP Address</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead>Last Sync</TableHead>
+                                            <TableHead>Message</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {agentData?.devices?.map(device => (
+                                            <TableRow key={device.id}>
+                                                <TableCell className="font-medium">{device.name}</TableCell>
+                                                <TableCell className="font-mono text-xs">{device.ip}:{device.port}</TableCell>
+                                                <TableCell>
+                                                    {device.lastSyncStatus === 'SUCCESS' ? (
+                                                        <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
+                                                            <CheckCircle className="w-3 h-3 mr-1" /> Synced
+                                                        </Badge>
+                                                    ) : device.lastSyncStatus === 'ERROR' ? (
+                                                        <Badge variant="destructive">
+                                                            <XCircle className="w-3 h-3 mr-1" /> Error
+                                                        </Badge>
+                                                    ) : (
+                                                        <Badge variant="outline">Pending</Badge>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-sm">
+                                                    {device.lastSyncedAt ? new Date(device.lastSyncedAt).toLocaleString() : '-'}
+                                                </TableCell>
+                                                <TableCell className="max-w-[200px] truncate text-muted-foreground text-xs">
+                                                    {device.error || 'OK'}
+                                                </TableCell>
                                             </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {agentData?.devices?.map(device => (
-                                                <TableRow key={device.id}>
-                                                    <TableCell className="font-medium">{device.name}</TableCell>
-                                                    <TableCell>
-                                                        {device.lastSyncStatus === 'SUCCESS' ? (
-                                                            <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Synced</Badge>
-                                                        ) : device.lastSyncStatus === 'ERROR' ? (
-                                                            <Badge variant="destructive">Error</Badge>
-                                                        ) : (
-                                                            <Badge variant="outline">Unknown</Badge>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {device.lastSyncedAt ? new Date(device.lastSyncedAt).toLocaleString() : '-'}
-                                                    </TableCell>
-                                                    <TableCell className="max-w-[200px] truncate text-muted-foreground text-xs">
-                                                        {device.error || 'OK'}
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                            {(!agentData?.devices || agentData.devices.length === 0) && (
-                                                <TableRow>
-                                                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                                                        No devices found. Add devices in Settings &gt; Biometric first.
-                                                    </TableCell>
-                                                </TableRow>
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </div>
+                                        ))}
+                                        {(!agentData?.devices || agentData.devices.length === 0) && (
+                                            <TableRow>
+                                                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                                    <Fingerprint className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                                                    No biometric devices configured.<br />
+                                                    <span className="text-xs">Add devices in Settings &gt; Biometric first.</span>
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
                             </div>
+
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -1251,10 +1300,10 @@ export default function UserMapping() {
                         </Button>
                     </DialogFooter>
                 </DialogContent>
-            </Dialog>
+            </Dialog >
 
             {/* RFID Assignment Dialog */}
-            <Dialog open={isRfidOpen} onOpenChange={setIsRfidOpen}>
+            < Dialog open={isRfidOpen} onOpenChange={setIsRfidOpen} >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Assign RFID Card</DialogTitle>
@@ -1296,7 +1345,7 @@ export default function UserMapping() {
                         </Button>
                     </DialogFooter>
                 </DialogContent>
-            </Dialog>
-        </div>
+            </Dialog >
+        </div >
     );
 }

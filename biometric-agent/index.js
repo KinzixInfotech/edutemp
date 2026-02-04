@@ -52,6 +52,59 @@ class ISAPIClient {
         this.password = device.password;
     }
 
+    /**
+     * Check if device is reachable via TCP connection
+     */
+    async checkConnectivity(timeout = 3000) {
+        const net = require('net');
+        return new Promise((resolve) => {
+            const socket = new net.Socket();
+            socket.setTimeout(timeout);
+
+            socket.on('connect', () => {
+                socket.destroy();
+                resolve({ online: true });
+            });
+
+            socket.on('timeout', () => {
+                socket.destroy();
+                resolve({ online: false, reason: 'Connection timeout - device not responding' });
+            });
+
+            socket.on('error', (err) => {
+                socket.destroy();
+                if (err.code === 'ECONNREFUSED') {
+                    resolve({ online: false, reason: 'Connection refused - port closed or wrong port' });
+                } else if (err.code === 'EHOSTUNREACH') {
+                    resolve({ online: false, reason: 'Host unreachable - check network/IP address' });
+                } else if (err.code === 'ENETUNREACH') {
+                    resolve({ online: false, reason: 'Network unreachable - agent has no network access' });
+                } else {
+                    resolve({ online: false, reason: err.message });
+                }
+            });
+
+            socket.connect(this.device.port, this.device.ip);
+        });
+    }
+
+    /**
+     * Get device info/type
+     */
+    async getDeviceInfo() {
+        try {
+            const info = await this.request('GET', '/ISAPI/System/deviceInfo', null, 5000);
+            return {
+                model: info?.DeviceInfo?.model || 'Unknown',
+                serialNumber: info?.DeviceInfo?.serialNumber || 'N/A',
+                firmwareVersion: info?.DeviceInfo?.firmwareVersion || 'N/A',
+                deviceType: info?.DeviceInfo?.deviceType || 'Hikvision'
+            };
+        } catch {
+            return { model: 'Hikvision (info unavailable)', deviceType: 'Hikvision' };
+        }
+    }
+
     generateDigestAuth(method, uri, realm, nonce, qop, nc, cnonce) {
         const ha1 = crypto.createHash('md5').update(`${this.username}:${realm}:${this.password}`).digest('hex');
         const ha2 = crypto.createHash('md5').update(`${method}:${uri}`).digest('hex');
@@ -126,6 +179,10 @@ class ISAPIClient {
 
             clearTimeout(timeoutId);
 
+            if (authRes.status === 401) {
+                throw new Error('Authentication failed - check username/password');
+            }
+
             if (!authRes.ok) {
                 throw new Error(`HTTP ${authRes.status}`);
             }
@@ -138,6 +195,9 @@ class ISAPIClient {
 
         } catch (error) {
             clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                throw new Error('Request timeout - device took too long to respond');
+            }
             throw error;
         }
     }
@@ -152,7 +212,7 @@ class ISAPIClient {
         const startTimeStr = formatIST(sinceTime);
         const endTimeStr = formatIST(new Date());
 
-        console.log(`  📅 Fetching events from ${startTimeStr} to ${endTimeStr}`);
+        console.log(`    📅 Time range: ${startTimeStr} to ${endTimeStr}`);
 
         const allEvents = [];
         let searchPosition = 0;
@@ -213,7 +273,7 @@ class ISAPIClient {
 async function pushEventsToCloud(deviceId, events) {
     const url = `${cloudUrl}/api/schools/${schoolId}/biometric/ingest`;
 
-    console.log(`  ☁️  Pushing ${events.length} events to cloud...`);
+    console.log(`    ☁️  Pushing ${events.length} events to cloud...`);
 
     const response = await fetch(url, {
         method: 'POST',
@@ -249,54 +309,111 @@ async function pushEventsToCloud(deviceId, events) {
 async function pollDevice(device) {
     const client = new ISAPIClient(device);
 
-    // Get last sync time (default: 24 hours ago)
+    console.log(`\n┌─────────────────────────────────────────────────────`);
+    console.log(`│ 📟 Device: ${device.name}`);
+    console.log(`│ 🌐 Address: ${device.ip}:${device.port}`);
+    console.log(`└─────────────────────────────────────────────────────`);
+
+    // Step 1: Check connectivity
+    console.log(`  🔍 Checking connectivity...`);
+    const connectivity = await client.checkConnectivity();
+
+    if (!connectivity.online) {
+        console.log(`  ❌ OFFLINE: ${connectivity.reason}`);
+        state[device.id] = {
+            ...state[device.id],
+            lastStatus: 'offline',
+            lastError: connectivity.reason,
+            lastCheck: new Date().toISOString()
+        };
+        saveState();
+        return { success: false, status: 'offline', error: connectivity.reason };
+    }
+
+    console.log(`  ✅ Device is ONLINE`);
+
+    // Step 2: Get device info (optional, for display)
+    try {
+        const info = await client.getDeviceInfo();
+        console.log(`  📱 Model: ${info.model}`);
+    } catch {
+        // Ignore - device info is optional
+    }
+
+    // Step 3: Get last sync time
     let sinceTime = state[device.id]?.lastSyncTime
         ? new Date(state[device.id].lastSyncTime)
         : new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    console.log(`\n🔄 Polling device: ${device.name} (${device.ip})`);
+    // Step 4: Fetch events
+    console.log(`  🔄 Fetching access events...`);
 
     try {
         const events = await client.getEvents(sinceTime);
 
         if (events.length === 0) {
-            console.log(`  ✓ No new events`);
-            state[device.id] = { lastSyncTime: new Date().toISOString(), lastStatus: 'success' };
+            console.log(`  ✓ No new events since last sync`);
+            state[device.id] = {
+                lastSyncTime: new Date().toISOString(),
+                lastStatus: 'success',
+                lastCheck: new Date().toISOString()
+            };
             saveState();
-            return { success: true, events: 0 };
+            return { success: true, status: 'online', events: 0 };
         }
 
         console.log(`  📥 Found ${events.length} events`);
 
         // Filter out events without user ID
         const validEvents = events.filter(e => e.deviceUserId);
+        const skippedEvents = events.length - validEvents.length;
+
+        if (skippedEvents > 0) {
+            console.log(`  ⚠️  Skipped ${skippedEvents} events (no user ID)`);
+        }
 
         if (validEvents.length > 0) {
             const result = await pushEventsToCloud(device.id, validEvents);
-            console.log(`  ✅ Cloud response: ${result.stats.newEvents} new, ${result.stats.duplicates} duplicates`);
+            console.log(`  ✅ Synced: ${result.stats.newEvents} new, ${result.stats.duplicates} duplicates`);
         }
 
-        state[device.id] = { lastSyncTime: new Date().toISOString(), lastStatus: 'success' };
+        state[device.id] = {
+            lastSyncTime: new Date().toISOString(),
+            lastStatus: 'success',
+            lastCheck: new Date().toISOString()
+        };
         saveState();
 
-        return { success: true, events: validEvents.length };
+        return { success: true, status: 'online', events: validEvents.length };
 
     } catch (error) {
         console.error(`  ❌ Error: ${error.message}`);
-        state[device.id] = { ...state[device.id], lastStatus: 'error', lastError: error.message };
+        state[device.id] = {
+            ...state[device.id],
+            lastStatus: 'error',
+            lastError: error.message,
+            lastCheck: new Date().toISOString()
+        };
         saveState();
-        return { success: false, error: error.message };
+        return { success: false, status: 'error', error: error.message };
     }
 }
 
 async function pollAllDevices() {
-    console.log(`\n${'='.repeat(60)}`);
-    console.log(`🕐 ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
-    console.log(`${'='.repeat(60)}`);
+    console.log(`\n${'═'.repeat(60)}`);
+    console.log(`  🕐 ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
+    console.log(`${'═'.repeat(60)}`);
+
+    const results = { online: 0, offline: 0, errors: 0 };
 
     for (const device of devices) {
-        await pollDevice(device);
+        const result = await pollDevice(device);
+        if (result.status === 'online') results.online++;
+        else if (result.status === 'offline') results.offline++;
+        else results.errors++;
     }
+
+    console.log(`\n📊 Summary: ${results.online} online, ${results.offline} offline, ${results.errors} errors`);
 }
 
 // =============================================================================
@@ -313,6 +430,12 @@ console.log(`
 ║  Interval:   ${(pollIntervalMs / 1000) + ' seconds'.padEnd(43)}║
 ╚══════════════════════════════════════════════════════════════╝
 `);
+
+// List devices
+console.log('📟 Configured Devices:');
+devices.forEach((d, i) => {
+    console.log(`   ${i + 1}. ${d.name} @ ${d.ip}:${d.port}`);
+});
 
 // Initial poll
 pollAllDevices();

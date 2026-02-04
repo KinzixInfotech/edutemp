@@ -26,12 +26,16 @@ export async function GET(req, props) {
             return NextResponse.json({ error: 'School not found' }, { status: 404 });
         }
 
-        // Get all devices and their last sync times
+        // Get all devices and their last sync times (including credentials for config)
         const devices = await prisma.biometricDevice.findMany({
             where: { schoolId, isEnabled: true },
             select: {
                 id: true,
                 name: true,
+                ipAddress: true,
+                port: true,
+                username: true,
+                password: true,
                 lastSyncedAt: true,
                 lastSyncStatus: true,
                 lastErrorMessage: true,
@@ -78,6 +82,7 @@ export async function GET(req, props) {
             agent: {
                 enabled: hasAgentKey,
                 maskedKey,
+                fullKey: hasAgentKey ? school.biometricAgentKey : null, // Include full key for config
                 status: overallStatus,
                 lastActivity,
                 statusMessage: getStatusMessage(overallStatus),
@@ -85,6 +90,10 @@ export async function GET(req, props) {
             devices: devices.map(d => ({
                 id: d.id,
                 name: d.name,
+                ip: d.ipAddress || '192.168.1.100',
+                port: d.port || 80,
+                username: d.username || 'admin',
+                password: d.password || '',
                 lastSyncedAt: d.lastSyncedAt,
                 lastSyncStatus: d.lastSyncStatus,
                 error: d.lastErrorMessage,

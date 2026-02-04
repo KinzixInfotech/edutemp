@@ -1,0 +1,16 @@
+{
+  "schoolId": "a1439aed-c6bc-4239-a19c-532a153f5b8f",
+  "cloudUrl": "https://www.edubreezy.com/",
+  "agentKey": "ebz_agent_e5ef24e9f9cf756b3fd853bd8bf1edcd221a31f2507218fdd484a44a7945864f",
+  "pollIntervalMs": 120000,
+  "devices": [
+    {
+      "id": "e82a77f6-f9af-4561-bc2f-6b87b3f22175",
+      "name": "Main Gate Entry",
+      "ip": "192.168.31.214",
+      "port": 80,
+      "username": "admin",
+      "password": "kin123456789"
+    }
+  ]
+}
