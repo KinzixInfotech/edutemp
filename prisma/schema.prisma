@@ -123,6 +123,7 @@ model School {
   subscription    SchoolSubscription?
 
   // Biometric System
+  biometricAgentKey      String? // API key for local biometric agent
   biometricDevices       BiometricDevice[]
   biometricIdentityMaps  BiometricIdentityMap[]
   rfidIdentityMaps       RfidIdentityMap[]

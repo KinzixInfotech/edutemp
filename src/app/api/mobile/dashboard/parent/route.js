@@ -238,7 +238,7 @@ async function fetchChildAttendance(schoolId, studentId, month, year) {
 async function fetchChildHomework(schoolId, studentId) {
     try {
         const student = await prisma.student.findUnique({
-            where: { id: studentId },
+            where: { userId: studentId },
             select: { classId: true, sectionId: true }
         });
 

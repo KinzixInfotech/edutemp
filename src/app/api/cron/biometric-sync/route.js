@@ -151,6 +151,11 @@ export async function GET(request) {
     }
 }
 
+// QStash sends POST by default
+export async function POST(request) {
+    return GET(request);
+}
+
 /**
  * Poll a single device for events
  */

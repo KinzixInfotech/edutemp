@@ -162,6 +162,11 @@ export async function GET(request) {
     }
 }
 
+// QStash sends POST by default
+export async function POST(request) {
+    return GET(request);
+}
+
 /**
  * Finalize attendance for a single school
  */

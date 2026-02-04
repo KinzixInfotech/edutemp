@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-    Users, UserPlus, CreditCard, Fingerprint, Loader2, Search, CheckCircle, XCircle, RefreshCw, Terminal, Activity, AlertCircle, ChevronLeft, ChevronRight
+    Users, UserPlus, CreditCard, Fingerprint, Loader2, Search, CheckCircle, XCircle, RefreshCw, Terminal, Activity, AlertCircle, ChevronLeft, ChevronRight, Download, Wifi, WifiOff, Key, Copy
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -98,6 +98,35 @@ export default function UserMapping() {
         },
         enabled: !!schoolId && activeTab === 'logs',
         refetchInterval: activeTab === 'logs' ? 30000 : false, // Auto-refresh every 30s when on logs tab
+    });
+
+    // Fetch Agent Status
+    const { data: agentData, isLoading: agentLoading, refetch: refetchAgent } = useQuery({
+        queryKey: ['agent-status', schoolId],
+        queryFn: async () => {
+            const res = await fetch(`/api/schools/${schoolId}/biometric/agent-status`);
+            if (!res.ok) throw new Error('Failed to fetch agent status');
+            return res.json();
+        },
+        enabled: !!schoolId && activeTab === 'agent',
+        refetchInterval: activeTab === 'agent' ? 10000 : false, // Auto-refresh every 10s
+    });
+
+    const generateKeyMutation = useMutation({
+        mutationFn: async ({ regenerate = false } = {}) => {
+            const res = await fetch(`/api/schools/${schoolId}/biometric/agent-key`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ regenerate })
+            });
+            if (!res.ok) throw new Error('Failed to generate key');
+            return res.json();
+        },
+        onSuccess: (data) => {
+            toast.success(data.message || 'Agent key generated');
+            refetchAgent();
+        },
+        onError: (err) => toast.error(err.message)
     });
 
     // Create mapping mutation
@@ -419,11 +448,14 @@ export default function UserMapping() {
 
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid bg-[#eef1f3] dark:bg-muted border grid-cols-3 gap-1">
+                <TabsList className="grid bg-[#eef1f3] dark:bg-muted border grid-cols-4 gap-1">
                     <TabsTrigger value="mapped">Mapped ({mappings.length})</TabsTrigger>
                     <TabsTrigger value="unmapped">Unmapped ({unmappedUsers.length})</TabsTrigger>
                     <TabsTrigger value="logs" className="flex items-center gap-1.5">
                         <Terminal className="w-3.5 h-3.5" /> Logs
+                    </TabsTrigger>
+                    <TabsTrigger value="agent" className="flex items-center gap-1.5">
+                        <Wifi className="w-3.5 h-3.5" /> Agent
                     </TabsTrigger>
                 </TabsList>
 
@@ -972,6 +1004,191 @@ export default function UserMapping() {
                                         ? `${filtered} of ${total} events (filtered)`
                                         : `${total} events`;
                                 })()} • Auto-refresh every 30s
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="agent" className="mt-4 space-y-4">
+                    <Card>
+                        <CardHeader className="pb-3">
+                            <CardTitle className="flex items-center gap-2">
+                                Local Biometric Agent
+                                {agentData?.agent?.status === 'CONNECTED' && <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Live</Badge>}
+                                {agentData?.agent?.status === 'RECENT' && <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Recent</Badge>}
+                                {agentData?.agent?.status === 'STALE' && <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100">Stale</Badge>}
+                                {agentData?.agent?.status === 'OFFLINE' && <Badge variant="destructive">Offline</Badge>}
+                                {agentData?.agent?.status === 'NOT_CONFIGURED' && <Badge variant="outline">Not Configured</Badge>}
+                            </CardTitle>
+                            <CardDescription>
+                                Monitor and configure the local agent running in your school network
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            {/* Status Overview */}
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <div className="border rounded-lg p-4 bg-muted/30">
+                                    <h3 className="font-medium mb-3 flex items-center gap-2">
+                                        <Activity className="w-4 h-4" /> Agent Status
+                                    </h3>
+                                    <div className="space-y-3 text-sm">
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Connection:</span>
+                                            <span className="font-medium">{agentData?.agent?.statusMessage || 'Loading...'}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Last Activity:</span>
+                                            <span>
+                                                {agentData?.agent?.lastActivity
+                                                    ? new Date(agentData.agent.lastActivity).toLocaleString()
+                                                    : 'Never'}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Agent Key:</span>
+
+                                            {agentData?.agent?.enabled ? (
+                                                <div className="flex items-center gap-2">
+                                                    <code className="bg-muted px-1.5 py-0.5 rounded text-xs">
+                                                        {agentData.agent.maskedKey}
+                                                    </code>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-6 w-6"
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(agentData.agent.maskedKey);
+                                                            toast.success('Key copied to clipboard');
+                                                        }}
+                                                    >
+                                                        <Copy className="w-3 h-3" />
+                                                    </Button>
+                                                </div>
+                                            ) : (
+                                                <span className="text-muted-foreground italic">Not generated</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="border rounded-lg p-4 bg-muted/30">
+                                    <h3 className="font-medium mb-3 flex items-center gap-2">
+                                        <Key className="w-4 h-4" /> Configuration
+                                    </h3>
+                                    <div className="space-y-3">
+                                        {!agentData?.agent?.enabled ? (
+                                            <div className="text-center py-2">
+                                                <Button
+                                                    onClick={() => generateKeyMutation.mutate({ regenerate: false })}
+                                                    disabled={generateKeyMutation.isPending}
+                                                >
+                                                    {generateKeyMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                                    Generate Agent Key
+                                                </Button>
+                                                <p className="text-xs text-muted-foreground mt-2">
+                                                    Required to connect the local agent
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    className="w-full"
+                                                    onClick={() => {
+                                                        const config = {
+                                                            schoolId: agentData.config.schoolId,
+                                                            cloudUrl: agentData.config.cloudUrl,
+                                                            agentKey: "REPLACE_WITH_YOUR_KEY",
+                                                            pollIntervalMs: agentData.config.pollIntervalMs,
+                                                            devices: agentData.devices.map(d => ({
+                                                                id: d.id,
+                                                                name: d.name,
+                                                                ip: "192.168.1.100",
+                                                                port: 80,
+                                                                username: "admin",
+                                                                password: "PASSWORD"
+                                                            }))
+                                                        };
+                                                        const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+                                                        const url = URL.createObjectURL(blob);
+                                                        const a = document.createElement('a');
+                                                        a.href = url;
+                                                        a.download = 'config.json';
+                                                        a.click();
+                                                    }}
+                                                >
+                                                    <Download className="w-4 h-4 mr-2" />
+                                                    Download Config
+                                                </Button>
+                                                <Button
+                                                    variant="destructive"
+                                                    className="w-full"
+                                                    disabled={generateKeyMutation.isPending}
+                                                    onClick={() => {
+                                                        if (confirm('Are you sure? This will disconnect existing agents.')) {
+                                                            generateKeyMutation.mutate({ regenerate: true });
+                                                        }
+                                                    }}
+                                                >
+                                                    <RefreshCw className="w-4 h-4 mr-2" />
+                                                    Regenerate Key
+                                                </Button>
+                                            </div>
+                                        )}
+
+                                        {agentData?.agent?.enabled && (
+                                            <div className="bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded text-xs text-yellow-800 dark:text-yellow-200 mt-2">
+                                                <strong>Note:</strong> Used to connect the local Windows/Linux agent.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Devices List */}
+                            <div className="mt-4">
+                                <h3 className="font-medium mb-3">Device Sync Status</h3>
+                                <div className="border rounded-lg overflow-hidden">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Device Name</TableHead>
+                                                <TableHead>Status</TableHead>
+                                                <TableHead>Last Sync</TableHead>
+                                                <TableHead>Message</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {agentData?.devices?.map(device => (
+                                                <TableRow key={device.id}>
+                                                    <TableCell className="font-medium">{device.name}</TableCell>
+                                                    <TableCell>
+                                                        {device.lastSyncStatus === 'SUCCESS' ? (
+                                                            <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Synced</Badge>
+                                                        ) : device.lastSyncStatus === 'ERROR' ? (
+                                                            <Badge variant="destructive">Error</Badge>
+                                                        ) : (
+                                                            <Badge variant="outline">Unknown</Badge>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {device.lastSyncedAt ? new Date(device.lastSyncedAt).toLocaleString() : '-'}
+                                                    </TableCell>
+                                                    <TableCell className="max-w-[200px] truncate text-muted-foreground text-xs">
+                                                        {device.error || 'OK'}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                            {(!agentData?.devices || agentData.devices.length === 0) && (
+                                                <TableRow>
+                                                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                                                        No devices found. Add devices in Settings &gt; Biometric first.
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
