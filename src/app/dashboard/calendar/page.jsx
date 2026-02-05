@@ -584,7 +584,7 @@ export default function SchoolCalendar() {
                                     resetForm();
                                     setIsCreateOpen(true);
                                 }}
-                                className="w-full rounded-2xl justify-start gap-2 "
+                                className="w-full rounded-lg justify-start gap-2 "
                                 size="lg"
                             >
                                 <Plus className="h-5 w-5" />
@@ -610,11 +610,11 @@ export default function SchoolCalendar() {
                                     This Month
                                 </h3>
                                 <div className="grid grid-cols-2 gap-2">
-                                    <div className="p-3 rounded-lg bg-muted/50">
+                                    <div className="p-3 rounded-lg bg-muted/50 border">
                                         <p className="text-2xl font-bold">{eventStats.total}</p>
                                         <p className="text-xs text-muted-foreground">Events</p>
                                     </div>
-                                    <div className="p-3 rounded-lg bg-red-500/10">
+                                    <div className="p-3 rounded-lg bg-red-500/10 border">
                                         <p className="text-2xl font-bold text-red-600">{eventStats.holidays}</p>
                                         <p className="text-xs text-muted-foreground">Holidays</p>
                                     </div>
@@ -631,7 +631,7 @@ export default function SchoolCalendar() {
                                         No upcoming events
                                     </p>
                                 ) : (
-                                    <div className="space-y-1 bg-muted">
+                                    <div className="space-y-1">
                                         {upcomingEvents.slice(0, 4).map((event, idx) => (
                                             <button
                                                 key={event.id || idx}

@@ -51,9 +51,13 @@ export function SiteHeader({ fullUser }) {
                     className="mx-2 data-[orientation=vertical]:h-4"
                 />
                 <SchoolDetailPopup school={fullUser?.school}>
-                    <div className="text-sm border gap-1 inline-flex font-medium capitalize bg-muted px-2 py-1 rounded-lg text-center max-w-[120px] sm:max-w-[200px] cursor-pointer hover:bg-muted/80 transition-colors">
-                        <div className="flex items-center gap-1 truncate">
-                            <School size={16} className="flex-shrink-0" />
+                    <div className="text-sm border gap-1 inline-flex items-center font-medium capitalize bg-muted px-2 py-1 rounded-lg text-center max-w-[120px] sm:max-w-[200px] cursor-pointer hover:bg-muted/80 transition-colors">
+                        <div className="flex items-center justify-center gap-1.5 truncate">
+                            {fullUser?.school?.profilePicture && (
+                                <Avatar className="w-5 h-5 flex-shrink-0">
+                                    <AvatarImage src={fullUser?.school?.profilePicture} alt={fullUser?.school?.name || "User"} className="w-5 h-5 object-cover" />
+                                </Avatar>
+                            )}
                             <span className="truncate">{fullUser?.school?.name || 'Dashboard'}</span>
                         </div>
                     </div>
