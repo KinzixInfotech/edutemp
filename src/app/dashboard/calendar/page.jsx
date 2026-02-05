@@ -257,6 +257,12 @@ export default function SchoolCalendar() {
                 );
             }
         },
+        onSuccess: (data) => {
+            // Show success with Google Calendar sync status
+            if (data?.googleCalendarSynced) {
+                console.log('✅ Event synced to Google Calendar:', data.googleEventId);
+            }
+        },
         onSettled: () => {
             // Refetch to ensure consistency
             queryClient.invalidateQueries({ queryKey: ['calendar-events'] });
@@ -578,7 +584,7 @@ export default function SchoolCalendar() {
                                     resetForm();
                                     setIsCreateOpen(true);
                                 }}
-                                className="w-full justify-start gap-2 shadow-md"
+                                className="w-full rounded-2xl justify-start gap-2 "
                                 size="lg"
                             >
                                 <Plus className="h-5 w-5" />
@@ -625,7 +631,7 @@ export default function SchoolCalendar() {
                                         No upcoming events
                                     </p>
                                 ) : (
-                                    <div className="space-y-1">
+                                    <div className="space-y-1 bg-muted">
                                         {upcomingEvents.slice(0, 4).map((event, idx) => (
                                             <button
                                                 key={event.id || idx}

@@ -288,12 +288,55 @@ export async function POST(req, props) {
             return newEvent;
         });
 
+        // Sync to Google Calendar if user has connected account
+        let googleEventId = null;
+        let googleCalendarSynced = false;
+
+        try {
+            const gmailAccount = await prisma.gmailAccount.findFirst({
+                where: {
+                    user: { schoolId },
+                },
+                orderBy: { lastUsedAt: 'desc' },
+            });
+
+            if (gmailAccount && gmailAccount.accessToken && gmailAccount.refreshToken) {
+                const googleResult = await syncEventToGoogleCalendar(
+                    gmailAccount.accessToken,
+                    gmailAccount.refreshToken,
+                    gmailAccount.id,
+                    event
+                );
+
+                if (googleResult) {
+                    googleEventId = googleResult.id;
+                    googleCalendarSynced = true;
+
+                    // Update local event with Google Calendar ID
+                    await prisma.calendarEvent.update({
+                        where: { id: event.id },
+                        data: {
+                            // Store Google Calendar event ID for future sync
+                            description: event.description
+                                ? `${event.description}\n\n[Google Calendar ID: ${googleEventId}]`
+                                : `[Google Calendar ID: ${googleEventId}]`
+                        }
+                    });
+                }
+            }
+        } catch (syncError) {
+            console.error('Google Calendar Sync Error (non-fatal):', syncError);
+            // Don't fail the request if Google sync fails - event is still saved locally
+        }
+
         await invalidatePattern(`calendar:*${schoolId}*`);
 
         return new Response(
             JSON.stringify({
                 message: 'Event created successfully',
                 event,
+                googleCalendarSynced,
+                googleEventId,
             }),
             { status: 201 }
         );
@@ -328,14 +371,31 @@ async function fetchGoogleCalendarEvents(accessToken, refreshToken, accountId, s
         const timeMin = startDate ? new Date(startDate).toISOString() : new Date().toISOString();
         const timeMax = endDate ? new Date(endDate).toISOString() : undefined;
 
-        const response = await calendar.events.list({
-            calendarId: 'en.indian#holiday@group.v.calendar.google.com',
+        // Fetch from user's primary calendar (bidirectional sync)
+        const primaryResponse = await calendar.events.list({
+            calendarId: 'primary',
             timeMin,
             timeMax,
             singleEvents: true,
             orderBy: 'startTime',
-            maxResults: 50,
+            maxResults: 100,
         });
+
+        // Also fetch Indian holidays for reference
+        let holidayEvents = [];
+        try {
+            const holidayResponse = await calendar.events.list({
+                calendarId: 'en.indian#holiday@group.v.calendar.google.com',
+                timeMin,
+                timeMax,
+                singleEvents: true,
+                orderBy: 'startTime',
+                maxResults: 50,
+            });
+            holidayEvents = holidayResponse.data.items || [];
+        } catch (err) {
+            console.log('Could not fetch Indian holidays:', err.message);
+        }
 
         // Update last used timestamp
         await prisma.gmailAccount.update({
@@ -343,7 +403,10 @@ async function fetchGoogleCalendarEvents(accessToken, refreshToken, accountId, s
             data: { lastUsedAt: new Date() },
         });
 
-        return response.data.items || [];
+        // Combine primary calendar events with holidays
+        const allEvents = [...(primaryResponse.data.items || []), ...holidayEvents];
+
+        return allEvents;
     } catch (error) {
         console.error('Google Calendar API Error:', error);
 
@@ -449,6 +512,130 @@ async function fetchGoogleCalendarEvents(accessToken, refreshToken, accountId, s
         syncError.code = 'SYNC_ERROR';
         throw syncError;
     }
+}
+
+// ============================================
+// HELPER: Sync Event to Google Calendar (Push)
+// ============================================
+
+async function syncEventToGoogleCalendar(accessToken, refreshToken, accountId, event) {
+    try {
+        const oauth2Client = new google.auth.OAuth2(
+            process.env.GOOGLE_CLIENT_ID,
+            process.env.GOOGLE_CLIENT_SECRET
+        );
+
+        oauth2Client.setCredentials({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+        });
+
+        const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+        // Format the event for Google Calendar
+        const googleEvent = {
+            summary: event.title,
+            description: event.description || '',
+            location: event.location || event.venue || '',
+            colorId: getGoogleCalendarColorId(event.color),
+            start: event.isAllDay
+                ? { date: event.startDate.toISOString().split('T')[0] }
+                : {
+                    dateTime: combineDateAndTime(event.startDate, event.startTime),
+                    timeZone: 'Asia/Kolkata',
+                },
+            end: event.isAllDay
+                ? { date: (event.endDate || event.startDate).toISOString().split('T')[0] }
+                : {
+                    dateTime: combineDateAndTime(event.endDate || event.startDate, event.endTime || event.startTime),
+                    timeZone: 'Asia/Kolkata',
+                },
+            reminders: {
+                useDefault: false,
+                overrides: [
+                    { method: 'popup', minutes: 30 },
+                    { method: 'email', minutes: 1440 }, // 1 day before
+                ],
+            },
+        };
+
+        // Insert event into user's primary calendar
+        const response = await calendar.events.insert({
+            calendarId: 'primary',
+            resource: googleEvent,
+            sendUpdates: 'none', // Don't send notifications to attendees
+        });
+
+        console.log('Event synced to Google Calendar:', response.data.id);
+
+        // Update last used timestamp
+        await prisma.gmailAccount.update({
+            where: { id: accountId },
+            data: { lastUsedAt: new Date() },
+        });
+
+        return response.data;
+    } catch (error) {
+        console.error('Google Calendar Sync Error:', error);
+
+        // Try to refresh token if expired
+        if (error.code === 401 || error.message?.includes('invalid_grant')) {
+            try {
+                const oauth2Client = new google.auth.OAuth2(
+                    process.env.GOOGLE_CLIENT_ID,
+                    process.env.GOOGLE_CLIENT_SECRET
+                );
+
+                oauth2Client.setCredentials({ refresh_token: refreshToken });
+                const { credentials } = await oauth2Client.refreshAccessToken();
+
+                // Update token in database
+                await prisma.gmailAccount.update({
+                    where: { id: accountId },
+                    data: {
+                        accessToken: credentials.access_token,
+                        lastUsedAt: new Date(),
+                    },
+                });
+
+                // Retry with new token
+                return syncEventToGoogleCalendar(credentials.access_token, refreshToken, accountId, event);
+            } catch (refreshError) {
+                console.error('Token refresh failed during sync:', refreshError);
+                throw refreshError;
+            }
+        }
+
+        throw error;
+    }
+}
+
+// Helper: Convert our color hex to Google Calendar color ID (1-11)
+function getGoogleCalendarColorId(hexColor) {
+    const colorMap = {
+        '#3B82F6': '1',  // Blue (Lavender in Google)
+        '#EF4444': '11', // Red
+        '#F59E0B': '5',  // Yellow/Orange (Banana in Google)
+        '#8B5CF6': '3',  // Purple (Grape in Google)
+        '#10B981': '10', // Green (Basil in Google)
+        '#6366F1': '9',  // Indigo (Blueberry in Google)
+        '#EC4899': '4',  // Pink (Flamingo in Google)
+        '#F97316': '6',  // Orange (Tangerine in Google)
+        '#14B8A6': '7',  // Teal (Peacock in Google)
+    };
+    return colorMap[hexColor] || '1'; // Default to blue
+}
+
+// Helper: Combine date and time string into ISO dateTime
+function combineDateAndTime(date, timeStr) {
+    const d = new Date(date);
+    if (timeStr) {
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        d.setHours(hours || 9, minutes || 0, 0, 0);
+    } else {
+        d.setHours(9, 0, 0, 0); // Default to 9 AM
+    }
+    return d.toISOString();
 }
 
 // Helper function to create admin notifications

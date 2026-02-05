@@ -37,24 +37,48 @@ const TopProgressBar = dynamic(() => import("@/app/components/TopProgressBar"), 
     ssr: false,
 });
 
-// Custom CSS keyframes for graduation cap animation
+// Modern CSS animations - GPU-accelerated for smooth 60fps
 const spinnerStyles = `
-@keyframes graduationPulse {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.2);
-  }
+/* Smooth rotation using transform (GPU accelerated) */
+@keyframes smoothSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-@keyframes spinCircle {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
+/* Subtle pulse using transform scale (GPU accelerated) */
+@keyframes smoothPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.08); opacity: 0.9; }
+}
+
+/* Shimmer sweep effect */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Floating particles */
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.3; }
+  50% { transform: translateY(-12px) rotate(180deg); opacity: 0.8; }
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Staggered dot animation */
+@keyframes dotPulse {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+/* Progress bar gradient animation */
+@keyframes gradientMove {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
 }
 `;
 
@@ -256,36 +280,143 @@ export default function ClientLayout({ children }) {
                                     {!hideUI && <BreadcrumbHeader schoolName={fullUser?.school?.name} />}
 
                                     <main className="w-full h-full relative">
-                                        {/* Navigation Loading Spinner */}
+                                        {/* Modern Navigation Loading Overlay */}
                                         {isNavigating && pathname?.startsWith('/dashboard') && (
                                             <div
-                                                className="fixed top-0 right-0 bottom-0 flex items-center justify-center bg-background/80 backdrop-blur-sm z-50"
-                                                style={{ left: 'var(--sidebar-width, 0px)' }}
+                                                className="fixed inset-0 flex items-center justify-center z-50 overflow-hidden"
+                                                style={{
+                                                    left: 'var(--sidebar-width, 0px)',
+                                                    animation: 'fadeIn 0.15s ease-out',
+                                                }}
                                             >
-                                                <div className="flex flex-col items-center gap-3">
-                                                    {/* Spinning circle around graduation cap */}
-                                                    <div className="relative">
-                                                        {/* Outer spinning circle */}
+                                                {/* Gradient mesh background */}
+                                                <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-background/95" />
+
+                                                {/* Animated gradient orbs */}
+                                                <div
+                                                    className="absolute w-96 h-96 rounded-full blur-3xl opacity-20"
+                                                    style={{
+                                                        background: 'linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary)/0.3) 100%)',
+                                                        top: '-10%',
+                                                        right: '-10%',
+                                                        animation: 'smoothPulse 3s ease-in-out infinite',
+                                                    }}
+                                                />
+                                                <div
+                                                    className="absolute w-64 h-64 rounded-full blur-3xl opacity-15"
+                                                    style={{
+                                                        background: 'linear-gradient(135deg, hsl(var(--primary)/0.5) 0%, transparent 100%)',
+                                                        bottom: '10%',
+                                                        left: '10%',
+                                                        animation: 'smoothPulse 4s ease-in-out infinite 0.5s',
+                                                    }}
+                                                />
+
+                                                {/* Floating particles */}
+                                                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                                                    {[...Array(6)].map((_, i) => (
                                                         <div
-                                                            className="absolute inset-0 rounded-full border-4 border-primary/20 border-t-primary"
+                                                            key={i}
+                                                            className="absolute w-2 h-2 rounded-full bg-primary/30"
                                                             style={{
-                                                                width: '5rem',
-                                                                height: '5rem',
-                                                                animation: 'spinCircle 1s linear infinite'
+                                                                left: `${15 + i * 15}%`,
+                                                                top: `${30 + (i % 3) * 20}%`,
+                                                                animation: `float ${2 + i * 0.3}s ease-in-out infinite ${i * 0.2}s`,
                                                             }}
                                                         />
-                                                        {/* Graduation cap in center (pulse/zoom only) */}
+                                                    ))}
+                                                </div>
+
+                                                {/* Center loading content */}
+                                                <div className="relative flex flex-col items-center gap-6 z-10">
+                                                    {/* Animated logo container */}
+                                                    <div className="relative">
+                                                        {/* Outer glow ring */}
                                                         <div
-                                                            className="w-20 h-20 flex items-center justify-center"
-                                                            style={{ animation: 'graduationPulse 0.8s ease-in-out infinite' }}
+                                                            className="absolute -inset-4 rounded-full opacity-30"
+                                                            style={{
+                                                                background: 'radial-gradient(circle, hsl(var(--primary)/0.4) 0%, transparent 70%)',
+                                                                animation: 'smoothPulse 2s ease-in-out infinite',
+                                                            }}
+                                                        />
+
+                                                        {/* Progress ring */}
+                                                        <svg
+                                                            className="w-20 h-20 sm:w-24 sm:h-24"
+                                                            style={{ animation: 'smoothSpin 1.5s linear infinite' }}
+                                                        >
+                                                            <circle
+                                                                cx="50%"
+                                                                cy="50%"
+                                                                r="45%"
+                                                                fill="none"
+                                                                stroke="hsl(var(--primary)/0.15)"
+                                                                strokeWidth="3"
+                                                            />
+                                                            <circle
+                                                                cx="50%"
+                                                                cy="50%"
+                                                                r="45%"
+                                                                fill="none"
+                                                                stroke="hsl(var(--primary))"
+                                                                strokeWidth="3"
+                                                                strokeLinecap="round"
+                                                                strokeDasharray="70 200"
+                                                            />
+                                                        </svg>
+
+                                                        {/* Graduation cap icon */}
+                                                        <div
+                                                            className="absolute inset-0 flex items-center justify-center"
+                                                            style={{ animation: 'smoothPulse 1.5s ease-in-out infinite' }}
                                                         >
                                                             <PiGraduationCapDuotone
-                                                                className="text-primary"
-                                                                style={{ fontSize: '2.5rem' }}
+                                                                className="text-primary w-8 h-8 sm:w-10 sm:h-10"
                                                             />
                                                         </div>
                                                     </div>
-                                                    <span className="text-sm text-muted-foreground animate-pulse">Loading</span>
+
+                                                    {/* Loading text with shimmer */}
+                                                    <div className="relative overflow-hidden">
+                                                        <span className="text-sm font-medium text-muted-foreground tracking-wide">
+                                                            Loading
+                                                        </span>
+                                                        {/* Shimmer overlay */}
+                                                        <div
+                                                            className="absolute inset-0 w-full"
+                                                            style={{
+                                                                background: 'linear-gradient(90deg, transparent 0%, hsl(var(--primary)/0.2) 50%, transparent 100%)',
+                                                                animation: 'shimmer 1.5s ease-in-out infinite',
+                                                            }}
+                                                        />
+                                                    </div>
+
+                                                    {/* Animated dots */}
+                                                    <div className="flex gap-1.5">
+                                                        {[0, 1, 2].map((i) => (
+                                                            <div
+                                                                key={i}
+                                                                className="w-2 h-2 rounded-full bg-primary"
+                                                                style={{
+                                                                    animation: `dotPulse 1.2s ease-in-out infinite ${i * 0.15}s`,
+                                                                }}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* Bottom gradient progress bar */}
+                                                <div
+                                                    className="absolute bottom-0 left-0 right-0 h-1 overflow-hidden"
+                                                >
+                                                    <div
+                                                        className="h-full w-full"
+                                                        style={{
+                                                            background: 'linear-gradient(90deg, transparent, hsl(var(--primary)), hsl(var(--primary)/0.5), hsl(var(--primary)), transparent)',
+                                                            backgroundSize: '200% 100%',
+                                                            animation: 'gradientMove 1.5s ease-in-out infinite',
+                                                        }}
+                                                    />
                                                 </div>
                                             </div>
                                         )}
