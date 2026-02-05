@@ -27,13 +27,17 @@ function ProgressBar({ value, max, color }) {
     );
 }
 
-export default function DailyStatsCards({ schoolId, academicYearId }) {
-    const { data, isLoading } = useQuery({
+export default function DailyStatsCards({ schoolId, academicYearId, data: propData }) {
+    // Use prop data if provided (from consolidated API), otherwise fetch independently
+    const { data: fetchedData, isLoading: fetchLoading } = useQuery({
         queryKey: ['daily-stats', schoolId, academicYearId],
         queryFn: () => fetchDailyStats({ schoolId, academicYearId }),
-        enabled: !!schoolId,
+        enabled: !!schoolId && !propData, // Only fetch if prop data not provided
         refetchInterval: 60000,
     });
+
+    const data = propData || fetchedData;
+    const isLoading = !propData && fetchLoading;
 
     const stats = [
         {

@@ -292,6 +292,7 @@ export default function Dashboard() {
   });
 
 
+  // ========== ACADEMIC YEARS QUERY (needed first for consolidated API) ==========
   const academicYearsQuery = useQuery({
     queryKey: ['academic-years', fullUser?.schoolId],
     queryFn: async () => {
@@ -304,35 +305,28 @@ export default function Dashboard() {
     staleTime: 1000 * 60 * 5,
   });
 
-  const classesQuery = useQuery({
-    queryKey: ['classes', fullUser?.schoolId],
-    queryFn: async () => {
-      if (!fullUser?.schoolId) return [];
-      // Using generic endpoint if specific one isn't clear, assuming this returns a list
-      const res = await fetch(`/api/schools/${fullUser.schoolId}/classes`);
-      if (!res.ok) return [];
-      const data = await res.json();
-      return data || []; // Adjust based on actual API response structure
-    },
-    enabled: fullUser?.role?.name === 'ADMIN' && !!fullUser?.schoolId,
-    staleTime: 1000 * 60 * 10,
-  });
-
-  const feeStructuresQuery = useQuery({
-    queryKey: ['feeStructures', fullUser?.schoolId],
-    queryFn: async () => {
-      if (!fullUser?.schoolId) return [];
-      const res = await fetch(`/api/schools/fee/global-structures?schoolId=${fullUser.schoolId}`);
-      if (!res.ok) return [];
-      const data = await res.json();
-      return data || [];
-    },
-    enabled: fullUser?.role?.name === 'ADMIN' && !!fullUser?.schoolId,
-    staleTime: 1000 * 60 * 10,
-  });
-
-
   const activeAcademicYear = academicYearsQuery.data?.find(y => y.isActive);
+
+  // ========== CONSOLIDATED DASHBOARD API (for ADMIN) ==========
+  // Single API call that replaces multiple individual queries
+  const consolidatedQuery = useQuery({
+    queryKey: ['dashboard-consolidated', fullUser?.schoolId, activeAcademicYear?.id],
+    queryFn: async () => {
+      if (!fullUser?.schoolId) return null;
+      const params = new URLSearchParams({ schoolId: fullUser.schoolId });
+      if (activeAcademicYear?.id) params.append('academicYearId', activeAcademicYear.id);
+      const res = await fetch(`/api/dashboard/consolidated?${params}`);
+      if (!res.ok) throw new Error('Failed to fetch dashboard data');
+      return res.json();
+    },
+    enabled: fullUser?.role?.name === 'ADMIN' && !!fullUser?.schoolId && !!activeAcademicYear?.id,
+    staleTime: 1000 * 60, // 1 minute
+    refetchInterval: 60000, // Refresh every minute
+  });
+
+  // Use setup status from consolidated API (default to true to avoid false warnings while loading)
+  const hasClasses = consolidatedQuery.data?.setupStatus?.hasClasses ?? true;
+  const hasFeeStructures = consolidatedQuery.data?.setupStatus?.hasFeeStructures ?? true;
 
   // Data extraction
   const schoolTrendData = schoolTrendQuery.data || {};
@@ -437,7 +431,7 @@ export default function Dashboard() {
 
               <div className="flex flex-col gap-3 mt-4">
                 {/* Warning: No Classes */}
-                {classesQuery.data?.length === 0 && academicYearsQuery.data?.length > 0 && (
+                {!hasClasses && academicYearsQuery.data?.length > 0 && (
                   <div className="bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-lg p-4 flex items-start gap-3">
                     <div className="bg-orange-100 dark:bg-orange-900/50 p-2 rounded-full">
                       <LayoutDashboard className="h-5 w-5 text-orange-600 dark:text-orange-400" />
@@ -457,7 +451,7 @@ export default function Dashboard() {
                 )}
 
                 {/* Warning: No Fee Structures */}
-                {feeStructuresQuery.data?.length === 0 && academicYearsQuery.data?.length > 0 && (
+                {!hasFeeStructures && academicYearsQuery.data?.length > 0 && (
                   <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 flex items-start gap-3">
                     <div className="bg-blue-100 dark:bg-blue-900/50 p-2 rounded-full">
                       <IconTrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -488,6 +482,7 @@ export default function Dashboard() {
               <DailyStatsCards
                 schoolId={fullUser?.schoolId}
                 academicYearId={activeAcademicYear?.id}
+                data={consolidatedQuery.data?.dailyStats}
               />
             </div>
 
@@ -498,22 +493,44 @@ export default function Dashboard() {
 
             {/* Widgets Grid - 3 equal columns for main widgets */}
             <div className="px-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
-              {['CALENDAR', 'ATTENDANCE', 'FEE_STATS'].map(widgetId => {
-                const widgetConfig = WIDGETS[widgetId];
-                if (!widgetConfig) return null;
-                const WidgetComponent = widgetConfig.component;
-                return (
-                  <div key={widgetId} className="col-span-1">
-                    <WidgetComponent fullUser={fullUser} />
-                  </div>
-                );
-              })}
+              {/* Calendar Widget */}
+              {WIDGETS['CALENDAR'] && (
+                <div className="col-span-1">
+                  <WIDGETS.CALENDAR.component
+                    fullUser={fullUser}
+                    upcomingEvents={consolidatedQuery.data?.upcomingEvents}
+                  />
+                </div>
+              )}
+
+              {/* Attendance Widget */}
+              {WIDGETS['ATTENDANCE'] && (
+                <div className="col-span-1">
+                  <WIDGETS.ATTENDANCE.component
+                    fullUser={fullUser}
+                    data={consolidatedQuery.data?.attendanceSummary}
+                  />
+                </div>
+              )}
+
+              {/* Fee Stats Widget */}
+              {WIDGETS['FEE_STATS'] && (
+                <div className="col-span-1">
+                  <WIDGETS.FEE_STATS.component
+                    fullUser={fullUser}
+                    feeStats={consolidatedQuery.data?.feeStats}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Recent Payments - Full Width */}
             <div className="px-4 mt-4">
               {WIDGETS['RECENT_PAYMENTS'] && (
-                <RecentPaymentsWidget fullUser={fullUser} />
+                <RecentPaymentsWidget
+                  fullUser={fullUser}
+                  recentPayments={consolidatedQuery.data?.feeStats?.recentPayments}
+                />
               )}
             </div>
           </>

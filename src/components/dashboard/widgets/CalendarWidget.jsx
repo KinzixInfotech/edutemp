@@ -35,7 +35,7 @@ const fetchLocationName = async (lat, lon) => {
     }
 };
 
-export default function CalendarWidget({ fullUser, onRemove }) {
+export default function CalendarWidget({ fullUser, onRemove, upcomingEvents: propEvents }) {
     const [coords, setCoords] = useState({ lat: 28.61, lon: 77.20 }); // Default: Delhi
     const [locationName, setLocationName] = useState({ district: '', state: '' });
     const [currentTime, setCurrentTime] = useState(null);
@@ -68,6 +68,7 @@ export default function CalendarWidget({ fullUser, onRemove }) {
         enabled: !!coords.lat && !!coords.lon,
     });
 
+    // Use prop events if provided (from consolidated API), otherwise fetch independently
     const { data: upcomingData } = useQuery({
         queryKey: ['upcoming-events', fullUser?.schoolId],
         queryFn: async () => {
@@ -76,11 +77,11 @@ export default function CalendarWidget({ fullUser, onRemove }) {
             if (!res.ok) return { events: [] };
             return res.json();
         },
-        enabled: !!fullUser?.schoolId,
+        enabled: !!fullUser?.schoolId && !propEvents,
         staleTime: 1000 * 60 * 5,
     });
 
-    const upcomingEvents = upcomingData?.events || [];
+    const upcomingEvents = propEvents || upcomingData?.events || [];
 
     useEffect(() => {
         setCurrentTime(new Date());
@@ -174,8 +175,9 @@ export default function CalendarWidget({ fullUser, onRemove }) {
                     {/* Day headers */}
                     <div className="grid grid-cols-7 gap-1.5 mb-2">
                         {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-                            <div key={i} className="text-center py-1">
-                                <span className={`text-xs font-semibold ${i === 0 || i === 6 ? 'text-rose-400' : 'text-muted-foreground'}`}>
+                            <div key={i} className="text-center py-1.5">
+                                <span className={`text-[10px] font-bold tracking-wide ${i === 0 ? 'text-rose-500' : i === 6 ? 'text-blue-500' : 'text-muted-foreground/80'
+                                    }`}>
                                     {d}
                                 </span>
                             </div>
@@ -202,24 +204,35 @@ export default function CalendarWidget({ fullUser, onRemove }) {
                                 const hasEvent = upcomingEvents.some(e => new Date(e.startDate).toDateString() === dateStr);
                                 const dayOfWeek = new Date(currentYear, currentMonth, i).getDay();
                                 const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                                const isPast = i < today;
 
                                 days.push(
                                     <div
                                         key={i}
                                         className={`
-                                            aspect-square rounded-lg flex items-center justify-center relative
-                                            text-sm font-medium transition-all cursor-pointer
+                                            aspect-square rounded-xl flex items-center justify-center relative
+                                            text-sm font-semibold transition-all duration-200 cursor-pointer
                                             ${isToday
-                                                ? 'bg-primary text-primary-foreground shadow-md'
-                                                : isWeekend
-                                                    ? 'text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10'
-                                                    : 'text-foreground hover:bg-muted'
+                                                ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30 scale-105 ring-2 ring-blue-400/30 ring-offset-1'
+                                                : isPast
+                                                    ? 'text-muted-foreground/40 hover:bg-muted/30'
+                                                    : dayOfWeek === 0
+                                                        ? 'text-rose-500 bg-rose-50/50 dark:bg-rose-500/5 hover:bg-rose-100 dark:hover:bg-rose-500/10 border border-rose-100/50 dark:border-rose-500/10'
+                                                        : dayOfWeek === 6
+                                                            ? 'text-blue-500 bg-blue-50/50 dark:bg-blue-500/5 hover:bg-blue-100 dark:hover:bg-blue-500/10 border border-blue-100/50 dark:border-blue-500/10'
+                                                            : 'text-foreground bg-muted/30 hover:bg-muted/60 border border-transparent hover:border-border/50'
                                             }
+                                            ${hasEvent && !isToday ? 'ring-1 ring-blue-400/40' : ''}
                                         `}
                                     >
                                         {i}
                                         {hasEvent && (
-                                            <div className={`absolute bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full ${isToday ? 'bg-primary-foreground' : 'bg-blue-500'}`} />
+                                            <div className={`absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5`}>
+                                                <div className={`w-1.5 h-1.5 rounded-full ${isToday ? 'bg-white' : 'bg-blue-500'} animate-pulse`} />
+                                            </div>
+                                        )}
+                                        {isToday && (
+                                            <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full border border-white" />
                                         )}
                                     </div>
                                 );

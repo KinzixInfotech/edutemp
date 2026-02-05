@@ -19,7 +19,7 @@ const fetchFeeStats = async ({ schoolId, academicYearId }) => {
     return res.json();
 };
 
-export default function FeeStatsWidget({ fullUser, onRemove }) {
+export default function FeeStatsWidget({ fullUser, onRemove, feeStats: propData }) {
     // 1. Fetch active academic year first (like the detailed page does)
     const { data: academicYears } = useQuery({
         queryKey: ['academic-years', fullUser?.schoolId],
@@ -29,20 +29,23 @@ export default function FeeStatsWidget({ fullUser, onRemove }) {
             if (!res.ok) throw new Error('Failed to fetch academic years');
             return res.json();
         },
-        enabled: !!fullUser?.schoolId,
+        enabled: !!fullUser?.schoolId && !propData,
     });
 
     const activeAcademicYearId = academicYears?.find(y => y.isActive)?.id;
 
-    // 2. Fetch stats using the active academic year
-    const { data, isLoading } = useQuery({
+    // 2. Fetch stats using the active academic year (only if prop data not provided)
+    const { data: fetchedData, isLoading: fetchLoading } = useQuery({
         queryKey: ['feeStats', fullUser?.schoolId, activeAcademicYearId],
         queryFn: () => fetchFeeStats({
             schoolId: fullUser?.schoolId,
             academicYearId: activeAcademicYearId
         }),
-        enabled: !!fullUser?.schoolId && !!activeAcademicYearId,
+        enabled: !!fullUser?.schoolId && !!activeAcademicYearId && !propData,
     });
+
+    const data = propData || fetchedData;
+    const isLoading = !propData && (fetchLoading || !academicYears);
 
     if (isLoading) {
         return (

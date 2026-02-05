@@ -22,7 +22,7 @@ const fetchRecentPayments = async ({ schoolId, academicYearId }) => {
     return data.recentPayments || [];
 };
 
-export default function RecentPaymentsWidget({ fullUser, onRemove }) {
+export default function RecentPaymentsWidget({ fullUser, onRemove, recentPayments: propData }) {
     // 1. Fetch active academic year first (like FeeStatsWidget does)
     const { data: academicYears } = useQuery({
         queryKey: ['academic-years', fullUser?.schoolId],
@@ -32,20 +32,23 @@ export default function RecentPaymentsWidget({ fullUser, onRemove }) {
             if (!res.ok) throw new Error('Failed to fetch academic years');
             return res.json();
         },
-        enabled: !!fullUser?.schoolId,
+        enabled: !!fullUser?.schoolId && !propData,
     });
 
     const activeAcademicYearId = academicYears?.find(y => y.isActive)?.id;
 
-    // 2. Fetch payments using the active academic year
-    const { data: payments, isLoading, error } = useQuery({
+    // 2. Fetch payments using the active academic year (only if prop data not provided)
+    const { data: fetchedPayments, isLoading: fetchLoading, error } = useQuery({
         queryKey: ['recentPayments', fullUser?.schoolId, activeAcademicYearId],
         queryFn: () => fetchRecentPayments({
             schoolId: fullUser?.schoolId,
             academicYearId: activeAcademicYearId
         }),
-        enabled: !!fullUser?.schoolId && !!activeAcademicYearId,
+        enabled: !!fullUser?.schoolId && !!activeAcademicYearId && !propData,
     });
+
+    const payments = propData || fetchedPayments;
+    const isLoading = !propData && fetchLoading;
 
     if (isLoading) {
         return (
