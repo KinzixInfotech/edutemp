@@ -24,8 +24,9 @@ import {
 } from "@/components/ui/tooltip"
 import { useLibraryNotifications } from "@/context/LibraryNotificationContext"
 import { Badge } from "@/components/ui/badge"
-import { useAuth } from "@/context/AuthContext" // Added
-import { useQuery } from "@tanstack/react-query" // Added
+import { useAuth } from "@/context/AuthContext"
+import { useQuery } from "@tanstack/react-query"
+import { usePrefetchNavigation } from "@/hooks/usePrefetchNavigation"
 
 export function NavSidebarSections({ sections, userRole, activePath }) {
     const { setLoading } = useLoader()
@@ -37,7 +38,10 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
     const isManualToggle = useRef(false)
     const hasInitialized = useRef(false)
     const { unseenRequestsCount } = useLibraryNotifications()
-    const { fullUser } = useAuth() // Added
+    const { fullUser } = useAuth()
+
+    // Prefetch navigation hook for Google-like instant navigation
+    const { prefetchOnHover } = usePrefetchNavigation()
 
     // Fetch unread notices count // Added
     const { data: noticesData } = useQuery({
@@ -130,14 +134,14 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
 
     return (
         <TooltipProvider delayDuration={0}>
-            {sections.map((section) => {
+            {sections.map((section, sectionIndex) => {
                 const visibleItems = section.items.filter(
                     (item) => !item.roles || item.roles.includes(userRole)
                 )
                 if (visibleItems.length === 0) return null
 
                 return (
-                    <SidebarGroup key={section.title}>
+                    <SidebarGroup key={section.title || `section-${sectionIndex}`}>
                         {section.title && !isCollapsed && (
                             <SidebarGroupLabel>{section.title}</SidebarGroupLabel>
                         )}
@@ -181,6 +185,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                                 key={sub.label}
                                                                 href={sub.url}
                                                                 onClick={handleClick}
+                                                                onMouseEnter={() => prefetchOnHover(sub.url)}
                                                                 className="text-xs dark:text-white hover:underline"
                                                             >
                                                                 {sub.label}
@@ -241,7 +246,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                                         ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-semibold" : ""
                                                                         }`}
                                                                 >
-                                                                    <Link href={sub.url} onClick={handleClick} className="flex items-center justify-between w-full">
+                                                                    <Link href={sub.url} onClick={handleClick} onMouseEnter={() => prefetchOnHover(sub.url)} className="flex items-center justify-between w-full">
                                                                         <div className="flex items-center gap-2">
                                                                             {sub.icon && <sub.icon className="w-4 h-4" />}
                                                                             <span className="">{sub.label}</span>
@@ -280,7 +285,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                             ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" : ""
                                                             }`}
                                                     >
-                                                        <Link href={item.url} onClick={handleClick}>
+                                                        <Link href={item.url} onClick={handleClick} onMouseEnter={() => prefetchOnHover(item.url)}>
                                                             {item.icon && <item.icon className="w-4 h-4" />}
                                                             {/* Pulsing indicator for Self Attendance in collapsed mode */}
                                                             {item.label === "Self Attendance" && attendanceActionNeeded && (
@@ -313,7 +318,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                 ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" : ""
                                                 }`}
                                         >
-                                            <Link href={item.url} onClick={handleClick} className="flex items-center justify-between w-full">
+                                            <Link href={item.url} onClick={handleClick} onMouseEnter={() => prefetchOnHover(item.url)} className="flex items-center justify-between w-full">
                                                 <div className="flex items-center gap-2">
                                                     {item.icon && <item.icon className="w-4 h-4" />}
                                                     <span>{item.label}</span>

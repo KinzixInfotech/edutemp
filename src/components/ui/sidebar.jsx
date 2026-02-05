@@ -58,6 +58,34 @@ function SidebarProvider({
   // We use openProp and setOpenProp for control from outside the component.
   const [_open, _setOpen] = React.useState(defaultOpen)
   const open = openProp ?? _open
+
+  // Track if sidebar is locked (explicitly collapsed by user button click)
+  const [isLocked, setIsLocked] = React.useState(false)
+
+  // Track if sidebar is temporarily expanded due to hover
+  const [openForHover, setOpenForHover] = React.useState(false)
+
+  // Hover expand setting from localStorage (default: true)
+  const [hoverExpand, setHoverExpandState] = React.useState(true)
+
+  // Load hover expand preference from localStorage on mount
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('sidebar:hoverExpand')
+      if (saved !== null) {
+        setHoverExpandState(saved === 'true')
+      }
+    }
+  }, [])
+
+  // Function to update hover expand preference
+  const setHoverExpand = React.useCallback((value) => {
+    setHoverExpandState(value)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sidebar:hoverExpand', String(value))
+    }
+  }, [])
+
   const setOpen = React.useCallback((value) => {
     const openState = typeof value === "function" ? value(open) : value
     if (setOpenProp) {
@@ -70,10 +98,18 @@ function SidebarProvider({
     document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
   }, [setOpenProp, open])
 
-  // Helper to toggle the sidebar.
+  // Helper to toggle the sidebar - also sets locked state
   const toggleSidebar = React.useCallback(() => {
-    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
-  }, [isMobile, setOpen, setOpenMobile])
+    if (isMobile) {
+      return setOpenMobile((open) => !open)
+    } else {
+      // When toggling, set locked state based on new state
+      const newOpenState = !open
+      setIsLocked(!newOpenState) // Lock when collapsing
+      setOpenForHover(false) // Reset hover state
+      return setOpen(newOpenState)
+    }
+  }, [isMobile, setOpen, setOpenMobile, open])
 
   // Adds a keyboard shortcut to toggle the sidebar.
   React.useEffect(() => {
@@ -91,19 +127,25 @@ function SidebarProvider({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [toggleSidebar])
 
-  // We add a state so that we can do data-state="expanded" or "collapsed".
-  // This makes it easier to style the sidebar with Tailwind classes.
-  const state = open ? "expanded" : "collapsed"
+  // Compute effective state - expanded if open OR (locked and hovering with hoverExpand enabled)
+  const effectiveOpen = open || (isLocked && openForHover && hoverExpand)
+  const state = effectiveOpen ? "expanded" : "collapsed"
 
   const contextValue = React.useMemo(() => ({
     state,
-    open,
+    open: effectiveOpen,
     setOpen,
     isMobile,
     openMobile,
     setOpenMobile,
     toggleSidebar,
-  }), [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar])
+    isLocked,
+    setIsLocked,
+    hoverExpand,
+    setHoverExpand,
+    openForHover,
+    setOpenForHover,
+  }), [state, effectiveOpen, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar, isLocked, hoverExpand, setHoverExpand, openForHover])
 
   return (
     <SidebarContext.Provider value={contextValue}>
@@ -137,7 +179,45 @@ function Sidebar({
   children,
   ...props
 }) {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+  const { isMobile, state, openMobile, setOpenMobile, isLocked, hoverExpand, setOpenForHover } = useSidebar()
+
+  // Ref for debounce timer
+  const hoverTimeoutRef = React.useRef(null)
+
+  // Handle mouse enter - expand sidebar if locked and hover expand is enabled (with debounce)
+  const handleMouseEnter = React.useCallback(() => {
+    if (isLocked && hoverExpand && !isMobile) {
+      // Clear any pending timeout
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current)
+      }
+      // Small delay to prevent accidental triggers
+      hoverTimeoutRef.current = setTimeout(() => {
+        setOpenForHover(true)
+      }, 100)
+    }
+  }, [isLocked, hoverExpand, isMobile, setOpenForHover])
+
+  // Handle mouse leave - collapse sidebar if it was expanded by hover
+  const handleMouseLeave = React.useCallback(() => {
+    // Clear any pending expand timeout
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current)
+      hoverTimeoutRef.current = null
+    }
+    if (isLocked && hoverExpand && !isMobile) {
+      setOpenForHover(false)
+    }
+  }, [isLocked, hoverExpand, isMobile, setOpenForHover])
+
+  // Cleanup timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current)
+      }
+    }
+  }, [])
 
   if (collapsible === "none") {
     return (
@@ -184,12 +264,14 @@ function Sidebar({
       data-collapsible={state === "collapsed" ? collapsible : ""}
       data-variant={variant}
       data-side={side}
-      data-slot="sidebar">
+      data-slot="sidebar"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}>
       {/* This is what handles the sidebar gap on desktop */}
       <div
         data-slot="sidebar-gap"
         className={cn(
-          "relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear",
+          "relative w-(--sidebar-width) bg-transparent transition-[width] duration-300 ease-in-out",
           "group-data-[collapsible=offcanvas]:w-0",
           "group-data-[side=right]:rotate-180",
           variant === "floating" || variant === "inset"
@@ -199,7 +281,7 @@ function Sidebar({
       <div
         data-slot="sidebar-container"
         className={cn(
-          "fixed z-10 hidden w-(--sidebar-width) transition-[left,right,width,top,height] duration-200 ease-linear md:flex",
+          "fixed z-10 hidden w-(--sidebar-width) transition-[left,right,width,top,height] duration-300 ease-in-out md:flex",
           side === "left"
             ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
             : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",

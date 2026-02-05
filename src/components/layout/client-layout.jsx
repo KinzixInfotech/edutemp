@@ -184,12 +184,18 @@ export default function ClientLayout({ children }) {
 
 
     // Create a single QueryClient instance for the whole app
+    // Optimized for perceived performance - show cached data immediately
     const [queryClient] = useState(() => new QueryClient({
         defaultOptions: {
             queries: {
-                staleTime: 1000 * 60 * 5, // 5 minutes
-                refetchOnWindowFocus: false,
-                retry: 1,
+                staleTime: 1000 * 60 * 5,      // 5 minutes - data considered "fresh"
+                gcTime: 1000 * 60 * 30,        // 30 minutes - keep unused data in cache
+                refetchOnWindowFocus: false,   // Don't refetch when tab gets focus
+                refetchOnMount: 'always',      // Always check for updates but show stale first
+                refetchOnReconnect: true,      // Refetch when network reconnects
+                retry: 1,                      // Only retry once on failure
+                retryDelay: 1000,              // Wait 1 second before retry
+                networkMode: 'offlineFirst',   // Use cache when offline
             },
         },
         queryCache: new QueryCache({

@@ -367,11 +367,11 @@ export default function Dashboard() {
     if (!fullUser) return;
 
     if (fullUser.role.name === 'SUPER_ADMIN') {
-      queryClient.prefetchQuery(['schoolTrend'], fetchSchoolTrend);
-      queryClient.prefetchQuery(['activeAccounts'], fetchActiveAccounts);
+      queryClient.prefetchQuery({ queryKey: ['schoolTrend'], queryFn: fetchSchoolTrend });
+      queryClient.prefetchQuery({ queryKey: ['activeAccounts'], queryFn: fetchActiveAccounts });
     } else if (fullUser.role.name === 'ADMIN') {
-      queryClient.prefetchQuery(['adminTeacherStats', fullUser.schoolId], () => fetchAdminStatsTeacher(fullUser.schoolId));
-      queryClient.prefetchQuery(['adminNonTeacherStats', fullUser.schoolId], () => fetchAdminStatsNonTeacher(fullUser.schoolId));
+      queryClient.prefetchQuery({ queryKey: ['adminTeacherStats', fullUser.schoolId], queryFn: () => fetchAdminStatsTeacher(fullUser.schoolId) });
+      queryClient.prefetchQuery({ queryKey: ['adminNonTeacherStats', fullUser.schoolId], queryFn: () => fetchAdminStatsNonTeacher(fullUser.schoolId) });
     }
   }, [fullUser, queryClient]);
 

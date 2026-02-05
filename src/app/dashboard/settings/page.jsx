@@ -10,12 +10,44 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Save, Settings as SettingsIcon, Calendar, Clock, Globe, Check, AlertTriangle, ExternalLink, RefreshCw, Unlink, MapPin, Navigation, Info } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Loader2, Save, Settings as SettingsIcon, Calendar, Clock, Globe, Check, AlertTriangle, ExternalLink, RefreshCw, Unlink, MapPin, Navigation, Info, PanelLeft, MousePointer } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import GoogleMapsLocationPicker from "@/components/maps/GoogleMapsLocationPicker";
+import { useSidebar } from "@/components/ui/sidebar";
+
+// Sidebar Preferences sub-component that uses the sidebar context
+function SidebarPreferencesSection() {
+    const { hoverExpand, setHoverExpand } = useSidebar();
+
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
+                <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                        <MousePointer className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium text-sm">Expand sidebar on hover</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                        When the sidebar is collapsed, hovering over it will temporarily expand it to show full menu labels.
+                    </p>
+                </div>
+                <Switch
+                    checked={hoverExpand}
+                    onCheckedChange={setHoverExpand}
+                    aria-label="Toggle sidebar hover expand"
+                />
+            </div>
+            <p className="text-xs text-muted-foreground">
+                Tip: You can collapse the sidebar using the toggle button in the header or by pressing <kbd className="px-1.5 py-0.5 rounded bg-muted border text-[10px] font-mono">⌘ B</kbd>
+            </p>
+        </div>
+    );
+}
 
 export default function GeneralSettingsPage() {
+
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;
     const userId = fullUser?.id;
@@ -277,7 +309,24 @@ export default function GeneralSettingsPage() {
 
             <Separator />
 
+            {/* Sidebar Preferences Section */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <PanelLeft className="h-5 w-5" />
+                        Sidebar Preferences
+                    </CardTitle>
+                    <CardDescription>
+                        Customize how the sidebar behaves
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <SidebarPreferencesSection />
+                </CardContent>
+            </Card>
+
             {/* School Configuration Section */}
+
             <Card>
                 <CardHeader>
                     <div className="flex items-center justify-between">
