@@ -260,14 +260,14 @@ async function fetchChildHomework(schoolId, studentId) {
                     where: { studentId },
                     select: { status: true }
                 },
-                subject: { select: { name: true } }
+                subject: { select: { subjectName: true } }
             }
         });
 
         const mapped = homework.map(hw => ({
             id: hw.id,
             title: hw.title,
-            subject: hw.subject?.name,
+            subject: hw.subject?.subjectName,
             dueDate: hw.dueDate,
             status: hw.submissions?.[0]?.status || 'PENDING',
             createdAt: hw.createdAt

@@ -4,36 +4,17 @@ import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern
 
 export default function FinalCTA() {
     return (
-        <section className="relative py-16 md:py-24 px-4 overflow-hidden bg-gradient-to-br from-gray-50 via-slate-50 to-gray-100">
-            {/* Interactive Grid Pattern Background */}
-            <InteractiveGridPattern
-                className="absolute inset-0 opacity-15 [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,white_20%,transparent_80%)]"
-                width={40}
-                height={40}
-                squares={[30, 30]}
-            />
+        <section
+            className="relative bg-white! py-16 md:py-24 px-4 overflow-hidden"
+            style={{
+                backgroundImage: "url('/edb_footer.png')",
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat'
+            }}
+        >
 
-            {/* Subtle gradient overlays for depth */}
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/30 to-transparent pointer-events-none"></div>
 
-            {/* Images - Hidden on Mobile, Visible on Desktop */}
-            {/* Left Image - Child */}
-            <div className="absolute left-0 bottom-0 z-0 hidden lg:block xl:left-10 animate-in fade-in slide-in-from-left-10 duration-1000">
-                <img
-                    src="/child.png"
-                    alt="Student"
-                    className="w-[100px] lg:w-[180px] xl:w-[280px] h-auto object-contain"
-                />
-            </div>
-
-            {/* Right Image - School/Min */}
-            <div className="absolute right-0 bottom-0 z-0 hidden lg:block animate-in fade-in slide-in-from-right-10 duration-1000 delay-200">
-                <img
-                    src="/chil.png"
-                    alt="School Management"
-                    className="w-[250px] lg:w-[450px] xl:w-[390px] h-auto object-contain"
-                />
-            </div>
             <div className="max-w-4xl mx-auto text-center relative z-10">
                 {/* Badge */}
                 <div className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-full text-gray-700 text-sm font-medium mb-6 bxorder border-gray-200 shadow-sm">

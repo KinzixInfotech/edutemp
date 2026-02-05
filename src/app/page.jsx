@@ -91,9 +91,9 @@ export default function HomePage() {
             {/* <BentoSection /> */}
             {/* <TestimonialsSection /> */}
             {/* <div className='p-2'> */}
-            <div id="app">
+            {/* <div id="app">
                 <DownloadAppCTA />
-            </div>
+            </div> */}
             <ProductGuideAI />
             {/* </div> */}
             <FinalCTA />

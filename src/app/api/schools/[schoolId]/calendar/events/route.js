@@ -5,6 +5,7 @@
 import { google } from "googleapis";
 import prisma from "@/lib/prisma";
 import { remember, generateKey, invalidatePattern } from "@/lib/cache";
+import { notifyCalendarEventCreated } from "@/lib/notifications/notificationHelper";
 
 // GET: Fetch all events (Custom + Google Calendar)
 export async function GET(req, props) {
@@ -330,6 +331,26 @@ export async function POST(req, props) {
         }
 
         await invalidatePattern(`calendar:*${schoolId}*`);
+
+        // Send push notification to users about the new event
+        try {
+            await notifyCalendarEventCreated({
+                schoolId,
+                eventId: event.id,
+                title: event.title,
+                eventType: event.eventType,
+                startDate: event.startDate,
+                endDate: event.endDate,
+                isAllDay: event.isAllDay,
+                location: event.location,
+                targetAudience: event.targetAudience,
+                senderId: createdById,
+                color: event.color,
+            });
+        } catch (notifyError) {
+            console.error('Calendar Notification Error (non-fatal):', notifyError);
+            // Don't fail the request if notification fails
+        }
 
         return new Response(
             JSON.stringify({

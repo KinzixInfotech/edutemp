@@ -2118,3 +2118,174 @@ export async function processHPCAssessmentJob({
         throw error;
     }
 }
+
+/**
+ * Notify users when a new calendar event is created
+ * Targets based on event's targetAudience setting
+ */
+export async function notifyCalendarEventCreated({
+    schoolId,
+    eventId,
+    title,
+    eventType,
+    startDate,
+    endDate,
+    isAllDay,
+    location,
+    targetAudience = 'ALL',
+    senderId,
+    color
+}) {
+    const dateFormatted = new Date(startDate).toLocaleDateString('en-IN', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+    });
+
+    const eventTypeLabels = {
+        CUSTOM: 'Event',
+        HOLIDAY: '🎉 Holiday',
+        VACATION: '🏖️ Vacation',
+        EXAM: '📋 Exam',
+        SPORTS: '⚽ Sports Event',
+        MEETING: '👥 Meeting',
+        ADMISSION: '🎓 Admission',
+        FEE_DUE: '💰 Fee Reminder',
+        BIRTHDAY: '🎂 Birthday',
+    };
+
+    const typeLabel = eventTypeLabels[eventType] || 'Event';
+    const locationText = location ? ` at ${location}` : '';
+    const message = `${typeLabel}: "${title}" on ${dateFormatted}${locationText}`;
+
+    // Build target options based on audience
+    let targetOptions = {};
+
+    switch (targetAudience) {
+        case 'STUDENTS':
+            targetOptions = { userTypes: ['STUDENT'] };
+            break;
+        case 'TEACHERS':
+            targetOptions = { userTypes: ['TEACHER', 'TEACHING_STAFF'] };
+            break;
+        case 'PARENTS':
+            targetOptions = { userTypes: ['PARENT'] };
+            break;
+        case 'STAFF':
+            targetOptions = { userTypes: ['TEACHER', 'TEACHING_STAFF', 'ADMIN'] };
+            break;
+        case 'ALL':
+        default:
+            targetOptions = { allUsers: true };
+            break;
+    }
+
+    return sendNotification({
+        schoolId,
+        title: `📅 New ${typeLabel}`,
+        message,
+        type: 'GENERAL',
+        priority: eventType === 'EXAM' ? 'HIGH' : 'NORMAL',
+        icon: '📅',
+        targetOptions,
+        senderId,
+        metadata: {
+            eventId,
+            eventType,
+            startDate,
+            endDate,
+            isAllDay,
+            location,
+            color
+        },
+        actionUrl: '/calendar'
+    });
+}
+
+/**
+ * Notify users about calendar event reminder (1 day before / on the day)
+ */
+export async function notifyCalendarEventReminder({
+    schoolId,
+    eventId,
+    title,
+    eventType,
+    startDate,
+    location,
+    targetAudience = 'ALL',
+    reminderType = 'DAY_BEFORE' // 'DAY_BEFORE' | 'SAME_DAY'
+}) {
+    const eventDate = new Date(startDate);
+    const today = new Date();
+
+    const isToday = eventDate.toDateString() === today.toDateString();
+
+    const dateFormatted = eventDate.toLocaleDateString('en-IN', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short'
+    });
+
+    const eventTypeLabels = {
+        CUSTOM: 'Event',
+        HOLIDAY: 'Holiday',
+        VACATION: 'Vacation',
+        EXAM: 'Exam',
+        SPORTS: 'Sports',
+        MEETING: 'Meeting',
+    };
+
+    const typeLabel = eventTypeLabels[eventType] || 'Event';
+    const locationText = location ? ` at ${location}` : '';
+
+    let reminderTitle, reminderMessage;
+
+    if (isToday || reminderType === 'SAME_DAY') {
+        reminderTitle = `⏰ Today: ${title}`;
+        reminderMessage = `${typeLabel} happening today${locationText}. Don't forget!`;
+    } else {
+        reminderTitle = `🔔 Tomorrow: ${title}`;
+        reminderMessage = `${typeLabel} is tomorrow (${dateFormatted})${locationText}`;
+    }
+
+    // Build target options based on audience
+    let targetOptions = {};
+
+    switch (targetAudience) {
+        case 'STUDENTS':
+            targetOptions = { userTypes: ['STUDENT'] };
+            break;
+        case 'TEACHERS':
+            targetOptions = { userTypes: ['TEACHER', 'TEACHING_STAFF'] };
+            break;
+        case 'PARENTS':
+            targetOptions = { userTypes: ['PARENT'] };
+            break;
+        case 'STAFF':
+            targetOptions = { userTypes: ['TEACHER', 'TEACHING_STAFF', 'ADMIN'] };
+            break;
+        case 'ALL':
+        default:
+            targetOptions = { allUsers: true };
+            break;
+    }
+
+    return sendNotification({
+        schoolId,
+        title: reminderTitle,
+        message: reminderMessage,
+        type: 'GENERAL',
+        priority: isToday ? 'HIGH' : 'NORMAL',
+        icon: '📅',
+        targetOptions,
+        metadata: {
+            eventId,
+            eventType,
+            startDate,
+            location,
+            reminderType
+        },
+        actionUrl: '/calendar'
+    });
+}
