@@ -1707,7 +1707,7 @@ export default function ApplicationDetails() {
                                     return (
                                         <>
                                             {/* Horizontal Stepper Navigation */}
-                                            <Card>
+                                            <Card className="mb-6">
                                                 <CardContent className="p-4">
                                                     <Stepper.Navigation className="overflow-x-auto">
                                                         {methods.all.map((step) => (
@@ -1763,8 +1763,8 @@ export default function ApplicationDetails() {
                                             </Card>
 
                                             {/* Navigation & Actions */}
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex gap-2">
+                                            <div className="flex items-center justify-between pt-4 mt-4 border-t">
+                                                <div className="flex gap-3">
                                                     <Button
                                                         variant="outline"
                                                         onClick={methods.prev}
