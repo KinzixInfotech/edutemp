@@ -94,17 +94,22 @@ export function AcademicYearSetupBannerProvider({ children }) {
         let type = null;
         let show = false;
 
+        // Count total non-archived years to determine if this is a "transition" scenario
+        const totalYears = years.length;
+        const isFirstYearEver = totalYears === 1;
+
         if (mounted && isAdmin && !isLoading && active && fullUser?.school?.onboardingComplete) {
             if (yearsDiffer && status === "pre-start") {
                 // Active is a future year, Running is current → Config mode
                 type = "config-mode";
                 show = true;
-            } else if (status === "pre-start") {
-                // Active is pre-start but no running year
+            } else if (status === "pre-start" && !isFirstYearEver) {
+                // Active is pre-start but no running year (only show if not first year)
                 type = "pre-start";
                 show = true;
-            } else if (needsSetup) {
-                // Active needs setup
+            } else if (needsSetup && !isFirstYearEver) {
+                // Active needs setup - only show if this is NOT the first/only year
+                // First year setup is handled by onboarding, not this banner
                 type = "setup-needed";
                 show = true;
             }

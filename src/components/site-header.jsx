@@ -18,6 +18,7 @@ import { useState } from "react"
 import { useCommandMenu } from "./CommandMenuContext"
 import { SchoolDetailPopup } from "./school-detail-popup"
 import { RequestsDropdown } from "./requests-dropdown"
+import { AdminTodoWidget } from "./admin-todo-widget"
 export function SiteHeader({ fullUser }) {
     console.log(fullUser)
     const { setOpen } = useCommandMenu()
@@ -94,6 +95,11 @@ export function SiteHeader({ fullUser }) {
                     </Button>
 
                     <ModeToggle />
+
+                    {/* Admin Todo Widget - Only for ADMIN */}
+                    {fullUser?.role?.name?.toUpperCase() === "ADMIN" && (
+                        <AdminTodoWidget userId={fullUser?.id} />
+                    )}
 
                     {/* Requests Dropdown */}
                     <RequestsDropdown schoolId={fullUser?.school?.id} />

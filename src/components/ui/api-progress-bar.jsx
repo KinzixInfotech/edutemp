@@ -17,7 +17,7 @@ export function ApiProgressBar() {
 
   return (
     <div className="fixed top-0 left-0 right-0 z-[100] flex justify-center pointer-events-none">
-      <div className="h-1 bg-black animate-expand-center w-0 rounded-full shadow-[0_0_10px_q]" />
+      <div className="h-1 bg-black dark:bg-white! animate-expand-center w-0 rounded-full shadow-[0_0_10px_q]" />
       <style jsx global>{`
         @keyframes expand-center {
           0% {
