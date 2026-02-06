@@ -179,6 +179,7 @@ export default function RootLayout({ children }) {
 
       <html lang="en" suppressHydrationWarning={true}>
         <head>
+          <meta name="facebook-domain-verification" content="ztcrr8bo64h6o5wo2fk5vxtdf09ial" />
           {/* Google Tag Manager */}
           <script
             dangerouslySetInnerHTML={{
