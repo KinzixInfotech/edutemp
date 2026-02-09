@@ -66,7 +66,7 @@ const updateSchema = z.object({
 });
 
 // Pricing constants
-const PRICE_PER_UNIT = 10500;
+const PRICE_PER_UNIT = 12000; // ₹12,000 per 100 students / year
 const STUDENTS_PER_UNIT = 100;
 const SOFT_BUFFER_PERCENT = 5;
 

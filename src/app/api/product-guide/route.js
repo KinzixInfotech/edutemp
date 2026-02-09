@@ -99,36 +99,30 @@ function calculatePricing(question) {
     const numbers = question.match(/\d+/g);
     const studentCount = numbers ? parseInt(numbers[0]) : 100;
 
-    const PRICE_PER_100_STUDENTS = 10500;
-    const ORIGINAL_PRICE_PER_100 = 15000;
+    const PRICE_PER_100_STUDENTS = 12000;
     const units = Math.ceil(studentCount / 100);
-    const yearlyPrice = units * PRICE_PER_100_STUDENTS
-    const originalPrice = units * ORIGINAL_PRICE_PER_100;
-    const savings = originalPrice - yearlyPrice;
-    const perStudentYearly = 105;
-    const perStudentMonthly = (perStudentYearly / 12).toFixed(2);
+    const yearlyPrice = units * PRICE_PER_100_STUDENTS;
+    const perStudentYearly = 120;
+    const perStudentMonthly = 10;
     const monthlyTotal = Math.round(yearlyPrice / 12);
 
     return {
         studentCount,
         units,
         yearlyPrice,
-        originalPrice,
-        savings,
         perStudentYearly,
         perStudentMonthly,
         monthlyTotal
     };
 }
 
-// Generate pricing response
+// Generate pricing response - Clean & Transparent
 function generatePricingResponse(pricing) {
     return `Great question! 🎉 Let me break down the pricing for **${pricing.studentCount} students**:
 
 📊 **Your Pricing Summary:**
-• **Total Yearly Cost:** ₹${pricing.yearlyPrice.toLocaleString('en-IN')} 
-• **Original Price:** ~~₹${pricing.originalPrice.toLocaleString('en-IN')}~~ (30% OFF applied! 🔥)
-• **You Save:** ₹${pricing.savings.toLocaleString('en-IN')} per year!
+• **Total Yearly Cost:** ₹${pricing.yearlyPrice.toLocaleString('en-IN')}
+• **Monthly Equivalent:** ₹${pricing.monthlyTotal.toLocaleString('en-IN')}/month (billed yearly)
 
 💡 **Per Student Breakdown:**
 • **Per Student/Year:** ₹${pricing.perStudentYearly}
@@ -136,7 +130,7 @@ function generatePricingResponse(pricing) {
 
 📦 **How it works:**
 You need ${pricing.units} unit${pricing.units > 1 ? 's' : ''} (1 unit = 100 students)
-${pricing.units} × ₹10,500 = ₹${pricing.yearlyPrice.toLocaleString('en-IN')}/year
+${pricing.units} × ₹12,000 = ₹${pricing.yearlyPrice.toLocaleString('en-IN')}/year
 
 ✨ That's less than the cost of a samosa per student per month! 🥟
 

@@ -1604,12 +1604,6 @@ function PricingSection() {
                                 30% OFF - Limited Time
                             </span>
 
-                            {/* Original Price - Strikethrough */}
-                            <div className="mb-2">
-                                <span className="text-white/60 line-through text-xl">₹17,143</span>
-                                <span className="text-white/60 text-sm ml-2">per 100 students / year</span>
-                            </div>
-
                             {/* Main Price */}
                             <div className="mb-8">
                                 <div className="flex items-baseline gap-3">
