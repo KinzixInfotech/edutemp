@@ -1606,14 +1606,14 @@ function PricingSection() {
 
                             {/* Original Price - Strikethrough */}
                             <div className="mb-2">
-                                <span className="text-white/60 line-through text-xl">₹15,000</span>
+                                <span className="text-white/60 line-through text-xl">₹17,143</span>
                                 <span className="text-white/60 text-sm ml-2">per 100 students / year</span>
                             </div>
 
                             {/* Main Price */}
                             <div className="mb-8">
                                 <div className="flex items-baseline gap-3">
-                                    <span className="text-6xl md:text-7xl font-black text-white">₹105</span>
+                                    <span className="text-6xl md:text-7xl font-black text-white">₹120</span>
                                     <div className="flex flex-col">
                                         <span className="text-white/90 text-lg font-semibold">per student</span>
                                         <span className="text-white/60 text-sm">per year</span>
@@ -1621,7 +1621,7 @@ function PricingSection() {
                                 </div>
                                 <p className="text-white text-base font-semibold mt-4 flex items-center gap-2">
                                     <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
-                                    Only ₹8.75 per month, billed yearly
+                                    Only ₹10 per month, billed yearly
                                 </p>
                             </div>
 

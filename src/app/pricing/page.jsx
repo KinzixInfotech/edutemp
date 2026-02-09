@@ -15,14 +15,14 @@ export default function PricingCalculatorPage() {
     const [inputValue, setInputValue] = useState('100');
 
     // Pricing calculation
-    const PRICE_PER_100_STUDENTS = 10500;
-    const ORIGINAL_PRICE_PER_100 = 15000; // Before 30% discount
+    const PRICE_PER_100_STUDENTS = 12000;
+    const ORIGINAL_PRICE_PER_100 = 17143; // Before 30% discount
     const units = Math.ceil(students / 100);
     const yearlyPrice = units * PRICE_PER_100_STUDENTS;
     const originalYearlyPrice = units * ORIGINAL_PRICE_PER_100;
     const savings = originalYearlyPrice - yearlyPrice;
-    const perStudentYearly = 105;
-    const perStudentMonthly = perStudentYearly / 12; // ₹8.75
+    const perStudentYearly = 120;
+    const perStudentMonthly = perStudentYearly / 12; // ₹10
     const monthlyEquivalent = Math.round(yearlyPrice / 12);
 
     // Handle input change - max 100,000 students (realistic limit)
@@ -205,7 +205,7 @@ export default function PricingCalculatorPage() {
                                     {/* Fun Comparison */}
                                     <div className="bg-gradient-to-br lg:block hidden from-amber-50 to-orange-50 rounded-xl p-5 border border-amber-200">
                                         <p className="text-center text-slate-700 font-medium mb-3">
-                                            💡 ₹8.75/month per child is...
+                                            💡 ₹10/month per child is...
                                         </p>
                                         <div className="flex flex-wrap justify-center gap-2">
                                             {[
@@ -302,7 +302,7 @@ export default function PricingCalculatorPage() {
                                                     {perStudentMonthly.toFixed(2)}
                                                 </span>
                                             </div>
-                                            <p className="text-xs text-green-600 font-medium mt-1">Only ₹8.75/month!</p>
+                                            <p className="text-xs text-green-600 font-medium mt-1">Only ₹10/month!</p>
                                         </div>
 
                                         {/* Monthly Equivalent */}
@@ -346,7 +346,7 @@ export default function PricingCalculatorPage() {
                                     <div className="bg-white rounded-xl p-4 border border-slate-100 mb-6">
                                         <div className="flex items-center justify-between text-sm">
                                             <span className="text-slate-600">
-                                                {units} unit{units > 1 ? 's' : ''} × ₹10,500
+                                                {units} unit{units > 1 ? 's' : ''} × ₹12,000
                                             </span>
                                             <span className="font-bold text-[#1a1a2e]">
                                                 = ₹{yearlyPrice.toLocaleString('en-IN')}

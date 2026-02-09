@@ -25,8 +25,8 @@ import { CalendarIcon, Calculator, Users, IndianRupee, AlertCircle, Sparkles } f
 import { cn } from '@/lib/utils';
 
 // Pricing constants
-const PRICE_PER_UNIT = 10500; // ₹10,500 per 100 students / year
-const BASE_PRICE_PER_UNIT = 15000; // ₹15,000 before discount
+const PRICE_PER_UNIT = 12000; // ₹12,000 per 100 students / year
+const BASE_PRICE_PER_UNIT = 17143; // ₹17,143 before discount
 const STUDENTS_PER_UNIT = 100;
 const SOFT_BUFFER_PERCENT = 5; // 5% buffer
 
@@ -131,8 +131,8 @@ export default function Step5ERPPlan({ data, updateFormData, nextStep }) {
                             <p className="text-xs text-muted-foreground">Early Access Discount Applied (30% off)</p>
                         </div>
                         <div className="text-right">
-                            <p className="text-lg font-bold text-green-600">₹10,500</p>
-                            <p className="text-xs text-muted-foreground line-through">₹15,000</p>
+                            <p className="text-lg font-bold text-green-600">₹12,000</p>
+                            <p className="text-xs text-muted-foreground line-through">₹17,143</p>
                             <p className="text-xs text-muted-foreground">per 100 students / year</p>
                         </div>
                     </div>

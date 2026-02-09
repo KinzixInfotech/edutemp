@@ -170,8 +170,8 @@ export async function getSubscriptionUsage(schoolId) {
  * Pricing constants for external use
  */
 export const PRICING = {
-    PRICE_PER_UNIT: 10500, // ₹10,500 per 100 students / year
-    BASE_PRICE_PER_UNIT: 15000, // ₹15,000 before discount
+    PRICE_PER_UNIT: 12000, // ₹12,000 per 100 students / year
+    BASE_PRICE_PER_UNIT: 17143, // ₹17,143 before discount
     STUDENTS_PER_UNIT: 100,
     SOFT_BUFFER_PERCENT: 5,
     DISCOUNT_PERCENT: 30,
