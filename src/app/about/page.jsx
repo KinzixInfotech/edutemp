@@ -204,13 +204,12 @@ export default function AboutPage() {
               variants={fadeInLeft}
               className="relative"
             >
-              <div className="relative rounded-3xl overflow-hidden ">
+              <div className="relative rounded-3xl overflow-hidden max-w-lg mx-auto md:max-w-none">
                 <img
-                  src="./bulb.png"
+                  src="./bulb_1.png"
                   alt="Modern EduBreezy Dashboard Interface"
-                  className="w-full h-[400px] object-cover"
+                  className="w-full h-auto max-h-[500px] object-contain"
                 />
-                <div className="absolute inset-0 " />
               </div>
             </motion.div>
 
@@ -292,11 +291,11 @@ export default function AboutPage() {
               variants={fadeInRight}
               className="relative order-1 md:order-2"
             >
-              <div className="relative rounded-3xl overflow-hiddenl">
+              <div className="relative rounded-3xl overflow-hidden max-w-lg mx-auto md:max-w-none">
                 <img
-                  src="./schl.png"
+                  src="./gbh.png"
                   alt="Teacher with students"
-                  className="w-full h-[400px] scale-120 lg:scale-150 object-cover"
+                  className="w-full h-auto max-h-[500px] object-contain"
                 />
               </div>
               {/* Floating Card */}
