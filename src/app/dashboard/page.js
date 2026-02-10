@@ -115,17 +115,7 @@ const LatestNotice = ({ fullUser, queryClient }) => {
     const data = await res.json();
     return data.notices[0] || null;
   };
-  // Prefetch the notice on page load
-  useEffect(() => {
-    if (fullUser) {
-      queryClient.prefetchQuery({
-        queryKey: ['latestNotice', { userId: fullUser.id, schoolId: fullUser.schoolId }],
-        queryFn: fetchLatestNotice
-      });
-    }
-  }, [fullUser?.schoolId, queryClient]);
-
-  // Use the query to access data
+  // Use the query to access data (no need for separate prefetch - useQuery handles it)
   const { data: latestNotice, isLoading, error } = useQuery({
     queryKey: ['latestNotice', { userId: fullUser.id, schoolId: fullUser.schoolId }],
     queryFn: fetchLatestNotice,
@@ -320,8 +310,7 @@ export default function Dashboard() {
       return res.json();
     },
     enabled: fullUser?.role?.name === 'ADMIN' && !!fullUser?.schoolId && !!activeAcademicYear?.id,
-    staleTime: 1000 * 60, // 1 minute
-    refetchInterval: 60000, // Refresh every minute
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
   // Use setup status from consolidated API (default to true to avoid false warnings while loading)
@@ -357,17 +346,6 @@ export default function Dashboard() {
     adminNonTeacherStatsQuery,
   ]);
 
-  useEffect(() => {
-    if (!fullUser) return;
-
-    if (fullUser.role.name === 'SUPER_ADMIN') {
-      queryClient.prefetchQuery({ queryKey: ['schoolTrend'], queryFn: fetchSchoolTrend });
-      queryClient.prefetchQuery({ queryKey: ['activeAccounts'], queryFn: fetchActiveAccounts });
-    } else if (fullUser.role.name === 'ADMIN') {
-      queryClient.prefetchQuery({ queryKey: ['adminTeacherStats', fullUser.schoolId], queryFn: () => fetchAdminStatsTeacher(fullUser.schoolId) });
-      queryClient.prefetchQuery({ queryKey: ['adminNonTeacherStats', fullUser.schoolId], queryFn: () => fetchAdminStatsNonTeacher(fullUser.schoolId) });
-    }
-  }, [fullUser, queryClient]);
 
 
   const events = [
