@@ -11,7 +11,8 @@ import {
     Pencil, BookMarked, Ruler, Calculator, Highlighter as HighlighterIcon, School,
     Home, Bus, Smartphone, MapPin, Plane, Globe, MessageCircle, Laptop, Wifi,
     UserPlus, Building2, MessageSquare, Sparkles, Library, Award, Trophy,
-    Microscope, Clipboard, Bell, Zap, ClipboardCheck, FileCheck, Handshake, Heart
+    Microscope, Clipboard, Bell, Zap, ClipboardCheck, FileCheck, Handshake, Heart,
+    FileSpreadsheet, Wallet
 } from 'lucide-react';
 import Header from './components/Header';
 import { DotPattern } from '@/components/ui/dot-pattern';
@@ -76,9 +77,7 @@ export default function HomePage() {
             <AttendanceSection />
             <HPCSection />
             <FeaturesSection />
-            <HowWeWorkSection />
-
-            <WhyEduBreezySection />
+            <IntegrationsSection />
 
             {/* AI Product Guide - Ask questions about EduBreezy */}
 
@@ -798,104 +797,7 @@ function HPCSection() {
     );
 }
 // Why EduBreezy Section
-function WhyEduBreezySection() {
-    const [showAll, setShowAll] = useState(false);
 
-    const apps = [
-        {
-            icon: Award,
-            title: "Director Login",
-            desc: "High-level oversight & analytics",
-            color: "#14B8A6"
-        },
-        {
-            icon: Trophy,
-            title: "Principal Login",
-            desc: "School operations & staff management",
-            color: "#F97316"
-        },
-        {
-            icon: Home,
-            title: "Admin Login",
-            desc: "Complete dashboard with AI-powered insights",
-            color: "#0569ff"
-        },
-        {
-            icon: CreditCard,
-            title: "Accountant Login",
-            desc: "Handle fees, payroll & finances",
-            color: "#0EA5E9"
-        },
-        {
-            icon: BookOpen,
-            title: "Student Login",
-            desc: "Access assignments, results & schedules",
-            color: "#EC4899"
-        },
-        {
-            icon: Users,
-            title: "Parent Login",
-            desc: "Track your child's progress easily",
-            color: "#8B5CF6"
-        },
-        {
-            icon: GraduationCap,
-            title: "Teacher Login",
-            desc: "Manage classes, attendance & grades",
-            color: "#10B981"
-        },
-    ];
-
-    const visibleApps = showAll ? apps : apps.slice(0, 6);
-
-    return (
-        <section className="py-20 md:py-28 px-5 bg-[#f5f7fa]">
-            <div className="max-w-[1200px] mx-auto">
-                {/* Section Header */}
-                <SectionHeading
-                    badge="ROLE-BASED ACCESS"
-                    title="One Platform,"
-                    highlightedText="Multiple Logins"
-                    description="Tailored dashboards for every stakeholder. From directors to students, everyone gets exactly what they need."
-                />
-
-                {/* Apps Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                    {visibleApps.map((app, index) => (
-                        <div
-                            key={index}
-                            className="bg-white rounded-2xl p-6 border border-slate-100 hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300 group cursor-pointer hover:-translate-y-1"
-                        >
-                            <div
-                                className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110"
-                                style={{ backgroundColor: `${app.color}15` }}
-                            >
-                                <app.icon className="w-6 h-6" style={{ color: app.color }} />
-                            </div>
-                            <h3 className="text-lg font-bold text-[#1a1a2e] mb-1 group-hover:text-[#0569ff] transition-colors">
-                                {app.title}
-                            </h3>
-                            <p className="text-slate-500 text-sm">{app.desc}</p>
-                        </div>
-                    ))}
-                </div>
-
-                {/* Show More Button */}
-                {apps.length > 6 && (
-                    <div className="text-center mt-8">
-                        <button
-                            onClick={() => setShowAll(!showAll)}
-                            className="inline-flex items-center gap-2 px-6 py-3 text-[#0569ff] font-semibold hover:bg-[#0569ff]/5 rounded-full transition-colors"
-                        >
-                            {showAll ? 'Show Less' : 'Show More'}
-                            <ChevronDown className={`w-5 h-5 transition-transform ${showAll ? 'rotate-180' : ''}`} />
-                        </button>
-                    </div>
-                )}
-            </div>
-        </section>
-    );
-}
 
 // Communicating Seamlessly Section with Orbiting Circles
 function CommunicatingSeamlesslySection() {
@@ -1097,84 +999,252 @@ function TrustedSection() {
 
 }
 
-// Features Grid Section
+// Features Section — Apple-Style Horizontal Scroll
 function FeaturesSection() {
-    const features = [
-        {
-            icon: UserPlus,
-            title: "Student Admission",
-            desc: "Complete digital onboarding pipeline for new enrollments.",
-            color: "#0569ff"
-        },
-        {
-            icon: CreditCard,
-            title: "Fees Collection",
-            desc: "Automated invoicing with multiple secure payment gateways.",
-            color: "#10B981"
-        },
-        {
-            icon: ClipboardCheck,
-            title: "Student Attendance",
-            desc: "Real-time tracking with instant notifications to parents.",
-            color: "#8B5CF6"
-        },
-        {
-            icon: FileCheck,
-            title: "Examinations",
-            desc: "Efficient grading systems and automated report generation.",
-            color: "#EC4899"
-        },
-        {
-            icon: BookOpen,
-            title: "Academics",
-            desc: "Smart timetable planning and lesson management tools.",
-            color: "#F59E0B"
-        },
-        {
-            icon: MessageSquare,
-            title: "Communication",
-            desc: "Seamless connectivity between teachers, students & parents.",
-            color: "#14B8A6"
-        }
+    const scrollRef = useRef(null);
+    const [canScrollLeft, setCanScrollLeft] = useState(false);
+    const [canScrollRight, setCanScrollRight] = useState(true);
+
+    const modules = [
+        { icon: UserPlus, title: "Admission Management", desc: "Complete digital onboarding, forms, applications, and enrollment tracking.", color: "#0469ff" },
+        { icon: CreditCard, title: "Fee Management", desc: "Automated invoicing, multiple payment gateways, and fee structure management.", color: "#10B981" },
+        { icon: ClipboardCheck, title: "Attendance System", desc: "Biometric integration, real-time tracking with instant parent notifications.", color: "#F59E0B" },
+        { icon: FileCheck, title: "Examination & Results", desc: "Exam creation, marks entry, hall tickets, online results & statistics.", color: "#8B5CF6" },
+        { icon: Calendar, title: "Timetable Management", desc: "Smart timetable creation, time slots, teacher shifts & scheduling.", color: "#EC4899" },
+        { icon: BookOpen, title: "Subject Management", desc: "Subject creation, assignment to classes, and subject-wise statistics.", color: "#0469ff" },
+        { icon: Users, title: "Staff Management", desc: "Manage teaching & non-teaching staff, roles, profiles & assignments.", color: "#F97316" },
+        { icon: GraduationCap, title: "Student Management", desc: "Student records, promotion, parent management & academic year control.", color: "#10B981" },
+        { icon: Bus, title: "Transport Management", desc: "Fleet tracking, route management, live GPS, drivers & student assignment.", color: "#8B5CF6" },
+        { icon: Library, title: "Library Management", desc: "Book catalog, issue & return, requests, fines & reading reports.", color: "#EC4899" },
+        { icon: Clipboard, title: "Holistic Progress Card", desc: "NEP 2020 compliant 360° assessment — academics, SEL & co-curricular.", color: "#0469ff" },
+        { icon: Award, title: "Documents & Certificates", desc: "Character, bonafide, TC, ID cards, admit cards & bulk generation.", color: "#F59E0B" },
+        { icon: MessageSquare, title: "SMS Module", desc: "Templates, bulk SMS, wallet & credits, logs, and auto-triggers.", color: "#F97316" },
+        { icon: Globe, title: "School Explorer", desc: "Public profile, admission inquiries, reviews, analytics & gallery.", color: "#8B5CF6" },
+        { icon: Smartphone, title: "Mobile App", desc: "Full-featured app for parents, students & teachers on iOS & Android.", color: "#10B981" },
+        { icon: BarChart3, title: "Reports & Analytics", desc: "Real-time dashboards, attendance reports, fee reports & audit logs.", color: "#EC4899" },
+        { icon: BookMarked, title: "Homework & Syllabus", desc: "Homework assignment, syllabus management & academic content tracking.", color: "#0469ff" },
+        { icon: FileText, title: "Notice & Circulars", desc: "Create, send & manage notices and circulars to all stakeholders.", color: "#F59E0B" },
+        { icon: Wallet, title: "Payroll Management", desc: "Salary structures, payroll processing, payslips, loans & HR reports.", color: "#8B5CF6" },
+        { icon: Building2, title: "Inventory Management", desc: "Track school inventory, assets, and procurement requirements.", color: "#F97316" },
+        { icon: FileSpreadsheet, title: "Form Builder", desc: "Custom form creation for data collection and surveys.", color: "#10B981" },
+        { icon: Sparkles, title: "AI-Powered Insights", desc: "Smart analytics, predictive reports, and AI-driven recommendations.", color: "#EC4899" },
+        { icon: Laptop, title: "Website Builder", desc: "Manage your school website, carousel, gallery & public pages.", color: "#0469ff" },
+        { icon: TrendingUp, title: "Alumni Management", desc: "Track alumni network, achievements & stay connected with graduates.", color: "#F59E0B" },
+    ];
+
+
+    const [activeGroup, setActiveGroup] = useState(0);
+    const cardsPerGroup = 4;
+    const totalGroups = Math.ceil(modules.length / cardsPerGroup);
+
+    const checkScroll = () => {
+        const el = scrollRef.current;
+        if (!el) return;
+        setCanScrollLeft(el.scrollLeft > 5);
+        setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 10);
+        // Track active dot
+        const cardW = 316; // card width + gap
+        const group = Math.round(el.scrollLeft / (cardW * cardsPerGroup));
+        setActiveGroup(Math.min(group, totalGroups - 1));
+    };
+
+    const scroll = (dir) => {
+        const el = scrollRef.current;
+        if (!el) return;
+        const cardW = 316;
+        el.scrollBy({ left: dir === 'left' ? -cardW * 2 : cardW * 2, behavior: 'smooth' });
+    };
+
+    const scrollToGroup = (groupIndex) => {
+        const el = scrollRef.current;
+        if (!el) return;
+        const cardW = 316;
+        el.scrollTo({ left: groupIndex * cardW * cardsPerGroup, behavior: 'smooth' });
+    };
+
+    useEffect(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+        el.addEventListener('scroll', checkScroll, { passive: true });
+        checkScroll();
+        return () => el.removeEventListener('scroll', checkScroll);
+    }, []);
+
+    return (
+        <section className="relative py-16 md:py-24 overflow-hidden bg-black" id="features">
+
+            <div className="max-w-[1400px] mx-auto px-6 relative z-10">
+
+                {/* Header Row */}
+                <div className="flex items-end justify-between mb-10">
+                    <div>
+                        <h2 className="text-2xl md:text-[2.5rem] font-black leading-tight text-white tracking-tight">
+                            All-in-one modules for your school.
+                        </h2>
+                        <p className="text-sm md:text-base text-white/40 mt-2 font-medium">
+                            {modules.length}+ modules to automate every aspect of school management.
+                        </p>
+                    </div>
+                    <Link href="/features" className="hidden md:inline-flex items-center gap-1 text-[#0469ff] text-sm font-semibold hover:underline whitespace-nowrap">
+                        Explore all <ArrowRight size={14} />
+                    </Link>
+                </div>
+
+                {/* Scrollable Cards Strip */}
+                <div className="relative group/strip">
+                    {/* Left Arrow — desktop only, on hover */}
+                    {canScrollLeft && (
+                        <button
+                            onClick={() => scroll('left')}
+                            className="hidden md:flex absolute -left-5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-white/10 backdrop-blur-md rounded-full border border-white/10 items-center justify-center text-white hover:bg-white/20 transition-all opacity-0 group-hover/strip:opacity-100"
+                            aria-label="Scroll left"
+                        >
+                            <ChevronDown className="w-5 h-5 rotate-90" />
+                        </button>
+                    )}
+
+                    {/* Right Arrow — desktop only, on hover */}
+                    {canScrollRight && (
+                        <button
+                            onClick={() => scroll('right')}
+                            className="hidden md:flex absolute -right-5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-white/10 backdrop-blur-md rounded-full border border-white/10 items-center justify-center text-white hover:bg-white/20 transition-all opacity-0 group-hover/strip:opacity-100"
+                            aria-label="Scroll right"
+                        >
+                            <ChevronDown className="w-5 h-5 -rotate-90" />
+                        </button>
+                    )}
+
+                    {/* Cards Container */}
+                    <div
+                        ref={scrollRef}
+                        className="features-scroll flex gap-4 overflow-x-auto pb-2 scroll-smooth"
+                        style={{
+                            scrollSnapType: 'x mandatory',
+                            scrollbarWidth: 'none',
+                            msOverflowStyle: 'none',
+                            WebkitOverflowScrolling: 'touch',
+                        }}
+                    >
+                        <style>{`
+                            .features-scroll::-webkit-scrollbar { display: none; }
+                        `}</style>
+
+                        {modules.map((mod, i) => {
+                            const IconComp = mod.icon;
+                            return (
+                                <div
+                                    key={i}
+                                    className="flex-shrink-0 w-[260px] md:w-[320px] bg-[#111111] rounded-2xl md:rounded-3xl p-5 md:p-7 cursor-pointer transition-all duration-300 hover:-translate-y-1.5 hover:bg-[#1a1a1a] relative overflow-hidden group border border-white/[0.06]"
+                                    style={{ scrollSnapAlign: 'start' }}
+                                >
+
+                                    {/* Icon */}
+                                    <div
+                                        className="w-11 h-11 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center mb-4 md:mb-5 transition-transform duration-300 group-hover:scale-110"
+                                        style={{ backgroundColor: `${mod.color}18` }}
+                                    >
+                                        <IconComp size={22} style={{ color: mod.color }} strokeWidth={1.8} />
+                                    </div>
+
+                                    {/* Title */}
+                                    <h3 className="text-white text-sm md:text-base font-bold mb-2 leading-snug">
+                                        {mod.title}
+                                    </h3>
+
+                                    {/* Description */}
+                                    <p className="text-white/40 text-xs md:text-sm leading-relaxed mb-5">
+                                        {mod.desc}
+                                    </p>
+
+                                    {/* Learn More */}
+                                    <Link href="/features" className="flex items-center gap-1 text-xs md:text-sm font-semibold transition-all group-hover:gap-2" style={{ color: mod.color }}>
+                                        Learn More <ArrowRight size={13} />
+                                    </Link>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Scroll Fade Edges */}
+                    <div className="absolute top-0 right-0 w-6 h-full bg-gradient-to-l from-black to-transparent pointer-events-none z-10" />
+                </div>
+
+                {/* Bottom scroll indicator dots — WORKING */}
+                <div className="flex justify-center mt-6 gap-2">
+                    {Array.from({ length: totalGroups }).map((_, i) => (
+                        <button
+                            key={i}
+                            onClick={() => scrollToGroup(i)}
+                            className={`h-2 rounded-full transition-all duration-300 ${i === activeGroup ? 'bg-[#0469ff] w-6' : 'bg-white/20 w-2 hover:bg-white/40'}`}
+                            aria-label={`Go to group ${i + 1}`}
+                        />
+                    ))}
+                </div>
+            </div>
+        </section>
+    );
+}
+
+// Integrations & Capabilities Section — Standalone with distinct background
+function IntegrationsSection() {
+    const integrations = [
+        { icon: Smartphone, title: "Biometric Devices", desc: "Fingerprint & face recognition for attendance" },
+        { icon: MapPin, title: "GPS & Location", desc: "Live bus tracking & geofencing" },
+        { icon: CreditCard, title: "Payment Gateway", desc: "Razorpay, Paytm & UPI integration" },
+        { icon: Laptop, title: "Online Classes", desc: "Zoom & Google Meet integration" },
+        { icon: MessageSquare, title: "SMS & WhatsApp", desc: "Automated alerts & bulk messaging" },
+        { icon: Bell, title: "Push Notifications", desc: "Mobile & web push notifications" },
+        { icon: Globe, title: "Website Builder", desc: "Custom school website & SEO" },
+        { icon: FileText, title: "Document Generation", desc: "Auto-generate certificates & reports" },
     ];
 
     return (
-        <section className="py-24 md:py-32 px-5 bg-white" id="features">
-            <div className="max-w-[1200px] mx-auto">
-                {/* Section Header */}
-                <SectionHeading
-                    badge="PLATFORM MODULES"
-                    title="Powerful Features For"
-                    highlightedText="Modern Schools"
-                    description="Everything you need to manage admissions, academics, attendance, fees, and more — all in one platform."
-                />
+        <section className="relative py-24 md:py-32 px-5 overflow-hidden bg-[#f0f4f8]">
+            {/* Subtle grid pattern */}
+            <div className="absolute inset-0 opacity-[0.4]"
+                style={{
+                    backgroundImage: `
+                        linear-gradient(rgba(4,107,255,0.06) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(4,107,255,0.06) 1px, transparent 1px)
+                    `,
+                    backgroundSize: '40px 40px',
+                }}
+            />
 
-                {/* Features Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
-                    {features.map((feature, index) => {
-                        const IconComponent = feature.icon;
+            {/* Soft gradient blobs */}
+            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#046bff]/5 rounded-full blur-[150px]" />
+            <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-[#10B981]/5 rounded-full blur-[120px]" />
+
+            <div className="max-w-[1200px] mx-auto relative z-10">
+                {/* Header */}
+                <div className="text-center mb-12 md:mb-16">
+                    <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs md:text-sm font-bold uppercase tracking-wider mb-5 bg-[#046bff]/10 text-[#046bff] border border-[#046bff]/20">
+                        <span className="w-2 h-2 rounded-full bg-[#046bff] animate-pulse" />
+                        Integrations & More
+                    </span>
+                    <h2 className="text-4xl md:text-5xl lg:text-6xl font-black leading-[1.1] mb-5 text-[#1a1a2e]">
+                        Seamlessly Connects{' '}
+                        <br className="hidden md:block" />
+                        With <span className="text-[#046bff]">Everything</span>
+                    </h2>
+                    <p className="text-base md:text-lg text-gray-500 font-medium max-w-3xl mx-auto leading-relaxed">
+                        20+ integrations that enhance the capability and functionality of EduBreezy — from biometric devices to payment gateways.
+                    </p>
+                </div>
+                {/* Integration Cards Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5 mb-12">
+                    {integrations.map((item, i) => {
+                        const IconComp = item.icon;
                         return (
-                            <div
-                                key={index}
-                                className="group bg-[#f8fafc] p-8 rounded-2xl border border-slate-200 transition-all duration-300 hover:bg-white hover:shadow-lg hover:border-slate-300 hover:-translate-y-1"
-                            >
-                                {/* Icon */}
-                                <div
-                                    className="w-14 h-14 rounded-xl flex items-center justify-center mb-5 transition-transform duration-300 group-hover:scale-110"
-                                    style={{ backgroundColor: `${feature.color}15` }}
-                                >
-                                    <IconComponent
-                                        size={26}
-                                        style={{ color: feature.color }}
-                                        strokeWidth={1.5}
-                                    />
+                            <div key={i} className="group bg-white rounded-2xl p-6 border border-slate-100 hover:shadow-xl hover:shadow-[#046bff]/5 hover:-translate-y-1 transition-all duration-300 cursor-pointer">
+                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#046bff]/10 to-[#046bff]/5 flex items-center justify-center mb-4 group-hover:from-[#046bff] group-hover:to-[#0358dd] transition-all duration-300">
+                                    <IconComp size={22} className="text-[#046bff] group-hover:text-white transition-colors" strokeWidth={1.8} />
                                 </div>
-
-                                <h3 className="text-[#1a1a2e] text-lg font-bold mb-2">
-                                    {feature.title}
+                                <h3 className="text-[#1a1a2e] text-base font-bold mb-1">
+                                    {item.title}
                                 </h3>
-                                <p className="text-slate-500 text-sm leading-relaxed">
-                                    {feature.desc}
+                                <p className="text-gray-400 text-sm leading-relaxed">
+                                    {item.desc}
                                 </p>
                             </div>
                         );
@@ -1184,131 +1254,14 @@ function FeaturesSection() {
                 {/* CTA */}
                 <div className="text-center">
                     <Link href="/features">
-                        <button className="inline-flex items-center gap-3 px-8 py-4 bg-[#0569ff] text-white font-bold rounded-full hover:bg-[#0358dd] transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
-                            Explore All Features
-                            <ArrowRight size={20} />
+                        <button className="inline-flex items-center gap-2 px-8 py-4 bg-[#046bff] text-white font-bold rounded-full hover:bg-[#0358dd] transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
+                            Explore All Integrations
+                            <ArrowRight size={18} />
                         </button>
                     </Link>
-                    <p className="mt-6 text-xs text-slate-400 uppercase tracking-widest">
+                    <p className="mt-5 text-xs text-gray-400 uppercase tracking-widest">
                         Trusted by 2000+ Schools
                     </p>
-                </div>
-            </div>
-        </section>
-    );
-}
-
-// How We Make Your School Smarter Section
-function HowWeWorkSection() {
-    const steps = [
-        {
-            icon: Laptop,
-            title: "Easy Onboarding",
-            desc: "Get started in minutes with our guided setup. Import your data seamlessly.",
-            color: "#0569ff"
-        },
-        {
-            icon: Users,
-            title: "Connect Everyone",
-            desc: "Link students, parents, teachers, and staff on one unified platform.",
-            color: "#10B981"
-        },
-        {
-            icon: BarChart3,
-            title: "Automate Operations",
-            desc: "From attendance to fees, automate repetitive tasks and save hours.",
-            color: "#F59E0B"
-        },
-        {
-            icon: FileText,
-            title: "Generate Reports",
-            desc: "Get comprehensive analytics and make data-driven decisions.",
-            color: "#8B5CF6"
-        },
-        {
-            icon: Smartphone,
-            title: "Mobile Access",
-            desc: "Access everything on-the-go with our mobile apps for all users.",
-            color: "#EC4899"
-        },
-        {
-            icon: TrendingUp,
-            title: "Grow & Scale",
-            desc: "Expand to multiple branches and scale without limits.",
-            color: "#14B8A6"
-        }
-    ];
-
-    return (
-        <section className="py-24 md:py-32 px-5 bg-[#f8fafc]">
-            <div className="max-w-[1200px] mx-auto">
-                {/* Section Header */}
-                <SectionHeading
-                    badge="HOW IT WORKS"
-                    title="Make Your School"
-                    highlightedText="Smarter"
-                    description="A simple, step-by-step approach to transform your school management."
-                />
-
-                {/* Steps Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
-                    {steps.map((step, index) => {
-                        const IconComponent = step.icon;
-                        return (
-                            <div
-                                key={index}
-                                className="group bg-white p-8 rounded-2xl border border-slate-200 transition-all duration-300 hover:shadow-lg hover:border-slate-300 hover:-translate-y-1"
-                            >
-                                {/* Step Number + Icon */}
-                                <div className="flex items-center gap-4 mb-5">
-                                    <div
-                                        className="w-14 h-14 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
-                                        style={{ backgroundColor: `${step.color}15` }}
-                                    >
-                                        <IconComponent
-                                            size={26}
-                                            style={{ color: step.color }}
-                                            strokeWidth={1.5}
-                                        />
-                                    </div>
-                                    <span
-                                        className="text-3xl font-bold"
-                                        style={{ color: `${step.color}30` }}
-                                    >
-                                        0{index + 1}
-                                    </span>
-                                </div>
-
-                                <h3 className="text-[#1a1a2e] text-lg font-bold mb-2">
-                                    {step.title}
-                                </h3>
-                                <p className="text-slate-500 text-sm leading-relaxed">
-                                    {step.desc}
-                                </p>
-                            </div>
-                        );
-                    })}
-                </div>
-
-                {/* Bottom CTA */}
-                <div className="text-center">
-                    <p className="text-slate-500 mb-6">
-                        Ready to transform your school?
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                        <Link href="/schoollogin">
-                            <button className="px-8 py-4 bg-[#0569ff] text-white rounded-full font-semibold transition-all duration-300 hover:bg-[#0358dd] hover:shadow-lg flex items-center gap-2">
-                                Get Started Now
-                                <ArrowRight size={18} />
-                            </button>
-                        </Link>
-                        <Link href="/contact">
-                            <button className="px-8 py-4 bg-white text-slate-700 rounded-full font-semibold border border-slate-200 transition-all duration-300 hover:border-slate-300 hover:bg-slate-50 flex items-center gap-2">
-                                Request a Demo
-                                <ArrowRight size={18} />
-                            </button>
-                        </Link>
-                    </div>
                 </div>
             </div>
         </section>
@@ -1828,7 +1781,6 @@ function TestimonialsSection() {
                     <div className="text-2xl font-black text-slate-800 tracking-tighter">CAMPUS_LIFE</div>
                 </div>
             </div>
-
             <style>{`
         .no-scrollbar::-webkit-scrollbar {
           display: none;
