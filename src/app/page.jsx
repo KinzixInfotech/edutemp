@@ -1364,7 +1364,7 @@ function SchoolExplorerSection() {
 
                         {/* Right - Features Grid */}
                         <div className="bg-white p-6 md:p-10 lg:p-16 flex items-center justify-center">
-                            <img src="./sx.png" alt="School Explorer" className="w-full h-full max-h-[400px] object-contain rounded-2xl scale-130" />
+                            <img src="./school_exp.png" alt="School Explorer" className="w-full h-full max-h-[400px] object-contain rounded-2xl scale-130" />
                         </div>
                     </div>
                 </div>
@@ -1594,30 +1594,11 @@ function PricingSection() {
                         </div>
 
                         {/* Right - Features List */}
-                        <div className="bg-white p-8 md:p-12 lg:p-16 border-t lg:border-t-0 lg:border-l border-slate-100">
-                            <h3 className="text-xl font-bold text-[#1a1a2e] mb-6">
-                                Everything you need, included:
-                            </h3>
-                            <div className="space-y-4">
-                                {features.map((feature, index) => (
-                                    <div key={index} className="flex items-center gap-4">
-                                        <div className="w-8 h-8 rounded-full bg-[#10B981]/10 flex items-center justify-center shrink-0">
-                                            <Check size={16} className="text-[#10B981]" />
-                                        </div>
-                                        <span className="text-slate-600 font-medium">{feature}</span>
-                                    </div>
-                                ))}
+                        <div className="bg-white border-t lg:border-t-0 lg:border-l border-slate-100">
+                            <div className="">
+                                <img src="./120.png" alt="Pricing Features" className="w-full h-full object-contain rounded-2xl  " />
                             </div>
 
-                            {/* T&C Links */}
-                            <div className="mt-8 pt-6 border-t border-slate-100">
-                                <p className="text-slate-400 text-xs">
-                                    By subscribing, you agree to our{' '}
-                                    <Link href="/terms" className="text-[#0569ff] hover:underline">Terms of Service</Link>
-                                    {' '}and{' '}
-                                    <Link href="/privacy" className="text-[#0569ff] hover:underline">Privacy Policy</Link>.
-                                </p>
-                            </div>
                         </div>
                     </div>
                 </div>
