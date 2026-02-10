@@ -73,7 +73,6 @@ export default function FeaturesIntroPage() {
 
     return (
         <div className="min-h-screen bg-white">
-            <Header />
 
             {/* Hero Section - Matching Homepage Style */}
             <section className="relative min-h-[70vh] flex items-center justify-center overflow-hidden bg-white pt-24">

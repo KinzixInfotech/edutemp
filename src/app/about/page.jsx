@@ -76,7 +76,6 @@ export default function AboutPage() {
 
   return (
     <div className="bg-white overflow-x-hidden">
-      <Header />
 
       {/* Shimmer animation keyframe */}
       <style jsx global>{`

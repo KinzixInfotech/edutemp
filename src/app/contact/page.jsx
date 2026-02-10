@@ -65,7 +65,6 @@ export default function ContactPage() {
 
     return (
         <div className="bg-white min-h-screen">
-            <Header />
 
             {/* Hero Section - Matching Homepage Style */}
             <section className="relative min-h-[60vh] flex items-center justify-center overflow-hidden bg-white pt-24">

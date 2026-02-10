@@ -963,7 +963,6 @@ export default function FeaturesPage() {
 
     return (
         <div className="min-h-screen bg-white">
-            {/* <Header /> */}
 
             {/* Mobile Top Bar with Menu Button */}
             <div className="lg:hidden fixed top-16 left-0 right-0 z-50  bg-[#ffffffbf] backdrop-blur-md border-b border-gray-200 px-4 py-3 flex items-center gap-3">

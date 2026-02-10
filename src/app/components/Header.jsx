@@ -100,7 +100,7 @@ export default function Header() {
     const isHomePage = pathname === '/';
 
     // Dynamic classes for header
-    const headerClasses = 'fixed w-full left-0 right-0 top-0 z-[100] transition-all duration-300 bg-white border-b border-gray-200';
+    const headerClasses = 'fixed w-full left-0 right-0 top-0 z-[100] transition-all duration-300 bg-[#ffffffdb] backdrop-blur-md border-b border-gray-200';
 
     return (
         <div className={headerClasses}>
