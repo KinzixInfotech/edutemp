@@ -641,9 +641,9 @@ function BusTrackingSection() {
                     {/* Phone Image - Left Side */}
                     <div className="flex-1 flex justify-center lg:justify-center">
                         <img
-                            src="/app_image.png"
+                            src="./bus_mkp.png"
                             alt="EduBreezy Bus Tracking"
-                            className="w-[300px] md:w-[350px] lg:w-[400px] h-auto"
+                            className="w-[300px] md:w-[350px] lg:w-[550px] h-auto"
                         />
                     </div>
 

@@ -42,9 +42,9 @@ export default function WebDashboardCTA() {
                     {/* Phone Image - right Side */}
                     <div className="flex-1 flex justify-center lg:justify-center">
                         <img
-                            src="/sm-portrait.png"
+                            src="/ppl.png"
                             alt="EduBreezy Bus Tracking"
-                            className="w-[300px] md:w-[350px] lg:w-[400px] h-auto"
+                            className="w-[300px] md:w-[350px] lg:w-[550px] h-auto"
                         />
                     </div>
 
