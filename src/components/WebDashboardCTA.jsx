@@ -40,11 +40,13 @@ export default function WebDashboardCTA() {
                         </div>
                     </div>
                     {/* Phone Image - right Side */}
-                    <div className="flex-1 flex justify-center lg:justify-center">
+                    <div className="flex-1 flex justify-center lg:justify-center relative">
+                        <div className="absolute inset-0 lg:block hidden border-2 border-[#0469ff]/10 rounded-full scale-100 animate-pulse" />
+
                         <img
                             src="/ppl.png"
-                            alt="EduBreezy Bus Tracking"
-                            className="w-[300px] md:w-[350px] lg:w-[550px] h-auto"
+                            alt="EduBreezy"
+                            className="relative w-[300px] md:w-[350px] lg:w-[550px] h-auto drop-shadow-2xl hover:scale-105 transition-transform duration-500"
                         />
                     </div>
 

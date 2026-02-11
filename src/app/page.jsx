@@ -364,57 +364,10 @@ function AttendanceSection() {
                         <div className="absolute inset-0 lg:block hidden border-2 border-[#0469ff]/10 rounded-full scale-110 animate-pulse" />
 
                         <img
-                            src="/mock_att.png"
+                            src="/att_mkcp.png"
                             alt="EduBreezy Attendance Screen"
-                            className="relative w-[280px] md:w-[340px] lg:w-[380px] h-auto drop-shadow-2xl hover:scale-105 transition-transform duration-500"
+                            className="relative w-[300px] md:w-[350px] lg:w-[550px] h-auto drop-shadow-2xl hover:scale-105 transition-transform duration-500"
                         />
-
-                        {/* Floating Notification Cards */}
-
-                        {/* Card 1: Attendance Marked */}
-                        <motion.div
-                            animate={{ y: [-10, 10, -10] }}
-                            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 0 }}
-                            className="absolute top-[15%] lg:flex hidden -left-4 md:-left-16 bg-white p-3 md:p-4 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-100 flex items-center -z-2 gap-3"
-                        >
-                            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                                <CheckCircle className="w-5 h-5 text-green-600" />
-                            </div>
-                            <div>
-                                <div className="text-[10px] md:text-xs text-gray-500 font-bold uppercase">Status</div>
-                                <div className="text-sm md:text-base font-bold text-[#1a1a2e] whitespace-nowrap">Marked Present</div>
-                            </div>
-                        </motion.div>
-
-                        {/* Card 2: Parent Alert */}
-                        <motion.div
-                            animate={{ y: [10, -10, 10] }}
-                            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-                            className="absolute bottom-[20%] lg:flex hidden -right-4 md:-right-20 bg-white p-3 md:p-4 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-100 flex items-center gap-3 z-20"
-                        >
-                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                                <Bell className="w-5 h-5 text-blue-600" />
-                            </div>
-                            <div>
-                                <div className="text-[10px] md:text-xs text-gray-500 font-bold uppercase">Parent Alert</div>
-                                <div className="text-sm md:text-base font-bold text-[#1a1a2e] whitespace-nowrap">Push Sent 🚀</div>
-                            </div>
-                        </motion.div>
-
-                        {/* Card 3: Sync Status */}
-                        <motion.div
-                            animate={{ y: [-8, 8, -8] }}
-                            transition={{ duration: 7, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-                            className="absolute -bottom-6 lg:flex hidden left-12 md:bottom-10 md:left-0 bg-white p-3 md:p-4 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-100 flex items-center gap-3 -z-2"
-                        >
-                            <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
-                                <Zap className="w-5 h-5 text-purple-600" />
-                            </div>
-                            <div>
-                                <div className="text-[10px] md:text-xs text-gray-500 font-bold uppercase">System</div>
-                                <div className="text-sm md:text-base font-bold text-[#1a1a2e] whitespace-nowrap">Sync Complete ⚡</div>
-                            </div>
-                        </motion.div>
                     </div>
 
                 </div>
@@ -639,11 +592,13 @@ function BusTrackingSection() {
                 <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
 
                     {/* Phone Image - Left Side */}
-                    <div className="flex-1 flex justify-center lg:justify-center">
+                    <div className="flex-1 flex justify-center lg:justify-center relative">
+                        <div className="absolute inset-0 lg:block hidden border-2 border-[#0469ff]/10 rounded-full scale-100 animate-pulse" />
+
                         <img
                             src="./bus_mkp.png"
                             alt="EduBreezy Bus Tracking"
-                            className="w-[300px] md:w-[350px] lg:w-[550px] h-auto"
+                            className="relative w-[300px] md:w-[350px] lg:w-[550px] h-auto drop-shadow-2xl hover:scale-105 transition-transform duration-500"
                         />
                     </div>
 
