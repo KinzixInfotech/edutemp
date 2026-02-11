@@ -62,6 +62,7 @@ import {
     FileText,
     GraduationCap,
     Images,
+    Smartphone,
 } from "lucide-react"
 import { useCommandMenu } from "./CommandMenuContext"
 import { cn } from "@/lib/utils"
@@ -643,6 +644,12 @@ export const SidebarData = [
             { label: "Pricing & Packs", url: "/dashboard/edubreezy/sms/pricing", icon: CreditCard, roles: ["SUPER_ADMIN"] },
             { label: "School Wallets", url: "/dashboard/edubreezy/sms/wallets", icon: Wallet, roles: ["SUPER_ADMIN"] },
             { label: "SMS Logs", url: "/dashboard/edubreezy/sms/logs", icon: FileText, roles: ["SUPER_ADMIN"] },
+        ],
+    },
+    {
+        title: "App Management",
+        items: [
+            { label: "App Config", url: "/dashboard/edubreezy/app-config", icon: Smartphone, roles: ["SUPER_ADMIN"] },
         ],
     },
     {

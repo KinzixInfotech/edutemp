@@ -6417,3 +6417,40 @@ model BiometricAttendanceEvent {
   @@index([deviceId, eventTime])
   @@index([resolvedUserId])
 }
+
+// ─── App Version & Config Management ───
+model AppConfig {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Version Control
+  currentVersion String @default("1.0.0")
+  minimumVersion String @default("1.0.0") // Below = FORCE update
+  latestVersion  String @default("1.0.0")
+
+  // Build Numbers (EAS auto-increment tracking)
+  androidVersionCode Int @default(1)
+  iosBuildNumber     Int @default(1)
+
+  // Update Mode
+  updateMode  String  @default("FLEXIBLE") // FLEXIBLE | IMMEDIATE | NONE
+  forceUpdate Boolean @default(false)
+
+  // Maintenance Mode
+  maintenanceMode    Boolean @default(false)
+  maintenanceMessage String?
+
+  // Changelog (JSON: [{ version, changes[], date }])
+  changelog Json?
+
+  // Store URLs
+  androidStoreUrl String?
+  iosStoreUrl     String?
+
+  // App Metadata (display in admin)
+  appName      String  @default("EduBreezy")
+  bundleId     String  @default("com.kinzix.edubreezy")
+  easProjectId String?
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
