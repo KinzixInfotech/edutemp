@@ -179,6 +179,17 @@ const getRoleSpecificData = async (userId, roleName) => {
                 },
             });
 
+        case 'ACCOUNTANT':
+            return prisma.accountant.findUnique({
+                where: { userId },
+                select: {
+                    userId: true,
+                    schoolId: true,
+                    permissions: true,
+                    school: { select: { id: true, name: true, profilePicture: true } },
+                },
+            });
+
         default:
             return null;
     }
@@ -195,6 +206,7 @@ const getRoleDataKey = (roleName) => {
         'CONDUCTOR': 'transportStaffData',
         'DIRECTOR': 'directorData',
         'PRINCIPAL': 'principalData',
+        'ACCOUNTANT': 'accountantData',
     };
     return mapping[roleName] || null;
 };
