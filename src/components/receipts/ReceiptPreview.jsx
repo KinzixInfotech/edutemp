@@ -1,126 +1,68 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
+import { useRef } from 'react';
 import ReceiptTemplate from './ReceiptTemplate';
 import { Printer } from 'lucide-react';
 import { Button } from '../ui/button';
 
 /**
  * Receipt Preview Component
- * Always displays receipt preview (no toggle)
+ * Displays a live preview of receipt with current settings
  */
 export default function ReceiptPreview({ schoolData, settings }) {
     const receiptRef = useRef(null);
 
-    // Debug: Log school data to check what we're receiving
-    useEffect(() => {
-        console.log('📋 ReceiptPreview - schoolData:', schoolData);
-        console.log('📋 ReceiptPreview - settings:', settings);
-    }, [schoolData, settings]);
-
-    // Sample receipt data
+    // Sample receipt data with fee head breakup
     const sampleReceiptData = {
         receiptNumber: `${settings.receiptPrefix || 'REC'}-2024-001`,
         receiptDate: new Date().toLocaleDateString('en-IN'),
         studentName: 'John Doe',
-        fatherName: 'RAMESH HEDGIKAR',
-        academicBatch: '2022-2024',
+        fatherName: 'Ramesh Doe',
+        degree: 'Class 10-A',
+        admissionNo: 'AD-001',
+        financialYear: '2025-26',
         feeItems: [
-            { description: 'Tuition Fee for Q1', quantity: 1, amount: 15000 },
-            { description: 'Laboratory Fee', quantity: 1, amount: 3000 },
-            { description: 'Library Fee', quantity: 1, amount: 1500 },
-            { description: 'Sports Fee', quantity: 1, amount: 2000 },
+            { description: 'Tuition Fee', amount: 15000 },
+            { description: 'Computer Fee', amount: 3000 },
+            { description: 'Library Fee', amount: 1500 },
+            { description: 'Sports Fee', amount: 2000 },
         ],
         total: 21500,
         totalInWords: 'Rupees Twenty One Thousand Five Hundred Only',
-        finalAmount: 21500,
-        paymentMethod: 'Online Payment Via UPI/DEBIT/CREDIT/Net Banking/IMPS/GC',
-        transactionId: 'NO : 1329/484-GC/A/Net-Exe/GXIII/23',
-        bankName: 'CANARA BANK,JALGAON:8072018932122',
-        remarks: 'Student Online Payment'
+        balanceAfterPayment: 42500,
+        paymentMode: 'Online Banking',
+        transactionId: 'TXN-2024-78901',
+        remarks: 'Q1 Fee Payment'
     };
 
     const handlePrint = () => {
         if (receiptRef.current) {
             const printWindow = window.open('', '', 'width=850,height=1100');
-
             printWindow.document.write(`
                 <!DOCTYPE html>
                 <html>
                 <head>
                     <title>Receipt Preview</title>
                     <style>
-                        @page {
-                            size: 8.5in 11in;
-                            margin: 0;
-                        }
-                        @media print {
-                            html, body {
-                                width: 8.5in;
-                                height: 11in;
-                                margin: 0;
-                                padding: 0;
-                            }
-                        }
-                        html, body {
-                            margin: 0;
-                            padding: 0;
-                            font-family: Arial, sans-serif;
-                            -webkit-print-color-adjust: exact !important;
-                            print-color-adjust: exact !important;
-                        }
-                        * {
-                            box-sizing: border-box;
-                        }
-                        /* Container styling to match preview */
-                        .receipt-container {
-                            width: 8.5in;
-                            height: 11in;
-                            padding: 0.5in;
-                            font-family: Arial, sans-serif;
-                            font-size: 11px;
-                            color: #000;
-                            box-sizing: border-box;
-                            border: 2px solid #8B0000;
-                            display: flex;
-                            flex-direction: column;
-                            background: white;
-                        }
-                        img {
-                            max-width: 100%;
-                            height: auto;
-                        }
-                        table {
-                            border-collapse: collapse;
-                            width: 100%;
-                        }
-                        td, th {
-                            border: 1px solid #000;
-                            padding: 6px;
-                        }
+                        @page { size: ${settings.paperSize === 'thermal' ? '80mm auto' : '8.5in 11in'}; margin: 0; }
+                        html, body { margin: 0; padding: 0; font-family: Arial, sans-serif; -webkit-print-color-adjust: exact !important; }
+                        * { box-sizing: border-box; }
                     </style>
                 </head>
                 <body>
-                    <div class="receipt-container">
-                        ${receiptRef.current.innerHTML}
-                    </div>
+                    ${receiptRef.current.outerHTML}
                     <script>
-                        window.onload = function() {
-                            setTimeout(function() {
-                                window.print();
-                            }, 100);
-                        };
-                        window.onafterprint = function() {
-                            window.close();
-                        };
+                        window.onload = function() { setTimeout(function() { window.print(); }, 100); };
+                        window.onafterprint = function() { window.close(); };
                     </script>
                 </body>
                 </html>
             `);
-
             printWindow.document.close();
         }
     };
+
+    const isThermal = settings.paperSize === 'thermal';
 
     return (
         <div className="space-y-4">
@@ -132,10 +74,17 @@ export default function ReceiptPreview({ schoolData, settings }) {
                 </Button>
             </div>
 
-            {/* Always visible preview */}
             <div className="border rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-900">
-                <div className="bg-white overflow-auto" style={{ maxHeight: '1100px', display: 'flex', justifyContent: 'center', padding: '20px' }}>
-                    <div style={{ transform: 'scale(0.95)', transformOrigin: 'top center' }}>
+                <div
+                    className="bg-white overflow-auto"
+                    style={{
+                        maxHeight: isThermal ? '600px' : '1100px',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        padding: '20px'
+                    }}
+                >
+                    <div style={{ transform: isThermal ? 'scale(1)' : 'scale(0.65)', transformOrigin: 'top center' }}>
                         <ReceiptTemplate
                             ref={receiptRef}
                             schoolData={schoolData}
@@ -146,7 +95,7 @@ export default function ReceiptPreview({ schoolData, settings }) {
                 </div>
                 <div className="bg-gray-100 dark:bg-gray-800 px-4 py-2 text-center">
                     <p className="text-xs text-muted-foreground">
-                        Sample Preview • 8.5" × 11" (US Letter) • Updates automatically with settings
+                        Sample Preview • {isThermal ? '80mm Thermal' : '8.5" × 11" (A4/Letter)'} • Updates automatically with settings
                     </p>
                 </div>
             </div>

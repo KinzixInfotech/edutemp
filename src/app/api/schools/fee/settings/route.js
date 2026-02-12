@@ -158,10 +158,13 @@ export async function POST(req) {
                     where: { schoolId },
                     data: {
                         receiptPrefix: settings.receiptPrefix,
-                        receiptTemplate: settings.receiptTemplate,
-                        autoGenerateReceipt: settings.autoGenerate,
+                        receiptPaperSize: settings.receiptPaperSize,
                         showSchoolLogo: settings.showSchoolLogo,
+                        showBalanceDue: settings.showBalanceDue,
+                        showPaymentMode: settings.showPaymentMode,
+                        showSignatureLine: settings.showSignatureLine,
                         receiptFooterText: settings.receiptFooterText,
+                        defaultPrintAction: settings.defaultPrintAction,
                     },
                 });
                 break;

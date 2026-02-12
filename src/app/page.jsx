@@ -1034,7 +1034,7 @@ function FeaturesSection() {
                 <div className="flex items-end justify-between mb-10">
                     <div>
                         <h2 className="text-2xl md:text-[2.5rem] font-black leading-tight text-white tracking-tight">
-                            <span className="text-[#037a7b]">All-in-one</span> modules for your school.
+                            All-in-one modules for your school.
                         </h2>
                         <p className="text-sm md:text-base text-white/40 mt-2 font-medium">
                             {modules.length}+ modules to automate every aspect of school management.

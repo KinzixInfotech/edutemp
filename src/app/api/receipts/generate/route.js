@@ -35,6 +35,9 @@ export async function POST(request) {
                 studentFee: {
                     include: {
                         feeStructure: true,
+                        particulars: {
+                            orderBy: { name: 'asc' },
+                        },
                     },
                 },
                 school: true,
@@ -67,6 +70,27 @@ export async function POST(request) {
             feeSettings?.receiptPrefix || 'REC'
         );
 
+        // Build fee items from student fee particulars (fee head breakup)
+        let feeItems = [];
+        const particulars = payment.studentFee?.particulars || [];
+        if (particulars.length > 0) {
+            feeItems = particulars.map(p => ({
+                description: p.name,
+                amount: p.amount,
+            }));
+        } else {
+            // Fallback to single line item
+            feeItems = [{
+                description: payment.studentFee?.feeStructure?.name || 'Fee Payment',
+                amount: payment.amount,
+            }];
+        }
+
+        // Calculate balance
+        const totalFee = payment.studentFee?.finalAmount || payment.amount;
+        const totalPaidSoFar = payment.studentFee?.paidAmount || payment.amount;
+        const balanceAfterPayment = totalFee - totalPaidSoFar;
+
         // Prepare receipt data snapshot
         const receiptData = {
             // School Info
@@ -74,6 +98,7 @@ export async function POST(request) {
             schoolLogo: payment.school.profilePicture,
             schoolAddress: payment.school.location,
             schoolContact: payment.school.contactNumber,
+            schoolEmail: payment.school.email || '',
 
             // Receipt Info
             receiptNumber,
@@ -95,22 +120,21 @@ export async function POST(request) {
             paymentMethod: payment.paymentMethod,
             transactionId: payment.transactionId || payment.gatewayPaymentId || 'N/A',
 
-            // Fee Items (simplified - you may need to expand based on your fee structure)
-            feeItems: [
-                {
-                    description: payment.studentFee?.feeStructure?.name || 'Fee Payment',
-                    quantity: 1,
-                    amount: payment.amount,
-                },
-            ],
+            // Fee Items (individual fee heads)
+            feeItems,
 
             // Amounts
             subtotal: payment.amount,
             discount: 0,
             totalPaid: payment.amount,
+            balanceAfterPayment: Math.max(0, balanceAfterPayment),
 
-            // Settings
+            // Display Settings
             showSchoolLogo: feeSettings?.showSchoolLogo ?? true,
+            showBalanceDue: feeSettings?.showBalanceDue ?? true,
+            showPaymentMode: feeSettings?.showPaymentMode ?? true,
+            showSignatureLine: feeSettings?.showSignatureLine ?? true,
+            paperSize: feeSettings?.receiptPaperSize || 'a4',
             footerText: feeSettings?.receiptFooterText || '',
         };
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -28,8 +28,17 @@ export default function FeeReports() {
     const schoolId = fullUser?.schoolId;
 
     const [reportType, setReportType] = useState('collection');
+
+    // Smart start date: Apr 1 of current academic year
+    // If we're in Jan-Mar, academic year started last Apr
+    const getAcademicYearStart = () => {
+        const now = new Date();
+        const year = now.getMonth() < 3 ? now.getFullYear() - 1 : now.getFullYear(); // month 0=Jan, 3=Apr
+        return new Date(year, 3, 1).toISOString().split('T')[0];
+    };
+
     const [dateRange, setDateRange] = useState({
-        startDate: new Date(new Date().getFullYear(), 3, 1).toISOString().split('T')[0],
+        startDate: getAcademicYearStart(),
         endDate: new Date().toISOString().split('T')[0]
     });
     const [selectedClass, setSelectedClass] = useState('all');
@@ -126,6 +135,45 @@ export default function FeeReports() {
     };
 
     const isLoading = reportType === 'collection' ? collectionLoading : overdueLoading;
+
+    // Class-wise summary computed from collection data
+    const classSummary = useMemo(() => {
+        if (!collectionReport?.report) return [];
+        const map = {};
+        collectionReport.report.forEach(s => {
+            const cls = s.class || 'Unknown';
+            if (!map[cls]) map[cls] = { className: cls, students: 0, expected: 0, collected: 0, balance: 0, discount: 0, paid: 0, partial: 0, unpaid: 0 };
+            map[cls].students++;
+            map[cls].expected += s.originalAmount || 0;
+            map[cls].collected += s.paidAmount || 0;
+            map[cls].balance += s.balanceAmount || 0;
+            map[cls].discount += s.discountAmount || 0;
+            if (s.status === 'PAID') map[cls].paid++;
+            else if (s.status === 'PARTIAL') map[cls].partial++;
+            else map[cls].unpaid++;
+        });
+        return Object.values(map).sort((a, b) => a.className.localeCompare(b.className, undefined, { numeric: true }));
+    }, [collectionReport]);
+
+    // Installment-level aggregation from collection data
+    const installmentSummary = useMemo(() => {
+        if (!collectionReport?.report) return [];
+        const map = {};
+        collectionReport.report.forEach(s => {
+            s.installments?.forEach(inst => {
+                const key = inst.number;
+                if (!map[key]) map[key] = { number: key, total: 0, paid: 0, partial: 0, unpaid: 0, overdue: 0, amount: 0, collected: 0 };
+                map[key].total++;
+                map[key].amount += inst.amount || 0;
+                map[key].collected += inst.paidAmount || 0;
+                if (inst.status === 'PAID') map[key].paid++;
+                else if (inst.status === 'PARTIAL') map[key].partial++;
+                else if (inst.isOverdue) map[key].overdue++;
+                else map[key].unpaid++;
+            });
+        });
+        return Object.values(map).sort((a, b) => a.number - b.number);
+    }, [collectionReport]);
 
     return (
         <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -439,30 +487,139 @@ export default function FeeReports() {
 
                 {/* Summary Report */}
                 <TabsContent value="summary">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Coming Soon</CardTitle>
-                            <CardDescription>Comprehensive summary report with charts and graphs</CardDescription>
-                        </CardHeader>
-                        <CardContent className="py-12 text-center">
-                            <TrendingUp className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                            <p className="text-muted-foreground">Summary report feature is under development</p>
-                        </CardContent>
-                    </Card>
+                    {collectionLoading ? (
+                        <div className="flex items-center justify-center py-12">
+                            <Loader2 className="h-12 w-12 animate-spin" />
+                        </div>
+                    ) : classSummary.length > 0 ? (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Class-wise Fee Summary</CardTitle>
+                                <CardDescription>Collection breakdown by class</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-3">
+                                    {classSummary.map((cls) => {
+                                        const collectionRate = cls.expected > 0 ? Math.round((cls.collected / cls.expected) * 100) : 0;
+                                        return (
+                                            <div key={cls.className} className="p-4 border rounded-lg">
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <div>
+                                                        <p className="font-semibold text-lg">{cls.className}</p>
+                                                        <p className="text-sm text-muted-foreground">{cls.students} students</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-sm text-muted-foreground">Collection Rate</p>
+                                                        <p className={`text-2xl font-bold ${collectionRate >= 80 ? 'text-green-600' : collectionRate >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                                            {collectionRate}%
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                {/* Progress bar */}
+                                                <div className="h-2 bg-muted rounded-full overflow-hidden mb-3">
+                                                    <div
+                                                        className={`h-full rounded-full transition-all ${collectionRate >= 80 ? 'bg-green-500' : collectionRate >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                                                        style={{ width: `${collectionRate}%` }}
+                                                    />
+                                                </div>
+                                                <div className="grid grid-cols-4 gap-4 text-sm">
+                                                    <div>
+                                                        <p className="text-muted-foreground">Expected</p>
+                                                        <p className="font-medium">{formatCurrency(cls.expected)}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-muted-foreground">Collected</p>
+                                                        <p className="font-medium text-green-600">{formatCurrency(cls.collected)}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-muted-foreground">Balance</p>
+                                                        <p className="font-medium text-red-600">{formatCurrency(cls.balance)}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-muted-foreground">Status</p>
+                                                        <p className="text-xs">
+                                                            <span className="text-green-600">{cls.paid} Paid</span> •{' '}
+                                                            <span className="text-yellow-600">{cls.partial} Partial</span> •{' '}
+                                                            <span className="text-red-600">{cls.unpaid} Unpaid</span>
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <Card>
+                            <CardContent className="py-12 text-center">
+                                <TrendingUp className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                                <p className="text-muted-foreground">No data available for the selected filters</p>
+                            </CardContent>
+                        </Card>
+                    )}
                 </TabsContent>
 
                 {/* Installment Report */}
                 <TabsContent value="installments">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Coming Soon</CardTitle>
-                            <CardDescription>Installment-wise payment tracking report</CardDescription>
-                        </CardHeader>
-                        <CardContent className="py-12 text-center">
-                            <Calendar className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                            <p className="text-muted-foreground">Installment report feature is under development</p>
-                        </CardContent>
-                    </Card>
+                    {collectionLoading ? (
+                        <div className="flex items-center justify-center py-12">
+                            <Loader2 className="h-12 w-12 animate-spin" />
+                        </div>
+                    ) : installmentSummary.length > 0 ? (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Installment-wise Status</CardTitle>
+                                <CardDescription>Payment status breakdown by installment number</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-3">
+                                    {installmentSummary.map((inst) => {
+                                        const collectionRate = inst.amount > 0 ? Math.round((inst.collected / inst.amount) * 100) : 0;
+                                        return (
+                                            <div key={inst.number} className="p-4 border rounded-lg">
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold">
+                                                            {inst.number}
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-semibold">Installment {inst.number}</p>
+                                                            <p className="text-sm text-muted-foreground">{inst.total} students</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="font-bold text-lg">{formatCurrency(inst.amount)}</p>
+                                                        <p className="text-sm text-green-600">Collected: {formatCurrency(inst.collected)}</p>
+                                                    </div>
+                                                </div>
+                                                {/* Progress */}
+                                                <div className="h-2 bg-muted rounded-full overflow-hidden mb-3">
+                                                    <div
+                                                        className={`h-full rounded-full transition-all ${collectionRate >= 80 ? 'bg-green-500' : collectionRate >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                                                        style={{ width: `${collectionRate}%` }}
+                                                    />
+                                                </div>
+                                                <div className="flex gap-3 text-xs">
+                                                    <Badge className="bg-green-100 text-green-800">{inst.paid} Paid</Badge>
+                                                    <Badge className="bg-yellow-100 text-yellow-800">{inst.partial} Partial</Badge>
+                                                    <Badge className="bg-blue-100 text-blue-800">{inst.unpaid} Pending</Badge>
+                                                    {inst.overdue > 0 && <Badge className="bg-red-100 text-red-800">{inst.overdue} Overdue</Badge>}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <Card>
+                            <CardContent className="py-12 text-center">
+                                <Calendar className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                                <p className="text-muted-foreground">No installment data available for the selected filters</p>
+                            </CardContent>
+                        </Card>
+                    )}
                 </TabsContent>
             </Tabs>
         </div>

@@ -17,6 +17,9 @@ export async function GET(request) {
         const { searchParams } = new URL(request.url);
         const studentId = searchParams.get('studentId');
         const schoolId = searchParams.get('schoolId');
+        const period = searchParams.get('period') || 'full_year';
+        const fromDate = searchParams.get('fromDate');
+        const toDate = searchParams.get('toDate');
 
         if (!studentId || !schoolId) {
             return NextResponse.json({ error: 'Missing studentId or schoolId' }, { status: 400 });
@@ -145,6 +148,7 @@ export async function GET(request) {
                 descriptor,
                 subDescriptor,
                 dueDate: new Date(inst.dueDate).toLocaleDateString('en-IN'),
+                rawDueDate: new Date(inst.dueDate),
                 amount: inst.amount,
                 paidDate: inst.paidDate ? new Date(inst.paidDate).toLocaleDateString('en-IN') : null,
                 receiptNo: '—',
@@ -153,9 +157,38 @@ export async function GET(request) {
             };
         });
 
-        // 6. Summary Calculation
-        const totalFee = installments.reduce((sum, i) => sum + i.amount + (i.lateFee || 0), 0);
-        const totalPaid = installments.reduce((sum, i) => sum + i.paidAmount, 0);
+        // Filter ledger rows by period
+        const today = new Date();
+        today.setHours(23, 59, 59, 999); // end of today
+        let filteredRows = ledgerRows;
+        if (period === 'till_date') {
+            filteredRows = ledgerRows.filter(row => row.rawDueDate <= today);
+        } else if (period === 'custom' && fromDate && toDate) {
+            const from = new Date(fromDate);
+            from.setHours(0, 0, 0, 0);
+            const to = new Date(toDate);
+            to.setHours(23, 59, 59, 999);
+            filteredRows = ledgerRows.filter(row => row.rawDueDate >= from && row.rawDueDate <= to);
+        }
+        // Remove rawDueDate before sending response
+        filteredRows = filteredRows.map(({ rawDueDate, ...rest }) => rest);
+
+        // 6. Summary Calculation (based on filtered rows)
+        const totalFee = filteredRows.reduce((sum, r) => sum + r.amount, 0);
+        const totalPaid = installments
+            .filter(inst => {
+                const d = new Date(inst.dueDate);
+                if (period === 'till_date') return d <= today;
+                if (period === 'custom' && fromDate && toDate) {
+                    const from = new Date(fromDate);
+                    from.setHours(0, 0, 0, 0);
+                    const to = new Date(toDate);
+                    to.setHours(23, 59, 59, 999);
+                    return d >= from && d <= to;
+                }
+                return true;
+            })
+            .reduce((sum, i) => sum + i.paidAmount, 0);
         const balanceDue = totalFee - totalPaid;
 
         return NextResponse.json({
@@ -174,7 +207,7 @@ export async function GET(request) {
                 totalDiscount: 0,
                 balanceDue
             },
-            ledgerData: ledgerRows,
+            ledgerData: filteredRows,
             receiptsList: receipts.map(r => ({
                 number: r.receiptNumber,
                 date: new Date(r.createdAt).toLocaleDateString('en-IN'),

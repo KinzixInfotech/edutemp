@@ -4,12 +4,24 @@ import { PrismaClient } from '@prisma/client';
 const globalForPrisma = globalThis;
 
 const createPrismaClient = () => {
+    const isDev = process.env.NODE_ENV === 'development';
+
+    // Append connection pool params to DATABASE_URL if not already present
+    let dbUrl = process.env.DATABASE_URL || '';
+
+    // Add connection_limit and pool_timeout if not already in the URL
+    if (!dbUrl.includes('connection_limit')) {
+        const separator = dbUrl.includes('?') ? '&' : '?';
+        // Lower limit to avoid exhausting Supabase's pool (~20 connections)
+        // Dev: 5, Prod: 10
+        dbUrl += `${separator}connection_limit=${isDev ? 5 : 10}&pool_timeout=20`;
+    }
+
     return new PrismaClient({
-        log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
-        // Serverless-optimized settings
+        log: isDev ? ['error', 'warn'] : ['error'],
         datasources: {
             db: {
-                url: process.env.DATABASE_URL,
+                url: dbUrl,
             },
         },
     });

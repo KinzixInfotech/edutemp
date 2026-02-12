@@ -26,7 +26,8 @@ import {
     CheckCircle2,
     XCircle,
     HelpCircle,
-    ChevronRight
+    ChevronRight,
+    Printer
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,8 +41,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import ReceiptPreview from '@/components/receipts/ReceiptPreview';
 import FeeStatementTemplate from '@/components/receipts/FeeStatementTemplate';
-import FileUploadButton from '@/components/fileupload';
-import { useUploadThing } from '@/lib/uploadthing';
+
 export default function FeeSettings() {
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;
@@ -98,13 +98,13 @@ export default function FeeSettings() {
 
     // Receipt Settings
     const [receiptPrefix, setReceiptPrefix] = useState('REC');
-    const [receiptTemplate, setReceiptTemplate] = useState('default');
-    const [autoGenerate, setAutoGenerate] = useState(true);
+    const [receiptPaperSize, setReceiptPaperSize] = useState('a4');
     const [showSchoolLogo, setShowSchoolLogo] = useState(true);
+    const [showBalanceDue, setShowBalanceDue] = useState(true);
+    const [showPaymentMode, setShowPaymentMode] = useState(true);
+    const [showSignatureLine, setShowSignatureLine] = useState(true);
     const [receiptFooterText, setReceiptFooterText] = useState('');
-    const [customReceiptLogo, setCustomReceiptLogo] = useState(''); // Custom logo URL or uploaded image
-    const [customReceiptEmail, setCustomReceiptEmail] = useState(''); // Custom email for receipts
-    const [customReceiptPhone, setCustomReceiptPhone] = useState(''); // Custom phone for receipts
+    const [defaultPrintAction, setDefaultPrintAction] = useState('download'); // 'download' or 'print'
 
     // Discount Settings
     const [siblingDiscountEnabled, setSiblingDiscountEnabled] = useState(false);
@@ -181,10 +181,13 @@ export default function FeeSettings() {
             setOverdueReminders(s.overdueReminders ?? true);
             // Receipts
             setReceiptPrefix(s.receiptPrefix || 'REC');
-            setReceiptTemplate(s.receiptTemplate || 'default');
-            setAutoGenerate(s.autoGenerateReceipt ?? true);
+            setReceiptPaperSize(s.receiptPaperSize || 'a4');
             setShowSchoolLogo(s.showSchoolLogo ?? true);
+            setShowBalanceDue(s.showBalanceDue ?? true);
+            setShowPaymentMode(s.showPaymentMode ?? true);
+            setShowSignatureLine(s.showSignatureLine ?? true);
             setReceiptFooterText(s.receiptFooterText || '');
+            setDefaultPrintAction(s.defaultPrintAction || 'download');
             // Discounts
             setSiblingDiscountEnabled(s.siblingDiscountEnabled ?? false);
             setSiblingDiscountPercentage(String(s.siblingDiscountPercentage || 0));
@@ -197,6 +200,7 @@ export default function FeeSettings() {
             setEarlyPaymentDaysYearly(s.earlyPaymentDaysYearly || 60);
             setStaffWardDiscountEnabled(s.staffWardDiscountEnabled ?? false);
             setStaffWardDiscountPercentage(String(s.staffWardDiscountPercentage || 0));
+            setDefaultPrintAction(s.defaultPrintAction || 'download');
         }
     }, [settingsData]);
 
@@ -363,10 +367,13 @@ export default function FeeSettings() {
             type: 'receipts',
             settings: {
                 receiptPrefix,
-                receiptTemplate,
-                autoGenerate,
+                receiptPaperSize,
                 showSchoolLogo,
+                showBalanceDue,
+                showPaymentMode,
+                showSignatureLine,
                 receiptFooterText,
+                defaultPrintAction,
             },
         });
     };
@@ -1353,7 +1360,7 @@ export default function FeeSettings() {
                                 <FileText className="w-5 h-5" />
                                 Receipt Settings
                             </CardTitle>
-                            <CardDescription>Configure payment receipt generation</CardDescription>
+                            <CardDescription>Configure payment receipt generation and display</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
                             {/* Receipt Prefix */}
@@ -1370,89 +1377,66 @@ export default function FeeSettings() {
                                 </p>
                             </div>
 
-                            {/* Receipt Template */}
+                            {/* Paper Size */}
                             <div className="space-y-2">
-                                <Label>Receipt Template</Label>
-                                <Select value={receiptTemplate} onValueChange={setReceiptTemplate}>
+                                <Label>Paper Size</Label>
+                                <Select value={receiptPaperSize} onValueChange={setReceiptPaperSize}>
                                     <SelectTrigger className="max-w-xs">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="default">Default Template</SelectItem>
-                                        <SelectItem value="detailed">Detailed Template</SelectItem>
-                                        <SelectItem value="minimal">Minimal Template</SelectItem>
+                                        <SelectItem value="a4">A4 / Letter (8.5&quot; × 11&quot;)</SelectItem>
+                                        <SelectItem value="thermal">Thermal 80mm</SelectItem>
                                     </SelectContent>
                                 </Select>
-                            </div>
-
-                            {/* Auto Generate */}
-                            <div className="flex items-center justify-between p-4 border rounded-lg">
-                                <div>
-                                    <Label>Auto-generate PDF</Label>
-                                    <p className="text-xs text-muted-foreground">
-                                        Automatically generate PDF receipt after payment
-                                    </p>
-                                </div>
-                                <Switch checked={autoGenerate} onCheckedChange={setAutoGenerate} />
-                            </div>
-
-                            {/* Show School Logo */}
-                            <div className="flex items-center justify-between p-4 border rounded-lg">
-                                <div>
-                                    <Label>Show School Logo</Label>
-                                    <p className="text-xs text-muted-foreground">
-                                        Display school logo on receipts
-                                    </p>
-                                </div>
-                                <Switch checked={showSchoolLogo} onCheckedChange={setShowSchoolLogo} />
-                            </div>
-
-                            {/* Custom Logo Upload - Only shown when logo is enabled */}
-                            {showSchoolLogo && (
-                                <div className="space-y-2 p-4 border rounded-lg bg-gray-50 dark:bg-gray-900">
-                                    <Label>Custom Receipt Logo (Optional)</Label>
-                                    <p className="text-xs text-muted-foreground mb-2">
-                                        Upload a custom logo for receipts, or leave empty to use school logo
-                                    </p>
-                                    <FileUploadButton
-                                        field="Receipt Logo"
-                                        onChange={setCustomReceiptLogo}
-                                        saveToLibrary={false}
-                                    />
-                                    {customReceiptLogo && (
-                                        <div className="mt-2">
-                                            <p className="text-xs text-green-600">✓ Custom logo uploaded</p>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Custom Email */}
-                            <div className="space-y-2">
-                                <Label>Receipt Email (Optional)</Label>
-                                <Input
-                                    type="email"
-                                    value={customReceiptEmail}
-                                    onChange={(e) => setCustomReceiptEmail(e.target.value)}
-                                    placeholder={settingsData?.school?.email || "e.g., fees@yourschool.com"}
-                                />
                                 <p className="text-xs text-muted-foreground">
-                                    Leave empty to use school email{settingsData?.school?.email ? `: ${settingsData.school.email}` : ''}. This will be displayed on receipts.
+                                    A4 for standard printers. Thermal for POS/receipt printers.
                                 </p>
                             </div>
 
-                            {/* Custom Phone */}
-                            <div className="space-y-2">
-                                <Label>Receipt Phone Number (Optional)</Label>
-                                <Input
-                                    type="tel"
-                                    value={customReceiptPhone}
-                                    onChange={(e) => setCustomReceiptPhone(e.target.value)}
-                                    placeholder={settingsData?.school?.contactNumber || "e.g., +91 9876543210"}
-                                />
-                                <p className="text-xs text-muted-foreground">
-                                    Leave empty to use school contact number{settingsData?.school?.contactNumber ? `: ${settingsData.school.contactNumber}` : ''}. This will be displayed on receipts.
-                                </p>
+                            {/* Toggle Settings */}
+                            <div className="space-y-3">
+                                <Label className="text-base font-semibold">Display Options</Label>
+
+                                <div className="flex items-center justify-between p-4 border rounded-lg">
+                                    <div>
+                                        <Label>Show School Logo</Label>
+                                        <p className="text-xs text-muted-foreground">
+                                            Display school logo on receipts (uses logo from school settings)
+                                        </p>
+                                    </div>
+                                    <Switch checked={showSchoolLogo} onCheckedChange={setShowSchoolLogo} />
+                                </div>
+
+                                <div className="flex items-center justify-between p-4 border rounded-lg">
+                                    <div>
+                                        <Label>Show Balance Due</Label>
+                                        <p className="text-xs text-muted-foreground">
+                                            Display remaining balance on the receipt after payment
+                                        </p>
+                                    </div>
+                                    <Switch checked={showBalanceDue} onCheckedChange={setShowBalanceDue} />
+                                </div>
+
+                                <div className="flex items-center justify-between p-4 border rounded-lg">
+                                    <div>
+                                        <Label>Show Payment Mode</Label>
+                                        <p className="text-xs text-muted-foreground">
+                                            Display payment method (Cash, UPI, Net Banking, etc.)
+                                        </p>
+                                    </div>
+                                    <Switch checked={showPaymentMode} onCheckedChange={setShowPaymentMode} />
+                                </div>
+
+                                <div className="flex items-center justify-between p-4 border rounded-lg">
+                                    <div>
+                                        <Label>Show Signature Line</Label>
+                                        <p className="text-xs text-muted-foreground">
+                                            Display signature fields at the bottom of receipts
+                                        </p>
+                                    </div>
+                                    <Switch checked={showSignatureLine} onCheckedChange={setShowSignatureLine} />
+                                </div>
                             </div>
 
                             {/* Footer Text */}
@@ -1466,7 +1450,6 @@ export default function FeeSettings() {
                                 />
                             </div>
 
-                            {/* Receipt Preview */}
                             {/* Document Preview */}
                             <div className="border-t pt-6">
                                 <div className="flex justify-between items-center mb-4">
@@ -1493,15 +1476,15 @@ export default function FeeSettings() {
                                     <ReceiptPreview
                                         schoolData={{
                                             ...(settingsData?.school || {}),
-                                            // Override with custom values if provided
-                                            profilePicture: customReceiptLogo || settingsData?.school?.profilePicture,
-                                            email: customReceiptEmail || settingsData?.school?.email,
-                                            contactNumber: customReceiptPhone || settingsData?.school?.contactNumber,
                                         }}
                                         settings={{
                                             showSchoolLogo,
+                                            showBalanceDue,
+                                            showPaymentMode,
+                                            showSignatureLine,
                                             receiptFooterText,
                                             receiptPrefix,
+                                            paperSize: receiptPaperSize,
                                         }}
                                     />
                                 ) : (
@@ -1510,11 +1493,8 @@ export default function FeeSettings() {
                                             <FeeStatementTemplate
                                                 schoolData={{
                                                     ...(settingsData?.school || {}),
-                                                    profilePicture: customReceiptLogo || settingsData?.school?.profilePicture,
                                                     name: settingsData?.school?.name || 'School Name',
                                                     location: settingsData?.school?.location || 'School Address',
-                                                    contactNumber: customReceiptPhone || settingsData?.school?.contactNumber,
-                                                    email: customReceiptEmail || settingsData?.school?.email,
                                                 }}
                                                 studentData={{
                                                     studentName: 'John Doe',
@@ -1544,6 +1524,60 @@ export default function FeeSettings() {
                                         </div>
                                     </div>
                                 )}
+                            </div>
+
+                            {/* Print Settings */}
+                            <div className="border-t pt-6">
+                                <h3 className="text-lg font-medium flex items-center gap-2 mb-4">
+                                    <Printer className="w-5 h-5" />
+                                    Print Settings
+                                </h3>
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label>Default Action for Receipts & Statements</Label>
+                                        <Select value={defaultPrintAction} onValueChange={setDefaultPrintAction}>
+                                            <SelectTrigger className="max-w-xs">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="download">Download as PDF</SelectItem>
+                                                <SelectItem value="print">Print Directly</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <p className="text-xs text-muted-foreground">
+                                            Choose the default action when generating receipts or statements. &quot;Print Directly&quot; will open your system print dialog.
+                                        </p>
+                                    </div>
+
+                                    <div className="flex items-center justify-between p-4 border rounded-lg bg-gray-50 dark:bg-gray-900">
+                                        <div>
+                                            <Label>Test Printer</Label>
+                                            <p className="text-xs text-muted-foreground">
+                                                Print a test page to verify your printer is working correctly
+                                            </p>
+                                        </div>
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => {
+                                                const testWindow = window.open('', '_blank', 'width=400,height=300');
+                                                testWindow.document.write(`
+                                                    <html><head><title>Printer Test</title></head>
+                                                    <body style="font-family: Arial, sans-serif; text-align: center; padding: 40px;">
+                                                        <h1 style="color: #2563eb;">🖨️ Printer Test Page</h1>
+                                                        <p style="margin-top: 20px; font-size: 14px;">If you can see this page printed, your printer is configured correctly.</p>
+                                                        <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">EduBreezy Fee Management System</p>
+                                                    </body></html>
+                                                `);
+                                                testWindow.document.close();
+                                                testWindow.focus();
+                                                testWindow.print();
+                                            }}
+                                        >
+                                            <Printer className="w-4 h-4 mr-2" />
+                                            Test Print
+                                        </Button>
+                                    </div>
+                                </div>
                             </div>
 
 

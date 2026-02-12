@@ -5539,10 +5539,15 @@ model FeeSettings {
 
   // Receipt Settings
   receiptPrefix       String  @default("REC")
-  receiptTemplate     String  @default("default") // default, detailed, minimal
-  autoGenerateReceipt Boolean @default(true)
+  receiptPaperSize    String  @default("a4") // 'a4' or 'thermal'
+  receiptTemplate     String  @default("default") // kept for backwards compat
+  autoGenerateReceipt Boolean @default(true) // kept for backwards compat
   showSchoolLogo      Boolean @default(true)
+  showBalanceDue      Boolean @default(true)
+  showPaymentMode     Boolean @default(true)
+  showSignatureLine   Boolean @default(true)
   receiptFooterText   String?
+  defaultPrintAction  String  @default("download") // 'download' or 'print'
 
   // Notification Settings
   emailReminders          Boolean @default(true)
