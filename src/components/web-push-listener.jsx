@@ -22,6 +22,10 @@ export function WebPushListener() {
         queryClient.invalidateQueries({ queryKey: ['notifications'] });
         queryClient.invalidateQueries({ queryKey: ['notices'] });
         queryClient.invalidateQueries({ queryKey: ['broadcasts'] });
+
+        // Refresh sidebar badge queries
+        queryClient.invalidateQueries({ queryKey: ['unread-notices-count'] });
+        queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
     }, [queryClient]);
 
     const { permission, requestForPermission } = useWebPush({

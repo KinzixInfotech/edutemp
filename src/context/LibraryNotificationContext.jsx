@@ -22,15 +22,7 @@ export function LibraryNotificationProvider({ children }) {
         }
     }, [schoolId]);
 
-    // Effect 2: Poll for updates
-    useEffect(() => {
-        if (schoolId) {
-            fetchUnseenCount();
-            // Refresh every 30 seconds
-            const interval = setInterval(fetchUnseenCount, 30000);
-            return () => clearInterval(interval);
-        }
-    }, [schoolId, lastVisitTime]);
+    // No auto-fetch on mount — only fetch via refreshCount() or FCM invalidation
 
     const fetchUnseenCount = async () => {
         try {

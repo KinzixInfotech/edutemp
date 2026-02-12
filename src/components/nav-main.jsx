@@ -26,7 +26,7 @@ import { useLibraryNotifications } from "@/context/LibraryNotificationContext"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/context/AuthContext"
 import { useQuery } from "@tanstack/react-query"
-import { usePrefetchNavigation } from "@/hooks/usePrefetchNavigation"
+
 
 export function NavSidebarSections({ sections, userRole, activePath }) {
     const { setLoading } = useLoader()
@@ -40,8 +40,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
     const { unseenRequestsCount } = useLibraryNotifications()
     const { fullUser } = useAuth()
 
-    // Prefetch navigation hook for Google-like instant navigation
-    const { prefetchOnHover } = usePrefetchNavigation()
+
 
     // Fetch unread notices count // Added
     const { data: noticesData } = useQuery({
@@ -53,7 +52,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
             return res.json()
         },
         enabled: !!fullUser?.id,
-        refetchInterval: 60000
+        staleTime: 5 * 60 * 1000, // 5 minutes
     })
 
     const unreadNoticesCount = noticesData?.unreadCount || 0
@@ -68,8 +67,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
             return res.json()
         },
         enabled: !!fullUser?.id && !!fullUser?.schoolId,
-        staleTime: 1000 * 60, // 1 minute
-        refetchInterval: 1000 * 60 * 2 // Refetch every 2 minutes
+        staleTime: 5 * 60 * 1000, // 5 minutes
     })
 
     // Determine if attendance action is needed
@@ -184,8 +182,8 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                             <Link
                                                                 key={sub.label}
                                                                 href={sub.url}
+                                                                prefetch={false}
                                                                 onClick={handleClick}
-                                                                onMouseEnter={() => prefetchOnHover(sub.url)}
                                                                 className="text-xs dark:text-white hover:underline"
                                                             >
                                                                 {sub.label}
@@ -246,7 +244,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                                         ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-semibold" : ""
                                                                         }`}
                                                                 >
-                                                                    <Link href={sub.url} onClick={handleClick} onMouseEnter={() => prefetchOnHover(sub.url)} className="flex items-center justify-between w-full">
+                                                                    <Link href={sub.url} prefetch={false} onClick={handleClick} className="flex items-center justify-between w-full">
                                                                         <div className="flex items-center gap-2">
                                                                             {sub.icon && <sub.icon className="w-4 h-4" />}
                                                                             <span className="">{sub.label}</span>
@@ -285,7 +283,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                             ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" : ""
                                                             }`}
                                                     >
-                                                        <Link href={item.url} onClick={handleClick} onMouseEnter={() => prefetchOnHover(item.url)}>
+                                                        <Link href={item.url} prefetch={false} onClick={handleClick}>
                                                             {item.icon && <item.icon className="w-4 h-4" />}
                                                             {/* Pulsing indicator for Self Attendance in collapsed mode */}
                                                             {item.label === "Self Attendance" && attendanceActionNeeded && (
@@ -318,7 +316,7 @@ export function NavSidebarSections({ sections, userRole, activePath }) {
                                                 ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" : ""
                                                 }`}
                                         >
-                                            <Link href={item.url} onClick={handleClick} onMouseEnter={() => prefetchOnHover(item.url)} className="flex items-center justify-between w-full">
+                                            <Link href={item.url} prefetch={false} onClick={handleClick} className="flex items-center justify-between w-full">
                                                 <div className="flex items-center gap-2">
                                                     {item.icon && <item.icon className="w-4 h-4" />}
                                                     <span>{item.label}</span>

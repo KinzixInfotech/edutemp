@@ -92,8 +92,7 @@ export function RequestsDropdown({ schoolId }) {
             }
         },
         enabled: !!schoolId && !!fullUser?.id,
-        staleTime: 1000 * 60,
-        refetchInterval: 1000 * 60 * 2, // Auto-refresh every 2 minutes
+        staleTime: 5 * 60 * 1000, // 5 minutes
     })
 
     const libraryRequests = libraryData?.requests || []
