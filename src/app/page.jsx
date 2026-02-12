@@ -103,16 +103,82 @@ export default function HomePage() {
 }
 
 
-// Hero Section - Matching the design exactly
+// Hero Section - Typewriter Animation with Glowing Cursor
 function HeroSection() {
     const [isVideoOpen, setIsVideoOpen] = useState(false);
     const videoSrc = "https://www.youtube.com/embed/dQw4w9WgXcQ";
 
+    // Refs for direct DOM manipulation (avoids re-rendering entire section per character)
+    const line1Ref = useRef(null);
+    const line2Ref = useRef(null);
+    const line2WrapperRef = useRef(null);
+    const cursor1Ref = useRef(null);
+    const cursor2Ref = useRef(null);
+    const cursorFadeRef = useRef(null);
+    const [showContent, setShowContent] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        const line1 = "Modern School Management";
+        const line2 = "Built for Real Schools";
+
+        const typeText = async () => {
+            // Show cursor on line1, blink idle 2 times (~1.2s)
+            if (cursor1Ref.current) cursor1Ref.current.style.display = 'inline-block';
+            if (cursor1Ref.current) cursor1Ref.current.classList.add('typewriter-cursor-idle');
+            await new Promise(r => setTimeout(r, 1200));
+            if (cancelled) return;
+            // Start typing - remove idle blink
+            if (cursor1Ref.current) cursor1Ref.current.classList.remove('typewriter-cursor-idle');
+
+            // Type line 1 - direct DOM
+            for (let i = 0; i <= line1.length; i++) {
+                if (cancelled) return;
+                if (line1Ref.current) line1Ref.current.textContent = line1.slice(0, i);
+                await new Promise(r => setTimeout(r, 55 + Math.random() * 45));
+            }
+
+            // Pause between lines
+            await new Promise(r => setTimeout(r, 350));
+            if (cancelled) return;
+
+            // Hide cursor1, show line2 wrapper + cursor2
+            if (cursor1Ref.current) cursor1Ref.current.style.display = 'none';
+            if (line2WrapperRef.current) line2WrapperRef.current.style.display = 'inline-block';
+            if (cursor2Ref.current) cursor2Ref.current.style.display = 'inline-block';
+
+            // Type line 2 - direct DOM
+            for (let i = 0; i <= line2.length; i++) {
+                if (cancelled) return;
+                if (line2Ref.current) line2Ref.current.textContent = line2.slice(0, i);
+                await new Promise(r => setTimeout(r, 55 + Math.random() * 45));
+            }
+
+            // Done typing
+            await new Promise(r => setTimeout(r, 400));
+            if (cancelled) return;
+
+            // Hide typing cursor, show fade cursor briefly
+            if (cursor2Ref.current) cursor2Ref.current.style.display = 'none';
+            if (cursorFadeRef.current) cursorFadeRef.current.style.display = 'inline-block';
+
+            await new Promise(r => setTimeout(r, 600));
+            if (cancelled) return;
+            if (cursorFadeRef.current) cursorFadeRef.current.style.display = 'none';
+
+            // Single state update to reveal content
+            setShowContent(true);
+        };
+
+        typeText();
+        return () => { cancelled = true; };
+    }, []);
+
     return (
-        <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-white">
+        <section className="relative min-h-screen  lg:pt-0 pt-20 flex items-center justify-center overflow-hidden bg-white">
             {/* Interactive Grid Pattern Background */}
             <InteractiveGridPattern
-                className="absolute opacity-80 inset-0 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,white_40%,transparent_70%)]"
+                className="absolute opacity-40 inset-0 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,white_40%,transparent_70%)]"
                 squares={[60, 60]}
             />
 
@@ -123,7 +189,7 @@ function HeroSection() {
                 </span>
             </div>
 
-            {/* Floating School Icons - Left Side (Reduced Quantity) */}
+            {/* Floating School Icons - Left Side */}
             <div className="absolute top-[12%] left-[5%] md:left-[8%] opacity-[0.05] pointer-events-none animate-float-slow">
                 <GraduationCap className="w-10 h-10 md:w-16 md:h-16 text-black rotate-[-15deg]" strokeWidth={1} />
             </div>
@@ -140,7 +206,7 @@ function HeroSection() {
                 <BookOpen className="w-8 h-8 md:w-12 md:h-12 text-black rotate-[12deg]" strokeWidth={1} />
             </div>
 
-            {/* Floating School Icons - Right Side (Reduced Quantity) */}
+            {/* Floating School Icons - Right Side */}
             <div className="absolute top-[10%] right-[5%] md:right-[8%] opacity-[0.05] pointer-events-none animate-float-slower" style={{ animationDelay: '0.8s' }}>
                 <BookMarked className="w-9 h-9 md:w-14 md:h-14 text-black rotate-[18deg]" strokeWidth={1} />
             </div>
@@ -163,34 +229,55 @@ function HeroSection() {
             <div className="relative max-w-[1400px] mx-auto px-6 py-20 z-10 w-full">
                 {/* Hero Content */}
                 <div className="text-center space-y-8">
-                    {/* Badge */}
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 border-[#0469ff]/20 bg-[#0469ff]/5">
+                    {/* Badge - fades in after typing */}
+                    <div
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 border-[#0469ff]/20 bg-[#0469ff]/5 transition-all duration-700"
+                        style={{
+                            opacity: showContent ? 1 : 0,
+                            transform: showContent ? 'translateY(0)' : 'translateY(12px)',
+                        }}
+                    >
                         <div className="w-2 h-2 rounded-full bg-[#0469ff] animate-pulse" />
                         <span className="text-sm font-semibold text-[#0469ff]">AI Powered School ERP</span>
                     </div>
 
-                    {/* Main Heading */}
+                    {/* Main Heading with Typewriter */}
                     <h1 className="text-[clamp(2.8rem,8vw,6.5rem)] font-bold leading-[1.05] tracking-tight">
                         <span className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent">
-                            Modern School Management
+                            <span ref={line1Ref}></span>
+                            <span ref={cursor1Ref} className="typewriter-cursor" style={{ display: 'none' }} />
                         </span>
                         <br />
-                        <span className="relative inline-block mt-2">
+                        <span ref={line2WrapperRef} className="relative inline-block mt-2" style={{ display: 'none' }}>
                             <span className="text-[#0469ff]">
-                                Built for Real Schools
+                                <span ref={line2Ref}></span>
+                                <span ref={cursor2Ref} className="typewriter-cursor" style={{ display: 'none' }} />
                             </span>
                         </span>
+                        <span ref={cursorFadeRef} className="typewriter-cursor typewriter-cursor-fade" style={{ display: 'none' }} />
                     </h1>
 
-                    {/* Subtitle */}
-                    <p className="text-xl md:text-2xl text-gray-600 max-w-[800px] mx-auto leading-relaxed font-medium">
+                    {/* Subtitle - fades in after typing */}
+                    <p
+                        className="text-xl md:text-2xl text-gray-600 max-w-[800px] mx-auto leading-relaxed font-medium transition-all duration-700 delay-100"
+                        style={{
+                            opacity: showContent ? 1 : 0,
+                            transform: showContent ? 'translateY(0)' : 'translateY(18px)',
+                        }}
+                    >
                         An all-in-one school ERP with smart insights and modern UI/UX that simplifies administration and improves outcomes.
                     </p>
 
-                    {/* CTA Buttons */}
-                    <div className="flex items-center justify-center gap-5 flex-wrap pt-6">
+                    {/* CTA Buttons - fade in after typing */}
+                    <div
+                        className="flex items-center justify-center gap-5 flex-wrap pt-6 transition-all duration-700 delay-200"
+                        style={{
+                            opacity: showContent ? 1 : 0,
+                            transform: showContent ? 'translateY(0)' : 'translateY(22px)',
+                        }}
+                    >
                         <Link href="/contact">
-                            <button className="group relative px-10 py-4 rounded-full font-bold text-lg text-white bg-[#0469ff]  hover:shadow-2xl transition-all duration-300 overflow-hidden">
+                            <button className="group relative px-10 py-4 rounded-full font-bold text-lg text-white bg-[#0469ff] hover:shadow-2xl transition-all duration-300 overflow-hidden">
                                 <span className="absolute inset-0 bg-[#0358dd] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                                 <span className="relative flex items-center gap-3">
                                     Get Started
@@ -208,28 +295,6 @@ function HeroSection() {
                             <Play className="w-5 h-5" />
                         </button>
                     </div>
-
-                    {/* Stats Row */}
-                    {/* <div className="flex items-center justify-center gap-12 flex-wrap pt-16">
-                        <div className="text-center">
-                            <div className="text-3xl font-bold text-[#0469ff]">10K+</div>
-                            <div className="text-sm text-gray-600 font-medium mt-1">Active Schools</div>
-                        </div>
-                        <div className="w-px h-12 bg-gray-200" />
-                        <div className="text-center">
-                            <div className="text-3xl font-bold text-[#0469ff]">5M+</div>
-                            <div className="text-sm text-gray-600 font-medium mt-1">Students Managed</div>
-                        </div>
-                        <div className="w-px h-12 bg-gray-200" />
-                        <div className="text-center">
-                            <div className="flex items-center gap-1 justify-center mb-1">
-                                {[1, 2, 3, 4, 5].map(i => (
-                                    <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                                ))}
-                            </div>
-                            <div className="text-sm text-gray-600 font-medium">4.9/5 Rating</div>
-                        </div>
-                    </div> */}
                 </div>
             </div>
 
@@ -293,6 +358,62 @@ function HeroSection() {
                 }
                 .scrollbar-hide::-webkit-scrollbar {
                     display: none;
+                }
+
+                /* Glowing Typewriter Cursor */
+                .typewriter-cursor {
+                    display: inline-block;
+                    position: relative;
+                    width: 4px;
+                    height: 1.1em;
+                    margin-left: 3px;
+                    vertical-align: middle;
+                    border-radius: 4px 4px 6px 6px;
+                    background: linear-gradient(180deg, #0567fe 0%, #037a7b 45%, rgba(3, 122, 123, 0.4) 75%, rgba(0, 0, 0, 0.08) 100%);
+                    animation: cursorGlow 2s ease-in-out infinite;
+                }
+                /* Blurred glow at the bottom of cursor */
+                .typewriter-cursor::after {
+                    content: '';
+                    position: absolute;
+                    bottom: -8px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    width: 10px;
+                    height: 14px;
+                    border-radius: 50%;
+                    background: radial-gradient(ellipse, rgba(3, 122, 123, 0.35) 0%, rgba(5, 103, 254, 0.15) 40%, transparent 70%);
+                    filter: blur(3px);
+                    pointer-events: none;
+                }
+                /* Idle blink before typing starts */
+                .typewriter-cursor-idle {
+                    animation: cursorBlink 0.6s steps(1) infinite, cursorGlow 2s ease-in-out infinite;
+                }
+                .typewriter-cursor-fade {
+                    animation: cursorFadeOut 0.6s ease forwards;
+                }
+                @keyframes cursorBlink {
+                    0%, 50% { opacity: 1; }
+                    51%, 100% { opacity: 0; }
+                }
+                @keyframes cursorGlow {
+                    0%, 100% {
+                        box-shadow:
+                            0 0 6px rgba(5, 103, 254, 0.5),
+                            0 0 14px rgba(3, 122, 123, 0.3),
+                            0 0 20px rgba(5, 103, 254, 0.15);
+                    }
+                    50% {
+                        box-shadow:
+                            0 0 10px rgba(5, 103, 254, 0.7),
+                            0 0 22px rgba(3, 122, 123, 0.5),
+                            0 0 32px rgba(5, 103, 254, 0.3);
+                    }
+                }
+                @keyframes cursorFadeOut {
+                    0% { opacity: 1; }
+                    100% { opacity: 0; }
                 }
             `}</style>
         </section>
