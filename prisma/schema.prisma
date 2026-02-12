@@ -1678,24 +1678,30 @@ model Role {
 }
 
 model User {
-  id             String      @id @db.Uuid
-  schoolId       String?     @db.Uuid
-  roleId         Int
-  email          String      @unique
-  password       String
-  name           String?
-  gender         String      @default("Unknown")
-  profilePicture String      @default("default.png")
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-  deletedAt      DateTime?
-  status         UserStatus  @default(ACTIVE)
-  Admin          Admin?
-  librarian      Librarian?
-  accountant     Accountant?
-  director       Director?
-  principal      Principal?
-  fcmToken       String?
+  id                   String     @id @db.Uuid
+  schoolId             String?    @db.Uuid
+  roleId               Int
+  email                String     @unique
+  password             String
+  name                 String?
+  gender               String     @default("Unknown")
+  profilePicture       String     @default("default.png")
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+  deletedAt            DateTime?
+  status               UserStatus @default(ACTIVE)
+  // Two-Factor Authentication
+  twoFactorEnabled     Boolean    @default(false)
+  twoFactorSecret      String? // AES-256-GCM encrypted TOTP secret
+  twoFactorTempSecret  String? // temp secret during setup (encrypted)
+  twoFactorBackupCodes String[]   @default([]) // SHA-256 hashed backup codes
+
+  Admin      Admin?
+  librarian  Librarian?
+  accountant Accountant?
+  director   Director?
+  principal  Principal?
+  fcmToken   String?
 
   AuditLog              AuditLog[]
   Document              Document[]

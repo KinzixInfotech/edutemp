@@ -19,7 +19,15 @@ const nextConfig = {
       },
       {
         protocol: "https",
+        hostname: "play-lh.googleusercontent.com",
+      },
+      {
+        protocol: "https",
         hostname: "sea1.ingest.uploadthing.com",
+      },
+      {
+        protocol: "https",
+        hostname: "dyjh2wszjk.ufs.sh",
       },
     ],
   },

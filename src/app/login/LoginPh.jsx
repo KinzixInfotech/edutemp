@@ -1,14 +1,14 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
-import { Loader2, Eye, EyeOff, Mail, Lock, CheckCircle2, AlertCircle, ArrowLeft } from "lucide-react"
+import { Loader2, Eye, EyeOff, Mail, Lock, CheckCircle2, AlertCircle, ArrowLeft, Shield, KeyRound } from "lucide-react"
 import axios from "axios"
 import Link from "next/link"
 import Image from "next/image"
@@ -24,6 +24,15 @@ export default function LoginPhoto() {
     const [loadingl, setLoadingl] = useState(true)
     const [alreadyLoggedIn, setAlreadyLoggedIn] = useState(false)
     const [turnstileToken, setTurnstileToken] = useState('');
+
+    // 2FA state
+    const [show2FA, setShow2FA] = useState(false);
+    const [twoFACode, setTwoFACode] = useState('');
+    const [twoFALoading, setTwoFALoading] = useState(false);
+    const [pendingUser, setPendingUser] = useState(null); // holds user data during 2FA
+    const [pendingSession, setPendingSession] = useState(null);
+    const [useBackupCode, setUseBackupCode] = useState(false);
+    const twoFAInputRef = useRef(null);
 
     // School data state
     const searchParams = useSearchParams()
@@ -165,32 +174,77 @@ export default function LoginPhoto() {
                 return;
             }
 
-            // Success Record
-            axios.post('/api/auth/record-attempt', {
-                email,
-                success: true,
-                schoolCode: school?.schoolCode
-            }).catch(err => console.error(err));
+            // ─── 2FA Check ───────────────────────────────────
+            if (result.twoFactorEnabled) {
+                setPendingUser(result);
+                setPendingSession(data.session);
+                setShow2FA(true);
+                setLoading(false);
+                setTimeout(() => twoFAInputRef.current?.focus(), 100);
+                return;
+            }
 
-            localStorage.setItem("user", JSON.stringify(result));
-
-            // Session Record (Async)
-            fetch('/api/auth/sessions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: result.id,
-                    rememberMe,
-                    supabaseSessionToken: data.session?.access_token
-                })
-            }).catch(err => console.error("Session record failed", err));
-
-            toast.success("Welcome back, " + result?.name || "User");
-            router.push("/dashboard");
+            // No 2FA — proceed to dashboard
+            completeLogin(result, data.session);
 
         } catch (err) {
             toast.error("Login Error", { description: err.message });
             setLoading(false);
+        }
+    };
+
+    // ─── Complete Login (after password + optional 2FA) ──────
+    const completeLogin = (result, session) => {
+        axios.post('/api/auth/record-attempt', {
+            email,
+            success: true,
+            schoolCode: school?.schoolCode
+        }).catch(err => console.error(err));
+
+        localStorage.setItem("user", JSON.stringify(result));
+
+        fetch('/api/auth/sessions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: result.id,
+                rememberMe,
+                supabaseSessionToken: session?.access_token
+            })
+        }).catch(err => console.error("Session record failed", err));
+
+        toast.success("Welcome back, " + result?.name || "User");
+        router.push("/dashboard");
+    };
+
+    // ─── 2FA Challenge Submit ────────────────────────────────
+    const handle2FASubmit = async (e) => {
+        e.preventDefault();
+        if (!twoFACode.trim()) return;
+        setTwoFALoading(true);
+
+        try {
+            const res = await fetch('/api/auth/2fa/challenge', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: pendingUser.id, code: twoFACode.trim() }),
+            });
+            const data = await res.json();
+
+            if (res.ok && data.success) {
+                if (data.backupCodeUsed) {
+                    toast.info(`Backup code used. ${data.remainingBackupCodes} remaining.`);
+                }
+                completeLogin(pendingUser, pendingSession);
+            } else {
+                toast.error("Verification Failed", { description: data.error });
+                setTwoFACode('');
+                twoFAInputRef.current?.focus();
+            }
+        } catch (err) {
+            toast.error("Verification Error", { description: err.message });
+        } finally {
+            setTwoFALoading(false);
         }
     };
 
@@ -299,100 +353,185 @@ export default function LoginPhoto() {
                 <div className="w-full lg:w-[45%] flex flex-col justify-center px-12 sm:px-16 py-12 relative bg-white">
                     <div className="max-w-[360px] mx-auto w-full">
 
-                        <div className="mb-10">
-                            <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome back</h2>
-                            <p className="text-gray-500 text-sm">Please enter your details to sign in.</p>
-                        </div>
-
-                        <form onSubmit={handleLogin} className="space-y-5">
-                            <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold uppercase tracking-wider text-gray-500 ml-1">Email</Label>
-                                <div className="relative">
-                                    <Mail className="absolute left-4 top-3.5 w-4 h-4 text-gray-400" />
-                                    <Input
-                                        type="email"
-                                        placeholder="Enter your email"
-                                        className="pl-11 h-12 bg-gray-50 border-gray-100 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl transition-all font-medium text-gray-900 placeholder:text-gray-400"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        required
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold uppercase tracking-wider text-gray-500 ml-1">Password</Label>
-                                <div className="relative">
-                                    <Lock className="absolute left-4 top-3.5 w-4 h-4 text-gray-400" />
-                                    <Input
-                                        type={showPassword ? "text" : "password"}
-                                        placeholder="••••••••"
-                                        className="pl-11 pr-11 h-12 bg-gray-50 border-gray-100 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl transition-all font-medium text-gray-900 placeholder:text-gray-400"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        required
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute right-4 top-3.5 text-gray-400 hover:text-gray-600 transition-colors focus:outline-none"
-                                    >
-                                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center justify-between pt-1">
-                                <label className="flex items-center gap-2 cursor-pointer group">
-                                    <div className={`w-4 h-4 rounded border transition-colors flex items-center justify-center ${rememberMe ? 'bg-blue-600 border-blue-600' : 'border-gray-300 bg-white group-hover:border-blue-400'}`}>
-                                        {rememberMe && <CheckCircle2 className="w-3 h-3 text-white" />}
+                        {show2FA ? (
+                            /* ─── 2FA Challenge Screen ─── */
+                            <>
+                                <div className="mb-8">
+                                    <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-5">
+                                        <Shield className="w-7 h-7 text-blue-600" />
                                     </div>
-                                    <input
-                                        type="checkbox"
-                                        className="hidden"
-                                        checked={rememberMe}
-                                        onChange={(e) => setRememberMe(e.target.checked)}
-                                    />
-                                    <span className="text-xs font-medium text-gray-600 group-hover:text-gray-900 transition-colors">Remember me</span>
-                                </label>
-                                <Link href="/forgot-password" className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors">
-                                    Forgot password?
-                                </Link>
-                            </div>
-
-
-
-                            <button
-                                type="submit"
-                                disabled={loading || alreadyLoggedIn || !email || !password}
-                                className={`group w-full relative h-12 rounded-xl border font-bold text-base transition-all duration-300 overflow-hidden flex items-center justify-center gap-2 mt-2 ${loading || alreadyLoggedIn || !email || !password
-                                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                    : 'bg-[#0569ff] text-white shadow-[0_4px_20px_rgba(5,105,255,0.3)] hover:shadow-[0_8px_30px_rgba(5,105,255,0.4)]'
-                                    }`}
-                            >
-                                {!loading && !alreadyLoggedIn && email && password && (
-                                    <span className="absolute inset-0 bg-[#0358dd] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                                )}
-                                {loading ? (
-                                    <>
-                                        <Loader2 className="w-5 h-5 animate-spin relative z-10" />
-                                        <span className="relative z-10">Signing in...</span>
-                                    </>
-                                ) : (
-                                    <span className="relative z-10">Sign in</span>
-                                )}
-                            </button>
-                            {/* Turnstile Widget - Hidden in development */}
-                            {process.env.NODE_ENV !== 'development' && (
-                                <div className="flex justify-center pt-2">
-                                    <Turnstile
-                                        sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
-                                        onVerify={(token) => setTurnstileToken(token)}
-                                        theme="light"
-                                    />
+                                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Two-Factor Authentication</h2>
+                                    <p className="text-gray-500 text-sm">
+                                        {useBackupCode
+                                            ? "Enter one of your backup codes to continue."
+                                            : "Enter the 6-digit code from your authenticator app."}
+                                    </p>
                                 </div>
-                            )}
-                        </form>
+
+                                <form onSubmit={handle2FASubmit} className="space-y-5">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-semibold uppercase tracking-wider text-gray-500 ml-1">
+                                            {useBackupCode ? "Backup Code" : "Verification Code"}
+                                        </Label>
+                                        <div className="relative">
+                                            <KeyRound className="absolute left-4 top-3.5 w-4 h-4 text-gray-400" />
+                                            <Input
+                                                ref={twoFAInputRef}
+                                                type="text"
+                                                inputMode={useBackupCode ? "text" : "numeric"}
+                                                placeholder={useBackupCode ? "XXXXXXXX" : "000000"}
+                                                maxLength={useBackupCode ? 8 : 6}
+                                                className="pl-11 h-12 bg-gray-50 border-gray-100 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl transition-all font-mono text-lg tracking-[0.3em] text-center text-gray-900 placeholder:text-gray-300"
+                                                value={twoFACode}
+                                                onChange={(e) => setTwoFACode(e.target.value.replace(useBackupCode ? /[^A-Fa-f0-9]/g : /\D/g, ''))}
+                                                autoComplete="one-time-code"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        type="submit"
+                                        disabled={twoFALoading || !twoFACode.trim()}
+                                        className={`group w-full relative h-12 rounded-xl border font-bold text-base transition-all duration-300 overflow-hidden flex items-center justify-center gap-2 ${twoFALoading || !twoFACode.trim()
+                                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                            : 'bg-[#0569ff] text-white shadow-[0_4px_20px_rgba(5,105,255,0.3)] hover:shadow-[0_8px_30px_rgba(5,105,255,0.4)]'
+                                            }`}
+                                    >
+                                        {twoFALoading ? (
+                                            <>
+                                                <Loader2 className="w-5 h-5 animate-spin relative z-10" />
+                                                <span className="relative z-10">Verifying...</span>
+                                            </>
+                                        ) : (
+                                            <span className="relative z-10">Verify</span>
+                                        )}
+                                    </button>
+
+                                    <div className="flex items-center justify-between pt-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setUseBackupCode(!useBackupCode);
+                                                setTwoFACode('');
+                                                twoFAInputRef.current?.focus();
+                                            }}
+                                            className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                                        >
+                                            {useBackupCode ? "Use authenticator app" : "Use a backup code"}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setShow2FA(false);
+                                                setTwoFACode('');
+                                                setPendingUser(null);
+                                                setPendingSession(null);
+                                                supabase.auth.signOut();
+                                            }}
+                                            className="text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
+                                        >
+                                            ← Back to login
+                                        </button>
+                                    </div>
+                                </form>
+                            </>
+                        ) : (
+                            /* ─── Login Form ─── */
+                            <>
+                                <div className="mb-10">
+                                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome back</h2>
+                                    <p className="text-gray-500 text-sm">Please enter your details to sign in.</p>
+                                </div>
+
+                                <form onSubmit={handleLogin} className="space-y-5">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-semibold uppercase tracking-wider text-gray-500 ml-1">Email</Label>
+                                        <div className="relative">
+                                            <Mail className="absolute left-4 top-3.5 w-4 h-4 text-gray-400" />
+                                            <Input
+                                                type="email"
+                                                placeholder="Enter your email"
+                                                className="pl-11 h-12 bg-gray-50 border-gray-100 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl transition-all font-medium text-gray-900 placeholder:text-gray-400"
+                                                value={email}
+                                                onChange={(e) => setEmail(e.target.value)}
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-semibold uppercase tracking-wider text-gray-500 ml-1">Password</Label>
+                                        <div className="relative">
+                                            <Lock className="absolute left-4 top-3.5 w-4 h-4 text-gray-400" />
+                                            <Input
+                                                type={showPassword ? "text" : "password"}
+                                                placeholder="••••••••"
+                                                className="pl-11 pr-11 h-12 bg-gray-50 border-gray-100 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl transition-all font-medium text-gray-900 placeholder:text-gray-400"
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                required
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                className="absolute right-4 top-3.5 text-gray-400 hover:text-gray-600 transition-colors focus:outline-none"
+                                            >
+                                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between pt-1">
+                                        <label className="flex items-center gap-2 cursor-pointer group">
+                                            <div className={`w-4 h-4 rounded border transition-colors flex items-center justify-center ${rememberMe ? 'bg-blue-600 border-blue-600' : 'border-gray-300 bg-white group-hover:border-blue-400'}`}>
+                                                {rememberMe && <CheckCircle2 className="w-3 h-3 text-white" />}
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                className="hidden"
+                                                checked={rememberMe}
+                                                onChange={(e) => setRememberMe(e.target.checked)}
+                                            />
+                                            <span className="text-xs font-medium text-gray-600 group-hover:text-gray-900 transition-colors">Remember me</span>
+                                        </label>
+                                        <Link href="/forgot-password" className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors">
+                                            Forgot password?
+                                        </Link>
+                                    </div>
+
+                                    <button
+                                        type="submit"
+                                        disabled={loading || alreadyLoggedIn || !email || !password}
+                                        className={`group w-full relative h-12 rounded-xl border font-bold text-base transition-all duration-300 overflow-hidden flex items-center justify-center gap-2 mt-2 ${loading || alreadyLoggedIn || !email || !password
+                                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                            : 'bg-[#0569ff] text-white shadow-[0_4px_20px_rgba(5,105,255,0.3)] hover:shadow-[0_8px_30px_rgba(5,105,255,0.4)]'
+                                            }`}
+                                    >
+                                        {!loading && !alreadyLoggedIn && email && password && (
+                                            <span className="absolute inset-0 bg-[#0358dd] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                        )}
+                                        {loading ? (
+                                            <>
+                                                <Loader2 className="w-5 h-5 animate-spin relative z-10" />
+                                                <span className="relative z-10">Signing in...</span>
+                                            </>
+                                        ) : (
+                                            <span className="relative z-10">Sign in</span>
+                                        )}
+                                    </button>
+                                    {/* Turnstile Widget - Hidden in development */}
+                                    {process.env.NODE_ENV !== 'development' && (
+                                        <div className="flex justify-center pt-2">
+                                            <Turnstile
+                                                sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+                                                onVerify={(token) => setTurnstileToken(token)}
+                                                theme="light"
+                                            />
+                                        </div>
+                                    )}
+                                </form>
+                            </>
+                        )}
                     </div>
 
                     {/* Bottom Legal/Copyright (Optional) */}

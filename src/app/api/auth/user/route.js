@@ -351,6 +351,7 @@ export async function GET(req) {
             role: user.role,
             profilePicture: user.profilePicture,
             schoolId: null,
+            twoFactorEnabled: user.twoFactorEnabled || false,
         };
 
         // Role-specific fetch
