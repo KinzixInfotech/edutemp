@@ -5,6 +5,7 @@ import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { addYears, addDays } from "date-fns";
 import { deleteFileByUrl } from "@/lib/server-uploadthing";
+import { invalidatePattern } from "@/lib/cache";
 
 // Schema validation
 const schoolSchema = z.object({
@@ -390,6 +391,9 @@ export async function POST(req) {
       timeout: 30000, // 30 seconds timeout
       maxWait: 60000, // 60 seconds max wait
     });
+
+    // Invalidate school search cache so new school appears immediately
+    await invalidatePattern('schools:search:*');
 
     return NextResponse.json({ success: true, result });
 

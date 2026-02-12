@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma"; // Use singleton to prevent connection pool exhaustion
+import prisma from "@/lib/prisma";
+import { invalidatePattern } from "@/lib/cache";
 
 const updateSchema = z.object({
     name: z.string().optional(),
@@ -47,6 +48,9 @@ export async function PUT(req) {
                 customDomain: parsed.domainMode === "custom" ? parsed.customDomain : "",
             },
         });
+
+        // Invalidate school search cache so updated details appear immediately
+        await invalidatePattern('schools:search:*');
 
         return NextResponse.json({ success: true, school: updatedSchool });
     } catch (error) {

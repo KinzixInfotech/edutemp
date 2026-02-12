@@ -7,6 +7,61 @@ import { InteractiveGridPattern } from "@/components/ui/interactive-grid-pattern
 import { useRouter } from "next/navigation";
 
 const SCHOOLS_PER_PAGE = 4;
+const LOCATION_CACHE_KEY = 'eb_nearby_schools';
+const LOCATION_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+const SEARCH_CACHE_TTL = 5 * 60 * 1000;     // 5 minutes
+const SEARCH_CACHE_MAX = 50;                  // max cached queries
+
+// ─── In-memory search cache (LRU) ───
+const searchCache = new Map();
+
+function getCachedSearch(query) {
+    const key = query.toLowerCase().trim();
+    const entry = searchCache.get(key);
+    if (!entry) return null;
+    if (Date.now() - entry.ts > SEARCH_CACHE_TTL) {
+        searchCache.delete(key);
+        return null;
+    }
+    // Move to end (most recently used)
+    searchCache.delete(key);
+    searchCache.set(key, entry);
+    return entry.data;
+}
+
+function setCachedSearch(query, data) {
+    const key = query.toLowerCase().trim();
+    // Evict oldest if at capacity
+    if (searchCache.size >= SEARCH_CACHE_MAX) {
+        const oldest = searchCache.keys().next().value;
+        searchCache.delete(oldest);
+    }
+    searchCache.set(key, { data, ts: Date.now() });
+}
+
+// ─── SessionStorage helpers for location cache ───
+function getLocationCache() {
+    try {
+        const raw = sessionStorage.getItem(LOCATION_CACHE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (Date.now() - parsed.ts > LOCATION_CACHE_TTL) {
+            sessionStorage.removeItem(LOCATION_CACHE_KEY);
+            return null;
+        }
+        return parsed;
+    } catch { return null; }
+}
+
+function setLocationCache(city, schools) {
+    try {
+        sessionStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify({
+            city,
+            schools,
+            ts: Date.now(),
+        }));
+    } catch { }
+}
 
 const Hero = () => {
     const router = useRouter();
@@ -24,18 +79,30 @@ const Hero = () => {
     const [userCity, setUserCity] = useState("");
     const [currentPage, setCurrentPage] = useState(0);
     const searchTimeout = useRef(null);
+    const hasFetchedLocation = useRef(false);
 
-    // ─── Fetch nearby schools via navigator.geolocation ───
-    const fetchNearbySchools = useCallback(async () => {
+    // ─── Fetch nearby schools (stale-while-revalidate) ───
+    const fetchNearbySchools = useCallback(async (skipCache = false) => {
         if (!navigator.geolocation) return;
+        if (hasFetchedLocation.current && !skipCache) return;
+        hasFetchedLocation.current = true;
 
-        setLocationLoading(true);
+        // 1. Serve from cache instantly
+        const cached = getLocationCache();
+        if (cached && !skipCache) {
+            setUserCity(cached.city);
+            setNearbySchools(cached.schools);
+            // Still refresh in background (stale-while-revalidate)
+        }
+
+        // 2. Fetch fresh in background (or foreground if no cache)
+        if (!cached) setLocationLoading(true);
+
         navigator.geolocation.getCurrentPosition(
             async (position) => {
                 try {
                     const { latitude, longitude } = position.coords;
 
-                    // Reverse geocode using OpenStreetMap Nominatim
                     const geoRes = await fetch(
                         `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`,
                         { headers: { 'Accept-Language': 'en' } }
@@ -59,16 +126,33 @@ const Hero = () => {
                         return;
                     }
 
-                    const allSchools = new Map();
-                    for (const term of searchTerms) {
-                        try {
+                    // Parallel fetch all location terms at once
+                    const results = await Promise.allSettled(
+                        searchTerms.map(async (term) => {
+                            // Check in-memory cache first
+                            const cachedResult = getCachedSearch(term);
+                            if (cachedResult) return cachedResult;
+
                             const res = await fetch(`/api/schools/search?q=${encodeURIComponent(term)}`);
                             const data = await res.json();
-                            (data?.schools || []).forEach((s) => allSchools.set(s.id, s));
-                        } catch { }
-                    }
+                            const schools = data?.schools || [];
+                            setCachedSearch(term, schools);
+                            return schools;
+                        })
+                    );
 
-                    setNearbySchools(Array.from(allSchools.values()));
+                    const allSchools = new Map();
+                    results.forEach((r) => {
+                        if (r.status === 'fulfilled') {
+                            r.value.forEach((s) => allSchools.set(s.id, s));
+                        }
+                    });
+
+                    const schoolList = Array.from(allSchools.values());
+                    setNearbySchools(schoolList);
+
+                    // Persist to sessionStorage
+                    setLocationCache(displayCity, schoolList);
                 } catch (err) {
                     console.log('Location fetch error:', err);
                 } finally {
@@ -84,15 +168,24 @@ const Hero = () => {
         fetchNearbySchools();
     }, [fetchNearbySchools]);
 
-    // ─── Debounced School Search ───
+    // ─── Debounced School Search (with cache) ───
     const handleSearch = useCallback((text) => {
         setSearchQuery(text);
         setCurrentPage(0);
 
         if (searchTimeout.current) clearTimeout(searchTimeout.current);
 
-        if (text.trim().length < 2) {
+        const trimmed = text.trim();
+        if (trimmed.length < 2) {
             setSearchResults([]);
+            setSearching(false);
+            return;
+        }
+
+        // Check cache first — instant result
+        const cached = getCachedSearch(trimmed);
+        if (cached) {
+            setSearchResults(cached);
             setSearching(false);
             return;
         }
@@ -101,9 +194,11 @@ const Hero = () => {
 
         searchTimeout.current = setTimeout(async () => {
             try {
-                const res = await fetch(`/api/schools/search?q=${encodeURIComponent(text.trim())}`);
+                const res = await fetch(`/api/schools/search?q=${encodeURIComponent(trimmed)}`);
                 const data = await res.json();
-                setSearchResults(data?.schools || []);
+                const schools = data?.schools || [];
+                setCachedSearch(trimmed, schools);
+                setSearchResults(schools);
             } catch {
                 setSearchResults([]);
             } finally {
