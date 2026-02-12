@@ -179,10 +179,6 @@ function HeroSection() {
                             <span className="text-[#0469ff]">
                                 Built for Real Schools
                             </span>
-                            {/* Underline Effect */}
-                            <svg className="absolute -bottom-4 left-0 w-full" height="12" viewBox="0 0 300 12" fill="none">
-                                <path d="M2 8C70 3 150 1 298 8" stroke="#0469ff" strokeWidth="3" strokeLinecap="round" />
-                            </svg>
                         </span>
                     </h1>
 
