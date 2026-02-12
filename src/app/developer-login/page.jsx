@@ -308,12 +308,14 @@ export default function DeveloperLoginPage() {
                                         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Authenticate"}
                                     </Button>
                                     {/* Turnstile Widget */}
-                                    <div className="flex justify-center">
-                                        <Turnstile
-                                            sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
-                                            onVerify={(token) => setTurnstileToken(token)}
-                                            theme="light"
-                                        />
+                                    <div className="w-full overflow-hidden" style={{ height: '65px' }}>
+                                        <div style={{ transform: 'scaleX(1.2)', transformOrigin: 'center top' }}>
+                                            <Turnstile
+                                                sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+                                                onVerify={(token) => setTurnstileToken(token)}
+                                                theme="auto"
+                                            />
+                                        </div>
                                     </div>
                                 </form>
                             </>

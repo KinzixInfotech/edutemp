@@ -1,29 +1,39 @@
 'use client';
 
-import { Loader2, RefreshCw } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { RefreshCw } from 'lucide-react';
 
 export function SessionSwitchLoader({
     isActive = false,
     title = "Switching Session",
     message = "Please wait while we load data for the new academic session..."
 }) {
-    if (!isActive) return null;
+    const [mounted, setMounted] = useState(false);
 
-    return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/95 backdrop-blur-md">
-            <div className="flex flex-col items-center gap-6 p-8">
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    if (!isActive || !mounted) return null;
+
+    const overlay = (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-background/95 backdrop-blur-md"
+            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh' }}
+        >
+            <div className="flex flex-col items-center gap-6 p-6 sm:p-8 max-w-sm w-full mx-4">
                 {/* Animated loader */}
                 <div className="relative">
-                    <RefreshCw className="h-16 w-16 text-primary animate-spin" />
+                    <RefreshCw className="h-12 w-12 sm:h-16 sm:w-16 text-primary animate-spin" />
                     <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="h-8 w-8 rounded-full bg-primary/20 animate-pulse" />
+                        <div className="h-6 w-6 sm:h-8 sm:w-8 rounded-full bg-primary/20 animate-pulse" />
                     </div>
                 </div>
 
                 {/* Text */}
                 <div className="text-center space-y-2">
-                    <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
-                    <p className="text-sm text-muted-foreground max-w-sm">
+                    <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">{title}</h2>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                         {message}
                     </p>
                 </div>
@@ -37,4 +47,7 @@ export function SessionSwitchLoader({
             </div>
         </div>
     );
+
+    // Portal to document.body so it escapes any stacking context (sidebar, etc.)
+    return createPortal(overlay, document.body);
 }
