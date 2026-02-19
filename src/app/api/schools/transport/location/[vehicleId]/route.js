@@ -55,6 +55,7 @@ export async function GET(req, props) {
                 status: true,
                 trackingStatus: true,
                 lastLocationTime: true,
+                schoolId: true,
                 routes: {
                     select: {
                         id: true,
@@ -79,11 +80,12 @@ export async function GET(req, props) {
                                 id: true,
                                 name: true,
                                 contactNumber: true,
-                                licenseNumber: true
+                                licenseNumber: true,
+                                profilePicture: true
                             }
                         },
                         conductor: {
-                            select: { id: true, name: true, contactNumber: true },
+                            select: { id: true, name: true, contactNumber: true, profilePicture: true },
                         },
                     },
                 },
@@ -104,8 +106,8 @@ export async function GET(req, props) {
                 id: true,
                 tripType: true,
                 startedAt: true,
-                driver: { select: { id: true, name: true, contactNumber: true, licenseNumber: true } },
-                conductor: { select: { id: true, name: true, contactNumber: true } },
+                driver: { select: { id: true, name: true, contactNumber: true, licenseNumber: true, profilePicture: true } },
+                conductor: { select: { id: true, name: true, contactNumber: true, profilePicture: true } },
                 route: {
                     select: {
                         name: true,
@@ -159,6 +161,16 @@ export async function GET(req, props) {
         const stops = activeTrip?.route?.busStops || route?.busStops || [];
         const assignedStudents = route?._count?.studentAssignments || 0;
 
+        // Fetch school profile picture
+        let schoolProfilePicture = null;
+        if (vehicle.schoolId) {
+            const school = await prisma.school.findUnique({
+                where: { id: vehicle.schoolId },
+                select: { profilePicture: true },
+            });
+            schoolProfilePicture = school?.profilePicture || null;
+        }
+
         return NextResponse.json({
             vehicle: {
                 id: vehicle.id,
@@ -179,6 +191,7 @@ export async function GET(req, props) {
             routeName,
             stops,
             assignedStudents,
+            schoolProfilePicture,
         });
     } catch (error) {
         // Edge Case #16: Handle backend errors gracefully
