@@ -117,6 +117,25 @@ export default function PublicFormPage() {
                     animate={{ scale: 1, opacity: 1 }}
                     className="text-center max-w-sm"
                 >
+                    {/* School Branding on Success */}
+                    {form?.school && (
+                        <div className="flex items-center justify-center gap-2.5 mb-6">
+                            {form.school.profilePicture ? (
+                                <img
+                                    src={form.school.profilePicture}
+                                    alt={form.school.name}
+                                    className="w-8 h-8 rounded-full object-cover ring-2 ring-white shadow-sm"
+                                />
+                            ) : (
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center text-white font-bold text-xs shadow-sm ring-2 ring-white">
+                                    {form.school.name?.charAt(0)?.toUpperCase()}
+                                </div>
+                            )}
+                            <span className="text-sm font-semibold text-slate-600">
+                                {form.school.name}
+                            </span>
+                        </div>
+                    )}
                     <motion.div
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
@@ -142,20 +161,42 @@ export default function PublicFormPage() {
     // Form UI
     return (
         <div className="min-h-screen bg-white">
-            {/* Floating Header */}
+            {/* Floating Header with School Branding */}
             <div className="sticky top-0 z-50 backdrop-blur-xl bg-white/80 border-b border-slate-200/50">
-                <div className="max-w-2xl mx-auto px-6 py-4 flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                        <h1 className="text-lg font-semibold text-slate-900 truncate">{form.title}</h1>
-                        {form.description && (
-                            <p className="text-sm text-slate-500 truncate">{form.description}</p>
+                <div className="max-w-2xl mx-auto px-6 py-4">
+                    {/* School Branding */}
+                    {form.school && (
+                        <div className="flex items-center gap-3 mb-3 pb-3 border-b border-slate-100">
+                            {form.school.profilePicture ? (
+                                <img
+                                    src={form.school.profilePicture}
+                                    alt={form.school.name}
+                                    className="w-10 h-10 rounded-full object-cover ring-2 ring-slate-100 shadow-sm"
+                                />
+                            ) : (
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center text-white font-bold text-sm shadow-sm ring-2 ring-slate-100">
+                                    {form.school.name?.charAt(0)?.toUpperCase()}
+                                </div>
+                            )}
+                            <span className="text-sm font-semibold text-slate-700 tracking-tight">
+                                {form.school.name}
+                            </span>
+                        </div>
+                    )}
+                    {/* Form Title */}
+                    <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                            <h1 className="text-lg font-semibold text-slate-900 truncate">{form.title}</h1>
+                            {form.description && (
+                                <p className="text-sm text-slate-500 truncate">{form.description}</p>
+                            )}
+                        </div>
+                        {form.status !== "PUBLISHED" && (
+                            <span className="ml-4 text-xs font-medium px-3 py-1.5 rounded-full bg-amber-100 text-amber-700">
+                                {form.status}
+                            </span>
                         )}
                     </div>
-                    {form.status !== "PUBLISHED" && (
-                        <span className="ml-4 text-xs font-medium px-3 py-1.5 rounded-full bg-amber-100 text-amber-700">
-                            {form.status}
-                        </span>
-                    )}
                 </div>
             </div>
 

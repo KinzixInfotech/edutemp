@@ -75,7 +75,7 @@ export async function GET(req, props) {
             // We relax the where clause for forms to show all forms, but stats will respect the filters
             const forms = await prisma.form.findMany({
                 where: { schoolId },
-                select: { id: true, title: true }
+                select: { id: true, title: true, viewCount: true }
             });
 
             // Group counts by formId (respecting query filters)
@@ -108,6 +108,7 @@ export async function GET(req, props) {
                     title: form.title,
                     totalApplications: total,
                     enrolledCount: enrolled,
+                    viewCount: form.viewCount || 0,
                     conversionRate: total > 0 ? ((enrolled / total) * 100).toFixed(1) : 0
                 };
             })
@@ -123,12 +124,16 @@ export async function GET(req, props) {
             const enrolledCount = stageStats.find(s => s.name === "Enrolled")?.count || 0;
             const conversionRate = totalApplications > 0 ? ((enrolledCount / totalApplications) * 100).toFixed(1) : 0;
 
+            // 6. Total form views
+            const totalFormViews = forms.reduce((sum, f) => sum + (f.viewCount || 0), 0);
+
             return {
                 totalApplications,
                 stageStats,
                 recentApplications,
                 conversionRate,
                 enrolledCount,
+                totalFormViews,
                 formStats: finalFormStats
             };
         }, 30);

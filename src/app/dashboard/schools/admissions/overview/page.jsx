@@ -205,8 +205,14 @@ export default function AdmissionOverviewPage() {
                         <Eye className="h-4 w-4 text-blue-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-blue-600">--</div>
-                        <p className="text-xs text-muted-foreground">Analytics integration pending</p>
+                        <div className="text-2xl font-bold text-blue-600">{stats?.totalFormViews || 0}</div>
+                        <p className="text-xs text-muted-foreground">
+                            {stats?.totalFormViews > 0 ? (
+                                <span>Across {stats?.formStats?.length || 0} forms</span>
+                            ) : (
+                                <span>No views yet</span>
+                            )}
+                        </p>
                     </CardContent>
                 </Card>
             </div>
@@ -252,6 +258,7 @@ export default function AdmissionOverviewPage() {
                                 <TableHeader>
                                     <TableRow className="bg-muted/50">
                                         <TableHead>Form Title</TableHead>
+                                        <TableHead className="text-center">Views</TableHead>
                                         <TableHead className="text-center">Applications</TableHead>
                                         <TableHead className="text-center">Enrolled</TableHead>
                                         <TableHead className="w-[200px]">Conversion</TableHead>
@@ -261,7 +268,7 @@ export default function AdmissionOverviewPage() {
                                 <TableBody>
                                     {stats?.formStats?.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                                                 No forms data found.
                                             </TableCell>
                                         </TableRow>
@@ -269,6 +276,12 @@ export default function AdmissionOverviewPage() {
                                         stats?.formStats?.map((form) => (
                                             <TableRow key={form.formId}>
                                                 <TableCell className="font-medium">{form.title}</TableCell>
+                                                <TableCell className="text-center">
+                                                    <span className="text-blue-600 font-medium flex items-center justify-center gap-1">
+                                                        <Eye className="w-3.5 h-3.5" />
+                                                        {form.viewCount || 0}
+                                                    </span>
+                                                </TableCell>
                                                 <TableCell className="text-center">
                                                     <Badge variant="outline">{form.totalApplications}</Badge>
                                                 </TableCell>

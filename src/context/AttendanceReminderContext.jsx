@@ -6,7 +6,17 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
+import {
+    AlertDialog,
+    AlertDialogContent,
+    AlertDialogHeader,
+    AlertDialogFooter,
+    AlertDialogTitle,
+    AlertDialogDescription,
+    AlertDialogAction,
+    AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
 
 const AttendanceReminderContext = createContext();
 
@@ -92,51 +102,50 @@ export function AttendanceReminderProvider({ children }) {
         setActiveReminder(null);
     }, [activeReminder]);
 
-    // Show a reminder (toast for web instead of modal)
+    // Reminder configurations
+    const REMINDER_CONFIG = {
+        [REMINDER_TYPES.CHECK_IN_OPEN]: {
+            emoji: '🕐',
+            title: 'Check-In Time!',
+            description: 'Attendance check-in is now open. Mark your attendance.',
+            actionLabel: 'Mark Attendance',
+            accentColor: 'bg-blue-500',
+        },
+        [REMINDER_TYPES.LATE_WARNING]: {
+            emoji: '⚠️',
+            title: 'Late Check-In Warning',
+            description: 'Grace period has ended. Check in now to avoid being marked late!',
+            actionLabel: 'Check In Now',
+            accentColor: 'bg-amber-500',
+        },
+        [REMINDER_TYPES.CHECK_OUT_OPEN]: {
+            emoji: '🏠',
+            title: 'Check-Out Available',
+            description: 'You can now check out. Don\'t forget to mark your exit!',
+            actionLabel: 'Check Out',
+            accentColor: 'bg-green-500',
+        },
+        [REMINDER_TYPES.CHECK_OUT_WARNING]: {
+            emoji: '⏰',
+            title: 'Check-Out Closing Soon!',
+            description: 'Only 15 minutes left to check out.',
+            actionLabel: 'Check Out Now',
+            accentColor: 'bg-red-500',
+        },
+    };
+
+    // Show a reminder popup
     const showReminder = useCallback((type, data = {}) => {
         if (isDismissedToday(type)) {
             console.log(`[AttendanceReminder] ${type} dismissed for today, skipping`);
             return;
         }
 
-        const config = {
-            [REMINDER_TYPES.CHECK_IN_OPEN]: {
-                title: '🕐 Check-In Time!',
-                description: 'Attendance check-in is now open. Mark your attendance.',
-                action: { label: 'Mark Attendance', onClick: () => window.location.href = '/dashboard/markattendance' },
-            },
-            [REMINDER_TYPES.LATE_WARNING]: {
-                title: '⚠️ Late Check-In Warning',
-                description: 'Grace period has ended. Check in now to avoid being marked late!',
-                action: { label: 'Check In Now', onClick: () => window.location.href = '/dashboard/markattendance' },
-            },
-            [REMINDER_TYPES.CHECK_OUT_OPEN]: {
-                title: '🏠 Check-Out Available',
-                description: 'You can now check out. Don\'t forget to mark your exit!',
-                action: { label: 'Check Out', onClick: () => window.location.href = '/dashboard/markattendance' },
-            },
-            [REMINDER_TYPES.CHECK_OUT_WARNING]: {
-                title: '⏰ Check-Out Closing Soon!',
-                description: 'Only 15 minutes left to check out.',
-                action: { label: 'Check Out Now', onClick: () => window.location.href = '/dashboard/markattendance' },
-            },
-        };
-
-        const reminderConfig = config[type];
+        const reminderConfig = REMINDER_CONFIG[type];
         if (!reminderConfig) return;
 
-        // Show toast notification
-        toast(reminderConfig.title, {
-            description: reminderConfig.description,
-            duration: 10000,
-            action: reminderConfig.action,
-            onDismiss: () => {
-                // Optional: track dismissal
-            },
-        });
-
-        // Also set state for potential dialog display
         setActiveReminder({ type, ...data, ...reminderConfig });
+        setIsDialogOpen(true);
     }, []);
 
     // Fetch attendance settings and status
@@ -353,7 +362,126 @@ export function AttendanceReminderProvider({ children }) {
     return (
         <AttendanceReminderContext.Provider value={value}>
             {children}
+            <AttendanceReminderPopup
+                activeReminder={activeReminder}
+                isDialogOpen={isDialogOpen}
+                setIsDialogOpen={setIsDialogOpen}
+                dismissReminder={dismissReminder}
+            />
         </AttendanceReminderContext.Provider>
+    );
+}
+
+// Popup component for attendance reminders - supports dark/light mode
+function AttendanceReminderPopup({ activeReminder, isDialogOpen, setIsDialogOpen, dismissReminder }) {
+    const router = useRouter();
+    const [dontRemindToday, setDontRemindToday] = useState(false);
+
+    const handleAction = () => {
+        dismissReminder(dontRemindToday);
+        setDontRemindToday(false);
+        router.push('/dashboard/markattendance');
+    };
+
+    const handleDismiss = () => {
+        dismissReminder(dontRemindToday);
+        setDontRemindToday(false);
+    };
+
+    if (!activeReminder) return null;
+
+    // Determine urgency styling
+    const isUrgent = activeReminder.type === REMINDER_TYPES.LATE_WARNING || activeReminder.type === REMINDER_TYPES.CHECK_OUT_WARNING;
+
+    return (
+        <AlertDialog open={isDialogOpen} onOpenChange={(open) => {
+            if (!open) handleDismiss();
+        }}>
+            <AlertDialogContent className="sm:max-w-[420px] p-0 overflow-hidden dark:bg-[#1a1a2e] bg-white border dark:border-gray-700/50 border-gray-200 shadow-2xl">
+                {/* Accent color bar at top */}
+                <div className={`h-1.5 w-full ${activeReminder.accentColor || 'bg-blue-500'}`} />
+
+                <div className="px-6 pt-5 pb-2">
+                    <AlertDialogHeader className="items-center sm:items-center text-center sm:text-center">
+                        {/* Emoji icon with pulse animation */}
+                        <div className={`
+                            w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-3
+                            ${isUrgent
+                                ? 'bg-red-50 dark:bg-red-950/30 animate-pulse'
+                                : 'bg-blue-50 dark:bg-blue-950/30'
+                            }
+                        `}>
+                            {activeReminder.emoji}
+                        </div>
+
+                        <AlertDialogTitle className="text-xl font-bold dark:text-white text-gray-900">
+                            {activeReminder.title}
+                        </AlertDialogTitle>
+
+                        <AlertDialogDescription className="text-sm dark:text-gray-400 text-gray-600 mt-1 leading-relaxed">
+                            {activeReminder.description}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                </div>
+
+                <div className="px-6 pb-5">
+                    {/* Don't remind today checkbox */}
+                    <label className="flex items-center gap-2.5 mb-4 cursor-pointer select-none group">
+                        <div className="relative">
+                            <input
+                                type="checkbox"
+                                checked={dontRemindToday}
+                                onChange={(e) => setDontRemindToday(e.target.checked)}
+                                className="peer sr-only"
+                            />
+                            <div className="
+                                w-4 h-4 rounded border-2 transition-all duration-200
+                                dark:border-gray-600 border-gray-300
+                                peer-checked:border-blue-500 peer-checked:bg-blue-500
+                                dark:peer-checked:border-blue-400 dark:peer-checked:bg-blue-400
+                                group-hover:border-blue-400 dark:group-hover:border-blue-500
+                            " />
+                            <svg
+                                className="absolute top-0.5 left-0.5 w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 pointer-events-none"
+                                viewBox="0 0 12 12"
+                                fill="none"
+                            >
+                                <path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                        </div>
+                        <span className="text-xs dark:text-gray-400 text-gray-500">
+                            Don&apos;t remind me again today
+                        </span>
+                    </label>
+
+                    <AlertDialogFooter className="flex-col gap-2 sm:flex-col">
+                        <AlertDialogAction
+                            onClick={handleAction}
+                            className={`
+                                w-full justify-center font-semibold text-white rounded-lg py-2.5 transition-all duration-200
+                                ${activeReminder.accentColor || 'bg-blue-500'}
+                                hover:opacity-90 hover:shadow-lg
+                                ${isUrgent ? 'animate-pulse hover:animate-none' : ''}
+                            `}
+                        >
+                            {activeReminder.actionLabel}
+                        </AlertDialogAction>
+
+                        <AlertDialogCancel
+                            onClick={handleDismiss}
+                            className="
+                                w-full justify-center font-medium rounded-lg py-2.5 transition-all duration-200
+                                dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700
+                                bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200
+                                mt-0
+                            "
+                        >
+                            Dismiss
+                        </AlertDialogCancel>
+                    </AlertDialogFooter>
+                </div>
+            </AlertDialogContent>
+        </AlertDialog>
     );
 }
 
@@ -372,5 +500,5 @@ export function useAttendanceReminder() {
             setIsDialogOpen: () => { },
         };
     }
-    return context;
+    return context
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { Users, UserCheck, IndianRupee, TrendingUp, MoreVertical } from 'lucide-react';
+import { Users, UserCheck, IndianRupee, TrendingUp } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const fetchDailyStats = async ({ schoolId, academicYearId }) => {
@@ -131,9 +131,6 @@ export default function DailyStatsCards({ schoolId, academicYearId, data: propDa
                                 <div className={`p-2.5 rounded-lg ${stat.iconBg}`}>
                                     <Icon className={`h-5 w-5 ${stat.iconColor}`} />
                                 </div>
-                                <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded">
-                                    <MoreVertical className="h-4 w-4 text-gray-400" />
-                                </button>
                             </div>
 
                             {/* Title */}

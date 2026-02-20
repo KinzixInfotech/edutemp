@@ -854,6 +854,7 @@ model Form {
   category    FormCategory @default(GENERAL)
   status      FormStatus   @default(DRAFT)
   settings    Json? // { isPublic: boolean, allowMultiple: boolean, notifications: [] }
+  viewCount   Int          @default(0)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 

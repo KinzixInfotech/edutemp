@@ -1,5 +1,5 @@
 import { IconTrendingDown, IconTrendingUp } from "@tabler/icons-react";
-import { MoreHorizontal } from "lucide-react";
+
 import { Badge } from "@/components/ui/badge";
 import {
     CardAction,
@@ -51,10 +51,7 @@ export function SectionCards({ data, isloading }) {
                                 </span>
                             )}
 
-                            {/* Top Right Dots */}
-                            <span className="absolute top-3 right-3 text-gray-400 dark:text-gray-500">
-                                <MoreHorizontal className="w-4 h-4" />
-                            </span>
+
 
                             {/* Value */}
                             <CardTitle className="text-2xl font-semibold mt-6">

@@ -117,6 +117,12 @@ export async function GET(req, props) {
             include: {
                 fields: {
                     orderBy: { order: "asc" }
+                },
+                school: {
+                    select: {
+                        name: true,
+                        profilePicture: true,
+                    }
                 }
             }
         });
@@ -137,8 +143,14 @@ export async function GET(req, props) {
         }
 
         // Hide sensitive settings
-        const { settings, ...publicForm } = form;
+        const { settings, viewCount, ...publicForm } = form;
         // We might want to expose some settings like allowMultiple
+
+        // Increment view count (fire-and-forget, don't block response)
+        prisma.form.update({
+            where: { id: formId },
+            data: { viewCount: { increment: 1 } }
+        }).catch(err => console.error('[FormViews] Failed to increment:', err));
 
         return NextResponse.json({
             ...publicForm,

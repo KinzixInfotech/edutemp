@@ -1,6 +1,7 @@
 
 'use client';
 export const dynamic = 'force-dynamic';
+import { z } from 'zod';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -168,6 +169,33 @@ export default function ApplicationDetails() {
 
     const [assignedRollNumbers, setAssignedRollNumbers] = useState([]);
     const [rollNumberWarning, setRollNumberWarning] = useState("");
+    const [enrollmentErrors, setEnrollmentErrors] = useState({});
+
+    // Zod schema for enrollment validation
+    const enrollmentSchema = z.object({
+        admissionNo: z.string().min(1, 'Admission number is required'),
+        studentName: z.string().min(1, 'Student name is required'),
+        classId: z.string().min(1, 'Class is required'),
+        sectionId: z.string().min(1, 'Section is required'),
+        gender: z.string().min(1, 'Gender is required'),
+        dob: z.string().optional(),
+        rollNumber: z.string().optional(),
+        admissionDate: z.string().optional(),
+    });
+
+    const validateEnrollment = (data) => {
+        const result = enrollmentSchema.safeParse(data);
+        if (!result.success) {
+            const fieldErrors = {};
+            result.error.errors.forEach(err => {
+                fieldErrors[err.path[0]] = err.message;
+            });
+            setEnrollmentErrors(fieldErrors);
+            return false;
+        }
+        setEnrollmentErrors({});
+        return true;
+    };
 
     // SMS Dialog state
     const [smsDialogOpen, setSmsDialogOpen] = useState(false);
@@ -1220,7 +1248,8 @@ export default function ApplicationDetails() {
                                     <Input
                                         placeholder="Admission Number"
                                         value={stageData.admissionNo || ""}
-                                        onChange={(e) => handleStageDataChange("admissionNo", e.target.value)}
+                                        onChange={(e) => { handleStageDataChange("admissionNo", e.target.value); setEnrollmentErrors(prev => ({ ...prev, admissionNo: undefined })); }}
+                                        className={enrollmentErrors.admissionNo ? 'border-red-500' : ''}
                                     />
                                     <Button
                                         variant="outline"
@@ -1231,6 +1260,7 @@ export default function ApplicationDetails() {
                                                 .then(data => {
                                                     if (data.nextAdmissionNo) {
                                                         handleStageDataChange("admissionNo", data.nextAdmissionNo);
+                                                        setEnrollmentErrors(prev => ({ ...prev, admissionNo: undefined }));
                                                         toast.success("Admission number generated");
                                                     }
                                                 })
@@ -1241,6 +1271,7 @@ export default function ApplicationDetails() {
                                         <RefreshCw className="h-4 w-4" />
                                     </Button>
                                 </div>
+                                {enrollmentErrors.admissionNo && <p className="text-xs text-red-500 mt-1">{enrollmentErrors.admissionNo}</p>}
                             </div>
                             <div>
                                 <Label className=" font-semibold mb-2 block">Admission Date</Label>
@@ -1255,8 +1286,10 @@ export default function ApplicationDetails() {
                                 <Input
                                     placeholder="Student Name"
                                     value={stageData.studentName || application.applicantName || ""}
-                                    onChange={(e) => handleStageDataChange("studentName", e.target.value)}
+                                    onChange={(e) => { handleStageDataChange("studentName", e.target.value); setEnrollmentErrors(prev => ({ ...prev, studentName: undefined })); }}
+                                    className={enrollmentErrors.studentName ? 'border-red-500' : ''}
                                 />
+                                {enrollmentErrors.studentName && <p className="text-xs text-red-500 mt-1">{enrollmentErrors.studentName}</p>}
                             </div>
                             <div>
                                 <Label className=" font-semibold mb-2 block">Date of Birth</Label>
@@ -1270,9 +1303,9 @@ export default function ApplicationDetails() {
                                 <Label className=" font-semibold mb-2 block">Gender</Label>
                                 <Select
                                     value={stageData.gender || ""}
-                                    onValueChange={(value) => handleStageDataChange("gender", value)}
+                                    onValueChange={(value) => { handleStageDataChange("gender", value); setEnrollmentErrors(prev => ({ ...prev, gender: undefined })); }}
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger className={enrollmentErrors.gender ? 'border-red-500' : ''}>
                                         <SelectValue placeholder="Select Gender" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -1281,6 +1314,7 @@ export default function ApplicationDetails() {
                                         <SelectItem value="OTHER">Other</SelectItem>
                                     </SelectContent>
                                 </Select>
+                                {enrollmentErrors.gender && <p className="text-xs text-red-500 mt-1">{enrollmentErrors.gender}</p>}
                             </div>
                             <div>
                                 <Label className=" font-semibold mb-2 block">Class Assigned</Label>
@@ -1295,9 +1329,10 @@ export default function ApplicationDetails() {
                                         onValueChange={(value) => {
                                             handleStageDataChange("classId", value);
                                             handleStageDataChange("sectionId", ""); // Reset section when class changes
+                                            setEnrollmentErrors(prev => ({ ...prev, classId: undefined, sectionId: undefined }));
                                         }}
                                     >
-                                        <SelectTrigger className="w-full">
+                                        <SelectTrigger className={`w-full ${enrollmentErrors.classId ? 'border-red-500' : ''}`}>
                                             <SelectValue placeholder="Select Class" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -1315,15 +1350,16 @@ export default function ApplicationDetails() {
                                         </SelectContent>
                                     </Select>
                                 )}
+                                {enrollmentErrors.classId && <p className="text-xs text-red-500 mt-1">{enrollmentErrors.classId}</p>}
                             </div>
                             <div>
                                 <Label className=" font-semibold  mb-2 block">Section Assigned</Label>
                                 <Select
                                     value={stageData.sectionId || ""}
-                                    onValueChange={(value) => handleStageDataChange("sectionId", value)}
+                                    onValueChange={(value) => { handleStageDataChange("sectionId", value); setEnrollmentErrors(prev => ({ ...prev, sectionId: undefined })); }}
                                     disabled={!stageData.classId}
                                 >
-                                    <SelectTrigger className="w-full">
+                                    <SelectTrigger className={`w-full ${enrollmentErrors.sectionId ? 'border-red-500' : ''}`}>
                                         <SelectValue placeholder="Select Section" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -1334,6 +1370,7 @@ export default function ApplicationDetails() {
                                         )) || <SelectItem value="select" disabled>Select Class First</SelectItem>}
                                     </SelectContent>
                                 </Select>
+                                {enrollmentErrors.sectionId && <p className="text-xs text-red-500 mt-1">{enrollmentErrors.sectionId}</p>}
                             </div>
                             <div>
                                 <Label className=" font-semibold mb-2 block">Roll Number</Label>
@@ -1783,7 +1820,24 @@ export default function ApplicationDetails() {
                                                     </Button>
                                                 </div>
                                                 <Button
-                                                    onClick={() => moveMutation.mutate({ id: applicationId, stageId: methods.current?.id, movedById, stageData })}
+                                                    onClick={() => {
+                                                        // Check if target stage is ENROLLED — apply Zod validation
+                                                        const targetStageName = methods.current?.title?.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+                                                        if (targetStageName === 'ENROLLED' || targetStageName === 'ENROLLMENT') {
+                                                            const isValid = validateEnrollment({
+                                                                admissionNo: stageData.admissionNo || '',
+                                                                studentName: stageData.studentName || application.applicantName || '',
+                                                                classId: stageData.classId || '',
+                                                                sectionId: stageData.sectionId || '',
+                                                                gender: stageData.gender || '',
+                                                            });
+                                                            if (!isValid) {
+                                                                toast.error('Please fill all required enrollment fields');
+                                                                return;
+                                                            }
+                                                        }
+                                                        moveMutation.mutate({ id: applicationId, stageId: methods.current?.id, movedById, stageData });
+                                                    }}
                                                     disabled={!methods.current || application.currentStage?.id === methods.current.id || moveMutation.isPending}
                                                 >
                                                     {moveMutation.isPending ? (

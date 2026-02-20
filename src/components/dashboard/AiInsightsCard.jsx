@@ -12,7 +12,7 @@
  * - Loading skeleton matching design
  */
 
-import { Sparkles, Calendar, Loader2, MoreHorizontal, Bot, TrendingUp, TrendingDown, Users, IndianRupee, RefreshCw } from 'lucide-react';
+import { Sparkles, Calendar, Loader2, Bot, TrendingUp, TrendingDown, Users, IndianRupee, RefreshCw } from 'lucide-react';
 import { useDashboardContext } from '@/hooks/useDashboardContext';
 import { useAiInsights } from '@/hooks/useAiInsights';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
@@ -100,9 +100,6 @@ function InsightCard({ insight, index }) {
                 <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${categoryStyle.bg} ${categoryStyle.text}`}>
                     {insight.category}
                 </span>
-                <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded">
-                    <MoreHorizontal className="h-4 w-4 text-gray-400" />
-                </button>
             </div>
 
             {/* Title */}
