@@ -11,6 +11,7 @@ import {
   CardDescription,
   CardFooter,
   CardHeader,
+  CardContent,
   CardTitle,
 } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
@@ -906,6 +907,7 @@ export default function Dashboard() {
                 </div>
               </CardDescription>
             </Card>
+
           </div>
         );
       case "PARTNER":
