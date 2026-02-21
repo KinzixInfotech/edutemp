@@ -19,7 +19,7 @@ import { ChartAreaInteractive } from '@/components/chart-area-interactive';
 import { SectionCards } from '@/components/section-cards';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import LoaderPage from '@/components/loader-page';
-import { CalendarClock, Plus, LayoutDashboard, Clock } from "lucide-react";
+import { CalendarClock, Plus, LayoutDashboard, Clock, Play, Eye } from "lucide-react";
 import { ChartPieLabel } from '@/components/chart-pie';
 import { ChartBarHorizontal, } from '@/components/bar-chart';
 import { ChartLineLabel } from '@/components/line-chart';
@@ -206,6 +206,116 @@ const fetchAdminStatsNonTeacher = async (schoolId) => {
   return { adminNonTeacherCount: data.count };
 };
 
+
+const TEXT_GRADIENTS = [
+  'from-purple-500 to-indigo-600',
+  'from-pink-500 to-rose-500',
+  'from-blue-400 to-cyan-400',
+  'from-green-400 to-teal-400',
+  'from-orange-400 to-yellow-400',
+  'from-violet-400 to-purple-400',
+];
+
+const StatusActivityWidget = ({ schoolId }) => {
+  const { data, isLoading } = useQuery({
+    queryKey: ['statusStats', schoolId],
+    queryFn: async () => {
+      const res = await fetch(`/api/schools/${schoolId}/status/stats`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!schoolId,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const stats = data?.stats;
+  const recentStatuses = stats?.recentStatuses || [];
+
+  // Don't show widget if no data or no activity
+  if (!isLoading && (!stats || (stats.activeStatuses === 0 && stats.statusesToday === 0))) {
+    return null;
+  }
+
+  return (
+    <div className="px-4 mt-2">
+      <Card className="bg-gradient-to-r from-indigo-50/80 via-blue-50/50 to-cyan-50/80 dark:from-indigo-950/30 dark:via-blue-950/20 dark:to-cyan-950/30 border-indigo-200/60 dark:border-indigo-800/40">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <div className="flex items-center gap-3">
+            <div className="bg-indigo-100 dark:bg-indigo-900/50 p-2 rounded-full">
+              <Play className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <div>
+              <CardTitle className="text-sm font-medium">Status Activity</CardTitle>
+              <CardDescription className="text-xs">
+                {isLoading ? 'Loading...' : `${stats?.activeStatuses || 0} active · ${stats?.totalViewsToday || 0} views today`}
+              </CardDescription>
+            </div>
+          </div>
+          <Link href="/dashboard/schools/status">
+            <Button variant="outline" size="sm" className="text-xs">
+              Manage
+            </Button>
+          </Link>
+        </CardHeader>
+
+        {/* Circular avatar row */}
+        {recentStatuses.length > 0 && (
+          <CardContent className="pt-0 pb-3">
+            <div className="flex gap-4 overflow-x-auto pb-1 scrollbar-hide">
+              {recentStatuses.map((status) => {
+                const gradIdx = Math.abs((status.userName || '').charCodeAt(0) || 0) % TEXT_GRADIENTS.length;
+                return (
+                  <Link
+                    key={status.id}
+                    href="/dashboard/schools/status"
+                    className="flex flex-col items-center gap-1 min-w-[64px] group"
+                  >
+                    {/* Ring + Avatar */}
+                    <div className="relative">
+                      <div className="w-14 h-14 rounded-full p-[2px] bg-gradient-to-tr from-blue-500 to-indigo-500">
+                        <div className="w-full h-full rounded-full overflow-hidden bg-white dark:bg-gray-900 p-[2px]">
+                          {status.type === 'text' ? (
+                            <div className={`w-full h-full rounded-full bg-gradient-to-br ${TEXT_GRADIENTS[gradIdx]} flex items-center justify-center`}>
+                              <span className="text-white text-[8px] font-bold leading-tight text-center px-1 line-clamp-2">
+                                {status.text || ''}
+                              </span>
+                            </div>
+                          ) : status.type === 'image' && status.mediaUrl ? (
+                            <img
+                              src={status.mediaUrl}
+                              alt=""
+                              className="w-full h-full rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full rounded-full bg-indigo-500 flex items-center justify-center">
+                              <span className="text-white text-lg font-bold">
+                                {(status.userName || '?')[0].toUpperCase()}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {/* View count badge */}
+                      {status.viewCount > 0 && (
+                        <span className="absolute -bottom-0.5 -right-0.5 bg-indigo-500 text-white text-[9px] font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-white dark:border-gray-900">
+                          {status.viewCount}
+                        </span>
+                      )}
+                    </div>
+                    {/* Name */}
+                    <span className="text-[10px] text-muted-foreground font-medium truncate max-w-[60px] group-hover:text-indigo-600 transition-colors">
+                      {(status.userName || 'Unknown').split(' ').slice(0, 2).join(' ')}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </CardContent>
+        )}
+      </Card>
+    </div>
+  );
+};
 
 export default function Dashboard() {
 
@@ -468,6 +578,9 @@ export default function Dashboard() {
             <div className="px-4">
               <AiInsightsCard schoolId={fullUser?.schoolId} />
             </div>
+
+            {/* Status Activity Card */}
+            <StatusActivityWidget schoolId={fullUser?.schoolId} />
 
             {/* Widgets Grid - 3 equal columns for main widgets */}
             <div className="px-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">

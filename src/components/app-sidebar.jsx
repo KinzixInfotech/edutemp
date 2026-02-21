@@ -64,6 +64,7 @@ import {
     Images,
     Smartphone,
     Shield,
+    Play,
 } from "lucide-react"
 import { useCommandMenu } from "./CommandMenuContext"
 import { cn } from "@/lib/utils"
@@ -105,6 +106,7 @@ export const SidebarData = [
         items: [
             { label: "App Carousel", url: "/dashboard/schools/carousel", icon: Images, roles: ['ADMIN'] },
             { label: "School Gallery", url: "/dashboard/schools/gallery", icon: Images, roles: ['ADMIN'] },
+            { label: "Status Updates", url: "/dashboard/schools/status", icon: Play, roles: ['ADMIN'] },
         ]
     },
     {

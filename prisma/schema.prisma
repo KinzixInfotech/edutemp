@@ -140,6 +140,10 @@ model School {
   hpcstageTemplates   HPCStageTemplate[]
   payrollSettings     PayrollSettings?
 
+  // Status System
+  statuses      Status[]
+  storyStatuses StoryStatus[]
+
   @@index([name])
 }
 
@@ -1776,6 +1780,10 @@ model User {
   biometricIdentityMaps BiometricIdentityMap[]
   rfidIdentityMaps      RfidIdentityMap[]
   biometricEvents       BiometricAttendanceEvent[] @relation("ResolvedBiometricEvents")
+
+  // Status System
+  postedStatuses StoryStatus[]     @relation("UserStatuses")
+  statusViews    StoryStatusView[] @relation("StatusViewer")
 
   @@index([schoolId])
   @@index([roleId])
@@ -6465,4 +6473,51 @@ model AppConfig {
 
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
+}
+
+// ============================================
+// STATUS (STORIES) SYSTEM
+// ============================================
+
+model StoryStatus {
+  id           String   @id @default(uuid()) @db.Uuid
+  schoolId     String   @db.Uuid
+  userId       String   @db.Uuid
+  type         String // "image" | "video" | "text"
+  mediaUrl     String?
+  thumbnailUrl String?
+  text         String?
+  caption      String?
+  audience     String   @default("all") // "all" | "teachers" | "class" | "custom"
+  targetData   Json? // [{classId, sectionId?}] for class-targeted statuses
+  groupId      String?  @db.Uuid // for split video groups
+  sequence     Int? // ordering for split video segments
+  duration     Int? // seconds (for video type)
+  trimStart    Float? // trim start offset in seconds
+  trimEnd      Float? // trim end offset in seconds
+  expiryAt     DateTime
+  createdAt    DateTime @default(now())
+
+  user   User              @relation("UserStatuses", fields: [userId], references: [id], onDelete: Cascade)
+  school School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  views  StoryStatusView[]
+
+  @@index([schoolId, expiryAt])
+  @@index([userId])
+  @@index([groupId])
+  @@index([createdAt])
+}
+
+model StoryStatusView {
+  id       String   @id @default(uuid()) @db.Uuid
+  statusId String   @db.Uuid
+  viewerId String   @db.Uuid
+  viewedAt DateTime @default(now())
+
+  status StoryStatus @relation(fields: [statusId], references: [id], onDelete: Cascade)
+  viewer User        @relation("StatusViewer", fields: [viewerId], references: [id], onDelete: Cascade)
+
+  @@unique([statusId, viewerId])
+  @@index([statusId])
+  @@index([viewerId])
 }
