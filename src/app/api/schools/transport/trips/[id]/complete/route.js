@@ -42,6 +42,11 @@ export async function POST(req, props) {
                 status: 'COMPLETED',
                 completedAt: new Date(),
                 ...(notes && { notes: trip.notes ? `${trip.notes}\n${notes}` : notes }),
+                vehicle: {
+                    update: {
+                        status: 'OFFLINE'
+                    }
+                }
             },
             include: {
                 vehicle: { select: { id: true, licensePlate: true } },
