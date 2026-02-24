@@ -7,15 +7,23 @@ import { NextResponse } from 'next/server';
 export const POST = async (request) => {
     try {
         const body = await request.json();
-        console.log('[Worker] Processing notification job:', body?.title || 'Unknown');
+        const attemptLabel = body?.retryAttempt ? ` (retry ${body.retryAttempt})` : '';
+        console.log(`[Worker] Processing notification job${attemptLabel}:`, body?.title || 'Unknown');
 
         // Call the heavy processing logic
         const result = await processNotificationJob(body);
 
+        // If retry was scheduled, return 200 so QStash doesn't double-retry
+        if (result?.retryScheduled) {
+            return NextResponse.json({ ...result, message: 'Retry scheduled' });
+        }
+
         return NextResponse.json(result);
     } catch (error) {
         console.error('[Worker] Job failed:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        // Return 200 to prevent QStash from retrying on its own
+        // (our own retry logic handles transient failures)
+        return NextResponse.json({ error: error.message, failed: true }, { status: 200 });
     }
 };
 

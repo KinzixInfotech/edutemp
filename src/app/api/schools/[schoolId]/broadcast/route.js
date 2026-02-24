@@ -4,10 +4,12 @@ import { invalidatePattern } from "@/lib/cache";
 import { sendNotification } from "@/lib/notifications/notificationHelper";
 
 /**
- * Broadcast API for Director/Principal
+ * Broadcast API for Director/Principal/Teaching Staff
  * POST - Send school-wide announcement
  * Creates: Notice + Push Notifications + In-app Notifications
  */
+
+const ALLOWED_BROADCAST_ROLES = ['DIRECTOR', 'PRINCIPAL', 'TEACHING_STAFF'];
 
 export async function POST(req, props) {
     const params = await props.params;
@@ -46,6 +48,14 @@ export async function POST(req, props) {
             return NextResponse.json(
                 { error: "Sender not found" },
                 { status: 404 }
+            );
+        }
+
+        // Validate sender role
+        if (!ALLOWED_BROADCAST_ROLES.includes(sender.role?.name)) {
+            return NextResponse.json(
+                { error: "You do not have permission to send broadcasts" },
+                { status: 403 }
             );
         }
 
@@ -93,6 +103,7 @@ export async function POST(req, props) {
             case 'PARENTS':
                 targetOptions = { userTypes: ['PARENT'] };
                 break;
+            case 'TEACHING_STAFF':
             case 'TEACHERS':
                 targetOptions = { userTypes: ['TEACHING_STAFF'] };
                 break;
@@ -154,12 +165,20 @@ export async function GET(req, props) {
         const { schoolId } = params;
         const { searchParams } = new URL(req.url);
         const limit = parseInt(searchParams.get("limit") || "20");
+        const senderId = searchParams.get("senderId");
+
+        const whereClause = {
+            schoolId,
+            status: 'PUBLISHED',
+        };
+
+        // Filter by sender if provided
+        if (senderId) {
+            whereClause.createdById = senderId;
+        }
 
         const notices = await prisma.notice.findMany({
-            where: {
-                schoolId,
-                status: 'PUBLISHED',
-            },
+            where: whereClause,
             select: {
                 id: true,
                 title: true,
@@ -172,15 +191,19 @@ export async function GET(req, props) {
                 viewCount: true,
                 issuedBy: true,
                 issuerRole: true,
-                fileUrl: true, // Include image
+                fileUrl: true,
+                createdById: true, // Include senderId for client filtering
             },
             orderBy: { publishedAt: 'desc' },
             take: limit,
         });
 
+        // Map createdById to senderId for frontend compatibility
+        const broadcasts = notices.map(n => ({ ...n, senderId: n.createdById }));
+
         return NextResponse.json({
-            broadcasts: notices,
-            total: notices.length,
+            broadcasts,
+            total: broadcasts.length,
         });
     } catch (error) {
         console.error("Error fetching broadcasts:", error);

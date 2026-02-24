@@ -169,6 +169,8 @@ export async function processNotificationJob({
     imageUrl = null,
     sendPush = true,
     jobType = null, // New field to distinguish job types
+    retryAttempt = 0, // Current retry attempt
+    maxAttempts = 3, // Max retry attempts
     ...otherParams // catch-all for bulk params
 }) {
     // DISPATCHER: Handle different job types
@@ -237,6 +239,43 @@ export async function processNotificationJob({
 
     } catch (error) {
         console.error('[Worker] Process notification error:', error);
+
+        // Check if this is a transient DB connection error that we can retry
+        const isTransientError = error?.code === 'P1017' || // Server closed connection
+            error?.code === 'P1001' || // Can't reach database
+            error?.code === 'P2024' || // Connection pool timeout
+            error?.message?.includes('Server has closed the connection') ||
+            error?.message?.includes('bad MAC') ||
+            error?.message?.includes('Connection refused');
+
+        const currentAttempt = retryAttempt || 0;
+        const maxRetries = maxAttempts || 3;
+
+        if (isTransientError && currentAttempt < maxRetries) {
+            console.log(`[Worker] Transient DB error (${error.code || 'unknown'}), scheduling retry ${currentAttempt + 1}/${maxRetries}...`);
+
+            // Note: Do NOT call prisma.$disconnect() — it's a global singleton
+            // and disconnecting it breaks ALL other API routes
+
+            const retryResult = await enqueueDelayedRetry({
+                schoolId,
+                title,
+                message,
+                type,
+                priority,
+                targetOptions,
+                senderId,
+                metadata,
+                icon,
+                actionUrl,
+                imageUrl,
+                sendPush,
+                jobType,
+            }, currentAttempt + 1, maxAttempts);
+
+            return { success: false, retryScheduled: true, ...retryResult };
+        }
+
         throw error;
     }
 }
