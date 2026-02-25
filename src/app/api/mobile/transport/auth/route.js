@@ -74,9 +74,11 @@ export async function POST(req) {
             });
         }
 
-        // Get today's assigned trips
+        // Get today's + tomorrow's assigned trips (not all future trips)
         const today = new Date();
         today.setHours(0, 0, 0, 0);
+        const dayAfterTomorrow = new Date(today);
+        dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2); // exclusive upper bound
 
         const trips = await prisma.busTrip.findMany({
             where: {
@@ -84,7 +86,7 @@ export async function POST(req) {
                     { driverId: user.transportStaff.id },
                     { conductorId: user.transportStaff.id },
                 ],
-                date: { gte: today },
+                date: { gte: today, lt: dayAfterTomorrow },
                 status: { in: ['SCHEDULED', 'IN_PROGRESS'] },
             },
             include: {

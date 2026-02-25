@@ -123,7 +123,18 @@ export async function POST(req) {
             });
         }
 
-        // Update vehicle tracking status
+        // Update vehicle tracking status — but NOT if vehicle is already OFFLINE (trip ended)
+        const vehicle = await prisma.vehicle.findUnique({
+            where: { id: vehicleId },
+            select: { status: true },
+        });
+
+        if (vehicle?.status === 'OFFLINE') {
+            // Trip was already completed — don't overwrite OFFLINE with IDLE/MOVING
+            // Signal client to stop sending location updates
+            return NextResponse.json({ success: true, location, trackingStatus: 'OFFLINE', shouldStop: true });
+        }
+
         await prisma.vehicle.update({
             where: { id: vehicleId },
             data: {

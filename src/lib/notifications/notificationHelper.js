@@ -57,7 +57,7 @@ export async function enqueueNotificationJob(payload) {
             await qstashClient.publishJSON({
                 url: workerUrl,
                 body: payload,
-                retries: 2,
+                retries: 3,
             });
         } else {
             // Fallback: Post directly if QStash not configured or using localhost
@@ -1879,12 +1879,27 @@ export async function notifyTripStarted({
     licensePlate
 }) {
     try {
-        console.log(`[Trip Start] Starting notification for tripId: ${tripId}, routeId: ${routeId}`);
+        // Derive routeId from tripId if not provided (callers often don't have it)
+        let resolvedRouteId = routeId;
+        if (!resolvedRouteId && tripId) {
+            const trip = await prisma.busTrip.findUnique({
+                where: { id: tripId },
+                select: { routeId: true }
+            });
+            resolvedRouteId = trip?.routeId;
+        }
+
+        if (!resolvedRouteId) {
+            console.warn('[Trip Start] No routeId available — cannot find students to notify');
+            return;
+        }
+
+        console.log(`[Trip Start] Starting notification for tripId: ${tripId}, routeId: ${resolvedRouteId}`);
 
         // Get all students assigned to this route
         const students = await prisma.studentRouteAssignment.findMany({
             where: {
-                routeId
+                routeId: resolvedRouteId
             },
             include: {
                 student: {
@@ -2042,6 +2057,77 @@ export async function notifyApproachingStop({
     } catch (error) {
         console.error('[Approaching Stop] Notification error:', error);
         // Don't throw - notification failure shouldn't block location tracking
+    }
+}
+
+/**
+ * Notify parents when a trip has been completed
+ */
+export async function notifyTripCompleted({
+    schoolId,
+    tripId,
+    routeName,
+    tripType,
+    licensePlate
+}) {
+    try {
+        // Get routeId from trip
+        const trip = await prisma.busTrip.findUnique({
+            where: { id: tripId },
+            select: { routeId: true }
+        });
+
+        if (!trip?.routeId) {
+            console.warn('[Trip Complete] No routeId — cannot notify parents');
+            return;
+        }
+
+        // Get all students on this route
+        const students = await prisma.studentRouteAssignment.findMany({
+            where: { routeId: trip.routeId },
+            include: {
+                student: {
+                    select: {
+                        studentParentLinks: {
+                            where: { isActive: true },
+                            include: { parent: { select: { userId: true } } }
+                        }
+                    }
+                }
+            }
+        });
+
+        const parentIds = new Set();
+        students.forEach(a => {
+            a.student.studentParentLinks.forEach(link => {
+                if (link.parent?.userId) parentIds.add(link.parent.userId);
+            });
+        });
+
+        if (parentIds.size === 0) return;
+
+        const tripTypeText = tripType === 'PICKUP' ? 'Pick-up' : 'Drop';
+
+        await sendNotification({
+            schoolId,
+            title: `🏫 ${tripTypeText} Trip Completed`,
+            message: `${licensePlate} (${routeName}) has completed the ${tripTypeText.toLowerCase()} trip`,
+            type: 'TRANSPORT',
+            priority: 'NORMAL',
+            icon: '✅',
+            targetOptions: { userIds: Array.from(parentIds) },
+            metadata: {
+                tripId,
+                routeName,
+                tripType,
+                licensePlate,
+                eventType: 'TRIP_COMPLETED'
+            },
+        });
+
+        console.log(`[Trip Complete] ✅ Notified ${parentIds.size} parents`);
+    } catch (error) {
+        console.error('[Trip Complete] Notification error:', error);
     }
 }
 

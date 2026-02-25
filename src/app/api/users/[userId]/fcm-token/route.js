@@ -38,6 +38,21 @@ export async function POST(request, props) {
             }
         });
 
+        // CRITICAL: Clear this same token from any OTHER users
+        // This prevents cross-role notification leak when multiple profiles
+        // on the same device share the same FCM token
+        const cleared = await prisma.user.updateMany({
+            where: {
+                fcmToken: fcmToken,
+                id: { not: userId }
+            },
+            data: { fcmToken: null }
+        });
+
+        if (cleared.count > 0) {
+            console.log(`🧹 Cleared stale FCM token from ${cleared.count} other user(s)`);
+        }
+
         console.log('✅ FCM token registered successfully for:', updatedUser.email);
 
         return NextResponse.json({
