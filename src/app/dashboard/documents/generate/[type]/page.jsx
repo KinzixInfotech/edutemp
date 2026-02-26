@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -18,7 +18,12 @@ import {
     User,
     Calendar,
     FileText,
-    Hash
+    Hash,
+    ChevronDown,
+    ChevronUp,
+    CheckCircle2,
+    AlertTriangle,
+    Settings2
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -39,6 +44,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
 import { useUploadThing } from '@/lib/uploadthing';
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
+import { DEFAULT_TEMPLATES } from '@/lib/default-templates';
 import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
 
@@ -108,7 +114,12 @@ export default function GenerateCertificatePage() {
     const schoolId = fullUser?.schoolId;
     const [generating, setGenerating] = useState(false);
     const [previewUrl, setPreviewUrl] = useState(null);
+    const [studentSearch, setStudentSearch] = useState('');
+    const [classFilter, setClassFilter] = useState('');
+    const [sectionFilter, setSectionFilter] = useState('');
     const [previewConfig, setPreviewConfig] = useState(null);
+    const [fieldOverrides, setFieldOverrides] = useState({});
+    const [showFieldMapper, setShowFieldMapper] = useState(false);
 
     const certificateType = params?.type;
     const config = CERTIFICATE_CONFIGS[certificateType];
@@ -143,11 +154,58 @@ export default function GenerateCertificatePage() {
         },
         enabled: !!schoolId,
     });
-    // console.log(students);
+
+    // Fetch document settings (signature/stamp URLs)
+    const { data: docSettings } = useQuery({
+        queryKey: ['document-settings', schoolId],
+        queryFn: async () => {
+            const res = await fetch(`/api/schools/${schoolId}/settings/documents`);
+            if (!res.ok) return {};
+            return res.json();
+        },
+        enabled: !!schoolId,
+        staleTime: 5 * 60 * 1000,
+    });
+
+    // Get unique classes from students
+    const availableClasses = useMemo(() => {
+        if (!students) return [];
+        const classMap = new Map();
+        students.forEach(s => {
+            if (s.class?.className && s.classId) classMap.set(s.classId, s.class.className);
+        });
+        return Array.from(classMap, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+    }, [students]);
+
+    // Get unique sections for selected class
+    const availableSections = useMemo(() => {
+        if (!students || !classFilter) return [];
+        const sectionMap = new Map();
+        students.filter(s => s.classId === classFilter).forEach(s => {
+            if (s.section?.sectionName && s.sectionId) sectionMap.set(s.sectionId, s.section.sectionName);
+        });
+        return Array.from(sectionMap, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+    }, [students, classFilter]);
+
+    // Filter students by search + class + section
+    const filteredStudents = useMemo(() => {
+        if (!students) return [];
+        let filtered = students;
+        if (classFilter) filtered = filtered.filter(s => s.classId === classFilter);
+        if (sectionFilter) filtered = filtered.filter(s => s.sectionId === sectionFilter);
+        if (studentSearch.trim()) {
+            const search = studentSearch.toLowerCase();
+            filtered = filtered.filter(s =>
+                (s.name || s.user?.name || '').toLowerCase().includes(search) ||
+                (s.rollNumber || '').toLowerCase().includes(search)
+            );
+        }
+        return filtered;
+    }, [students, studentSearch, classFilter, sectionFilter]);
 
 
-    // Fetch templates for this certificate type
-    const { data: templates, isLoading: loadingTemplates } = useQuery({
+    // Fetch saved templates for this certificate type
+    const { data: savedTemplates, isLoading: loadingTemplates } = useQuery({
         queryKey: ['certificate-templates', schoolId, config?.apiType],
         queryFn: async () => {
             if (!schoolId || !config) throw new Error('Invalid configuration');
@@ -157,6 +215,18 @@ export default function GenerateCertificatePage() {
         },
         enabled: !!schoolId && !!config,
     });
+
+    // Merge saved DB templates with built-in default templates
+    const templates = useMemo(() => {
+        const saved = savedTemplates || [];
+        // Get built-in templates for this certificate type + generic fallbacks
+        const builtIn = [
+            ...(DEFAULT_TEMPLATES[certificateType] || []),
+            ...(DEFAULT_TEMPLATES['certificate'] || [])
+        ].filter(bi => !saved.some(s => s.id === bi.id))
+            .map(t => ({ ...t, isBuiltIn: true }));
+        return [...saved, ...builtIn];
+    }, [savedTemplates, certificateType]);
 
     // Get default template
     useEffect(() => {
@@ -178,20 +248,29 @@ export default function GenerateCertificatePage() {
         // Create a deep copy of elements to avoid mutating original
         const elements = JSON.parse(JSON.stringify(template.layoutConfig.elements || []));
 
-        // Replace placeholders
-        const replacements = {
-            '{{studentName}}': student.name || 'Student Name',
-            '{{rollNumber}}': student.rollNumber || 'Roll No',
-            '{{admissionNo}}': student.admissionNo || 'Adm No',
-            '{{class}}': student.class?.className || 'Class',
-            '{{section}}': student.section?.sectionName || 'Section',
-            '{{dob}}': student.dob ? new Date(student.dob).toLocaleDateString() : 'DOB',
-            '{{fatherName}}': student.fatherName || 'Father Name',
-            '{{motherName}}': student.motherName || 'Mother Name',
-            '{{address}}': student.address || 'Address',
-            '{{schoolName}}': fullUser?.schoolName || 'School Name',
+        // Map conduct enum values to display labels
+        const conductLabels = { 'excellent': 'Excellent', 'very-good': 'Very Good', 'good': 'Good', 'satisfactory': 'Satisfactory' };
+        const conductDisplay = conductLabels[watchedValues.conduct] || watchedValues.conduct || '';
+
+        // Generate a certificate number for QR / verification
+        const certNumber = `CERT-${Date.now()}`;
+        const verificationUrl = typeof window !== 'undefined' ? `${window.location.origin}/verify/certificate/${certNumber}` : '';
+
+        // Auto replacements from student/school/form data
+        const autoReplacements = {
+            '{{studentName}}': student.name || '',
+            '{{rollNumber}}': student.rollNumber || '',
+            '{{admissionNo}}': student.admissionNo || '',
+            '{{class}}': student.class?.className || '',
+            '{{section}}': student.section?.sectionName || '',
+            '{{dob}}': student.dob ? new Date(student.dob).toLocaleDateString() : '',
+            '{{fatherName}}': student.fatherName || '',
+            '{{motherName}}': student.motherName || '',
+            '{{address}}': student.address || '',
+            '{{schoolName}}': fullUser?.schoolName || '',
+            '{{schoolAddress}}': fullUser?.school?.address || '',
             '{{issueDate}}': watchedValues.issueDate ? new Date(watchedValues.issueDate).toLocaleDateString() : new Date().toLocaleDateString(),
-            '{{conduct}}': watchedValues.conduct || '',
+            '{{conduct}}': conductDisplay,
             '{{purpose}}': watchedValues.purpose || '',
             '{{academicYear}}': watchedValues.academicYear || '',
             '{{dateOfLeaving}}': watchedValues.dateOfLeaving ? new Date(watchedValues.dateOfLeaving).toLocaleDateString() : '',
@@ -201,25 +280,60 @@ export default function GenerateCertificatePage() {
             '{{title}}': watchedValues.title || '',
             '{{content}}': watchedValues.content || '',
             '{{remarks}}': watchedValues.remarks || '',
+            '{{verificationUrl}}': verificationUrl,
+            '{{certificateNumber}}': certNumber,
+            '{{tcNumber}}': `TC-${Date.now()}`,
+            '{{nationality}}': student.nationality || '',
+            '{{religion}}': student.religion || '',
+            '{{category}}': student.category || '',
+            '{{bloodGroup}}': student.bloodGroup || '',
+            '{{gender}}': student.gender || '',
+            '{{admissionDate}}': student.admissionDate ? new Date(student.admissionDate).toLocaleDateString() : '',
+            '{{parentContact}}': student.parentContact || student.fatherPhone || '',
+        };
+
+        // Merge with user overrides (overrides win)
+        const replacements = { ...autoReplacements };
+        Object.entries(fieldOverrides).forEach(([key, value]) => {
+            if (value !== undefined && value !== '') {
+                replacements[`{{${key}}}`] = value;
+            }
+        });
+
+        // Image replacements (URLs)
+        const imageReplacements = {
+            '{{studentPhoto}}': student?.user?.profilePicture || student.photoUrl || 'https://placehold.co/100x100?text=Photo',
+            '{{schoolLogo}}': fullUser?.school?.profilePicture || 'https://placehold.co/100x100?text=Logo',
+            '{{principalSignature}}': docSettings?.signatureUrl || fullUser?.school?.signatureUrl || 'https://placehold.co/100x50?text=Signature',
+            '{{schoolStamp}}': docSettings?.stampUrl || fullUser?.school?.stampUrl || 'https://placehold.co/100x50?text=Stamp',
         };
 
         const processedElements = elements.map(el => {
             if (el.type === 'text' && el.content) {
                 let content = el.content;
                 Object.entries(replacements).forEach(([key, value]) => {
-                    content = content.replace(new RegExp(key, 'g'), value);
+                    content = content.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value);
                 });
                 return { ...el, content };
             }
             if (el.type === 'qrcode' && el.content) {
                 let content = el.content;
                 Object.entries(replacements).forEach(([key, value]) => {
-                    content = content.replace(new RegExp(key, 'g'), value);
+                    content = content.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value);
                 });
                 return { ...el, content };
             }
-            if (el.type === 'image' && el.url && el.url.includes('{{studentPhoto}}')) {
-                return { ...el, url: student.photoUrl || 'https://placehold.co/100x100?text=Photo' };
+            if (el.type === 'image') {
+                let url = el.url || '';
+                Object.entries(imageReplacements).forEach(([key, value]) => {
+                    if (url.includes(key) || url === key) {
+                        url = value;
+                    }
+                });
+                if (!url || url.startsWith('{{')) {
+                    url = 'https://placehold.co/100x100?text=Image';
+                }
+                return { ...el, url };
             }
             return el;
         });
@@ -230,7 +344,7 @@ export default function GenerateCertificatePage() {
             backgroundImage: template.layoutConfig.backgroundImage
         });
 
-    }, [JSON.stringify(watchedValues), templates, students, fullUser]);
+    }, [JSON.stringify(watchedValues), templates, students, fullUser, docSettings, fieldOverrides]);
 
     const handleGeneratePDF = async () => {
         // Target the specific content div
@@ -392,16 +506,51 @@ export default function GenerateCertificatePage() {
                                         <SelectValue placeholder="Choose a student..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {students?.map((student) => (
+                                        <div className="p-2 pb-1 space-y-1.5">
+                                            <div className="flex gap-1.5">
+                                                <select
+                                                    value={classFilter}
+                                                    onChange={(e) => { setClassFilter(e.target.value); setSectionFilter(''); }}
+                                                    className="h-7 text-xs rounded border bg-background px-1.5 flex-1 min-w-0"
+                                                >
+                                                    <option value="">All Classes</option>
+                                                    {availableClasses.map(c => (
+                                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                                    ))}
+                                                </select>
+                                                {classFilter && availableSections.length > 0 && (
+                                                    <select
+                                                        value={sectionFilter}
+                                                        onChange={(e) => setSectionFilter(e.target.value)}
+                                                        className="h-7 text-xs rounded border bg-background px-1.5 w-20"
+                                                    >
+                                                        <option value="">All</option>
+                                                        {availableSections.map(s => (
+                                                            <option key={s.id} value={s.id}>{s.name}</option>
+                                                        ))}
+                                                    </select>
+                                                )}
+                                            </div>
+                                            <Input
+                                                placeholder="Search students..."
+                                                value={studentSearch}
+                                                onChange={(e) => setStudentSearch(e.target.value)}
+                                                className="h-7 text-xs"
+                                            />
+                                        </div>
+                                        {filteredStudents?.map((student) => (
                                             <SelectItem key={student.userId} value={student.userId}>
                                                 <div className="flex flex-col text-left">
-                                                    <span>{student.name}</span>
+                                                    <span>{student.name || student.user?.name}</span>
                                                     <span className="text-[10px] text-muted-foreground">
-                                                        Roll: {student.rollNumber} | Class: {student.class?.className}
+                                                        Roll: {student.rollNumber} | {student.class?.className}{student.section?.sectionName ? ` - ${student.section.sectionName}` : ''}
                                                     </span>
                                                 </div>
                                             </SelectItem>
                                         ))}
+                                        {filteredStudents?.length === 0 && (
+                                            <div className="text-center text-xs text-muted-foreground py-3">No students found</div>
+                                        )}
                                     </SelectContent>
                                 </Select>
                                 {errors.studentId && (
@@ -428,6 +577,9 @@ export default function GenerateCertificatePage() {
                                                 {template.name}
                                                 {template.isDefault && (
                                                     <Badge variant="secondary" className="ml-2 text-[10px] h-4">Default</Badge>
+                                                )}
+                                                {template.isBuiltIn && (
+                                                    <Badge variant="outline" className="ml-2 text-[10px] h-4">Built-in</Badge>
                                                 )}
                                             </SelectItem>
                                         ))}
@@ -584,6 +736,108 @@ export default function GenerateCertificatePage() {
                                     />
                                 </div>
                             )}
+
+                            <div className="h-px bg-border my-2" />
+
+                            {/* Field Mapping Panel */}
+                            {watchedValues.templateId && templates && (() => {
+                                const template = templates.find(t => t.id === watchedValues.templateId);
+                                if (!template?.layoutConfig?.elements) return null;
+                                // Detect all {{...}} placeholders from the template
+                                const placeholderSet = new Set();
+                                template.layoutConfig.elements.forEach(el => {
+                                    const text = el.content || el.url || '';
+                                    const matches = text.match(/\{\{([^}]+)\}\}/g);
+                                    if (matches) matches.forEach(m => placeholderSet.add(m.replace(/[{}]/g, '')));
+                                });
+                                const placeholders = Array.from(placeholderSet).sort();
+                                if (placeholders.length === 0) return null;
+
+                                const student = students?.find(s => s.userId === watchedValues.studentId) || {};
+                                const conductLabels = { 'excellent': 'Excellent', 'very-good': 'Very Good', 'good': 'Good', 'satisfactory': 'Satisfactory' };
+                                // Get auto-resolved values for display
+                                const autoValues = {
+                                    studentName: student.name || '',
+                                    rollNumber: student.rollNumber || '',
+                                    admissionNo: student.admissionNo || '',
+                                    class: student.class?.className || '',
+                                    section: student.section?.sectionName || '',
+                                    dob: student.dob ? new Date(student.dob).toLocaleDateString() : '',
+                                    fatherName: student.fatherName || '',
+                                    motherName: student.motherName || '',
+                                    address: student.address || '',
+                                    schoolName: fullUser?.schoolName || '',
+                                    schoolAddress: fullUser?.school?.address || '',
+                                    issueDate: watchedValues.issueDate ? new Date(watchedValues.issueDate).toLocaleDateString() : '',
+                                    conduct: conductLabels[watchedValues.conduct] || watchedValues.conduct || '',
+                                    purpose: watchedValues.purpose || '',
+                                    academicYear: watchedValues.academicYear || '',
+                                    dateOfLeaving: watchedValues.dateOfLeaving ? new Date(watchedValues.dateOfLeaving).toLocaleDateString() : '',
+                                    reason: watchedValues.reason || '',
+                                    eventName: watchedValues.eventName || '',
+                                    position: watchedValues.position || '',
+                                    title: watchedValues.title || '',
+                                    content: watchedValues.content || '',
+                                    remarks: watchedValues.remarks || '',
+                                    nationality: student.nationality || '',
+                                    religion: student.religion || '',
+                                    category: student.category || '',
+                                    bloodGroup: student.bloodGroup || '',
+                                    gender: student.gender || '',
+                                };
+
+                                return (
+                                    <div className="space-y-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowFieldMapper(!showFieldMapper)}
+                                            className="flex items-center justify-between w-full text-xs font-semibold text-muted-foreground uppercase tracking-wide hover:text-foreground transition-colors"
+                                        >
+                                            <span className="flex items-center gap-1.5">
+                                                <Settings2 className="h-3.5 w-3.5" />
+                                                Field Mapping ({placeholders.length})
+                                            </span>
+                                            {showFieldMapper ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                                        </button>
+                                        {showFieldMapper && (
+                                            <div className="space-y-1 max-h-[300px] overflow-y-auto">
+                                                {placeholders.map(ph => {
+                                                    const resolved = fieldOverrides[ph] || autoValues[ph] || '';
+                                                    const isMapped = !!resolved;
+                                                    const isOverridden = !!fieldOverrides[ph];
+                                                    return (
+                                                        <div key={ph} className={`flex items-start gap-1.5 p-1.5 rounded text-xs border ${isMapped ? 'border-green-200 bg-green-50/50 dark:border-green-900/50 dark:bg-green-950/20' : 'border-amber-200 bg-amber-50/50 dark:border-amber-900/50 dark:bg-amber-950/20'
+                                                            }`}>
+                                                            {isMapped ? (
+                                                                <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mt-0.5 flex-shrink-0" />
+                                                            ) : (
+                                                                <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 flex-shrink-0" />
+                                                            )}
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="font-medium text-[11px] text-foreground truncate">
+                                                                    {`{{${ph}}}`}
+                                                                </div>
+                                                                {!isOverridden && resolved && (
+                                                                    <div className="text-[10px] text-muted-foreground truncate" title={resolved}>
+                                                                        → {resolved}
+                                                                    </div>
+                                                                )}
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder={resolved || 'Enter value...'}
+                                                                    value={fieldOverrides[ph] || ''}
+                                                                    onChange={(e) => setFieldOverrides(prev => ({ ...prev, [ph]: e.target.value }))}
+                                                                    className="mt-0.5 w-full h-6 text-[11px] px-1.5 rounded border bg-background focus:ring-1 focus:ring-primary/30 outline-none"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
 
                             <div className="h-px bg-border my-2" />
 

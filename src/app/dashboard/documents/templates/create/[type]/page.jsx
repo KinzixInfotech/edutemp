@@ -106,15 +106,23 @@ const PLACEHOLDERS = [
     { value: 'motherName', label: 'Mother Name' },
     { value: 'address', label: 'Address' },
     { value: 'schoolName', label: 'School Name' },
+    { value: 'schoolAddress', label: 'School Address' },
+    { value: 'schoolLogo', label: 'School Logo (Image)' },
+    { value: 'schoolStamp', label: 'School Stamp (Image)' },
     { value: 'examCenter', label: 'Exam Center' },
+    { value: 'examName', label: 'Exam Name' },
+    { value: 'examSchedule', label: 'Exam Schedule' },
+    { value: 'seatNumber', label: 'Seat Number' },
+    { value: 'center', label: 'Center' },
+    { value: 'venue', label: 'Venue' },
     { value: 'issueDate', label: 'Issue Date' },
     { value: 'validUntil', label: 'Valid Until' },
-    { value: 'principalSignature', label: 'Principal Signature' },
+    { value: 'principalSignature', label: 'Principal Signature (Image)' },
     { value: 'classTeacherSignature', label: 'Class Teacher Signature' },
     { value: 'studentId', label: 'Student ID' },
     { value: 'verificationUrl', label: 'Verification URL' },
     { value: 'bloodGroup', label: 'Blood Group' },
-    { value: 'studentPhoto', label: 'Student Photo' },
+    { value: 'studentPhoto', label: 'Student Photo (Image)' },
 ];
 
 export default function CreateTemplatePage() {
@@ -246,7 +254,12 @@ export default function CreateTemplatePage() {
     }
 
     const Icon = config.icon;
-    const availableTemplates = DEFAULT_TEMPLATES[templateType] || [];
+    // For certificates, show ALL type-specific themes so users can browse them all
+    const allCertTypes = ['transfer', 'character', 'bonafide', 'school-leaving', 'competition', 'custom'];
+    const availableTemplates = templateType === 'certificate'
+        ? allCertTypes.flatMap(t => (DEFAULT_TEMPLATES[t] || []))
+            .concat((DEFAULT_TEMPLATES['certificate'] || []).filter(g => !allCertTypes.some(t => (DEFAULT_TEMPLATES[t] || []).some(s => s.id === g.id))))
+        : (DEFAULT_TEMPLATES[templateType] || []);
 
     return (
         <div className="flex flex-col h-[calc(100vh-4rem)]">
@@ -374,7 +387,7 @@ export default function CreateTemplatePage() {
                         />
                     </div>
                 ) : activeTab === 'themes' ? (
-                    <div className="h-full bg-muted/30 overflow-hidden flex flex-col">
+                    <div className="h-full bg-muted/30 overflow-auto flex flex-col">
                         <div className="p-6 border-b bg-background">
                             <div className="max-w-6xl mx-auto">
                                 <h2 className="text-2xl font-bold mb-2">Choose a Theme</h2>

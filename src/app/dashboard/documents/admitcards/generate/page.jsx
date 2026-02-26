@@ -53,12 +53,13 @@ const formSchema = z.object({
 export default function GenerateAdmitCardPage() {
     const router = useRouter();
     const { fullUser } = useAuth();
-    console.log(fullUser);
-
     const schoolId = fullUser?.schoolId;
     const [generating, setGenerating] = useState(false);
     const [previewUrl, setPreviewUrl] = useState(null);
     const [previewConfig, setPreviewConfig] = useState(null);
+    const [studentSearch, setStudentSearch] = useState('');
+    const [classFilter, setClassFilter] = useState('');
+    const [sectionFilter, setSectionFilter] = useState('');
     const lastExamIdRef = useRef(null);
 
     const {
@@ -108,6 +109,18 @@ export default function GenerateAdmitCardPage() {
         staleTime: 5 * 60 * 1000,
     });
 
+    // Fetch document settings (signature/stamp URLs)
+    const { data: docSettings } = useQuery({
+        queryKey: ['document-settings', schoolId],
+        queryFn: async () => {
+            const res = await fetch(`/api/schools/${schoolId}/settings/documents`);
+            if (!res.ok) return {};
+            return res.json();
+        },
+        enabled: !!schoolId,
+        staleTime: 5 * 60 * 1000,
+    });
+
     // Fetch exams
     const { data: exams } = useQuery({
         queryKey: ['exams', schoolId],
@@ -120,6 +133,42 @@ export default function GenerateAdmitCardPage() {
         enabled: !!schoolId,
         staleTime: 5 * 60 * 1000,
     });
+
+    // Get unique classes from students
+    const availableClasses = useMemo(() => {
+        if (!students) return [];
+        const classMap = new Map();
+        students.forEach(s => {
+            if (s.class?.className && s.classId) classMap.set(s.classId, s.class.className);
+        });
+        return Array.from(classMap, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+    }, [students]);
+
+    // Get unique sections for selected class
+    const availableSections = useMemo(() => {
+        if (!students || !classFilter) return [];
+        const sectionMap = new Map();
+        students.filter(s => s.classId === classFilter).forEach(s => {
+            if (s.section?.sectionName && s.sectionId) sectionMap.set(s.sectionId, s.section.sectionName);
+        });
+        return Array.from(sectionMap, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+    }, [students, classFilter]);
+
+    // Filter students by search + class + section
+    const filteredStudents = useMemo(() => {
+        if (!students) return [];
+        let filtered = students;
+        if (classFilter) filtered = filtered.filter(s => s.classId === classFilter);
+        if (sectionFilter) filtered = filtered.filter(s => s.sectionId === sectionFilter);
+        if (studentSearch.trim()) {
+            const search = studentSearch.toLowerCase();
+            filtered = filtered.filter(s =>
+                (s.name || s.user?.name || '').toLowerCase().includes(search) ||
+                (s.rollNumber || '').toLowerCase().includes(search)
+            );
+        }
+        return filtered;
+    }, [students, studentSearch, classFilter, sectionFilter]);
 
     // Fetch templates
     const { data: templates, isLoading: loadingTemplates } = useQuery({
@@ -142,8 +191,6 @@ export default function GenerateAdmitCardPage() {
         if (!template || !template.layoutConfig) return;
 
         const student = students.find(s => s.userId === studentId) || {};
-        console.log(student);
-
         const exam = exams?.find(e => e.id?.toString() === examId) || {};
 
         // Create a deep copy of elements to avoid mutating original
@@ -232,7 +279,8 @@ export default function GenerateAdmitCardPage() {
         const imageReplacements = {
             '{{studentPhoto}}': student?.user?.profilePicture || student.photoUrl || 'https://placehold.co/100x100?text=Photo',
             '{{schoolLogo}}': fullUser?.school?.profilePicture || 'https://placehold.co/100x100?text=Logo',
-            '{{principalSignature}}': fullUser?.school?.signatureUrl || fullUser?.school?.signature || 'https://placehold.co/100x50?text=Signature',
+            '{{principalSignature}}': docSettings?.signatureUrl || fullUser?.school?.signatureUrl || 'https://placehold.co/100x50?text=Signature',
+            '{{schoolStamp}}': docSettings?.stampUrl || fullUser?.school?.stampUrl || 'https://placehold.co/100x50?text=Stamp',
         };
 
         const processedElements = elements.map(el => {
@@ -289,7 +337,7 @@ export default function GenerateAdmitCardPage() {
         };
         setPreviewConfig(config);
 
-    }, [templateId, studentId, examId, seatNumber, center, examDate, examTime, venue, templates, students, exams, fullUser]);
+    }, [templateId, studentId, examId, seatNumber, center, examDate, examTime, venue, templates, students, exams, fullUser, docSettings]);
 
     const handleGeneratePDF = async (data) => {
         const canvasElement = document.querySelector('#admitcard-preview-container [style*="background"]');
@@ -458,11 +506,51 @@ export default function GenerateAdmitCardPage() {
                                         <SelectValue placeholder="Select student..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {students?.map((student) => (
+                                        <div className="p-2 pb-1 space-y-1.5">
+                                            <div className="flex gap-1.5">
+                                                <select
+                                                    value={classFilter}
+                                                    onChange={(e) => { setClassFilter(e.target.value); setSectionFilter(''); }}
+                                                    className="h-7 text-xs rounded border bg-background px-1.5 flex-1 min-w-0"
+                                                >
+                                                    <option value="">All Classes</option>
+                                                    {availableClasses.map(c => (
+                                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                                    ))}
+                                                </select>
+                                                {classFilter && availableSections.length > 0 && (
+                                                    <select
+                                                        value={sectionFilter}
+                                                        onChange={(e) => setSectionFilter(e.target.value)}
+                                                        className="h-7 text-xs rounded border bg-background px-1.5 w-20"
+                                                    >
+                                                        <option value="">All</option>
+                                                        {availableSections.map(s => (
+                                                            <option key={s.id} value={s.id}>{s.name}</option>
+                                                        ))}
+                                                    </select>
+                                                )}
+                                            </div>
+                                            <Input
+                                                placeholder="Search students..."
+                                                value={studentSearch}
+                                                onChange={(e) => setStudentSearch(e.target.value)}
+                                                className="h-7 text-xs"
+                                            />
+                                        </div>
+                                        {filteredStudents?.map((student) => (
                                             <SelectItem key={student.userId} value={student.userId}>
-                                                <span className="text-sm">{student.user?.name || student.name}</span>
+                                                <div className="flex flex-col text-left">
+                                                    <span className="text-sm">{student.user?.name || student.name}</span>
+                                                    <span className="text-[10px] text-muted-foreground">
+                                                        Roll: {student.rollNumber} | {student.class?.className}{student.section?.sectionName ? ` - ${student.section.sectionName}` : ''}
+                                                    </span>
+                                                </div>
                                             </SelectItem>
                                         ))}
+                                        {filteredStudents?.length === 0 && (
+                                            <div className="text-center text-xs text-muted-foreground py-3">No students found</div>
+                                        )}
                                     </SelectContent>
                                 </Select>
                                 {errors.studentId && (

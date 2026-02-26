@@ -37,7 +37,7 @@ const ImageUploader = ({ currentUrl, onUrlChange, type, label }) => {
 
     try {
       setUploading(true);
-      const res = await uploadFiles("imageUploader", {
+      const res = await uploadFiles("logoupload", {
         files: [files[0].file],
       });
 

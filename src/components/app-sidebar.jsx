@@ -213,11 +213,6 @@ export const SidebarData = [
                         roles: ["ADMIN"],
                     },
                     {
-                        label: "ID Card Templates",
-                        url: "/dashboard/documents/templates/id-card",
-                        roles: ["ADMIN"],
-                    },
-                    {
                         label: "Admit Card Templates",
                         url: "/dashboard/documents/templates/admit-cards",
                         roles: ["ADMIN"],
@@ -290,24 +285,6 @@ export const SidebarData = [
                     {
                         label: "Download / Print History",
                         url: "/dashboard/documents/admitcards/history",
-                        roles: ["ADMIN"],
-                    },
-                ],
-            },
-            {
-                label: "Digital ID Cards",
-                icon: IdCard,
-                roles: ["ADMIN"],
-                submenu: [
-                    {
-                        label: "Generate Student ID",
-                        url: "/dashboard/documents/idcards/generate",
-                        roles: ["ADMIN"],
-                    },
-
-                    {
-                        label: "Reissue / Expire Old IDs",
-                        url: "/dashboard/documents/idcards/manage",
                         roles: ["ADMIN"],
                     },
                 ],

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Rnd } from 'react-rnd';
 import { QRCodeSVG } from 'qrcode.react';
 import {
@@ -116,8 +116,13 @@ export default function CertificateDesignEditor({
     const [canvasSize, setCanvasSize] = useState(safeConfig.canvasSize || { width: 800, height: 600 });
     const [backgroundImage, setBackgroundImage] = useState(safeConfig.backgroundImage || '');
     const containerRef = useRef(null);
+    const canvasAreaRef = useRef(null);
     const [isInitialized, setIsInitialized] = useState(false);
     const onChangeRef = useRef(onChange);
+    const [canvasScale, setCanvasScale] = useState(1);
+    const guideXRef = useRef(null);
+    const guideYRef = useRef(null);
+    const SNAP_THRESHOLD = 6;
     onChangeRef.current = onChange;
 
     // Update state when initialConfig changes
@@ -146,6 +151,25 @@ export default function CertificateDesignEditor({
             });
         }
     }, [elements, canvasSize, backgroundImage, readOnly, isInitialized]);
+
+    // Auto-scale canvas to fit the available area (edit mode only)
+    useEffect(() => {
+        if (readOnly) { setCanvasScale(1); return; }
+        const area = canvasAreaRef.current;
+        if (!area) return;
+        const observer = new ResizeObserver(entries => {
+            for (const entry of entries) {
+                const availableW = entry.contentRect.width - 64; // account for padding
+                const availableH = entry.contentRect.height - 64;
+                const scaleW = availableW / canvasSize.width;
+                const scaleH = availableH / canvasSize.height;
+                const scale = Math.min(scaleW, scaleH, 1); // never scale up
+                setCanvasScale(Math.max(scale, 0.3));
+            }
+        });
+        observer.observe(area);
+        return () => observer.disconnect();
+    }, [canvasSize, readOnly]);
 
     const addElement = (type) => {
         const newElement = {
@@ -183,8 +207,89 @@ export default function CertificateDesignEditor({
         setSelectedId(newElement.id);
     };
 
+    // Find the single closest snap per axis — no React state, pure DOM
+    const findSnap = useCallback((dragId, x, y, w, h) => {
+        const cw = canvasSize.width;
+        const ch = canvasSize.height;
+
+        // Candidate vertical lines (x positions) on the canvas
+        const xTargets = [0, cw / 2, cw];
+        // Candidate horizontal lines (y positions) on the canvas
+        const yTargets = [0, ch / 2, ch];
+
+        // Add other element edges/centers
+        elements.forEach(el => {
+            if (el.id === dragId) return;
+            xTargets.push(el.x, el.x + el.width / 2, el.x + el.width);
+            yTargets.push(el.y, el.y + el.height / 2, el.y + el.height);
+        });
+
+        // Element edges: left, centerX, right
+        const myXEdges = [x, x + w / 2, x + w];
+        const myYEdges = [y, y + h / 2, y + h];
+
+        let bestX = null, bestXDist = SNAP_THRESHOLD + 1, bestXOffset = 0;
+        let bestY = null, bestYDist = SNAP_THRESHOLD + 1, bestYOffset = 0;
+
+        for (const t of xTargets) {
+            for (const edge of myXEdges) {
+                const dist = Math.abs(edge - t);
+                if (dist < bestXDist) {
+                    bestXDist = dist;
+                    bestX = t;
+                    bestXOffset = t - edge;
+                }
+            }
+        }
+        for (const t of yTargets) {
+            for (const edge of myYEdges) {
+                const dist = Math.abs(edge - t);
+                if (dist < bestYDist) {
+                    bestYDist = dist;
+                    bestY = t;
+                    bestYOffset = t - edge;
+                }
+            }
+        }
+
+        const snappedX = bestXDist <= SNAP_THRESHOLD ? x + bestXOffset : x;
+        const snappedY = bestYDist <= SNAP_THRESHOLD ? y + bestYOffset : y;
+        const showX = bestXDist <= SNAP_THRESHOLD ? bestX : null;
+        const showY = bestYDist <= SNAP_THRESHOLD ? bestY : null;
+
+        return { snappedX, snappedY, showX, showY };
+    }, [canvasSize, elements]);
+
+    // Direct DOM manipulation — no setState, zero lag
+    const showGuides = useCallback((showX, showY) => {
+        if (guideXRef.current) {
+            guideXRef.current.style.display = showX !== null ? 'block' : 'none';
+            if (showX !== null) guideXRef.current.style.left = `${showX}px`;
+        }
+        if (guideYRef.current) {
+            guideYRef.current.style.display = showY !== null ? 'block' : 'none';
+            if (showY !== null) guideYRef.current.style.top = `${showY}px`;
+        }
+    }, []);
+
+    const hideGuides = useCallback(() => {
+        if (guideXRef.current) guideXRef.current.style.display = 'none';
+        if (guideYRef.current) guideYRef.current.style.display = 'none';
+    }, []);
+
+    const handleDrag = useCallback((id, d) => {
+        const el = elements.find(e => e.id === id);
+        if (!el) return;
+        const { showX, showY } = findSnap(id, d.x, d.y, el.width, el.height);
+        showGuides(showX, showY);
+    }, [elements, findSnap, showGuides]);
+
     const handleDragStop = (id, d) => {
-        updateElement(id, { x: d.x, y: d.y });
+        const el = elements.find(e => e.id === id);
+        if (!el) { updateElement(id, { x: d.x, y: d.y }); hideGuides(); return; }
+        const { snappedX, snappedY } = findSnap(id, d.x, d.y, el.width, el.height);
+        updateElement(id, { x: snappedX, y: snappedY });
+        hideGuides();
     };
 
     const handleResizeStop = (id, ref, position) => {
@@ -210,44 +315,54 @@ export default function CertificateDesignEditor({
             )}
 
             {/* Main Canvas Area */}
-            <div className={cn("flex-1 bg-muted/50 relative overflow-auto flex items-start justify-center py-8 px-8", readOnly && "bg-transparent p-0 overflow-visible")}>
-                <div
-                    ref={containerRef}
-                    className={cn("bg-white shadow-lg relative transition-all", readOnly && "shadow-none")}
-                    style={{
-                        width: canvasSize.width,
-                        height: canvasSize.height,
-                        backgroundImage: backgroundImage ? `url(${backgroundImage})` : 'none',
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                        transform: readOnly ? 'scale(1)' : 'none', // Ensure no transform interferes with html2canvas
-                        transformOrigin: 'top left'
-                    }}
-                    onClick={(e) => {
-                        if (!readOnly && e.target === containerRef.current) setSelectedId(null);
-                    }}
-                >
-                    {elements.map((el) => (
-                        <Rnd
-                            key={el.id}
-                            size={{ width: el.width, height: el.height }}
-                            position={{ x: el.x, y: el.y }}
-                            onDragStop={!readOnly ? (e, d) => handleDragStop(el.id, d) : undefined}
-                            onResizeStop={!readOnly ? (e, direction, ref, delta, position) => handleResizeStop(el.id, ref, position) : undefined}
-                            bounds="parent"
-                            onClick={!readOnly ? () => setSelectedId(el.id) : undefined}
-                            disableDragging={readOnly}
-                            enableResizing={!readOnly}
-                            className={cn(
-                                "border-2 border-transparent transition-colors",
-                                !readOnly && "hover:border-blue-300",
-                                selectedId === el.id && !readOnly && "border-blue-500 z-50"
-                            )}
-                            style={{ zIndex: el.zIndex, pointerEvents: readOnly ? 'none' : 'auto' }}
-                        >
-                            <ElementRenderer element={el} />
-                        </Rnd>
-                    ))}
+            <div ref={canvasAreaRef} className={cn("flex-1 min-w-0 bg-muted/50 relative overflow-hidden flex items-start justify-center py-8 px-8", readOnly && "bg-transparent p-0 overflow-visible")}>
+                {/* Sizing wrapper: shrinks to the scaled canvas size so the parent doesn't scroll */}
+                <div style={!readOnly ? { width: canvasSize.width * canvasScale, height: canvasSize.height * canvasScale } : undefined}>
+                    <div
+                        ref={containerRef}
+                        className={cn("bg-white shadow-lg relative transition-all", readOnly && "shadow-none")}
+                        style={{
+                            width: canvasSize.width,
+                            height: canvasSize.height,
+                            backgroundImage: backgroundImage ? `url(${backgroundImage})` : 'none',
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            transform: readOnly ? 'scale(1)' : `scale(${canvasScale})`,
+                            transformOrigin: 'top left',
+                        }}
+                        onClick={(e) => {
+                            if (!readOnly && e.target === containerRef.current) setSelectedId(null);
+                        }}
+                    >
+                        {/* Alignment guide lines — controlled via refs, no re-renders */}
+                        {!readOnly && (
+                            <>
+                                <div ref={guideXRef} style={{ display: 'none', position: 'absolute', top: 0, width: 1, height: '100%', background: '#3b82f6', opacity: 0.8, zIndex: 9999, pointerEvents: 'none' }} />
+                                <div ref={guideYRef} style={{ display: 'none', position: 'absolute', left: 0, height: 1, width: '100%', background: '#3b82f6', opacity: 0.8, zIndex: 9999, pointerEvents: 'none' }} />
+                            </>
+                        )}
+                        {elements.map((el) => (
+                            <Rnd
+                                key={el.id}
+                                size={{ width: el.width, height: el.height }}
+                                position={{ x: el.x, y: el.y }}
+                                onDrag={!readOnly ? (e, d) => handleDrag(el.id, d) : undefined}
+                                onDragStop={!readOnly ? (e, d) => handleDragStop(el.id, d) : undefined}
+                                onResizeStop={!readOnly ? (e, direction, ref, delta, position) => handleResizeStop(el.id, ref, position) : undefined}
+                                onClick={!readOnly ? () => setSelectedId(el.id) : undefined}
+                                disableDragging={readOnly}
+                                enableResizing={!readOnly}
+                                className={cn(
+                                    "border-2 border-transparent transition-colors",
+                                    !readOnly && "hover:border-blue-300",
+                                    selectedId === el.id && !readOnly && "border-blue-500 z-50"
+                                )}
+                                style={{ zIndex: el.zIndex, pointerEvents: readOnly ? 'none' : 'auto' }}
+                            >
+                                <ElementRenderer element={el} />
+                            </Rnd>
+                        ))}
+                    </div>
                 </div>
             </div>
 
@@ -315,12 +430,48 @@ export default function CertificateDesignEditor({
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Background Image URL</Label>
+                                        <Label>Background Image</Label>
                                         <Input
                                             value={backgroundImage}
                                             onChange={(e) => setBackgroundImage(e.target.value)}
-                                            placeholder="https://..."
+                                            placeholder="Paste image URL or upload below..."
                                         />
+                                        <div className="flex gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="w-full"
+                                                onClick={() => {
+                                                    const input = document.createElement('input');
+                                                    input.type = 'file';
+                                                    input.accept = 'image/*';
+                                                    input.onchange = (e) => {
+                                                        const file = e.target.files[0];
+                                                        if (file) {
+                                                            const reader = new FileReader();
+                                                            reader.onload = (ev) => setBackgroundImage(ev.target.result);
+                                                            reader.readAsDataURL(file);
+                                                        }
+                                                    };
+                                                    input.click();
+                                                }}
+                                            >
+                                                <ImageIcon className="h-3.5 w-3.5 mr-1.5" /> Upload Image
+                                            </Button>
+                                            {backgroundImage && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="text-destructive hover:text-destructive"
+                                                    onClick={() => setBackgroundImage('')}
+                                                >
+                                                    Clear
+                                                </Button>
+                                            )}
+                                        </div>
+                                        {backgroundImage && (
+                                            <img src={backgroundImage} alt="Background" className="w-full h-20 object-cover rounded border mt-1" />
+                                        )}
                                     </div>
                                 </div>
                             </ScrollArea>
@@ -355,18 +506,24 @@ function ElementRenderer({ element }) {
                     {element.content}
                 </div>
             );
-        case ELEMENT_TYPES.IMAGE:
+        case ELEMENT_TYPES.IMAGE: {
+            const isPlaceholder = !element.url || (element.url.startsWith('{{ ') && element.url.endsWith('}}'));
+            const placeholderLabel = isPlaceholder && element.url
+                ? element.url.replace(/[{ }]/g, '').replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim()
+                : 'Image';
             return (
                 <div style={style} className="overflow-hidden">
-                    {element.url ? (
-                        <img src={element.url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                        <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground">
-                            <ImageIcon className="h-8 w-8" />
+                    {isPlaceholder ? (
+                        <div className="w-full h-full bg-muted/60 flex flex-col items-center justify-center text-muted-foreground border-2 border-dashed border-muted-foreground/30 rounded">
+                            <ImageIcon className="h-6 w-6 mb-1" />
+                            <span className="text-[10px] font-medium text-center px-1 leading-tight">{placeholderLabel}</span>
                         </div>
+                    ) : (
+                        <img src={element.url} alt="" className="w-full h-full object-cover" />
                     )}
                 </div>
             );
+        }
         case ELEMENT_TYPES.QRCODE:
             return (
                 <div style={style} className="flex items-center justify-center bg-white">
@@ -508,7 +665,7 @@ function PropertiesEditor({ element, onUpdate, onDelete, onDuplicate, placeholde
             <Separator />
 
             {/* Common Position & Size */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-3">
                 <div>
                     <Label className="text-xs">X</Label>
                     <Input type="number" value={Math.round(element.x)} onChange={(e) => onUpdate({ x: parseInt(e.target.value) })} />
@@ -638,7 +795,7 @@ function PropertiesEditor({ element, onUpdate, onDelete, onDuplicate, placeholde
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="_custom_">Custom URL...</SelectItem>
-                                {placeholders.filter(ph => ph.value.toLowerCase().includes('photo') || ph.value.toLowerCase().includes('image') || ph.value.toLowerCase().includes('signature')).map(ph => (
+                                {placeholders.filter(ph => ph.value.toLowerCase().includes('photo') || ph.value.toLowerCase().includes('image') || ph.value.toLowerCase().includes('signature') || ph.value.toLowerCase().includes('logo') || ph.value.toLowerCase().includes('stamp')).map(ph => (
                                     <SelectItem key={ph.value} value={ph.value}>
                                         {ph.label}
                                     </SelectItem>
