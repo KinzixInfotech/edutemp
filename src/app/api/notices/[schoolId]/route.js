@@ -306,6 +306,9 @@ export async function POST(request, props) {
             await sendPushNotifications(usersExcludingSender, notice);
         }
 
+        // Invalidate Redis cache for notices list so new notice appears immediately
+        await invalidatePattern(`notices:list:*schoolId:${schoolId}*`);
+
         return NextResponse.json(notice, { status: 201 });
 
     } catch (error) {

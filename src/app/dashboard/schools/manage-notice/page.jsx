@@ -23,6 +23,7 @@ import {
     CalendarClock,
     ChevronLeft,
     ChevronRight,
+    RefreshCw,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -107,6 +108,9 @@ export default function NoticeAdminPage() {
     const [uploadResetKey, setUploadResetKey] = useState(0);
     const [isImageUploading, setIsImageUploading] = useState(false);
 
+    // IDs currently being deleted — filtered out of UI instantly
+    const [deletingIds, setDeletingIds] = useState([]);
+
     // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
@@ -136,7 +140,7 @@ export default function NoticeAdminPage() {
     const watchedValues = watch();
 
     // Fetch notices - only notices created by current user
-    const { data: noticesData, isLoading } = useQuery({
+    const { data: noticesData, isLoading, isFetching, refetch } = useQuery({
         queryKey: ['notices', schoolId, fullUser?.id],
         queryFn: async () => {
             const res = await fetch(`/api/notices/${schoolId}?limit=100&creatorId=${fullUser?.id}`);
@@ -146,7 +150,17 @@ export default function NoticeAdminPage() {
         enabled: !!schoolId && !!fullUser?.id,
     });
 
-    const notices = noticesData?.notices || [];
+    // Filter out items currently being deleted so they vanish from UI immediately
+    const notices = useMemo(() => {
+        const all = noticesData?.notices || [];
+        if (deletingIds.length === 0) return all;
+        return all.filter(n => !deletingIds.includes(n.id));
+    }, [noticesData, deletingIds]);
+
+    // Manual refresh handler
+    const handleRefresh = () => {
+        refetch();
+    };
 
     // Stats
     const stats = useMemo(() => {
@@ -228,7 +242,7 @@ export default function NoticeAdminPage() {
                     ? 'Notice scheduled successfully!'
                     : 'Notice published successfully!';
             toast.success(statusMsg);
-            queryClient.invalidateQueries(['notices', schoolId]);
+            queryClient.refetchQueries({ queryKey: ['notices', schoolId, fullUser?.id] });
             closeDialog();
         },
         onError: (error) => {
@@ -236,7 +250,7 @@ export default function NoticeAdminPage() {
         },
     });
 
-    // Delete mutation
+    // Delete mutation — minimal, callers handle UX
     const deleteMutation = useMutation({
         mutationFn: async (noticeId) => {
             const res = await fetch(`/api/notices/${schoolId}/${noticeId}`, {
@@ -245,14 +259,29 @@ export default function NoticeAdminPage() {
             if (!res.ok) throw new Error('Failed to delete notice');
             return res.json();
         },
-        onSuccess: () => {
-            toast.success('Notice deleted');
-            queryClient.invalidateQueries(['notices', schoolId]);
-        },
-        onError: () => {
-            toast.error('Failed to delete notice');
-        },
     });
+
+    // Single notice delete — state-based instant UI update
+    const handleSingleDelete = async (noticeId) => {
+        if (!confirm('Delete this notice?')) return;
+
+        // Instantly hide from UI
+        setDeletingIds(prev => [...prev, noticeId]);
+        const loadingId = toast.loading('Deleting notice...');
+
+        try {
+            await deleteMutation.mutateAsync(noticeId);
+            toast.dismiss(loadingId);
+            toast.success('Notice deleted');
+        } catch {
+            toast.dismiss(loadingId);
+            toast.error('Failed to delete notice');
+        } finally {
+            // Force hard refetch from server & clear deleting state
+            await queryClient.refetchQueries({ queryKey: ['notices', schoolId, fullUser?.id] });
+            setDeletingIds(prev => prev.filter(id => id !== noticeId));
+        }
+    };
 
     const openDialog = (notice = null) => {
         if (notice) {
@@ -314,11 +343,36 @@ export default function NoticeAdminPage() {
     };
 
     const handleBulkDelete = async () => {
-        if (!confirm(`Delete ${selectedIds.length} notice(s)?`)) return;
-        for (const id of selectedIds) {
-            await deleteMutation.mutateAsync(id);
-        }
+        const count = selectedIds.length;
+        if (!confirm(`Delete ${count} notice(s)?`)) return;
+
+        const idsToDelete = [...selectedIds];
+
+        // Instantly hide from UI
+        setDeletingIds(prev => [...prev, ...idsToDelete]);
         setSelectedIds([]);
+
+        const loadingId = toast.loading(`Deleting ${count} notice(s)...`);
+
+        try {
+            const results = await Promise.allSettled(
+                idsToDelete.map(id => deleteMutation.mutateAsync(id))
+            );
+            const failed = results.filter(r => r.status === 'rejected').length;
+            toast.dismiss(loadingId);
+            if (failed > 0) {
+                toast.error(`Failed to delete ${failed} of ${count} notice(s)`);
+            } else {
+                toast.success(`Deleted ${count} notice(s)`);
+            }
+        } catch {
+            toast.dismiss(loadingId);
+            toast.error('Failed to delete notices');
+        } finally {
+            // Force hard refetch from server & clear deleting state
+            await queryClient.refetchQueries({ queryKey: ['notices', schoolId, fullUser?.id] });
+            setDeletingIds(prev => prev.filter(id => !idsToDelete.includes(id)));
+        }
     };
 
     const getCategoryColor = (category) => {
@@ -349,10 +403,21 @@ export default function NoticeAdminPage() {
                     </h1>
                     <p className="text-muted-foreground">Create and manage school notices and circulars</p>
                 </div>
-                <Button onClick={() => openDialog()}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create Notice
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={handleRefresh}
+                        disabled={isFetching}
+                        title="Refresh notices"
+                    >
+                        <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+                    </Button>
+                    <Button onClick={() => openDialog()}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Create Notice
+                    </Button>
+                </div>
             </div>
 
             {/* Stats Cards */}
@@ -483,7 +548,7 @@ export default function NoticeAdminPage() {
                                     <TableHead>Notice</TableHead>
                                     <TableHead>Category</TableHead>
                                     <TableHead>Audience</TableHead>
-                                    <TableHead>Priority</TableHead>z
+                                    <TableHead>Priority</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>Views</TableHead>
                                     <TableHead>Date</TableHead>
@@ -569,11 +634,7 @@ export default function NoticeAdminPage() {
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        onClick={() => {
-                                                            if (confirm('Delete this notice?')) {
-                                                                deleteMutation.mutate(notice.id);
-                                                            }
-                                                        }}
+                                                        onClick={() => handleSingleDelete(notice.id)}
                                                     >
                                                         <Trash2 className="h-4 w-4 text-red-500" />
                                                     </Button>

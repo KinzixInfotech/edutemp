@@ -20,6 +20,7 @@ export default function DeveloperLoginPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [turnstileToken, setTurnstileToken] = useState('');
+    const isDev = process.env.NODE_ENV === 'development';
 
     // 2FA state
     const [show2FA, setShow2FA] = useState(false);
@@ -34,7 +35,7 @@ export default function DeveloperLoginPage() {
         e.preventDefault();
         setError('');
 
-        if (!turnstileToken) {
+        if (!isDev && !turnstileToken) {
             setError('Please complete the security check');
             return;
         }
@@ -46,7 +47,7 @@ export default function DeveloperLoginPage() {
             const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
                 email,
                 password,
-                options: { captchaToken: turnstileToken }
+                ...(isDev ? {} : { options: { captchaToken: turnstileToken } })
             });
 
             if (authError || !authData.user) {
@@ -308,15 +309,15 @@ export default function DeveloperLoginPage() {
                                         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Authenticate"}
                                     </Button>
                                     {/* Turnstile Widget */}
-                                    <div className="w-full overflow-hidden" style={{ height: '65px' }}>
-                                        <div style={{ transform: 'scaleX(1.2)', transformOrigin: 'center top' }}>
+                                    {!isDev && (
+                                        <div className="w-full overflow-hidden" style={{ height: '65px' }}>
                                             <Turnstile
                                                 sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
                                                 onVerify={(token) => setTurnstileToken(token)}
                                                 theme="auto"
                                             />
                                         </div>
-                                    </div>
+                                    )}
                                 </form>
                             </>
                         )}

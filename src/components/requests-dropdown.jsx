@@ -31,6 +31,10 @@ export function RequestsDropdown({ schoolId }) {
     const queryClient = useQueryClient()
     const [open, setOpen] = useState(false)
 
+    // Role-based visibility — library & transport are ADMIN-only
+    const roleName = fullUser?.role?.name?.toUpperCase()
+    const isAdmin = roleName === 'ADMIN'
+
     // Fetch library book requests
     const { data: libraryData, isLoading: libraryLoading, refetch: refetchLibrary } = useQuery({
         queryKey: ['library-requests-count', schoolId],
@@ -39,7 +43,7 @@ export function RequestsDropdown({ schoolId }) {
             if (!res.ok) throw new Error('Failed to fetch')
             return res.json()
         },
-        enabled: !!schoolId && open,
+        enabled: !!schoolId && open && isAdmin,
         staleTime: 1000 * 30,
     })
 
@@ -51,7 +55,7 @@ export function RequestsDropdown({ schoolId }) {
             if (!res.ok) throw new Error('Failed to fetch')
             return res.json()
         },
-        enabled: !!schoolId && open,
+        enabled: !!schoolId && open && isAdmin,
         staleTime: 1000 * 30,
     })
 
@@ -69,25 +73,33 @@ export function RequestsDropdown({ schoolId }) {
 
     // Fetch counts for badge (lightweight call)
     const { data: countsData, refetch: refetchCounts } = useQuery({
-        queryKey: ['requests-counts', schoolId],
+        queryKey: ['requests-counts', schoolId, isAdmin],
         queryFn: async () => {
-            const [libraryRes, busRes, notifRes] = await Promise.all([
-                fetch(`/api/schools/${schoolId}/library/requests?status=PENDING&limit=1`),
-                fetch(`/api/schools/transport/requests?schoolId=${schoolId}&status=PENDING&limit=1`),
+            // Only fetch library/bus counts for ADMIN role
+            const fetches = [
                 fetch(`/api/notifications?userId=${fullUser?.id}&schoolId=${schoolId}&limit=1&isRead=false`)
-            ])
-            const libraryData = libraryRes.ok ? await libraryRes.json() : { total: 0 }
-            const busData = busRes.ok ? await busRes.json() : { total: 0 }
-            // For notifications, we want unread count, but API might return list. 
-            // Assuming API has 'total' or we count length. 
-            // If the API returns { notifications: [], total: X }, we use X.
-            // If standard pagination, check 'total'.
-            const notifData = notifRes.ok ? await notifRes.json() : { total: 0 }
+            ]
+            if (isAdmin) {
+                fetches.push(
+                    fetch(`/api/schools/${schoolId}/library/requests?status=PENDING&limit=1`),
+                    fetch(`/api/schools/transport/requests?schoolId=${schoolId}&status=PENDING&limit=1`)
+                )
+            }
+
+            const results = await Promise.all(fetches)
+            const notifData = results[0].ok ? await results[0].json() : { total: 0 }
+
+            let libraryCount = 0, busCount = 0
+            if (isAdmin) {
+                const libraryData = results[1]?.ok ? await results[1].json() : { total: 0 }
+                const busData = results[2]?.ok ? await results[2].json() : { total: 0 }
+                libraryCount = libraryData.total || libraryData.requests?.length || 0
+                busCount = busData.total || busData.requests?.length || 0
+            }
 
             return {
-                library: libraryData.total || libraryData.requests?.length || 0,
-                bus: busData.total || busData.requests?.length || 0,
-                // API returns unreadCount for notifications
+                library: libraryCount,
+                bus: busCount,
                 notifications: notifData.unreadCount || notifData.total || notifData.notifications?.length || 0
             }
         },
@@ -112,10 +124,12 @@ export function RequestsDropdown({ schoolId }) {
     // Usually badge is for ACTION required.
     // For now, let's include notifications in total count.
     const totalCount = (countsData?.library || 0) + (countsData?.bus || 0) + (countsData?.notifications || 0)
-    const isLoading = libraryLoading || busLoading || notificationsLoading
+    const isLoading = (isAdmin ? (libraryLoading || busLoading) : false) || notificationsLoading
 
     const handleRefresh = async () => {
-        await Promise.all([refetchLibrary(), refetchBus(), refetchNotifications(), refetchCounts()])
+        const promises = [refetchNotifications(), refetchCounts()]
+        if (isAdmin) promises.push(refetchLibrary(), refetchBus())
+        await Promise.all(promises)
     }
 
     const formatDate = (dateStr) => {
@@ -308,154 +322,162 @@ export function RequestsDropdown({ schoolId }) {
                         )}
                     </div>
 
-                    <Separator />
-                    {/* Library Book Requests */}
-                    <div className="p-3">
-                        <button
-                            className="flex items-center justify-between w-full px-2 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground rounded-md hover:bg-muted transition-colors"
-                            onClick={() => {
-                                router.push('/dashboard/schools/library/requests')
-                                setOpen(false)
-                            }}
-                        >
-                            <div className="flex items-center gap-2">
-                                <BookOpen size={16} className="text-blue-500" />
-                                <span>Library Book Requests</span>
-                                {countsData?.library > 0 && (
-                                    <Badge variant="outline" className="h-5 text-xs bg-blue-50 text-blue-600 border-blue-200">
-                                        {countsData.library}
-                                    </Badge>
-                                )}
-                            </div>
-                            <ChevronRight size={14} />
-                        </button>
-
-                        {libraryLoading ? (
-                            <div className="flex items-center justify-center py-4">
-                                <Loader2 size={18} className="animate-spin text-muted-foreground" />
-                            </div>
-                        ) : libraryRequests.length > 0 ? (
-                            <div className="mt-2 space-y-1">
-                                {libraryRequests.slice(0, 3).map((request) => (
-                                    <div
-                                        key={request.id}
-                                        className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors"
-                                        onClick={() => {
-                                            router.push('/dashboard/schools/library/requests')
-                                            setOpen(false)
-                                        }}
-                                    >
-                                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                                            <BookOpen size={14} className="text-blue-600" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium truncate">
-                                                {request.book?.title || 'Book Request'}
-                                            </p>
-                                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                                <User size={10} />
-                                                <span className="truncate">{request.student?.name || 'Student'}</span>
-                                                <span>•</span>
-                                                <Clock size={10} />
-                                                <span>{formatDate(request.createdAt)}</span>
-                                            </div>
-                                        </div>
+                    {isAdmin && (
+                        <>
+                            <Separator />
+                            {/* Library Book Requests */}
+                            <div className="p-3">
+                                <button
+                                    className="flex items-center justify-between w-full px-2 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground rounded-md hover:bg-muted transition-colors"
+                                    onClick={() => {
+                                        router.push('/dashboard/schools/library/requests')
+                                        setOpen(false)
+                                    }}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <BookOpen size={16} className="text-blue-500" />
+                                        <span>Library Book Requests</span>
+                                        {countsData?.library > 0 && (
+                                            <Badge variant="outline" className="h-5 text-xs bg-blue-50 text-blue-600 border-blue-200">
+                                                {countsData.library}
+                                            </Badge>
+                                        )}
                                     </div>
-                                ))}
-                                {countsData?.library > 3 && (
-                                    <button
-                                        className="w-full text-xs text-center text-primary hover:underline py-1"
-                                        onClick={() => {
-                                            router.push('/dashboard/schools/library/requests')
-                                            setOpen(false)
-                                        }}
-                                    >
-                                        View all {countsData.library} requests
-                                    </button>
-                                )}
-                            </div>
-                        ) : (
-                            <p className="text-xs text-muted-foreground text-center py-3">
-                                No pending library requests
-                            </p>
-                        )}
-                    </div>
+                                    <ChevronRight size={14} />
+                                </button>
 
-                    <Separator />
-
-                    {/* Bus Requests */}
-                    <div className="p-3">
-                        <button
-                            className="flex items-center justify-between w-full px-2 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground rounded-md hover:bg-muted transition-colors"
-                            onClick={() => {
-                                router.push('/dashboard/schools/transport/requests')
-                                setOpen(false)
-                            }}
-                        >
-                            <div className="flex items-center gap-2">
-                                <Bus size={16} className="text-green-500" />
-                                <span>Bus Service Requests</span>
-                                {countsData?.bus > 0 && (
-                                    <Badge variant="outline" className="h-5 text-xs bg-green-50 text-green-600 border-green-200">
-                                        {countsData.bus}
-                                    </Badge>
-                                )}
-                            </div>
-                            <ChevronRight size={14} />
-                        </button>
-
-                        {busLoading ? (
-                            <div className="flex items-center justify-center py-4">
-                                <Loader2 size={18} className="animate-spin text-muted-foreground" />
-                            </div>
-                        ) : busRequests.length > 0 ? (
-                            <div className="mt-2 space-y-1">
-                                {busRequests.slice(0, 3).map((request) => (
-                                    <div
-                                        key={request.id}
-                                        className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors"
-                                        onClick={() => {
-                                            router.push('/dashboard/schools/transport/requests')
-                                            setOpen(false)
-                                        }}
-                                    >
-                                        <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                                            <Bus size={14} className="text-green-600" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium truncate">
-                                                {request.requestType === 'NEW' ? 'New Service' :
-                                                    request.requestType === 'CHANGE_STOP' ? 'Change Stop' :
-                                                        request.requestType === 'CANCEL' ? 'Cancel Service' : 'Request'}
-                                            </p>
-                                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                                <User size={10} />
-                                                <span className="truncate">{request.student?.name || 'Student'}</span>
-                                                <span>•</span>
-                                                <Clock size={10} />
-                                                <span>{formatDate(request.createdAt)}</span>
-                                            </div>
-                                        </div>
+                                {libraryLoading ? (
+                                    <div className="flex items-center justify-center py-4">
+                                        <Loader2 size={18} className="animate-spin text-muted-foreground" />
                                     </div>
-                                ))}
-                                {countsData?.bus > 3 && (
-                                    <button
-                                        className="w-full text-xs text-center text-primary hover:underline py-1"
-                                        onClick={() => {
-                                            router.push('/dashboard/schools/transport/requests')
-                                            setOpen(false)
-                                        }}
-                                    >
-                                        View all {countsData.bus} requests
-                                    </button>
+                                ) : libraryRequests.length > 0 ? (
+                                    <div className="mt-2 space-y-1">
+                                        {libraryRequests.slice(0, 3).map((request) => (
+                                            <div
+                                                key={request.id}
+                                                className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors"
+                                                onClick={() => {
+                                                    router.push('/dashboard/schools/library/requests')
+                                                    setOpen(false)
+                                                }}
+                                            >
+                                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                                    <BookOpen size={14} className="text-blue-600" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium truncate">
+                                                        {request.book?.title || 'Book Request'}
+                                                    </p>
+                                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                        <User size={10} />
+                                                        <span className="truncate">{request.student?.name || 'Student'}</span>
+                                                        <span>•</span>
+                                                        <Clock size={10} />
+                                                        <span>{formatDate(request.createdAt)}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {countsData?.library > 3 && (
+                                            <button
+                                                className="w-full text-xs text-center text-primary hover:underline py-1"
+                                                onClick={() => {
+                                                    router.push('/dashboard/schools/library/requests')
+                                                    setOpen(false)
+                                                }}
+                                            >
+                                                View all {countsData.library} requests
+                                            </button>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-muted-foreground text-center py-3">
+                                        No pending library requests
+                                    </p>
                                 )}
                             </div>
-                        ) : (
-                            <p className="text-xs text-muted-foreground text-center py-3">
-                                No pending bus requests
-                            </p>
-                        )}
-                    </div>
+                        </>
+                    )}
+
+                    {isAdmin && (
+                        <>
+                            <Separator />
+
+                            {/* Bus Requests */}
+                            <div className="p-3">
+                                <button
+                                    className="flex items-center justify-between w-full px-2 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground rounded-md hover:bg-muted transition-colors"
+                                    onClick={() => {
+                                        router.push('/dashboard/schools/transport/requests')
+                                        setOpen(false)
+                                    }}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <Bus size={16} className="text-green-500" />
+                                        <span>Bus Service Requests</span>
+                                        {countsData?.bus > 0 && (
+                                            <Badge variant="outline" className="h-5 text-xs bg-green-50 text-green-600 border-green-200">
+                                                {countsData.bus}
+                                            </Badge>
+                                        )}
+                                    </div>
+                                    <ChevronRight size={14} />
+                                </button>
+
+                                {busLoading ? (
+                                    <div className="flex items-center justify-center py-4">
+                                        <Loader2 size={18} className="animate-spin text-muted-foreground" />
+                                    </div>
+                                ) : busRequests.length > 0 ? (
+                                    <div className="mt-2 space-y-1">
+                                        {busRequests.slice(0, 3).map((request) => (
+                                            <div
+                                                key={request.id}
+                                                className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors"
+                                                onClick={() => {
+                                                    router.push('/dashboard/schools/transport/requests')
+                                                    setOpen(false)
+                                                }}
+                                            >
+                                                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                                                    <Bus size={14} className="text-green-600" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium truncate">
+                                                        {request.requestType === 'NEW' ? 'New Service' :
+                                                            request.requestType === 'CHANGE_STOP' ? 'Change Stop' :
+                                                                request.requestType === 'CANCEL' ? 'Cancel Service' : 'Request'}
+                                                    </p>
+                                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                        <User size={10} />
+                                                        <span className="truncate">{request.student?.name || 'Student'}</span>
+                                                        <span>•</span>
+                                                        <Clock size={10} />
+                                                        <span>{formatDate(request.createdAt)}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {countsData?.bus > 3 && (
+                                            <button
+                                                className="w-full text-xs text-center text-primary hover:underline py-1"
+                                                onClick={() => {
+                                                    router.push('/dashboard/schools/transport/requests')
+                                                    setOpen(false)
+                                                }}
+                                            >
+                                                View all {countsData.bus} requests
+                                            </button>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-muted-foreground text-center py-3">
+                                        No pending bus requests
+                                    </p>
+                                )}
+                            </div>
+                        </>
+                    )}
                 </ScrollArea>
 
                 {totalCount === 0 && !isLoading && (

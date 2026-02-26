@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
     Dialog,
@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
     Loader2,
     Search,
@@ -22,17 +22,67 @@ import {
     LayoutGrid,
     Calendar,
     FileImage,
-    AlertCircle
+    AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 
+// Individual lazy-loaded image with skeleton
+function LazyImage({ src, alt, className, onLoad: onLoadProp }) {
+    const [loaded, setLoaded] = useState(false);
+    const [inView, setInView] = useState(false);
+    const imgRef = useRef(null);
+
+    useEffect(() => {
+        const el = imgRef.current;
+        if (!el) return;
+
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) {
+                    setInView(true);
+                    observer.disconnect();
+                }
+            },
+            { rootMargin: "200px" } // Start loading 200px before visible
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, []);
+
+    return (
+        <div ref={imgRef} className="relative w-full h-full">
+            {/* Skeleton placeholder */}
+            {!loaded && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <Skeleton className="w-full h-full rounded-none" />
+                    <ImageIcon className="absolute h-6 w-6 text-muted-foreground/30" />
+                </div>
+            )}
+            {inView && (
+                <img
+                    src={src}
+                    alt={alt}
+                    className={cn(
+                        className,
+                        "transition-opacity duration-300",
+                        loaded ? "opacity-100" : "opacity-0"
+                    )}
+                    onLoad={() => {
+                        setLoaded(true);
+                        onLoadProp?.();
+                    }}
+                />
+            )}
+        </div>
+    );
+}
+
 export function MediaLibraryDialog({ open, onOpenChange, schoolId, onSelect }) {
     const [search, setSearch] = useState("");
     const [selectedImage, setSelectedImage] = useState(null);
     const [viewMode, setViewMode] = useState("grid"); // "grid" | "compact"
-    const [loadedImages, setLoadedImages] = useState(new Set());
 
     const { data, isLoading, refetch, error } = useQuery({
         queryKey: ["media-library", schoolId, search],
@@ -45,14 +95,14 @@ export function MediaLibraryDialog({ open, onOpenChange, schoolId, onSelect }) {
             return res.json();
         },
         enabled: !!schoolId && open,
-        staleTime: 30000, // Cache for 30 seconds
+        staleTime: 30000,
     });
 
     // Filter and sort images
     const filteredImages = useMemo(() => {
         if (!data?.mediaItems) return [];
-        return data.mediaItems.sort((a, b) =>
-            new Date(b.createdAt) - new Date(a.createdAt)
+        return data.mediaItems.sort(
+            (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
         );
     }, [data?.mediaItems]);
 
@@ -64,54 +114,57 @@ export function MediaLibraryDialog({ open, onOpenChange, schoolId, onSelect }) {
         }
     }, [selectedImage, onSelect, onOpenChange]);
 
-    const handleDelete = useCallback(async (id, e) => {
-        e.stopPropagation();
-        if (!confirm("Are you sure you want to delete this image?")) return;
+    const handleDelete = useCallback(
+        async (id, e) => {
+            e.stopPropagation();
+            if (!confirm("Are you sure you want to delete this image?")) return;
 
-        try {
-            const res = await fetch(`/api/schools/${schoolId}/media?id=${id}`, {
-                method: "DELETE",
-            });
+            try {
+                const res = await fetch(
+                    `/api/schools/${schoolId}/media?id=${id}`,
+                    { method: "DELETE" }
+                );
+                if (!res.ok) throw new Error("Failed to delete");
 
-            if (!res.ok) throw new Error("Failed to delete");
-
-            toast.success("Image deleted successfully");
-            if (selectedImage?.id === id) {
-                setSelectedImage(null);
+                toast.success("Image deleted successfully");
+                if (selectedImage?.id === id) setSelectedImage(null);
+                refetch();
+            } catch {
+                toast.error("Failed to delete image");
             }
-            refetch();
-        } catch (error) {
-            toast.error("Failed to delete image");
-        }
-    }, [schoolId, selectedImage, refetch]);
-
-    const handleImageLoad = useCallback((id) => {
-        setLoadedImages(prev => new Set([...prev, id]));
-    }, []);
+        },
+        [schoolId, selectedImage, refetch]
+    );
 
     // Reset state when dialog closes
-    const handleOpenChange = useCallback((open) => {
-        if (!open) {
-            setSelectedImage(null);
-            setSearch("");
-        }
-        onOpenChange(open);
-    }, [onOpenChange]);
+    const handleOpenChange = useCallback(
+        (open) => {
+            if (!open) {
+                setSelectedImage(null);
+                setSearch("");
+            }
+            onOpenChange(open);
+        },
+        [onOpenChange]
+    );
 
     const imageCount = filteredImages.length;
 
+    // Skeleton count matches grid columns
+    const skeletonCount = viewMode === "grid" ? 12 : 18;
+
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
+            <DialogContent className="max-w-4xl h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
                 {/* Header */}
-                <div className="px-6 py-4 border-b bg-muted/30">
+                <div className="px-6 py-4 border-b bg-muted/30 flex-shrink-0">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <FileImage className="h-5 w-5 text-primary" />
                             Media Library
                         </DialogTitle>
                         <DialogDescription>
-                            Select an image from your school's library
+                            Select an image from your school&apos;s library
                         </DialogDescription>
                     </DialogHeader>
 
@@ -155,18 +208,35 @@ export function MediaLibraryDialog({ open, onOpenChange, schoolId, onSelect }) {
                     {/* Image count badge */}
                     {!isLoading && imageCount > 0 && (
                         <div className="mt-3 text-xs text-muted-foreground">
-                            {imageCount} image{imageCount !== 1 ? 's' : ''} in library
+                            {imageCount} image{imageCount !== 1 ? "s" : ""} in
+                            library
                         </div>
                     )}
                 </div>
 
-                {/* Image Grid */}
-                <ScrollArea className="flex-1 min-h-0">
+                {/* Image Grid — scrollable area */}
+                <div className="flex-1 min-h-0 overflow-y-auto">
                     <div className="p-4">
                         {isLoading ? (
-                            <div className="flex flex-col items-center justify-center h-[350px] gap-3">
-                                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                                <p className="text-sm text-muted-foreground">Loading your media...</p>
+                            /* Skeleton grid matching the layout */
+                            <div
+                                className={cn(
+                                    "grid gap-3",
+                                    viewMode === "grid"
+                                        ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4"
+                                        : "grid-cols-3 sm:grid-cols-4 md:grid-cols-6"
+                                )}
+                            >
+                                {Array.from({ length: skeletonCount }).map(
+                                    (_, i) => (
+                                        <div
+                                            key={i}
+                                            className="rounded-xl overflow-hidden"
+                                        >
+                                            <Skeleton className="aspect-square w-full" />
+                                        </div>
+                                    )
+                                )}
                             </div>
                         ) : error ? (
                             <div className="flex flex-col items-center justify-center h-[350px] gap-3 text-center">
@@ -174,12 +244,18 @@ export function MediaLibraryDialog({ open, onOpenChange, schoolId, onSelect }) {
                                     <AlertCircle className="h-8 w-8 text-destructive" />
                                 </div>
                                 <div>
-                                    <p className="font-medium text-foreground">Failed to load media</p>
+                                    <p className="font-medium text-foreground">
+                                        Failed to load media
+                                    </p>
                                     <p className="text-sm text-muted-foreground mt-1">
                                         Please try again later
                                     </p>
                                 </div>
-                                <Button variant="outline" size="sm" onClick={() => refetch()}>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => refetch()}
+                                >
                                     Retry
                                 </Button>
                             </div>
@@ -190,13 +266,14 @@ export function MediaLibraryDialog({ open, onOpenChange, schoolId, onSelect }) {
                                 </div>
                                 <div>
                                     <p className="font-medium text-foreground">
-                                        {search ? "No images found" : "Your library is empty"}
+                                        {search
+                                            ? "No images found"
+                                            : "Your library is empty"}
                                     </p>
                                     <p className="text-sm text-muted-foreground mt-1 max-w-xs">
                                         {search
                                             ? `No images match "${search}". Try a different search.`
-                                            : "Upload your first image to start building your media library"
-                                        }
+                                            : "Upload your first image to start building your media library"}
                                     </p>
                                 </div>
                                 {search && (
@@ -210,15 +287,17 @@ export function MediaLibraryDialog({ open, onOpenChange, schoolId, onSelect }) {
                                 )}
                             </div>
                         ) : (
-                            <div className={cn(
-                                "grid gap-3",
-                                viewMode === "grid"
-                                    ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4"
-                                    : "grid-cols-3 sm:grid-cols-4 md:grid-cols-6"
-                            )}>
+                            <div
+                                className={cn(
+                                    "grid gap-3",
+                                    viewMode === "grid"
+                                        ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4"
+                                        : "grid-cols-3 sm:grid-cols-4 md:grid-cols-6"
+                                )}
+                            >
                                 {filteredImages.map((item) => {
-                                    const isSelected = selectedImage?.id === item.id;
-                                    const isLoaded = loadedImages.has(item.id);
+                                    const isSelected =
+                                        selectedImage?.id === item.id;
 
                                     return (
                                         <div
@@ -230,29 +309,19 @@ export function MediaLibraryDialog({ open, onOpenChange, schoolId, onSelect }) {
                                                     ? "ring-primary shadow-lg scale-[1.02]"
                                                     : "ring-transparent hover:ring-muted-foreground/30"
                                             )}
-                                            onClick={() => setSelectedImage(item)}
+                                            onClick={() =>
+                                                setSelectedImage(item)
+                                            }
                                         >
-                                            {/* Image container */}
-                                            <div className={cn(
-                                                "bg-muted",
-                                                viewMode === "grid" ? "aspect-square" : "aspect-square"
-                                            )}>
-                                                {/* Loading skeleton */}
-                                                {!isLoaded && (
-                                                    <div className="absolute inset-0 bg-muted animate-pulse flex items-center justify-center">
-                                                        <ImageIcon className="h-6 w-6 text-muted-foreground/30" />
-                                                    </div>
-                                                )}
-                                                <img
+                                            {/* Image container with lazy loading */}
+                                            <div className="bg-muted aspect-square">
+                                                <LazyImage
                                                     src={item.url}
-                                                    alt={item.altText || item.fileName}
-                                                    className={cn(
-                                                        "w-full h-full object-cover transition-all duration-300",
-                                                        isLoaded ? "opacity-100" : "opacity-0",
-                                                        "group-hover:scale-105"
-                                                    )}
-                                                    loading="lazy"
-                                                    onLoad={() => handleImageLoad(item.id)}
+                                                    alt={
+                                                        item.altText ||
+                                                        item.fileName
+                                                    }
+                                                    className="w-full h-full object-cover group-hover:scale-105"
                                                 />
                                             </div>
 
@@ -271,24 +340,35 @@ export function MediaLibraryDialog({ open, onOpenChange, schoolId, onSelect }) {
                                                     "absolute top-2 left-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg",
                                                     isSelected && "opacity-100"
                                                 )}
-                                                onClick={(e) => handleDelete(item.id, e)}
+                                                onClick={(e) =>
+                                                    handleDelete(item.id, e)
+                                                }
                                             >
                                                 <Trash2 className="h-3.5 w-3.5" />
                                             </Button>
 
                                             {/* Filename overlay */}
                                             {viewMode === "grid" && (
-                                                <div className={cn(
-                                                    "absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 pt-8",
-                                                    "opacity-0 group-hover:opacity-100 transition-opacity"
-                                                )}>
+                                                <div
+                                                    className={cn(
+                                                        "absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 pt-8",
+                                                        "opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    )}
+                                                >
                                                     <p className="text-white text-xs font-medium truncate">
                                                         {item.fileName}
                                                     </p>
                                                     {item.createdAt && (
                                                         <p className="text-white/70 text-[10px] flex items-center gap-1 mt-0.5">
                                                             <Calendar className="h-3 w-3" />
-                                                            {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
+                                                            {formatDistanceToNow(
+                                                                new Date(
+                                                                    item.createdAt
+                                                                ),
+                                                                {
+                                                                    addSuffix: true,
+                                                                }
+                                                            )}
                                                         </p>
                                                     )}
                                                 </div>
@@ -299,10 +379,10 @@ export function MediaLibraryDialog({ open, onOpenChange, schoolId, onSelect }) {
                             </div>
                         )}
                     </div>
-                </ScrollArea>
+                </div>
 
                 {/* Footer with actions */}
-                <div className="px-6 py-4 border-t bg-muted/30 flex items-center justify-between">
+                <div className="px-6 py-4 border-t bg-muted/30 flex items-center justify-between flex-shrink-0">
                     {selectedImage ? (
                         <div className="flex items-center gap-3 text-sm">
                             <div className="w-10 h-10 rounded-lg overflow-hidden border bg-muted">
@@ -313,8 +393,12 @@ export function MediaLibraryDialog({ open, onOpenChange, schoolId, onSelect }) {
                                 />
                             </div>
                             <div className="max-w-[200px]">
-                                <p className="font-medium truncate">{selectedImage.fileName}</p>
-                                <p className="text-xs text-muted-foreground">Selected</p>
+                                <p className="font-medium truncate">
+                                    {selectedImage.fileName}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    Selected
+                                </p>
                             </div>
                         </div>
                     ) : (
@@ -324,10 +408,16 @@ export function MediaLibraryDialog({ open, onOpenChange, schoolId, onSelect }) {
                     )}
 
                     <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => handleOpenChange(false)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => handleOpenChange(false)}
+                        >
                             Cancel
                         </Button>
-                        <Button onClick={handleSelect} disabled={!selectedImage}>
+                        <Button
+                            onClick={handleSelect}
+                            disabled={!selectedImage}
+                        >
                             <Check className="h-4 w-4 mr-2" />
                             Select Image
                         </Button>

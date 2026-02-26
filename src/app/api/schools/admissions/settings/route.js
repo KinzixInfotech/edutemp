@@ -28,3 +28,36 @@ export async function GET(req) {
         );
     }
 }
+
+// PATCH: Update global test settings for a stage
+export async function PATCH(req) {
+    try {
+        const body = await req.json();
+        const { stageId, globalTestDate, globalTestStartTime, globalTestEndTime, globalTestVenue } = body;
+
+        if (!stageId) {
+            return NextResponse.json(
+                { error: "stageId is required" },
+                { status: 400 }
+            );
+        }
+
+        const updated = await prisma.stage.update({
+            where: { id: stageId },
+            data: {
+                globalTestDate: globalTestDate ? new Date(globalTestDate) : null,
+                globalTestStartTime: globalTestStartTime || null,
+                globalTestEndTime: globalTestEndTime || null,
+                globalTestVenue: globalTestVenue || null,
+            },
+        });
+
+        return NextResponse.json({ stage: updated });
+    } catch (error) {
+        console.error("Error updating global test settings:", error);
+        return NextResponse.json(
+            { error: "Failed to update global test settings" },
+            { status: 500 }
+        );
+    }
+}

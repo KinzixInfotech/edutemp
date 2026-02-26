@@ -144,6 +144,9 @@ model School {
   statuses      Status[]
   storyStatuses StoryStatus[]
 
+  // Profile Change Requests
+  profileChangeRequests ProfileChangeRequest[]
+
   @@index([name])
 }
 
@@ -929,6 +932,12 @@ model Stage {
   requiresTest      Boolean @default(false)
   requiresInterview Boolean @default(false)
   feeRequired       Boolean @default(false)
+
+  // Global test/interview schedule (set once, applies to all applications)
+  globalTestDate      DateTime?
+  globalTestStartTime String?
+  globalTestEndTime   String?
+  globalTestVenue     String?
 
   currentApplications Application[]  @relation("CurrentStage")
   stageHistory        StageHistory[]
@@ -1785,6 +1794,10 @@ model User {
   postedStatuses StoryStatus[]     @relation("UserStatuses")
   statusViews    StoryStatusView[] @relation("StatusViewer")
 
+  // Profile Change Requests
+  submittedProfileChanges ProfileChangeRequest[] @relation("ProfileChangeRequester")
+  reviewedProfileChanges  ProfileChangeRequest[] @relation("ProfileChangeReviewer")
+
   @@index([schoolId])
   @@index([roleId])
 }
@@ -1831,6 +1844,34 @@ model MasterAdmin {
   schoolId String @unique @db.Uuid
   school   School @relation(fields: [schoolId], references: [id])
   User     User   @relation(fields: [userId], references: [id])
+}
+
+model ProfileChangeRequest {
+  id            String @id @default(uuid()) @db.Uuid
+  schoolId      String @db.Uuid
+  school        School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  requestedById String @db.Uuid
+  requestedBy   User   @relation("ProfileChangeRequester", fields: [requestedById], references: [id])
+
+  // JSON diff: { fieldName: { old: value, new: value } }
+  changes Json
+
+  // PENDING | APPROVED | REJECTED
+  status String @default("PENDING")
+
+  // PROFILE_UPDATE | VERIFICATION_REQUEST
+  type String @default("PROFILE_UPDATE")
+
+  reviewedById  String?   @db.Uuid
+  reviewedBy    User?     @relation("ProfileChangeReviewer", fields: [reviewedById], references: [id])
+  reviewedAt    DateTime?
+  reviewRemarks String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([schoolId, status])
+  @@index([status])
 }
 
 model Librarian {

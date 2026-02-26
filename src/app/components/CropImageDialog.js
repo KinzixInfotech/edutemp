@@ -47,7 +47,9 @@ export default function CropImageDialog({
   defaultAspect = 1,
   cropShape = "rect", // "rect" or "round"
   showGrid = true,
-  title = "Crop & Edit Image"
+  title = "Crop & Edit Image",
+  lockAspect = false, // When true, hides the aspect ratio selector
+  outputSize = null, // { width, height } - resizes output to exact dimensions
 }) {
   // Crop states
   const [zoom, setZoom] = useState(1);
@@ -95,7 +97,7 @@ export default function CropImageDialog({
       setUploadStatus("uploading");
       setErrorMessage("");
 
-      const croppedImage = await getCroppedImg(image, croppedAreaPixels, rotation, { flipH, flipV });
+      const croppedImage = await getCroppedImg(image, croppedAreaPixels, rotation, { flipH, flipV }, outputSize);
 
       // Call parent's upload handler
       await onCropComplete(croppedImage);
@@ -184,7 +186,7 @@ export default function CropImageDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="max-w-[95vw] sm:max-w-[600px] p-0 overflow-hidden"
+        className="max-w-[95vw] sm:max-w-[600px] max-h-[90vh] p-0 overflow-y-auto"
         onPointerDownOutside={(e) => {
           // Prevent closing by clicking outside during upload
           if (isProcessing) {
@@ -201,7 +203,7 @@ export default function CropImageDialog({
         hideCloseButton={isProcessing}
       >
         {/* Header */}
-        <DialogHeader className="px-6 pt-6 pb-2">
+        <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2">
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center gap-2">
               <ImageIcon className="w-5 h-5 text-primary" />
@@ -227,7 +229,7 @@ export default function CropImageDialog({
         </DialogHeader>
 
         {/* Crop Area */}
-        <div className="relative w-full h-[300px] sm:h-[350px] bg-muted/50">
+        <div className="relative w-full h-[200px] sm:h-[300px] md:h-[350px] bg-muted/50">
           <Cropper
             image={image}
             crop={crop}
@@ -296,37 +298,45 @@ export default function CropImageDialog({
 
         {/* Controls Section */}
         <div className={cn(
-          "px-6 py-4 space-y-4 border-t transition-opacity",
+          "px-4 sm:px-6 py-3 sm:py-4 space-y-3 sm:space-y-4 border-t transition-opacity",
           isProcessing && "opacity-50 pointer-events-none"
         )}>
-          {/* Aspect Ratio Selector */}
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-2 block uppercase tracking-wide">
-              Aspect Ratio
-            </label>
-            <div className="flex gap-2 flex-wrap">
-              {ASPECT_RATIOS.map((ratio) => {
-                const Icon = ratio.icon;
-                const isActive = selectedAspect === ratio.value && (ratio.label !== "Circle" || isCircleCrop);
-                return (
-                  <Button
-                    key={ratio.label}
-                    variant={isActive ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleAspectChange(ratio)}
-                    disabled={isProcessing}
-                    className={cn(
-                      "gap-1.5 transition-all",
-                      isActive && "ring-2 ring-primary/30"
-                    )}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    {ratio.label}
-                  </Button>
-                );
-              })}
+          {/* Aspect Ratio Selector - hidden when locked */}
+          {!lockAspect && (
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-2 block uppercase tracking-wide">
+                Aspect Ratio
+              </label>
+              <div className="flex gap-2 flex-wrap">
+                {ASPECT_RATIOS.map((ratio) => {
+                  const Icon = ratio.icon;
+                  const isActive = selectedAspect === ratio.value && (ratio.label !== "Circle" || isCircleCrop);
+                  return (
+                    <Button
+                      key={ratio.label}
+                      variant={isActive ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handleAspectChange(ratio)}
+                      disabled={isProcessing}
+                      className={cn(
+                        "gap-1.5 transition-all",
+                        isActive && "ring-2 ring-primary/30"
+                      )}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      {ratio.label}
+                    </Button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
+          {lockAspect && outputSize && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
+              <RectangleHorizontal className="w-4 h-4 text-primary" />
+              <span>Output: <strong className="text-foreground">{outputSize.width} × {outputSize.height}px</strong> (locked)</span>
+            </div>
+          )}
 
           {/* Zoom Control */}
           <div>
@@ -430,7 +440,7 @@ export default function CropImageDialog({
         </div>
 
         {/* Action Buttons */}
-        <div className="px-6 py-4 border-t bg-muted/30 flex justify-between items-center">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-t bg-muted/30 flex justify-between items-center">
           <Button
             variant="ghost"
             size="sm"

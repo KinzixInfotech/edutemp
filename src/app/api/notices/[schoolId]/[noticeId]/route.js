@@ -1,10 +1,6 @@
-// / File: app/api / notices / [schoolId] / [noticeId] / route.js
-// GET - Fetch single notice
-// PUT - Update notice
-// DELETE - Delete notice'
-
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { invalidatePattern } from '@/lib/cache';
 
 export async function GET(request, props) {
     const params = await props.params;
@@ -20,7 +16,7 @@ export async function GET(request, props) {
             },
             include: {
                 Author: {
-                    select: { 
+                    select: {
                         name: true,
                         email: true,
                     }
@@ -129,6 +125,9 @@ export async function PUT(request, props) {
             });
         }
 
+        // Invalidate Redis cache for notices list
+        await invalidatePattern(`notices:list:*schoolId:${schoolId}*`);
+
         return NextResponse.json(notice);
 
     } catch (error) {
@@ -143,11 +142,14 @@ export async function PUT(request, props) {
 export async function DELETE(request, props) {
     const params = await props.params;
     try {
-        const { noticeId } = params;
+        const { schoolId, noticeId } = params;
 
         await prisma.notice.delete({
             where: { id: noticeId }
         });
+
+        // Invalidate Redis cache for notices list
+        await invalidatePattern(`notices:list:*schoolId:${schoolId}*`);
 
         return NextResponse.json({ message: 'Notice deleted successfully' });
 

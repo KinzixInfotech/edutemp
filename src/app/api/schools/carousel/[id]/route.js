@@ -1,23 +1,28 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { delCache, generateKey } from '@/lib/cache';
+import { deleteFileByUrl } from '@/lib/server-uploadthing';
 
 export async function DELETE(request, { params }) {
     try {
         const { id } = params;
 
-        // Use await params if necessary in newer Next.js versions, but destructuring usually works for now via the context
-        // Check if ID exists first to get the schoolId for cache clearing
+        // Check if ID exists first to get the schoolId and imageUrl for cleanup
         const image = await prisma.schoolCarouselImage.findUnique({
             where: { id },
-            select: { schoolId: true }
+            select: { schoolId: true, imageUrl: true }
         });
 
         if (!image) {
             return NextResponse.json({ error: 'Image not found' }, { status: 404 });
         }
 
-        // Delete the image
+        // Delete from UploadThing storage
+        if (image.imageUrl) {
+            await deleteFileByUrl(image.imageUrl);
+        }
+
+        // Delete from database
         await prisma.schoolCarouselImage.delete({
             where: { id }
         });
@@ -26,7 +31,7 @@ export async function DELETE(request, { params }) {
         const cacheKey = generateKey('school_carousel', { schoolId: image.schoolId });
         await delCache(cacheKey);
 
-        return NextResponse.json({ success: true, message: 'Image deleted' });
+        return NextResponse.json({ success: true, message: 'Image deleted from DB and storage' });
     } catch (error) {
         console.error('Error deleting carousel image:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

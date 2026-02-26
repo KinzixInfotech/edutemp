@@ -27,7 +27,9 @@ import {
     Eye,
     EyeOff,
     FolderOpen,
-    Tag
+    Tag,
+    CheckCircle,
+    Library
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
@@ -66,7 +68,9 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import FileUploadButton from '@/components/fileupload';
+import CropImageDialog from '@/app/components/CropImageDialog';
+import { useUploadThing } from '@/lib/uploadthing';
+import { MediaLibraryDialog } from '@/components/media-library-dialog';
 
 // Audience options
 const AUDIENCE_OPTIONS = [
@@ -310,6 +314,73 @@ export default function SchoolCarouselPage() {
         category: 'none',
     });
 
+    // Carousel crop dialog state
+    const [rawImage, setRawImage] = useState(null);
+    const [showCropDialog, setShowCropDialog] = useState(false);
+    const [isCarouselUploading, setIsCarouselUploading] = useState(false);
+    const [showLibrary, setShowLibrary] = useState(false);
+    const fileInputRef = useRef(null);
+
+    const CAROUSEL_OUTPUT_SIZE = { width: 1920, height: 1080 };
+
+    // Upload hook for carousel images
+    const { startUpload } = useUploadThing("schoolImageUpload", {
+        onUploadBegin: () => setIsCarouselUploading(true),
+        onClientUploadComplete: (res) => {
+            if (res?.[0]?.ufsUrl) {
+                setNewImage(prev => ({ ...prev, imageUrl: res[0].ufsUrl }));
+            }
+            setIsCarouselUploading(false);
+        },
+        onUploadError: (error) => {
+            console.error("Carousel upload error:", error);
+            toast.error('Failed to upload image');
+            setIsCarouselUploading(false);
+        },
+    });
+
+    // Handle file selection for cropping
+    const handleFileSelect = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            toast.error('Please select an image file');
+            return;
+        }
+
+        // Validate file size (10MB max for source image before crop)
+        if (file.size > 10 * 1024 * 1024) {
+            toast.error('Image must be under 10MB');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            setRawImage(reader.result);
+            setShowCropDialog(true);
+        };
+        reader.readAsDataURL(file);
+
+        // Reset input so the same file can be re-selected
+        e.target.value = '';
+    };
+
+    // Handle crop complete → upload
+    const handleCropComplete = async (croppedBlob) => {
+        const file = new File([croppedBlob], 'carousel-image.jpg', { type: 'image/jpeg' });
+        await startUpload([file], {
+            schoolId,
+            uploadedById: fullUser?.id,
+        });
+    };
+
+    // Handle crop dialog close / cancel
+    const handleCropCancel = () => {
+        setRawImage(null);
+    };
+
     // Fetch carousel images (include inactive for admin)
     const { data: images = [], isLoading, refetch } = useQuery({
         queryKey: ['school-carousel', schoolId],
@@ -352,6 +423,7 @@ export default function SchoolCarouselPage() {
             queryClient.invalidateQueries(['school-carousel']);
             setIsAddOpen(false);
             setNewImage({ imageUrl: '', caption: '', audience: 'ALL', expiryDate: undefined, category: 'none' });
+            setRawImage(null);
         },
         onError: () => toast.error('Failed to add image'),
     });
@@ -475,12 +547,103 @@ export default function SchoolCarouselPage() {
                             <div className="space-y-4 py-4">
                                 <div className="space-y-2">
                                     <Label>Upload Image</Label>
-                                    <FileUploadButton
-                                        field="carousel"
-                                        aspectRatio="video"
-                                        value={newImage.imageUrl}
-                                        onChange={(url) => setNewImage(prev => ({ ...prev, imageUrl: url || '' }))}
+
+                                    {/* Hidden file input */}
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleFileSelect}
+                                        className="hidden"
                                     />
+
+                                    {/* Preview or upload button */}
+                                    {newImage.imageUrl ? (
+                                        <div className="relative group rounded-xl overflow-hidden border bg-muted aspect-video">
+                                            <img
+                                                src={newImage.imageUrl}
+                                                alt="Carousel preview"
+                                                className="w-full h-full object-cover"
+                                            />
+                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                                <Button
+                                                    type="button"
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    onClick={() => fileInputRef.current?.click()}
+                                                >
+                                                    Change Image
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant="destructive"
+                                                    size="sm"
+                                                    onClick={() => setNewImage(prev => ({ ...prev, imageUrl: '' }))}
+                                                >
+                                                    Remove
+                                                </Button>
+                                            </div>
+                                            <div className="absolute bottom-2 left-2 bg-emerald-500 text-white text-[10px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1">
+                                                <CheckCircle className="h-3 w-3" />
+                                                1920 × 1080
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30 transition-all cursor-pointer aspect-video"
+                                        >
+                                            <div className="flex items-center justify-center w-14 h-14 rounded-full bg-primary/10">
+                                                <ImageIcon className="w-7 h-7 text-primary" />
+                                            </div>
+                                            <div className="text-center">
+                                                <p className="font-medium text-sm">Click to upload carousel image</p>
+                                                <p className="text-xs text-muted-foreground">Image will be cropped to 1920 × 1080 (16:9)</p>
+                                            </div>
+                                            <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                                                {schoolId && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => setShowLibrary(true)}
+                                                        className="text-muted-foreground hover:text-foreground"
+                                                    >
+                                                        <Library className="size-4 mr-1.5" />
+                                                        From Library
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Media Library Dialog */}
+                                    {schoolId && (
+                                        <MediaLibraryDialog
+                                            open={showLibrary}
+                                            onOpenChange={setShowLibrary}
+                                            schoolId={schoolId}
+                                            onSelect={(url) => {
+                                                setRawImage(url);
+                                                setShowCropDialog(true);
+                                            }}
+                                        />
+                                    )}
+
+                                    {/* Crop Dialog */}
+                                    <CropImageDialog
+                                        image={rawImage}
+                                        open={showCropDialog}
+                                        onClose={() => setShowCropDialog(false)}
+                                        onCropComplete={handleCropComplete}
+                                        onCancel={handleCropCancel}
+                                        uploading={isCarouselUploading}
+                                        defaultAspect={16 / 9}
+                                        lockAspect={true}
+                                        outputSize={CAROUSEL_OUTPUT_SIZE}
+                                        title="Crop Carousel Image"
+                                    />
+
                                     <div className="bg-muted/50 rounded-lg p-3 mt-2">
                                         <p className="text-xs font-medium text-foreground mb-2">📐 Image Guidelines</p>
                                         <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
@@ -489,12 +652,12 @@ export default function SchoolCarouselPage() {
                                                 <p>1920 × 1080px (16:9)</p>
                                             </div>
                                             <div>
-                                                <span className="font-medium text-foreground">Max Size:</span>
-                                                <p>5 MB per image</p>
+                                                <span className="font-medium text-foreground">Output:</span>
+                                                <p>Auto-cropped & resized</p>
                                             </div>
                                         </div>
                                         <p className="text-[10px] text-muted-foreground mt-2">
-                                            💡 For best results, use landscape images with 16:9 aspect ratio. JPG/PNG supported.
+                                            💡 Upload any image — it will be cropped to 16:9 and resized to exactly 1920×1080px.
                                         </p>
                                     </div>
                                 </div>

@@ -1,8 +1,13 @@
 /**
- * Enhanced image cropping utility with rotation and flip support
+ * Enhanced image cropping utility with rotation, flip, and output resize support
+ * @param {string} imageSrc - Source image URL or data URI
+ * @param {object} crop - Crop area { x, y, width, height } in pixels
+ * @param {number} rotation - Rotation in degrees
+ * @param {object} flip - { flipH: boolean, flipV: boolean }
+ * @param {object} [outputSize] - Optional { width, height } to resize the final output to exact dimensions
  */
 
-export const getCroppedImg = async (imageSrc, crop, rotation = 0, flip = { flipH: false, flipV: false }) => {
+export const getCroppedImg = async (imageSrc, crop, rotation = 0, flip = { flipH: false, flipV: false }, outputSize = null) => {
     const image = await createImage(imageSrc);
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
@@ -49,8 +54,28 @@ export const getCroppedImg = async (imageSrc, crop, rotation = 0, flip = { flipH
         crop.height
     );
 
+    // If outputSize is specified, resize to exact target dimensions
+    let finalCanvas = croppedCanvas;
+    if (outputSize && outputSize.width && outputSize.height) {
+        const resizedCanvas = document.createElement("canvas");
+        const resizedCtx = resizedCanvas.getContext("2d");
+        resizedCanvas.width = outputSize.width;
+        resizedCanvas.height = outputSize.height;
+
+        // Use high-quality image smoothing for resize
+        resizedCtx.imageSmoothingEnabled = true;
+        resizedCtx.imageSmoothingQuality = "high";
+
+        resizedCtx.drawImage(
+            croppedCanvas,
+            0, 0, croppedCanvas.width, croppedCanvas.height,
+            0, 0, outputSize.width, outputSize.height
+        );
+        finalCanvas = resizedCanvas;
+    }
+
     return new Promise((resolve, reject) => {
-        croppedCanvas.toBlob(
+        finalCanvas.toBlob(
             (blob) => {
                 if (!blob) {
                     reject(new Error("Canvas is empty"));

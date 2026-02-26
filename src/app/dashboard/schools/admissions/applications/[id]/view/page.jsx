@@ -545,16 +545,10 @@ export default function ApplicationDetails() {
             }));
         }
     }, [testScoremut, activeStep]);
-    // force refetch whenever step changes
-    useEffect(() => {
-        if (activeStep) refetch();
-    }, [activeStep, refetch]);
     const { mutate: scheduleTest, isPending: isLoading } = useScheduleTest();
-    console.log(isLoading);
 
 
     const [stageData, setStageData] = useState({}); // Store stage-specific data
-    console.log(stageData);
 
     useEffect(() => {
         if (stageData.sectionId && schoolId) {
@@ -869,123 +863,59 @@ export default function ApplicationDetails() {
             case "TEST_INTERVIEW":
             case "TEST":
             case "INTERVIEW":
-            case "TESTINTERVIEW":
+            case "TESTINTERVIEW": {
+                // Find current stage's global test settings from stages data
+                const currentStageData = stages.find(s => s.id === activeStep);
+                const globalTestDate = currentStageData?.globalTestDate;
+                const globalTestStartTime = currentStageData?.globalTestStartTime;
+                const globalTestEndTime = currentStageData?.globalTestEndTime;
+                const globalTestVenue = currentStageData?.globalTestVenue;
+                const hasGlobalSchedule = !!globalTestDate;
+
+                // Check if the test date has passed (for conditional result entry)
+                const testDatePassed = globalTestDate
+                    ? new Date(globalTestDate).setHours(23, 59, 59) < Date.now()
+                    : false;
+
                 return (
                     <div className="space-y-6">
-                        {/* Step 1: Schedule Test */}
+                        {/* Step 1: Global Test Schedule (Read-only) */}
                         <div className="rounded-lg border bg-card p-4">
                             <div className="flex items-start gap-4">
-                                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${test ? 'bg-green-100 text-green-700' : 'bg-primary text-primary-foreground'}`}>
-                                    {test ? <CheckCircle2 className="h-4 w-4" /> : '1'}
+                                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${hasGlobalSchedule ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                    {hasGlobalSchedule ? <CheckCircle2 className="h-4 w-4" /> : '1'}
                                 </div>
                                 <div className="flex-1 space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <h4 className="font-medium">Schedule Test</h4>
-                                            <p className="text-sm text-muted-foreground">
-                                                {test ? 'Test scheduled successfully' : 'Set date, time and venue for the test'}
-                                            </p>
-                                        </div>
-                                        <Dialog open={scopen} onOpenChange={setScopen}>
-                                            <DialogTrigger asChild>
-                                                <Button variant={test ? 'outline' : 'default'} size="sm">
-                                                    <CalendarCheck className="h-4 w-4 mr-2" />
-                                                    {test ? 'Update Schedule' : 'Schedule Test'}
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent className="bg-white max-h-[95vh] overflow-y-auto shadow-none dark:bg-[#171717] w-[384px] h-fit p-0 text-foreground space-y-0 gap-0 rounded-md">
-                                                <div className="space-y-4 mt-4">
-                                                    <div>
-                                                        <DialogHeader className='border-b py-2 h-min flex justify-center px-3.5'>
-                                                            <DialogTitle className="flex text-lg tracking-tight leading-tight dark:text-white text-black font-semibold">
-                                                                Schedule Test
-                                                            </DialogTitle>
-                                                        </DialogHeader>
-                                                        <div className="px-3.5 py-3.5">
-                                                            <div className="space-y-4">
-                                                                <div>
-                                                                    <Label className={'mb-3'}>Test Date</Label>
-                                                                    <Input
-                                                                        type="date"
-                                                                        className="bg-background"
-                                                                        value={stageData.testDate || ""}
-                                                                        onChange={(e) => handleStageDataChange("testDate", e.target.value)}
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <div className="grid grid-cols-2 gap-2.5">
-                                                                        <div>
-                                                                            <Label className={'mb-3'}>Start Time</Label>
-                                                                            <Input
-                                                                                type="time"
-                                                                                className="bg-background"
-                                                                                value={stageData.testStartTime || new Date(Date.now()).toTimeString().slice(0, 5)}
-                                                                                onChange={(e) => handleStageDataChange("testStartTime", e.target.value)}
-                                                                            />
-                                                                        </div>
-                                                                        <div>
-                                                                            <Label className={'mb-3'}>End Time</Label>
-                                                                            <Input
-                                                                                type="time"
-                                                                                className="bg-background"
-                                                                                value={stageData.testEndTime || new Date(Date.now() + 2 * 60 * 60 * 1000).toTimeString().slice(0, 5)}
-                                                                                onChange={(e) => handleStageDataChange("testEndTime", e.target.value)}
-                                                                            />
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                <div>
-                                                                    <LocationInput queryClient={queryClient} stageData={stageData} handleStageDataChange={handleStageDataChange} />
-                                                                </div>
-                                                                <div>
-                                                                    <Label className={'mb-3'}>Custom Message (Optional)</Label>
-                                                                    <Textarea className={'shadow-none'} placeholder="Custom Message...." />
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <DialogFooter className="mb-4 px-4 border-t pt-3.5">
-                                                    <Button
-                                                        disabled={isLoading}
-                                                        onClick={() => {
-                                                            scheduleTest({
-                                                                applicationId: applicationId,
-                                                                stageId: application.currentStage?.id,
-                                                                movedById,
-                                                                testDate: stageData.testDate,
-                                                                testStartTime: stageData.testStartTime,
-                                                                testEndTime: stageData.testEndTime,
-                                                                testVenue: stageData.testVenue,
-                                                                customMessage: stageData.customMessage,
-                                                            });
-                                                        }}
-                                                        className="inline-flex w-full justify-center items-center"
-                                                    >
-                                                        <Mail strokeWidth={2} className="h-4 w-4 mr-2" />
-                                                        {isLoading ? "Scheduling..." : "Schedule & Notify via SMS"}
-                                                    </Button>
-                                                </DialogFooter>
-                                            </DialogContent>
-                                        </Dialog>
+                                    <div>
+                                        <h4 className="font-medium">Test Schedule</h4>
+                                        <p className="text-sm text-muted-foreground">
+                                            {hasGlobalSchedule
+                                                ? 'Test schedule set globally — applies to all applicants'
+                                                : 'No test scheduled yet. Configure from the Applications list page.'}
+                                        </p>
                                     </div>
 
-                                    {/* Show scheduled test info */}
-                                    {test && (
+                                    {/* Show global test info */}
+                                    {hasGlobalSchedule && (
                                         <div className="text-sm bg-green-50 dark:bg-green-950/20 rounded-md p-3 border border-green-200">
                                             <div className="flex flex-wrap gap-x-4 gap-y-1">
-                                                <span><strong>Date:</strong> {new Date(test.testDate).toLocaleDateString()}</span>
-                                                <span><strong>Time:</strong> {new Date(test.testStartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {new Date(test.testEndTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                                {test.testVenue && <span><strong>Venue:</strong> {test.testVenue}</span>}
+                                                <span><strong>Date:</strong> {new Date(globalTestDate).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                                                {globalTestStartTime && (
+                                                    <span><strong>Time:</strong> {globalTestStartTime}{globalTestEndTime ? ` – ${globalTestEndTime}` : ''}</span>
+                                                )}
+                                                {globalTestVenue && <span><strong>Venue:</strong> {globalTestVenue}</span>}
                                             </div>
+                                            {!testDatePassed && (
+                                                <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">⏳ Test date is upcoming — results can be entered after the test.</p>
+                                            )}
                                         </div>
                                     )}
                                 </div>
                             </div>
                         </div>
 
-                        {/* Step 2: Enter Test Results */}
-                        <div className={`rounded-lg border bg-card p-4 ${!test ? 'opacity-50 pointer-events-none' : ''}`}>
+                        {/* Step 2: Enter Test Results (only after test date has passed) */}
+                        <div className={`rounded-lg border bg-card p-4 ${(!hasGlobalSchedule || !testDatePassed) ? 'opacity-50 pointer-events-none' : ''}`}>
                             <div className="flex items-start gap-4">
                                 <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${stageData.testResult ? 'bg-green-100 text-green-700' : test ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
                                     {stageData.testResult ? <CheckCircle2 className="h-4 w-4" /> : '2'}
@@ -994,7 +924,13 @@ export default function ApplicationDetails() {
                                     <div>
                                         <h4 className="font-medium">Enter Test Results</h4>
                                         <p className="text-sm text-muted-foreground">
-                                            {!test ? 'Schedule test first' : stageData.testResult ? 'Results recorded' : 'Add the test score and result'}
+                                            {!hasGlobalSchedule
+                                                ? 'Schedule test first from the Applications page'
+                                                : !testDatePassed
+                                                    ? `Results available after ${new Date(globalTestDate).toLocaleDateString()}`
+                                                    : stageData.testResult
+                                                        ? 'Results recorded'
+                                                        : 'Add the test score and result'}
                                         </p>
                                     </div>
 
@@ -1157,6 +1093,7 @@ export default function ApplicationDetails() {
                         </div>
                     </div>
                 );
+            }
             case "OFFER":
             case "OFFERED":
                 return (

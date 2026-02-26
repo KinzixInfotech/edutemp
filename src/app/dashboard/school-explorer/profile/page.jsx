@@ -12,7 +12,149 @@ import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { Save, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
+    Save, Eye, EyeOff, CheckCircle2, AlertCircle,
+    ChevronDown, ChevronUp, Clock, BadgeCheck, ShieldCheck, Send, Link2
+} from 'lucide-react';
+import FileUploadButton from '@/components/fileupload';
+
+// Human-readable field labels
+const FIELD_LABELS = {
+    tagline: 'Tagline',
+    description: 'Description',
+    vision: 'Vision',
+    mission: 'Mission',
+    coverImage: 'Cover Image URL',
+    logoImage: 'Logo Image URL',
+    videoUrl: 'Promotional Video URL',
+    publicEmail: 'Public Email',
+    publicPhone: 'Public Phone',
+    website: 'Website',
+    minFee: 'Minimum Fee (₹/year)',
+    maxFee: 'Maximum Fee (₹/year)',
+    feeStructureUrl: 'Fee Structure URL',
+    detailedFeeStructure: 'Detailed Fee Structure',
+    establishedYear: 'Established Year',
+    totalStudents: 'Total Students',
+    totalTeachers: 'Total Teachers',
+    studentTeacherRatio: 'Student-Teacher Ratio',
+    isPubliclyVisible: 'Publicly Visible',
+    isFeatured: 'Featured School',
+    isVerified: 'Verified Badge',
+};
+
+function formatValue(val) {
+    if (val === null || val === undefined || val === '') return '—';
+    if (typeof val === 'boolean') return val ? 'Yes' : 'No';
+    if (typeof val === 'object') return JSON.stringify(val, null, 2);
+    return String(val);
+}
+
+// Pending Changes Banner Component
+function PendingChangesBanner({ pendingChanges }) {
+    const [openId, setOpenId] = useState(null);
+
+    if (!pendingChanges || pendingChanges.length === 0) return null;
+
+    return (
+        <div className="space-y-3">
+            {pendingChanges.map((request) => {
+                const isOpen = openId === request.id;
+                const changes = request.changes || {};
+                const fieldCount = Object.keys(changes).length;
+                const timeAgo = getTimeAgo(request.createdAt);
+
+                return (
+                    <Collapsible key={request.id} open={isOpen} onOpenChange={() => setOpenId(isOpen ? null : request.id)}>
+                        <div className="border border-amber-200 dark:border-amber-800 rounded-lg bg-amber-50/80 dark:bg-amber-950/30 overflow-hidden">
+                            <CollapsibleTrigger className="w-full">
+                                <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-amber-100/50 dark:hover:bg-amber-900/20 transition-colors">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-amber-100 dark:bg-amber-900/50 p-2 rounded-full">
+                                            <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                        </div>
+                                        <div className="text-left">
+                                            <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                                                {request.type === 'VERIFICATION_REQUEST'
+                                                    ? 'Verification request sent for review'
+                                                    : `${fieldCount} change${fieldCount > 1 ? 's' : ''} sent for review`
+                                                }
+                                            </p>
+                                            <p className="text-xs text-amber-700 dark:text-amber-300">
+                                                Submitted {timeAgo} by {request.requestedBy?.name || 'Admin'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant="outline" className="bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-700">
+                                            Pending Review
+                                        </Badge>
+                                        {isOpen ? <ChevronUp className="h-4 w-4 text-amber-600" /> : <ChevronDown className="h-4 w-4 text-amber-600" />}
+                                    </div>
+                                </div>
+                            </CollapsibleTrigger>
+
+                            <CollapsibleContent>
+                                <div className="border-t border-amber-200 dark:border-amber-800 p-4 space-y-2">
+                                    {request.type === 'VERIFICATION_REQUEST' ? (
+                                        <div className="flex items-center gap-2 p-3 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+                                            <BadgeCheck className="h-5 w-5 text-blue-500" />
+                                            <span className="text-sm text-blue-800 dark:text-blue-200">
+                                                Requesting verified profile badge (blue tick)
+                                            </span>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {Object.entries(changes).map(([field, diff]) => (
+                                                <div key={field} className="p-3 rounded-md bg-white dark:bg-gray-900/50 border border-amber-100 dark:border-amber-900/30">
+                                                    <p className="text-xs font-medium text-muted-foreground mb-1.5">
+                                                        {FIELD_LABELS[field] || field}
+                                                    </p>
+                                                    <div className="grid grid-cols-2 gap-3 text-sm">
+                                                        <div>
+                                                            <span className="text-xs text-red-500 font-medium">Current</span>
+                                                            <p className="mt-0.5 text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/20 p-1.5 rounded text-xs break-all">
+                                                                {formatValue(diff.old)}
+                                                            </p>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-xs text-green-500 font-medium">Proposed</span>
+                                                            <p className="mt-0.5 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-950/20 p-1.5 rounded text-xs break-all">
+                                                                {formatValue(diff.new)}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </CollapsibleContent>
+                        </div>
+                    </Collapsible>
+                );
+            })}
+        </div>
+    );
+}
+
+function getTimeAgo(date) {
+    const now = new Date();
+    const diff = now - new Date(date);
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    if (days > 0) return `${days}d ago`;
+    if (hours > 0) return `${hours}h ago`;
+    if (minutes > 0) return `${minutes}m ago`;
+    return 'just now';
+}
 
 export default function PublicProfileSettings() {
     const { fullUser } = useAuth();
@@ -31,19 +173,41 @@ export default function PublicProfileSettings() {
         enabled: !!fullUser?.schoolId,
     });
 
+    const pendingChanges = profile?.pendingChanges || [];
+    const hasPendingProfileUpdate = pendingChanges.some(c => c.type === 'PROFILE_UPDATE');
+    const hasPendingVerification = pendingChanges.some(c => c.type === 'VERIFICATION_REQUEST');
+
     const updateMutation = useMutation({
         mutationFn: async (data) => {
             const response = await fetch(`/api/schools/${fullUser.schoolId}/explorer/profile`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
+                body: JSON.stringify({ ...data, _requestedById: fullUser.id }),
             });
-            if (!response.ok) throw new Error('Failed to update');
+            if (!response.ok) throw new Error('Failed to submit');
+            return response.json();
+        },
+        onSuccess: (data) => {
+            if (data.noChanges) return;
+            queryClient.invalidateQueries(['school-public-profile']);
+        },
+    });
+
+    const verifyMutation = useMutation({
+        mutationFn: async () => {
+            const response = await fetch(`/api/schools/${fullUser.schoolId}/explorer/profile-changes/verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ requestedById: fullUser.id }),
+            });
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || 'Failed to submit');
+            }
             return response.json();
         },
         onSuccess: () => {
             queryClient.invalidateQueries(['school-public-profile']);
-            queryClient.invalidateQueries(['school-explorer-analytics']);
         },
     });
 
@@ -53,7 +217,7 @@ export default function PublicProfileSettings() {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        const { school, ...updateData } = formData;
+        const { school, pendingChanges: _pc, ...updateData } = formData;
         updateMutation.mutate(updateData);
     };
 
@@ -83,12 +247,24 @@ export default function PublicProfileSettings() {
                 </p>
             </div>
 
+            {/* Pending Changes Banner */}
+            <PendingChangesBanner pendingChanges={pendingChanges} />
+
             {/* Success/Error Messages */}
-            {updateMutation.isSuccess && (
+            {updateMutation.isSuccess && !updateMutation.data?.noChanges && (
                 <Alert className="bg-green-50 dark:bg-green-900/20 border-green-200">
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <Send className="h-4 w-4 text-green-600" />
                     <AlertDescription className="text-green-800 dark:text-green-200">
-                        Profile updated successfully!
+                        Changes submitted for review! Master admin will review your request.
+                    </AlertDescription>
+                </Alert>
+            )}
+
+            {updateMutation.isSuccess && updateMutation.data?.noChanges && (
+                <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-200">
+                    <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                    <AlertDescription className="text-blue-800 dark:text-blue-200">
+                        No changes detected. Profile is already up to date.
                     </AlertDescription>
                 </Alert>
             )}
@@ -97,13 +273,31 @@ export default function PublicProfileSettings() {
                 <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                        Failed to update profile. Please try again.
+                        Failed to submit changes. Please try again.
+                    </AlertDescription>
+                </Alert>
+            )}
+
+            {verifyMutation.isSuccess && (
+                <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-200">
+                    <BadgeCheck className="h-4 w-4 text-blue-600" />
+                    <AlertDescription className="text-blue-800 dark:text-blue-200">
+                        Verification request submitted! You'll be notified once reviewed.
+                    </AlertDescription>
+                </Alert>
+            )}
+
+            {verifyMutation.isError && (
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                        {verifyMutation.error?.message || 'Failed to submit verification request.'}
                     </AlertDescription>
                 </Alert>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Visibility Settings */}
+                {/* Visibility & Verified Badge */}
                 <Card className="p-6">
                     <h2 className="text-xl font-semibold mb-4">Visibility Settings</h2>
                     <div className="space-y-4">
@@ -137,17 +331,48 @@ export default function PublicProfileSettings() {
 
                         <Separator />
 
+                        {/* Verified Badge Section */}
                         <div className="flex items-center justify-between">
                             <div className="space-y-0.5">
-                                <Label>Verified Badge</Label>
+                                <div className="flex items-center gap-2">
+                                    <Label>Verified Badge</Label>
+                                    {formData.isVerified && (
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-medium">
+                                            <BadgeCheck className="h-3.5 w-3.5 text-blue-500" />
+                                            Verified
+                                        </span>
+                                    )}
+                                </div>
                                 <p className="text-sm text-muted-foreground">
-                                    Show verified badge (contact support to enable)
+                                    {formData.isVerified
+                                        ? 'Your school profile is verified with a blue tick badge'
+                                        : 'Request a verified badge for your school profile'
+                                    }
                                 </p>
                             </div>
-                            <Switch
-                                checked={formData.isVerified || false}
-                                disabled
-                            />
+                            {formData.isVerified ? (
+                                <div className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-3 py-1.5 rounded-full text-sm font-medium">
+                                    <BadgeCheck className="h-4 w-4" />
+                                    Verified
+                                </div>
+                            ) : hasPendingVerification ? (
+                                <Badge variant="outline" className="bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700 gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    Pending Review
+                                </Badge>
+                            ) : (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-2 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                                    disabled={verifyMutation.isPending}
+                                    onClick={() => verifyMutation.mutate()}
+                                >
+                                    <ShieldCheck className="h-4 w-4" />
+                                    {verifyMutation.isPending ? 'Submitting...' : 'Request Verification'}
+                                </Button>
+                            )}
                         </div>
                     </div>
                 </Card>
@@ -214,29 +439,63 @@ export default function PublicProfileSettings() {
                 {/* Media  */}
                 <Card className="p-6">
                     <h2 className="text-xl font-semibold mb-4">Media</h2>
-                    <div className="space-y-4">
+                    <div className="space-y-6">
+                        {/* Cover Image - 1920x400 banner */}
                         <div>
-                            <Label htmlFor="coverImage">Cover Image URL</Label>
-                            <Input
-                                id="coverImage"
-                                type="url"
-                                value={formData.coverImage || ''}
-                                onChange={(e) => handleChange('coverImage', e.target.value)}
-                                placeholder="https://example.com/cover.jpg"
-                                className="mt-2"
+                            <Label className="text-base font-medium">Cover Image</Label>
+                            <p className="text-xs text-muted-foreground mb-2">
+                                Recommended: 1920×400px (wide banner). Displayed as a full-width cover on your public profile.
+                            </p>
+                            <FileUploadButton
+                                field="cover"
+                                value={formData.coverImage || null}
+                                onChange={(url) => handleChange('coverImage', url)}
+                                aspectRatio="video"
                             />
+                            <div className="flex items-center gap-2 mt-2">
+                                <Link2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                                <Input
+                                    type="url"
+                                    value={formData.coverImage || ''}
+                                    onChange={(e) => handleChange('coverImage', e.target.value)}
+                                    placeholder="Or paste image URL here"
+                                    className="text-xs h-8"
+                                />
+                            </div>
                         </div>
+
+                        <Separator />
+
+                        {/* Logo Image - 400x400 square */}
                         <div>
-                            <Label htmlFor="logoImage">Logo Image URL</Label>
-                            <Input
-                                id="logoImage"
-                                type="url"
-                                value={formData.logoImage || ''}
-                                onChange={(e) => handleChange('logoImage', e.target.value)}
-                                placeholder="https://example.com/logo.png"
-                                className="mt-2"
-                            />
+                            <Label className="text-base font-medium">School Logo</Label>
+                            <p className="text-xs text-muted-foreground mb-2">
+                                Recommended: 400×400px (square). Displayed as a circular avatar on your public profile.
+                            </p>
+                            <div className="max-w-xs">
+                                <FileUploadButton
+                                    field="logo"
+                                    value={formData.logoImage || null}
+                                    onChange={(url) => handleChange('logoImage', url)}
+                                    aspectRatio="square"
+                                    compact
+                                />
+                            </div>
+                            <div className="flex items-center gap-2 mt-2 max-w-xs">
+                                <Link2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                                <Input
+                                    type="url"
+                                    value={formData.logoImage || ''}
+                                    onChange={(e) => handleChange('logoImage', e.target.value)}
+                                    placeholder="Or paste image URL here"
+                                    className="text-xs h-8"
+                                />
+                            </div>
                         </div>
+
+                        <Separator />
+
+                        {/* Video URL */}
                         <div>
                             <Label htmlFor="videoUrl">Promotional Video URL</Label>
                             <Input
@@ -295,9 +554,6 @@ export default function PublicProfileSettings() {
 
                 {/* Fees */}
                 <Card className="p-6">
-                </Card>
-                {/* Fees */}
-                <Card className="p-6">
                     <h2 className="text-xl font-semibold mb-4">Fee Structure</h2>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <div>
@@ -349,7 +605,6 @@ export default function PublicProfileSettings() {
                                 handleChange('minFee', Math.min(...totals));
                                 handleChange('maxFee', Math.max(...totals));
                             }
-                            
                         }}
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -519,7 +774,6 @@ export default function PublicProfileSettings() {
                                 onChange={(e) => {
                                     const value = parseInt(e.target.value);
                                     handleChange('totalStudents', value);
-                                    // Auto-calculate ratio if teachers exist
                                     if (formData.totalTeachers && value) {
                                         handleChange('studentTeacherRatio', Math.round(value / formData.totalTeachers));
                                     }
@@ -537,7 +791,6 @@ export default function PublicProfileSettings() {
                                 onChange={(e) => {
                                     const value = parseInt(e.target.value);
                                     handleChange('totalTeachers', value);
-                                    // Auto-calculate ratio if students exist
                                     if (formData.totalStudents && value) {
                                         handleChange('studentTeacherRatio', Math.round(formData.totalStudents / value));
                                     }
@@ -571,8 +824,8 @@ export default function PublicProfileSettings() {
                         disabled={updateMutation.isPending}
                         className="gap-2"
                     >
-                        <Save className="h-4 w-4" />
-                        {updateMutation.isPending ? 'Saving...' : 'Save Profile'}
+                        <Send className="h-4 w-4" />
+                        {updateMutation.isPending ? 'Submitting...' : 'Submit for Review'}
                     </Button>
 
                     {formData.id && (

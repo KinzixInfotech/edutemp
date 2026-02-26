@@ -656,6 +656,12 @@ export const SidebarData = [
         ],
     },
     {
+        title: "Master Admin",
+        items: [
+            { label: "Profile Reviews", url: "/dashboard/master-admin/profile-reviews", icon: Shield, roles: ["SUPER_ADMIN"] },
+        ],
+    },
+    {
         title: "Alumni",
         items: [
             { label: "Alumni Management", url: "/dashboard/schools/alumni/", icon: TrendingUp, roles: ["ADMIN"] },

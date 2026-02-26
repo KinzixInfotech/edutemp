@@ -13,8 +13,9 @@ import { toast } from "sonner";
 import {
     Loader2, UserPlus, Eye, ArrowRight, Users, ClipboardCheck, Clock,
     CheckCircle, XCircle, Search, ArrowUpDown, ChevronLeft, ChevronRight,
-    FileText
+    FileText, CalendarCheck, MapPin, Settings
 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import Link from 'next/link';
 import { useAuth } from "@/context/AuthContext";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +33,15 @@ export default function Applications() {
     const [admitDialogOpen, setAdmitDialogOpen] = useState(false);
     const [selectedAppForAdmission, setSelectedAppForAdmission] = useState(null);
     const [admissionData, setAdmissionData] = useState({ classId: "", admissionNumber: "" });
+
+    // Global test schedule state
+    const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+    const [globalSchedule, setGlobalSchedule] = useState({
+        globalTestDate: "",
+        globalTestStartTime: "",
+        globalTestEndTime: "",
+        globalTestVenue: "",
+    });
     const [admitting, setAdmitting] = useState(false);
 
     // Sorting & Pagination
@@ -73,6 +83,58 @@ export default function Applications() {
             return res.data;
         },
         enabled: !!schoolId,
+    });
+
+    // Fetch admission settings (stages with global test info)
+    const { data: stagesSettings = [] } = useQuery({
+        queryKey: ["stages-settings", schoolId],
+        queryFn: async () => {
+            const res = await fetch(`/api/schools/admissions/settings?schoolId=${schoolId}`);
+            if (!res.ok) throw new Error("Failed");
+            const data = await res.json();
+            return data.stages || [];
+        },
+        enabled: !!schoolId,
+        staleTime: 5 * 60 * 1000,
+    });
+
+    // Find the test/interview stage
+    const testStage = useMemo(() =>
+        stagesSettings.find(s => {
+            const n = s.name?.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+            return n === 'TEST_INTERVIEW' || n === 'TEST' || n === 'INTERVIEW' || n === 'TESTINTERVIEW';
+        }),
+        [stagesSettings]);
+
+    // Pre-fill dialog when testStage data loads
+    React.useEffect(() => {
+        if (testStage) {
+            setGlobalSchedule({
+                globalTestDate: testStage.globalTestDate ? new Date(testStage.globalTestDate).toISOString().split('T')[0] : "",
+                globalTestStartTime: testStage.globalTestStartTime || "",
+                globalTestEndTime: testStage.globalTestEndTime || "",
+                globalTestVenue: testStage.globalTestVenue || "",
+            });
+        }
+    }, [testStage]);
+
+    // Mutation: save global test schedule
+    const saveGlobalSchedule = useMutation({
+        mutationFn: async (data) => {
+            const res = await fetch('/api/schools/admissions/settings', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stageId: testStage.id, ...data }),
+            });
+            if (!res.ok) throw new Error('Failed to save');
+            return res.json();
+        },
+        onSuccess: () => {
+            toast.success('Global test schedule saved!');
+            queryClient.invalidateQueries(['stages-settings', schoolId]);
+            setScheduleDialogOpen(false);
+        },
+        onError: () => toast.error('Failed to save schedule'),
     });
 
     // Fetch Classes for Admission Dialog
@@ -297,6 +359,108 @@ export default function Applications() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Global Test/Interview Schedule */}
+            {testStage && (
+                <Card>
+                    <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                                    <CalendarCheck className="h-5 w-5 text-yellow-600" />
+                                    Test / Interview Schedule
+                                </CardTitle>
+                                <CardDescription>Set a global schedule — applies to all applications at this stage</CardDescription>
+                            </div>
+                            <Button size="sm" variant="outline" onClick={() => setScheduleDialogOpen(true)}>
+                                <Settings className="h-4 w-4 mr-2" /> Configure
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    {testStage.globalTestDate && (
+                        <CardContent>
+                            <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+                                <div className="flex items-center gap-2">
+                                    <CalendarCheck className="h-4 w-4 text-muted-foreground" />
+                                    <span className="font-medium">Date:</span>
+                                    {new Date(testStage.globalTestDate).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                                </div>
+                                {testStage.globalTestStartTime && (
+                                    <div className="flex items-center gap-2">
+                                        <Clock className="h-4 w-4 text-muted-foreground" />
+                                        <span className="font-medium">Time:</span>
+                                        {testStage.globalTestStartTime}{testStage.globalTestEndTime ? ` – ${testStage.globalTestEndTime}` : ''}
+                                    </div>
+                                )}
+                                {testStage.globalTestVenue && (
+                                    <div className="flex items-center gap-2">
+                                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                                        <span className="font-medium">Venue:</span>
+                                        {testStage.globalTestVenue}
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    )}
+                </Card>
+            )}
+
+            {/* Global Schedule Dialog */}
+            <Dialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Configure Test / Interview Schedule</DialogTitle>
+                        <DialogDescription>
+                            Set globally — all applications at the "{testStage?.name}" stage will use these settings.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div>
+                            <Label className="mb-2 block">Test Date</Label>
+                            <Input
+                                type="date"
+                                value={globalSchedule.globalTestDate}
+                                onChange={(e) => setGlobalSchedule(prev => ({ ...prev, globalTestDate: e.target.value }))}
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <Label className="mb-2 block">Start Time</Label>
+                                <Input
+                                    type="time"
+                                    value={globalSchedule.globalTestStartTime}
+                                    onChange={(e) => setGlobalSchedule(prev => ({ ...prev, globalTestStartTime: e.target.value }))}
+                                />
+                            </div>
+                            <div>
+                                <Label className="mb-2 block">End Time</Label>
+                                <Input
+                                    type="time"
+                                    value={globalSchedule.globalTestEndTime}
+                                    onChange={(e) => setGlobalSchedule(prev => ({ ...prev, globalTestEndTime: e.target.value }))}
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <Label className="mb-2 block">Venue / Location</Label>
+                            <Input
+                                placeholder="Enter venue or location"
+                                value={globalSchedule.globalTestVenue}
+                                onChange={(e) => setGlobalSchedule(prev => ({ ...prev, globalTestVenue: e.target.value }))}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setScheduleDialogOpen(false)}>Cancel</Button>
+                        <Button
+                            onClick={() => saveGlobalSchedule.mutate(globalSchedule)}
+                            disabled={saveGlobalSchedule.isPending || !globalSchedule.globalTestDate}
+                        >
+                            {saveGlobalSchedule.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...</> : 'Save Schedule'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Data Table Card */}
             <Card>

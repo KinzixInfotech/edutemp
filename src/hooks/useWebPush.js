@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 
 // Roles allowed to receive web push notifications
-export const ALLOWED_ROLES = ['ADMIN', 'ACCOUNTANT', 'LIBRARIAN', 'DIRECTOR', 'PRINCIPAL'];
+export const ALLOWED_ROLES = ['ADMIN', 'SUPER_ADMIN', 'ACCOUNTANT', 'LIBRARIAN', 'DIRECTOR', 'PRINCIPAL'];
 
 export function useWebPush({ onMessageReceived } = {}) {
     const { fullUser } = useAuth();

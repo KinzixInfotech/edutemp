@@ -105,14 +105,14 @@ export default function LoginPhoto() {
 
         try {
             // Check rate limit
-            const rateLimitCheck = await axios.get('/api/auth/check-rate-limit');
-            if (rateLimitCheck.data.blocked) {
-                toast.error("Account Temporarily Locked", {
-                    description: "Too many failed login attempts. Try again in 15 minutes."
-                });
-                setLoading(false);
-                return;
-            }
+            // const rateLimitCheck = await axios.get('/api/auth/check-rate-limit');
+            // if (rateLimitCheck.data.blocked) {
+            //     toast.error("Account Temporarily Locked", {
+            //         description: "Too many failed login attempts. Try again in 15 minutes."
+            //     });
+            //     setLoading(false);
+            //     return;
+            // }
 
             // Authenticate
             const { data, error } = await supabase.auth.signInWithPassword({
