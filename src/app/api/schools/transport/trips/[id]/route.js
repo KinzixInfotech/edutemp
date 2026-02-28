@@ -23,6 +23,11 @@ export async function GET(req, props) {
                             where: { isActive: true },
                             orderBy: { orderIndex: 'asc' },
                             select: { id: true, name: true, orderIndex: true, pickupTime: true, dropTime: true, latitude: true, longitude: true }
+                        },
+                        _count: {
+                            select: {
+                                studentAssignments: true
+                            }
                         }
                     }
                 },
