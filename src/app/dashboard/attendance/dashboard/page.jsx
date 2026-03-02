@@ -8,6 +8,9 @@ import {
   ArrowUpDown, ChevronLeft, ChevronRight, MoreHorizontal
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
+} from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -43,14 +46,16 @@ export default function AdminAttendanceDashboard() {
   const [classPage, setClassPage] = useState(1);
   const [teacherPage, setTeacherPage] = useState(1);
   const [recentPage, setRecentPage] = useState(1);
+  const [trendRange, setTrendRange] = useState('30d');
   const pageSize = 10;
 
   // Fetch dashboard data
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['attendance-dashboard', schoolId, dateFilter, classFilter],
+    queryKey: ['attendance-dashboard', schoolId, dateFilter, classFilter, trendRange],
     queryFn: async () => {
       const params = new URLSearchParams({
         date: dateFilter,
+        trendRange,
         ...(classFilter !== 'all' && { classId: classFilter })
       });
       const res = await fetch(`/api/schools/${schoolId}/attendance/admin/dashboard?${params}`);
@@ -67,10 +72,47 @@ export default function AdminAttendanceDashboard() {
     roleWiseStats,
     classWiseStats,
     teacherActivity,
+    monthlyTrend,
     alerts,
     lowAttendanceUsers,
     recentActivity
   } = data || {};
+
+  // Prepare chart data from monthlyTrend (sorted ascending by date)
+  const isMonthlyGrouping = trendRange === '6m' || trendRange === '1y';
+  const trendChartData = useMemo(() => {
+    if (!monthlyTrend || monthlyTrend.length === 0) return [];
+    return [...monthlyTrend]
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .map(day => {
+        const d = new Date(day.date);
+        const label = isMonthlyGrouping
+          ? d.toLocaleString('default', { month: 'short', year: '2-digit' })
+          : `${d.getDate()} ${d.toLocaleString('default', { month: 'short' })}`;
+        return {
+          date: label,
+          present: day.present,
+          absent: day.absent,
+          late: day.late,
+        };
+      });
+  }, [monthlyTrend, isMonthlyGrouping]);
+
+  // Custom tooltip for attendance chart
+  const AttendanceTooltip = ({ active, payload, label }) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div className="bg-popover border rounded-lg shadow-lg p-3 text-sm">
+        <p className="font-medium mb-1">{label}</p>
+        {payload.map((p) => (
+          <p key={p.name} className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
+            {p.name}: <span className="font-semibold">{p.value}</span>
+          </p>
+        ))}
+      </div>
+    );
+  };
 
   const formatTime = (dateString) => {
     if (!dateString) return '—';
@@ -259,48 +301,104 @@ export default function AdminAttendanceDashboard() {
         </Card>
       )}
 
-      {/* Stats Cards - Noticeboard Style */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Students</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+      {/* Stats Cards + Monthly Trend Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Left: Stats Cards */}
+        <div className="lg:col-span-1 grid grid-cols-2 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalStudents}</div>
+              <p className="text-xs text-muted-foreground">Across all classes</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Present Today</CardTitle>
+              <CheckCircle className="h-4 w-4 text-green-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{todayOverview?.present || 0}</div>
+              <p className="text-xs text-muted-foreground">
+                {todayOverview?.total ? Math.round((todayOverview.present / todayOverview.total) * 100) : 0}% rate
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Absent Today</CardTitle>
+              <XCircle className="h-4 w-4 text-red-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">{todayOverview?.absent || 0}</div>
+              <p className="text-xs text-muted-foreground">{todayOverview?.notMarked || 0} not marked</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Late Check-ins</CardTitle>
+              <Clock className="h-4 w-4 text-yellow-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-yellow-600">{todayOverview?.late || 0}</div>
+              <p className="text-xs text-muted-foreground">{alerts?.pendingApprovals || 0} pending</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right: Attendance Trend Line Chart */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Attendance Trend</CardTitle>
+                <CardDescription>
+                  {{ '30d': 'Last 30 days', '2m': 'Last 2 months', '6m': 'Last 6 months', '1y': 'Last 1 year' }[trendRange]}
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-3">
+                <Select value={trendRange} onValueChange={setTrendRange}>
+                  <SelectTrigger className="w-[140px] h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="30d">Last 30 Days</SelectItem>
+                    <SelectItem value="2m">Last 2 Months</SelectItem>
+                    <SelectItem value="6m">Last 6 Months</SelectItem>
+                    <SelectItem value="1y">Last 1 Year</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" /> Present</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> Absent</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500" /> Late</span>
+                </div>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalStudents}</div>
-            <p className="text-xs text-muted-foreground">Across all classes</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Present Today</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{todayOverview?.present || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              {todayOverview?.total ? Math.round((todayOverview.present / todayOverview.total) * 100) : 0}% attendance rate
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Absent Today</CardTitle>
-            <XCircle className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{todayOverview?.absent || 0}</div>
-            <p className="text-xs text-muted-foreground">{todayOverview?.notMarked || 0} not marked</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Late Check-ins</CardTitle>
-            <Clock className="h-4 w-4 text-yellow-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{todayOverview?.late || 0}</div>
-            <p className="text-xs text-muted-foreground">{alerts?.pendingApprovals || 0} pending approvals</p>
+            <div className="h-[200px] w-full">
+              {trendChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trendChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis dataKey="date" tick={{ fontSize: 10 }} interval={2} className="text-muted-foreground" />
+                    <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" />
+                    <Tooltip content={<AttendanceTooltip />} />
+                    <Line type="monotone" dataKey="present" name="Present" stroke="#22c55e" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 5 }} />
+                    <Line type="monotone" dataKey="absent" name="Absent" stroke="#ef4444" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 5 }} />
+                    <Line type="monotone" dataKey="late" name="Late" stroke="#eab308" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 5 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                  No trend data available
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>

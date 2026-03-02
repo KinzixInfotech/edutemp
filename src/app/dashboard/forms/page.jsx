@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
     Loader2, Plus, FileText, Trash2, Edit, Link2, ExternalLink,
-    ArrowUpDown, ChevronLeft, ChevronRight, ClipboardList, CheckCircle, FileEdit, Users, ChevronDown
+    ArrowUpDown, ChevronLeft, ChevronRight, ClipboardList, CheckCircle,
+    FileEdit, Users, ChevronDown, Search, X, Archive, Filter
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -49,6 +50,43 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+// ── Custom hooks for debounce & throttle ──────────────────────────────
+
+function useDebounce(value, delay) {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+
+        return () => clearTimeout(handler);
+    }, [value, delay]);
+
+    return debouncedValue;
+}
+
+function useThrottle(value, interval) {
+    const [throttledValue, setThrottledValue] = useState(value);
+    const lastUpdated = useRef(Date.now());
+
+    useEffect(() => {
+        const now = Date.now();
+        if (now - lastUpdated.current >= interval) {
+            lastUpdated.current = now;
+            setThrottledValue(value);
+        } else {
+            const timer = setTimeout(() => {
+                lastUpdated.current = Date.now();
+                setThrottledValue(value);
+            }, interval - (now - lastUpdated.current));
+            return () => clearTimeout(timer);
+        }
+    }, [value, interval]);
+
+    return throttledValue;
+}
+
 export default function FormListPage() {
     const { fullUser } = useAuth();
     const [forms, setForms] = useState([]);
@@ -67,11 +105,28 @@ export default function FormListPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
 
+    // Filter & search state
+    const [searchQuery, setSearchQuery] = useState("");
+    const [filterCategory, setFilterCategory] = useState("ALL");
+    const [filterStatus, setFilterStatus] = useState("ALL");
+
+    // Row-level loading state (set of form IDs currently updating)
+    const [updatingRows, setUpdatingRows] = useState(new Set());
+
+    // Debounce search (300ms) then throttle (200ms) for combined effect
+    const debouncedSearch = useDebounce(searchQuery, 300);
+    const throttledSearch = useThrottle(debouncedSearch, 200);
+
     useEffect(() => {
         if (fullUser?.schoolId) {
             fetchForms();
         }
     }, [fullUser?.schoolId]);
+
+    // Reset to page 1 when filters/search change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [throttledSearch, filterCategory, filterStatus]);
 
     const fetchForms = async () => {
         try {
@@ -139,32 +194,74 @@ export default function FormListPage() {
     };
 
     const updateStatus = async (formId, newStatus) => {
+        // Add this row to the updating set → triggers skeleton
+        setUpdatingRows(prev => {
+            const next = new Set(prev);
+            next.add(formId);
+            return next;
+        });
+
         try {
             await axios.put(`/api/schools/${fullUser.schoolId}/forms/${formId}`, {
                 status: newStatus
             });
             toast.success(`Form status updated to ${newStatus}`);
-            fetchForms();
+            await fetchForms();
         } catch (error) {
             console.error("Failed to update status", error);
             toast.error("Failed to update status");
+        } finally {
+            // Remove from updating set → skeleton goes away
+            setUpdatingRows(prev => {
+                const next = new Set(prev);
+                next.delete(formId);
+                return next;
+            });
         }
     };
 
-    // Stats
+    // Stats — now includes archived count
     const stats = useMemo(() => {
         const totalForms = forms.length;
         const publishedForms = forms.filter(f => f.status === "PUBLISHED").length;
         const draftForms = forms.filter(f => f.status === "DRAFT").length;
+        const archivedForms = forms.filter(f => f.status === "ARCHIVED").length;
         const totalSubmissions = forms.reduce((acc, f) => acc + (f._count?.applications || 0), 0);
-        return { totalForms, publishedForms, draftForms, totalSubmissions };
+        return { totalForms, publishedForms, draftForms, archivedForms, totalSubmissions };
     }, [forms]);
 
-    // Sort and paginate
-    const processedForms = useMemo(() => {
-        let sorted = [...forms];
+    // Unique categories derived from data
+    const availableCategories = useMemo(() => {
+        const cats = new Set(forms.map(f => f.category).filter(Boolean));
+        return Array.from(cats).sort();
+    }, [forms]);
 
-        sorted.sort((a, b) => {
+    // Filter → search → sort pipeline
+    const processedForms = useMemo(() => {
+        let filtered = [...forms];
+
+        // Category filter
+        if (filterCategory !== "ALL") {
+            filtered = filtered.filter(f => f.category === filterCategory);
+        }
+
+        // Status filter
+        if (filterStatus !== "ALL") {
+            filtered = filtered.filter(f => f.status === filterStatus);
+        }
+
+        // Search (debounced + throttled)
+        if (throttledSearch.trim()) {
+            const q = throttledSearch.toLowerCase();
+            filtered = filtered.filter(f =>
+                f.title?.toLowerCase().includes(q) ||
+                f.description?.toLowerCase().includes(q) ||
+                f.category?.toLowerCase().includes(q)
+            );
+        }
+
+        // Sort
+        filtered.sort((a, b) => {
             let aVal, bVal;
             switch (sortColumn) {
                 case "title":
@@ -200,8 +297,8 @@ export default function FormListPage() {
             return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
         });
 
-        return sorted;
-    }, [forms, sortColumn, sortDirection]);
+        return filtered;
+    }, [forms, filterCategory, filterStatus, throttledSearch, sortColumn, sortDirection]);
 
     // Pagination
     const totalPages = Math.ceil(processedForms.length / pageSize);
@@ -219,6 +316,14 @@ export default function FormListPage() {
         }
     };
 
+    const clearFilters = () => {
+        setSearchQuery("");
+        setFilterCategory("ALL");
+        setFilterStatus("ALL");
+    };
+
+    const hasActiveFilters = searchQuery || filterCategory !== "ALL" || filterStatus !== "ALL";
+
     const SortableHeader = ({ column, children }) => (
         <TableHead
             className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
@@ -231,18 +336,23 @@ export default function FormListPage() {
         </TableHead>
     );
 
-    // Loading skeleton
+    // Loading skeleton for a single row
+    const SkeletonRow = ({ index }) => (
+        <TableRow className={index % 2 === 0 ? "bg-muted dark:bg-background/50" : ""}>
+            <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+            <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
+            <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+            <TableCell><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+        </TableRow>
+    );
+
+    // Loading skeleton for initial load
     const TableLoadingRows = () => (
         <>
-            {[1, 2, 3, 4, 5].map((i) => (
-                <TableRow key={i}>
-                    <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                    <TableCell><Skeleton className="h-8 w-24" /></TableCell>
-                </TableRow>
+            {[0, 1, 2, 3, 4].map((i) => (
+                <SkeletonRow key={i} index={i} />
             ))}
         </>
     );
@@ -331,8 +441,8 @@ export default function FormListPage() {
 
             <Separator />
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {/* Stats Cards — now 5 cards with Archived */}
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-medium">Total Forms</CardTitle>
@@ -362,7 +472,16 @@ export default function FormListPage() {
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium">Total Submissions</CardTitle>
+                        <CardTitle className="text-sm font-medium">Archived</CardTitle>
+                        <Archive className="h-4 w-4 text-red-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{stats.archivedForms}</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium">Submissions</CardTitle>
                         <Users className="h-4 w-4 text-purple-500" />
                     </CardHeader>
                     <CardContent>
@@ -393,6 +512,73 @@ export default function FormListPage() {
                             </Select>
                         </div>
                     </div>
+
+                    {/* Search & Filters bar */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mt-4">
+                        {/* Search input */}
+                        <div className="relative flex-1 w-full sm:max-w-sm">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search forms..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-9 pr-9"
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery("")}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Category filter */}
+                        <Select value={filterCategory} onValueChange={setFilterCategory}>
+                            <SelectTrigger className="w-[150px]">
+                                <div className="flex items-center gap-2">
+                                    <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                                    <SelectValue placeholder="Category" />
+                                </div>
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="ALL">All Categories</SelectItem>
+                                {availableCategories.map(cat => (
+                                    <SelectItem key={cat} value={cat}>{cat.charAt(0) + cat.slice(1).toLowerCase()}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+
+                        {/* Status filter */}
+                        <Select value={filterStatus} onValueChange={setFilterStatus}>
+                            <SelectTrigger className="w-[150px]">
+                                <div className="flex items-center gap-2">
+                                    <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                                    <SelectValue placeholder="Status" />
+                                </div>
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="ALL">All Status</SelectItem>
+                                <SelectItem value="DRAFT">Draft</SelectItem>
+                                <SelectItem value="PUBLISHED">Published</SelectItem>
+                                <SelectItem value="ARCHIVED">Archived</SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        {/* Clear filters button */}
+                        {hasActiveFilters && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={clearFilters}
+                                className="text-muted-foreground hover:text-foreground gap-1"
+                            >
+                                <X className="h-3.5 w-3.5" />
+                                Clear
+                            </Button>
+                        )}
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <div className="rounded-lg border overflow-hidden">
@@ -415,74 +601,87 @@ export default function FormListPage() {
                                         <TableCell colSpan={6} className="text-center py-12">
                                             <div className="flex flex-col items-center gap-2">
                                                 <FileText className="w-12 h-12 text-muted-foreground/50" />
-                                                <p className="text-muted-foreground">No forms found</p>
-                                                <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
-                                                    <Plus className="w-4 h-4 mr-2" /> Create your first form
-                                                </Button>
+                                                <p className="text-muted-foreground">
+                                                    {hasActiveFilters ? "No forms match your filters" : "No forms found"}
+                                                </p>
+                                                {hasActiveFilters ? (
+                                                    <Button size="sm" variant="outline" onClick={clearFilters}>
+                                                        <X className="w-4 h-4 mr-2" /> Clear Filters
+                                                    </Button>
+                                                ) : (
+                                                    <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
+                                                        <Plus className="w-4 h-4 mr-2" /> Create your first form
+                                                    </Button>
+                                                )}
                                             </div>
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     paginatedForms.map((form, index) => (
-                                        <TableRow key={form.id} className={`hover:bg-muted/30 dark:hover:bg-background/30 ${index % 2 === 0 ? "bg-muted dark:bg-background/50" : ""}`}>
-                                            <TableCell className="font-medium">
-                                                <div className="flex flex-col">
-                                                    <span>{form.title}</span>
-                                                    {form.description && (
-                                                        <span className="text-xs text-muted-foreground truncate max-w-[200px]">{form.description}</span>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline" className="text-xs">{form.category}</Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Badge
-                                                            variant={getStatusColor(form.status)}
-                                                            className="cursor-pointer hover:opacity-80 transition-opacity flex items-center w-fit gap-1 pr-1"
-                                                        >
-                                                            {form.status}
-                                                            <ChevronDown className="h-3 w-3 opacity-50" />
-                                                        </Badge>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="start">
-                                                        <DropdownMenuItem onClick={() => updateStatus(form.id, "DRAFT")}>
-                                                            Set as Draft
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => updateStatus(form.id, "PUBLISHED")}>
-                                                            Publish Form
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => updateStatus(form.id, "ARCHIVED")} className="text-destructive">
-                                                            Archive Form
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </TableCell>
-                                            <TableCell className="text-muted-foreground">{form._count?.applications || 0}</TableCell>
-                                            <TableCell className="text-muted-foreground">{format(new Date(form.createdAt), "MMM d, yyyy")}</TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex justify-end gap-1">
-                                                    <Button variant="ghost" size="icon" onClick={() => copyFormUrl(form.id)} title="Copy Public Link">
-                                                        <Link2 className="h-4 w-4" />
-                                                    </Button>
-                                                    <Link href={`/dashboard/forms/${form.id}/submissions`}>
-                                                        <Button variant="ghost" size="icon" title="View Submissions">
-                                                            <FileText className="h-4 w-4" />
+                                        updatingRows.has(form.id) ? (
+                                            // Skeleton row while this specific form's status is updating
+                                            <SkeletonRow key={form.id} index={index} />
+                                        ) : (
+                                            <TableRow key={form.id} className={`hover:bg-muted/30 dark:hover:bg-background/30 ${index % 2 === 0 ? "bg-muted dark:bg-background/50" : ""}`}>
+                                                <TableCell className="font-medium">
+                                                    <div className="flex flex-col">
+                                                        <span>{form.title}</span>
+                                                        {form.description && (
+                                                            <span className="text-xs text-muted-foreground truncate max-w-[200px]">{form.description}</span>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge variant="outline" className="text-xs">{form.category}</Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Badge
+                                                                variant={getStatusColor(form.status)}
+                                                                className="cursor-pointer hover:opacity-80 transition-opacity flex items-center w-fit gap-1 pr-1"
+                                                            >
+                                                                {form.status}
+                                                                <ChevronDown className="h-3 w-3 opacity-50" />
+                                                            </Badge>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="start">
+                                                            <DropdownMenuItem onClick={() => updateStatus(form.id, "DRAFT")}>
+                                                                Set as Draft
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem onClick={() => updateStatus(form.id, "PUBLISHED")}>
+                                                                Publish Form
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem onClick={() => updateStatus(form.id, "ARCHIVED")} className="text-destructive">
+                                                                Archive Form
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </TableCell>
+                                                <TableCell className="text-muted-foreground">{form._count?.applications || 0}</TableCell>
+                                                <TableCell className="text-muted-foreground">{format(new Date(form.createdAt), "MMM d, yyyy")}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <div className="flex justify-end gap-1">
+                                                        <Button variant="ghost" size="icon" onClick={() => copyFormUrl(form.id)} title="Copy Public Link">
+                                                            <Link2 className="h-4 w-4" />
                                                         </Button>
-                                                    </Link>
-                                                    <Link href={`/dashboard/forms/builder/${form.id}`}>
-                                                        <Button variant="ghost" size="icon" title="Edit Form">
-                                                            <Edit className="h-4 w-4" />
+                                                        <Link href={`/dashboard/forms/${form.id}/submissions`}>
+                                                            <Button variant="ghost" size="icon" title="View Submissions">
+                                                                <FileText className="h-4 w-4" />
+                                                            </Button>
+                                                        </Link>
+                                                        <Link href={`/dashboard/forms/builder/${form.id}`}>
+                                                            <Button variant="ghost" size="icon" title="Edit Form">
+                                                                <Edit className="h-4 w-4" />
+                                                            </Button>
+                                                        </Link>
+                                                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => deleteForm(form.id)} title="Delete Form">
+                                                            <Trash2 className="h-4 w-4" />
                                                         </Button>
-                                                    </Link>
-                                                    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => deleteForm(form.id)} title="Delete Form">
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        )
                                     ))
                                 )}
                             </TableBody>

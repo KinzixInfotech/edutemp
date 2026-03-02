@@ -304,7 +304,7 @@ export default function AdmissionOverviewPage() {
                                                 <TableCell className="text-right">
                                                     <Button variant="ghost" size="sm" asChild>
                                                         <Link href={`/dashboard/schools/admissions/applications?formId=${form.formId}`}>
-                                                            View Apps
+                                                            View Form
                                                         </Link>
                                                     </Button>
                                                 </TableCell>

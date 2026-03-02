@@ -1,0 +1,834 @@
+"use client";
+
+import React, { useState, useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import {
+    ShoppingCart,
+    Search,
+    Receipt,
+    TrendingUp,
+    TrendingDown,
+    DollarSign,
+    Users,
+    RotateCcw,
+    ChevronDown,
+    ChevronUp,
+    Calendar,
+    BarChart3,
+    ArrowUpRight,
+    ArrowDownRight,
+    ChevronLeft,
+    ChevronRight,
+} from "lucide-react";
+import {
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    ResponsiveContainer,
+    PieChart,
+    Pie,
+    Cell,
+    AreaChart,
+    Area,
+    Legend,
+} from "recharts";
+
+// Color palette for charts
+const CHART_COLORS = [
+    "hsl(221, 83%, 53%)",  // blue
+    "hsl(142, 71%, 45%)",  // green
+    "hsl(38, 92%, 50%)",   // amber
+    "hsl(0, 84%, 60%)",    // red
+    "hsl(262, 83%, 58%)",  // violet
+    "hsl(173, 80%, 40%)",  // teal
+];
+
+const PAYMENT_COLORS = {
+    CASH: "hsl(142, 71%, 45%)",
+    ONLINE: "hsl(221, 83%, 53%)",
+    UPI: "hsl(262, 83%, 58%)",
+    CARD: "hsl(38, 92%, 50%)",
+};
+
+const BUYER_TYPE_COLORS = {
+    STUDENT: "hsl(221, 83%, 53%)",
+    STAFF: "hsl(142, 71%, 45%)",
+    EXTERNAL: "hsl(38, 92%, 50%)",
+};
+
+function EmptyState({ icon: Icon, title, description, action }) {
+    return (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="rounded-full bg-muted p-4 mb-4">
+                <Icon className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-semibold mb-1">{title}</h3>
+            <p className="text-sm text-muted-foreground max-w-sm mb-4">{description}</p>
+            {action}
+        </div>
+    );
+}
+
+// Custom tooltip for charts
+function CustomTooltip({ active, payload, label, prefix = "₹" }) {
+    if (!active || !payload?.length) return null;
+    return (
+        <div className="bg-popover border rounded-lg shadow-lg p-3 text-sm">
+            <p className="font-medium text-foreground mb-1">{label}</p>
+            {payload.map((entry, i) => (
+                <p key={i} style={{ color: entry.color }} className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: entry.color }} />
+                    {entry.name}: {prefix}{typeof entry.value === 'number' ? entry.value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : entry.value}
+                </p>
+            ))}
+        </div>
+    );
+}
+
+function PieTooltip({ active, payload }) {
+    if (!active || !payload?.length) return null;
+    const data = payload[0];
+    return (
+        <div className="bg-popover border rounded-lg shadow-lg p-3 text-sm">
+            <p className="font-medium text-foreground">{data.name}</p>
+            <p style={{ color: data.payload.fill }}>
+                ₹{data.value.toLocaleString('en-IN', { minimumFractionDigits: 2 })} ({data.payload.percentage}%)
+            </p>
+        </div>
+    );
+}
+
+export default function SalesTab({ sales, onNewSale }) {
+    // Filters
+    const [searchTerm, setSearchTerm] = useState("");
+    const [filterBuyerType, setFilterBuyerType] = useState("all");
+    const [filterPaymentMethod, setFilterPaymentMethod] = useState("all");
+    const [filterDateRange, setFilterDateRange] = useState("all"); // all, today, week, month, quarter
+    const [filterStartDate, setFilterStartDate] = useState("");
+    const [filterEndDate, setFilterEndDate] = useState("");
+    const [expandedSale, setExpandedSale] = useState(null);
+    const [reportView, setReportView] = useState("overview"); // overview, trends
+    const [trendMonth, setTrendMonth] = useState(() => {
+        const now = new Date();
+        return { year: now.getFullYear(), month: now.getMonth() };
+    });
+
+    // Date filtering helper
+    const getDateRangeFilter = () => {
+        const now = new Date();
+        switch (filterDateRange) {
+            case "today":
+                return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            case "week":
+                const weekAgo = new Date(now);
+                weekAgo.setDate(weekAgo.getDate() - 7);
+                return weekAgo;
+            case "month":
+                return new Date(now.getFullYear(), now.getMonth(), 1);
+            case "quarter":
+                const quarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+                return quarterStart;
+            case "custom":
+                return filterStartDate ? new Date(filterStartDate) : null;
+            default:
+                return null;
+        }
+    };
+
+    // Filtered sales
+    const filteredSales = useMemo(() => {
+        let result = [...sales];
+        const startFilter = getDateRangeFilter();
+        const endFilter = filterDateRange === "custom" && filterEndDate ? new Date(filterEndDate + "T23:59:59") : null;
+
+        result = result.filter((sale) => {
+            // Search
+            if (searchTerm) {
+                const q = searchTerm.toLowerCase();
+                const matchName = sale.buyerName?.toLowerCase().includes(q);
+                const matchAmount = sale.totalAmount?.toString().includes(q);
+                const matchItems = sale.items?.some(si => si.item?.name?.toLowerCase().includes(q));
+                if (!matchName && !matchAmount && !matchItems) return false;
+            }
+            // Buyer type
+            if (filterBuyerType !== "all" && sale.buyerType !== filterBuyerType) return false;
+            // Payment method
+            if (filterPaymentMethod !== "all" && sale.paymentMethod !== filterPaymentMethod) return false;
+            // Date range
+            if (startFilter) {
+                const saleDate = new Date(sale.saleDate);
+                if (saleDate < startFilter) return false;
+                if (endFilter && saleDate > endFilter) return false;
+            }
+            return true;
+        });
+
+        return result.sort((a, b) => new Date(b.saleDate) - new Date(a.saleDate));
+    }, [sales, searchTerm, filterBuyerType, filterPaymentMethod, filterDateRange, filterStartDate, filterEndDate]);
+
+    // ============ REPORT DATA ============
+
+    // Monthly revenue data — 6 months ending at trendMonth
+    const monthlyData = useMemo(() => {
+        const { year, month } = trendMonth;
+        const months = [];
+        for (let i = 5; i >= 0; i--) {
+            const date = new Date(year, month - i, 1);
+            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            const monthName = date.toLocaleString('default', { month: 'short', year: '2-digit' });
+
+            const monthSales = sales.filter(s => {
+                const sd = new Date(s.saleDate);
+                return sd.getFullYear() === date.getFullYear() && sd.getMonth() === date.getMonth();
+            });
+
+            const revenue = monthSales.reduce((sum, s) => sum + (s.totalAmount || 0), 0);
+            const count = monthSales.length;
+
+            months.push({ month: monthName, key: monthKey, revenue, count });
+        }
+        return months;
+    }, [sales, trendMonth]);
+
+    // Current vs previous month comparison
+    const monthComparison = useMemo(() => {
+        const now = new Date();
+        const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+        const thisMonthSales = sales.filter(s => new Date(s.saleDate) >= thisMonthStart);
+        const lastMonthSales = sales.filter(s => {
+            const d = new Date(s.saleDate);
+            return d >= lastMonthStart && d <= lastMonthEnd;
+        });
+
+        const thisRevenue = thisMonthSales.reduce((sum, s) => sum + (s.totalAmount || 0), 0);
+        const lastRevenue = lastMonthSales.reduce((sum, s) => sum + (s.totalAmount || 0), 0);
+        const revenueChange = lastRevenue > 0 ? ((thisRevenue - lastRevenue) / lastRevenue * 100) : (thisRevenue > 0 ? 100 : 0);
+
+        return {
+            thisMonth: { revenue: thisRevenue, count: thisMonthSales.length },
+            lastMonth: { revenue: lastRevenue, count: lastMonthSales.length },
+            revenueChange: revenueChange.toFixed(1),
+            countChange: lastMonthSales.length > 0
+                ? (((thisMonthSales.length - lastMonthSales.length) / lastMonthSales.length) * 100).toFixed(1)
+                : (thisMonthSales.length > 0 ? "100" : "0"),
+        };
+    }, [sales]);
+
+    // Payment method breakdown
+    const paymentBreakdown = useMemo(() => {
+        const totals = {};
+        sales.forEach(s => {
+            const method = s.paymentMethod || "OTHER";
+            totals[method] = (totals[method] || 0) + (s.totalAmount || 0);
+        });
+        const grandTotal = Object.values(totals).reduce((s, v) => s + v, 0);
+        return Object.entries(totals).map(([name, value]) => ({
+            name,
+            value,
+            percentage: grandTotal > 0 ? (value / grandTotal * 100).toFixed(1) : "0",
+            fill: PAYMENT_COLORS[name] || CHART_COLORS[0],
+        }));
+    }, [sales]);
+
+    // Buyer type breakdown
+    const buyerBreakdown = useMemo(() => {
+        const totals = {};
+        sales.forEach(s => {
+            const type = s.buyerType || "OTHER";
+            totals[type] = (totals[type] || 0) + (s.totalAmount || 0);
+        });
+        const grandTotal = Object.values(totals).reduce((s, v) => s + v, 0);
+        return Object.entries(totals).map(([name, value]) => ({
+            name,
+            value,
+            percentage: grandTotal > 0 ? (value / grandTotal * 100).toFixed(1) : "0",
+            fill: BUYER_TYPE_COLORS[name] || CHART_COLORS[3],
+        }));
+    }, [sales]);
+
+    // Daily trend — simple last 30 days
+    const dailyTrend = useMemo(() => {
+        const now = new Date();
+        const days = [];
+        for (let i = 29; i >= 0; i--) {
+            const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+            const daySales = sales.filter(s => {
+                const sd = new Date(s.saleDate);
+                return sd.getFullYear() === date.getFullYear() && sd.getMonth() === date.getMonth() && sd.getDate() === date.getDate();
+            });
+            days.push({
+                date: date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
+                revenue: daySales.reduce((sum, s) => sum + (s.totalAmount || 0), 0),
+                count: daySales.length,
+            });
+        }
+        return days;
+    }, [sales]);
+
+    // Window label: shows range like "Oct '25 — Mar '26"
+    const windowStart = new Date(trendMonth.year, trendMonth.month - 5);
+    const windowEnd = new Date(trendMonth.year, trendMonth.month);
+    const trendWindowLabel = `${windowStart.toLocaleString('default', { month: 'short', year: '2-digit' })} — ${windowEnd.toLocaleString('default', { month: 'short', year: '2-digit' })}`;
+    const isCurrentMonth = trendMonth.year === new Date().getFullYear() && trendMonth.month === new Date().getMonth();
+
+    const goToPrevMonth = () => setTrendMonth(prev => {
+        const d = new Date(prev.year, prev.month - 6);
+        return { year: d.getFullYear(), month: d.getMonth() };
+    });
+    const goToNextMonth = () => {
+        if (!isCurrentMonth) {
+            setTrendMonth(prev => {
+                const d = new Date(prev.year, prev.month + 6);
+                const now = new Date();
+                // Don't go beyond current month
+                if (d.getFullYear() > now.getFullYear() || (d.getFullYear() === now.getFullYear() && d.getMonth() > now.getMonth())) {
+                    return { year: now.getFullYear(), month: now.getMonth() };
+                }
+                return { year: d.getFullYear(), month: d.getMonth() };
+            });
+        }
+    };
+
+    // Summary stats
+    const summaryStats = useMemo(() => {
+        const totalRevenue = filteredSales.reduce((sum, s) => sum + (s.totalAmount || 0), 0);
+        const avgSale = filteredSales.length > 0 ? totalRevenue / filteredSales.length : 0;
+        const uniqueBuyers = new Set(filteredSales.map(s => s.buyerName)).size;
+        const totalItems = filteredSales.reduce((sum, s) => sum + (s.items?.length || 0), 0);
+        return { totalRevenue, avgSale, uniqueBuyers, totalItems, salesCount: filteredSales.length };
+    }, [filteredSales]);
+
+    const clearFilters = () => {
+        setSearchTerm("");
+        setFilterBuyerType("all");
+        setFilterPaymentMethod("all");
+        setFilterDateRange("all");
+        setFilterStartDate("");
+        setFilterEndDate("");
+    };
+
+    const hasActiveFilters = searchTerm || filterBuyerType !== "all" || filterPaymentMethod !== "all" || filterDateRange !== "all";
+
+    if (sales.length === 0) {
+        return (
+            <Card>
+                <CardContent className="pt-6">
+                    <EmptyState
+                        icon={Receipt}
+                        title="No sales recorded yet"
+                        description="Once you start selling inventory items, your sales history and reports will appear here."
+                        action={
+                            <Button onClick={onNewSale}>
+                                <ShoppingCart className="h-4 w-4 mr-2" />
+                                Record First Sale
+                            </Button>
+                        }
+                    />
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return (
+        <div className="space-y-6">
+            {/* Report Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card>
+                    <CardContent className="pt-5 pb-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">This Month</p>
+                                <p className="text-2xl font-bold mt-1">₹{monthComparison.thisMonth.revenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                                <div className="flex items-center gap-1 mt-1">
+                                    {parseFloat(monthComparison.revenueChange) >= 0 ? (
+                                        <ArrowUpRight className="h-3.5 w-3.5 text-green-500" />
+                                    ) : (
+                                        <ArrowDownRight className="h-3.5 w-3.5 text-red-500" />
+                                    )}
+                                    <span className={`text-xs font-medium ${parseFloat(monthComparison.revenueChange) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                                        {monthComparison.revenueChange}% vs last month
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                                <DollarSign className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardContent className="pt-5 pb-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Sales Count</p>
+                                <p className="text-2xl font-bold mt-1">{monthComparison.thisMonth.count}</p>
+                                <div className="flex items-center gap-1 mt-1">
+                                    {parseFloat(monthComparison.countChange) >= 0 ? (
+                                        <ArrowUpRight className="h-3.5 w-3.5 text-green-500" />
+                                    ) : (
+                                        <ArrowDownRight className="h-3.5 w-3.5 text-red-500" />
+                                    )}
+                                    <span className={`text-xs font-medium ${parseFloat(monthComparison.countChange) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                                        {monthComparison.countChange}% vs last month
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                                <ShoppingCart className="h-5 w-5 text-green-600 dark:text-green-400" />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardContent className="pt-5 pb-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Avg. Sale Value</p>
+                                <p className="text-2xl font-bold mt-1">₹{summaryStats.avgSale.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                <p className="text-xs text-muted-foreground mt-1">Across {summaryStats.salesCount} sales</p>
+                            </div>
+                            <div className="h-10 w-10 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+                                <BarChart3 className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardContent className="pt-5 pb-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Unique Buyers</p>
+                                <p className="text-2xl font-bold mt-1">{summaryStats.uniqueBuyers}</p>
+                                <p className="text-xs text-muted-foreground mt-1">{summaryStats.totalItems} items sold</p>
+                            </div>
+                            <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                                <Users className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Charts Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Monthly Revenue Bar Chart */}
+                <Card className="lg:col-span-2">
+                    <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="text-base">{reportView === "overview" ? "Monthly Revenue" : "Daily Trend"}</CardTitle>
+                                <CardDescription>{reportView === "overview" ? trendWindowLabel : "Last 30 days"}</CardDescription>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {reportView === "overview" && (
+                                    <div className="flex items-center gap-1">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goToPrevMonth}>
+                                            <ChevronLeft className="h-4 w-4" />
+                                        </Button>
+                                        <span className="text-xs font-medium min-w-[120px] text-center">{trendWindowLabel}</span>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goToNextMonth} disabled={isCurrentMonth}>
+                                            <ChevronRight className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                )}
+                                <div className="flex gap-1">
+                                    <Button
+                                        variant={reportView === "overview" ? "default" : "ghost"}
+                                        size="sm"
+                                        className="h-7 text-xs"
+                                        onClick={() => setReportView("overview")}
+                                    >
+                                        Monthly
+                                    </Button>
+                                    <Button
+                                        variant={reportView === "trends" ? "default" : "ghost"}
+                                        size="sm"
+                                        className="h-7 text-xs"
+                                        onClick={() => setReportView("trends")}
+                                    >
+                                        Daily Trend
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="h-[280px] w-full">
+                            {reportView === "overview" ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={monthlyData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                                        <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                                        <XAxis dataKey="month" tick={{ fontSize: 12 }} className="text-muted-foreground" />
+                                        <YAxis tick={{ fontSize: 12 }} className="text-muted-foreground" tickFormatter={(v) => `₹${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`} />
+                                        <Tooltip content={<CustomTooltip />} />
+                                        <Bar dataKey="revenue" name="Revenue" fill="hsl(221, 83%, 53%)" radius={[6, 6, 0, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={dailyTrend} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                                        <defs>
+                                            <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="hsl(221, 83%, 53%)" stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor="hsl(221, 83%, 53%)" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                                        <XAxis dataKey="date" tick={{ fontSize: 10 }} interval={4} className="text-muted-foreground" />
+                                        <YAxis tick={{ fontSize: 12 }} className="text-muted-foreground" tickFormatter={(v) => `₹${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`} />
+                                        <Tooltip content={<CustomTooltip />} />
+                                        <Area type="monotone" dataKey="revenue" name="Revenue" stroke="hsl(221, 83%, 53%)" fill="url(#salesGradient)" strokeWidth={2} />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Payment & Buyer Breakdown */}
+                <div className="space-y-6">
+                    {/* Payment Method Pie */}
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-base">By Payment Method</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {paymentBreakdown.length > 0 ? (
+                                <>
+                                    <div className="h-[140px]">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie
+                                                    data={paymentBreakdown}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    innerRadius={35}
+                                                    outerRadius={60}
+                                                    dataKey="value"
+                                                    paddingAngle={3}
+                                                    strokeWidth={0}
+                                                >
+                                                    {paymentBreakdown.map((entry, i) => (
+                                                        <Cell key={i} fill={entry.fill} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip content={<PieTooltip />} />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                    <div className="space-y-1.5 mt-2">
+                                        {paymentBreakdown.map((item) => (
+                                            <div key={item.name} className="flex items-center justify-between text-sm">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.fill }} />
+                                                    <span className="text-muted-foreground">{item.name}</span>
+                                                </div>
+                                                <span className="font-medium">{item.percentage}%</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            ) : (
+                                <p className="text-sm text-muted-foreground text-center py-6">No data</p>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Buyer Type Breakdown */}
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-base">By Buyer Type</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {buyerBreakdown.length > 0 ? (
+                                <div className="space-y-3">
+                                    {buyerBreakdown.map((item) => {
+                                        const pct = parseFloat(item.percentage);
+                                        return (
+                                            <div key={item.name} className="space-y-1">
+                                                <div className="flex items-center justify-between text-sm">
+                                                    <span className="text-muted-foreground">{item.name}</span>
+                                                    <span className="font-medium">₹{item.value.toLocaleString('en-IN', { minimumFractionDigits: 0 })}</span>
+                                                </div>
+                                                <div className="h-2 rounded-full bg-muted overflow-hidden">
+                                                    <div
+                                                        className="h-full rounded-full transition-all duration-500"
+                                                        style={{
+                                                            width: `${pct}%`,
+                                                            backgroundColor: item.fill,
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-muted-foreground text-center py-6">No data</p>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+
+            {/* Filters & Sales Table */}
+            <Card>
+                <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle>Sales History</CardTitle>
+                            <CardDescription>
+                                {hasActiveFilters
+                                    ? `Showing ${filteredSales.length} of ${sales.length} sales`
+                                    : `${sales.length} total sales`}
+                            </CardDescription>
+                        </div>
+                        <Button onClick={onNewSale}>
+                            <ShoppingCart className="h-4 w-4 mr-2" />
+                            New Sale
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {/* Filters Bar */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                        <div className="relative lg:col-span-2">
+                            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search by buyer, amount, or item..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-10"
+                            />
+                        </div>
+                        <Select value={filterDateRange} onValueChange={(v) => setFilterDateRange(v)}>
+                            <SelectTrigger>
+                                <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
+                                <SelectValue placeholder="Date Range" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Time</SelectItem>
+                                <SelectItem value="today">Today</SelectItem>
+                                <SelectItem value="week">Last 7 Days</SelectItem>
+                                <SelectItem value="month">This Month</SelectItem>
+                                <SelectItem value="quarter">This Quarter</SelectItem>
+                                <SelectItem value="custom">Custom Range</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Select value={filterBuyerType} onValueChange={(v) => setFilterBuyerType(v)}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Buyer Type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Buyers</SelectItem>
+                                <SelectItem value="STUDENT">Student</SelectItem>
+                                <SelectItem value="STAFF">Staff</SelectItem>
+                                <SelectItem value="EXTERNAL">External</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Select value={filterPaymentMethod} onValueChange={(v) => setFilterPaymentMethod(v)}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Payment" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Payments</SelectItem>
+                                <SelectItem value="CASH">Cash</SelectItem>
+                                <SelectItem value="ONLINE">Online</SelectItem>
+                                <SelectItem value="UPI">UPI</SelectItem>
+                                <SelectItem value="CARD">Card</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {/* Custom date range */}
+                    {filterDateRange === "custom" && (
+                        <div className="flex gap-3 items-end">
+                            <div className="space-y-1">
+                                <Label className="text-xs">Start Date</Label>
+                                <Input
+                                    type="date"
+                                    value={filterStartDate}
+                                    onChange={(e) => setFilterStartDate(e.target.value)}
+                                    className="w-[160px]"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-xs">End Date</Label>
+                                <Input
+                                    type="date"
+                                    value={filterEndDate}
+                                    onChange={(e) => setFilterEndDate(e.target.value)}
+                                    className="w-[160px]"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Active filters indicator */}
+                    {hasActiveFilters && (
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">Active filters:</span>
+                            {searchTerm && (
+                                <Badge variant="secondary" className="text-xs">
+                                    Search: "{searchTerm}"
+                                </Badge>
+                            )}
+                            {filterBuyerType !== "all" && (
+                                <Badge variant="secondary" className="text-xs">
+                                    Buyer: {filterBuyerType}
+                                </Badge>
+                            )}
+                            {filterPaymentMethod !== "all" && (
+                                <Badge variant="secondary" className="text-xs">
+                                    Payment: {filterPaymentMethod}
+                                </Badge>
+                            )}
+                            {filterDateRange !== "all" && (
+                                <Badge variant="secondary" className="text-xs">
+                                    Date: {filterDateRange}
+                                </Badge>
+                            )}
+                            <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={clearFilters}>
+                                <RotateCcw className="h-3 w-3 mr-1" />
+                                Clear
+                            </Button>
+                        </div>
+                    )}
+
+                    {/* Sales Table */}
+                    {filteredSales.length === 0 ? (
+                        <div className="text-center py-12 text-muted-foreground">
+                            <Search className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                            <p className="text-sm">No sales match your filters</p>
+                            <Button variant="link" size="sm" onClick={clearFilters}>Clear all filters</Button>
+                        </div>
+                    ) : (
+                        <div className="rounded-lg border overflow-hidden">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="dark:bg-background/50 bg-muted/50">
+                                        <TableHead className="w-[30px]"></TableHead>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Buyer</TableHead>
+                                        <TableHead>Type</TableHead>
+                                        <TableHead>Items</TableHead>
+                                        <TableHead className="text-right">Amount</TableHead>
+                                        <TableHead>Payment</TableHead>
+                                        <TableHead>Status</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {filteredSales.map((sale, index) => (
+                                        <React.Fragment key={sale.id}>
+                                            <TableRow
+                                                className={`cursor-pointer hover:bg-muted/30 dark:hover:bg-background/30 ${index % 2 === 0 ? "bg-muted/20 dark:bg-background/20" : ""}`}
+                                                onClick={() => setExpandedSale(expandedSale === sale.id ? null : sale.id)}
+                                            >
+                                                <TableCell className="pr-0">
+                                                    {expandedSale === sale.id ? (
+                                                        <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                                                    ) : (
+                                                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="whitespace-nowrap">
+                                                    {new Date(sale.saleDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}
+                                                </TableCell>
+                                                <TableCell className="font-medium">{sale.buyerName}</TableCell>
+                                                <TableCell>
+                                                    <Badge variant="outline" className="text-xs">{sale.buyerType}</Badge>
+                                                </TableCell>
+                                                <TableCell className="text-muted-foreground">
+                                                    {sale.items?.length || 0} item(s)
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono font-medium">
+                                                    ₹{sale.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge
+                                                        variant="secondary"
+                                                        className="text-xs"
+                                                        style={{
+                                                            backgroundColor: PAYMENT_COLORS[sale.paymentMethod] ? `${PAYMENT_COLORS[sale.paymentMethod]}20` : undefined,
+                                                            color: PAYMENT_COLORS[sale.paymentMethod],
+                                                        }}
+                                                    >
+                                                        {sale.paymentMethod}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-xs">
+                                                        {sale.status}
+                                                    </Badge>
+                                                </TableCell>
+                                            </TableRow>
+
+                                            {/* Expanded row showing sale items */}
+                                            {expandedSale === sale.id && sale.items && (
+                                                <TableRow className="bg-muted/10 dark:bg-background/10">
+                                                    <TableCell colSpan={8} className="py-3">
+                                                        <div className="ml-6 rounded-md border overflow-hidden">
+                                                            <Table>
+                                                                <TableHeader>
+                                                                    <TableRow className="bg-muted/40">
+                                                                        <TableHead className="text-xs py-2">Item</TableHead>
+                                                                        <TableHead className="text-xs py-2">Qty</TableHead>
+                                                                        <TableHead className="text-xs py-2 text-right">Unit Price</TableHead>
+                                                                        <TableHead className="text-xs py-2 text-right">Total</TableHead>
+                                                                    </TableRow>
+                                                                </TableHeader>
+                                                                <TableBody>
+                                                                    {sale.items.map((si) => (
+                                                                        <TableRow key={si.id}>
+                                                                            <TableCell className="text-sm py-1.5">{si.item?.name || si.itemId}</TableCell>
+                                                                            <TableCell className="text-sm py-1.5 font-mono">{si.quantity}</TableCell>
+                                                                            <TableCell className="text-sm py-1.5 text-right font-mono">₹{si.unitPrice.toFixed(2)}</TableCell>
+                                                                            <TableCell className="text-sm py-1.5 text-right font-mono font-medium">₹{si.totalPrice.toFixed(2)}</TableCell>
+                                                                        </TableRow>
+                                                                    ))}
+                                                                </TableBody>
+                                                            </Table>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                        </React.Fragment>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
+    );
+}

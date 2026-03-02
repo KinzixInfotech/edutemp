@@ -908,6 +908,12 @@ model Application {
   payments     Payment[]
 
   @@unique([schoolId, formId, applicantEmail])
+  @@index([schoolId])
+  @@index([formId])
+  @@index([currentStageId])
+  @@index([submittedAt])
+  @@index([schoolId, currentStageId])
+  @@index([schoolId, formId])
 }
 
 model ApplicationDocument {

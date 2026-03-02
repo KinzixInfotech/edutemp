@@ -27,68 +27,78 @@ export async function GET(req, props) {
     }
 
     try {
-        // Cache key includes filters now
+        // Cache key includes filters
         const cacheKey = generateKey('admissions:stats', {
             schoolId, formId, academicYearId, startDate, endDate
         });
 
-        // Reduced cache time for real-time feel (30s)
+        // Cache for 60s
         const stats = await remember(cacheKey, async () => {
-            // 1. Total Applications
-            const totalApplications = await prisma.application.count({ where });
+            // ── Phase 1: All independent queries in parallel ──────────
+            const [
+                totalApplications,
+                applicationsByStage,
+                stages,
+                forms,
+                formCounts,
+                recentApplications
+            ] = await Promise.all([
+                // 1. Total count
+                prisma.application.count({ where }),
 
-            // 2. Applications by Stage
-            const applicationsByStage = await prisma.application.groupBy({
-                by: ["currentStageId"],
-                where,
-                _count: { _all: true },
-            });
+                // 2. Group by stage
+                prisma.application.groupBy({
+                    by: ["currentStageId"],
+                    where,
+                    _count: { _all: true },
+                }),
 
-            const stages = await prisma.stage.findMany({
-                where: { schoolId },
-                select: { id: true, name: true, order: true },
-                orderBy: { order: 'asc' }
-            });
+                // 3. All stages for this school
+                prisma.stage.findMany({
+                    where: { schoolId },
+                    select: { id: true, name: true, order: true },
+                    orderBy: { order: 'asc' }
+                }),
 
+                // 4. All forms for this school
+                prisma.form.findMany({
+                    where: { schoolId },
+                    select: { id: true, title: true, viewCount: true }
+                }),
+
+                // 5. Application counts grouped by form
+                prisma.application.groupBy({
+                    by: ["formId"],
+                    where,
+                    _count: { _all: true },
+                }),
+
+                // 6. Recent applications
+                prisma.application.findMany({
+                    where,
+                    orderBy: { submittedAt: "desc" },
+                    take: 50,
+                    select: {
+                        id: true,
+                        applicantName: true,
+                        applicantEmail: true,
+                        submittedAt: true,
+                        form: { select: { title: true } },
+                        currentStage: { select: { name: true } },
+                    },
+                }),
+            ]);
+
+            // ── Phase 2: Dependent query (needs stages result) ────────
             const stageStats = stages.map((stage) => {
                 const count = applicationsByStage.find((s) => s.currentStageId === stage.id)?._count?._all || 0;
-                return {
-                    name: stage.name,
-                    count,
-                    order: stage.order,
-                };
+                return { name: stage.name, count, order: stage.order };
             });
 
-            // 3. Recent Applications (Increased limit for list filtering)
-            const recentApplications = await prisma.application.findMany({
-                where,
-                orderBy: { submittedAt: "desc" },
-                take: 50,
-                include: {
-                    form: { select: { title: true } },
-                    currentStage: { select: { name: true } },
-                },
-            });
-
-            // 4. Form-wise Stats
-            // FETCH ALL FORMS for the school to ensure table is populated
-            // We relax the where clause for forms to show all forms, but stats will respect the filters
-            const forms = await prisma.form.findMany({
-                where: { schoolId },
-                select: { id: true, title: true, viewCount: true }
-            });
-
-            // Group counts by formId (respecting query filters)
-            const formCounts = await prisma.application.groupBy({
-                by: ["formId"],
-                where,
-                _count: { _all: true },
-            });
-
-            // Calculate enrolled count per form
             const enrolledStage = stages.find(s => s.name === "Enrolled");
-            let enrolledByForm = [];
 
+            // Only run the enrolled groupBy if the stage exists
+            let enrolledByForm = [];
             if (enrolledStage) {
                 enrolledByForm = await prisma.application.groupBy({
                     by: ["formId"],
@@ -100,6 +110,7 @@ export async function GET(req, props) {
                 });
             }
 
+            // ── Assemble form stats ───────────────────────────────────
             const formStats = forms.map(form => {
                 const total = formCounts.find(f => f.formId === form.id)?._count?._all || 0;
                 const enrolled = enrolledByForm.find(f => f.formId === form.id)?._count?._all || 0;
@@ -111,20 +122,15 @@ export async function GET(req, props) {
                     viewCount: form.viewCount || 0,
                     conversionRate: total > 0 ? ((enrolled / total) * 100).toFixed(1) : 0
                 };
-            })
-                // Sort by total applications (desc), but keep 0s at bottom
-                .sort((a, b) => b.totalApplications - a.totalApplications);
+            }).sort((a, b) => b.totalApplications - a.totalApplications);
 
-            // If a specific form IS selected, filter the formStats to show only that one (optional, but good for focus)
             const finalFormStats = (formId && formId !== 'all')
                 ? formStats.filter(f => f.formId === formId)
                 : formStats;
 
-            // 5. Overall Conversion Rate
+            // Overall stats
             const enrolledCount = stageStats.find(s => s.name === "Enrolled")?.count || 0;
             const conversionRate = totalApplications > 0 ? ((enrolledCount / totalApplications) * 100).toFixed(1) : 0;
-
-            // 6. Total form views
             const totalFormViews = forms.reduce((sum, f) => sum + (f.viewCount || 0), 0);
 
             return {
@@ -136,7 +142,7 @@ export async function GET(req, props) {
                 totalFormViews,
                 formStats: finalFormStats
             };
-        }, 30);
+        }, 60);
 
         return NextResponse.json(stats);
     } catch (error) {

@@ -21,6 +21,7 @@ export async function GET(req, props) {
     : null;
 
   const status = searchParams.get('status');
+  const trendRange = searchParams.get('trendRange') || '30d'; // 30d, 2m, 6m, 1y
 
   try {
     if (!schoolId) {
@@ -82,6 +83,16 @@ export async function GET(req, props) {
     // Monthly date range
     const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
     const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+
+    // Trend: compute range based on trendRange param
+    const trendStart = new Date(date);
+    switch (trendRange) {
+      case '2m': trendStart.setMonth(trendStart.getMonth() - 2); break;
+      case '6m': trendStart.setMonth(trendStart.getMonth() - 6); break;
+      case '1y': trendStart.setFullYear(trendStart.getFullYear() - 1); break;
+      default: trendStart.setDate(trendStart.getDate() - 29); break; // 30d
+    }
+    const groupByMonth = trendRange === '6m' || trendRange === '1y';
 
     // PARALLEL BATCH 2: All remaining queries
     const [
@@ -180,23 +191,38 @@ export async function GET(req, props) {
         take: 30  // Limit for performance
       }),
 
-      // Monthly trend
-      prisma.$queryRaw`
-        SELECT 
-          DATE(a.date) as date,
-          COUNT(CASE WHEN a.status = 'PRESENT' THEN 1 END) as present,
-          COUNT(CASE WHEN a.status = 'ABSENT' THEN 1 END) as absent,
-          COUNT(CASE WHEN a.status = 'LATE' THEN 1 END) as late,
-          COUNT(CASE WHEN a.status = 'HALF_DAY' THEN 1 END) as "halfDay",
-          COUNT(CASE WHEN a.status = 'ON_LEAVE' THEN 1 END) as "onLeave"
-        FROM "Attendance" a
-        WHERE a."schoolId" = ${schoolId}::uuid
-          AND a.date >= ${monthStart.toISOString().split('T')[0]}::date
-          AND a.date <= ${monthEnd.toISOString().split('T')[0]}::date
-        GROUP BY DATE(a.date)
-        ORDER BY date DESC
-        LIMIT 30
-      `,
+      // Monthly/daily trend (conditional grouping)
+      groupByMonth
+        ? prisma.$queryRaw`
+            SELECT 
+              DATE_TRUNC('month', a.date) as date,
+              COUNT(CASE WHEN a.status = 'PRESENT' THEN 1 END) as present,
+              COUNT(CASE WHEN a.status = 'ABSENT' THEN 1 END) as absent,
+              COUNT(CASE WHEN a.status = 'LATE' THEN 1 END) as late,
+              COUNT(CASE WHEN a.status = 'HALF_DAY' THEN 1 END) as "halfDay",
+              COUNT(CASE WHEN a.status = 'ON_LEAVE' THEN 1 END) as "onLeave"
+            FROM "Attendance" a
+            WHERE a."schoolId" = ${schoolId}::uuid
+              AND a.date >= ${trendStart.toISOString().split('T')[0]}::date
+              AND a.date <= ${date.toISOString().split('T')[0]}::date
+            GROUP BY DATE_TRUNC('month', a.date)
+            ORDER BY date ASC
+          `
+        : prisma.$queryRaw`
+            SELECT 
+              DATE(a.date) as date,
+              COUNT(CASE WHEN a.status = 'PRESENT' THEN 1 END) as present,
+              COUNT(CASE WHEN a.status = 'ABSENT' THEN 1 END) as absent,
+              COUNT(CASE WHEN a.status = 'LATE' THEN 1 END) as late,
+              COUNT(CASE WHEN a.status = 'HALF_DAY' THEN 1 END) as "halfDay",
+              COUNT(CASE WHEN a.status = 'ON_LEAVE' THEN 1 END) as "onLeave"
+            FROM "Attendance" a
+            WHERE a."schoolId" = ${schoolId}::uuid
+              AND a.date >= ${trendStart.toISOString().split('T')[0]}::date
+              AND a.date <= ${date.toISOString().split('T')[0]}::date
+            GROUP BY DATE(a.date)
+            ORDER BY date ASC
+          `,
 
       // Pending approvals
       prisma.attendance.count({

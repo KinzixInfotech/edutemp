@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import {
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
+} from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -40,6 +43,7 @@ export default function AdminFeeDashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
+  const [feeChartRange, setFeeChartRange] = useState('all');
   const ITEMS_PER_PAGE = 10;
 
   // Fetch active academic year
@@ -92,6 +96,46 @@ export default function AdminFeeDashboard() {
     enabled: !!schoolId,
   });
 
+  // Destructure BEFORE any early return to keep hooks order stable
+  const { summary, statusCounts, recentPayments, overdueStudents, classWiseStats, paymentMethodStats, monthlyCollection } = dashboardData || {};
+
+  // Prepare class-wise chart data
+  const classChartData = useMemo(() => {
+    if (!classWiseStats) return [];
+    return classWiseStats.map(s => ({
+      name: s.className?.length > 10 ? s.className.slice(0, 10) + '…' : s.className,
+      fullName: s.className,
+      collected: s.collected || 0,
+      due: s.balance || 0,
+    }));
+  }, [classWiseStats]);
+
+  // Prepare monthly collection chart data (filtered by range)
+  const monthlyChartData = useMemo(() => {
+    if (!monthlyCollection || monthlyCollection.length === 0) return [];
+    const sorted = [...monthlyCollection].sort((a, b) => new Date(a.month) - new Date(b.month));
+
+    // Filter based on selected range
+    let filtered = sorted;
+    if (feeChartRange !== 'all') {
+      const now = new Date();
+      let cutoff = new Date();
+      switch (feeChartRange) {
+        case '3m': cutoff.setMonth(now.getMonth() - 3); break;
+        case '6m': cutoff.setMonth(now.getMonth() - 6); break;
+        case '1y': cutoff.setFullYear(now.getFullYear() - 1); break;
+      }
+      filtered = sorted.filter(m => new Date(m.month) >= cutoff);
+    }
+
+    return filtered.map(m => ({
+      month: new Date(m.month).toLocaleString('default', { month: 'short', year: '2-digit' }),
+      fullMonth: new Date(m.month).toLocaleString('default', { month: 'long', year: 'numeric' }),
+      amount: Number(m.total) || 0,
+      count: Number(m.count) || 0,
+    }));
+  }, [monthlyCollection, feeChartRange]);
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -108,6 +152,26 @@ export default function AdminFeeDashboard() {
     });
   };
 
+  // Fee chart tooltip
+  const FeeTooltip = ({ active, payload, label }) => {
+    if (!active || !payload?.length) return null;
+    const data = payload[0]?.payload;
+    return (
+      <div className="bg-popover border rounded-lg shadow-lg p-3 text-sm">
+        <p className="font-medium mb-1">{data?.fullMonth || data?.fullName || label}</p>
+        {payload.map((p) => (
+          <p key={p.name} className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
+            {p.name}: <span className="font-semibold">₹{(p.value || 0).toLocaleString('en-IN')}</span>
+          </p>
+        ))}
+        {data?.count != null && (
+          <p className="text-muted-foreground mt-1">{data.count} transaction{data.count !== 1 ? 's' : ''}</p>
+        )}
+      </div>
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -115,8 +179,6 @@ export default function AdminFeeDashboard() {
       </div>
     );
   }
-
-  const { summary, statusCounts, recentPayments, overdueStudents, classWiseStats, paymentMethodStats } = dashboardData || {};
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -274,6 +336,90 @@ export default function AdminFeeDashboard() {
                 <p className="text-2xl font-bold text-red-600">{statusCounts?.overdue || 0}</p>
               </div>
               <AlertCircle className="w-10 h-10 text-red-500 opacity-20" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Class-wise Collection Chart */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Class-wise Collection</CardTitle>
+                <CardDescription>Collected vs Due by class</CardDescription>
+              </div>
+              <div className="flex items-center gap-3 text-xs">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" /> Collected</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400" /> Due</span>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[220px] w-full">
+              {classChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={classChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} className="text-muted-foreground" />
+                    <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" tickFormatter={(v) => `₹${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`} />
+                    <Tooltip content={<FeeTooltip />} />
+                    <Bar dataKey="collected" name="Collected" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="due" name="Due" fill="#f87171" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground text-sm">No class data</div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Monthly Collection Trend — Line Chart */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Collection Trend</CardTitle>
+                <CardDescription>
+                  {{ '3m': 'Last 3 months', '6m': 'Last 6 months', '1y': 'Last 1 year', 'all': 'Full academic year' }[feeChartRange]}
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-3">
+                <Select value={feeChartRange} onValueChange={setFeeChartRange}>
+                  <SelectTrigger className="w-[150px] h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="3m">Last 3 Months</SelectItem>
+                    <SelectItem value="6m">Last 6 Months</SelectItem>
+                    <SelectItem value="1y">Last 1 Year</SelectItem>
+                    <SelectItem value="all">Full Year</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: 'hsl(221, 83%, 53%)' }} /> Collected</span>
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[220px] w-full">
+              {monthlyChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={monthlyChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis dataKey="month" tick={{ fontSize: 11 }} className="text-muted-foreground" />
+                    <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" tickFormatter={(v) => `₹${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`} />
+                    <Tooltip content={<FeeTooltip />} />
+                    <Line type="monotone" dataKey="amount" name="Collected" stroke="hsl(221, 83%, 53%)" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 6 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground text-sm">No collection data for this range</div>
+              )}
             </div>
           </CardContent>
         </Card>

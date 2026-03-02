@@ -76,6 +76,7 @@ import {
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import FileUploadButton from "@/components/fileupload";
+import SalesTab from "./SalesTab";
 
 export default function InventoryManagementPage() {
     const { fullUser } = useAuth();
@@ -935,66 +936,7 @@ export default function InventoryManagementPage() {
 
                 {/* Sales Tab */}
                 <TabsContent value="sales" className="space-y-4">
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between">
-                            <div>
-                                <CardTitle>Sales History</CardTitle>
-                                <CardDescription>Record of all inventory sales</CardDescription>
-                            </div>
-                            <Button onClick={() => setIsSaleDialogOpen(true)}>
-                                <ShoppingCart className="h-4 w-4 mr-2" />
-                                New Sale
-                            </Button>
-                        </CardHeader>
-                        <CardContent>
-                            {sales.length === 0 ? (
-                                <EmptyState
-                                    icon={Receipt}
-                                    title="No sales recorded yet"
-                                    description="Once you start selling inventory items, your sales history will appear here."
-                                    action={
-                                        <Button onClick={() => setIsSaleDialogOpen(true)}>
-                                            <ShoppingCart className="h-4 w-4 mr-2" />
-                                            Record First Sale
-                                        </Button>
-                                    }
-                                />
-                            ) : (
-                                <div className="rounded-lg border overflow-hidden">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow className="dark:bg-background/50 bg-muted/50">
-                                                <TableHead>Date</TableHead>
-                                                <TableHead>Buyer</TableHead>
-                                                <TableHead>Type</TableHead>
-                                                <TableHead>Amount</TableHead>
-                                                <TableHead>Payment</TableHead>
-                                                <TableHead>Status</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {sales.map((sale, index) => (
-                                                <TableRow key={sale.id} className={index % 2 === 0 ? "bg-muted/20 dark:bg-background/20" : ""}>
-                                                    <TableCell>{new Date(sale.saleDate).toLocaleDateString()}</TableCell>
-                                                    <TableCell className="font-medium">{sale.buyerName}</TableCell>
-                                                    <TableCell>
-                                                        <Badge variant="outline">{sale.buyerType}</Badge>
-                                                    </TableCell>
-                                                    <TableCell className="font-mono">₹{sale.totalAmount.toFixed(2)}</TableCell>
-                                                    <TableCell>{sale.paymentMethod}</TableCell>
-                                                    <TableCell>
-                                                        <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                                            {sale.status}
-                                                        </Badge>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
+                    <SalesTab sales={sales} onNewSale={() => setIsSaleDialogOpen(true)} />
                 </TabsContent>
 
                 {/* Categories Tab */}
@@ -1342,6 +1284,265 @@ export default function InventoryManagementPage() {
                         </Button>
                         <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
                             Cancel
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* New Sale Dialog */}
+            <Dialog open={isSaleDialogOpen} onOpenChange={(open) => {
+                setIsSaleDialogOpen(open);
+                if (!open) {
+                    setSaleForm({ buyerName: "", buyerType: "STUDENT", items: [], paymentMethod: "CASH" });
+                }
+            }}>
+                <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <ShoppingCart className="h-5 w-5" />
+                            Record New Sale
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-6">
+                        {/* Buyer Information */}
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Buyer Information</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label>Buyer Name *</Label>
+                                    <Input
+                                        value={saleForm.buyerName}
+                                        onChange={(e) => setSaleForm({ ...saleForm, buyerName: e.target.value })}
+                                        placeholder="Enter buyer name"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Buyer Type</Label>
+                                    <Select
+                                        value={saleForm.buyerType}
+                                        onValueChange={(value) => setSaleForm({ ...saleForm, buyerType: value })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="STUDENT">Student</SelectItem>
+                                            <SelectItem value="STAFF">Staff</SelectItem>
+                                            <SelectItem value="EXTERNAL">External</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <Separator />
+
+                        {/* Add Items */}
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Sale Items</h3>
+                                <Badge variant="outline">{saleForm.items.length} item(s)</Badge>
+                            </div>
+
+                            {/* Item Picker */}
+                            <div className="space-y-2">
+                                <Label>Add Item to Sale</Label>
+                                <Select
+                                    onValueChange={(itemId) => {
+                                        const item = items.find(i => i.id === itemId);
+                                        if (!item) return;
+                                        // Check if already added
+                                        if (saleForm.items.find(si => si.itemId === itemId)) {
+                                            toast.error("Item already added to sale");
+                                            return;
+                                        }
+                                        setSaleForm({
+                                            ...saleForm,
+                                            items: [...saleForm.items, {
+                                                itemId: item.id,
+                                                name: item.name,
+                                                quantity: 1,
+                                                unitPrice: item.sellingPrice || item.costPerUnit,
+                                                maxQuantity: item.quantity,
+                                                unit: item.unit,
+                                            }]
+                                        });
+                                    }}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select an item to add..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {items.filter(i => i.isSellable && i.quantity > 0).length === 0 ? (
+                                            <div className="p-3 text-sm text-muted-foreground text-center">
+                                                No sellable items available. Mark items as sellable first.
+                                            </div>
+                                        ) : (
+                                            items
+                                                .filter(i => i.isSellable && i.quantity > 0)
+                                                .map((item) => (
+                                                    <SelectItem key={item.id} value={item.id}>
+                                                        <div className="flex items-center justify-between w-full gap-4">
+                                                            <span>{item.name}</span>
+                                                            <span className="text-muted-foreground text-xs">
+                                                                ₹{item.sellingPrice || item.costPerUnit} · {item.quantity} {item.unit} available
+                                                            </span>
+                                                        </div>
+                                                    </SelectItem>
+                                                ))
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {/* Selected Items List */}
+                            {saleForm.items.length > 0 && (
+                                <div className="rounded-lg border overflow-hidden">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow className="bg-muted/50">
+                                                <TableHead>Item</TableHead>
+                                                <TableHead className="w-[140px]">Quantity</TableHead>
+                                                <TableHead className="text-right">Unit Price</TableHead>
+                                                <TableHead className="text-right">Total</TableHead>
+                                                <TableHead className="w-[50px]"></TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {saleForm.items.map((saleItem, idx) => (
+                                                <TableRow key={saleItem.itemId}>
+                                                    <TableCell>
+                                                        <div>
+                                                            <span className="font-medium">{saleItem.name}</span>
+                                                            <p className="text-xs text-muted-foreground">{saleItem.maxQuantity} {saleItem.unit} available</p>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-1">
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-7 w-7 p-0"
+                                                                onClick={() => {
+                                                                    if (saleItem.quantity <= 1) return;
+                                                                    const updated = [...saleForm.items];
+                                                                    updated[idx] = { ...updated[idx], quantity: updated[idx].quantity - 1 };
+                                                                    setSaleForm({ ...saleForm, items: updated });
+                                                                }}
+                                                                disabled={saleItem.quantity <= 1}
+                                                            >
+                                                                -
+                                                            </Button>
+                                                            <Input
+                                                                type="number"
+                                                                min="1"
+                                                                max={saleItem.maxQuantity}
+                                                                value={saleItem.quantity}
+                                                                onChange={(e) => {
+                                                                    const val = Math.min(Math.max(1, parseInt(e.target.value) || 1), saleItem.maxQuantity);
+                                                                    const updated = [...saleForm.items];
+                                                                    updated[idx] = { ...updated[idx], quantity: val };
+                                                                    setSaleForm({ ...saleForm, items: updated });
+                                                                }}
+                                                                className="h-7 w-14 text-center px-1"
+                                                            />
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-7 w-7 p-0"
+                                                                onClick={() => {
+                                                                    if (saleItem.quantity >= saleItem.maxQuantity) return;
+                                                                    const updated = [...saleForm.items];
+                                                                    updated[idx] = { ...updated[idx], quantity: updated[idx].quantity + 1 };
+                                                                    setSaleForm({ ...saleForm, items: updated });
+                                                                }}
+                                                                disabled={saleItem.quantity >= saleItem.maxQuantity}
+                                                            >
+                                                                +
+                                                            </Button>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-mono">₹{saleItem.unitPrice.toFixed(2)}</TableCell>
+                                                    <TableCell className="text-right font-mono font-medium">
+                                                        ₹{(saleItem.unitPrice * saleItem.quantity).toFixed(2)}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
+                                                            onClick={() => {
+                                                                setSaleForm({
+                                                                    ...saleForm,
+                                                                    items: saleForm.items.filter((_, i) => i !== idx)
+                                                                });
+                                                            }}
+                                                        >
+                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+
+                                    {/* Total */}
+                                    <div className="flex items-center justify-between p-3 bg-muted/30 border-t">
+                                        <span className="font-semibold">Total Amount</span>
+                                        <span className="text-lg font-bold">
+                                            ₹{saleForm.items.reduce((sum, si) => sum + (si.unitPrice * si.quantity), 0).toFixed(2)}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {saleForm.items.length === 0 && (
+                                <div className="text-center py-8 text-muted-foreground border rounded-lg border-dashed">
+                                    <ShoppingCart className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                                    <p className="text-sm">No items added yet. Select items from the dropdown above.</p>
+                                </div>
+                            )}
+                        </div>
+
+                        <Separator />
+
+                        {/* Payment Method */}
+                        <div className="space-y-2">
+                            <Label>Payment Method</Label>
+                            <Select
+                                value={saleForm.paymentMethod}
+                                onValueChange={(value) => setSaleForm({ ...saleForm, paymentMethod: value })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="CASH">Cash</SelectItem>
+                                    <SelectItem value="ONLINE">Online</SelectItem>
+                                    <SelectItem value="UPI">UPI</SelectItem>
+                                    <SelectItem value="CARD">Card</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Submit */}
+                        <Button
+                            onClick={handleCreateSale}
+                            className="w-full"
+                            disabled={isCreatingSale || !saleForm.buyerName || saleForm.items.length === 0}
+                        >
+                            {isCreatingSale ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Recording Sale...
+                                </>
+                            ) : (
+                                <>
+                                    <Receipt className="h-4 w-4 mr-2" />
+                                    Record Sale — ₹{saleForm.items.reduce((sum, si) => sum + (si.unitPrice * si.quantity), 0).toFixed(2)}
+                                </>
+                            )}
                         </Button>
                     </div>
                 </DialogContent>
