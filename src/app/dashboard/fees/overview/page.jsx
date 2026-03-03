@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import {
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
+  BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
@@ -239,146 +239,54 @@ export default function AdminFeeDashboard() {
         </CardContent>
       </Card>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-none">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between mb-2">
-              <DollarSign className="w-8 h-8 opacity-80" />
-              <span className="text-2xl font-bold">{summary?.collectionPercentage}%</span>
-            </div>
-            <h3 className="text-sm font-medium opacity-90">Total Fees Expected</h3>
-            <p className="text-2xl font-bold mt-1">{formatCurrency(summary?.totalExpected)}</p>
-          </CardContent>
-        </Card>
+      {/* Stats Cards + Collection Trend Chart (like attendance dashboard) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Left: Stats Cards in 2x4 grid */}
+        <div className="lg:col-span-1 grid grid-cols-2 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Expected</CardTitle>
+              <DollarSign className="h-4 w-4 text-blue-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(summary?.totalExpected)}</div>
+              <p className="text-xs text-muted-foreground">{summary?.collectionPercentage}% collected</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Collected</CardTitle>
+              <CheckCircle className="h-4 w-4 text-green-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{formatCurrency(summary?.totalCollected)}</div>
+              <p className="text-xs text-muted-foreground">{statusCounts?.paid || 0} fully paid</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Fees Due</CardTitle>
+              <AlertCircle className="h-4 w-4 text-red-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">{formatCurrency(summary?.totalBalance)}</div>
+              <p className="text-xs text-muted-foreground">{statusCounts?.overdue || 0} overdue</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Discount</CardTitle>
+              <TrendingUp className="h-4 w-4 text-purple-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-600">{formatCurrency(summary?.totalDiscount)}</div>
+              <p className="text-xs text-muted-foreground">{statusCounts?.total || 0} students</p>
+            </CardContent>
+          </Card>
+        </div>
 
-        <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-none">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between mb-2">
-              <CheckCircle className="w-8 h-8 opacity-80" />
-              <TrendingUp className="w-6 h-6" />
-            </div>
-            <h3 className="text-sm font-medium opacity-90">Total Fees Collected</h3>
-            <p className="text-2xl font-bold mt-1">{formatCurrency(summary?.totalCollected)}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white border-none">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between mb-2">
-              <AlertCircle className="w-8 h-8 opacity-80" />
-              <span className="text-sm bg-white/20 px-2 py-1 rounded">
-                {statusCounts?.overdue || 0} Students
-              </span>
-            </div>
-            <h3 className="text-sm font-medium opacity-90">Total Fees Due</h3>
-            <p className="text-2xl font-bold mt-1">{formatCurrency(summary?.totalBalance)}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-none">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between mb-2">
-              <Users className="w-8 h-8 opacity-80" />
-              <span className="text-sm bg-white/20 px-2 py-1 rounded">
-                {statusCounts?.total || 0} Total
-              </span>
-            </div>
-            <h3 className="text-sm font-medium opacity-90">Discount Given</h3>
-            <p className="text-2xl font-bold mt-1">{formatCurrency(summary?.totalDiscount)}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Status Breakdown */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border-l-4 border-green-500">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Paid</p>
-                <p className="text-2xl font-bold text-green-600">{statusCounts?.paid || 0}</p>
-              </div>
-              <CheckCircle className="w-10 h-10 text-green-500 opacity-20" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-yellow-500">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Partial</p>
-                <p className="text-2xl font-bold text-yellow-600">{statusCounts?.partial || 0}</p>
-              </div>
-              <Clock className="w-10 h-10 text-yellow-500 opacity-20" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-blue-500">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Unpaid</p>
-                <p className="text-2xl font-bold text-blue-600">{statusCounts?.unpaid || 0}</p>
-              </div>
-              <XCircle className="w-10 h-10 text-blue-500 opacity-20" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-l-4 border-red-500">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Overdue</p>
-                <p className="text-2xl font-bold text-red-600">{statusCounts?.overdue || 0}</p>
-              </div>
-              <AlertCircle className="w-10 h-10 text-red-500 opacity-20" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Class-wise Collection Chart */}
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-base">Class-wise Collection</CardTitle>
-                <CardDescription>Collected vs Due by class</CardDescription>
-              </div>
-              <div className="flex items-center gap-3 text-xs">
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" /> Collected</span>
-                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400" /> Due</span>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[220px] w-full">
-              {classChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={classChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                    <XAxis dataKey="name" tick={{ fontSize: 10 }} className="text-muted-foreground" />
-                    <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" tickFormatter={(v) => `₹${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`} />
-                    <Tooltip content={<FeeTooltip />} />
-                    <Bar dataKey="collected" name="Collected" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="due" name="Due" fill="#f87171" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground text-sm">No class data</div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Monthly Collection Trend — Line Chart */}
-        <Card>
+        {/* Right: Collection Trend Line Chart */}
+        <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
@@ -406,19 +314,90 @@ export default function AdminFeeDashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="h-[220px] w-full">
+            <div className="h-[200px] w-full">
               {monthlyChartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={monthlyChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <AreaChart data={monthlyChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                    <defs>
+                      <linearGradient id="feeGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                     <XAxis dataKey="month" tick={{ fontSize: 11 }} className="text-muted-foreground" />
                     <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" tickFormatter={(v) => `₹${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`} />
                     <Tooltip content={<FeeTooltip />} />
-                    <Line type="monotone" dataKey="amount" name="Collected" stroke="hsl(221, 83%, 53%)" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 6 }} />
-                  </LineChart>
+                    <Area type="monotone" dataKey="amount" name="Collected" stroke="#3b82f6" strokeWidth={2.5} fill="url(#feeGradient)" dot={{ r: 4, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 7, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }} />
+                  </AreaChart>
                 </ResponsiveContainer>
               ) : (
                 <div className="h-full flex items-center justify-center text-muted-foreground text-sm">No collection data for this range</div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Status Breakdown + Class-wise Chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Left: Status Cards */}
+        <div className="lg:col-span-1 grid grid-cols-2 gap-4">
+          <Card className="border-l-4 border-green-500">
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground">Paid</p>
+              <p className="text-2xl font-bold text-green-600">{statusCounts?.paid || 0}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-l-4 border-yellow-500">
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground">Partial</p>
+              <p className="text-2xl font-bold text-yellow-600">{statusCounts?.partial || 0}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-l-4 border-blue-500">
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground">Unpaid</p>
+              <p className="text-2xl font-bold text-blue-600">{statusCounts?.unpaid || 0}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-l-4 border-red-500">
+            <CardContent className="pt-6">
+              <p className="text-sm text-muted-foreground">Overdue</p>
+              <p className="text-2xl font-bold text-red-600">{statusCounts?.overdue || 0}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right: Class-wise Collection Chart */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Class-wise Collection</CardTitle>
+                <CardDescription>Collected vs Due by class</CardDescription>
+              </div>
+              <div className="flex items-center gap-3 text-xs">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" /> Collected</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400" /> Due</span>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[200px] w-full">
+              {classChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={classChartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} className="text-muted-foreground" />
+                    <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" tickFormatter={(v) => `₹${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`} />
+                    <Tooltip content={<FeeTooltip />} />
+                    <Bar dataKey="collected" name="Collected" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="due" name="Due" fill="#f87171" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground text-sm">No class data</div>
               )}
             </div>
           </CardContent>

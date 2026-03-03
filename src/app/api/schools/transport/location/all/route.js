@@ -20,7 +20,6 @@ export async function GET(req) {
         const vehicles = await prisma.vehicle.findMany({
             where: {
                 schoolId,
-                status: 'active',
                 ...(search && {
                     OR: [
                         { licensePlate: { contains: search, mode: 'insensitive' } },

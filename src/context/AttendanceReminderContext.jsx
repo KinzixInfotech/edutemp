@@ -159,6 +159,11 @@ export function AttendanceReminderProvider({ children }) {
             const res = await fetch(`/api/schools/${fullUser.schoolId}/attendance/mark?userId=${fullUser.id}`);
 
             if (!res.ok) {
+                // 404 means attendance config not set up yet — not an error
+                if (res.status === 404) {
+                    hasFetched.current = true;
+                    return null;
+                }
                 throw new Error('Failed to fetch attendance data');
             }
 
