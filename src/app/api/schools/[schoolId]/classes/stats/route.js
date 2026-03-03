@@ -26,6 +26,32 @@ export async function GET(req, props) {
                 where: { schoolId, isAlumni: false }
             });
 
+            // Sections without class teacher
+            const sectionsWithoutTeacher = await prisma.section.count({
+                where: { schoolId, teachingStaffUserId: null }
+            });
+
+            // Empty sections (0 students)
+            const sectionsWithStudents = await prisma.section.findMany({
+                where: { schoolId },
+                select: {
+                    id: true,
+                    _count: { select: { students: true } }
+                }
+            });
+            const emptySections = sectionsWithStudents.filter(s => s._count.students === 0).length;
+
+            // Total distinct teachers assigned to sections
+            const teachersAssigned = await prisma.section.findMany({
+                where: {
+                    schoolId,
+                    teachingStaffUserId: { not: null }
+                },
+                select: { teachingStaffUserId: true },
+                distinct: ['teachingStaffUserId']
+            });
+            const totalTeachersAssigned = teachersAssigned.length;
+
             // Get students per class breakdown
             const classesWithCounts = await prisma.class.findMany({
                 where: { schoolId },
@@ -64,6 +90,9 @@ export async function GET(req, props) {
                 totalSections,
                 totalStudents,
                 avgStudentsPerClass,
+                sectionsWithoutTeacher,
+                emptySections,
+                totalTeachersAssigned,
                 breakdown
             };
         }, 300); // Cache for 5 minutes

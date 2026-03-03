@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -10,7 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
     Plus,
     RefreshCw,
@@ -22,19 +23,22 @@ import {
     Eye,
     ChevronLeft,
     ChevronRight,
+    ChevronsLeft,
+    ChevronsRight,
     UserX,
     GraduationCap,
-    Mail,
-    Phone,
-    MapPin,
-    Calendar,
-    Briefcase
+    Briefcase,
+    Download,
+    AlertTriangle,
+    FileSpreadsheet,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { toast } from 'sonner';
+import { useDebounce } from '@/hooks/useDebounce';
+import * as XLSX from 'xlsx';
 
 export default function TeachingStaffPage() {
     const router = useRouter();
@@ -43,26 +47,35 @@ export default function TeachingStaffPage() {
     const queryClient = useQueryClient();
 
     const [selected, setSelected] = useState([]);
-    const [dialogData, setDialogData] = useState(null);
-    const [search, setSearch] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
     const [designationFilter, setDesignationFilter] = useState('ALL');
     const [statusFilter, setStatusFilter] = useState('ALL');
     const [sortBy, setSortBy] = useState('newest');
     const [page, setPage] = useState(1);
     const itemsPerPage = 10;
 
+    // Delete confirmation dialog state
+    const [deleteDialog, setDeleteDialog] = useState({ open: false, ids: [] });
+    const [confirmName, setConfirmName] = useState('');
+
+    // Debounce search
+    const debouncedSearch = useDebounce(searchQuery, 400);
+
     // Fetch teaching staff
     const { data: staffData = {}, isLoading, isFetching } = useQuery({
-        queryKey: ['teaching-staff', schoolId, page, search, designationFilter, statusFilter, sortBy],
+        queryKey: ['teaching-staff', schoolId, page, debouncedSearch, designationFilter, statusFilter, sortBy],
         queryFn: async () => {
             const res = await axios.get(`/api/schools/teaching-staff/${schoolId}`, {
-                params: { page, limit: itemsPerPage, search, designation: designationFilter, status: statusFilter, sortBy }
+                params: {
+                    page,
+                    limit: itemsPerPage,
+                    search: debouncedSearch || undefined,
+                    designation: designationFilter !== 'ALL' ? designationFilter : undefined,
+                    status: statusFilter !== 'ALL' ? statusFilter : undefined,
+                    sortBy,
+                },
             });
-            const data = res.data;
-            if (Array.isArray(data)) {
-                return { staff: data, total: data.length };
-            }
-            return { staff: data.staff || data, total: data.total || data.length };
+            return res.data;
         },
         enabled: !!schoolId,
         keepPreviousData: true,
@@ -71,31 +84,45 @@ export default function TeachingStaffPage() {
 
     const staff = staffData.staff || [];
     const total = staffData.total || 0;
-    const pageCount = Math.ceil(total / itemsPerPage);
+    const totalPages = staffData.totalPages || 1;
 
-    // Calculate stats
+    // Fetch all designations for filter (separate lightweight query)
+    const { data: allDesignations = [] } = useQuery({
+        queryKey: ['teaching-staff-designations', schoolId],
+        queryFn: async () => {
+            const res = await axios.get(`/api/schools/teaching-staff/${schoolId}`, {
+                params: { limit: 500, page: 1 },
+            });
+            const allStaff = res.data?.staff || [];
+            return [...new Set(allStaff.map(s => s.designation).filter(Boolean))];
+        },
+        enabled: !!schoolId,
+        staleTime: 60 * 1000,
+    });
+
+    // Stats from current response
     const activeCount = staff.filter(s => s.user?.status === 'ACTIVE').length;
     const uniqueDesignations = [...new Set(staff.map(s => s.designation).filter(Boolean))].length;
-
-    // Get unique designations for filter
-    const designations = [...new Set(staff.map(s => s.designation).filter(Boolean))];
 
     // Delete mutation
     const deleteMutation = useMutation({
         mutationFn: async (ids) => {
             const res = await axios.delete(`/api/schools/teaching-staff/${schoolId}`, {
-                data: { staffIds: ids }
+                data: { staffIds: ids },
             });
             return res.data;
         },
-        onSuccess: () => {
+        onSuccess: (data) => {
             queryClient.invalidateQueries(['teaching-staff', schoolId]);
-            toast.success('Staff members deleted successfully');
+            queryClient.invalidateQueries(['teaching-staff-designations', schoolId]);
+            toast.success(data.message || 'Staff members deleted successfully');
             setSelected([]);
+            setDeleteDialog({ open: false, ids: [] });
+            setConfirmName('');
         },
         onError: (error) => {
-            toast.error(error.response?.data?.message || 'Failed to delete staff');
-        }
+            toast.error(error.response?.data?.error || 'Failed to delete staff');
+        },
     });
 
     // Inactivate mutation
@@ -103,7 +130,7 @@ export default function TeachingStaffPage() {
         mutationFn: async (ids) => {
             const res = await axios.patch(`/api/schools/teaching-staff/${schoolId}/status`, {
                 staffIds: ids,
-                status: 'INACTIVE'
+                status: 'INACTIVE',
             });
             return res.data;
         },
@@ -114,17 +141,20 @@ export default function TeachingStaffPage() {
         },
         onError: (error) => {
             toast.error(error.response?.data?.message || 'Failed to inactivate staff');
-        }
+        },
     });
 
     const toggleSelect = (id) => {
         setSelected(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
     };
 
-    const handleDeleteSelected = () => {
-        if (window.confirm(`Delete ${selected.length} staff member(s)?`)) {
-            deleteMutation.mutate(selected);
-        }
+    const openDeleteDialog = (ids) => {
+        setDeleteDialog({ open: true, ids });
+        setConfirmName('');
+    };
+
+    const handleDeleteConfirm = () => {
+        deleteMutation.mutate(deleteDialog.ids);
     };
 
     const handleInactivateSelected = () => {
@@ -133,9 +163,103 @@ export default function TeachingStaffPage() {
         }
     };
 
-    const openDialog = (staffMember) => {
-        setDialogData(staffMember);
+    // Reset page when filters change
+    const handleSearchChange = (e) => {
+        setSearchQuery(e.target.value);
+        setPage(1);
     };
+
+    // Admin name for delete confirmation
+    const adminName = fullUser?.name || fullUser?.user?.name || '';
+    const isNameMatch = confirmName.trim().toLowerCase() === adminName.trim().toLowerCase();
+
+    // XLSX Export
+    const handleExportXLSX = useCallback(async () => {
+        try {
+            toast.loading('Generating report...', { id: 'xlsx-export' });
+
+            // Fetch all data for export
+            const res = await axios.get(`/api/schools/teaching-staff/${schoolId}`, {
+                params: {
+                    page: 1,
+                    limit: 500,
+                    search: debouncedSearch || undefined,
+                    designation: designationFilter !== 'ALL' ? designationFilter : undefined,
+                    status: statusFilter !== 'ALL' ? statusFilter : undefined,
+                    sortBy,
+                },
+            });
+
+            const exportData = (res.data?.staff || []).map((member, index) => ({
+                'S.No': index + 1,
+                'Employee ID': member.employeeId || 'N/A',
+                'Name': member.name || member.user?.name || '',
+                'Email': member.email || member.user?.email || '',
+                'Designation': member.designation || 'N/A',
+                'Phone': member.contactNumber || '',
+                'Gender': member.gender || '',
+                'Date of Birth': member.dob || '',
+                'Age': member.age || '',
+                'Blood Group': member.bloodGroup || '',
+                'Address': member.address || '',
+                'City': member.City || '',
+                'State': member.state || '',
+                'Status': member.user?.status || 'UNKNOWN',
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Teaching Staff');
+
+            // Auto-size columns
+            const colWidths = Object.keys(exportData[0] || {}).map(key => ({
+                wch: Math.max(key.length, ...exportData.map(row => String(row[key] || '').length)) + 2,
+            }));
+            ws['!cols'] = colWidths;
+
+            XLSX.writeFile(wb, `Teaching_Staff_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+            toast.success('Report downloaded successfully', { id: 'xlsx-export' });
+        } catch (error) {
+            console.error('Export error:', error);
+            toast.error('Failed to generate report', { id: 'xlsx-export' });
+        }
+    }, [schoolId, debouncedSearch, designationFilter, statusFilter, sortBy]);
+
+    // Pagination helpers
+    const getPageNumbers = () => {
+        const pages = [];
+        const maxVisible = 5;
+        let start = Math.max(1, page - Math.floor(maxVisible / 2));
+        let end = Math.min(totalPages, start + maxVisible - 1);
+        if (end - start + 1 < maxVisible) {
+            start = Math.max(1, end - maxVisible + 1);
+        }
+        for (let i = start; i <= end; i++) {
+            pages.push(i);
+        }
+        return pages;
+    };
+
+    // Skeleton rows
+    const SkeletonRow = () => (
+        <TableRow>
+            <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+            <TableCell>
+                <div className="flex items-center gap-3">
+                    <Skeleton className="h-9 w-9 rounded-full" />
+                    <div className="space-y-1.5">
+                        <Skeleton className="h-4 w-28" />
+                        <Skeleton className="h-3 w-20" />
+                    </div>
+                </div>
+            </TableCell>
+            <TableCell><Skeleton className="h-4 w-36" /></TableCell>
+            <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
+            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+            <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+            <TableCell className="text-right"><Skeleton className="h-8 w-16 ml-auto" /></TableCell>
+        </TableRow>
+    );
 
     if (!schoolId) {
         return (
@@ -158,12 +282,18 @@ export default function TeachingStaffPage() {
                         Manage your teaching staff members
                     </p>
                 </div>
-                <Link href={`/dashboard/schools/${schoolId}/profiles/teacher/new`}>
-                    <Button className="w-full sm:w-auto dark:text-white" size="sm">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Teacher
+                <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={handleExportXLSX} disabled={isLoading || total === 0}>
+                        <FileSpreadsheet className="mr-2 h-4 w-4" />
+                        Export XLSX
                     </Button>
-                </Link>
+                    <Link href={`/dashboard/schools/${schoolId}/profiles/teacher/new`}>
+                        <Button className="w-full sm:w-auto dark:text-white" size="sm">
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add Teacher
+                        </Button>
+                    </Link>
+                </div>
             </div>
 
             {/* Stats Cards */}
@@ -210,13 +340,10 @@ export default function TeachingStaffPage() {
                         <div className="relative lg:col-span-2">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
-                                placeholder="Search by name or email..."
+                                placeholder="Search by name, email, or ID..."
                                 className="pl-9 text-sm bg-muted"
-                                value={search}
-                                onChange={(e) => {
-                                    setSearch(e.target.value);
-                                    setPage(1);
-                                }}
+                                value={searchQuery}
+                                onChange={handleSearchChange}
                             />
                         </div>
 
@@ -230,7 +357,7 @@ export default function TeachingStaffPage() {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="ALL">All Designations</SelectItem>
-                                {designations.map(d => (
+                                {allDesignations.map(d => (
                                     <SelectItem key={d} value={d}>{d}</SelectItem>
                                 ))}
                             </SelectContent>
@@ -293,7 +420,7 @@ export default function TeachingStaffPage() {
                                 <Button
                                     variant="destructive"
                                     size="sm"
-                                    onClick={handleDeleteSelected}
+                                    onClick={() => openDeleteDialog(selected)}
                                     disabled={deleteMutation.isPending}
                                 >
                                     {deleteMutation.isPending ? (
@@ -323,9 +450,9 @@ export default function TeachingStaffPage() {
             )}
 
             {/* Staff Table */}
-            <Card>
+            <div className="border rounded-2xl bg-white dark:bg-muted/30">
                 <div className="overflow-x-auto">
-                    <Table className="min-w-[800px]">
+                    <Table>
                         <TableHeader className="bg-muted sticky top-0 z-10">
                             <TableRow>
                                 <TableHead className="w-12">
@@ -346,28 +473,25 @@ export default function TeachingStaffPage() {
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
-                                <TableRow>
-                                    <TableCell colSpan={7} className="text-center py-12">
-                                        <Loader2 className="animate-spin w-6 h-6 mx-auto text-muted-foreground mb-2" />
-                                        <p className="text-sm text-muted-foreground">Loading teachers...</p>
-                                    </TableCell>
-                                </TableRow>
+                                Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
                             ) : staff.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={7} className="text-center py-12">
                                         <GraduationCap className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
                                         <h3 className="text-lg font-semibold mb-2">No teachers found</h3>
                                         <p className="text-sm text-muted-foreground mb-4">
-                                            {search || designationFilter !== 'ALL' || statusFilter !== 'ALL'
-                                                ? 'Try adjusting your filters'
+                                            {searchQuery || designationFilter !== 'ALL' || statusFilter !== 'ALL'
+                                                ? 'Try adjusting your search or filters'
                                                 : 'Add your first teacher to get started'}
                                         </p>
-                                        <Link href={`/dashboard/schools/${schoolId}/profiles/teacher/new`}>
-                                            <Button size="sm">
-                                                <Plus className="mr-2 h-4 w-4" />
-                                                Add Teacher
-                                            </Button>
-                                        </Link>
+                                        {!searchQuery && designationFilter === 'ALL' && statusFilter === 'ALL' && (
+                                            <Link href={`/dashboard/schools/${schoolId}/profiles/teacher/new`}>
+                                                <Button size="sm">
+                                                    <Plus className="mr-2 h-4 w-4" />
+                                                    Add Teacher
+                                                </Button>
+                                            </Link>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             ) : (
@@ -411,7 +535,7 @@ export default function TeachingStaffPage() {
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-sm">
-                                            {member.contactNumber || member.phone || '-'}
+                                            {member.contactNumber || '-'}
                                         </TableCell>
                                         <TableCell>
                                             <Badge
@@ -427,14 +551,22 @@ export default function TeachingStaffPage() {
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => openDialog(member)}
-                                            >
-                                                <Eye className="mr-1.5 h-3.5 w-3.5" />
-                                                View
-                                            </Button>
+                                            <div className="flex items-center justify-end gap-1">
+                                                <Link href={`/dashboard/schools/${schoolId}/staff/${member.userId}`}>
+                                                    <Button variant="outline" size="sm">
+                                                        <Eye className="mr-1.5 h-3.5 w-3.5" />
+                                                        View
+                                                    </Button>
+                                                </Link>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="text-destructive hover:text-destructive"
+                                                    onClick={() => openDeleteDialog([member.userId])}
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))
@@ -444,169 +576,129 @@ export default function TeachingStaffPage() {
                 </div>
 
                 {/* Pagination */}
-                {pageCount > 1 && (
+                {totalPages > 1 && (
                     <div className="border-t p-4">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <p className="text-sm text-muted-foreground">
-                                Showing {((page - 1) * itemsPerPage) + 1} to {Math.min(page * itemsPerPage, total)} of {total} teachers
+                                Showing {((page - 1) * itemsPerPage) + 1} – {Math.min(page * itemsPerPage, total)} of {total} teachers
                             </p>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1">
                                 <Button
                                     variant="outline"
-                                    size="sm"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => setPage(1)}
+                                    disabled={page === 1 || isFetching}
+                                >
+                                    <ChevronsLeft className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-8 w-8"
                                     onClick={() => setPage(p => Math.max(p - 1, 1))}
                                     disabled={page === 1 || isFetching}
                                 >
-                                    <ChevronLeft className="h-4 w-4 mr-1" />
-                                    Previous
+                                    <ChevronLeft className="h-4 w-4" />
                                 </Button>
-                                <div className="flex items-center gap-1">
-                                    <span className="text-sm font-medium px-2">
-                                        Page {page} of {pageCount}
-                                    </span>
-                                </div>
+                                {getPageNumbers().map(num => (
+                                    <Button
+                                        key={num}
+                                        variant={page === num ? "default" : "outline"}
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setPage(num)}
+                                        disabled={isFetching}
+                                    >
+                                        {num}
+                                    </Button>
+                                ))}
                                 <Button
                                     variant="outline"
-                                    size="sm"
-                                    onClick={() => setPage(p => Math.min(p + 1, pageCount))}
-                                    disabled={page === pageCount || isFetching}
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => setPage(p => Math.min(p + 1, totalPages))}
+                                    disabled={page === totalPages || isFetching}
                                 >
-                                    Next
-                                    <ChevronRight className="h-4 w-4 ml-1" />
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => setPage(totalPages)}
+                                    disabled={page === totalPages || isFetching}
+                                >
+                                    <ChevronsRight className="h-4 w-4" />
                                 </Button>
                             </div>
                         </div>
                     </div>
                 )}
-            </Card>
+            </div>
 
-            {/* Teacher Details Dialog */}
-            {dialogData && (
-                <Dialog open={!!dialogData} onOpenChange={() => setDialogData(null)}>
-                    <DialogContent className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        <DialogHeader>
-                            <div className="flex items-start gap-4 pb-4 border-b">
-                                <Avatar className="w-16 h-16">
-                                    <AvatarImage src={dialogData.user?.profilePicture} />
-                                    <AvatarFallback className="text-lg">
-                                        {dialogData.name?.[0]?.toUpperCase() || dialogData.user?.name?.[0]?.toUpperCase() || "T"}
-                                    </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1 min-w-0">
-                                    <DialogTitle className="text-xl font-bold mb-1">
-                                        {dialogData.name || dialogData.user?.name}
-                                    </DialogTitle>
-                                    <p className="text-sm text-muted-foreground mb-2">
-                                        {dialogData.email || dialogData.user?.email || 'No email'}
-                                    </p>
-                                    <div className="flex flex-wrap gap-2">
-                                        <Badge variant="outline">
-                                            {dialogData.designation || 'N/A'}
-                                        </Badge>
-                                        <Badge variant="outline">
-                                            ID: {dialogData.employeeId || 'N/A'}
-                                        </Badge>
-                                        <Badge
-                                            variant="outline"
-                                            className={cn(
-                                                dialogData.user?.status === "ACTIVE"
-                                                    ? "bg-green-100 text-green-700 border-green-200"
-                                                    : "bg-red-100 text-red-700 border-red-200"
-                                            )}
-                                        >
-                                            {dialogData.user?.status}
-                                        </Badge>
-                                    </div>
-                                </div>
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={deleteDialog.open} onOpenChange={(open) => {
+                if (!open) {
+                    setDeleteDialog({ open: false, ids: [] });
+                    setConfirmName('');
+                }
+            }}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-destructive">
+                            <AlertTriangle className="h-5 w-5" />
+                            Delete Staff Member{deleteDialog.ids.length > 1 ? 's' : ''}
+                        </DialogTitle>
+                        <DialogDescription className="pt-2 space-y-3">
+                            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-sm text-destructive">
+                                <strong>⚠ This action is irreversible.</strong> All associated data will be permanently removed,
+                                including class assignments, timetable entries, attendance records, exam assignments, and payroll profiles.
                             </div>
-                        </DialogHeader>
-
-                        <div className="space-y-6 mt-4">
-                            {/* Basic Information */}
-                            <div>
-                                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                                    <Users className="h-4 w-4" />
-                                    Basic Information
-                                </h3>
-                                <div className="grid grid-cols-2 gap-4 text-sm">
-                                    <div>
-                                        <p className="text-muted-foreground">Gender</p>
-                                        <p className="font-medium">{dialogData.gender || dialogData.user?.gender || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-muted-foreground">Date of Birth</p>
-                                        <p className="font-medium">{dialogData.dob || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-muted-foreground">Blood Group</p>
-                                        <p className="font-medium">{dialogData.bloodGroup || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-muted-foreground">Age</p>
-                                        <p className="font-medium">{dialogData.age || 'N/A'}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Contact Information */}
-                            <div>
-                                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                                    <Phone className="h-4 w-4" />
-                                    Contact Information
-                                </h3>
-                                <div className="grid grid-cols-2 gap-4 text-sm">
-                                    <div>
-                                        <p className="text-muted-foreground">Phone</p>
-                                        <p className="font-medium">{dialogData.contactNumber || dialogData.phone || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-muted-foreground">Email</p>
-                                        <p className="font-medium">{dialogData.email || dialogData.user?.email || 'N/A'}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Address Information */}
-                            <div>
-                                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                                    <MapPin className="h-4 w-4" />
-                                    Address
-                                </h3>
-                                <div className="grid grid-cols-2 gap-4 text-sm">
-                                    <div className="col-span-2">
-                                        <p className="text-muted-foreground">Address</p>
-                                        <p className="font-medium">{dialogData.address || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-muted-foreground">City</p>
-                                        <p className="font-medium">{dialogData.City || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-muted-foreground">State</p>
-                                        <p className="font-medium">{dialogData.state || 'N/A'}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="flex gap-3 pt-4 border-t">
-                                <Link href={`/dashboard/schools/${schoolId}/profiles/teacher/${dialogData.userId}`} className="flex-1">
-                                    <Button className="w-full" variant="outline">
-                                        <Eye className="mr-2 h-4 w-4" />
-                                        View Full Profile
-                                    </Button>
-                                </Link>
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setDialogData(null)}
-                                >
-                                    Close
-                                </Button>
-                            </div>
+                            <p className="text-sm text-muted-foreground">
+                                You are about to delete <strong>{deleteDialog.ids.length}</strong> staff member{deleteDialog.ids.length > 1 ? 's' : ''}.
+                                To confirm, type your name below:
+                            </p>
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3 py-2">
+                        <div className="text-xs text-muted-foreground">
+                            Type <span className="font-semibold text-foreground">&quot;{adminName}&quot;</span> to confirm
                         </div>
-                    </DialogContent>
-                </Dialog>
-            )}
+                        <Input
+                            placeholder="Type your name..."
+                            value={confirmName}
+                            onChange={(e) => setConfirmName(e.target.value)}
+                            className={cn(
+                                isNameMatch && confirmName ? "border-green-500 focus-visible:ring-green-500" : ""
+                            )}
+                        />
+                    </div>
+                    <DialogFooter className="gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setDeleteDialog({ open: false, ids: [] });
+                                setConfirmName('');
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleDeleteConfirm}
+                            disabled={!isNameMatch || deleteMutation.isPending}
+                        >
+                            {deleteMutation.isPending ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <Trash2 className="mr-2 h-4 w-4" />
+                            )}
+                            Delete Permanently
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

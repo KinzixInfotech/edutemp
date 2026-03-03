@@ -6,7 +6,7 @@ import { remember, generateKey, invalidatePattern } from "@/lib/cache"
 // 👉 Create new class and automatically connect to active academic year
 export async function POST(req) {
   try {
-    const { name, schoolId, capacity } = await req.json()
+    const { name, schoolId, capacity, sections: sectionCount } = await req.json()
 
     if (!name || !schoolId) {
       return NextResponse.json({ error: "Name and schoolId are required" }, { status: 400 })
@@ -20,54 +20,123 @@ export async function POST(req) {
       },
     })
 
-    const newClass = await prisma.class.create({
-      data: {
-        className: name,
-        schoolId,
-        // capacity,
-        // Automatically connect to the active academic year if it exists
-        ...(activeAcademicYear && {
-          academicYearId: activeAcademicYear.id,
-        }),
-      },
+    // Use transaction to create class + sections in one go
+    const result = await prisma.$transaction(async (tx) => {
+      const newClass = await tx.class.create({
+        data: {
+          className: name,
+          schoolId,
+          capacity: capacity ? parseInt(capacity, 10) : null,
+          ...(activeAcademicYear && {
+            academicYearId: activeAcademicYear.id,
+          }),
+        },
+      })
+
+      // Auto-generate sections if requested (1 → A, 2 → A,B, etc.)
+      const numSections = parseInt(sectionCount, 10) || 0
+      if (numSections > 0) {
+        const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+        const sectionData = []
+        for (let i = 0; i < Math.min(numSections, 26); i++) {
+          sectionData.push({
+            name: letters[i],
+            classId: newClass.id,
+            schoolId,
+          })
+        }
+        await tx.section.createMany({ data: sectionData })
+      }
+
+      // Return with sections included
+      return tx.class.findUnique({
+        where: { id: newClass.id },
+        include: {
+          sections: { orderBy: { name: 'asc' } },
+        },
+      })
     })
 
     // Invalidate classes cache
     await invalidatePattern(`classes:${schoolId}*`)
 
-    return NextResponse.json(newClass, { status: 201 })
+    return NextResponse.json(result, { status: 201 })
   } catch (error) {
     console.error(error)
     return NextResponse.json({ error: "Failed to create class" }, { status: 500 })
   }
 }
 
-//Fetch classes with optional academicYearId filter and conditional AcademicYear inclusion
+// Fetch classes with server-side search, filters, sort, and pagination
 export async function GET(req, props) {
   const params = await props.params;
   try {
     const { schoolId } = params
     const { searchParams } = new URL(req.url)
-    const academicYearId = searchParams.get("academicYearId") // Optional filter by academicYearId
-    const getAcademicYear = searchParams.get("getAcademicYear") === "true" // Check if getAcademicYear=true
+    const academicYearId = searchParams.get("academicYearId")
+    const getAcademicYear = searchParams.get("getAcademicYear") === "true"
     const getStudent = searchParams.get("getStudent") === "true"
     const showStructure = searchParams.get("showStructure") === "true"
+
+    // Server-side search & filter params
+    const search = searchParams.get("search")?.trim() || ""
+    const teacherFilter = searchParams.get("teacherFilter") || "ALL" // ALL | ASSIGNED | UNASSIGNED
+    const capacityFilter = searchParams.get("capacityFilter") || "ALL" // ALL | OVER | EMPTY
+    const sort = searchParams.get("sort") || "name_asc" // name_asc | name_desc
 
     if (!schoolId) {
       return errorResponse("schoolId is required", 400)
     }
 
     const { page, limit, skip } = getPagination(req);
-    const cacheKey = generateKey('classes', { schoolId, academicYearId, getAcademicYear, getStudent, showStructure, page, limit });
+    const cacheKey = generateKey('classes', {
+      schoolId, academicYearId, getAcademicYear, getStudent, showStructure,
+      page, limit, search, teacherFilter, capacityFilter, sort
+    });
 
     const result = await remember(cacheKey, async () => {
-      // If limit is -1, fetch all (useful for dropdowns)
       const isAll = limit === -1;
 
+      // Build where clause with optional search
       const where = {
         schoolId,
         ...(academicYearId && { academicYearId }),
       };
+
+      // If searching, match against class name, section name, or teacher name
+      if (search) {
+        where.OR = [
+          { className: { contains: search, mode: "insensitive" } },
+          {
+            sections: {
+              some: {
+                OR: [
+                  { name: { contains: search, mode: "insensitive" } },
+                  { teachingStaff: { name: { contains: search, mode: "insensitive" } } },
+                ]
+              }
+            }
+          },
+        ]
+      }
+
+      // Teacher filter: only classes that have at least one section matching the criteria
+      if (teacherFilter === "ASSIGNED") {
+        where.sections = {
+          ...where.sections,
+          some: { ...where.sections?.some, teachingStaffUserId: { not: null } },
+        }
+      } else if (teacherFilter === "UNASSIGNED") {
+        where.sections = {
+          ...where.sections,
+          some: { ...where.sections?.some, teachingStaffUserId: null },
+        }
+      }
+
+      // Determine sort order
+      const orderBy = sort === "name_desc"
+        ? { className: "desc" }
+        : { className: "asc" }
 
       const include = {
         FeeStructure: {
@@ -88,13 +157,14 @@ export async function GET(req, props) {
             subjectTeachers: {
               include: { teacher: true, subject: true },
             },
-            teachingStaff: true, // properties: id, name, etc.
+            teachingStaff: true,
             _count: {
               select: {
                 students: true
               }
             }
           },
+          orderBy: { name: "asc" },
         },
         ...(getAcademicYear && { AcademicYear: true }),
         ...(getStudent
@@ -107,21 +177,42 @@ export async function GET(req, props) {
       let total;
 
       if (isAll) {
-        classes = await prisma.class.findMany({ where, include });
+        classes = await prisma.class.findMany({ where, include, orderBy });
         total = classes.length;
       } else {
-        const paged = await paginate(prisma.class, { where, include }, page, limit);
-        classes = paged.data;
-        total = paged.meta.total;
+        [classes, total] = await Promise.all([
+          prisma.class.findMany({
+            where,
+            include,
+            orderBy,
+            skip,
+            take: limit,
+          }),
+          prisma.class.count({ where }),
+        ]);
       }
 
-      //post process the count of fee structure to show the user that fee is assigned or not
+      // Post-process: capacity filter (can't be done in Prisma where easily)
+      if (capacityFilter === "OVER") {
+        classes = classes.filter(cls => {
+          if (!cls.capacity) return false
+          return cls.sections?.some(sec => (sec._count?.students || 0) > cls.capacity)
+        })
+        if (!isAll) total = classes.length // adjust total for capacity-filtered results
+      } else if (capacityFilter === "EMPTY") {
+        classes = classes.filter(cls => {
+          return cls.sections?.some(sec => (sec._count?.students || 0) === 0)
+        })
+        if (!isAll) total = classes.length
+      }
+
+      // Post-process: fee structure assignment check
       const processedClasses = await Promise.all(
         classes.map(async (cls) => {
           const assigned = await prisma.class.findFirst({
             where: {
               id: cls.id,
-              academicYearId, //  match the year
+              academicYearId,
             },
             include: {
               FeeStructure: true,
@@ -143,15 +234,17 @@ export async function GET(req, props) {
           total,
           page,
           limit,
-          totalPages: Math.ceil(total / (limit === -1 ? total : limit)),
+          totalPages: Math.ceil(total / (limit || 1)),
         }
       };
 
-    }, 300); // Cache for 5 minutes
+    }, 300);
 
-    // Return data array for backward compatibility
-    // If isAll, result is array; otherwise result.data
-    return apiResponse(Array.isArray(result) ? result : result.data);
+    // Return with meta for paginated requests, plain array for isAll
+    if (Array.isArray(result)) {
+      return apiResponse(result);
+    }
+    return NextResponse.json(result);
   } catch (error) {
     console.error("[CLASS_GET_ERROR]", error)
     return errorResponse("Failed to fetch classes")

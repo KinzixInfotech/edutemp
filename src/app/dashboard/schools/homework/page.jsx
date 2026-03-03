@@ -1,5 +1,5 @@
 'use client';
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -19,12 +19,23 @@ import Link from "next/link";
 import {
     Loader2, Upload, FileText, Trash2, Eye, BookOpen,
     TrendingUp, Calendar, Filter, CheckCircle2, AlertCircle,
-    Clock, Users, BarChart3, X
+    Clock, Users, BarChart3, X, RefreshCw, Search,
+    ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
 const PdfUploadButton = dynamic(() => import('@/components/upload'), { ssr: false });
+
+// Debounce hook
+function useDebounce(value, delay = 400) {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedValue(value), delay);
+        return () => clearTimeout(timer);
+    }, [value, delay]);
+    return debouncedValue;
+}
 
 export default function HomeworkManagement() {
     const { fullUser } = useAuth();
@@ -45,7 +56,17 @@ export default function HomeworkManagement() {
     const [uploading, setUploading] = useState(false);
     const [resetKey, setResetKey] = useState(0);
     const [filterClass, setFilterClass] = useState('');
-    const [filterModalVisible, setFilterModalVisible] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const pageSize = 10;
+
+    // Debounced search value — waits 400ms after user stops typing
+    const debouncedSearch = useDebounce(searchQuery, 400);
+
+    // Reset to page 1 when search or filter changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [debouncedSearch, filterClass]);
 
     // Fetch classes
     const { data: classes = [] } = useQuery({
@@ -88,20 +109,24 @@ export default function HomeworkManagement() {
         enabled: !!fullUser?.schoolId,
     });
 
-    // Fetch homework
-    const { data: homeworkData, isLoading: loading } = useQuery({
-        queryKey: ['homework', fullUser?.schoolId, filterClass],
+    // Fetch homework — server-side search + pagination
+    const { data: homeworkData, isLoading: loading, isFetching } = useQuery({
+        queryKey: ['homework', fullUser?.schoolId, filterClass, debouncedSearch, currentPage],
         queryFn: async () => {
-            let url = `/api/schools/homework?schoolId=${fullUser?.schoolId}`;
-            if (filterClass) url += `&classId=${filterClass}`;
+            let url = `/api/schools/homework?schoolId=${fullUser?.schoolId}&page=${currentPage}&limit=${pageSize}`;
+            if (filterClass && filterClass !== 'all') url += `&classId=${filterClass}`;
+            if (debouncedSearch) url += `&search=${encodeURIComponent(debouncedSearch)}`;
 
             const res = await axios.get(url);
             return res.data;
         },
         enabled: !!fullUser?.schoolId,
+        keepPreviousData: true,
     });
 
     const homework = homeworkData?.homework || [];
+    const totalPages = homeworkData?.totalPages || 1;
+    const totalItems = homeworkData?.total || 0;
 
     const handleChange = (name, value) => {
         setFormData({ ...formData, [name]: value });
@@ -203,7 +228,7 @@ export default function HomeworkManagement() {
     const isOverdue = (dueDate) => new Date(dueDate) < new Date();
 
     return (
-        <div className="min-h-screen bg-background p-4 md:p-6 space-y-6">
+        <div className="min-h-screen p-4 md:p-6 space-y-6">
             {/* Header */}
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
@@ -462,10 +487,19 @@ export default function HomeworkManagement() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="flex flex-col sm:flex-row gap-4"
+                className="flex flex-col sm:flex-row gap-4 items-center"
             >
+                <div className="relative w-full sm:w-[300px]">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Search by title, class, subject..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10 bg-white dark:bg-muted"
+                    />
+                </div>
                 <Select value={filterClass} onValueChange={setFilterClass}>
-                    <SelectTrigger className="w-full sm:w-[250px]">
+                    <SelectTrigger className="w-full sm:w-[250px] bg-white dark:bg-muted">
                         <SelectValue placeholder="Filter by class" />
                     </SelectTrigger>
                     <SelectContent>
@@ -477,6 +511,17 @@ export default function HomeworkManagement() {
                         ))}
                     </SelectContent>
                 </Select>
+                <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                        queryClient.invalidateQueries(['homework']);
+                        queryClient.invalidateQueries(['homework-stats']);
+                    }}
+                    title="Refresh"
+                >
+                    <RefreshCw className={`h-4 w-4 ${(loading || isFetching) ? 'animate-spin' : ''}`} />
+                </Button>
             </motion.div>
 
             {/* Homework Table */}
@@ -490,6 +535,7 @@ export default function HomeworkManagement() {
                         <CardTitle>Homework Library</CardTitle>
                         <CardDescription>
                             View and manage all assigned homework
+                            {totalItems > 0 && ` · ${totalItems} total`}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -532,7 +578,9 @@ export default function HomeworkManagement() {
                                                     transition={{ delay: index * 0.05 }}
                                                     className="group hover:bg-muted/50 transition-colors"
                                                 >
-                                                    <TableCell className="font-medium">{index + 1}</TableCell>
+                                                    <TableCell className="font-medium">
+                                                        {(currentPage - 1) * pageSize + index + 1}
+                                                    </TableCell>
                                                     <TableCell>
                                                         <div className="flex items-center gap-2">
                                                             <BookOpen className="h-4 w-4 text-primary" />
@@ -628,6 +676,78 @@ export default function HomeworkManagement() {
                                 </TableBody>
                             </Table>
                         </div>
+
+                        {/* Pagination Controls */}
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-between pt-4">
+                                <p className="text-sm text-muted-foreground">
+                                    Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, totalItems)} of {totalItems}
+                                </p>
+                                <div className="flex items-center gap-1">
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setCurrentPage(1)}
+                                        disabled={currentPage === 1}
+                                    >
+                                        <ChevronsLeft className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                        disabled={currentPage === 1}
+                                    >
+                                        <ChevronLeft className="h-4 w-4" />
+                                    </Button>
+                                    <div className="flex items-center gap-1 mx-2">
+                                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                            let pageNum;
+                                            if (totalPages <= 5) {
+                                                pageNum = i + 1;
+                                            } else if (currentPage <= 3) {
+                                                pageNum = i + 1;
+                                            } else if (currentPage >= totalPages - 2) {
+                                                pageNum = totalPages - 4 + i;
+                                            } else {
+                                                pageNum = currentPage - 2 + i;
+                                            }
+                                            return (
+                                                <Button
+                                                    key={pageNum}
+                                                    variant={currentPage === pageNum ? "default" : "outline"}
+                                                    size="icon"
+                                                    className="h-8 w-8"
+                                                    onClick={() => setCurrentPage(pageNum)}
+                                                >
+                                                    {pageNum}
+                                                </Button>
+                                            );
+                                        })}
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                        disabled={currentPage === totalPages}
+                                    >
+                                        <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setCurrentPage(totalPages)}
+                                        disabled={currentPage === totalPages}
+                                    >
+                                        <ChevronsRight className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </motion.div>

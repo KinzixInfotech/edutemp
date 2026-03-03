@@ -1,5 +1,5 @@
 'use client';
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-// import { useToast } from "@/components/ui/use-toast";
 import { useUploadThing } from "@/app/components/utils/uploadThing";
 import { useAuth } from "@/context/AuthContext";
 import dynamic from "next/dynamic";
@@ -19,17 +18,27 @@ import Link from "next/link";
 import {
     Loader2, Upload, FileText, Trash2, Eye, BookOpen,
     TrendingUp, School, Calendar, Download, Filter,
-    BarChart3, Users, CheckCircle2, AlertCircle
+    BarChart3, Users, CheckCircle2, AlertCircle, RefreshCw, Search,
+    ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
 const PdfUploadButton = dynamic(() => import('@/components/upload'), { ssr: false });
 
+// Debounce hook
+function useDebounce(value, delay = 400) {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedValue(value), delay);
+        return () => clearTimeout(timer);
+    }, [value, delay]);
+    return debouncedValue;
+}
+
 export default function SyllabusManagement() {
     const { startUpload } = useUploadThing("syllabus");
     const { fullUser } = useAuth();
-    // const { toast } = useToast();
     const queryClient = useQueryClient();
 
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -42,6 +51,17 @@ export default function SyllabusManagement() {
     const [uploading, setUploading] = useState(false);
     const [resetKey, setResetKey] = useState(0);
     const [filterClass, setFilterClass] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const pageSize = 10;
+
+    // Debounced search value — waits 400ms after user stops typing
+    const debouncedSearch = useDebounce(searchQuery, 400);
+
+    // Reset to page 1 when search or filter changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [debouncedSearch, filterClass]);
 
     // Fetch classes
     const { data: classes = [] } = useQuery({
@@ -73,20 +93,24 @@ export default function SyllabusManagement() {
         enabled: !!fullUser?.schoolId,
     });
 
-    // Fetch syllabi
-    const { data: syllabusData, isLoading: loading } = useQuery({
-        queryKey: ['syllabi', fullUser?.schoolId, filterClass],
+    // Fetch syllabi — server-side search + pagination
+    const { data: syllabusData, isLoading: loading, isFetching } = useQuery({
+        queryKey: ['syllabi', fullUser?.schoolId, filterClass, debouncedSearch, currentPage],
         queryFn: async () => {
-            let url = `/api/schools/syllabus?schoolId=${fullUser?.schoolId}`;
-            if (filterClass) url += `&classId=${filterClass}`;
+            let url = `/api/schools/syllabus?schoolId=${fullUser?.schoolId}&page=${currentPage}&limit=${pageSize}`;
+            if (filterClass && filterClass !== 'all') url += `&classId=${filterClass}`;
+            if (debouncedSearch) url += `&search=${encodeURIComponent(debouncedSearch)}`;
 
             const res = await axios.get(url);
             return res.data;
         },
         enabled: !!fullUser?.schoolId,
+        keepPreviousData: true,
     });
 
     const syllabi = syllabusData?.syllabi || [];
+    const totalPages = syllabusData?.totalPages || 1;
+    const totalItems = syllabusData?.total || 0;
 
     const handleChange = (name, value) => setFormData({ ...formData, [name]: value });
 
@@ -115,7 +139,6 @@ export default function SyllabusManagement() {
                 throw new Error('Upload failed - no response from server');
             }
 
-            // Check for various URL properties that uploadthing might return
             const firstResult = uploadRes[0];
             const fileUrl = firstResult.url || firstResult.ufsUrl || firstResult.serverData?.url || firstResult.fileUrl;
 
@@ -141,7 +164,6 @@ export default function SyllabusManagement() {
             toast.success("Success!", {
                 description: data.message || "Syllabus uploaded successfully",
             });
-
 
             setDialogOpen(false);
             setSelectedFile(null);
@@ -185,7 +207,7 @@ export default function SyllabusManagement() {
     };
 
     return (
-        <div className="min-h-screen bg-background p-4 md:p-6 space-y-6">
+        <div className="min-h-screen p-4 md:p-6 space-y-6">
             {/* Header */}
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
@@ -398,10 +420,19 @@ export default function SyllabusManagement() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="flex flex-col sm:flex-row gap-4"
+                className="flex flex-col sm:flex-row gap-4 items-center"
             >
+                <div className="relative w-full sm:w-[300px]">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Search by name, class..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10 bg-white dark:bg-muted"
+                    />
+                </div>
                 <Select value={filterClass} onValueChange={setFilterClass}>
-                    <SelectTrigger className="w-full sm:w-[250px]">
+                    <SelectTrigger className="w-full sm:w-[250px] bg-white dark:bg-muted">
                         <SelectValue placeholder="Filter by class" />
                     </SelectTrigger>
                     <SelectContent>
@@ -413,6 +444,17 @@ export default function SyllabusManagement() {
                         ))}
                     </SelectContent>
                 </Select>
+                <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                        queryClient.invalidateQueries(['syllabi']);
+                        queryClient.invalidateQueries(['syllabus-stats']);
+                    }}
+                    title="Refresh"
+                >
+                    <RefreshCw className={`h-4 w-4 ${(loading || isFetching) ? 'animate-spin' : ''}`} />
+                </Button>
             </motion.div>
 
             {/* Syllabi Table */}
@@ -426,6 +468,7 @@ export default function SyllabusManagement() {
                         <CardTitle>Syllabi Library</CardTitle>
                         <CardDescription>
                             View and manage all uploaded syllabi
+                            {totalItems > 0 && ` · ${totalItems} total`}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -466,10 +509,11 @@ export default function SyllabusManagement() {
                                                     transition={{ delay: index * 0.05 }}
                                                     className="group hover:bg-muted/50 transition-colors"
                                                 >
-                                                    <TableCell className="font-medium">{index + 1}</TableCell>
+                                                    <TableCell className="font-medium">
+                                                        {(currentPage - 1) * pageSize + index + 1}
+                                                    </TableCell>
                                                     <TableCell>
                                                         <div className="flex items-center gap-2">
-                                                            {/* <BookOpen className="h-4 w-4 text-primary" /> */}
                                                             <span className="font-medium">
                                                                 {syllabus?.filename || 'N/A'}
                                                             </span>
@@ -535,7 +579,7 @@ export default function SyllabusManagement() {
                                             ))
                                         ) : (
                                             <TableRow>
-                                                <TableCell colSpan={6} className="text-center py-12">
+                                                <TableCell colSpan={7} className="text-center py-12">
                                                     <div className="flex flex-col items-center gap-2">
                                                         <AlertCircle className="h-12 w-12 text-muted-foreground" />
                                                         <p className="text-muted-foreground">No syllabi found</p>
@@ -554,6 +598,78 @@ export default function SyllabusManagement() {
                                 </TableBody>
                             </Table>
                         </div>
+
+                        {/* Pagination Controls */}
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-between pt-4">
+                                <p className="text-sm text-muted-foreground">
+                                    Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, totalItems)} of {totalItems}
+                                </p>
+                                <div className="flex items-center gap-1">
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setCurrentPage(1)}
+                                        disabled={currentPage === 1}
+                                    >
+                                        <ChevronsLeft className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                        disabled={currentPage === 1}
+                                    >
+                                        <ChevronLeft className="h-4 w-4" />
+                                    </Button>
+                                    <div className="flex items-center gap-1 mx-2">
+                                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                            let pageNum;
+                                            if (totalPages <= 5) {
+                                                pageNum = i + 1;
+                                            } else if (currentPage <= 3) {
+                                                pageNum = i + 1;
+                                            } else if (currentPage >= totalPages - 2) {
+                                                pageNum = totalPages - 4 + i;
+                                            } else {
+                                                pageNum = currentPage - 2 + i;
+                                            }
+                                            return (
+                                                <Button
+                                                    key={pageNum}
+                                                    variant={currentPage === pageNum ? "default" : "outline"}
+                                                    size="icon"
+                                                    className="h-8 w-8"
+                                                    onClick={() => setCurrentPage(pageNum)}
+                                                >
+                                                    {pageNum}
+                                                </Button>
+                                            );
+                                        })}
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                        disabled={currentPage === totalPages}
+                                    >
+                                        <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setCurrentPage(totalPages)}
+                                        disabled={currentPage === totalPages}
+                                    >
+                                        <ChevronsRight className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </motion.div>

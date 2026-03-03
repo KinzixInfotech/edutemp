@@ -8,6 +8,9 @@ export async function GET(req) {
     const schoolId = searchParams.get("schoolId");
     const classId = searchParams.get("classId");
     const academicYearId = searchParams.get("academicYearId");
+    const search = searchParams.get("search");
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "10");
 
     if (!schoolId) {
         return NextResponse.json({ error: "schoolId is required" }, { status: 400 });
@@ -18,36 +21,54 @@ export async function GET(req) {
         if (classId) where.classId = parseInt(classId);
         if (academicYearId) where.academicYearId = academicYearId;
 
-        const syllabi = await prisma.syllabus.findMany({
-            where,
-            include: {
-                Class: {
-                    include: {
-                        sections: {
-                            select: {
-                                id: true,
-                                name: true,
+        // Server-side search by filename or class name
+        if (search) {
+            where.OR = [
+                { filename: { contains: search, mode: 'insensitive' } },
+                { Class: { className: { contains: search, mode: 'insensitive' } } },
+            ];
+        }
+
+        const skip = (page - 1) * limit;
+
+        const [syllabi, total] = await Promise.all([
+            prisma.syllabus.findMany({
+                where,
+                include: {
+                    Class: {
+                        include: {
+                            sections: {
+                                select: {
+                                    id: true,
+                                    name: true,
+                                }
                             }
                         }
-                    }
+                    },
+                    AcademicYear: {
+                        select: {
+                            id: true,
+                            name: true,
+                            isActive: true,
+                        }
+                    },
                 },
-                AcademicYear: {
-                    select: {
-                        id: true,
-                        name: true,
-                        isActive: true,
-                    }
+                orderBy: {
+                    uploadedAt: 'desc'
                 },
-            },
-            orderBy: {
-                uploadedAt: 'desc'
-            }
-        });
+                skip,
+                take: limit,
+            }),
+            prisma.syllabus.count({ where }),
+        ]);
 
         return NextResponse.json({
             success: true,
             syllabi,
-            total: syllabi.length
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
         });
     } catch (error) {
         console.error("Fetch syllabi error:", error);

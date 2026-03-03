@@ -11,6 +11,9 @@ export async function GET(req) {
     const teacherId = searchParams.get("teacherId");
     const studentId = searchParams.get("studentId");
     const isActive = searchParams.get("isActive");
+    const search = searchParams.get("search");
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "10");
 
     if (!schoolId) {
         return NextResponse.json({ error: "schoolId is required" }, { status: 400 });
@@ -26,6 +29,21 @@ export async function GET(req) {
             where.isActive = isActive === 'true';
         }
 
+        // Server-side search by title, description, class name, or subject name
+        if (search) {
+            where.AND = [
+                ...(where.AND || []),
+                {
+                    OR: [
+                        { title: { contains: search, mode: 'insensitive' } },
+                        { description: { contains: search, mode: 'insensitive' } },
+                        { class: { className: { contains: search, mode: 'insensitive' } } },
+                        { subject: { subjectName: { contains: search, mode: 'insensitive' } } },
+                    ]
+                }
+            ];
+        }
+
         // If studentId provided, get homework for that student's class/section
         if (studentId) {
             const student = await prisma.student.findUnique({
@@ -35,68 +53,76 @@ export async function GET(req) {
 
             if (student) {
                 where.classId = student.classId;
-                // Filter homework that either:
-                // 1. Has no sectionId (assigned to entire class), OR
-                // 2. Has sectionId matching the student's section
-                where.OR = [
-                    { sectionId: null },
-                    { sectionId: student.sectionId }
+                where.AND = [
+                    ...(where.AND || []),
+                    {
+                        OR: [
+                            { sectionId: null },
+                            { sectionId: student.sectionId }
+                        ]
+                    }
                 ];
             }
         }
 
+        const skip = (page - 1) * limit;
 
-        const homework = await prisma.homework.findMany({
-            where,
-            include: {
-                class: {
-                    select: {
-                        id: true,
-                        className: true
+        const [homework, total] = await Promise.all([
+            prisma.homework.findMany({
+                where,
+                include: {
+                    class: {
+                        select: {
+                            id: true,
+                            className: true
+                        }
+                    },
+                    section: {
+                        select: {
+                            id: true,
+                            name: true
+                        }
+                    },
+                    subject: {
+                        select: {
+                            id: true,
+                            subjectName: true
+                        }
+                    },
+                    teacher: {
+                        select: {
+                            userId: true,
+                            name: true
+                        }
+                    },
+                    submissions: studentId ? {
+                        where: { studentId },
+                        select: {
+                            id: true,
+                            status: true,
+                            submittedAt: true,
+                            grade: true,
+                            feedback: true
+                        }
+                    } : {
+                        select: {
+                            id: true,
+                            status: true
+                        }
                     }
                 },
-                section: {
-                    select: {
-                        id: true,
-                        name: true
-                    }
+                orderBy: {
+                    assignedDate: 'desc'
                 },
-                subject: {
-                    select: {
-                        id: true,
-                        subjectName: true
-                    }
-                },
-                teacher: {
-                    select: {
-                        userId: true,
-                        name: true
-                    }
-                },
-                submissions: studentId ? {
-                    where: { studentId },
-                    select: {
-                        id: true,
-                        status: true,
-                        submittedAt: true,
-                        grade: true,
-                        feedback: true
-                    }
-                } : {
-                    select: {
-                        id: true,
-                        status: true
-                    }
-                }
-            },
-            orderBy: {
-                assignedDate: 'desc'
-            }
-        });
+                skip,
+                take: limit,
+            }),
+            prisma.homework.count({ where }),
+        ]);
 
         // Add submission stats for each homework
         const homeworkWithStats = homework.map(hw => {
-            const total = hw.submissions.length;
+            const totalSubs = hw.submissions.length;
             const submitted = hw.submissions.filter(s =>
                 s.status === 'SUBMITTED' || s.status === 'EVALUATED'
             ).length;
@@ -105,7 +131,7 @@ export async function GET(req) {
 
             return {
                 ...hw,
-                stats: { total, submitted, pending, late },
+                stats: { total: totalSubs, submitted, pending, late },
                 // For student view, include their submission
                 mySubmission: studentId ? hw.submissions[0] : undefined
             };
@@ -114,7 +140,10 @@ export async function GET(req) {
         return NextResponse.json({
             success: true,
             homework: homeworkWithStats,
-            total: homeworkWithStats.length
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
         });
     } catch (error) {
         console.error("Fetch homework error:", error);
