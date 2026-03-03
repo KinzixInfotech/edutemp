@@ -84,6 +84,10 @@ function getProfileIncludes() {
                 location: true,
                 profilePicture: true,
                 contactNumber: true,
+                classes: {
+                    select: { className: true },
+                    orderBy: { className: 'asc' },
+                },
             }
         },
         achievements: {

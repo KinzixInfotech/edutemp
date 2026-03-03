@@ -44,6 +44,8 @@ const FIELD_LABELS = {
     totalStudents: 'Total Students',
     totalTeachers: 'Total Teachers',
     studentTeacherRatio: 'Student-Teacher Ratio',
+    latitude: 'Latitude',
+    longitude: 'Longitude',
     isPubliclyVisible: 'Publicly Visible',
     isFeatured: 'Featured School',
     isVerified: 'Verified Badge',
@@ -546,6 +548,41 @@ export default function PublicProfileSettings() {
                                 value={formData.website || ''}
                                 onChange={(e) => handleChange('website', e.target.value)}
                                 placeholder="https://www.school.com"
+                                className="mt-2"
+                            />
+                        </div>
+                    </div>
+                </Card>
+
+                {/* Location Coordinates */}
+                <Card className="p-6">
+                    <h2 className="text-xl font-semibold mb-2">Location Coordinates</h2>
+                    <p className="text-sm text-muted-foreground mb-4">
+                        Enter your school's coordinates for Google Maps embed on your public profile.
+                        You can find coordinates by right-clicking your school on Google Maps.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <Label htmlFor="latitude">Latitude</Label>
+                            <Input
+                                id="latitude"
+                                type="number"
+                                step="0.000001"
+                                value={formData.latitude || ''}
+                                onChange={(e) => handleChange('latitude', parseFloat(e.target.value) || null)}
+                                placeholder="e.g. 23.9991"
+                                className="mt-2"
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="longitude">Longitude</Label>
+                            <Input
+                                id="longitude"
+                                type="number"
+                                step="0.000001"
+                                value={formData.longitude || ''}
+                                onChange={(e) => handleChange('longitude', parseFloat(e.target.value) || null)}
+                                placeholder="e.g. 85.3556"
                                 className="mt-2"
                             />
                         </div>

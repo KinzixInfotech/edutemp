@@ -14,6 +14,7 @@ const PROFILE_FIELDS = [
     'publicEmail', 'publicPhone', 'website',
     'minFee', 'maxFee', 'feeStructureUrl', 'detailedFeeStructure',
     'establishedYear', 'totalStudents', 'totalTeachers', 'studentTeacherRatio',
+    'latitude', 'longitude',
     'isPubliclyVisible', 'isFeatured',
 ];
 

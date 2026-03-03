@@ -102,6 +102,10 @@ export async function GET(req) {
                                 name: true,
                                 location: true,
                                 profilePicture: true,
+                                classes: {
+                                    select: { className: true },
+                                    orderBy: { className: 'asc' },
+                                },
                             }
                         },
                         badges: {

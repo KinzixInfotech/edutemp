@@ -57,8 +57,8 @@ export async function POST(req) {
       })
     })
 
-    // Invalidate classes cache
-    await invalidatePattern(`classes:${schoolId}*`)
+    // Invalidate classes cache (schoolId is in the middle of sorted key params)
+    await invalidatePattern(`classes:*schoolId:${schoolId}*`)
 
     return NextResponse.json(result, { status: 201 })
   } catch (error) {
@@ -89,6 +89,13 @@ export async function GET(req, props) {
     }
 
     const { page, limit, skip } = getPagination(req);
+    const noCache = searchParams.get("noCache") === "true";
+
+    // If noCache, invalidate all classes cache for this school
+    if (noCache) {
+      await invalidatePattern(`classes:*schoolId:${schoolId}*`);
+    }
+
     const cacheKey = generateKey('classes', {
       schoolId, academicYearId, getAcademicYear, getStudent, showStructure,
       page, limit, search, teacherFilter, capacityFilter, sort

@@ -35,6 +35,15 @@ export async function generateMetadata(props) {
         const schoolName = data?.school?.name || 'School Profile';
         const location = data?.school?.location || '';
         const rating = data?.overallRating ? `${data.overallRating.toFixed(1)}/5` : '';
+        const ogImage = data?.coverImage || data?.school?.profilePicture || `${schoolBaseUrl}/edu_ex.png`;
+
+        // Build a rich description
+        const descParts = [`Explore ${schoolName} in ${location}`];
+        if (rating) descParts.push(`Rated ${rating}`);
+        if (data?.establishedYear) descParts.push(`Est. ${data.establishedYear}`);
+        if (data?.minFee && data?.maxFee) descParts.push(`Fees ₹${data.minFee.toLocaleString('en-IN')}–₹${data.maxFee.toLocaleString('en-IN')}`);
+        if (data?._count?.facilities) descParts.push(`${data._count.facilities}+ facilities`);
+        const richDescription = `${descParts.join(' · ')}. View admissions, fees, curriculum, reviews & more on EduBreezy.`;
 
         // Use slug for canonical URL, fallback to schoolId
         const urlIdentifier = data?.slug || data?.schoolId || id;
@@ -56,7 +65,7 @@ export async function generateMetadata(props) {
 
         return {
             title: `${schoolName} - ${location} | EduBreezy`,
-            description: `Explore ${schoolName} in ${location}${rating ? ` - Rated ${rating}` : ''}. View admissions, fees, reviews & more on EduBreezy - India's trusted school explorer.`,
+            description: richDescription,
 
             keywords: keywords,
 
@@ -68,17 +77,17 @@ export async function generateMetadata(props) {
             // Open Graph
             openGraph: {
                 title: `${schoolName} | EduBreezy School Explorer`,
-                description: `Everything you need to know about ${schoolName}. Admissions, Fees, Reviews, Facilities & more on EduBreezy.`,
+                description: richDescription,
                 url: canonicalUrl,
                 siteName: 'EduBreezy',
                 locale: 'en_IN',
                 type: 'website',
                 images: [
                     {
-                        url: data?.school?.profilePicture || `${schoolBaseUrl}/edu_ex.png`,
+                        url: ogImage,
                         width: 1200,
                         height: 630,
-                        alt: `${schoolName} - EduBreezy`,
+                        alt: `${schoolName} campus - EduBreezy`,
                     }
                 ],
             },
@@ -87,8 +96,8 @@ export async function generateMetadata(props) {
             twitter: {
                 card: 'summary_large_image',
                 title: `${schoolName} - ${location} | EduBreezy`,
-                description: `Explore reviews, fees & admissions for ${schoolName}. Find your perfect school on EduBreezy.`,
-                images: [data?.school?.profilePicture || `${schoolBaseUrl}/edu_ex.png`],
+                description: richDescription,
+                images: [ogImage],
                 creator: '@edubreezy',
             },
 
@@ -175,7 +184,7 @@ export default async function SchoolProfilePage(props) {
         '@type': 'School',
         '@id': `${baseUrl}/explore/schools/${urlIdentifier}`,
         name: school.school?.name,
-        image: school.school?.profilePicture ? [school.school.profilePicture] : [`${baseUrl}/edu_ex.png`],
+        image: school.coverImage ? [school.coverImage] : (school.school?.profilePicture ? [school.school.profilePicture] : [`${baseUrl}/edu_ex.png`]),
         description: school.description || `Explore ${school.school?.name} on EduBreezy - India's trusted school explorer.`,
         address: {
             '@type': 'PostalAddress',
@@ -184,6 +193,11 @@ export default async function SchoolProfilePage(props) {
             addressRegion: school.school?.location?.split(',')[1]?.trim() || 'India',
             addressCountry: 'IN'
         },
+        geo: school.latitude && school.longitude ? {
+            '@type': 'GeoCoordinates',
+            latitude: school.latitude,
+            longitude: school.longitude
+        } : undefined,
         telephone: school.school?.contactNumber,
         url: `${baseUrl}/explore/schools/${urlIdentifier}`,
         aggregateRating: school.overallRating > 0 ? {

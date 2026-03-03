@@ -1,472 +1,440 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Search, MapPin, School as SchoolIcon, GraduationCap, Award, ArrowRight, Trophy,
-    Pencil, BookMarked, Ruler, BookOpen, Users, Star
+    Search, MapPin, School as SchoolIcon, GraduationCap, ArrowRight,
+    Heart, ChevronLeft, ChevronRight, Star, CheckCircle2, BookOpen,
+    DollarSign, Trophy, Layers, Globe, ChevronDown, Monitor, Award
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { DotPattern } from '@/components/ui/dot-pattern';
 
-// Animation variants
+// ─── Dropdown data ───
+const curriculumOptions = ['CBSE', 'ICSE', 'IB', 'IGCSE', 'State Board', 'Cambridge', 'Montessori', 'Waldorf'];
+const gradeLevelOptions = ['Pre-K', 'Elementary (K-5)', 'Middle School (6-8)', 'High School (9-12)', 'K-12', 'Pre-K to 8'];
+const tuitionOptions = ['Under ₹50K', '₹50K – ₹1L', '₹1L – ₹2L', '₹2L – ₹5L', '₹5L+'];
+const activitiesOptions = ['Sports', 'Arts & Craft', 'Music', 'Robotics', 'Debate', 'Drama', 'Swimming', 'Dance'];
+
+// Major Indian cities
+const indianCities = [
+    'Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Chennai', 'Kolkata', 'Pune',
+    'Ahmedabad', 'Jaipur', 'Lucknow', 'Chandigarh', 'Bhopal', 'Indore',
+    'Kochi', 'Coimbatore', 'Nagpur', 'Visakhapatnam', 'Patna', 'Vadodara',
+    'Gurgaon', 'Noida', 'Thiruvananthapuram', 'Dehradun', 'Surat', 'Mysore',
+    'Ranchi', 'Guwahati', 'Bhubaneswar', 'Amritsar', 'Varanasi'
+];
+
+// ─── Animation variants ───
 const fadeInUp = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0 }
+    hidden: { opacity: 0, y: 24 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
 };
-
 const staggerContainer = {
     hidden: { opacity: 0 },
-    visible: {
-        opacity: 1,
-        transition: { staggerChildren: 0.1 }
-    }
+    visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
 };
 
-const scaleIn = {
-    hidden: { opacity: 0, scale: 0.8 },
-    visible: {
-        opacity: 1,
-        scale: 1,
-        transition: { type: "spring", stiffness: 100 }
-    }
-};
-
-export default function ExploreHomeClient() {
-    const [locationState, setLocationState] = useState({
-        status: 'idle',
-        city: null,
-        error: null
-    });
-
-    const { data: nearbySchoolsData, isLoading: isSchoolsLoading } = useQuery({
-        queryKey: ['nearby-schools', locationState.city],
-        queryFn: async () => {
-            if (!locationState.city) return null;
-            const res = await fetch(`/api/public/schools?location=${encodeURIComponent(locationState.city)}&limit=3`);
-            if (!res.ok) throw new Error('Failed to fetch schools');
-            return res.json();
-        },
-        enabled: !!locationState.city,
-    });
-
-    const { data: featuredSchoolsData } = useQuery({
-        queryKey: ['featured-schools', locationState.city],
-        queryFn: async () => {
-            if (locationState.city) {
-                const res = await fetch(`/api/public/schools?featured=true&location=${encodeURIComponent(locationState.city)}&limit=4`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.schools.length > 0) return { ...data, source: 'local' };
-                }
-            }
-            const res = await fetch(`/api/public/schools?featured=true&limit=4`);
-            if (!res.ok) throw new Error('Failed to fetch featured schools');
-            return { ...(await res.json()), source: 'global' };
-        },
-    });
+// ─── CategoryDropdown Component ───
+function CategoryDropdown({ icon: Icon, label, options, onSelect }) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef(null);
 
     useEffect(() => {
-        detectLocation();
+        const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
     }, []);
 
-    const detectLocation = () => {
-        if (!navigator.geolocation) {
-            setLocationState({ status: 'error', error: 'Geolocation not supported', city: null });
-            return;
-        }
-        setLocationState(prev => ({ ...prev, status: 'loading' }));
-        navigator.geolocation.getCurrentPosition(
-            async (position) => {
-                try {
-                    const { latitude, longitude } = position.coords;
-                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
-                    const data = await res.json();
-                    const city = data.address.city || data.address.town || data.address.village || data.address.county || data.address.state_district;
-                    if (city) {
-                        setLocationState({ status: 'success', city, error: null });
-                    } else {
-                        setLocationState({ status: 'error', error: 'City not found', city: null });
-                    }
-                } catch (err) {
-                    setLocationState({ status: 'error', error: 'Location lookup failed', city: null });
-                }
-            },
-            (error) => {
-                let errorMessage = 'Location permission denied';
-                if (error.code === 2) errorMessage = 'Location unavailable';
-                if (error.code === 3) errorMessage = 'Location request timed out';
-                setLocationState({ status: 'error', error: errorMessage, city: null });
+    return (
+        <div ref={ref} className="relative">
+            <button
+                onClick={() => setOpen(!open)}
+                className="inline-flex items-center gap-2 h-10 px-4 rounded-full border border-gray-200 bg-white text-sm font-medium text-[#0f172a] hover:border-[#2563eb] hover:text-[#2563eb] transition-all focus:outline-none focus:ring-2 focus:ring-blue-100"
+            >
+                <Icon className="h-4 w-4 text-gray-400" />
+                {label}
+                <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+            </button>
+            <AnimatePresence>
+                {open && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 6, scale: 0.97 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 6, scale: 0.97 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute top-full left-0 mt-2 w-56 max-h-64 overflow-y-auto bg-white rounded-xl border border-gray-200 shadow-xl shadow-black/5 z-50 py-1"
+                    >
+                        {options.map((opt) => (
+                            <button
+                                key={opt}
+                                onClick={() => {
+                                    onSelect(opt);
+                                    setOpen(false);
+                                }}
+                                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-[#2563eb] transition-colors"
+                            >
+                                {opt}
+                            </button>
+                        ))}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+}
+
+// ─── Main Component ───
+export default function ExploreHomeClient() {
+    const [searchQuery, setSearchQuery] = useState('');
+    const featuredScrollRef = useRef(null);
+
+    // Fetch featured schools — fallback to all schools if none are featured
+    const { data: featuredSchoolsData, isLoading: featuredLoading } = useQuery({
+        queryKey: ['featured-schools-home'],
+        queryFn: async () => {
+            // Try featured first
+            const res = await fetch('/api/public/schools?featured=true&limit=6');
+            if (res.ok) {
+                const data = await res.json();
+                if (data.schools && data.schools.length > 0) return data;
             }
-        );
+            // Fallback to regular schools sorted by rating
+            const fallback = await fetch('/api/public/schools?sort=rating&limit=6');
+            if (!fallback.ok) throw new Error('Failed to fetch schools');
+            return fallback.json();
+        },
+    });
+
+    const scrollFeatured = (dir) => {
+        if (featuredScrollRef.current) {
+            featuredScrollRef.current.scrollBy({
+                left: dir === 'left' ? -340 : 340,
+                behavior: 'smooth'
+            });
+        }
+    };
+
+    const handleSearch = (e) => {
+        e.preventDefault();
+        window.location.href = searchQuery.trim()
+            ? `/explore/schools?search=${encodeURIComponent(searchQuery.trim())}`
+            : '/explore/schools';
+    };
+
+    const handleCategorySelect = (type, value) => {
+        const param = type === 'location' ? 'location' : 'search';
+        window.location.href = `/explore/schools?${param}=${encodeURIComponent(value)}`;
+    };
+
+    const popularTags = ['Montessori', 'IB World Schools', 'STEM'];
+
+    const formatFee = (fee) => {
+        if (!fee) return null;
+        if (fee >= 100000) return `₹${(fee / 100000).toFixed(1)}L`;
+        if (fee >= 1000) return `₹${(fee / 1000).toFixed(0)}K`;
+        return `₹${fee}`;
     };
 
     return (
-        <div className="relative min-h-screen overflow-hidden">
-            {/* ===== HERO SECTION - Gradient Background ===== */}
-            <section className="relative bg-[linear-gradient(120deg,#f8fafc_0%,#fff9f0_50%,#f0f7ff_100%)] pt-8 pb-16 md:pt-12 md:pb-24">
-                {/* Mesh Gradient Glows */}
-                <div className="absolute top-[10%] -left-[10%] w-[400px] h-[400px] bg-[radial-gradient(circle,rgba(5,105,255,0.2)_0%,transparent_70%)] blur-[80px] rounded-full pointer-events-none" />
-                <div className="absolute top-[20%] -right-[10%] w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(255,150,50,0.15)_0%,transparent_70%)] blur-[100px] rounded-full pointer-events-none" />
-
-                {/* Dot Pattern */}
-                <DotPattern width={24} height={24} cr={1} className="absolute inset-0 w-full h-full opacity-15" />
-
-                {/* Floating Icons - Hidden on mobile for cleaner look */}
-                <div className="hidden md:block absolute top-[8%] left-[10%] opacity-[0.08] pointer-events-none animate-[float_6s_ease-in-out_infinite]">
-                    <GraduationCap size={70} className="text-black rotate-[-15deg]" />
-                </div>
-                <div className="hidden md:block absolute top-[18%] left-[18%] opacity-[0.06] pointer-events-none animate-[float_8s_ease-in-out_infinite_1s]">
-                    <Pencil size={50} className="text-black rotate-[25deg]" />
-                </div>
-                <div className="hidden md:block absolute top-[6%] right-[10%] opacity-[0.07] pointer-events-none animate-[float_7s_ease-in-out_infinite_2s]">
-                    <SchoolIcon size={75} className="text-black rotate-[10deg]" />
-                </div>
-                <div className="hidden md:block absolute top-[20%] right-[8%] opacity-[0.06] pointer-events-none animate-[float_8s_ease-in-out_infinite_0.5s]">
-                    <BookOpen size={55} className="text-black rotate-[-15deg]" />
-                </div>
+        <div className="relative min-h-screen bg-white">
+            {/* ═══════════ HERO SECTION ═══════════ */}
+            <section className="relative bg-gradient-to-br from-[#f8fafc] via-white to-[#f0f4ff] pt-10 pb-14 md:pt-16 md:pb-20 overflow-hidden">
+                {/* Subtle blobs */}
+                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(5,105,255,0.06)_0%,transparent_70%)] blur-[60px] rounded-full pointer-events-none" />
+                <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-[radial-gradient(circle,rgba(59,130,246,0.04)_0%,transparent_70%)] blur-[60px] rounded-full pointer-events-none" />
 
                 <div className="max-w-7xl mx-auto px-4 md:px-6 relative z-10">
-                    <motion.div
-                        className="text-center max-w-4xl mx-auto space-y-6"
-                        initial="hidden"
-                        animate="visible"
-                        variants={staggerContainer}
-                    >
-                        <motion.div variants={fadeInUp}>
-                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#0569ff]/10 text-[#0569ff] text-sm font-medium border border-[#0569ff]/20 mb-4">
-                                <Trophy className="h-3.5 w-3.5" />
-                                <span>Trusted by 500+ Top Schools</span>
-                            </div>
-                        </motion.div>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+                        {/* ── Left Column ── */}
+                        <motion.div className="space-y-6" initial="hidden" animate="visible" variants={staggerContainer}>
+                            <motion.div variants={fadeInUp}>
+                                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-[#2563eb] bg-blue-50 px-3 py-1.5 rounded-full">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-[#2563eb]" />
+                                    The Premier Education Marketplace
+                                </span>
+                            </motion.div>
 
-                        <motion.h1
-                            className="text-3xl md:text-5xl lg:text-6xl font-bold text-[#1a1a2e] leading-[1.15] px-4"
-                            variants={fadeInUp}
-                        >
-                            Find the{' '}
-                            <span className="relative inline-block">
-                                <span className="relative z-10 text-transparent bg-clip-text bg-gradient-to-r from-[#0569ff] to-[#0450d4]">Perfect School</span>
-                                <span className="absolute bottom-1 left-0 w-full h-2 md:h-3 bg-[#FF9800]/30 -rotate-1 rounded"></span>
-                            </span>
-                            <br className="hidden sm:block" />
-                            <span className="sm:hidden"> </span>for Your Child
-                        </motion.h1>
+                            <motion.h1 className="text-4xl md:text-5xl lg:text-[3.4rem] font-extrabold text-[#0f172a] leading-[1.08] tracking-tight" variants={fadeInUp}>
+                                Find the Perfect
+                                <br />Future{' '}
+                                <span className="text-[#2563eb]">for Your Child</span>
+                            </motion.h1>
 
-                        <motion.p
-                            className="text-base md:text-lg text-gray-600 max-w-xl mx-auto leading-relaxed px-4"
-                            variants={fadeInUp}
-                        >
-                            Browse verified schools, compare facilities, and view transparent fee structures—all in one modern platform.
-                        </motion.p>
+                            <motion.p className="text-[15px] md:text-base text-gray-500 max-w-md leading-relaxed" variants={fadeInUp}>
+                                Discover and compare top-rated educational institutions tailored to your child's unique needs, talents, and aspirations.
+                            </motion.p>
 
-                        <motion.div variants={fadeInUp} className="pt-4 px-4">
-                            <Link href="/explore/schools" className="block max-w-[500px] mx-auto w-full">
-                                <div className="relative group cursor-pointer">
-                                    <div className="absolute -inset-0.5 bg-gradient-to-r from-[#0569ff] to-[#0450d4] rounded-full opacity-20 group-hover:opacity-40 blur transition duration-500" />
-                                    <div className="relative flex items-center bg-white rounded-full p-2 pr-2 pl-4 md:pl-6 shadow-xl border border-gray-200/50">
-                                        <Search className="h-5 w-5 text-gray-400 mr-2 md:mr-3" />
-                                        <span className="flex-1 text-left text-gray-500 text-sm md:text-lg truncate">Search for schools...</span>
-                                        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 border-l border-gray-200 mx-2 text-sm font-medium text-[#1a1a2e]">
-                                            <MapPin className="h-4 w-4 text-[#0569ff]" />
-                                            <span className="truncate max-w-[100px]">{locationState.city || "Nearby"}</span>
-                                        </div>
-                                        <div className="h-9 w-9 md:h-10 md:w-auto md:px-5 rounded-full bg-[#0569ff] text-white flex items-center justify-center font-medium transition-transform group-hover:scale-105 active:scale-95 shadow-lg">
-                                            <span className="hidden md:inline text-sm">Search</span>
-                                            <ArrowRight className="h-4 w-4 md:hidden" />
-                                        </div>
-                                    </div>
+                            {/* Search */}
+                            <motion.form onSubmit={handleSearch} variants={fadeInUp} className="max-w-md">
+                                <div className="flex items-center bg-white rounded-full border border-gray-200 shadow-lg shadow-gray-200/50 p-1.5 pl-4 hover:shadow-xl transition-shadow">
+                                    <Search className="h-5 w-5 text-gray-400 mr-2 shrink-0" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search for schools..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="flex-1 text-sm bg-transparent outline-none placeholder:text-gray-400 text-gray-700 min-w-0"
+                                    />
+                                    <button type="submit" className="h-9 px-6 rounded-full bg-[#2563eb] text-white text-sm font-semibold hover:bg-[#1d4ed8] transition-colors shrink-0">
+                                        Search
+                                    </button>
                                 </div>
-                            </Link>
-                        </motion.div>
+                            </motion.form>
 
-                        {/* Stats Row */}
-                        <motion.div variants={fadeInUp} className="flex flex-wrap justify-center gap-4 md:gap-8 pt-6">
-                            <div className="flex items-center gap-2">
-                                <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-[#0569ff]/10 flex items-center justify-center">
-                                    <SchoolIcon className="w-4 h-4 md:w-5 md:h-5 text-[#0569ff]" />
-                                </div>
-                                <div className="text-left">
-                                    <div className="text-lg md:text-xl font-bold text-[#1a1a2e]">500+</div>
-                                    <div className="text-[10px] md:text-xs text-gray-500">Schools Listed</div>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-[#FF9800]/10 flex items-center justify-center">
-                                    <Users className="w-4 h-4 md:w-5 md:h-5 text-[#FF9800]" />
-                                </div>
-                                <div className="text-left">
-                                    <div className="text-lg md:text-xl font-bold text-[#1a1a2e]">10K+</div>
-                                    <div className="text-[10px] md:text-xs text-gray-500">Parents Trust Us</div>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-green-500/10 flex items-center justify-center">
-                                    <Star className="w-4 h-4 md:w-5 md:h-5 text-green-500" />
-                                </div>
-                                <div className="text-left">
-                                    <div className="text-lg md:text-xl font-bold text-[#1a1a2e]">4.8★</div>
-                                    <div className="text-[10px] md:text-xs text-gray-500">Avg Rating</div>
-                                </div>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                </div>
-            </section>
-
-            {/* ===== FEATURED SCHOOLS SECTION - White Background ===== */}
-            {featuredSchoolsData?.schools?.length > 0 && (
-                <section className="bg-white py-12 md:py-16">
-                    <div className="max-w-7xl mx-auto px-4 md:px-6">
-                        <motion.div
-                            initial="hidden"
-                            whileInView="visible"
-                            viewport={{ once: true }}
-                            variants={staggerContainer}
-                        >
-                            <div className="flex items-center gap-2 mb-6 md:mb-8">
-                                <div className="h-6 md:h-8 w-1 bg-gradient-to-b from-yellow-400 to-orange-500 rounded-full" />
-                                <h2 className="text-xl md:text-2xl lg:text-3xl font-bold tracking-tight text-[#1a1a2e]">Featured Schools</h2>
-                                {featuredSchoolsData.source === 'local' && locationState.city && (
-                                    <span className="text-xs font-medium px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-600 border border-yellow-500/20">
-                                        in {locationState.city}
-                                    </span>
-                                )}
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-                                {featuredSchoolsData.schools.map((profile) => (
-                                    <motion.div key={profile.id} variants={fadeInUp}>
-                                        <Link href={`/explore/schools/${profile.slug || profile.schoolId}`} className="group block h-full">
-                                            <div className="relative h-full rounded-2xl overflow-hidden border border-gray-200 bg-white hover:shadow-xl hover:shadow-yellow-500/10 transition-all duration-300">
-                                                <div className="absolute top-3 right-3 z-10 px-2 py-1 rounded-md bg-yellow-400 text-black text-[10px] font-bold uppercase tracking-wider shadow-sm">
-                                                    Featured
-                                                </div>
-                                                <div className="h-32 md:h-40 w-full bg-gray-100 relative overflow-hidden">
-                                                    {profile.coverImage ? (
-                                                        <img src={profile.coverImage} alt={profile.school?.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                                                    ) : (
-                                                        <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                                                            <SchoolIcon className="w-8 h-8 text-gray-300" />
-                                                        </div>
-                                                    )}
-                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                                                    <div className="absolute bottom-3 left-3 flex items-center gap-2 md:gap-3">
-                                                        <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-white p-0.5 shadow-lg">
-                                                            <img src={profile.school?.profilePicture || '/placeholder-logo.png'} alt="Logo" className="w-full h-full object-cover rounded-md" />
-                                                        </div>
-                                                        <div className="text-white">
-                                                            <h3 className="font-bold text-xs md:text-sm leading-tight drop-shadow-md line-clamp-1">{profile.school?.name}</h3>
-                                                            <div className="flex items-center gap-2 mt-0.5">
-                                                                <p className="text-[10px] text-white/80 flex items-center gap-1">
-                                                                    <MapPin className="w-2.5 h-2.5" /> {profile.school?.location?.split(',')[0]}
-                                                                </p>
-                                                                {profile.overallRating > 0 && (
-                                                                    <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-black/40 backdrop-blur-md">
-                                                                        <span className="text-yellow-400 text-[8px]">★</span>
-                                                                        <span className="text-[10px] font-bold text-white">{profile.overallRating.toFixed(1)}</span>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="p-3 bg-white">
-                                                    <p className="text-xs text-gray-500 line-clamp-1">
-                                                        {profile.tagline || "Excellence in education"}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </Link>
-                                    </motion.div>
-                                ))}
-                            </div>
-                        </motion.div>
-                    </div>
-                </section>
-            )}
-
-            {/* ===== SCHOOLS NEAR YOU SECTION - Light Gray Background ===== */}
-            <section className="bg-gray-50 py-12 md:py-16">
-                <div className="max-w-7xl mx-auto px-4 md:px-6">
-                    <motion.div
-                        className="space-y-6 md:space-y-8"
-                        initial="hidden"
-                        whileInView="visible"
-                        viewport={{ once: true, margin: "-100px" }}
-                        variants={staggerContainer}
-                    >
-                        <motion.div className="flex flex-col md:flex-row md:items-end justify-between gap-4" variants={fadeInUp}>
-                            <div>
-                                <h2 className="text-xl md:text-2xl lg:text-3xl font-bold tracking-tight text-[#1a1a2e]">
-                                    {locationState.status === 'success' ? (
-                                        <>
-                                            Schools in{' '}
-                                            <span className="inline-flex items-center justify-center px-3 py-1 rounded-md bg-white border border-gray-200 text-[#0569ff] text-lg md:text-xl ml-1 shadow-sm">
-                                                {locationState.city}
-                                            </span>
-                                        </>
-                                    ) : 'Schools Near You'}
-                                </h2>
-                                <p className="text-gray-500 mt-2 text-sm md:text-lg">
-                                    {locationState.status === 'success' ? 'Curated top picks in your area' : 'Enable location access to discover local schools'}
-                                </p>
-                            </div>
-                        </motion.div>
-
-                        {locationState.status === 'loading' || isSchoolsLoading ? (
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8">
-                                {[...Array(3)].map((_, i) => (
-                                    <Card key={i} className="p-0 border-0 shadow-none bg-white overflow-hidden h-[280px] md:h-[320px] flex flex-col rounded-2xl">
-                                        <Skeleton className="h-28 md:h-32 w-full" />
-                                        <div className="p-4 md:p-6 space-y-3 md:space-y-4 flex-1">
-                                            <Skeleton className="h-12 md:h-16 w-12 md:w-16 rounded-xl" />
-                                            <Skeleton className="h-5 md:h-6 w-3/4" />
-                                            <Skeleton className="h-4 w-1/2" />
-                                        </div>
-                                    </Card>
-                                ))}
-                            </div>
-                        ) : locationState.status === 'error' ? (
-                            <Card className="p-8 md:p-12 text-center border-dashed border-2 bg-white rounded-2xl">
-                                <MapPin className="h-10 md:h-12 w-10 md:w-12 mx-auto mb-4 text-gray-300" />
-                                <h3 className="text-base md:text-lg font-medium mb-2 text-[#1a1a2e]">Location Access Needed</h3>
-                                <p className="text-gray-500 mb-6 text-sm md:text-base">
-                                    We need your permission to find schools in your neighborhood.
-                                </p>
-                                <Button onClick={detectLocation} className="gap-2 bg-[#0569ff] hover:bg-[#0450d4]">
-                                    <MapPin className="h-4 w-4" />
-                                    Use Current Location
-                                </Button>
-                            </Card>
-                        ) : nearbySchoolsData?.schools?.length > 0 ? (
-                            <motion.div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8" initial="hidden" animate="visible" variants={staggerContainer}>
-                                {nearbySchoolsData.schools.map((profile) => (
-                                    <motion.div key={profile.id} variants={scaleIn} whileHover={{ y: -8 }} className="h-full">
-                                        <Link href={`/explore/schools/${profile.slug || profile.schoolId}`} className="block h-full">
-                                            <Card className="h-full border border-gray-200 bg-white hover:shadow-2xl hover:shadow-blue-500/10 transition-all duration-300 rounded-2xl md:rounded-3xl group overflow-hidden relative flex flex-col">
-                                                {profile.coverImage && (
-                                                    <div className="h-28 md:h-32 w-full bg-gray-100 relative overflow-hidden">
-                                                        <img src={profile.coverImage} alt="Cover" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                                                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                                                    </div>
-                                                )}
-                                                <div className={`p-4 md:p-6 flex-1 flex flex-col ${profile.coverImage ? 'pt-0' : 'pt-4 md:pt-6'}`}>
-                                                    <div className="flex justify-between items-start">
-                                                        <div className={`${profile.coverImage ? '-mt-6 md:-mt-8' : ''} relative z-10`}>
-                                                            <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-white p-1 shadow-lg ring-1 ring-gray-100">
-                                                                {profile.school?.profilePicture ? (
-                                                                    <img src={profile.school.profilePicture} alt={profile.school.name} className="w-full h-full object-cover rounded-lg md:rounded-xl" />
-                                                                ) : (
-                                                                    <div className="w-full h-full bg-gray-50 rounded-lg md:rounded-xl flex items-center justify-center">
-                                                                        <SchoolIcon className="w-6 h-6 md:w-8 md:h-8 text-[#0569ff]" />
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        {profile.overallRating > 0 && (
-                                                            <div className={`flex items-center gap-1 bg-[#0569ff]/5 px-2 py-1 rounded-lg border border-[#0569ff]/10 ${profile.coverImage ? 'mt-2 md:mt-4' : ''}`}>
-                                                                <span className="font-bold text-[#0569ff] text-sm">{profile.overallRating.toFixed(1)}</span>
-                                                                <span className="text-yellow-500 text-xs">★</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <div className="mt-3 md:mt-4 space-y-1 md:space-y-2 flex-1">
-                                                        <h3 className="font-bold text-base md:text-xl text-[#1a1a2e] line-clamp-1 group-hover:text-[#0569ff] transition-colors">
-                                                            {profile.school?.name}
-                                                        </h3>
-                                                        <div className="flex items-center gap-1.5 text-xs md:text-sm text-gray-500">
-                                                            <MapPin className="h-3 w-3 md:h-3.5 md:w-3.5 shrink-0" />
-                                                            <span className="truncate">{profile.school?.location}</span>
-                                                        </div>
-                                                        <p className="text-xs md:text-sm text-gray-500 line-clamp-2 mt-2 md:mt-3 leading-relaxed">
-                                                            {profile.tagline || profile.description || "A premier educational institution."}
-                                                        </p>
-                                                    </div>
-                                                    <div className="mt-4 md:mt-6 pt-3 md:pt-4 border-t border-gray-100 flex items-center justify-between">
-                                                        <div className="text-[10px] md:text-xs text-gray-400 font-medium uppercase tracking-wider">View Details</div>
-                                                        <div className="h-7 w-7 md:h-8 md:w-8 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-[#0569ff] group-hover:text-white transition-all duration-300">
-                                                            <ArrowRight className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </Card>
-                                        </Link>
-                                    </motion.div>
+                            {/* Popular Tags */}
+                            <motion.div variants={fadeInUp} className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs text-gray-400 font-medium">Popular:</span>
+                                {popularTags.map((tag) => (
+                                    <Link key={tag} href={`/explore/schools?search=${encodeURIComponent(tag)}`}
+                                        className="text-xs text-gray-500 hover:text-[#2563eb] transition-colors border-b border-dashed border-gray-300 hover:border-[#2563eb] pb-px">
+                                        {tag}
+                                    </Link>
                                 ))}
                             </motion.div>
+
+                            {/* Stats */}
+                            <motion.div variants={fadeInUp} className="flex items-center gap-10 pt-2">
+                                {[
+                                    { value: '500+', label: 'SCHOOLS' },
+                                    { value: '12K+', label: 'REVIEWS' },
+                                    { value: '98%', label: 'SATISFIED' },
+                                ].map((s) => (
+                                    <div key={s.label}>
+                                        <div className="text-2xl md:text-3xl font-extrabold text-[#0f172a]">{s.value}</div>
+                                        <div className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">{s.label}</div>
+                                    </div>
+                                ))}
+                            </motion.div>
+                        </motion.div>
+
+                        {/* ── Right Column — Image ── */}
+                        <motion.div className="relative hidden lg:block" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6, delay: 0.2 }}>
+                            <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-blue-500/10 aspect-[4/3]">
+                                <img
+                                    src="https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=800&h=600&fit=crop"
+                                    alt="Modern school campus"
+                                    className="w-full h-full object-cover"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                            </div>
+
+
+
+                        </motion.div>
+                    </div>
+                </div>
+            </section>
+
+            {/* ═══════════ EXPLORE BY CATEGORY ═══════════ */}
+            <section className="bg-white py-10 md:py-14 border-t border-gray-50">
+                <div className="max-w-7xl mx-auto px-4 md:px-6">
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-xl md:text-2xl font-bold text-[#0f172a]">Explore by Category</h2>
+                        <Link href="/explore/schools" className="text-sm font-medium text-[#2563eb] hover:text-[#1d4ed8] flex items-center gap-1 transition-colors">
+                            View all filters <ArrowRight className="h-3.5 w-3.5" />
+                        </Link>
+                    </div>
+
+                    <div className="flex flex-wrap gap-3">
+                        <CategoryDropdown icon={MapPin} label="Location" options={indianCities} onSelect={(v) => handleCategorySelect('location', v)} />
+                        <CategoryDropdown icon={Monitor} label="Curriculum" options={curriculumOptions} onSelect={(v) => handleCategorySelect('curriculum', v)} />
+                        <CategoryDropdown icon={GraduationCap} label="Grade Level" options={gradeLevelOptions} onSelect={(v) => handleCategorySelect('grade', v)} />
+                        <CategoryDropdown icon={DollarSign} label="Tuition" options={tuitionOptions} onSelect={(v) => handleCategorySelect('tuition', v)} />
+                        <CategoryDropdown icon={Award} label="Activities" options={activitiesOptions} onSelect={(v) => handleCategorySelect('activities', v)} />
+                    </div>
+                </div>
+            </section>
+
+            {/* ═══════════ FEATURED INSTITUTIONS ═══════════ */}
+            <section className="bg-[#f8fafc] py-12 md:py-16">
+                <div className="max-w-7xl mx-auto px-4 md:px-6">
+                    <div className="flex items-center justify-between mb-8">
+                        <h2 className="text-xl md:text-2xl font-bold text-[#0f172a]">Featured Institutions</h2>
+                        <div className="flex items-center gap-2">
+                            <button onClick={() => scrollFeatured('left')} className="w-8 h-8 rounded-full border border-gray-200 bg-white flex items-center justify-center text-gray-500 hover:border-[#2563eb] hover:text-[#2563eb] transition-colors">
+                                <ChevronLeft className="h-4 w-4" />
+                            </button>
+                            <button onClick={() => scrollFeatured('right')} className="w-8 h-8 rounded-full border border-gray-200 bg-white flex items-center justify-center text-gray-500 hover:border-[#2563eb] hover:text-[#2563eb] transition-colors">
+                                <ChevronRight className="h-4 w-4" />
+                            </button>
+                        </div>
+                    </div>
+
+                    <div
+                        ref={featuredScrollRef}
+                        className="flex gap-5 overflow-x-auto pb-4 snap-x snap-mandatory"
+                        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                    >
+                        {featuredLoading ? (
+                            [...Array(3)].map((_, i) => (
+                                <div key={i} className="w-[310px] shrink-0 snap-start">
+                                    <Card className="overflow-hidden rounded-xl">
+                                        <Skeleton className="h-48 w-full" />
+                                        <div className="p-4 space-y-3">
+                                            <Skeleton className="h-5 w-3/4" />
+                                            <Skeleton className="h-4 w-1/2" />
+                                            <Skeleton className="h-4 w-full" />
+                                        </div>
+                                    </Card>
+                                </div>
+                            ))
+                        ) : featuredSchoolsData?.schools?.length > 0 ? (
+                            featuredSchoolsData.schools.map((profile) => {
+                                const name = profile.school?.name || profile.name || 'School';
+                                const location = profile.school?.location || profile.location || '';
+                                const slug = profile.slug || profile.schoolId || profile.id;
+                                const rating = profile.overallRating || 0;
+                                const coverImage = profile.coverImage;
+                                const badges = profile.badges || [];
+                                const minFee = profile.minFee;
+                                const maxFee = profile.maxFee;
+
+                                return (
+                                    <Link key={profile.schoolId || profile.id} href={`/explore/schools/${slug}`} className="w-[280px] shrink-0 snap-start group block">
+                                        <div className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-[0_2px_16px_-4px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_30px_-8px_rgba(0,0,0,0.15)] transition-all duration-300 group-hover:-translate-y-1">
+                                            {/* Image section */}
+                                            <div className="relative h-[180px] overflow-hidden">
+                                                {coverImage ? (
+                                                    <img src={coverImage} alt={name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                                ) : (
+                                                    <div className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
+                                                        <SchoolIcon className="w-10 h-10 text-gray-300" />
+                                                    </div>
+                                                )}
+
+                                                {/* Top Rated / Featured badge */}
+                                                {(profile.isFeatured || rating >= 4) && (
+                                                    <div className="absolute top-3 left-3 px-3 py-1.5 rounded-md bg-[#0f172a] text-white text-[11px] font-bold shadow-md">
+                                                        {profile.isFeatured ? 'Featured' : 'Top Rated'}
+                                                    </div>
+                                                )}
+
+                                                {/* Heart icon */}
+                                                <button onClick={(e) => e.preventDefault()} className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center shadow-sm hover:bg-white hover:scale-110 transition-all duration-200">
+                                                    <Heart className="w-[18px] h-[18px] text-gray-400" />
+                                                </button>
+                                            </div>
+
+                                            {/* Content section */}
+                                            <div className="p-4 space-y-3">
+                                                {/* Name + Rating */}
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <h3 className="font-bold text-[15px] text-[#0f172a] leading-snug line-clamp-2 flex items-center gap-1.5">
+                                                        <span className="line-clamp-2">{name}</span>
+                                                        {profile.isVerified && (
+                                                            <img src="/bluetick.png" alt="Verified" className="w-[16px] h-[16px] shrink-0" />
+                                                        )}
+                                                    </h3>
+                                                    {rating > 0 && (
+                                                        <div className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200">
+                                                            <span className="text-sm font-bold text-emerald-700">{rating.toFixed(1)}</span>
+                                                            <Star className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600" />
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Location */}
+                                                {location && (
+                                                    <p className="text-[13px] text-gray-500 flex items-center gap-1.5">
+                                                        <MapPin className="w-3.5 h-3.5 shrink-0 text-blue-500" />
+                                                        <span className="truncate">{location.split(',').slice(0, 2).join(',').trim()}</span>
+                                                    </p>
+                                                )}
+
+                                                {/* Tags */}
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {badges.length > 0 ? (
+                                                        badges.slice(0, 3).map((b, idx) => (
+                                                            <span key={idx} className="text-[11px] font-medium px-2.5 py-1 rounded-full border border-gray-200 text-gray-600 bg-white">
+                                                                {b.badgeType || b}
+                                                            </span>
+                                                        ))
+                                                    ) : (
+                                                        <>
+                                                            <span className="text-[11px] font-medium px-2.5 py-1 rounded-full border border-gray-200 text-gray-600 bg-white">K-12</span>
+                                                            <span className="text-[11px] font-medium px-2.5 py-1 rounded-full border border-gray-200 text-gray-600 bg-white">Co-ed</span>
+                                                        </>
+                                                    )}
+                                                </div>
+
+                                                {/* Price + Status */}
+                                                <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                                                    <div>
+                                                        {(minFee || maxFee) ? (
+                                                            <span className="text-[15px] font-bold text-[#0f172a]">
+                                                                {formatFee(minFee || maxFee)}
+                                                                <span className="text-xs font-normal text-gray-400 ml-1">/ year</span>
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[13px] text-gray-400">Contact for fees</span>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-[11px] font-semibold text-emerald-600">
+                                                        Accepting Applications
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </Link>
+                                );
+                            })
                         ) : (
-                            <div className="text-center py-12 md:py-20 bg-white rounded-2xl md:rounded-3xl border border-dashed border-gray-200">
-                                <SchoolIcon className="h-8 w-8 md:h-10 md:w-10 mx-auto mb-4 text-gray-300" />
-                                <p className="text-base md:text-lg text-gray-500">No schools found in {locationState.city}.</p>
-                                <Link href="/explore/schools">
-                                    <Button variant="link" className="mt-2 text-[#0569ff]">View All Available Schools</Button>
-                                </Link>
+                            <div className="w-full text-center py-16 text-gray-400">
+                                <SchoolIcon className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+                                <p className="text-sm">No featured schools available at the moment.</p>
                             </div>
                         )}
-                    </motion.div>
+                    </div>
                 </div>
             </section>
 
-            {/* ===== FEATURES SECTION - White Background ===== */}
-            <section className="bg-white py-12 md:py-16">
+            {/* ═══════════ CTA BANNER ═══════════ */}
+            <section className="py-12 md:py-16">
                 <div className="max-w-7xl mx-auto px-4 md:px-6">
-                    <motion.div
-                        className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6"
-                        initial="hidden"
-                        whileInView="visible"
-                        viewport={{ once: true }}
-                        variants={staggerContainer}
-                    >
-                        <motion.div variants={fadeInUp} className="p-6 md:p-10 rounded-2xl md:rounded-[2rem] bg-gradient-to-br from-[#0569ff] to-[#0450d4] text-white relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 p-8 md:p-12 opacity-10 group-hover:scale-110 transition-transform duration-700">
-                                <Search className="w-32 md:w-64 h-32 md:h-64" />
-                            </div>
-                            <div className="relative z-10 h-full flex flex-col justify-between">
-                                <div>
-                                    <h3 className="text-xl md:text-3xl font-bold mb-3 md:mb-4">Smart Filters</h3>
-                                    <p className="text-blue-100 text-sm md:text-lg max-w-sm">
-                                        Find exactly what you need. Filter by board, fees, facilities, and more.
-                                    </p>
-                                </div>
-                                <Link href="/explore/schools">
-                                    <Button className="w-fit mt-6 md:mt-8 bg-white/20 hover:bg-white/30 text-white border-0 backdrop-blur-md rounded-full px-5 md:px-6 text-sm">
-                                        Try Filters <ArrowRight className="ml-2 h-4 w-4" />
-                                    </Button>
-                                </Link>
-                            </div>
-                        </motion.div>
-
-                        <motion.div variants={fadeInUp} className="p-6 md:p-10 rounded-2xl md:rounded-[2rem] bg-gray-50 border border-gray-200 relative overflow-hidden group hover:shadow-lg transition-all">
-                            <div className="h-full flex flex-col justify-center text-center items-center space-y-4 md:space-y-6">
-                                <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-[#0569ff]/10 shadow-lg flex items-center justify-center">
-                                    <Award className="w-6 h-6 md:w-8 md:h-8 text-[#0569ff]" />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg md:text-2xl font-bold mb-2 text-[#1a1a2e]">Verified Excellence</h3>
-                                    <p className="text-gray-500 max-w-md mx-auto text-sm md:text-base">
-                                        We verify every single data point so you can trust what you see.
-                                    </p>
-                                </div>
-                                <Link href="/explore/about">
-                                    <Button variant="outline" className="rounded-full px-5 md:px-6 border-[#0569ff] text-[#0569ff] hover:bg-[#0569ff] hover:text-white text-sm">Learn More</Button>
-                                </Link>
-                            </div>
-                        </motion.div>
-                    </motion.div>
+                    <div className="rounded-2xl bg-gradient-to-r from-[#1e40af] to-[#2563eb] p-8 md:p-12 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                        <div>
+                            <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
+                                Are you a School Administrator?
+                            </h2>
+                            <p className="text-blue-200 text-sm md:text-base max-w-md leading-relaxed">
+                                Join EduMarket to showcase your institution to thousands of parents and students looking for their perfect match.
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                            <Link href="/explore/about">
+                                <button className="h-11 px-6 rounded-full bg-white text-[#2563eb] text-sm font-semibold hover:bg-blue-50 transition-colors border border-white">
+                                    List Your School
+                                </button>
+                            </Link>
+                            <Link href="/explore/about">
+                                <button className="h-11 px-6 rounded-full bg-[#3b82f6] text-white text-sm font-semibold hover:bg-[#2563eb] transition-colors border border-white/20">
+                                    Learn More
+                                </button>
+                            </Link>
+                        </div>
+                    </div>
                 </div>
             </section>
 
-            {/* ===== FOOTER ===== */}
-            <section className="bg-gray-50 py-8">
-                <div className="text-center text-sm text-gray-500">
-                    © 2024 EduBreezy Explorer. <Link href="/explore/about" className="underline underline-offset-4 hover:text-[#0569ff]">About Us</Link>
+            {/* ═══════════ FOOTER ═══════════ */}
+            <footer className="bg-white border-t border-gray-100 py-8">
+                <div className="max-w-7xl mx-auto px-4 md:px-6 flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                        <SchoolIcon className="w-5 h-5 text-[#2563eb]" />
+                        <span className="font-bold text-[#0f172a]">EduBreezy</span>
+                    </div>
+                    <div className="flex items-center gap-6">
+                        <Link href="/explore/about" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">Privacy Policy</Link>
+                        <Link href="/explore/about" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">Terms of Service</Link>
+                        <Link href="/explore/about" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">Contact Support</Link>
+                    </div>
+                    <p className="text-xs text-gray-400">© 2024 EduBreezy Inc.</p>
                 </div>
-            </section>
+            </footer>
         </div>
     );
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect, useMemo } from "react"
+import { useState, useCallback, useEffect, useMemo, Fragment } from "react"
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
     LabelList,
@@ -145,7 +145,17 @@ function TeacherCombobox({ teachers, value, onChange, disabled }) {
 
 // ─── Capacity Indicator ────────────────────────────────────────────
 function CapacityIndicator({ current, max }) {
-    if (!max) return <span className="text-sm text-muted-foreground">{current} students</span>
+    if (!max) {
+        return current > 0 ? (
+            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800 font-medium text-xs">
+                <Users className="h-3 w-3 mr-1" />{current} students
+            </Badge>
+        ) : (
+            <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800 font-medium text-xs">
+                0 students
+            </Badge>
+        )
+    }
     const ratio = (current / max) * 100
     const color = ratio > 100 ? "bg-red-500" : ratio >= 80 ? "bg-orange-500" : "bg-green-500"
     const textColor = ratio > 100 ? "text-red-600" : ratio >= 80 ? "text-orange-600" : "text-green-600"
@@ -193,6 +203,8 @@ export default function ManageClassSectionPage() {
     const [addSectionOpen, setAddSectionOpen] = useState(false)
     const [addSectionClassId, setAddSectionClassId] = useState(null)
     const [addSectionName, setAddSectionName] = useState("")
+    const [expandedClasses, setExpandedClasses] = useState(new Set())
+
 
     // Reset page on filters
     useEffect(() => { setPage(1) }, [debouncedSearch, teacherFilter, capacityFilter])
@@ -245,6 +257,16 @@ export default function ManageClassSectionPage() {
     const classes = classesResponse?.data || (Array.isArray(classesResponse) ? classesResponse : [])
     const classesMeta = classesResponse?.meta || null
     const showTableSkeleton = isLoading || (isFetching && !classesResponse)
+
+    // Auto-expand all classes when data loads
+    useEffect(() => {
+        if (classes.length > 0) {
+            setExpandedClasses(prev => {
+                if (prev.size === 0) return new Set(classes.map(c => c.id))
+                return prev
+            })
+        }
+    }, [classes])
 
     // Active academic year
     const activeYear = classes.find(c => c.AcademicYear)?.AcademicYear
@@ -432,18 +454,31 @@ export default function ManageClassSectionPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(sectionData)
             })
-            if (!res.ok) throw new Error('Failed to add section')
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}))
+                throw new Error(err.error || 'Failed to add section')
+            }
             return res.json()
         },
-        onSuccess: () => {
+        onSuccess: async () => {
             toast.success("Section added")
+            // Auto-expand the class that just got a new section
+            if (addSectionClassId) {
+                setExpandedClasses(prev => {
+                    const next = new Set(prev)
+                    next.add(addSectionClassId)
+                    return next
+                })
+            }
             setAddSectionOpen(false)
             setAddSectionName("")
             setAddSectionClassId(null)
-            queryClient.invalidateQueries({ queryKey: ['classes'] })
-            queryClient.invalidateQueries({ queryKey: ['class-stats'] })
+            // Bust server-side Redis cache first, then refetch
+            await fetch(`/api/schools/${schoolId}/classes?noCache=true&limit=1`).catch(() => { })
+            queryClient.invalidateQueries({ queryKey: ['classes'], refetchType: 'all' })
+            queryClient.invalidateQueries({ queryKey: ['class-stats'], refetchType: 'all' })
         },
-        onError: () => toast.error("Failed to add section")
+        onError: (error) => toast.error(error.message || "Failed to add section")
     })
 
     const assignSupervisorMutation = useMutation({
@@ -899,7 +934,13 @@ export default function ManageClassSectionPage() {
                                 variant="outline"
                                 size="sm"
                                 className="bg-muted"
-                                onClick={() => queryClient.invalidateQueries({ queryKey: ['classes'] })}
+                                onClick={async () => {
+                                    // Bust server-side Redis cache by fetching with noCache
+                                    await fetch(`/api/schools/${schoolId}/classes?noCache=true&limit=1`)
+                                    // Then invalidate client-side queries to refetch fresh data
+                                    queryClient.invalidateQueries({ queryKey: ['classes'], refetchType: 'all' })
+                                    queryClient.invalidateQueries({ queryKey: ['class-stats'], refetchType: 'all' })
+                                }}
                                 disabled={isFetching}
                             >
                                 <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
@@ -923,9 +964,9 @@ export default function ManageClassSectionPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {(showTableSkeleton || isFetching) ? (
+                            {showTableSkeleton ? (
                                 Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)
-                            ) : paginatedRows.length === 0 ? (
+                            ) : classes.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={5} className="text-center py-12">
                                         <School className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
@@ -947,90 +988,114 @@ export default function ManageClassSectionPage() {
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                paginatedRows.map((row, idx) => {
-                                    if (row.type === 'empty-class') {
-                                        return (
-                                            <TableRow key={`empty-${row.cls.id}`} className="hover:bg-muted/50 transition-colors">
-                                                <TableCell>
-                                                    <Badge variant="outline" className="font-semibold text-sm">
-                                                        {displayClassName(row.cls.className)}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell colSpan={3} className="text-muted-foreground text-sm">
-                                                    <span className="flex items-center gap-2">
-                                                        <AlertTriangle className="h-3 w-3 text-orange-500" />
-                                                        No sections —
-                                                        <button
-                                                            className="text-primary underline underline-offset-2 text-sm"
-                                                            onClick={() => { setAddSectionClassId(row.cls.id); setAddSectionOpen(true) }}
-                                                        >
-                                                            Add section
-                                                        </button>
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell />
-                                            </TableRow>
-                                        )
+                                classes.map(cls => {
+                                    const isExpanded = expandedClasses.has(cls.id)
+                                    const totalStudents = cls.sections?.reduce((sum, s) => sum + (s._count?.students || 0), 0) || 0
+                                    const sectionCount = cls.sections?.length || 0
+                                    const toggleExpand = () => {
+                                        setExpandedClasses(prev => {
+                                            const next = new Set(prev)
+                                            if (next.has(cls.id)) next.delete(cls.id)
+                                            else next.add(cls.id)
+                                            return next
+                                        })
                                     }
 
-                                    const { cls, sec, isFirst } = row
-                                    const totalStudents = isFirst
-                                        ? cls.sections.reduce((sum, s) => sum + (s._count?.students || 0), 0)
-                                        : null
-
                                     return (
-                                        <TableRow key={sec.id} className="hover:bg-muted/50 transition-colors group">
-                                            <TableCell>
-                                                {isFirst && (
-                                                    <div className="flex items-center gap-2">
-                                                        <Badge variant="outline" className="font-semibold text-sm">
-                                                            {displayClassName(cls.className)}
-                                                        </Badge>
-                                                        <span className="text-xs text-muted-foreground hidden sm:inline">
-                                                            {cls.sections.length} sec • {totalStudents} students
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant="secondary" className="text-xs">{sec.name}</Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                <CapacityIndicator
-                                                    current={sec._count?.students || 0}
-                                                    max={cls.capacity}
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                <TeacherCombobox
-                                                    teachers={teachers}
-                                                    value={sec.teachingStaffUserId}
-                                                    onChange={(teacherId) => handleSupervisorChange(sec.id, teacherId)}
-                                                    disabled={assignSupervisorMutation.isPending}
-                                                />
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => router.push(`/dashboard/schools/create-classes/${cls.id}/students`)}
-                                                    >
-                                                        <Eye className="mr-1.5 h-3.5 w-3.5" />
-                                                        View
-                                                    </Button>
-                                                    {sec.id === cls.sections[cls.sections.length - 1]?.id && (
+                                        <Fragment key={cls.id}>
+                                            {/* Class Group Header */}
+                                            <TableRow
+                                                className="bg-muted/40 hover:bg-muted/60 cursor-pointer transition-colors"
+                                                onClick={toggleExpand}
+                                            >
+                                                <TableCell colSpan={5}>
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2.5">
+                                                            {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                                                            <Badge variant="outline" className="font-semibold text-sm">
+                                                                {displayClassName(cls.className)}
+                                                            </Badge>
+                                                            <span className="text-xs text-muted-foreground">
+                                                                {sectionCount} {sectionCount === 1 ? 'section' : 'sections'} · {totalStudents} {totalStudents === 1 ? 'student' : 'students'}
+                                                            </span>
+                                                        </div>
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
-                                                            onClick={() => { setAddSectionClassId(cls.id); setAddSectionOpen(true) }}
+                                                            className="h-7 text-xs"
+                                                            onClick={(e) => { e.stopPropagation(); setAddSectionClassId(cls.id); setAddSectionOpen(true) }}
                                                         >
-                                                            <Plus className="h-3.5 w-3.5" />
+                                                            <Plus className="h-3.5 w-3.5 mr-1" /> Section
                                                         </Button>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+
+                                            {/* Sections (expanded) */}
+                                            {isExpanded && (
+                                                <>
+                                                    {!cls.sections?.length ? (
+                                                        <TableRow>
+                                                            <TableCell colSpan={5} className="py-4 text-center">
+                                                                <span className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                                                                    <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
+                                                                    No sections yet —
+                                                                    <button
+                                                                        className="text-primary underline underline-offset-2 text-sm"
+                                                                        onClick={() => { setAddSectionClassId(cls.id); setAddSectionOpen(true) }}
+                                                                    >
+                                                                        Add one
+                                                                    </button>
+                                                                </span>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ) : (
+                                                        cls.sections.map(sec => (
+                                                            <TableRow key={sec.id} className="hover:bg-muted/50 transition-colors group">
+                                                                <TableCell className="pl-10" />
+                                                                <TableCell>
+                                                                    <Badge variant="secondary" className="text-xs">{sec.name}</Badge>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <CapacityIndicator
+                                                                        current={sec._count?.students || 0}
+                                                                        max={cls.capacity}
+                                                                    />
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <TeacherCombobox
+                                                                        teachers={teachers}
+                                                                        value={sec.teachingStaffUserId}
+                                                                        onChange={(teacherId) => handleSupervisorChange(sec.id, teacherId)}
+                                                                        disabled={assignSupervisorMutation.isPending}
+                                                                    />
+                                                                </TableCell>
+                                                                <TableCell className="text-right">
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() => router.push(`/dashboard/schools/create-classes/${cls.id}/students`)}
+                                                                    >
+                                                                        <Eye className="mr-1.5 h-3.5 w-3.5" />
+                                                                        View
+                                                                    </Button>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ))
                                                     )}
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
+                                                    {/* Optimistic skeleton row while section is being created */}
+                                                    {(createSectionMutation.isPending && createSectionMutation.variables?.classId === cls.id) && (
+                                                        <TableRow className="animate-pulse">
+                                                            <TableCell className="pl-10" />
+                                                            <TableCell><div className="h-5 w-8 bg-muted rounded" /></TableCell>
+                                                            <TableCell><div className="h-5 w-20 bg-muted rounded" /></TableCell>
+                                                            <TableCell><div className="h-8 w-40 bg-muted rounded" /></TableCell>
+                                                            <TableCell className="text-right"><div className="h-8 w-16 bg-muted rounded ml-auto" /></TableCell>
+                                                        </TableRow>
+                                                    )}
+                                                </>
+                                            )}
+                                        </Fragment>
                                     )
                                 })
                             )}
@@ -1227,7 +1292,11 @@ export default function ManageClassSectionPage() {
                                     <SelectValue placeholder="Select section name" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(sec => (
+                                    {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').filter(letter => {
+                                        const cls = classes.find(c => c.id === addSectionClassId)
+                                        const existing = cls?.sections?.map(s => s.name.toUpperCase()) || []
+                                        return !existing.includes(letter)
+                                    }).map(sec => (
                                         <SelectItem key={sec} value={sec}>{sec}</SelectItem>
                                     ))}
                                 </SelectContent>

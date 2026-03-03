@@ -290,6 +290,10 @@ model SchoolPublicProfile {
   logoImage  String?
   videoUrl   String?
 
+  // Location Coordinates (for Google Maps embed)
+  latitude  Float?
+  longitude Float?
+
   // Contact
   publicEmail String?
   publicPhone String?
