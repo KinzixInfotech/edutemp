@@ -209,7 +209,8 @@ export async function GET(request) {
 // CORE PROCESSING LOGIC
 // -------------------------------------------------------------
 
-async function processEvent(event) {
+export async function processEvent(event) {
+
     // 1. Prepare Target Options
     const targetOptions = buildTargetOptions(event);
 

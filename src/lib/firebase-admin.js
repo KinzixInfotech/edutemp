@@ -24,9 +24,16 @@ try {
     serviceAccount = JSON.parse(raw);
     console.log('Firebase Admin: Initialized from ENV (project_id:', serviceAccount.project_id, ')');
   } else {
-    serviceAccount = require('../../firebase-admin.json');
-    console.log('Firebase Admin: Initialized from local file (project_id:', serviceAccount.project_id, ')');
+    try {
+      // Use eval('require') to hide from Webpack/Vercel build
+      const localServiceAccount = eval('require')('../../firebase-admin.json');
+      serviceAccount = localServiceAccount;
+      console.log('Firebase Admin: Initialized from local file');
+    } catch (err) {
+      throw new Error('Firebase Service Account not found (ENV or local file)');
+    }
   }
+
 
   // Validate required fields
   if (!serviceAccount.project_id || !serviceAccount.private_key || !serviceAccount.client_email) {

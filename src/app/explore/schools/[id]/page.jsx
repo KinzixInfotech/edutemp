@@ -119,7 +119,8 @@ export async function generateMetadata(props) {
 }
 
 // ISR settings: Disable caching in development, use short cache in production
-export const revalidate = process.env.NODE_ENV === 'development' ? 0 : 60;
+export const revalidate = 60;
+
 
 async function getSchool(id) {
     const baseUrl = getBaseUrl();
