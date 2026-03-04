@@ -14,7 +14,6 @@ import FloatingDemoButton from "@/components/FloatingDemoButton";
 import AOSProvider from "@/components/AosProvider";
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.edubreezy.com';
-
 export const metadata = {
   // Core metadata
   title: {

@@ -27,8 +27,6 @@ export async function GET(req) {
     const academicYearId = sanitizeUUID(searchParams.get("academicYearId"));
     const classId = searchParams.get("classId");
 
-    console.log('📊 [FEE DASHBOARD] Request params:', { schoolId, academicYearId, classId });
-
     if (!schoolId || !academicYearId) {
       return NextResponse.json(
         { error: "Invalid or missing schoolId/academicYearId" },
@@ -45,24 +43,17 @@ export async function GET(req) {
     const startDate = academicYear?.startDate;
     const endDate = academicYear?.endDate || new Date(); // Default to now if no end date
 
-    // Generate cache key
+    // Cache key is class-agnostic — we cache the full dataset and filter in memory.
+    // This prevents cache storms when users switch between class filters.
     const cacheKey = generateKey('fee-dashboard', {
       schoolId,
       academicYearId,
-      classId: classId || 'all',
     });
 
     // Use Redis caching with 60 second TTL
-    const stats = await remember(cacheKey, async () => {
-      const where = {
-        schoolId,
-        academicYearId,
-        ...(classId && classId !== 'all' && { student: { classId: parseInt(classId) } }),
-      };
-
-      // Debug: Check if any StudentFee records exist
-      const totalRecords = await prisma.studentFee.count({ where: { schoolId, academicYearId } });
-      console.log(`📊 [FEE DASHBOARD] Total StudentFee records: ${totalRecords}`);
+    const rawStats = await remember(cacheKey, async () => {
+      // Always fetch all classes (unfiltered) for caching
+      const where = { schoolId, academicYearId };
 
       // Parallel queries for performance
       const [
@@ -142,7 +133,7 @@ export async function GET(req) {
             },
           },
           orderBy: { paymentDate: "desc" },
-          take: 100, // Limit to last 100 for performance
+          take: 100,
         }),
         // Overdue Students
         prisma.studentFee.findMany({
@@ -174,58 +165,31 @@ export async function GET(req) {
           take: 20,
         }),
 
-        // Class-wise collection stats
-        prisma.studentFee
-          .groupBy({
-            by: ["studentId"],
-            where,
-            _sum: {
-              originalAmount: true,
-              paidAmount: true,
-              balanceAmount: true,
-            },
-          })
-          .then(async (results) => {
-            const studentIds = results.map((r) => r.studentId);
-            const students = await prisma.student.findMany({
-              where: { userId: { in: studentIds } },
-              select: { userId: true, classId: true },
-            });
+        // Class-wise collection stats — single raw SQL join (was a 3-query N+1 waterfall)
+        prisma.$queryRaw`
+          SELECT
+            c.id AS "classId",
+            c."className",
+            SUM(sf."originalAmount") AS expected,
+            SUM(sf."paidAmount") AS collected,
+            SUM(sf."balanceAmount") AS balance,
+            COUNT(DISTINCT sf."studentId")::int AS count
+          FROM "StudentFee" sf
+          JOIN "Student" s ON s."userId" = sf."studentId"
+          JOIN "Class" c ON c.id = s."classId"
+          WHERE sf."schoolId" = ${schoolId}::uuid
+            AND sf."academicYearId" = ${academicYearId}::uuid
+          GROUP BY c.id, c."className"
+          ORDER BY c."className"
+        `.then(rows => rows.map(r => ({
+          classId: Number(r.classId),
+          className: r.className,
+          expected: Number(r.expected || 0),
+          collected: Number(r.collected || 0),
+          balance: Number(r.balance || 0),
+          count: Number(r.count || 0),
+        }))).catch(() => []),
 
-            const classMap = {};
-            students.forEach((s) => {
-              if (!classMap[s.classId]) {
-                classMap[s.classId] = {
-                  expected: 0,
-                  collected: 0,
-                  balance: 0,
-                  count: 0,
-                };
-              }
-            });
-
-            results.forEach((r) => {
-              const student = students.find((s) => s.userId === r.studentId);
-              if (student) {
-                const stats = classMap[student.classId];
-                stats.expected += r._sum.originalAmount || 0;
-                stats.collected += r._sum.paidAmount || 0;
-                stats.balance += r._sum.balanceAmount || 0;
-                stats.count += 1;
-              }
-            });
-
-            const classes = await prisma.class.findMany({
-              where: { id: { in: Object.keys(classMap).map(Number) } },
-              select: { id: true, className: true },
-            });
-
-            return classes.map((c) => ({
-              classId: c.id,
-              className: c.className,
-              ...classMap[c.id],
-            }));
-          }),
 
         // Payment method distribution
         prisma.feePayment.groupBy({
@@ -261,8 +225,6 @@ export async function GET(req) {
 
       ]);
 
-      console.log('📊 [FEE DASHBOARD] Recent payments found:', recentPayments?.length, recentPayments?.[0]?.id);
-
       return safeJSON({
         summary: {
           totalExpected: totalExpected._sum.originalAmount || 0,
@@ -295,6 +257,16 @@ export async function GET(req) {
         monthlyCollection,
       });
     }, 60); // Cache for 60 seconds
+
+    // Apply class filter in memory — avoids separate cache entry per class
+    let stats = rawStats;
+    if (classId && classId !== 'all' && rawStats) {
+      const classIdInt = parseInt(classId);
+      stats = {
+        ...rawStats,
+        classWiseStats: rawStats.classWiseStats?.filter(c => c.classId === classIdInt) || [],
+      };
+    }
 
     return NextResponse.json(stats);
   } catch (error) {

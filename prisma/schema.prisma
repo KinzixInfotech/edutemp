@@ -2822,6 +2822,7 @@ model Attendance {
   @@unique([userId, schoolId, date])
   @@index([userId, date])
   @@index([schoolId, date])
+  @@index([schoolId, date, status]) // Composite for dashboard count queries
   @@index([status])
   @@index([approvalStatus])
   @@index([markedBy])
@@ -4209,6 +4210,7 @@ model StudentFee {
 
   @@unique([studentId, academicYearId])
   @@index([schoolId, academicYearId])
+  @@index([schoolId, academicYearId, balanceAmount]) // Composite for outstanding fees queries
   @@index([status])
   @@index([studentId])
 }
@@ -4342,6 +4344,7 @@ model FeePayment {
   @@index([studentFeeId])
   @@index([studentId])
   @@index([schoolId, academicYearId])
+  @@index([schoolId, academicYearId, status, paymentDate]) // Composite for fee dashboard queries
   @@index([status])
   @@index([paymentDate])
   @@index([receiptNumber])

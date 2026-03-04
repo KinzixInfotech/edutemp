@@ -1,5 +1,4 @@
 'use client';
-
 import { useState, useMemo } from 'react';
 import {
   BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
@@ -32,7 +31,6 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
-
 export default function AdminFeeDashboard() {
   const { fullUser } = useAuth();
   const schoolId = fullUser?.schoolId;
@@ -89,9 +87,11 @@ export default function AdminFeeDashboard() {
   const { data: classes } = useQuery({
     queryKey: ['classes', schoolId],
     queryFn: async () => {
-      const res = await fetch(`/api/schools/${schoolId}/classes`);
+      const res = await fetch(`/api/schools/${schoolId}/classes?limit=-1`);
       if (!res.ok) throw new Error('Failed');
-      return res.json();
+      const json = await res.json();
+      // API returns plain array when limit=-1, or paginated object otherwise
+      return Array.isArray(json) ? json : (json.data ?? []);
     },
     enabled: !!schoolId,
   });

@@ -2,6 +2,7 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import dayjs from "dayjs";
+import { remember, generateKey } from '@/lib/cache';
 
 export async function GET(req, props) {
   const params = await props.params;
@@ -94,31 +95,40 @@ export async function GET(req, props) {
     }
     const groupByMonth = trendRange === '6m' || trendRange === '1y';
 
-    // PARALLEL BATCH 2: All remaining queries
-    const [
-      notMarkedCount,
-      roleWiseStats,
-      classWiseStats,
-      teacherActivity,
-      monthlyTrend,
-      pendingApprovals,
-      pendingLeaves,
-      workingDaysCount,
-      lowAttendanceUsers,
-      recentActivity
-    ] = await Promise.all([
-      // Not marked count
-      prisma.user.count({
-        where: {
-          schoolId,
-          deletedAt: null,
-          status: 'ACTIVE',
-          attendance: { none: { date: today } }
-        }
-      }),
+    // Redis cache key scoped to schoolId, date, and trendRange
+    const cacheKey = generateKey('attendance-admin-dashboard', {
+      schoolId,
+      date: todayStr,
+      trendRange,
+    });
 
-      // Role-wise stats (raw SQL is already optimized)
-      prisma.$queryRaw`
+    const dashboardData = await remember(cacheKey, async () => {
+
+      // PARALLEL BATCH 2: All remaining queries
+      const [
+        notMarkedCount,
+        roleWiseStats,
+        classWiseStats,
+        teacherActivity,
+        monthlyTrend,
+        pendingApprovals,
+        pendingLeaves,
+        workingDaysCount,
+        lowAttendanceUsers,
+        recentActivity
+      ] = await Promise.all([
+        // Not marked count
+        prisma.user.count({
+          where: {
+            schoolId,
+            deletedAt: null,
+            status: 'ACTIVE',
+            attendance: { none: { date: today } }
+          }
+        }),
+
+        // Role-wise stats (raw SQL is already optimized)
+        prisma.$queryRaw`
         SELECT 
           r.name as "roleName",
           r.id as "roleId",
@@ -136,8 +146,8 @@ export async function GET(req, props) {
         ORDER BY r.name
       `,
 
-      // Class-wise stats
-      prisma.$queryRaw`
+        // Class-wise stats
+        prisma.$queryRaw`
         SELECT 
           c.id as "classId",
           c."className",
@@ -157,43 +167,43 @@ export async function GET(req, props) {
         ORDER BY c."className"
       `,
 
-      // Teacher activity (simplified - no streak calculation per teacher)
-      prisma.attendance.findMany({
-        where: {
-          schoolId,
-          date: today,
-          user: { role: { name: 'TEACHING_STAFF' } }
-        },
-        select: {
-          userId: true,
-          checkInTime: true,
-          checkOutTime: true,
-          workingHours: true,
-          status: true,
-          isLateCheckIn: true,
-          lateByMinutes: true,
-          checkInLocation: true,
-          checkOutLocation: true,
-          deviceInfo: true,
-          remarks: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-              profilePicture: true,
-              teacher: {
-                select: { employeeId: true, designation: true }
+        // Teacher activity (simplified - no streak calculation per teacher)
+        prisma.attendance.findMany({
+          where: {
+            schoolId,
+            date: today,
+            user: { role: { name: 'TEACHING_STAFF' } }
+          },
+          select: {
+            userId: true,
+            checkInTime: true,
+            checkOutTime: true,
+            workingHours: true,
+            status: true,
+            isLateCheckIn: true,
+            lateByMinutes: true,
+            checkInLocation: true,
+            checkOutLocation: true,
+            deviceInfo: true,
+            remarks: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                profilePicture: true,
+                teacher: {
+                  select: { employeeId: true, designation: true }
+                }
               }
             }
-          }
-        },
-        orderBy: { checkInTime: 'desc' },
-        take: 30  // Limit for performance
-      }),
+          },
+          orderBy: { checkInTime: 'desc' },
+          take: 30  // Limit for performance
+        }),
 
-      // Monthly/daily trend (conditional grouping)
-      groupByMonth
-        ? prisma.$queryRaw`
+        // Monthly/daily trend (conditional grouping)
+        groupByMonth
+          ? prisma.$queryRaw`
             SELECT 
               DATE_TRUNC('month', a.date) as date,
               COUNT(CASE WHEN a.status = 'PRESENT' THEN 1 END) as present,
@@ -208,7 +218,7 @@ export async function GET(req, props) {
             GROUP BY DATE_TRUNC('month', a.date)
             ORDER BY date ASC
           `
-        : prisma.$queryRaw`
+          : prisma.$queryRaw`
             SELECT 
               DATE(a.date) as date,
               COUNT(CASE WHEN a.status = 'PRESENT' THEN 1 END) as present,
@@ -224,153 +234,156 @@ export async function GET(req, props) {
             ORDER BY date ASC
           `,
 
-      // Pending approvals
-      prisma.attendance.count({
-        where: { schoolId, approvalStatus: 'PENDING', requiresApproval: true }
-      }),
+        // Pending approvals
+        prisma.attendance.count({
+          where: { schoolId, approvalStatus: 'PENDING', requiresApproval: true }
+        }),
 
-      // Pending leaves
-      prisma.leaveRequest.count({
-        where: { schoolId, status: 'PENDING' }
-      }),
+        // Pending leaves
+        prisma.leaveRequest.count({
+          where: { schoolId, status: 'PENDING' }
+        }),
 
-      // Working days count
-      prisma.schoolCalendar.count({
-        where: {
-          schoolId,
-          dayType: 'WORKING_DAY',
-          date: { gte: monthStart, lte: today }
-        }
-      }),
-
-      // Low attendance users (optimized query with limit)
-      prisma.attendanceStats.findMany({
-        where: {
-          schoolId,
-          academicYearId: academicYear.id,
-          month: date.getMonth() + 1,
-          year: date.getFullYear(),
-          attendancePercentage: { lt: 75 }
-        },
-        select: {
-          attendancePercentage: true,
-          totalPresent: true,
-          totalAbsent: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              role: { select: { name: true } },
-              student: {
-                select: {
-                  admissionNo: true,
-                  class: { select: { className: true } },
-                  section: { select: { name: true } }
-                }
-              }
-            }
+        // Working days count
+        prisma.schoolCalendar.count({
+          where: {
+            schoolId,
+            dayType: 'WORKING_DAY',
+            date: { gte: monthStart, lte: today }
           }
-        },
-        orderBy: { attendancePercentage: 'asc' },
-        take: 10  // Reduced from 20
-      }),
+        }),
 
-      // Recent activity (reduced and simplified)
-      prisma.attendance.findMany({
-        where: { schoolId, date: today },
-        select: {
-          id: true,
-          status: true,
-          checkInTime: true,
-          markedAt: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-              profilePicture: true,
-              role: { select: { name: true } },
-              student: {
-                select: {
-                  admissionNo: true,
-                  class: { select: { className: true } }
+        // Low attendance users (optimized query with limit)
+        prisma.attendanceStats.findMany({
+          where: {
+            schoolId,
+            academicYearId: academicYear.id,
+            month: date.getMonth() + 1,
+            year: date.getFullYear(),
+            attendancePercentage: { lt: 75 }
+          },
+          select: {
+            attendancePercentage: true,
+            totalPresent: true,
+            totalAbsent: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                role: { select: { name: true } },
+                student: {
+                  select: {
+                    admissionNo: true,
+                    class: { select: { className: true } },
+                    section: { select: { name: true } }
+                  }
                 }
               }
             }
           },
-          marker: { select: { name: true } }
+          orderBy: { attendancePercentage: 'asc' },
+          take: 10  // Reduced from 20
+        }),
+
+        // Recent activity (reduced and simplified)
+        prisma.attendance.findMany({
+          where: { schoolId, date: today },
+          select: {
+            id: true,
+            status: true,
+            checkInTime: true,
+            markedAt: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                profilePicture: true,
+                role: { select: { name: true } },
+                student: {
+                  select: {
+                    admissionNo: true,
+                    class: { select: { className: true } }
+                  }
+                }
+              }
+            },
+            marker: { select: { name: true } }
+          },
+          orderBy: { markedAt: 'desc' },
+          take: 20
+        })
+      ]); // end Promise.all
+
+      todayOverview.notMarked = notMarkedCount;
+
+      const MIN_WORKING_DAYS = 10;
+      const hasInsufficientData = workingDaysCount < MIN_WORKING_DAYS;
+
+      // Format teacher activity
+      const teacherActivityFormatted = teacherActivity.map(att => ({
+        userId: att.user.id,
+        name: att.user.name,
+        employeeId: att.user.teacher?.employeeId,
+        designation: att.user.teacher?.designation,
+        profilePicture: att.user.profilePicture,
+        checkInTime: att.checkInTime,
+        checkOutTime: att.checkOutTime,
+        workingHours: att.workingHours || 0,
+        status: att.status,
+        isLateCheckIn: att.isLateCheckIn,
+        lateByMinutes: att.lateByMinutes,
+        location: {
+          checkIn: att.checkInLocation,
+          checkOut: att.checkOutLocation
         },
-        orderBy: { markedAt: 'desc' },
-        take: 20  // Reduced from 50
-      })
-    ]);
+        deviceInfo: att.deviceInfo,
+        remarks: att.remarks
+      }));
 
-    todayOverview.notMarked = notMarkedCount;
+      return {
+        dayInfo,
+        todayOverview: { ...todayOverview, notMarked: notMarkedCount },
+        roleWiseStats: roleWiseStats.map(stat => ({
+          ...stat,
+          totalUsers: Number(stat.totalUsers),
+          present: Number(stat.present),
+          absent: Number(stat.absent),
+          late: Number(stat.late),
+          halfDay: Number(stat.halfDay),
+          onLeave: Number(stat.onLeave),
+        })),
+        classWiseStats: classWiseStats.map(stat => ({
+          ...stat,
+          totalStudents: Number(stat.totalStudents),
+          present: Number(stat.present),
+          absent: Number(stat.absent),
+          late: Number(stat.late),
+          attendancePercentage: Number(stat.attendancePercentage || 0),
+        })),
+        teacherActivity: teacherActivityFormatted,
+        monthlyTrend: monthlyTrend.map(day => ({
+          ...day,
+          present: Number(day.present),
+          absent: Number(day.absent),
+          late: Number(day.late),
+          halfDay: Number(day.halfDay),
+          onLeave: Number(day.onLeave),
+        })),
+        alerts: {
+          pendingApprovals,
+          pendingLeaves,
+          lowAttendanceCount: hasInsufficientData ? 0 : lowAttendanceUsers.length,
+          hasInsufficientData,
+          workingDaysCount,
+          minWorkingDays: MIN_WORKING_DAYS,
+        },
+        lowAttendanceUsers: hasInsufficientData ? [] : lowAttendanceUsers,
+        recentActivity,
+      };
+    }, 30); // Redis cache: 30 seconds TTL (matches Cache-Control header)
 
-    const MIN_WORKING_DAYS = 10;
-    const hasInsufficientData = workingDaysCount < MIN_WORKING_DAYS;
-
-    // Format teacher activity (without expensive streak calculation)
-    const teacherActivityFormatted = teacherActivity.map(att => ({
-      userId: att.user.id,
-      name: att.user.name,
-      employeeId: att.user.teacher?.employeeId,
-      designation: att.user.teacher?.designation,
-      profilePicture: att.user.profilePicture,
-      checkInTime: att.checkInTime,
-      checkOutTime: att.checkOutTime,
-      workingHours: att.workingHours || 0,
-      status: att.status,
-      isLateCheckIn: att.isLateCheckIn,
-      lateByMinutes: att.lateByMinutes,
-      location: {
-        checkIn: att.checkInLocation,
-        checkOut: att.checkOutLocation
-      },
-      deviceInfo: att.deviceInfo,
-      remarks: att.remarks
-    }));
-
-    return NextResponse.json({
-      dayInfo,
-      todayOverview,
-      roleWiseStats: roleWiseStats.map(stat => ({
-        ...stat,
-        totalUsers: Number(stat.totalUsers),
-        present: Number(stat.present),
-        absent: Number(stat.absent),
-        late: Number(stat.late),
-        halfDay: Number(stat.halfDay),
-        onLeave: Number(stat.onLeave),
-      })),
-      classWiseStats: classWiseStats.map(stat => ({
-        ...stat,
-        totalStudents: Number(stat.totalStudents),
-        present: Number(stat.present),
-        absent: Number(stat.absent),
-        late: Number(stat.late),
-        attendancePercentage: Number(stat.attendancePercentage || 0),
-      })),
-      teacherActivity: teacherActivityFormatted,
-      monthlyTrend: monthlyTrend.map(day => ({
-        ...day,
-        present: Number(day.present),
-        absent: Number(day.absent),
-        late: Number(day.late),
-        halfDay: Number(day.halfDay),
-        onLeave: Number(day.onLeave),
-      })),
-      alerts: {
-        pendingApprovals,
-        pendingLeaves,
-        lowAttendanceCount: hasInsufficientData ? 0 : lowAttendanceUsers.length,
-        hasInsufficientData,
-        workingDaysCount,
-        minWorkingDays: MIN_WORKING_DAYS,
-      },
-      lowAttendanceUsers: hasInsufficientData ? [] : lowAttendanceUsers,
-      recentActivity,
-    }, {
+    return NextResponse.json(dashboardData, {
       headers: {
         'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
       }
