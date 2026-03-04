@@ -263,6 +263,42 @@ export async function GET(req, props) {
                     ? ((calculatedStats.totalPresent + calculatedStats.totalLate + (calculatedStats.totalHalfDay * 0.5)) / effectiveWorkingDays) * 100
                     : 0;
 
+                // Compute yearlyAggregate from REAL attendance records (not stale AttendanceStats)
+                const allYearAttendance = await prisma.attendance.findMany({
+                    where: {
+                        userId,
+                        schoolId,
+                        date: {
+                            gte: academicYear.startDate,
+                            lte: academicYear.endDate
+                        }
+                    },
+                    select: { status: true }
+                });
+
+                const allYearWorkingDays = await prisma.schoolCalendar.count({
+                    where: {
+                        schoolId,
+                        date: {
+                            gte: academicYear.startDate,
+                            lte: new Date() > new Date(academicYear.endDate) ? academicYear.endDate : new Date()
+                        },
+                        dayType: 'WORKING_DAY'
+                    }
+                });
+
+                const yearlyAggregate = allYearAttendance.reduce((acc, record) => {
+                    if (record.status === 'PRESENT') acc.totalPresent++;
+                    else if (record.status === 'ABSENT') acc.totalAbsent++;
+                    else if (record.status === 'LATE') acc.totalLate++;
+                    else if (record.status === 'HALF_DAY') acc.totalHalfDay++;
+                    else if (record.status === 'ON_LEAVE') acc.totalLeaves++;
+                    return acc;
+                }, { totalPresent: 0, totalAbsent: 0, totalHalfDay: 0, totalLate: 0, totalLeaves: 0 });
+
+                // Use calendar working days, fallback to total records
+                yearlyAggregate.totalWorkingDays = allYearWorkingDays > 0 ? allYearWorkingDays : allYearAttendance.length;
+
                 return {
                     userId,
                     monthlyStats: {
@@ -275,21 +311,7 @@ export async function GET(req, props) {
                         attendancePercentage: percentage
                     },
                     yearlyStats,
-                    yearlyAggregate: yearlyStats.reduce((acc, stat) => ({
-                        totalPresent: acc.totalPresent + stat.totalPresent,
-                        totalAbsent: acc.totalAbsent + stat.totalAbsent,
-                        totalHalfDay: acc.totalHalfDay + stat.totalHalfDay,
-                        totalLate: acc.totalLate + stat.totalLate,
-                        totalLeaves: acc.totalLeaves + stat.totalLeaves,
-                        totalWorkingDays: acc.totalWorkingDays + stat.totalWorkingDays
-                    }), {
-                        totalPresent: 0,
-                        totalAbsent: 0,
-                        totalHalfDay: 0,
-                        totalLate: 0,
-                        totalLeaves: 0,
-                        totalWorkingDays: 0
-                    }),
+                    yearlyAggregate,
                     recentAttendance,
                     streak,
                     workingDaysInMonth: effectiveWorkingDays

@@ -26,7 +26,7 @@ const getRoleSpecificData = async (userId, roleName) => {
             return prisma.student.findUnique({
                 where: { userId },
                 select: {
-                    id: true,
+                    userId: true,
                     name: true,
                     email: true,
                     admissionNo: true,

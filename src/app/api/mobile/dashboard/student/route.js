@@ -20,9 +20,11 @@ export async function GET(request) {
             );
         }
 
-        const now = new Date();
-        const month = now.getMonth() + 1;
-        const year = now.getFullYear();
+        // Fetch the active academic year for this school
+        const activeYear = await prisma.academicYear.findFirst({
+            where: { schoolId, isActive: true },
+            select: { id: true, name: true, startDate: true, endDate: true }
+        });
 
         // Execute all queries in parallel for maximum speed
         const [
@@ -35,10 +37,10 @@ export async function GET(request) {
         ] = await Promise.all([
             // 1. Recent Notices
             fetchNotices(schoolId, userId),
-            // 2. Attendance Stats
-            fetchAttendanceStats(schoolId, userId, month, year),
-            // 3. Exam Results
-            fetchExamResults(schoolId, userId),
+            // 2. Attendance Stats (full academic year)
+            fetchAttendanceStats(schoolId, userId, activeYear),
+            // 3. Exam Results (scoped to academic year)
+            fetchExamResults(schoolId, userId, activeYear),
             // 4. Homework
             fetchHomework(userId),
             // 5. Upcoming Events
@@ -55,7 +57,8 @@ export async function GET(request) {
                 exams: examsData,
                 homework: homeworkData,
                 events: eventsData,
-                student: studentData
+                student: studentData,
+                academicYear: activeYear ? { name: activeYear.name, startDate: activeYear.startDate, endDate: activeYear.endDate } : null
             }
         });
 
@@ -76,24 +79,24 @@ async function fetchNotices(schoolId, userId) {
             where: {
                 schoolId,
                 OR: [
-                    { targetAudience: 'ALL' },
-                    { targetAudience: 'STUDENTS' },
+                    { audience: 'ALL' },
+                    { audience: 'STUDENTS' },
                     {
-                        noticeRecipients: {
+                        NoticeTarget: {
                             some: { userId }
                         }
                     }
                 ]
             },
-            orderBy: { createdAt: 'desc' },
+            orderBy: { id: 'desc' },
             take: 4,
             select: {
                 id: true,
                 title: true,
                 createdAt: true,
-                noticeRecipients: {
+                NoticeReads: {
                     where: { userId },
-                    select: { isRead: true }
+                    select: { id: true }
                 }
             }
         });
@@ -102,7 +105,7 @@ async function fetchNotices(schoolId, userId) {
             id: n.id,
             title: n.title,
             time: n.createdAt,
-            unread: !n.noticeRecipients?.[0]?.isRead
+            unread: n.NoticeReads.length === 0
         }));
     } catch (error) {
         console.error('fetchNotices error:', error);
@@ -110,80 +113,117 @@ async function fetchNotices(schoolId, userId) {
     }
 }
 
-async function fetchAttendanceStats(schoolId, userId, month, year) {
+async function fetchAttendanceStats(schoolId, userId, activeYear) {
     try {
-        const startDate = new Date(year, month - 1, 1);
-        const endDate = new Date(year, month, 0);
+        // Use the full academic year date range (not just current month)
+        const now = new Date();
+        const startDate = activeYear?.startDate ? new Date(activeYear.startDate) : new Date(now.getFullYear(), 3, 1); // Fallback: April 1
+        const endDate = activeYear?.endDate ? new Date(activeYear.endDate) : now; // Fallback: today
+        // Don't count future days - cap at today
+        const effectiveEndDate = endDate > now ? now : endDate;
 
         const [attendanceRecords, workingDays] = await Promise.all([
             prisma.attendance.findMany({
                 where: {
                     schoolId,
-                    studentId: userId,
-                    date: { gte: startDate, lte: endDate }
+                    userId,
+                    date: { gte: startDate, lte: effectiveEndDate }
                 },
                 select: { status: true }
             }),
             prisma.schoolCalendar.count({
                 where: {
                     schoolId,
-                    date: { gte: startDate, lte: endDate },
-                    isWorkingDay: true
+                    date: { gte: startDate, lte: effectiveEndDate },
+                    dayType: 'WORKING_DAY'
                 }
             })
         ]);
 
         const present = attendanceRecords.filter(a => a.status === 'PRESENT').length;
         const absent = attendanceRecords.filter(a => a.status === 'ABSENT').length;
+        const late = attendanceRecords.filter(a => a.status === 'LATE').length;
         const total = workingDays || attendanceRecords.length;
 
         return {
             monthlyStats: {
-                attendancePercentage: total > 0 ? Math.round((present / total) * 100) : 0,
-                totalPresent: present,
+                attendancePercentage: total > 0 ? Math.round(((present + late) / total) * 100) : 0,
+                totalPresent: present + late,
                 totalAbsent: absent,
-                totalWorkingDays: total
+                totalWorkingDays: total,
+                totalLate: late
             }
         };
     } catch (error) {
         console.error('fetchAttendanceStats error:', error);
-        return { monthlyStats: { attendancePercentage: 0, totalPresent: 0, totalAbsent: 0, totalWorkingDays: 0 } };
+        return { monthlyStats: { attendancePercentage: 0, totalPresent: 0, totalAbsent: 0, totalWorkingDays: 0, totalLate: 0 } };
     }
 }
 
-async function fetchExamResults(schoolId, userId) {
+async function fetchExamResults(schoolId, userId, activeYear) {
     try {
         const results = await prisma.examResult.findMany({
             where: {
                 studentId: userId,
-                exam: { schoolId }
+                exam: {
+                    schoolId,
+                    ...(activeYear?.id ? { academicYearId: activeYear.id } : {})
+                }
             },
-            orderBy: { createdAt: 'desc' },
+            orderBy: { id: 'desc' },
             take: 10,
             include: {
                 exam: {
-                    select: { name: true, examDate: true, totalMarks: true }
+                    select: { title: true, startDate: true }
+                },
+                subject: {
+                    select: { subjectName: true }
                 }
             }
         });
 
-        const totalExams = results.length;
-        const totalPassed = results.filter(r => r.isPassed).length;
-        const avgPercentage = totalExams > 0
-            ? Math.round(results.reduce((sum, r) => sum + (r.percentage || 0), 0) / totalExams)
-            : 0;
+        if (results.length === 0) return { results: [], stats: { totalExams: 0, totalPassed: 0, avgPercentage: 0 } };
+
+        // Fetch maxMarks from ExamSubject for these results
+        const examIds = Array.from(new Set(results.map(r => r.examId)));
+        const subjectIds = Array.from(new Set(results.map(r => r.subjectId)));
+
+        const examSubjects = await prisma.examSubject.findMany({
+            where: {
+                examId: { in: examIds },
+                subjectId: { in: subjectIds }
+            },
+            select: { examId: true, subjectId: true, maxMarks: true, passingMarks: true }
+        });
+
+        const esMap = new Map();
+        examSubjects.forEach(es => esMap.set(`${es.examId}-${es.subjectId}`, es));
+
+        const processedResults = results.map(r => {
+            const es = esMap.get(`${r.examId}-${r.subjectId}`);
+            const maxMarks = es?.maxMarks || 100;
+            const passingMarks = es?.passingMarks || 33;
+            const percentage = Math.round(((r.marksObtained || 0) / maxMarks) * 100);
+
+            return {
+                id: r.id,
+                examName: r.exam?.title,
+                subjectName: r.subject?.subjectName,
+                examDate: r.exam?.startDate,
+                marksObtained: r.marksObtained,
+                totalMarks: maxMarks,
+                percentage: percentage,
+                isPassed: r.marksObtained >= passingMarks,
+                createdAt: r.id
+            };
+        });
+
+        const totalExams = processedResults.length;
+        const totalPassed = processedResults.filter(r => r.isPassed).length;
+        const avgPercentage = Math.round(processedResults.reduce((sum, r) => sum + r.percentage, 0) / totalExams);
 
         return {
-            results: results.map(r => ({
-                id: r.id,
-                examName: r.exam?.name,
-                examDate: r.exam?.examDate,
-                marksObtained: r.marksObtained,
-                totalMarks: r.exam?.totalMarks,
-                percentage: r.percentage,
-                isPassed: r.isPassed,
-                createdAt: r.createdAt
-            })),
+            results: processedResults,
             stats: {
                 totalExams,
                 totalPassed,
@@ -195,6 +235,7 @@ async function fetchExamResults(schoolId, userId) {
         return { results: [], stats: { totalExams: 0, totalPassed: 0, avgPercentage: 0 } };
     }
 }
+
 
 async function fetchHomework(userId) {
     try {
@@ -221,17 +262,17 @@ async function fetchHomework(userId) {
                     where: { studentId: userId },
                     select: { status: true }
                 },
-                subject: { select: { name: true } }
+                subject: { select: { subjectName: true } }
             }
         });
 
         return homework.map(hw => ({
             id: hw.id,
             title: hw.title,
-            subject: hw.subject?.name,
+            subject: hw.subject?.subjectName,
             dueDate: hw.dueDate,
             status: hw.submissions?.[0]?.status || 'PENDING',
-            createdAt: hw.createdAt
+            createdAt: hw.id // Fallback
         }));
     } catch (error) {
         console.error('fetchHomework error:', error);
@@ -275,16 +316,17 @@ async function fetchStudentInfo(userId) {
         const student = await prisma.student.findFirst({
             where: { userId },
             select: {
-                id: true,
                 name: true,
                 admissionNo: true,
                 class: { select: { id: true, className: true } },
                 section: { select: { id: true, name: true } }
             }
         });
+        if (student) student.id = userId; // Add id manually for component consistency
         return student;
     } catch (error) {
         console.error('fetchStudentInfo error:', error);
         return null;
     }
 }
+
