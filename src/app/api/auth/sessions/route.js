@@ -103,6 +103,14 @@ export async function POST(req) {
         let isNewDevice = false;
 
         // 1. Check for existing active session to reuse
+        // If device info is passed explicitly from body (e.g. mobile app), use it
+        const finalDeviceName = body.deviceName || deviceInfo.deviceModel || deviceInfo.os || 'Unknown Device';
+        const finalDeviceType = body.deviceType || deviceInfo.deviceType || 'mobile';
+        const finalOS = body.os || deviceInfo.os || 'Unknown OS';
+        const finalOSVersion = body.osVersion || deviceInfo.osVersion;
+        const finalBrowser = body.browser || deviceInfo.browser || 'App';
+        const finalBrowserVersion = body.browserVersion || deviceInfo.browserVersion;
+
         const existingSession = await prisma.userSession.findFirst({
             where: {
                 userId,
@@ -122,12 +130,12 @@ export async function POST(req) {
                     location,
                     lastActiveAt: new Date(),
                     expiresAt, // Extend expiry
-                    // Update device info in case it changed (e.g. browser update)
-                    browser: deviceInfo.browser,
-                    browserVersion: deviceInfo.browserVersion,
-                    os: deviceInfo.os,
-                    osVersion: deviceInfo.osVersion,
-                    // Keep original deviceName if custom, or update if it was default
+                    // Update device info
+                    browser: finalBrowser,
+                    browserVersion: finalBrowserVersion,
+                    os: finalOS,
+                    osVersion: finalOSVersion,
+                    deviceName: finalDeviceName,
                 }
             });
             // Not a new device, so isNewDevice remains false
@@ -142,15 +150,15 @@ export async function POST(req) {
                     sessionToken,
                     refreshToken: supabaseSessionToken,
                     expiresAt,
-                    browser: deviceInfo.browser,
-                    browserVersion: deviceInfo.browserVersion,
-                    os: deviceInfo.os,
-                    osVersion: deviceInfo.osVersion,
-                    deviceType: deviceInfo.deviceType,
+                    browser: finalBrowser,
+                    browserVersion: finalBrowserVersion,
+                    os: finalOS,
+                    osVersion: finalOSVersion,
+                    deviceType: finalDeviceType,
                     ipAddress,
                     userAgent,
                     location: location,
-                    deviceName: deviceInfo.deviceModel || deviceInfo.os, // Save specific model or OS as default name
+                    deviceName: finalDeviceName,
                 },
             });
 
