@@ -145,7 +145,7 @@ export default function SchoolCard({ school }) {
 
                 {/* Action Buttons */}
                 <div className="flex gap-2.5 pt-3">
-                    <Link href={`/explore/schools/${slug}`} className="flex-1">
+                    <Link href={`/explore/compare?schools=${school.id}`} className="flex-1">
                         <Button
                             variant="outline"
                             size="sm"

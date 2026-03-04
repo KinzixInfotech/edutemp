@@ -27,7 +27,9 @@ export async function generateMetadata(props) {
 
     try {
         const baseUrl = getBaseUrl();
-        const response = await fetch(`${baseUrl}/api/public/schools/${id}`, { next: { revalidate: 600 } });
+        const response = await fetch(`${baseUrl}/api/public/schools/${id}`, {
+            next: { revalidate: process.env.NODE_ENV === 'development' ? 0 : 60 }
+        });
 
         if (!response.ok) return { title: 'School Not Found | EduBreezy' };
 
@@ -116,13 +118,19 @@ export async function generateMetadata(props) {
     }
 }
 
-// 10 minute ISR for the page itself
-export const revalidate = 600;
+// ISR settings: Disable caching in development, use short cache in production
+export const revalidate = process.env.NODE_ENV === 'development' ? 0 : 60;
 
 async function getSchool(id) {
     const baseUrl = getBaseUrl();
     try {
-        const res = await fetch(`${baseUrl}/api/public/schools/${id}`, { next: { revalidate: 600 } });
+        const res = await fetch(`${baseUrl}/api/public/schools/${id}`, {
+            next: {
+                revalidate: process.env.NODE_ENV === 'development' ? 0 : 60,
+                tags: [`school-profile-${id}`]
+            },
+            cache: process.env.NODE_ENV === 'development' ? 'no-store' : 'default'
+        });
         if (!res.ok) return null;
         return res.json();
     } catch (e) {

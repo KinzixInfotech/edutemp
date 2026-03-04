@@ -263,7 +263,7 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                 )}
                 {galleryImages.length > 0 && (
                     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-                        className="grid grid-cols-1 md:grid-cols-3 gap-3 h-auto md:h-[320px] rounded-2xl overflow-hidden">
+                        className="grid grid-cols-1 md:grid-cols-3 gap-3 h-auto md:h-[400px] rounded-2xl overflow-hidden">
                         {/* Main large image */}
                         <div className="md:col-span-2 relative overflow-hidden rounded-2xl bg-gray-100 h-60 md:h-full cursor-pointer"
                         >
@@ -274,16 +274,17 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                             />
                         </div>
                         {/* Small 2x2 grid — only actual images */}
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-2 grid-rows-2 gap-3 h-full min-h-0">
                             {galleryImages.slice(0, 4).map((img, i) => {
                                 const isLast = i === 3 && galleryImages.length > 4;
                                 return (
-                                    <div key={i} className="relative overflow-hidden rounded-2xl bg-gray-100 h-36 md:h-auto cursor-pointer"
+                                    <div key={i} className="relative overflow-hidden rounded-xl bg-gray-100 h-full cursor-pointer min-h-0"
                                         onClick={() => { setGalleryIndex(i); setShowGalleryModal(true); }}>
                                         <img src={img.imageUrl} alt={img.caption || 'Gallery'} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
                                         {isLast && (
-                                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-sm font-semibold">
-                                                <ImageIcon className="w-4 h-4 mr-1.5" /> View All Photos
+                                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-[10px] font-bold text-center p-2">
+                                                <ImageIcon className="w-3.5 h-3.5 mb-1 mx-auto block" />
+                                                <span>+{galleryImages.length - 3} More</span>
                                             </div>
                                         )}
                                     </div>
@@ -295,7 +296,7 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
 
                 {/* Gallery Lightbox Modal */}
                 <Dialog open={showGalleryModal} onOpenChange={setShowGalleryModal}>
-                    <DialogContent className="max-w-4xl p-0 bg-black/95 border-0">
+                    <DialogContent showCloseButton={false} className="max-w-4xl p-0 bg-black/95 border-0">
                         <div className="relative">
                             <Button
                                 variant="ghost"

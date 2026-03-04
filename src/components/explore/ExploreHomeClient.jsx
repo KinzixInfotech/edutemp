@@ -272,7 +272,7 @@ export default function ExploreHomeClient() {
                         {featuredLoading ? (
                             [...Array(3)].map((_, i) => (
                                 <div key={i} className="w-[310px] shrink-0 snap-start">
-                                    <Card className="overflow-hidden rounded-xl">
+                                    <Card className="overflow-hidden pt-0 rounded-xl">
                                         <Skeleton className="h-48 w-full" />
                                         <div className="p-4 space-y-3">
                                             <Skeleton className="h-5 w-3/4" />
@@ -290,8 +290,20 @@ export default function ExploreHomeClient() {
                                 const rating = profile.overallRating || 0;
                                 const coverImage = profile.coverImage;
                                 const badges = profile.badges || [];
+                                const classes = profile.school?.classes || [];
+                                const classNames = classes.map(c => c.className).sort((a, b) => {
+                                    const numA = parseInt(a.replace(/\D/g, '')) || 0;
+                                    const numB = parseInt(b.replace(/\D/g, '')) || 0;
+                                    return numA - numB;
+                                });
+                                const gradeLabel = classNames.length > 1
+                                    ? `Grades ${classNames[0]}–${classNames[classNames.length - 1]}`
+                                    : classNames.length === 1 ? `Grade ${classNames[0]}` : null;
                                 const minFee = profile.minFee;
                                 const maxFee = profile.maxFee;
+                                const detailedFees = Array.isArray(profile.detailedFeeStructure) ? profile.detailedFeeStructure : [];
+                                const feeTotals = detailedFees.map(f => f.total).filter(Boolean);
+                                const computedFee = feeTotals.length > 0 ? Math.min(...feeTotals) : null;
 
                                 return (
                                     <Link key={profile.schoolId || profile.id} href={`/explore/schools/${slug}`} className="w-[280px] shrink-0 snap-start group block">
@@ -349,24 +361,21 @@ export default function ExploreHomeClient() {
                                                 <div className="flex flex-wrap gap-1.5">
                                                     {badges.length > 0 ? (
                                                         badges.slice(0, 3).map((b, idx) => (
-                                                            <span key={idx} className="text-[11px] font-medium px-2.5 py-1 rounded-full border border-gray-200 text-gray-600 bg-white">
+                                                            <span className="text-[11px] bg-[#f7f9fc] font-bold px-2.5 py-1 rounded-full border border-gray-200 text-[#2d3c52] ">
                                                                 {b.badgeType || b}
                                                             </span>
                                                         ))
-                                                    ) : (
-                                                        <>
-                                                            <span className="text-[11px] font-medium px-2.5 py-1 rounded-full border border-gray-200 text-gray-600 bg-white">K-12</span>
-                                                            <span className="text-[11px] font-medium px-2.5 py-1 rounded-full border border-gray-200 text-gray-600 bg-white">Co-ed</span>
-                                                        </>
-                                                    )}
+                                                    ) : gradeLabel ? (
+                                                        <span className="text-[11px] bg-[#f7f9fc] font-bold px-2.5 py-1 rounded-full border border-gray-200 text-[#2d3c52] ">{gradeLabel}</span>
+                                                    ) : null}
                                                 </div>
 
                                                 {/* Price + Status */}
                                                 <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                                                     <div>
-                                                        {(minFee || maxFee) ? (
+                                                        {(minFee || maxFee || computedFee) ? (
                                                             <span className="text-[15px] font-bold text-[#0f172a]">
-                                                                {formatFee(minFee || maxFee)}
+                                                                {formatFee(minFee || maxFee || computedFee)}
                                                                 <span className="text-xs font-normal text-gray-400 ml-1">/ year</span>
                                                             </span>
                                                         ) : (

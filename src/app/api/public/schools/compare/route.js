@@ -36,12 +36,56 @@ export async function POST(req) {
                     id: { in: schoolIds },
                     isPubliclyVisible: true,
                 },
-                include: {
+                select: {
+                    id: true,
+                    schoolId: true,
+                    slug: true,
+                    tagline: true,
+                    coverImage: true,
+                    logoImage: true,
+                    minFee: true,
+                    maxFee: true,
+                    overallRating: true,
+                    academicRating: true,
+                    infrastructureRating: true,
+                    sportsRating: true,
+                    establishedYear: true,
+                    totalStudents: true,
+                    totalTeachers: true,
+                    studentTeacherRatio: true,
+                    isVerified: true,
+                    isFeatured: true,
+                    latitude: true,
+                    longitude: true,
+                    publicEmail: true,
+                    publicPhone: true,
+                    website: true,
+                    detailedFeeStructure: true,
+                    feeStructureUrl: true,
                     school: {
                         select: {
                             name: true,
                             location: true,
                             profilePicture: true,
+                            classes: {
+                                select: { className: true },
+                                orderBy: { className: 'asc' },
+                            },
+                            FeeStructure: {
+                                select: {
+                                    name: true,
+                                    mode: true,
+                                    Class: { select: { className: true } },
+                                    feeParticulars: {
+                                        select: {
+                                            name: true,
+                                            defaultAmount: true,
+                                        }
+                                    }
+                                },
+                                orderBy: { createdAt: 'desc' },
+                                take: 10,
+                            },
                         }
                     },
                     facilities: {

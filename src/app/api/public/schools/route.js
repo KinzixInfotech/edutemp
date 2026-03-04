@@ -97,6 +97,7 @@ export async function GET(req) {
                         sportsRating: true,
                         isFeatured: true,
                         isVerified: true,
+                        detailedFeeStructure: true,
                         school: {
                             select: {
                                 name: true,

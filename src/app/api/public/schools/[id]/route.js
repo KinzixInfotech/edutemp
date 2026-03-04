@@ -13,9 +13,15 @@ export async function GET(req, props) {
         const params = await props.params;
         const { id } = params; // Can be either slug or UUID (schoolId)
 
+        const cacheControl = req.headers.get('cache-control') || '';
+        const shouldBypassCache =
+            process.env.NODE_ENV === 'development' ||
+            cacheControl.includes('no-cache') ||
+            cacheControl.includes('no-store');
+
         const cacheKey = generateKey('school-profile', { id });
 
-        const school = await remember(cacheKey, async () => {
+        const fetchProfile = async () => {
             // Optimized: Single query with OR condition instead of 2 separate queries
             const isIdUUID = isUUID(id);
 
@@ -33,7 +39,11 @@ export async function GET(req, props) {
             });
 
             return profile;
-        }, 600); // 10 minutes cache
+        };
+
+        const school = shouldBypassCache
+            ? await fetchProfile()
+            : await remember(cacheKey, fetchProfile, 600); // 10 minutes cache
 
         if (!school) {
             return NextResponse.json(
