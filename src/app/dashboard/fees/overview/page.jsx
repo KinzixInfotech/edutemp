@@ -37,7 +37,7 @@ export default function AdminFeeDashboard() {
   const { fullUser } = useAuth();
   const schoolId = fullUser?.schoolId;
 
-  const [selectedClass, setSelecxtedClass] = useState('all');
+  const [selectedClass, setSelectedClass] = useState('all');
 
   // Pagination state for Recent Payments
   const [currentPage, setCurrentPage] = useState(1);
