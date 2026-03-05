@@ -239,29 +239,40 @@ const StatusActivityWidget = ({ schoolId }) => {
 
   return (
     <div className="px-4 mt-2">
-      <Card className="bg-gradient-to-r from-indigo-50/80 via-blue-50/50 to-cyan-50/80 dark:from-indigo-950/30 dark:via-blue-950/20 dark:to-cyan-950/30 border-indigo-200/60 dark:border-indigo-800/40">
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
+      <Card className={'bg-transparent border-none'}>
+        {/* <CardHeader className="flex flex-row items-center justify-between pb-2">
           <div className="flex items-center gap-3">
-            <div className="bg-indigo-100 dark:bg-indigo-900/50 p-2 rounded-full">
-              <Play className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+            <div className="h-9 w-9 rounded-lg bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center">
+              <Play className="h-4 w-4 text-violet-600 dark:text-violet-400" />
             </div>
             <div>
-              <CardTitle className="text-sm font-medium">Status Activity</CardTitle>
-              <CardDescription className="text-xs">
-                {isLoading ? 'Loading...' : `${stats?.activeStatuses || 0} active · ${stats?.totalViewsToday || 0} views today`}
-              </CardDescription>
+              <CardTitle className="text-sm font-semibold">Status Updates</CardTitle>
+              {!isLoading && (
+                <div className="flex items-center gap-2 mt-1">
+                  {(stats?.activeStatuses || 0) > 0 && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-medium bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800">
+                      {stats.activeStatuses} active
+                    </Badge>
+                  )}
+                  {(stats?.totalViewsToday || 0) > 0 && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-medium bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800">
+                      <Eye className="h-2.5 w-2.5 mr-0.5" />
+                      {stats.totalViewsToday} today
+                    </Badge>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <Link href="/dashboard/schools/status">
-            <Button variant="outline" size="sm" className="text-xs">
+            <Button variant="outline" size="sm" className="text-xs h-8">
               Manage
             </Button>
           </Link>
-        </CardHeader>
+        </CardHeader> */}
 
-        {/* Circular avatar row */}
         {recentStatuses.length > 0 && (
-          <CardContent className="pt-0 pb-3">
+          <CardContent className="pt-0 pb-2">
             <div className="flex gap-4 overflow-x-auto pb-1 scrollbar-hide">
               {recentStatuses.map((status) => {
                 const gradIdx = Math.abs((status.userName || '').charCodeAt(0) || 0) % TEXT_GRADIENTS.length;
@@ -269,15 +280,14 @@ const StatusActivityWidget = ({ schoolId }) => {
                   <Link
                     key={status.id}
                     href="/dashboard/schools/status"
-                    className="flex flex-col items-center gap-1 min-w-[64px] group"
+                    className="flex flex-col items-center gap-1.5 min-w-[72px] group"
                   >
-                    {/* Ring + Avatar */}
                     <div className="relative">
-                      <div className="w-14 h-14 rounded-full p-[2px] bg-gradient-to-tr from-blue-500 to-indigo-500">
-                        <div className="w-full h-full rounded-full overflow-hidden bg-white dark:bg-gray-900 p-[2px]">
+                      <div className="w-16 h-16 rounded-full p-[2.5px] bg-gradient-to-br from-blue-600 to-blue-500 dark:from-blue-500 dark:to-blue-600 group-hover:from-blue-500 group-hover:to-blue-600 transition-all">
+                        <div className="w-full h-full rounded-full overflow-hidden bg-white dark:bg-zinc-900 p-[1.5px]">
                           {status.type === 'text' ? (
                             <div className={`w-full h-full rounded-full bg-gradient-to-br ${TEXT_GRADIENTS[gradIdx]} flex items-center justify-center`}>
-                              <span className="text-white text-[8px] font-bold leading-tight text-center px-1 line-clamp-2">
+                              <span className="text-white text-[9px] font-bold leading-tight text-center px-1.5 line-clamp-2">
                                 {status.text || ''}
                               </span>
                             </div>
@@ -288,7 +298,7 @@ const StatusActivityWidget = ({ schoolId }) => {
                               className="w-full h-full rounded-full object-cover"
                             />
                           ) : (
-                            <div className="w-full h-full rounded-full bg-indigo-500 flex items-center justify-center">
+                            <div className={`w-full h-full rounded-full bg-gradient-to-br ${TEXT_GRADIENTS[gradIdx]} flex items-center justify-center`}>
                               <span className="text-white text-lg font-bold">
                                 {(status.userName || '?')[0].toUpperCase()}
                               </span>
@@ -296,16 +306,14 @@ const StatusActivityWidget = ({ schoolId }) => {
                           )}
                         </div>
                       </div>
-                      {/* View count badge */}
                       {status.viewCount > 0 && (
-                        <span className="absolute -bottom-0.5 -right-0.5 bg-indigo-500 text-white text-[9px] font-bold rounded-full w-5 h-5 flex items-center justify-center border-2 border-white dark:border-gray-900">
-                          {status.viewCount}
+                        <span className="absolute -bottom-0.5 -right-0.5 bg-foreground text-background text-[10px] font-semibold rounded-full min-w-[20px] h-[20px] flex items-center justify-center border-2 border-background px-0.5">
+                          {status.viewCount > 99 ? '99+' : status.viewCount}
                         </span>
                       )}
                     </div>
-                    {/* Name */}
-                    <span className="text-[10px] text-muted-foreground font-medium truncate max-w-[60px] group-hover:text-indigo-600 transition-colors">
-                      {(status.userName || 'Unknown').split(' ').slice(0, 2).join(' ')}
+                    <span className="text-[11px] text-muted-foreground font-medium truncate max-w-[68px] group-hover:text-foreground transition-colors">
+                      {(status.userName || 'Unknown').split(' ')[0]}
                     </span>
                   </Link>
                 );
@@ -574,6 +582,7 @@ export default function Dashboard() {
                 data={consolidatedQuery.data?.dailyStats}
               />
             </div>
+            <StatusActivityWidget schoolId={fullUser?.schoolId} />
 
             {/* AI Insights Section */}
             <div className="px-4">
@@ -581,7 +590,6 @@ export default function Dashboard() {
             </div>
 
             {/* Status Activity Card */}
-            <StatusActivityWidget schoolId={fullUser?.schoolId} />
 
             {/* Widgets Grid - 3 equal columns for main widgets */}
             <div className="px-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
