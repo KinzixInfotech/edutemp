@@ -8,15 +8,15 @@ export default async function robots() {
     const host = headersList.get('host') || '';
 
     // Determine if this is the school subdomain
-    const isSchoolDomain = host.includes('school.edubreezy.com') || host.includes('school.localhost');
+    const isAtlasDomain = host.includes('atlas.edubreezy.com') || host.includes('atlas.localhost');
 
     // Use appropriate base URL based on domain
-    const baseUrl = isSchoolDomain
-        ? 'https://school.edubreezy.com'
+    const baseUrl = isAtlasDomain
+        ? 'https://atlas.edubreezy.com'
         : (process.env.NEXT_PUBLIC_APP_URL || 'https://www.edubreezy.com');
 
-    if (isSchoolDomain) {
-        // Robots.txt for school.edubreezy.com
+    if (isAtlasDomain) {
+        // Robots.txt for atlas.edubreezy.com
         return {
             rules: [
                 {
@@ -61,7 +61,7 @@ export default async function robots() {
                     '/schoollogin',
                     '/reset-password',
                     '/verify/',
-                    '/explore/', // Redirect to school subdomain
+                    '/explore/', // Redirect to atlas subdomain
                 ],
             },
             {
@@ -70,7 +70,7 @@ export default async function robots() {
                 disallow: [
                     '/api/',
                     '/dashboard/',
-                    '/explore/', // Should go to school subdomain
+                    '/explore/', // Should go to atlas subdomain
                 ],
             },
         ],

@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 
 export async function generateMetadata() {
     const headersList = await headers();
-    const host = headersList.get('host') || 'school.edubreezy.com';
+    const host = headersList.get('host') || 'atlas.edubreezy.com';
     const protocol = host.includes('localhost') ? 'http' : 'https';
     const baseUrl = `${protocol}://${host}`;
 
@@ -36,7 +36,7 @@ export async function generateMetadata() {
 export default function SchoolExplorerHome() {
     // Determine base URL for Explorer (subdomain)
     const isDev = process.env.NODE_ENV === 'development';
-    const baseUrl = isDev ? 'http://school.localhost:3000' : 'https://school.edubreezy.com';
+    const baseUrl = isDev ? 'http://atlas.localhost:3000' : 'https://atlas.edubreezy.com';
 
     // Structured Data (JSON-LD) for SEO
     const jsonLd = {

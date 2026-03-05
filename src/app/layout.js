@@ -158,7 +158,7 @@ export default function RootLayout({ children }) {
       {
         "@type": "SiteNavigationElement",
         "name": "School Explorer - Find Schools",
-        "url": "https://school.edubreezy.com/explore"
+        "url": "https://atlas.edubreezy.com/explore"
       },
       {
         "@type": "SiteNavigationElement",

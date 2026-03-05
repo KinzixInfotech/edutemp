@@ -174,7 +174,7 @@ export function SchoolDetailPopup({ school, children }) {
                         {/* View Profile Action */}
                         <Button className="w-full h-11 shadow-lg shadow-primary/20 mt-2 hover:translate-y-[-1px] transition-transform" asChild>
                             <a
-                                href={`https://school.edubreezy.com/explore/schools/${school.id}`}
+                                href={`https://atlas.edubreezy.com/explore/schools/${school.id}`}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="flex items-center justify-center gap-2 font-semibold"

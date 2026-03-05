@@ -14,8 +14,8 @@ export const revalidate = 3600; // Revalidate every hour
 export default async function sitemap() {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://edubreezy.com';
     const schoolBaseUrl = process.env.NODE_ENV === 'development'
-        ? 'http://school.localhost:3000'
-        : 'https://school.edubreezy.com';
+        ? 'http://atlas.localhost:3000'
+        : 'https://atlas.edubreezy.com';
 
     // Static pages - always included
     const staticPages = [
@@ -63,7 +63,7 @@ export default async function sitemap() {
         },
     ];
 
-    // School Explorer pages (school.edubreezy.com subdomain)
+    // School Explorer pages (atlas.edubreezy.com subdomain)
     const explorerPages = [
         {
             url: schoolBaseUrl,

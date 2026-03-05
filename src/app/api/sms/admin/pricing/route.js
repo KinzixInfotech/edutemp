@@ -11,7 +11,7 @@ const DEFAULT_CONFIG = {
         { credits: 500, price: 100, enabled: true },
         { credits: 1000, price: 200, enabled: true },
     ],
-    whitelistedDomains: ['edubreezy.com', 'www.edubreezy.com', 'school.edubreezy.com'],
+    whitelistedDomains: ['edubreezy.com', 'www.edubreezy.com', 'atlas.edubreezy.com'],
 };
 
 // GET - Fetch pricing config

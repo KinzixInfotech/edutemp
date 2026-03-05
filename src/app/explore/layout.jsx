@@ -2,7 +2,7 @@
 import ExploreClientWrapper from '@/components/explore/ExploreClientWrapper';
 
 export const metadata = {
-    metadataBase: new URL('https://school.edubreezy.com'),
+    metadataBase: new URL('https://atlas.edubreezy.com'),
     title: {
         template: '%s | EduBreezy School Explorer',
         default: 'EduBreezy School Explorer - Find Top Rated Schools',
@@ -23,7 +23,7 @@ export const metadata = {
     openGraph: {
         type: 'website',
         locale: 'en_IN',
-        url: 'https://school.edubreezy.com/explore',
+        url: 'https://atlas.edubreezy.com/explore',
         siteName: 'EduBreezy School Explorer',
         title: 'EduBreezy School Explorer - Find Top Rated Schools',
         description: 'Discover and compare the best schools for your child. Verified reviews, real-time rankings, and detailed insights.',

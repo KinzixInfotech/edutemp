@@ -52,7 +52,7 @@ const organizationSchema = {
         "@type": "SearchAction",
         "target": {
             "@type": "EntryPoint",
-            "urlTemplate": "https://school.edubreezy.com/explore/schools?search={search_term_string}"
+            "urlTemplate": "https://atlas.edubreezy.com/explore/schools?search={search_term_string}"
         },
         "query-input": "required name=search_term_string"
     }
@@ -1377,7 +1377,7 @@ function SchoolExplorerSection() {
                     badge="SCHOOL EXPLORER"
                     title="Get Discovered by"
                     highlightedText="Parents"
-                    description="List your school on school.edubreezy.com and reach parents searching for schools."
+                    description="List your school on atlas.edubreezy.com and reach parents searching for schools."
                 />
 
                 {/* Main Card */}
@@ -1387,7 +1387,7 @@ function SchoolExplorerSection() {
                         <div className="p-6 md:p-10 lg:p-16 flex flex-col justify-center">
                             <div className="inline-flex items-center gap-2 bg-gradient-to-r from-[#0569ff]/10 to-[#10B981]/10 text-[#0569ff] px-3 py-2 rounded-full text-xs md:text-sm font-semibold mb-6 self-start">
                                 <Globe size={14} className="md:w-4 md:h-4" />
-                                school.edubreezy.com
+                                atlas.edubreezy.com
                             </div>
 
                             <h3 className="text-3xl md:text-4xl lg:text-5xl font-black text-[#1a1a2e] mb-4 md:mb-6 leading-tight tracking-tight">
@@ -1417,7 +1417,7 @@ function SchoolExplorerSection() {
                             {/* CTA */}
                             <div className="flex flex-col sm:flex-row mt-8 gap-3 md:gap-4">
                                 <a
-                                    href="https://school.edubreezy.com/explore"
+                                    href="https://atlas.edubreezy.com/explore"
                                     target="_blank"
                                     className="inline-flex items-center justify-center gap-2 bg-[#0569ff] text-white px-5 md:px-6 py-3 md:py-3.5 rounded-full text-sm md:text-base font-bold hover:bg-[#0358dd] transition-all duration-300 hover:shadow-lg"
                                 >
@@ -1425,7 +1425,7 @@ function SchoolExplorerSection() {
                                     <ArrowRight size={16} className="md:w-[18px] md:h-[18px]" />
                                 </a>
                                 <a
-                                    href="https://school.edubreezy.com"
+                                    href="https://atlas.edubreezy.com"
                                     target="_blank"
                                     className="inline-flex items-center justify-center gap-2 text-slate-600 font-semibold px-5 md:px-6 py-3 md:py-3.5 border border-slate-200 rounded-full text-sm md:text-base hover:bg-slate-50 transition-all"
                                 >

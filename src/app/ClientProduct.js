@@ -17,7 +17,7 @@ export default function ClientProduct({ children }) {
         }
     }, [])
 
-    const isSchoolDomain = hostname.startsWith("school.")
+    const isAtlasDomain = hostname.startsWith("atlas.")
     const isPayDomain = hostname.startsWith("pay.")
     const isTeacherDomain = hostname.startsWith("teacher.")
 
@@ -26,7 +26,7 @@ export default function ClientProduct({ children }) {
         pathname === "/login" ||
         pathname.startsWith("/exam") ||
         pathname.startsWith("/forms") ||
-        (isSchoolDomain || pathname.startsWith("/explore")) ||
+        (isAtlasDomain || pathname.startsWith("/explore")) ||
         (isPayDomain || pathname.startsWith("/pay")) ||
         (isTeacherDomain || pathname.startsWith("/teacher"))
 

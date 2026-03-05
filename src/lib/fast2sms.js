@@ -12,7 +12,7 @@ const MAX_SMS_LENGTH = 160; // Single SMS limit
 const WHITELISTED_DOMAINS = [
     'edubreezy.com',
     'www.edubreezy.com',
-    'school.edubreezy.com',
+    'atlas.edubreezy.com',
 ];
 
 // Blocked promo words (case insensitive)

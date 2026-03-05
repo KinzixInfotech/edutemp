@@ -26,9 +26,9 @@ export async function middleware(request) {
     // DOMAIN-BASED ROUTING (School Explorer & Fee Payment)
     // ============================================
 
-    // Check if request is for school subdomain
-    const isSchoolDomain = hostname.includes('school.edubreezy.com') ||
-        hostname.includes('school.localhost');
+    // Check if request is for atlas subdomain
+    const isAtlasDomain = hostname.includes('atlas.edubreezy.com') ||
+        hostname.includes('atlas.localhost');
 
     // Check if request is for pay subdomain
     const isPayDomain = hostname.includes('pay.edubreezy.com') ||
@@ -44,8 +44,8 @@ export async function middleware(request) {
         pathname === '/favicon.ico';
 
     if (!skipDomainRouting) {
-        // Handle school.edubreezy.com subdomain
-        if (isSchoolDomain) {
+        // Handle atlas.edubreezy.com subdomain
+        if (isAtlasDomain) {
             // For root path, REWRITE to /explore (not redirect) - prevents redirect loop for SEO
             if (pathname === '/') {
                 const exploreUrl = new URL('/explore', request.url);
@@ -99,22 +99,22 @@ export async function middleware(request) {
         }
 
         // Handle main domain (edubreezy.com)
-        // Redirect /explore routes to school subdomain
-        if (!isSchoolDomain && !isPayDomain && !isTeacherDomain && pathname.startsWith('/explore')) {
-            const schoolUrl = new URL(request.url);
-            schoolUrl.hostname = 'school.edubreezy.com';
-            return NextResponse.redirect(schoolUrl, { status: 301 });
+        // Redirect /explore routes to atlas subdomain
+        if (!isAtlasDomain && !isPayDomain && !isTeacherDomain && pathname.startsWith('/explore')) {
+            const atlasUrl = new URL(request.url);
+            atlasUrl.hostname = 'atlas.edubreezy.com';
+            return NextResponse.redirect(atlasUrl, { status: 301 });
         }
 
         // Redirect /pay routes to pay subdomain
-        if (!isPayDomain && !isSchoolDomain && !isTeacherDomain && pathname.startsWith('/pay')) {
+        if (!isPayDomain && !isAtlasDomain && !isTeacherDomain && pathname.startsWith('/pay')) {
             const payUrl = new URL(request.url);
             payUrl.hostname = 'pay.edubreezy.com';
             return NextResponse.redirect(payUrl, { status: 301 });
         }
 
         // Redirect /teacher routes to teacher subdomain
-        if (!isTeacherDomain && !isPayDomain && !isSchoolDomain && pathname.startsWith('/teacher')) {
+        if (!isTeacherDomain && !isPayDomain && !isAtlasDomain && pathname.startsWith('/teacher')) {
             const teacherUrl = new URL(request.url);
             teacherUrl.hostname = 'teacher.edubreezy.com';
             return NextResponse.redirect(teacherUrl, { status: 301 });

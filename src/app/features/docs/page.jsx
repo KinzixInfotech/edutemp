@@ -567,7 +567,7 @@ const featureContent = {
     'school-explorer': {
         title: 'School Explorer',
         tagline: 'Get discovered by parents',
-        description: 'Create a public profile for your school on school.edubreezy.com. Receive admission inquiries and build your online presence.',
+        description: 'Create a public profile for your school on atlas.edubreezy.com. Receive admission inquiries and build your online presence.',
         features: [
             {
                 title: 'Public Profile',

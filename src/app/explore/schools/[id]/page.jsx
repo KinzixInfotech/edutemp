@@ -14,9 +14,9 @@ const getBaseUrl = () => {
 
 const getSchoolBaseUrl = () => {
     if (process.env.NODE_ENV === 'development') {
-        return 'http://school.localhost:3000';
+        return 'http://atlas.localhost:3000';
     }
-    return 'https://school.edubreezy.com';
+    return 'https://atlas.edubreezy.com';
 };
 
 // Generate dynamic metadata for SEO - Enhanced for Google ranking
@@ -164,7 +164,7 @@ export default async function SchoolProfilePage(props) {
     }
 
     const isDev = process.env.NODE_ENV === 'development';
-    const baseUrl = isDev ? 'http://school.localhost:3000' : 'https://school.edubreezy.com';
+    const baseUrl = isDev ? 'http://atlas.localhost:3000' : 'https://atlas.edubreezy.com';
 
     // Use slug for URLs, fallback to schoolId
     const urlIdentifier = school.slug || school.schoolId;
