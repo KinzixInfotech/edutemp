@@ -120,18 +120,13 @@ export default function Footer() {
                     </div>
 
                     {/* Google Play button */}
-                    <a href="#" className="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all duration-300 group">
-                        <Image
-                            src="/playstore.png"
+                    <a target="_blank" href="https://play.google.com/store/apps/details?id=com.kinzix.edubreezy">
+                        <img
+                            src="/play.png"
                             alt="Google Play"
-                            width={24}
-                            height={24}
-                            className="w-6 h-6"
+                            width={120}
+                            height={120}
                         />
-                        <div className="flex flex-col items-start">
-                            <span className="text-[10px] leading-none uppercase tracking-wide opacity-90">Get it on</span>
-                            <span className="text-sm font-semibold leading-tight">Google Play</span>
-                        </div>
                     </a>
                 </div>
 

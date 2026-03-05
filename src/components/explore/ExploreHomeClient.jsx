@@ -428,22 +428,6 @@ export default function ExploreHomeClient() {
                     </div>
                 </div>
             </section>
-
-            {/* ═══════════ FOOTER ═══════════ */}
-            <footer className="bg-white border-t border-gray-100 py-8">
-                <div className="max-w-7xl mx-auto px-4 md:px-6 flex flex-col md:flex-row items-center justify-between gap-4">
-                    <div className="flex items-center gap-2">
-                        <SchoolIcon className="w-5 h-5 text-[#2563eb]" />
-                        <span className="font-bold text-[#0f172a]">EduBreezy</span>
-                    </div>
-                    <div className="flex items-center gap-6">
-                        <Link href="/explore/about" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">Privacy Policy</Link>
-                        <Link href="/explore/about" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">Terms of Service</Link>
-                        <Link href="/explore/about" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">Contact Support</Link>
-                    </div>
-                    <p className="text-xs text-gray-400">© 2024 EduBreezy Inc.</p>
-                </div>
-            </footer>
         </div>
     );
 }

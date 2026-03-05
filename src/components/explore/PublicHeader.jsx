@@ -100,7 +100,7 @@ export default function PublicHeader() {
             {/* Left: Logo + Nav */}
             <div className="flex items-center gap-8">
                 <Link href="/explore" className="flex items-center gap-2 shrink-0">
-                    <Image src='/edu.png' width={120} height={30} alt="EduBreezy" priority />
+                    <Image src='/atlas.png' width={160} height={80} alt="EduBreezy" priority />
                 </Link>
                 <nav className="hidden md:flex items-center gap-8">
                     {navLinks.map((link) => (

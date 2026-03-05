@@ -82,7 +82,7 @@ export default function HomePage() {
             {/* AI Product Guide - Ask questions about EduBreezy */}
 
             {/* <TrustedSection /> */}
-            <SchoolExplorerSection />
+            {/* <SchoolExplorerSection /> */}
             <PricingSection />
 
             {/* Partner Teaser - Grow With Us */}
@@ -93,7 +93,7 @@ export default function HomePage() {
             {/* <div id="app">
                 <DownloadAppCTA />
             </div> */}
-            <ProductGuideAI />
+            {/* <ProductGuideAI /> */}
             {/* </div> */}
             <FinalCTA />
             <PartnerTeaser />
