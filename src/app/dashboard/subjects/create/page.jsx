@@ -43,8 +43,9 @@ export default function CreateSubjectPage() {
 
     const fetchInitialData = async () => {
         try {
-            const classesRes = await axios.get(`/api/schools/${fullUser.schoolId}/classes`);
-            setClasses(classesRes.data);
+            const classesRes = await axios.get(`/api/schools/${fullUser.schoolId}/classes?limit=-1`);
+            const classesData = classesRes.data;
+            setClasses(Array.isArray(classesData) ? classesData : (classesData.data || []));
 
             // If editing, fetch subject data
             if (subjectId) {

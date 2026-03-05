@@ -53,8 +53,9 @@ export default function StudentListPage() {
     const { data: allClasses = [] } = useQuery({
         queryKey: ['classes', schoolId],
         queryFn: async () => {
-            const res = await axios.get(`/api/schools/${schoolId}/classes`);
-            return res.data || [];
+            const res = await axios.get(`/api/schools/${schoolId}/classes?limit=-1`);
+            const data = res.data;
+            return Array.isArray(data) ? data : (data.data || []);
         },
         enabled: !!schoolId,
         staleTime: 5 * 60 * 1000,

@@ -31,9 +31,10 @@ export default function ClassAttendanceMarking() {
     const { data: classes } = useQuery({
         queryKey: ['classes', schoolId],
         queryFn: async () => {
-            const res = await fetch(`/api/schools/${schoolId}/classes`);
+            const res = await fetch(`/api/schools/${schoolId}/classes?limit=-1`);
             if (!res.ok) throw new Error('Failed');
-            return res.json();
+            const data = await res.json();
+            return Array.isArray(data) ? data : (data.data || []);
         },
         enabled: !!schoolId
     });

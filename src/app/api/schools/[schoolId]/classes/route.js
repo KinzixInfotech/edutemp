@@ -89,6 +89,7 @@ export async function GET(req, props) {
     }
 
     const { page, limit, skip } = getPagination(req);
+    const hasPaginationParams = searchParams.has("page") || searchParams.has("limit");
     const noCache = searchParams.get("noCache") === "true";
 
     // If noCache, invalidate all classes cache for this school
@@ -98,11 +99,11 @@ export async function GET(req, props) {
 
     const cacheKey = generateKey('classes', {
       schoolId, academicYearId, getAcademicYear, getStudent, showStructure,
-      page, limit, search, teacherFilter, capacityFilter, sort
+      page, limit, search, teacherFilter, capacityFilter, sort, hasPaginationParams
     });
 
     const result = await remember(cacheKey, async () => {
-      const isAll = limit === -1;
+      const isAll = !hasPaginationParams || limit === -1;
 
       // Build where clause with optional search
       const where = {

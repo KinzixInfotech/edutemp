@@ -96,10 +96,11 @@ export default function CreateTimetablePage() {
     const fetchInitialData = async () => {
         try {
             const [classesRes, slotsRes] = await Promise.all([
-                axios.get(`/api/schools/${fullUser.schoolId}/classes`),
+                axios.get(`/api/schools/${fullUser.schoolId}/classes?limit=-1`),
                 axios.get(`/api/schools/${fullUser.schoolId}/timetable/slots`),
             ]);
-            setClasses(classesRes.data);
+            const classesData = classesRes.data;
+            setClasses(Array.isArray(classesData) ? classesData : (classesData.data || []));
             setTimeSlots(slotsRes.data || []);
 
             try {

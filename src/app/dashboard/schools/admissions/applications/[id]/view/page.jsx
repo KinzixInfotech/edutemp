@@ -47,7 +47,8 @@ async function fetchApplication({ applicationId, schoolId }) {
 async function fetchStages(schoolId) {
     const response = await fetch(`/api/schools/admissions/settings?schoolId=${schoolId}`);
     if (!response.ok) throw new Error("Failed to fetch stages");
-    return response.json();
+    const data = await response.json();
+    return data.stages || [];
 }
 
 async function moveApplication({ id, stageId, movedById, stageData }) {
@@ -356,11 +357,10 @@ export default function ApplicationDetails() {
     });
     const fetchClasses = async (schoolId) => {
         if (!schoolId) throw new Error("schoolId is required")
-        const res = await fetch(`/api/schools/${schoolId}/classes`)
+        const res = await fetch(`/api/schools/${schoolId}/classes?limit=-1`)
         if (!res.ok) throw new Error("Failed to fetch classes")
         const data = await res.json()
-        if (!Array.isArray(data)) throw new Error("Invalid data format")
-        return data
+        return Array.isArray(data) ? data : (data.data || [])
     }
     // TanStack Query hook for fetching classes
     const { data: classes = [], isLoading: loadingClasses, error } = useQuery({
@@ -569,7 +569,7 @@ export default function ApplicationDetails() {
     }, [stageData.sectionId, schoolId]);
 
 
-    const { data: { stages = [] } = {}, isLoading: stagesLoading } = useQuery({
+    const { data: stages = [], isLoading: stagesLoading } = useQuery({
         queryKey: ["stages", schoolId],
         queryFn: () => fetchStages(schoolId),
         enabled: !!schoolId,
