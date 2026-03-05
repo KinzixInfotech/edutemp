@@ -543,19 +543,18 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
+            <div className="px-4">
+              <AiInsightsCard schoolId={fullUser?.schoolId} ready={!consolidatedQuery.isLoading && !!consolidatedQuery.data} />
+            </div>
             {/* Key Metrics Cards */}
-            <div className='px-4 mt-6'>
+            <div className='px-4'>
               <DailyStatsCards
                 schoolId={fullUser?.schoolId}
                 academicYearId={activeAcademicYear?.id}
                 data={consolidatedQuery.data?.dailyStats}
               />
             </div>
-
             {/* AI Insights Section */}
-            <div className="px-4">
-              <AiInsightsCard schoolId={fullUser?.schoolId} />
-            </div>
 
 
             {/* Widgets Grid */}

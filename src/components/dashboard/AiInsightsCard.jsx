@@ -219,7 +219,10 @@ function NonAiDayCard({ context }) {
     );
 }
 
-export function AiInsightsCard({ schoolId }) {
+export function AiInsightsCard({ schoolId, ready = true }) {
+    // Hide entirely until parent signals readiness (all other APIs loaded)
+    if (!ready) return null;
+
     const {
         data: context,
         isLoading: contextLoading,

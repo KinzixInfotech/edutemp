@@ -164,24 +164,30 @@ export async function GET(req) {
             ]);
 
             // Format attendance breakdown for bar chart
-            const attendanceBar = [];
+            // Merge rows that map to the same display name (e.g. NULL + ABSENT both → 'Absent')
+            const barMap = new Map(); // name → { value, fill }
             let totalStudentsForBar = 0;
             (attendanceToday || []).forEach(row => {
                 totalStudentsForBar += row.count;
             });
             (attendanceToday || []).forEach(row => {
                 const status = row.status || 'ABSENT';
-                attendanceBar.push({
-                    name: status === 'PRESENT' ? 'Present' :
-                        status === 'LATE' ? 'Late' : 'Absent',
-                    value: row.count,
-                    percentage: totalStudentsForBar > 0
-                        ? ((row.count / totalStudentsForBar) * 100).toFixed(1)
-                        : '0',
-                    fill: status === 'PRESENT' ? 'hsl(142, 71%, 45%)' :
-                        status === 'LATE' ? 'hsl(38, 92%, 50%)' : 'hsl(0, 84%, 60%)'
-                });
+                const name = status === 'PRESENT' ? 'Present' :
+                    status === 'LATE' ? 'Late' : 'Absent';
+                const fill = status === 'PRESENT' ? 'hsl(142, 71%, 45%)' :
+                    status === 'LATE' ? 'hsl(38, 92%, 50%)' : 'hsl(0, 84%, 60%)';
+                if (barMap.has(name)) {
+                    barMap.get(name).value += row.count;
+                } else {
+                    barMap.set(name, { name, value: row.count, fill });
+                }
             });
+            const attendanceBar = Array.from(barMap.values()).map(item => ({
+                ...item,
+                percentage: totalStudentsForBar > 0
+                    ? ((item.value / totalStudentsForBar) * 100).toFixed(1)
+                    : '0',
+            }));
 
             // Format fee breakdown for pie chart
             const feeSums = feeBreakdown._sum || {};

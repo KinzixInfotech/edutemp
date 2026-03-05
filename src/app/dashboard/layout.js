@@ -11,7 +11,7 @@ import { LoaderProvider } from './context/Loader';
 import { Profile } from '@/components/profile';
 
 import { CommandMenuProvider } from '@/components/CommandMenuContext';
-import CommandMenu from '@/components/commandmenu';
+
 import { SecurityAlertBanner } from '@/components/security-alert-banner';
 export default async function RootLayout({ children }) {
 
@@ -34,7 +34,7 @@ export default async function RootLayout({ children }) {
 
                                     />
                                     <SecurityAlertBanner />
-                                    <CommandMenu />
+                                    {/* CommandMenu is rendered inside CommandMenuProvider */}
                                 </ThemeProvider>
                             </LoaderProvider>
                         </CommandMenuProvider>

@@ -151,6 +151,14 @@ export default function DailyStatsCards({ schoolId, academicYearId, data: propDa
         staleTime: 5 * 60 * 1000,
     });
 
+    // ── Static data for Breakdown & Overview (independent of range filters) ──
+    const { data: staticChartData, isLoading: staticChartLoading } = useQuery({
+        queryKey: ['dashboard-charts-static', schoolId, academicYearId],
+        queryFn: () => fetchChartData({ schoolId, academicYearId, range: '30d' }),
+        enabled: !!schoolId,
+        staleTime: 10 * 60 * 1000,
+    });
+
     // ── Format chart data ──
     const isMonthly = (r) => r === '6m' || r === '1y';
 
@@ -176,26 +184,39 @@ export default function DailyStatsCards({ schoolId, academicYearId, data: propDa
         });
     }, [feeChartData, feeRange]);
 
-    const attendanceBar = attendanceChartData?.attendanceBar || [];
-    const feePie = feeChartData?.feePie || [];
+    const attendanceBar = staticChartData?.attendanceBar || [];
+    const feePie = staticChartData?.feePie || [];
+
+    // ── Format large numbers (Indian: K, L, Cr) ──
+    const formatCount = (num) => {
+        if (num == null) return '0';
+        if (num >= 10000000) return `${(num / 10000000).toFixed(1).replace(/\.0$/, '')} Cr`;
+        if (num >= 100000) return `${(num / 100000).toFixed(1).replace(/\.0$/, '')} L`;
+        if (num >= 1000) return `${(num / 1000).toFixed(1).replace(/\.0$/, '')} K`;
+        return num.toLocaleString('en-IN');
+    };
 
     // ── Summary stats ──
+    const totalStaff = (data?.totalTeachingStaff ?? 0) + (data?.totalNonTeachingStaff ?? 0);
+    const totalStudents = data?.totalStudents ?? 0;
+
     const stats = [
         {
-            title: 'Students Present',
-            value: data?.studentsPresent ?? 0,
-            total: data?.totalStudents ?? 0,
-            subtitle: `out of ${data?.totalStudents ?? 0} enrolled`,
+            title: 'Total Students',
+            value: formatCount(totalStudents),
+            rawValue: totalStudents,
+            total: totalStudents || 1,
+            subtitle: `Enrolled this session`,
             icon: Users,
             iconBg: 'bg-blue-100 dark:bg-blue-900/40',
             iconColor: 'text-blue-600 dark:text-blue-400',
             progressColor: 'bg-blue-500',
         },
         {
-            title: 'Staff Attendance',
-            value: `${(data?.teachingStaffPresent ?? 0) + (data?.nonTeachingStaffPresent ?? 0)}/${(data?.totalTeachingStaff ?? 0) + (data?.totalNonTeachingStaff ?? 0)}`,
-            rawValue: (data?.teachingStaffPresent ?? 0) + (data?.nonTeachingStaffPresent ?? 0),
-            total: (data?.totalTeachingStaff ?? 0) + (data?.totalNonTeachingStaff ?? 0),
+            title: 'Total Staff',
+            value: formatCount(totalStaff),
+            rawValue: totalStaff,
+            total: totalStaff || 1,
             subtitle: 'Teaching & Non-teaching',
             icon: UserCheck,
             iconBg: 'bg-green-100 dark:bg-green-900/40',
@@ -372,7 +393,7 @@ export default function DailyStatsCards({ schoolId, academicYearId, data: propDa
                         <CardDescription>Student attendance status</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {attendanceChartLoading ? (
+                        {staticChartLoading ? (
                             <Skeleton className="h-[220px] w-full rounded-lg" />
                         ) : attendanceBar.length > 0 ? (
                             <>
@@ -478,7 +499,7 @@ export default function DailyStatsCards({ schoolId, academicYearId, data: propDa
                         <CardDescription>Year-to-date breakdown</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {feeChartLoading ? (
+                        {staticChartLoading ? (
                             <Skeleton className="h-[180px] w-full rounded-lg" />
                         ) : feePie.length > 0 ? (
                             <>

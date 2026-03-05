@@ -155,17 +155,29 @@ export async function GET(req) {
                         prisma.feePayment.findMany({
                             where: { schoolId, academicYearId, status: 'SUCCESS' },
                             orderBy: { paymentDate: 'desc' },
-                            take: 10,
+                            take: 20,
                             select: {
                                 id: true,
                                 amount: true,
                                 paymentDate: true,
                                 status: true,
+                                receiptNumber: true,
+                                paymentMethod: true,
+                                paymentMode: true,
+                                studentId: true,
                                 student: {
                                     select: {
                                         name: true,
                                         admissionNo: true,
-                                        class: { select: { className: true } }
+                                        class: { select: { className: true } },
+                                        section: { select: { name: true } }
+                                    }
+                                },
+                                studentFee: {
+                                    select: {
+                                        finalAmount: true,
+                                        paidAmount: true,
+                                        balanceAmount: true,
                                     }
                                 }
                             }
