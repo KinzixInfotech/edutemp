@@ -37,6 +37,7 @@ export default function ClientProduct({ children }) {
         pathname.startsWith("/exam") ||
         pathname.startsWith("/forms") ||
         (isPayDomain || pathname.startsWith("/pay")) ||
+        (isAtlasDomain || pathname.startsWith("/atlas")) ||
         (isTeacherDomain || pathname.startsWith("/teacher"))
 
 

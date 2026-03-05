@@ -6,14 +6,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+import PublicFooter from './PublicFooter';
 
 export default function ExploreClientWrapper({ children }) {
     return (
         <div className="min-h-screen bg-[#f9fafb] dark:bg-black">
             <PublicHeader />
-            <main className="w-full h-full relative">
+            <main className="w-full h-full relative pt-[72px]">
                 {children}
             </main>
+            <PublicFooter />
         </div>
     );
 }
