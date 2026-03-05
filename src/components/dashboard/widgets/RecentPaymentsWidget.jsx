@@ -52,7 +52,7 @@ export default function RecentPaymentsWidget({ fullUser, onRemove, recentPayment
 
     if (isLoading) {
         return (
-            <WidgetContainer title="Recent Payments" onRemove={onRemove} className="col-span-1 md:col-span-2">
+            <WidgetContainer title="Recent Payments" onRemove={onRemove} className="h-full">
                 <div className="space-y-2">
                     {[1, 2, 3, 4].map((i) => (
                         <Skeleton key={i} className="h-12 w-full" />
@@ -63,7 +63,7 @@ export default function RecentPaymentsWidget({ fullUser, onRemove, recentPayment
     }
 
     return (
-        <WidgetContainer title="Recent Payments" onRemove={onRemove} className="col-span-1 md:col-span-2">
+        <WidgetContainer title="Recent Payments" onRemove={onRemove} className="h-full">
             <div className="relative overflow-x-auto">
                 <Table>
                     <TableHeader>

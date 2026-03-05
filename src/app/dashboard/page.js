@@ -238,42 +238,11 @@ const StatusActivityWidget = ({ schoolId }) => {
   }
 
   return (
-    <div className="px-4 mt-2">
+    <div className="">
       <Card className={'bg-transparent border-none'}>
-        {/* <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center">
-              <Play className="h-4 w-4 text-violet-600 dark:text-violet-400" />
-            </div>
-            <div>
-              <CardTitle className="text-sm font-semibold">Status Updates</CardTitle>
-              {!isLoading && (
-                <div className="flex items-center gap-2 mt-1">
-                  {(stats?.activeStatuses || 0) > 0 && (
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-medium bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800">
-                      {stats.activeStatuses} active
-                    </Badge>
-                  )}
-                  {(stats?.totalViewsToday || 0) > 0 && (
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-medium bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800">
-                      <Eye className="h-2.5 w-2.5 mr-0.5" />
-                      {stats.totalViewsToday} today
-                    </Badge>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-          <Link href="/dashboard/schools/status">
-            <Button variant="outline" size="sm" className="text-xs h-8">
-              Manage
-            </Button>
-          </Link>
-        </CardHeader> */}
-
         {recentStatuses.length > 0 && (
-          <CardContent className="pt-0 pb-2">
-            <div className="flex gap-4 overflow-x-auto pb-1 scrollbar-hide">
+          <CardContent className="pt-0">
+            <div className="flex gap-4 overflow-x-auto scrollbar-hide">
               {recentStatuses.map((status) => {
                 const gradIdx = Math.abs((status.userName || '').charCodeAt(0) || 0) % TEXT_GRADIENTS.length;
                 return (
@@ -522,6 +491,7 @@ export default function Dashboard() {
                 fullUser={fullUser}
                 schoolName={fullUser?.school?.name || 'Your School'}
               />
+              <StatusActivityWidget schoolId={fullUser?.schoolId} />
 
               {/* Setup Warnings */}
               {/* Old OnboardingModal removed - replaced by SchoolOnboardingWizard in client-layout */}
@@ -573,7 +543,6 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
-
             {/* Key Metrics Cards */}
             <div className='px-4 mt-6'>
               <DailyStatsCards
@@ -582,55 +551,32 @@ export default function Dashboard() {
                 data={consolidatedQuery.data?.dailyStats}
               />
             </div>
-            <StatusActivityWidget schoolId={fullUser?.schoolId} />
 
             {/* AI Insights Section */}
             <div className="px-4">
               <AiInsightsCard schoolId={fullUser?.schoolId} />
             </div>
 
-            {/* Status Activity Card */}
 
-            {/* Widgets Grid - 3 equal columns for main widgets */}
-            <div className="px-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
+            {/* Widgets Grid */}
+            <div className="px-4 grid grid-cols-1 md:grid-cols-12 gap-4 mt-2 items-stretch">
               {/* Calendar Widget */}
               {WIDGETS['CALENDAR'] && (
-                <div className="col-span-1">
+                <div className="md:col-span-4 h-full">
                   <WIDGETS.CALENDAR.component
                     fullUser={fullUser}
                     upcomingEvents={consolidatedQuery.data?.upcomingEvents}
                   />
                 </div>
               )}
-
-              {/* Attendance Widget */}
-              {WIDGETS['ATTENDANCE'] && (
-                <div className="col-span-1">
-                  <WIDGETS.ATTENDANCE.component
-                    fullUser={fullUser}
-                    data={consolidatedQuery.data?.attendanceSummary}
-                  />
-                </div>
-              )}
-
-              {/* Fee Stats Widget */}
-              {WIDGETS['FEE_STATS'] && (
-                <div className="col-span-1">
-                  <WIDGETS.FEE_STATS.component
-                    fullUser={fullUser}
-                    feeStats={consolidatedQuery.data?.feeStats}
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Recent Payments - Full Width */}
-            <div className="px-4 mt-4">
+              {/* Recent Payments */}
               {WIDGETS['RECENT_PAYMENTS'] && (
-                <RecentPaymentsWidget
-                  fullUser={fullUser}
-                  recentPayments={consolidatedQuery.data?.feeStats?.recentPayments}
-                />
+                <div className="md:col-span-8 h-full">
+                  <RecentPaymentsWidget
+                    fullUser={fullUser}
+                    recentPayments={consolidatedQuery.data?.feeStats?.recentPayments}
+                  />
+                </div>
               )}
             </div>
           </>

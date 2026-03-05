@@ -1,28 +1,8 @@
-import FeeStatsWidget from "./FeeStatsWidget";
-import AttendanceWidget from "./AttendanceWidget";
 import RecentPaymentsWidget from "./RecentPaymentsWidget";
-import NoticeBoardWidget from "./NoticeBoardWidget";
-import QuickActionsWidget from "./QuickActionsWidget";
 import CalendarWidget from "./CalendarWidget";
-import { IndianRupee, CalendarCheck, Receipt, Bell, Zap, Calendar } from "lucide-react";
+import { Receipt, Calendar } from "lucide-react";
 
 export const WIDGETS = {
-    FEE_STATS: {
-        id: 'FEE_STATS',
-        title: 'Fee Collection',
-        description: 'Overview of expected vs collected fees',
-        component: FeeStatsWidget,
-        icon: IndianRupee,
-        defaultSize: 'col-span-1'
-    },
-    ATTENDANCE: {
-        id: 'ATTENDANCE',
-        title: 'Attendance',
-        description: 'Daily attendance summary for students & staff',
-        component: AttendanceWidget,
-        icon: CalendarCheck,
-        defaultSize: 'col-span-1'
-    },
     CALENDAR: {
         id: 'CALENDAR',
         title: 'Calendar & Weather',
@@ -39,22 +19,6 @@ export const WIDGETS = {
         icon: Receipt,
         defaultSize: 'col-span-1 md:col-span-2'
     },
-    // NOTICE_BOARD: {
-    //     id: 'NOTICE_BOARD',
-    //     title: 'Notice Board',
-    //     description: 'Recent announcements and notices',
-    //     component: NoticeBoardWidget,
-    //     icon: Bell,
-    //     defaultSize: 'col-span-1 md:col-span-2'
-    // },
-    // QUICK_ACTIONS: {
-    //     id: 'QUICK_ACTIONS',
-    //     title: 'Quick Actions',
-    //     description: 'Shortcuts to common tasks',
-    //     component: QuickActionsWidget,
-    //     icon: Zap,
-    //     defaultSize: 'col-span-1'
-    // }
 };
 
-export const DEFAULT_WIDGETS = ['CALENDAR', 'STATS_OVERVIEW', 'ATTENDANCE', 'FEE_STATS', 'RECENT_PAYMENTS'];
+export const DEFAULT_WIDGETS = ['CALENDAR', 'RECENT_PAYMENTS'];

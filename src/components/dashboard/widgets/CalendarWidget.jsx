@@ -116,17 +116,17 @@ export default function CalendarWidget({ fullUser, onRemove, upcomingEvents: pro
 
     return (
         <WidgetContainer title="Calendar & Weather" onRemove={onRemove} className="col-span-1 h-full">
-            <div className="flex flex-col h-full gap-4">
+            <div className="flex flex-col h-full gap-2.5">
                 {/* Weather Card */}
-                <div className={`rounded-xl bg-gradient-to-br ${getWeatherBg(weatherCode)} p-4 border border-border/30`}>
+                <div className={`rounded-lg bg-gradient-to-br ${getWeatherBg(weatherCode)} p-3 border border-border/30`}>
                     <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="p-2.5 rounded-xl bg-white/60 dark:bg-white/10 backdrop-blur-sm">
-                                <WeatherIcon className="h-6 w-6 text-amber-500" />
+                            <div className="p-2 rounded-lg bg-white/60 dark:bg-white/10 backdrop-blur-sm">
+                                <WeatherIcon className="h-5 w-5 text-amber-500" />
                             </div>
                             <div>
                                 <div className="flex items-baseline gap-1">
-                                    <span className="text-3xl font-bold text-foreground">
+                                    <span className="text-2xl font-bold text-foreground">
                                         {temp !== undefined ? Math.round(temp) : '--'}
                                     </span>
                                     <span className="text-sm text-muted-foreground">°C</span>
@@ -134,18 +134,18 @@ export default function CalendarWidget({ fullUser, onRemove, upcomingEvents: pro
                             </div>
                         </div>
                         <div className="text-right">
-                            <div className="text-xl font-semibold text-foreground">
+                            <div className="text-base font-semibold text-foreground">
                                 {currentTime ? currentTime.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '--:--'}
                             </div>
-                            <div className="text-xs text-muted-foreground">
+                            <div className="text-[10px] text-muted-foreground">
                                 {currentTime ? currentTime.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : ''}
                             </div>
                         </div>
                     </div>
 
                     {/* Location - Separate row */}
-                    <div className="flex items-center gap-1.5 mt-2 text-sm text-muted-foreground">
-                        <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+                    <div className="flex items-center gap-1 mt-1.5 text-xs text-muted-foreground">
+                        <MapPin className="h-3 w-3 flex-shrink-0" />
                         <span className="truncate">
                             {locationName.district || locationName.state
                                 ? `${locationName.district}${locationName.district && locationName.state ? ', ' : ''}${locationName.state}`
@@ -154,16 +154,16 @@ export default function CalendarWidget({ fullUser, onRemove, upcomingEvents: pro
                     </div>
 
                     {/* Mini weather stats */}
-                    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-foreground/10">
+                    <div className="flex items-center gap-3 mt-2 pt-2 border-t border-foreground/10">
                         {humidity !== undefined && (
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                <Droplets className="h-3.5 w-3.5 text-blue-400" />
+                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <Droplets className="h-3 w-3 text-blue-400" />
                                 <span>{humidity}%</span>
                             </div>
                         )}
                         {windSpeed !== undefined && (
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                <Wind className="h-3.5 w-3.5 text-emerald-400" />
+                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <Wind className="h-3 w-3 text-emerald-400" />
                                 <span>{Math.round(windSpeed)} km/h</span>
                             </div>
                         )}
@@ -173,10 +173,10 @@ export default function CalendarWidget({ fullUser, onRemove, upcomingEvents: pro
                 {/* Calendar Grid */}
                 <div className="flex-1 flex flex-col min-h-0">
                     {/* Day headers */}
-                    <div className="grid grid-cols-7 gap-1.5 mb-2">
+                    <div className="grid grid-cols-7 gap-1 mb-1">
                         {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-                            <div key={i} className="text-center py-1.5">
-                                <span className={`text-[10px] font-bold tracking-wide ${i === 0 ? 'text-rose-500' : i === 6 ? 'text-blue-500' : 'text-muted-foreground/80'
+                            <div key={i} className="text-center py-0.5">
+                                <span className={`text-[9px] font-bold tracking-wide ${i === 0 ? 'text-rose-500' : i === 6 ? 'text-blue-500' : 'text-muted-foreground/80'
                                     }`}>
                                     {d}
                                 </span>
@@ -185,7 +185,7 @@ export default function CalendarWidget({ fullUser, onRemove, upcomingEvents: pro
                     </div>
 
                     {/* Calendar days */}
-                    <div className="grid grid-cols-7 gap-1.5 flex-1">
+                    <div className="grid grid-cols-7 gap-1 flex-1">
                         {(() => {
                             if (!currentTime) return null;
                             const today = currentTime.getDate();
@@ -196,43 +196,39 @@ export default function CalendarWidget({ fullUser, onRemove, upcomingEvents: pro
 
                             const days = [];
                             for (let i = 0; i < firstDay; i++) {
-                                days.push(<div key={`empty-${i}`} className="aspect-square" />);
+                                days.push(<div key={`empty-${i}`} className="h-9" />);
                             }
                             for (let i = 1; i <= daysInMonth; i++) {
                                 const isToday = i === today;
                                 const dateStr = new Date(currentYear, currentMonth, i).toDateString();
                                 const hasEvent = upcomingEvents.some(e => new Date(e.startDate).toDateString() === dateStr);
                                 const dayOfWeek = new Date(currentYear, currentMonth, i).getDay();
-                                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
                                 const isPast = i < today;
 
                                 days.push(
                                     <div
                                         key={i}
                                         className={`
-                                            aspect-square rounded-xl flex items-center justify-center relative
-                                            text-sm font-semibold transition-all duration-200 cursor-pointer
+                                            w-9 h-9 mx-auto rounded-full flex items-center justify-center relative
+                                            text-[11px] font-semibold transition-all duration-150 cursor-pointer
                                             ${isToday
-                                                ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30 scale-105 ring-2 ring-blue-400/30 ring-offset-1'
+                                                ? 'bg-primary text-primary-foreground shadow-sm'
                                                 : isPast
                                                     ? 'text-muted-foreground/40 hover:bg-muted/30'
                                                     : dayOfWeek === 0
-                                                        ? 'text-rose-500 bg-rose-50/50 dark:bg-rose-500/5 hover:bg-rose-100 dark:hover:bg-rose-500/10 border border-rose-100/50 dark:border-rose-500/10'
+                                                        ? 'text-rose-500 hover:bg-rose-100/50 dark:hover:bg-rose-500/10'
                                                         : dayOfWeek === 6
-                                                            ? 'text-blue-500 bg-blue-50/50 dark:bg-blue-500/5 hover:bg-blue-100 dark:hover:bg-blue-500/10 border border-blue-100/50 dark:border-blue-500/10'
-                                                            : 'text-foreground bg-muted/30 hover:bg-muted/60 border border-transparent hover:border-border/50'
+                                                            ? 'text-blue-500 hover:bg-blue-100/50 dark:hover:bg-blue-500/10'
+                                                            : 'text-foreground hover:bg-muted/50'
                                             }
                                             ${hasEvent && !isToday ? 'ring-1 ring-blue-400/40' : ''}
                                         `}
                                     >
                                         {i}
                                         {hasEvent && (
-                                            <div className={`absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5`}>
-                                                <div className={`w-1.5 h-1.5 rounded-full ${isToday ? 'bg-white' : 'bg-blue-500'} animate-pulse`} />
+                                            <div className={`absolute -bottom-0.5 left-1/2 -translate-x-1/2`}>
+                                                <div className={`w-1 h-1 rounded-full ${isToday ? 'bg-primary-foreground' : 'bg-blue-500'}`} />
                                             </div>
-                                        )}
-                                        {isToday && (
-                                            <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full border border-white" />
                                         )}
                                     </div>
                                 );
@@ -243,28 +239,28 @@ export default function CalendarWidget({ fullUser, onRemove, upcomingEvents: pro
                 </div>
 
                 {/* Next Event */}
-                <div className="pt-3 border-t border-border/40">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Next Event</span>
+                <div className="pt-2 border-t border-border/40">
+                    <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Next Event</span>
                     </div>
                     {upcomingEvents?.length > 0 ? (
-                        <div className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors cursor-pointer">
+                        <div className="flex items-center gap-2 p-2 rounded-md bg-muted/40 hover:bg-muted/60 transition-colors cursor-pointer">
                             <div
-                                className="w-1 h-10 rounded-full flex-shrink-0"
+                                className="w-0.5 h-8 rounded-full flex-shrink-0"
                                 style={{ backgroundColor: upcomingEvents[0].color || '#3B82F6' }}
                             />
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium text-foreground truncate">{upcomingEvents[0].title}</p>
-                                <div className="flex items-center gap-1.5 mt-0.5">
-                                    <Clock className="h-3 w-3 text-muted-foreground" />
-                                    <span className="text-xs text-muted-foreground">
+                                <p className="text-xs font-medium text-foreground truncate">{upcomingEvents[0].title}</p>
+                                <div className="flex items-center gap-1 mt-0.5">
+                                    <Clock className="h-2.5 w-2.5 text-muted-foreground" />
+                                    <span className="text-[10px] text-muted-foreground">
                                         {upcomingEvents[0].startTime || 'All Day'} • {new Date(upcomingEvents[0].startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                                     </span>
                                 </div>
                             </div>
                         </div>
                     ) : (
-                        <div className="text-center py-3 text-xs text-muted-foreground bg-muted/30 rounded-lg">
+                        <div className="text-center py-2 text-[10px] text-muted-foreground bg-muted/30 rounded-md">
                             No upcoming events
                         </div>
                     )}
