@@ -750,13 +750,22 @@ async function sendPushNotifications({
             },
             data: stringifiedData,
             android: {
+                // DELIVERY priority (wakes device from Doze mode)
+                priority: 'high',
+                // Store messages for 4 weeks if device is offline
+                ttl: 2419200000, // 4 weeks in milliseconds
                 notification: {
                     channelId: 'default',
-                    priority: 'high',
+                    // DISPLAY priority (notification shade ordering)
+                    notificationPriority: 'PRIORITY_HIGH',
                     ...(imageUrl && { image: imageUrl }),
                 },
             },
             apns: {
+                headers: {
+                    'apns-priority': '10', // Immediate delivery on iOS
+                    'apns-expiration': String(Math.floor(Date.now() / 1000) + 2419200), // 4 weeks from now
+                },
                 payload: {
                     aps: {
                         sound: 'default',
@@ -1790,8 +1799,23 @@ async function sendPushNotificationsOptimized({ userIds, title, message, data = 
             tokens,
             notification: { title, body: message },
             data: stringifiedData,
-            android: { notification: { channelId: 'default', priority: 'high' } },
-            apns: { payload: { aps: { sound: 'default', contentAvailable: true } } }
+            android: {
+                priority: 'high', // DELIVERY priority — wakes device from Doze
+                ttl: 2419200000, // 4 weeks in ms — message stored if device offline
+                notification: {
+                    channelId: 'default',
+                    notificationPriority: 'PRIORITY_HIGH',
+                },
+            },
+            apns: {
+                headers: {
+                    'apns-priority': '10',
+                    'apns-expiration': String(Math.floor(Date.now() / 1000) + 2419200),
+                },
+                payload: {
+                    aps: { sound: 'default', contentAvailable: true },
+                },
+            },
         });
 
         console.log(`[Push] Sent to ${response.successCount}/${tokens.length} devices`);

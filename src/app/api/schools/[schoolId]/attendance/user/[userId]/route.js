@@ -28,6 +28,17 @@ export async function GET(req, props) {
                     lte: endDate
                 }
             };
+        } else if (year) {
+            // Year-only filter: Jan 1 to Dec 31
+            const startDate = new Date(parseInt(year), 0, 1);
+            const endDate = new Date(parseInt(year), 11, 31);
+            endDate.setHours(23, 59, 59, 999);
+            dateFilter = {
+                date: {
+                    gte: startDate,
+                    lte: endDate
+                }
+            };
         }
 
         const records = await prisma.attendance.findMany({

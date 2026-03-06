@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -93,10 +93,14 @@ const PRIORITIES = [
     { value: 'CRITICAL', label: 'Critical', color: 'bg-red-100 text-red-700' },
 ];
 
+const DRAFT_STORAGE_KEY = 'notice_draft';
+
 export default function NoticeAdminPage() {
     const queryClient = useQueryClient();
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;
+    const [hasDraft, setHasDraft] = useState(false);
+    const skipDraftSave = useRef(false);
 
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [selectedNotice, setSelectedNotice] = useState(null);
@@ -137,7 +141,46 @@ export default function NoticeAdminPage() {
         },
     });
 
-    const watchedValues = watch();
+    // Only watch fields that need to trigger UI re-renders (Selects, Status buttons)
+    // We EXCLUDE title, subtitle, and description from here to prevent lag
+    const category = watch('category');
+    const priority = watch('priority');
+    const audience = watch('audience');
+    const status = watch('status');
+    const publishedAt = watch('publishedAt');
+
+    // ── Draft auto-save to localStorage (Non-rendering approach) ──
+    useEffect(() => {
+        if (!isDialogOpen || selectedNotice) return;
+
+        const subscription = watch((values) => {
+            if (skipDraftSave.current || selectedNotice) return;
+
+            const { title, subtitle, description } = values;
+            const hasContent = title || subtitle || description;
+            if (!hasContent) return;
+
+            // Debounce save operation
+            const timer = setTimeout(() => {
+                try {
+                    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({
+                        ...values,
+                        uploadedImageUrl, // Still needed from state
+                        savedAt: Date.now(),
+                    }));
+                } catch { /* ignore */ }
+            }, 1000);
+
+            return () => clearTimeout(timer);
+        });
+
+        return () => subscription.unsubscribe();
+    }, [watch, isDialogOpen, selectedNotice, uploadedImageUrl]);
+
+    const clearDraft = useCallback(() => {
+        try { localStorage.removeItem(DRAFT_STORAGE_KEY); } catch { }
+        setHasDraft(false);
+    }, []);
 
     // Fetch notices - only notices created by current user
     const { data: noticesData, isLoading, isFetching, refetch } = useQuery({
@@ -242,8 +285,9 @@ export default function NoticeAdminPage() {
                     ? 'Notice scheduled successfully!'
                     : 'Notice published successfully!';
             toast.success(statusMsg);
+            clearDraft(); // Clear draft from localStorage on successful save
             queryClient.refetchQueries({ queryKey: ['notices', schoolId, fullUser?.id] });
-            closeDialog();
+            closeDialog(true);
         },
         onError: (error) => {
             toast.error(error.message || 'Failed to create notice');
@@ -300,25 +344,59 @@ export default function NoticeAdminPage() {
             setUploadedImageUrl(notice.fileUrl || '');
         } else {
             setSelectedNotice(null);
-            reset({
-                priority: 'NORMAL',
-                status: 'DRAFT',
-                audience: 'ALL',
-                category: 'GENERAL',
-                issuedBy: fullUser?.name || '',
-                issuerRole: fullUser?.role?.name || 'Administration',
-            });
-            setUploadedImageUrl('');
+            // Try to restore draft from localStorage
+            let restoredDraft = false;
+            try {
+                const saved = localStorage.getItem(DRAFT_STORAGE_KEY);
+                if (saved) {
+                    const draft = JSON.parse(saved);
+                    // Only restore if draft is less than 7 days old
+                    if (draft.savedAt && Date.now() - draft.savedAt < 7 * 24 * 60 * 60 * 1000) {
+                        reset({
+                            title: draft.title || '',
+                            subtitle: draft.subtitle || '',
+                            description: draft.description || '',
+                            category: draft.category || 'GENERAL',
+                            audience: draft.audience || 'ALL',
+                            priority: draft.priority || 'NORMAL',
+                            status: draft.status || 'DRAFT',
+                            issuedBy: draft.issuedBy || fullUser?.name || '',
+                            issuerRole: draft.issuerRole || fullUser?.role?.name || 'Administration',
+                            publishedAt: draft.publishedAt || '',
+                            expiryDate: draft.expiryDate || '',
+                        });
+                        setUploadedImageUrl(draft.uploadedImageUrl || '');
+                        setHasDraft(true);
+                        restoredDraft = true;
+                    }
+                }
+            } catch { }
+            if (!restoredDraft) {
+                reset({
+                    priority: 'NORMAL',
+                    status: 'DRAFT',
+                    audience: 'ALL',
+                    category: 'GENERAL',
+                    issuedBy: fullUser?.name || '',
+                    issuerRole: fullUser?.role?.name || 'Administration',
+                });
+                setUploadedImageUrl('');
+                setHasDraft(false);
+            }
         }
         setIsDialogOpen(true);
     };
 
-    const closeDialog = () => {
+    const closeDialog = (clearSavedDraft = false) => {
         setIsDialogOpen(false);
         setSelectedNotice(null);
         setUploadedImageUrl('');
         setUploadResetKey(prev => prev + 1);
+        setHasDraft(false);
         reset();
+        if (clearSavedDraft) {
+            clearDraft();
+        }
     };
 
     const onSubmit = (data) => {
@@ -717,6 +795,39 @@ export default function NoticeAdminPage() {
                         </DialogDescription>
                     </DialogHeader>
 
+                    {/* Draft restored indicator */}
+                    {hasDraft && !selectedNotice && (
+                        <div className="flex items-center justify-between bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2 text-sm">
+                            <span className="text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                                <Save className="h-3.5 w-3.5" />
+                                Draft restored from previous session
+                            </span>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs text-amber-600 hover:text-amber-800"
+                                onClick={() => {
+                                    clearDraft();
+                                    skipDraftSave.current = true;
+                                    reset({
+                                        priority: 'NORMAL',
+                                        status: 'DRAFT',
+                                        audience: 'ALL',
+                                        category: 'GENERAL',
+                                        issuedBy: fullUser?.name || '',
+                                        issuerRole: fullUser?.role?.name || 'Administration',
+                                    });
+                                    setUploadedImageUrl('');
+                                    setHasDraft(false);
+                                    setTimeout(() => { skipDraftSave.current = false; }, 600);
+                                }}
+                            >
+                                Clear draft
+                            </Button>
+                        </div>
+                    )}
+
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-2">
                         {/* Title */}
                         <div className="space-y-2">
@@ -768,7 +879,7 @@ export default function NoticeAdminPage() {
                             <div className="space-y-2">
                                 <Label>Category *</Label>
                                 <Select
-                                    value={watchedValues.category}
+                                    value={category}
                                     onValueChange={(value) => setValue('category', value)}
                                 >
                                     <SelectTrigger>
@@ -791,7 +902,7 @@ export default function NoticeAdminPage() {
                             <div className="space-y-2">
                                 <Label>Priority</Label>
                                 <Select
-                                    value={watchedValues.priority}
+                                    value={priority}
                                     onValueChange={(value) => setValue('priority', value)}
                                 >
                                     <SelectTrigger>
@@ -812,7 +923,7 @@ export default function NoticeAdminPage() {
                         <div className="space-y-2">
                             <Label>Target Audience *</Label>
                             <Select
-                                value={watchedValues.audience}
+                                value={audience}
                                 onValueChange={(value) => setValue('audience', value)}
                             >
                                 <SelectTrigger>
@@ -880,7 +991,7 @@ export default function NoticeAdminPage() {
                             <div className="grid grid-cols-3 gap-2">
                                 <Button
                                     type="button"
-                                    variant={watchedValues.status === 'DRAFT' ? 'default' : 'outline'}
+                                    variant={status === 'DRAFT' ? 'default' : 'outline'}
                                     className="w-full"
                                     onClick={() => setValue('status', 'DRAFT')}
                                 >
@@ -889,7 +1000,7 @@ export default function NoticeAdminPage() {
                                 </Button>
                                 <Button
                                     type="button"
-                                    variant={watchedValues.status === 'SCHEDULED' ? 'default' : 'outline'}
+                                    variant={status === 'SCHEDULED' ? 'default' : 'outline'}
                                     className="w-full"
                                     onClick={() => setValue('status', 'SCHEDULED')}
                                 >
@@ -898,7 +1009,7 @@ export default function NoticeAdminPage() {
                                 </Button>
                                 <Button
                                     type="button"
-                                    variant={watchedValues.status === 'PUBLISHED' ? 'default' : 'outline'}
+                                    variant={status === 'PUBLISHED' ? 'default' : 'outline'}
                                     className="w-full"
                                     onClick={() => setValue('status', 'PUBLISHED')}
                                 >
@@ -906,14 +1017,14 @@ export default function NoticeAdminPage() {
                                     Publish
                                 </Button>
                             </div>
-                            {watchedValues.status === 'SCHEDULED' && !watchedValues.publishedAt && (
+                            {status === 'SCHEDULED' && !publishedAt && (
                                 <p className="text-xs text-amber-600">⚠️ Set a publish date above for scheduled notices</p>
                             )}
                         </div>
 
                         {/* Buttons */}
                         <div className="flex gap-2 justify-end pt-2">
-                            <Button type="button" variant="outline" onClick={closeDialog}>
+                            <Button type="button" variant="outline" onClick={() => closeDialog(false)}>
                                 Cancel
                             </Button>
                             <Button type="submit" disabled={createMutation.isPending || isImageUploading}>
@@ -930,7 +1041,7 @@ export default function NoticeAdminPage() {
                                 ) : (
                                     <>
                                         <Send className="mr-2 h-4 w-4" />
-                                        {watchedValues.status === 'PUBLISHED' ? 'Publish' : 'Save'}
+                                        {status === 'PUBLISHED' ? 'Publish' : 'Save'}
                                     </>
                                 )}
                             </Button>

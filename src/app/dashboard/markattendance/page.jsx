@@ -88,7 +88,7 @@ export default function SelfAttendancePage() {
         staleTime: 1000 * 60 * 5,
     });
 
-    // Mark attendance mutation
+    // Mark attendance mutation with optimistic UI
     const markMutation = useMutation({
         mutationFn: async ({ type, location }) => {
             const res = await fetch(`/api/schools/${fullUser.schoolId}/attendance/mark`, {
@@ -108,14 +108,65 @@ export default function SelfAttendancePage() {
             if (!res.ok) throw new Error(result.message || result.error || "Failed to mark attendance");
             return result;
         },
+        onMutate: async ({ type }) => {
+            // Cancel outgoing refetches so they don't overwrite optimistic update
+            await queryClient.cancelQueries({ queryKey: ['selfAttendance'] });
+            await queryClient.cancelQueries({ queryKey: ['attendanceHistory'] });
+
+            // Snapshot previous data for rollback
+            const previousData = queryClient.getQueryData(['selfAttendance', fullUser?.id, fullUser?.schoolId]);
+
+            // Optimistically update the attendance status
+            queryClient.setQueryData(['selfAttendance', fullUser?.id, fullUser?.schoolId], (old) => {
+                if (!old) return old;
+                const now = new Date().toISOString();
+                if (type === 'CHECK_IN') {
+                    return {
+                        ...old,
+                        attendance: {
+                            ...old.attendance,
+                            checkInTime: now,
+                            workingHours: 0,
+                            liveWorkingHours: 0,
+                        },
+                    };
+                }
+                if (type === 'CHECK_OUT') {
+                    const checkIn = old.attendance?.checkInTime ? new Date(old.attendance.checkInTime) : new Date();
+                    const hours = ((new Date() - checkIn) / (1000 * 60 * 60)).toFixed(2);
+                    return {
+                        ...old,
+                        attendance: {
+                            ...old.attendance,
+                            checkOutTime: now,
+                            workingHours: parseFloat(hours),
+                            liveWorkingHours: null,
+                        },
+                    };
+                }
+                return old;
+            });
+
+            return { previousData };
+        },
         onSuccess: (data) => {
             toast.success(data.message);
-            queryClient.invalidateQueries(['selfAttendance']);
-            queryClient.invalidateQueries(['attendanceHistory']);
         },
-        onError: (error) => {
+        onError: (error, _variables, context) => {
+            // Rollback to previous state on error
+            if (context?.previousData) {
+                queryClient.setQueryData(
+                    ['selfAttendance', fullUser?.id, fullUser?.schoolId],
+                    context.previousData
+                );
+            }
             toast.error(error.message);
-        }
+        },
+        onSettled: () => {
+            // Always sync with server after mutation
+            queryClient.invalidateQueries({ queryKey: ['selfAttendance'] });
+            queryClient.invalidateQueries({ queryKey: ['attendanceHistory'] });
+        },
     });
 
     // Get user location when geofencing is enabled
@@ -746,11 +797,22 @@ export default function SelfAttendancePage() {
                 {/* Attendance History */}
                 <Card>
                     <CardHeader className="pb-3">
-                        <CardTitle className="flex items-center gap-2">
-                            <History className="h-5 w-5 text-muted-foreground" />
-                            Recent Attendance
-                        </CardTitle>
-                        <CardDescription>Your attendance records from the last 10 days</CardDescription>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="flex items-center gap-2">
+                                    <History className="h-5 w-5 text-muted-foreground" />
+                                    Recent Attendance
+                                </CardTitle>
+                                <CardDescription>Your last 5 attendance records</CardDescription>
+                            </div>
+                            {historyData?.records?.length > 0 && (
+                                <Button variant="ghost" size="sm" asChild>
+                                    <Link href="/dashboard/markattendance/report" className="text-primary">
+                                        View All →
+                                    </Link>
+                                </Button>
+                            )}
+                        </div>
                     </CardHeader>
                     <CardContent>
                         {historyLoading ? (
@@ -770,7 +832,7 @@ export default function SelfAttendancePage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {historyData.records.map((record) => (
+                                        {historyData.records.slice(0, 5).map((record) => (
                                             <TableRow key={record.id}>
                                                 <TableCell className="font-medium">{formatDate(record.date)}</TableCell>
                                                 <TableCell>
