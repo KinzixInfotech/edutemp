@@ -123,9 +123,12 @@ const fetchChartData = async ({ schoolId, academicYearId, range }) => {
 
 
 export default function DailyStatsCards({ schoolId, academicYearId, data: propData }) {
-    const [attendanceRange, setAttendanceRange] = useState('30d');
-    const [feeRange, setFeeRange] = useState('30d');
-
+    const [attendanceRange, setAttendanceRange] = useState(
+        () => (typeof window !== 'undefined' && localStorage.getItem('dashboard_attendanceRange')) || '30d'
+    );
+    const [feeRange, setFeeRange] = useState(
+        () => (typeof window !== 'undefined' && localStorage.getItem('dashboard_feeRange')) || '30d'
+    );
     // ── Stats data (existing) ──
     const { data: fetchedData, isLoading: fetchLoading } = useQuery({
         queryKey: ['daily-stats', schoolId, academicYearId],
@@ -329,7 +332,11 @@ export default function DailyStatsCards({ schoolId, academicYearId, data: propDa
                                 </CardDescription>
                             </div>
                             <div className="flex items-center gap-3">
-                                <Select value={attendanceRange} onValueChange={setAttendanceRange}>
+                                <Select value={attendanceRange} onValueChange={(val) => {
+                                    setAttendanceRange(val);
+                                    localStorage.setItem('dashboard_attendanceRange', val);
+                                }}
+                                >
                                     <SelectTrigger className="w-[140px] h-8 text-xs">
                                         <SelectValue />
                                     </SelectTrigger>
@@ -447,7 +454,10 @@ export default function DailyStatsCards({ schoolId, academicYearId, data: propDa
                                     {RANGE_OPTIONS.find(r => r.value === feeRange)?.label}
                                 </CardDescription>
                             </div>
-                            <Select value={feeRange} onValueChange={setFeeRange}>
+                            <Select value={feeRange} onValueChange={(val) => {
+                                setFeeRange(val);
+                                localStorage.setItem('dashboard_feeRange', val);
+                            }}>
                                 <SelectTrigger className="w-[140px] h-8 text-xs">
                                     <SelectValue />
                                 </SelectTrigger>

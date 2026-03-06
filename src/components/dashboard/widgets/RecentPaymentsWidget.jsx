@@ -33,7 +33,7 @@ import { toJpeg } from 'html-to-image';
 import { createRoot } from 'react-dom/client';
 import ReceiptTemplate from '@/components/receipts/ReceiptTemplate';
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 6;
 
 const fetchRecentPayments = async ({ schoolId, academicYearId }) => {
     if (!schoolId || !academicYearId) return null;
@@ -177,7 +177,7 @@ export default function RecentPaymentsWidget({ fullUser, onRemove, recentPayment
         return (
             <WidgetContainer title="Recent Payments" onRemove={onRemove} className="h-full">
                 <div className="space-y-1">
-                    {[1, 2, 3, 4, 5].map((i) => (
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
                         <Skeleton key={i} className="h-10 w-full" />
                     ))}
                 </div>
@@ -193,9 +193,9 @@ export default function RecentPaymentsWidget({ fullUser, onRemove, recentPayment
             className="h-full"
         >
             <div className="relative overflow-x-auto flex-1 -mt-1 flex flex-col">
-                <Table className="flex-1 [&_tbody]:h-full [&_tbody_tr]:h-full">
+                <Table className="flex-1">
                     <TableHeader>
-                        <TableRow className="bg-muted/50 dark:bg-background/50 h-full">
+                        <TableRow className="bg-muted/50 dark:bg-background/50">
                             <TableHead className="w-[30px] text-xs py-3.5">#</TableHead>
                             <TableHead className="text-xs py-3.5">Receipt No</TableHead>
                             <TableHead className="text-xs py-3.5">Student</TableHead>
