@@ -6,6 +6,7 @@
 
 import { google } from "googleapis";
 import prisma from "@/lib/prisma";
+import { invalidatePattern } from "@/lib/cache";
 
 export async function POST(req) {
     try {
@@ -52,6 +53,9 @@ export async function POST(req) {
                 ...(email && { email }),
             },
         });
+
+        // Invalidate server-side calendar events cache so hasGoogleCalendar becomes false
+        await invalidatePattern('calendar:events');
 
         return new Response(
             JSON.stringify({ message: 'Google Calendar disconnected successfully' }),

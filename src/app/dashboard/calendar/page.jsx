@@ -597,7 +597,7 @@ export default function SchoolCalendar() {
                                             });
                                             if (res.ok) {
                                                 setGcBanner({ type: 'success', message: 'Google Calendar disconnected.' });
-                                                queryClient.invalidateQueries({ queryKey: ['calendar-events'] });
+                                                queryClient.invalidateQueries({ queryKey: ['calendar-events'], refetchType: 'all' });
                                             }
                                         } catch (err) {
                                             console.error('Disconnect error:', err);
