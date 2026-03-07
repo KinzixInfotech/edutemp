@@ -32,6 +32,8 @@ import { WebPushListener } from "@/components/web-push-listener";
 import { PiGraduationCapDuotone } from "react-icons/pi";
 import { ApiProgressBar } from "@/components/ui/api-progress-bar";
 import { apiLoader } from "@/lib/api-loader";
+import { BulkUploadProvider } from "@/context/BulkUploadContext";
+import BulkUploadToast from "@/components/gallery/BulkUploadToast";
 
 const TopProgressBar = dynamic(() => import("@/app/components/TopProgressBar"), {
     ssr: false,
@@ -258,205 +260,208 @@ export default function ClientLayout({ children }) {
                 <OnboardingSetupBannerProvider>
                     <AcademicYearSetupBannerProvider>
                         <QueryClientProvider client={queryClient}>
-                            {/* Inject animation styles */}
-                            <style dangerouslySetInnerHTML={{ __html: spinnerStyles }} />
+                            <BulkUploadProvider>
+                                {/* Inject animation styles */}
+                                <style dangerouslySetInnerHTML={{ __html: spinnerStyles }} />
 
-                            <SidebarProvider
-                                style={{
-                                    "--sidebar-width": "calc(var(--spacing) * 72)",
-                                    "--header-height": "calc(var(--spacing) * 16)",
-                                }}
-                            >
+                                <SidebarProvider
+                                    style={{
+                                        "--sidebar-width": "calc(var(--spacing) * 72)",
+                                        "--header-height": "calc(var(--spacing) * 16)",
+                                    }}
+                                >
 
-                                {!hideUI && <SchoolOnboardingWizard />}
-                                {!hideUI && <SetupHelperButton />}
-                                {!hideUI && <AppSidebar />}
-                                <TopProgressBar />
-                                <ApiProgressBar />
+                                    {!hideUI && <SchoolOnboardingWizard />}
+                                    {!hideUI && <SetupHelperButton />}
+                                    {!hideUI && <AppSidebar />}
+                                    <TopProgressBar />
+                                    <ApiProgressBar />
 
-                                <SidebarInset className={'bg-[#f9fafb] dark:bg-black'}>
-                                    {!hideUI && <SiteHeader fullUser={fullUser} />}
+                                    <SidebarInset className={'bg-[#f9fafb] dark:bg-black'}>
+                                        {!hideUI && <SiteHeader fullUser={fullUser} />}
 
-                                    {!hideUI && <BreadcrumbHeader schoolName={fullUser?.school?.name} />}
+                                        {!hideUI && <BreadcrumbHeader schoolName={fullUser?.school?.name} />}
 
-                                    <main className="w-full h-full relative">
-                                        {/* Modern Navigation Loading Overlay */}
-                                        {isNavigating && pathname?.startsWith('/dashboard') && (
-                                            <div
-                                                className="fixed inset-0 flex items-center justify-center z-50 overflow-hidden"
-                                                style={{
-                                                    left: 'var(--sidebar-width, 0px)',
-                                                    animation: 'fadeIn 0.15s ease-out',
-                                                }}
-                                            >
-                                                {/* Gradient mesh background */}
-                                                <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-background/95" />
-
-                                                {/* Animated gradient orbs */}
+                                        <main className="w-full h-full relative">
+                                            {/* Modern Navigation Loading Overlay */}
+                                            {isNavigating && pathname?.startsWith('/dashboard') && (
                                                 <div
-                                                    className="absolute w-96 h-96 rounded-full blur-3xl opacity-20"
+                                                    className="fixed inset-0 flex items-center justify-center z-50 overflow-hidden"
                                                     style={{
-                                                        background: 'linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary)/0.3) 100%)',
-                                                        top: '-10%',
-                                                        right: '-10%',
-                                                        animation: 'smoothPulse 3s ease-in-out infinite',
+                                                        left: 'var(--sidebar-width, 0px)',
+                                                        animation: 'fadeIn 0.15s ease-out',
                                                     }}
-                                                />
-                                                <div
-                                                    className="absolute w-64 h-64 rounded-full blur-3xl opacity-15"
-                                                    style={{
-                                                        background: 'linear-gradient(135deg, hsl(var(--primary)/0.5) 0%, transparent 100%)',
-                                                        bottom: '10%',
-                                                        left: '10%',
-                                                        animation: 'smoothPulse 4s ease-in-out infinite 0.5s',
-                                                    }}
-                                                />
+                                                >
+                                                    {/* Gradient mesh background */}
+                                                    <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-background/95" />
 
-                                                {/* Floating particles */}
-                                                <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                                                    {[...Array(6)].map((_, i) => (
-                                                        <div
-                                                            key={i}
-                                                            className="absolute w-2 h-2 rounded-full bg-primary/30"
-                                                            style={{
-                                                                left: `${15 + i * 15}%`,
-                                                                top: `${30 + (i % 3) * 20}%`,
-                                                                animation: `float ${2 + i * 0.3}s ease-in-out infinite ${i * 0.2}s`,
-                                                            }}
-                                                        />
-                                                    ))}
-                                                </div>
+                                                    {/* Animated gradient orbs */}
+                                                    <div
+                                                        className="absolute w-96 h-96 rounded-full blur-3xl opacity-20"
+                                                        style={{
+                                                            background: 'linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary)/0.3) 100%)',
+                                                            top: '-10%',
+                                                            right: '-10%',
+                                                            animation: 'smoothPulse 3s ease-in-out infinite',
+                                                        }}
+                                                    />
+                                                    <div
+                                                        className="absolute w-64 h-64 rounded-full blur-3xl opacity-15"
+                                                        style={{
+                                                            background: 'linear-gradient(135deg, hsl(var(--primary)/0.5) 0%, transparent 100%)',
+                                                            bottom: '10%',
+                                                            left: '10%',
+                                                            animation: 'smoothPulse 4s ease-in-out infinite 0.5s',
+                                                        }}
+                                                    />
 
-                                                {/* Center loading content */}
-                                                <div className="relative flex flex-col items-center gap-6 z-10">
-                                                    {/* Animated logo container */}
-                                                    <div className="relative">
-                                                        {/* Outer glow ring */}
-                                                        <div
-                                                            className="absolute -inset-4 rounded-full opacity-30"
-                                                            style={{
-                                                                background: 'radial-gradient(circle, hsl(var(--primary)/0.4) 0%, transparent 70%)',
-                                                                animation: 'smoothPulse 2s ease-in-out infinite',
-                                                            }}
-                                                        />
-
-                                                        {/* Progress ring */}
-                                                        <svg
-                                                            className="w-20 h-20 sm:w-24 sm:h-24"
-                                                            style={{ animation: 'smoothSpin 1.5s linear infinite' }}
-                                                        >
-                                                            <circle
-                                                                cx="50%"
-                                                                cy="50%"
-                                                                r="45%"
-                                                                fill="none"
-                                                                stroke="hsl(var(--primary)/0.15)"
-                                                                strokeWidth="3"
-                                                            />
-                                                            <circle
-                                                                cx="50%"
-                                                                cy="50%"
-                                                                r="45%"
-                                                                fill="none"
-                                                                stroke="hsl(var(--primary))"
-                                                                strokeWidth="3"
-                                                                strokeLinecap="round"
-                                                                strokeDasharray="70 200"
-                                                            />
-                                                        </svg>
-
-                                                        {/* Graduation cap icon */}
-                                                        <div
-                                                            className="absolute inset-0 flex items-center justify-center"
-                                                            style={{ animation: 'smoothPulse 1.5s ease-in-out infinite' }}
-                                                        >
-                                                            <PiGraduationCapDuotone
-                                                                className="text-primary w-8 h-8 sm:w-10 sm:h-10"
-                                                            />
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Loading text with shimmer */}
-                                                    <div className="relative overflow-hidden">
-                                                        <span className="text-sm font-medium text-muted-foreground tracking-wide">
-                                                            Loading
-                                                        </span>
-                                                        {/* Shimmer overlay */}
-                                                        <div
-                                                            className="absolute inset-0 w-full"
-                                                            style={{
-                                                                background: 'linear-gradient(90deg, transparent 0%, hsl(var(--primary)/0.2) 50%, transparent 100%)',
-                                                                animation: 'shimmer 1.5s ease-in-out infinite',
-                                                            }}
-                                                        />
-                                                    </div>
-
-                                                    {/* Animated dots */}
-                                                    <div className="flex gap-1.5">
-                                                        {[0, 1, 2].map((i) => (
+                                                    {/* Floating particles */}
+                                                    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                                                        {[...Array(6)].map((_, i) => (
                                                             <div
                                                                 key={i}
-                                                                className="w-2 h-2 rounded-full bg-primary"
+                                                                className="absolute w-2 h-2 rounded-full bg-primary/30"
                                                                 style={{
-                                                                    animation: `dotPulse 1.2s ease-in-out infinite ${i * 0.15}s`,
+                                                                    left: `${15 + i * 15}%`,
+                                                                    top: `${30 + (i % 3) * 20}%`,
+                                                                    animation: `float ${2 + i * 0.3}s ease-in-out infinite ${i * 0.2}s`,
                                                                 }}
                                                             />
                                                         ))}
                                                     </div>
-                                                </div>
 
-                                                {/* Bottom gradient progress bar */}
-                                                <div
-                                                    className="absolute bottom-0 left-0 right-0 h-1 overflow-hidden"
-                                                >
+                                                    {/* Center loading content */}
+                                                    <div className="relative flex flex-col items-center gap-6 z-10">
+                                                        {/* Animated logo container */}
+                                                        <div className="relative">
+                                                            {/* Outer glow ring */}
+                                                            <div
+                                                                className="absolute -inset-4 rounded-full opacity-30"
+                                                                style={{
+                                                                    background: 'radial-gradient(circle, hsl(var(--primary)/0.4) 0%, transparent 70%)',
+                                                                    animation: 'smoothPulse 2s ease-in-out infinite',
+                                                                }}
+                                                            />
+
+                                                            {/* Progress ring */}
+                                                            <svg
+                                                                className="w-20 h-20 sm:w-24 sm:h-24"
+                                                                style={{ animation: 'smoothSpin 1.5s linear infinite' }}
+                                                            >
+                                                                <circle
+                                                                    cx="50%"
+                                                                    cy="50%"
+                                                                    r="45%"
+                                                                    fill="none"
+                                                                    stroke="hsl(var(--primary)/0.15)"
+                                                                    strokeWidth="3"
+                                                                />
+                                                                <circle
+                                                                    cx="50%"
+                                                                    cy="50%"
+                                                                    r="45%"
+                                                                    fill="none"
+                                                                    stroke="hsl(var(--primary))"
+                                                                    strokeWidth="3"
+                                                                    strokeLinecap="round"
+                                                                    strokeDasharray="70 200"
+                                                                />
+                                                            </svg>
+
+                                                            {/* Graduation cap icon */}
+                                                            <div
+                                                                className="absolute inset-0 flex items-center justify-center"
+                                                                style={{ animation: 'smoothPulse 1.5s ease-in-out infinite' }}
+                                                            >
+                                                                <PiGraduationCapDuotone
+                                                                    className="text-primary w-8 h-8 sm:w-10 sm:h-10"
+                                                                />
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Loading text with shimmer */}
+                                                        <div className="relative overflow-hidden">
+                                                            <span className="text-sm font-medium text-muted-foreground tracking-wide">
+                                                                Loading
+                                                            </span>
+                                                            {/* Shimmer overlay */}
+                                                            <div
+                                                                className="absolute inset-0 w-full"
+                                                                style={{
+                                                                    background: 'linear-gradient(90deg, transparent 0%, hsl(var(--primary)/0.2) 50%, transparent 100%)',
+                                                                    animation: 'shimmer 1.5s ease-in-out infinite',
+                                                                }}
+                                                            />
+                                                        </div>
+
+                                                        {/* Animated dots */}
+                                                        <div className="flex gap-1.5">
+                                                            {[0, 1, 2].map((i) => (
+                                                                <div
+                                                                    key={i}
+                                                                    className="w-2 h-2 rounded-full bg-primary"
+                                                                    style={{
+                                                                        animation: `dotPulse 1.2s ease-in-out infinite ${i * 0.15}s`,
+                                                                    }}
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Bottom gradient progress bar */}
                                                     <div
-                                                        className="h-full w-full"
-                                                        style={{
-                                                            background: 'linear-gradient(90deg, transparent, hsl(var(--primary)), hsl(var(--primary)/0.5), hsl(var(--primary)), transparent)',
-                                                            backgroundSize: '200% 100%',
-                                                            animation: 'gradientMove 1.5s ease-in-out infinite',
-                                                        }}
-                                                    />
+                                                        className="absolute bottom-0 left-0 right-0 h-1 overflow-hidden"
+                                                    >
+                                                        <div
+                                                            className="h-full w-full"
+                                                            style={{
+                                                                background: 'linear-gradient(90deg, transparent, hsl(var(--primary)), hsl(var(--primary)/0.5), hsl(var(--primary)), transparent)',
+                                                                backgroundSize: '200% 100%',
+                                                                animation: 'gradientMove 1.5s ease-in-out infinite',
+                                                            }}
+                                                        />
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        )}
-                                        {loading ? (
-                                            <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-50">
-                                                <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <WebPushListener />
-                                                {children}
-                                            </>
-                                        )}
-                                    </main>
-                                    <footer className="w-full mt-auto py-6 px-8 border-t bg-background/50 backdrop-blur-sm">
-                                        <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-muted-foreground/80">
-                                            <div className="flex items-center gap-6">
-                                                <StatusIndicator className="text-[10px] px-2 py-0.5 h-auto font-medium" />
-                                                <div className="hidden md:flex items-center gap-4">
-                                                    <Link target="_blank" href="/support" className="hover:text-foreground transition-colors">Raise A Bug</Link>
-                                                    <Link target="_blank" href="/features/docs" className="hover:text-foreground transition-colors">Documentation</Link>
-                                                    <Link target="_blank" href="/privacy-policy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
+                                            )}
+                                            {loading ? (
+                                                <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-50">
+                                                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
                                                 </div>
-                                            </div>
+                                            ) : (
+                                                <>
+                                                    <WebPushListener />
+                                                    {children}
+                                                </>
+                                            )}
+                                        </main>
+                                        <footer className="w-full mt-auto py-6 px-8 border-t bg-background/50 backdrop-blur-sm">
+                                            <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-muted-foreground/80">
+                                                <div className="flex items-center gap-6">
+                                                    <StatusIndicator className="text-[10px] px-2 py-0.5 h-auto font-medium" />
+                                                    <div className="hidden md:flex items-center gap-4">
+                                                        <Link target="_blank" href="/support" className="hover:text-foreground transition-colors">Raise A Bug</Link>
+                                                        <Link target="_blank" href="/features/docs" className="hover:text-foreground transition-colors">Documentation</Link>
+                                                        <Link target="_blank" href="/privacy-policy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
+                                                    </div>
+                                                </div>
 
-                                            <div className="flex items-center gap-2">
-                                                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted/50 border border-muted">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                                                    <span className="font-mono">v{pkg.version}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted/50 border border-muted">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                                                        <span className="font-mono">v{pkg.version}</span>
+                                                    </div>
+                                                    <span className="opacity-50">•</span>
+                                                    <span className="font-medium hover:text-foreground transition-colors cursor-default">
+                                                        Made with <span className="text-red-400">♥</span> by Kinzix
+                                                    </span>
                                                 </div>
-                                                <span className="opacity-50">•</span>
-                                                <span className="font-medium hover:text-foreground transition-colors cursor-default">
-                                                    Made with <span className="text-red-400">♥</span> by Kinzix
-                                                </span>
                                             </div>
-                                        </div>
-                                    </footer>
-                                </SidebarInset>
-                            </SidebarProvider>
-                            {/* <DatabaseErrorDialog open={isDbDown} /> */}
+                                        </footer>
+                                    </SidebarInset>
+                                </SidebarProvider>
+                                <BulkUploadToast />
+                                {/* <DatabaseErrorDialog open={isDbDown} /> */}
+                            </BulkUploadProvider>
                         </QueryClientProvider>
                     </AcademicYearSetupBannerProvider>
                 </OnboardingSetupBannerProvider>

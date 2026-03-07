@@ -43,6 +43,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import FileUploadButton from '@/components/fileupload';
+import BulkUploadDialog from '@/components/gallery/BulkUploadDialog';
 import { cn } from '@/lib/utils';
 
 const CATEGORIES = [
@@ -78,6 +79,7 @@ export default function AlbumDetailPage() {
     const [selectedImage, setSelectedImage] = useState(null);
     const [viewMode, setViewMode] = useState('grid');
     const [currentPage, setCurrentPage] = useState(1);
+    const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
     const [uploadResetKey, setUploadResetKey] = useState(0);
     const pageSize = 24;
 
@@ -282,8 +284,21 @@ export default function AlbumDetailPage() {
                             </div>
                         </DialogContent>
                     </Dialog>
+
+                    {/* Bulk Upload Button */}
+                    <Button variant="outline" onClick={() => setBulkUploadOpen(true)}>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Bulk Upload
+                    </Button>
                 </div>
             </div>
+
+            <BulkUploadDialog
+                open={bulkUploadOpen}
+                onOpenChange={setBulkUploadOpen}
+                albumId={albumId}
+                albumTitle={album?.title}
+            />
 
             {/* Stats Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

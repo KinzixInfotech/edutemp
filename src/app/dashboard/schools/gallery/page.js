@@ -55,6 +55,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import BulkUploadDialog from '@/components/gallery/BulkUploadDialog';
 
 const CATEGORIES = [
     { value: 'ANNUAL_DAY', label: 'Annual Day', color: 'bg-purple-500' },
@@ -82,6 +83,7 @@ export default function GalleryPage() {
     const router = useRouter();
     const queryClient = useQueryClient();
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
+    const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
     const [categoryFilter, setCategoryFilter] = useState('all');
     const [newAlbum, setNewAlbum] = useState({
         title: '',
@@ -199,99 +201,111 @@ export default function GalleryPage() {
                         Manage photo albums and gallery for your school
                     </p>
                 </div>
-                <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button>
-                            <Plus className="w-4 h-4 mr-2" />
-                            Create Album
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Create New Album</DialogTitle>
-                            <DialogDescription>
-                                Create a new album to organize your school photos
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="title">Album Title</Label>
-                                <Input
-                                    id="title"
-                                    placeholder="e.g., Annual Day 2024"
-                                    value={newAlbum.title}
-                                    onChange={(e) =>
-                                        setNewAlbum({ ...newAlbum, title: e.target.value })
-                                    }
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="description">Description</Label>
-                                <Input
-                                    id="description"
-                                    placeholder="Brief description of the event"
-                                    value={newAlbum.description}
-                                    onChange={(e) =>
-                                        setNewAlbum({ ...newAlbum, description: e.target.value })
-                                    }
-                                />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" onClick={() => setBulkUploadOpen(true)}>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Bulk Upload
+                    </Button>
+                    <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button>
+                                <Plus className="w-4 h-4 mr-2" />
+                                Create Album
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Create New Album</DialogTitle>
+                                <DialogDescription>
+                                    Create a new album to organize your school photos
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="category">Category</Label>
-                                    <Select
-                                        value={newAlbum.category}
-                                        onValueChange={(value) =>
-                                            setNewAlbum({ ...newAlbum, category: value })
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select category" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {CATEGORIES.map((cat) => (
-                                                <SelectItem key={cat.value} value={cat.value}>
-                                                    <div className="flex items-center gap-2">
-                                                        <div className={cn('w-2 h-2 rounded-full', cat.color)} />
-                                                        {cat.label}
-                                                    </div>
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="eventDate">Event Date</Label>
+                                    <Label htmlFor="title">Album Title</Label>
                                     <Input
-                                        id="eventDate"
-                                        type="date"
-                                        value={newAlbum.eventDate}
+                                        id="title"
+                                        placeholder="e.g., Annual Day 2024"
+                                        value={newAlbum.title}
                                         onChange={(e) =>
-                                            setNewAlbum({ ...newAlbum, eventDate: e.target.value })
+                                            setNewAlbum({ ...newAlbum, title: e.target.value })
                                         }
                                     />
                                 </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="description">Description</Label>
+                                    <Input
+                                        id="description"
+                                        placeholder="Brief description of the event"
+                                        value={newAlbum.description}
+                                        onChange={(e) =>
+                                            setNewAlbum({ ...newAlbum, description: e.target.value })
+                                        }
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="category">Category</Label>
+                                        <Select
+                                            value={newAlbum.category}
+                                            onValueChange={(value) =>
+                                                setNewAlbum({ ...newAlbum, category: value })
+                                            }
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select category" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {CATEGORIES.map((cat) => (
+                                                    <SelectItem key={cat.value} value={cat.value}>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className={cn('w-2 h-2 rounded-full', cat.color)} />
+                                                            {cat.label}
+                                                        </div>
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="eventDate">Event Date</Label>
+                                        <Input
+                                            id="eventDate"
+                                            type="date"
+                                            value={newAlbum.eventDate}
+                                            onChange={(e) =>
+                                                setNewAlbum({ ...newAlbum, eventDate: e.target.value })
+                                            }
+                                        />
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
-                                Cancel
-                            </Button>
-                            <Button
-                                onClick={handleCreateAlbum}
-                                disabled={createAlbumMutation.isPending}
-                            >
-                                {createAlbumMutation.isPending ? (
-                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                ) : (
-                                    <Plus className="w-4 h-4 mr-2" />
-                                )}
-                                Create & Add Photos
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
+                                    Cancel
+                                </Button>
+                                <Button
+                                    onClick={handleCreateAlbum}
+                                    disabled={createAlbumMutation.isPending}
+                                >
+                                    {createAlbumMutation.isPending ? (
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    ) : (
+                                        <Plus className="w-4 h-4 mr-2" />
+                                    )}
+                                    Create & Add Photos
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                </div>
             </div>
+
+            <BulkUploadDialog
+                open={bulkUploadOpen}
+                onOpenChange={setBulkUploadOpen}
+                albums={albums}
+            />
 
             {/* Stats Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

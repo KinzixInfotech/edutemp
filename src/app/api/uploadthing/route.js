@@ -231,6 +231,29 @@ export const ourFileRouter = {
       }
       return { url: file.ufsUrl };
     }),
+
+  // Gallery image upload - lightweight, NO DB operations
+  // DB records are created in batch via /api/schools/[schoolId]/gallery/bulk-save
+  galleryImageUpload: f({ image: { maxFileSize: "10MB", maxFileCount: 20 } })
+    .input(z.object({
+      schoolId: z.string(),
+      albumId: z.string(),
+      uploadedById: z.string(),
+    }))
+    .middleware(async ({ input }) => {
+      // Pass-through, no DB calls
+      return input;
+    })
+    .onUploadComplete(async ({ metadata, file }) => {
+      // Just return file info - no DB writes here
+      console.log("Gallery file uploaded:", file.name, file.size);
+      return {
+        url: file.ufsUrl,
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type,
+      };
+    }),
 };
 
 export const { GET, POST } = createRouteHandler({
