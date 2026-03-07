@@ -54,8 +54,8 @@ export async function POST(req) {
             },
         });
 
-        // Invalidate server-side calendar events cache so hasGoogleCalendar becomes false
-        await invalidatePattern('calendar:events');
+        // Invalidate ALL calendar cache so hasGoogleCalendar becomes false immediately
+        await invalidatePattern('calendar:*');
 
         return new Response(
             JSON.stringify({ message: 'Google Calendar disconnected successfully' }),

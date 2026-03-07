@@ -134,6 +134,11 @@ export default function SchoolCalendar() {
         const error = searchParams.get('error');
         if (connected === 'true') {
             setGcBanner({ type: 'success', message: 'Google Calendar connected successfully!' });
+            // Force clear all stale TanStack cache and refetch fresh data from server
+            // (Redis cache was already busted by the callback route)
+            queryClient.removeQueries({ queryKey: ['calendar-events'] });
+            queryClient.invalidateQueries({ queryKey: ['calendar-events'], refetchType: 'all' });
+            queryClient.invalidateQueries({ queryKey: ['upcoming-events'], refetchType: 'all' });
             router.replace('/dashboard/calendar', { scroll: false });
         } else if (error) {
             const errorMessages = {
@@ -145,7 +150,7 @@ export default function SchoolCalendar() {
             setGcBanner({ type: 'error', message: errorMessages[error] || 'Failed to connect Google Calendar.' });
             router.replace('/dashboard/calendar', { scroll: false });
         }
-    }, [searchParams, router]);
+    }, [searchParams, router, queryClient]);
 
     // Auto-dismiss banner after 6 seconds
     useEffect(() => {
@@ -597,7 +602,10 @@ export default function SchoolCalendar() {
                                             });
                                             if (res.ok) {
                                                 setGcBanner({ type: 'success', message: 'Google Calendar disconnected.' });
+                                                // Clear stale TanStack cache so hasGoogleCalendar updates immediately
+                                                queryClient.removeQueries({ queryKey: ['calendar-events'] });
                                                 queryClient.invalidateQueries({ queryKey: ['calendar-events'], refetchType: 'all' });
+                                                queryClient.invalidateQueries({ queryKey: ['upcoming-events'], refetchType: 'all' });
                                             }
                                         } catch (err) {
                                             console.error('Disconnect error:', err);

@@ -5,6 +5,7 @@
 
 import { google } from "googleapis";
 import prisma from "@/lib/prisma";
+import { invalidatePattern } from "@/lib/cache";
 
 export async function GET(req) {
     try {
@@ -94,6 +95,9 @@ export async function GET(req) {
                 lastUsedAt: new Date(),
             },
         });
+
+        // Bust all calendar Redis cache so the events API returns fresh hasGoogleCalendar: true
+        await invalidatePattern('calendar:*');
 
         return new Response(null, {
             status: 302,
