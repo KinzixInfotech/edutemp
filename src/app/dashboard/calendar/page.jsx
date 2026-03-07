@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient, useQueries } from '@tanstack/rea
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
@@ -32,7 +33,9 @@ import {
     CalendarDays,
     PanelLeftClose,
     PanelLeft,
-    Users
+    Users,
+    ChevronDown,
+    LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
@@ -574,10 +577,38 @@ export default function SchoolCalendar() {
                             <span className="text-xs hidden md:inline">Reconnect</span>
                         </Button>
                     ) : hasGoogleCalendar ? (
-                        <Badge variant="outline" className="gap-1.5 bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800 hidden py-1.5 sm:flex">
-                            <Image src="/gc_icon.png" alt="Google Calendar" width={14} height={14} className="rounded-sm" />
-                            <span className="text-xs text-green-700 dark:text-green-400 hidden md:inline">Synced</span>
-                        </Badge>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button className="gap-1.5 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 hidden py-1.5 sm:flex items-center rounded-full px-2.5 text-xs cursor-pointer hover:bg-green-100 dark:hover:bg-green-900 transition-colors">
+                                    <Image src="/gc_icon.png" alt="Google Calendar" width={14} height={14} className="rounded-sm" />
+                                    <span className="text-green-700 dark:text-green-400 hidden md:inline">Synced</span>
+                                    <ChevronDown className="h-3 w-3 text-green-600 dark:text-green-400" />
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuItem
+                                    className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400 cursor-pointer"
+                                    onClick={async () => {
+                                        try {
+                                            const res = await fetch('/api/auth/google-calendar/disconnect', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ userId }),
+                                            });
+                                            if (res.ok) {
+                                                setGcBanner({ type: 'success', message: 'Google Calendar disconnected.' });
+                                                queryClient.invalidateQueries({ queryKey: ['calendar-events'] });
+                                            }
+                                        } catch (err) {
+                                            console.error('Disconnect error:', err);
+                                        }
+                                    }}
+                                >
+                                    <LogOut className="h-4 w-4 mr-2" />
+                                    Disconnect
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     ) : (
                         <Button
                             variant="outline"
