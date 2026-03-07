@@ -372,7 +372,7 @@ export default function GalleryPage() {
 
 
             {/* Albums Section */}
-            <Card>
+            <Card className={'border-none'}>
                 <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                         <div>
@@ -414,13 +414,13 @@ export default function GalleryPage() {
                             ))}
                         </div>
                     ) : filteredAlbums.length > 0 ? (
-                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        <div className="grid gap-4 sm:grid-cols-2  lg:grid-cols-3 xl:grid-cols-4">
                             {filteredAlbums.map((album) => {
                                 const categoryInfo = CATEGORIES.find(c => c.value === album.category);
                                 return (
                                     <Card
                                         key={album.id}
-                                        className="group cursor-pointer overflow-hidden hover:shadow-lg transition-all hover:border-primary/50"
+                                        className="group  pt-0 cursor-pointer overflow-hidden border transition-all "
                                         onClick={() => router.push(`/dashboard/schools/gallery/albums/${album.id}`)}
                                     >
                                         <div className="aspect-video bg-muted relative overflow-hidden">
@@ -496,50 +496,7 @@ export default function GalleryPage() {
                 </CardContent>
             </Card>
 
-            {/* Settings Card */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                        <Settings className="w-5 h-5" />
-                        Gallery Settings
-                    </CardTitle>
-                    <CardDescription>
-                        Configure gallery behavior and permissions
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
-                            <div>
-                                <Label className="font-medium">Require Approval</Label>
-                                <p className="text-sm text-muted-foreground">
-                                    Images require admin approval before going public
-                                </p>
-                            </div>
-                            <Switch
-                                checked={settings.requireApproval}
-                                onCheckedChange={(checked) =>
-                                    updateSettingsMutation.mutate({ requireApproval: checked })
-                                }
-                            />
-                        </div>
-                        <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
-                            <div>
-                                <Label className="font-medium">Allow Public View</Label>
-                                <p className="text-sm text-muted-foreground">
-                                    Allow unauthenticated users to view gallery
-                                </p>
-                            </div>
-                            <Switch
-                                checked={settings.allowPublicView}
-                                onCheckedChange={(checked) =>
-                                    updateSettingsMutation.mutate({ allowPublicView: checked })
-                                }
-                            />
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+
         </div>
     );
 }

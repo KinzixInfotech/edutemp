@@ -44,7 +44,7 @@ export function DynamicBreadcrumb() {
     const NON_ROUTABLE_PATHS = new Set([
         "/dashboard/payroll",
         "/dashboard/schools",
-        "/dashboard/fees",
+        "/dashboard/fees", ,
         "/dashboard/documents",
         "/dashboard/attendance",
         "/dashboard/examination",

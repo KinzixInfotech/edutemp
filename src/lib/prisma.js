@@ -14,7 +14,7 @@ const createPrismaClient = () => {
         const separator = dbUrl.includes('?') ? '&' : '?';
         // Lower limit to avoid exhausting Supabase's pool (~20 connections)
         // Dev: 5, Prod: 10
-        dbUrl += `${separator}connection_limit=${isDev ? 5 : 10}&pool_timeout=20`;
+        dbUrl += `${separator}connection_limit=${isDev ? 5 : 10}&pool_timeout=20&connect_timeout=10`;
     }
 
     return new PrismaClient({

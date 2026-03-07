@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useBulkUpload } from '@/context/BulkUploadContext';
 import { useAuth } from '@/context/AuthContext';
 import { uploadFiles } from '@/lib/uploadthing';
@@ -66,7 +67,12 @@ async function extractImagesFromZip(zipFile) {
  * Background upload + save pipeline.
  * Runs independently of UI — progress tracked via BulkUploadContext.
  */
-async function runUploadPipeline({ allImages, jobId, signal, albumId, schoolId, uploadedById, updateJob }) {
+async function runUploadPipeline({ allImages, jobId, signal, albumId, schoolId, uploadedById, updateJob, queryClient }) {
+    const successfulUploads = [];
+    let totalCompleted = 0;
+    let totalFailed = 0;
+    const failedFiles = [];
+
     // 1. Persist uploads locally as they happen (failsafe)
     const storageKey = `bulk_upload_pending_${jobId}`;
     const persistUploads = (uploads) => {
@@ -90,57 +96,52 @@ async function runUploadPipeline({ allImages, jobId, signal, albumId, schoolId, 
 
         const batch = allImages.slice(i, i + BATCH_SIZE);
 
-        // Compress batch
-        const compressedBatch = await Promise.all(
+        // Compress + upload each file, updating progress per-file
+        await Promise.allSettled(
             batch.map(async (file) => {
+                if (signal.aborted) throw new Error('Upload aborted');
+
+                // Compress
+                let compressed = file;
                 try {
                     if (file.size > COMPRESSION_TARGET || file.type !== 'image/webp') {
-                        return await compressImage(file);
+                        compressed = await compressImage(file);
                     }
-                    return file;
                 } catch {
-                    return file;
+                    compressed = file;
                 }
+
+                // Upload
+                try {
+                    const res = await uploadFiles('galleryImageUpload', {
+                        files: [compressed],
+                        input: { schoolId, albumId, uploadedById },
+                    });
+                    const r = res[0];
+                    if (r) {
+                        totalCompleted++;
+                        successfulUploads.push({
+                            url: r.ufsUrl || r.url || r.serverData?.url,
+                            fileName: r.name || r.serverData?.fileName,
+                            fileSize: r.size || r.serverData?.fileSize,
+                            mimeType: r.type || r.serverData?.mimeType || 'image/webp',
+                        });
+                    }
+                } catch (err) {
+                    totalFailed++;
+                    failedFiles.push(err?.message || 'unknown');
+                    console.error('Upload failed:', err);
+                }
+
+                // Update progress immediately after each file
+                persistUploads(successfulUploads);
+                updateJob(jobId, {
+                    completed: totalCompleted,
+                    failed: totalFailed,
+                    failedFiles,
+                });
             })
         );
-
-        // Upload (zero DB connections)
-        const results = await Promise.allSettled(
-            compressedBatch.map(async (file) => {
-                if (signal.aborted) throw new Error('Upload aborted');
-                const res = await uploadFiles('galleryImageUpload', {
-                    files: [file],
-                    input: { schoolId, albumId, uploadedById },
-                });
-                return res[0];
-            })
-        );
-
-        for (const result of results) {
-            if (result.status === 'fulfilled' && result.value) {
-                totalCompleted++;
-                const r = result.value;
-                successfulUploads.push({
-                    url: r.ufsUrl || r.url || r.serverData?.url,
-                    fileName: r.name || r.serverData?.fileName,
-                    fileSize: r.size || r.serverData?.fileSize,
-                    mimeType: r.type || r.serverData?.mimeType || 'image/webp',
-                });
-            } else {
-                totalFailed++;
-                failedFiles.push(result.reason?.message || 'unknown');
-                console.error('Upload failed:', result.reason);
-            }
-        }
-
-        // Update persistence after each batch
-        persistUploads(successfulUploads);
-
-        updateJob(jobId, {
-            completed: totalCompleted,
-            failed: totalFailed,
-            failedFiles,
-        });
     }
 
     // 2. Batch save to DB with RETRY logic
@@ -165,6 +166,8 @@ async function runUploadPipeline({ allImages, jobId, signal, albumId, schoolId, 
                 if (saveRes.ok) {
                     saved = true;
                     localStorage.removeItem(storageKey); // Clear on success
+                    // Invalidate gallery queries so the page refreshes
+                    queryClient?.invalidateQueries({ queryKey: ['admin-gallery'] });
                     console.log('Bulk save successful on attempt', attempts);
                 } else {
                     const err = await saveRes.json();
@@ -193,6 +196,7 @@ async function runUploadPipeline({ allImages, jobId, signal, albumId, schoolId, 
 export function useBulkGalleryUpload() {
     const { addJob, updateJob } = useBulkUpload();
     const { fullUser } = useAuth();
+    const queryClient = useQueryClient();
     const isProcessing = useRef(false);
 
     const startBulkUpload = useCallback(
@@ -264,6 +268,7 @@ export function useBulkGalleryUpload() {
                     schoolId,
                     uploadedById,
                     updateJob,
+                    queryClient,
                 });
 
                 // Function returns here — dialog closes, uploads continue in background
@@ -272,7 +277,7 @@ export function useBulkGalleryUpload() {
                 isProcessing.current = false;
             }
         },
-        [addJob, updateJob, fullUser]
+        [addJob, updateJob, fullUser, queryClient]
     );
 
     return { startBulkUpload };

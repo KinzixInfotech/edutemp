@@ -234,7 +234,10 @@ export const ourFileRouter = {
 
   // Gallery image upload - lightweight, NO DB operations
   // DB records are created in batch via /api/schools/[schoolId]/gallery/bulk-save
-  galleryImageUpload: f({ image: { maxFileSize: "10MB", maxFileCount: 20 } })
+  galleryImageUpload: f(
+    { image: { maxFileSize: "10MB", maxFileCount: 20 } },
+    { awaitServerData: false }
+  )
     .input(z.object({
       schoolId: z.string(),
       albumId: z.string(),
@@ -245,14 +248,10 @@ export const ourFileRouter = {
       return input;
     })
     .onUploadComplete(async ({ metadata, file }) => {
-      // Just return file info - no DB writes here
+      // Return void — no data needed by client
+      // This makes awaitServerData=false, so client doesn't wait for this callback
+      // Client already gets ufsUrl, name, size, type from presigned upload response
       console.log("Gallery file uploaded:", file.name, file.size);
-      return {
-        url: file.ufsUrl,
-        fileName: file.name,
-        fileSize: file.size,
-        mimeType: file.type,
-      };
     }),
 };
 

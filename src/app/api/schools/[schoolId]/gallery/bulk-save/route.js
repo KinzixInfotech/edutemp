@@ -32,9 +32,10 @@ export async function POST(request, { params }) {
 
         const approvalStatus = settings?.requireApproval ? 'PENDING' : 'APPROVED';
         const totalSize = files.reduce((sum, f) => sum + (f.fileSize || 0), 0);
+        const totalSizeBigInt = BigInt(totalSize);
 
-        // Check quota before saving
-        if (settings && settings.storageUsed + totalSize > settings.storageQuota) {
+        // Check quota before saving (BigInt-safe comparison)
+        if (settings && (settings.storageUsed ?? 0n) + totalSizeBigInt > (settings.storageQuota ?? 0n)) {
             return NextResponse.json(
                 { error: 'QUOTA_EXCEEDED', message: 'Storage quota would be exceeded' },
                 { status: 400 }
