@@ -505,7 +505,8 @@ async function getTargetUserIds(schoolId, targetOptions) {
         roleNames = [],
         userTypes = [], // ['STUDENT', 'TEACHER', 'PARENT', 'ADMIN']
         allUsers = false,
-        includeParents = false // Only when targeting students
+        includeParents = false, // Only when targeting students
+        excludeUserIds = [] // User IDs to exclude from the target list (e.g. sender)
     } = targetOptions;
 
     const userIdSet = new Set(userIds);
@@ -683,7 +684,10 @@ async function getTargetUserIds(schoolId, targetOptions) {
         users.forEach(u => userIdSet.add(u.id));
     }
 
-    return Array.from(userIdSet);
+    // Filter out excluded user IDs (e.g., sender who shouldn't receive their own notification)
+    const excludeSet = new Set(excludeUserIds);
+    const finalUserIds = Array.from(userIdSet).filter(id => !excludeSet.has(id));
+    return finalUserIds;
 }
 /**
  * Send push notifications via FCM
@@ -2328,6 +2332,11 @@ export async function notifyCalendarEventCreated({
         default:
             targetOptions = { allUsers: true };
             break;
+    }
+
+    // Exclude the sender (creator) from receiving the notification
+    if (senderId) {
+        targetOptions.excludeUserIds = [senderId];
     }
 
     return sendNotification({

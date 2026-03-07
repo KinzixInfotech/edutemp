@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { useQuery, useMutation, useQueryClient, useQueries } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,7 +31,8 @@ import {
     List,
     CalendarDays,
     PanelLeftClose,
-    PanelLeft
+    PanelLeft,
+    Users
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
@@ -109,6 +112,8 @@ export default function SchoolCalendar() {
     const schoolId = fullUser?.schoolId;
     const userId = fullUser?.id;
     const queryClient = useQueryClient();
+    const searchParams = useSearchParams();
+    const router = useRouter();
 
     // Core state
     const [currentDate, setCurrentDate] = useState(() => new Date());
@@ -117,6 +122,35 @@ export default function SchoolCalendar() {
     const [showSidebar, setShowSidebar] = useState(true);
     const [loadingProgress, setLoadingProgress] = useState(0);
     const initialLoadRef = useRef(false);
+
+    // Google Calendar connection banner
+    const [gcBanner, setGcBanner] = useState(null);
+
+    useEffect(() => {
+        const connected = searchParams.get('connected');
+        const error = searchParams.get('error');
+        if (connected === 'true') {
+            setGcBanner({ type: 'success', message: 'Google Calendar connected successfully!' });
+            router.replace('/dashboard/calendar', { scroll: false });
+        } else if (error) {
+            const errorMessages = {
+                access_denied: 'Google Calendar access was denied.',
+                invalid_request: 'Invalid request. Please try again.',
+                unauthorized: 'Unauthorized. Please check your account.',
+                auth_failed: 'Authentication failed. Please try again.',
+            };
+            setGcBanner({ type: 'error', message: errorMessages[error] || 'Failed to connect Google Calendar.' });
+            router.replace('/dashboard/calendar', { scroll: false });
+        }
+    }, [searchParams, router]);
+
+    // Auto-dismiss banner after 6 seconds
+    useEffect(() => {
+        if (gcBanner) {
+            const timer = setTimeout(() => setGcBanner(null), 6000);
+            return () => clearTimeout(timer);
+        }
+    }, [gcBanner]);
 
     // Event state
     const [selectedEvent, setSelectedEvent] = useState(null);
@@ -131,22 +165,29 @@ export default function SchoolCalendar() {
     });
 
     // Form state for full create dialog
-    const [formData, setFormData] = useState({
-        title: '',
-        description: '',
-        eventType: 'CUSTOM',
-        category: 'OTHER',
-        startDate: '',
-        endDate: '',
-        startTime: '',
-        endTime: '',
-        isAllDay: false,
-        location: '',
-        venue: '',
-        color: '#3B82F6',
-        priority: 'NORMAL',
-        targetAudience: 'ALL',
-        sendPushNotification: false,
+    const [formData, setFormData] = useState(() => {
+        // Read persisted push notification preference
+        let savedPushPref = false;
+        try {
+            savedPushPref = localStorage.getItem('calendar_push_pref') === 'true';
+        } catch (e) { /* ignore */ }
+        return {
+            title: '',
+            description: '',
+            eventType: 'CUSTOM',
+            category: 'OTHER',
+            startDate: '',
+            endDate: '',
+            startTime: '',
+            endTime: '',
+            isAllDay: false,
+            location: '',
+            venue: '',
+            color: '#3B82F6',
+            priority: 'NORMAL',
+            targetAudience: 'ALL',
+            sendPushNotification: savedPushPref,
+        };
     });
 
     // Get months to prefetch (±6 months from current)
@@ -313,6 +354,11 @@ export default function SchoolCalendar() {
     }, [formData, createEventMutation]);
 
     const resetForm = useCallback(() => {
+        // Read persisted push notification preference
+        let savedPushPref = false;
+        try {
+            savedPushPref = localStorage.getItem('calendar_push_pref') === 'true';
+        } catch (e) { /* ignore */ }
         setFormData({
             title: '',
             description: '',
@@ -328,7 +374,7 @@ export default function SchoolCalendar() {
             color: '#3B82F6',
             priority: 'NORMAL',
             targetAudience: 'ALL',
-            sendPushNotification: false,
+            sendPushNotification: savedPushPref,
         });
     }, []);
 
@@ -395,6 +441,12 @@ export default function SchoolCalendar() {
 
     const updateFormField = useCallback((field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }));
+        // Persist push notification preference
+        if (field === 'sendPushNotification') {
+            try {
+                localStorage.setItem('calendar_push_pref', String(value));
+            } catch (e) { /* ignore */ }
+        }
     }, []);
 
     // Format header title based on view
@@ -510,18 +562,33 @@ export default function SchoolCalendar() {
                 </div>
 
                 <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                    {/* Sync Status - hidden on very small screens */}
+                    {/* Google Calendar Status */}
                     {eventsData?.googleCalendarError ? (
-                        <Badge variant="outline" className="gap-1.5 bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800 hidden sm:flex">
-                            <div className="w-2 h-2 rounded-full bg-red-500" />
-                            <span className="text-xs text-red-700 dark:text-red-400 hidden md:inline">Sync Error</span>
-                        </Badge>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1.5 bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900 hidden sm:flex"
+                            onClick={() => window.location.href = `/api/auth/google-calendar?userId=${userId}&schoolId=${schoolId}`}
+                        >
+                            <Image src="/gc_icon.png" alt="Google Calendar" width={16} height={16} className="rounded-sm" />
+                            <span className="text-xs hidden md:inline">Reconnect</span>
+                        </Button>
                     ) : hasGoogleCalendar ? (
-                        <Badge variant="outline" className="gap-1.5 bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800 hidden sm:flex">
-                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                        <Badge variant="outline" className="gap-1.5 bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800 hidden py-1.5 sm:flex">
+                            <Image src="/gc_icon.png" alt="Google Calendar" width={14} height={14} className="rounded-sm" />
                             <span className="text-xs text-green-700 dark:text-green-400 hidden md:inline">Synced</span>
                         </Badge>
-                    ) : null}
+                    ) : (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1.5 hidden sm:flex"
+                            onClick={() => window.location.href = `/api/auth/google-calendar?userId=${userId}&schoolId=${schoolId}`}
+                        >
+                            <Image src="/gc_icon.png" alt="Google Calendar" width={16} height={16} className="rounded-sm" />
+                            <span className="text-xs hidden md:inline">Connect</span>
+                        </Button>
+                    )}
 
                     {/* View Mode Selector - compact on mobile */}
                     <div className="flex items-center border rounded-lg p-0.5 bg-muted/50">
@@ -568,6 +635,27 @@ export default function SchoolCalendar() {
                     </Button>
                 </div>
             </div>
+
+            {/* Google Calendar Connection Banner */}
+            {gcBanner && (
+                <div className={cn(
+                    "flex items-center gap-3 px-4 py-2.5 border-b text-sm animate-in slide-in-from-top-2 duration-300",
+                    gcBanner.type === 'success'
+                        ? 'bg-green-50 dark:bg-green-950/50 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300'
+                        : 'bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300'
+                )}>
+                    <Image src="/gc_icon.png" alt="Google Calendar" width={20} height={20} className="rounded-sm shrink-0" />
+                    <span className="flex-1">{gcBanner.message}</span>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 shrink-0"
+                        onClick={() => setGcBanner(null)}
+                    >
+                        <X className="h-3.5 w-3.5" />
+                    </Button>
+                </div>
+            )}
 
             {/* Main Content */}
             <div className="flex flex-1 overflow-hidden">
@@ -921,6 +1009,29 @@ export default function SchoolCalendar() {
                             </div>
                         </div>
 
+                        {/* Target Audience */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium flex items-center gap-2">
+                                <Users className="h-4 w-4" />
+                                Target Audience
+                            </label>
+                            <Select
+                                value={formData.targetAudience}
+                                onValueChange={(value) => updateFormField('targetAudience', value)}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="ALL">Everyone</SelectItem>
+                                    <SelectItem value="STUDENTS">Students</SelectItem>
+                                    <SelectItem value="TEACHERS">Teachers</SelectItem>
+                                    <SelectItem value="PARENTS">Parents</SelectItem>
+                                    <SelectItem value="STAFF">Staff Only</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
                         {/* Notification Toggle */}
                         <div className="flex items-start gap-3 p-4 rounded-lg bg-primary/5 border border-primary/20">
                             <Checkbox
@@ -934,7 +1045,7 @@ export default function SchoolCalendar() {
                                     Send Push Notification
                                 </label>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                    Notify all school members about this event
+                                    Notify selected audience about this event
                                 </p>
                             </div>
                         </div>

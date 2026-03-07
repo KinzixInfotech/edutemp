@@ -4,7 +4,8 @@ import { useState, useRef, useEffect, memo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { X, Clock, MapPin, ChevronRight, Loader2 } from 'lucide-react';
+import { X, Clock, MapPin, ChevronRight, Loader2, Bell, Users } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 
 const eventTypeColors = {
@@ -49,8 +50,13 @@ export const EventPopover = memo(function EventPopover({
     const [startTime, setStartTime] = useState('09:00');
     const [endTime, setEndTime] = useState('10:00');
     const [isAllDay, setIsAllDay] = useState(true);
+    const [sendPush, setSendPush] = useState(() => {
+        try { return localStorage.getItem('calendar_push_pref') === 'true'; } catch { return false; }
+    });
+    const [targetAudience, setTargetAudience] = useState('ALL');
     const inputRef = useRef(null);
     const popoverRef = useRef(null);
+    const selectOpenRef = useRef(false);
 
     // Focus input when opened
     useEffect(() => {
@@ -67,6 +73,8 @@ export const EventPopover = memo(function EventPopover({
             setStartTime('09:00');
             setEndTime('10:00');
             setIsAllDay(true);
+            setTargetAudience('ALL');
+            try { setSendPush(localStorage.getItem('calendar_push_pref') === 'true'); } catch { setSendPush(false); }
         } else if (selectedDate) {
             // If a specific hour is selected (from DayView/WeekView time slot click)
             const hour = selectedDate.getHours();
@@ -95,6 +103,9 @@ export const EventPopover = memo(function EventPopover({
     // Close on outside click
     useEffect(() => {
         const handleClickOutside = (e) => {
+            // If the Select dropdown is open, don't close the popover
+            if (selectOpenRef.current) return;
+
             if (popoverRef.current && !popoverRef.current.contains(e.target)) {
                 onClose();
             }
@@ -107,10 +118,18 @@ export const EventPopover = memo(function EventPopover({
         }
     }, [isOpen, onClose]);
 
+    // Format date as YYYY-MM-DD without timezone shift
+    const formatLocalDate = (date) => {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    };
+
     const handleSave = () => {
         if (!title.trim()) return;
 
-        const dateStr = selectedDate.toISOString().split('T')[0];
+        const dateStr = formatLocalDate(selectedDate);
 
         onSave({
             title: title.trim(),
@@ -121,6 +140,8 @@ export const EventPopover = memo(function EventPopover({
             startTime: isAllDay ? null : startTime,
             endTime: isAllDay ? null : endTime,
             isAllDay,
+            sendPushNotification: sendPush,
+            targetAudience,
         });
     };
 
@@ -191,7 +212,7 @@ export const EventPopover = memo(function EventPopover({
                         className="w-3 h-3 rounded-full"
                         style={{ backgroundColor: eventTypeColors[eventType] }}
                     />
-                    <Select value={eventType} onValueChange={setEventType}>
+                    <Select value={eventType} onValueChange={setEventType} onOpenChange={(open) => { selectOpenRef.current = open; }}>
                         <SelectTrigger className="h-8 w-auto border-0 bg-transparent hover:bg-muted/50 px-2">
                             <SelectValue />
                         </SelectTrigger>
@@ -243,6 +264,39 @@ export const EventPopover = memo(function EventPopover({
                         </div>
                     )}
                 </div>
+
+                {/* Target Audience */}
+                <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <Select value={targetAudience} onValueChange={setTargetAudience} onOpenChange={(open) => { selectOpenRef.current = open; }}>
+                        <SelectTrigger className="h-8 w-auto border-0 bg-transparent hover:bg-muted/50 px-2">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="ALL">Everyone</SelectItem>
+                            <SelectItem value="STUDENTS">Students</SelectItem>
+                            <SelectItem value="TEACHERS">Teachers</SelectItem>
+                            <SelectItem value="PARENTS">Parents</SelectItem>
+                            <SelectItem value="STAFF">Staff Only</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                {/* Push Notification Toggle */}
+                <div className="flex items-center gap-2">
+                    <Checkbox
+                        id="popover-push"
+                        checked={sendPush}
+                        onCheckedChange={(checked) => {
+                            setSendPush(checked);
+                            try { localStorage.setItem('calendar_push_pref', String(checked)); } catch { }
+                        }}
+                    />
+                    <label htmlFor="popover-push" className="text-sm cursor-pointer flex items-center gap-1.5">
+                        <Bell className="h-3.5 w-3.5 text-muted-foreground" />
+                        Send Push Notification
+                    </label>
+                </div>
             </div>
 
             {/* Footer */}
@@ -253,10 +307,12 @@ export const EventPopover = memo(function EventPopover({
                     onClick={() => onMoreOptions?.({
                         title,
                         eventType,
-                        startDate: selectedDate.toISOString().split('T')[0],
+                        startDate: formatLocalDate(selectedDate),
                         isAllDay,
                         startTime,
                         endTime,
+                        sendPushNotification: sendPush,
+                        targetAudience,
                     })}
                     className="text-muted-foreground"
                 >
