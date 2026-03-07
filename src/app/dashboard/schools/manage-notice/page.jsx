@@ -19,8 +19,7 @@ import {
     Search,
     CheckCircle,
     Clock,
-    Save,
-    CalendarClock,
+
     ChevronLeft,
     ChevronRight,
     RefreshCw,
@@ -141,13 +140,11 @@ export default function NoticeAdminPage() {
         },
     });
 
-    // Only watch fields that need to trigger UI re-renders (Selects, Status buttons)
+    // Only watch fields that need to trigger UI re-renders (Selects)
     // We EXCLUDE title, subtitle, and description from here to prevent lag
     const category = watch('category');
     const priority = watch('priority');
     const audience = watch('audience');
-    const status = watch('status');
-    const publishedAt = watch('publishedAt');
 
     // ── Draft auto-save to localStorage (Non-rendering approach) ──
     useEffect(() => {
@@ -244,26 +241,15 @@ export default function NoticeAdminPage() {
     // Create mutation
     const createMutation = useMutation({
         mutationFn: async (data) => {
-            // Handle status-specific logic
-            let publishedAt = data.publishedAt || null;
-
-            // If publishing now and no date set, use current time
-            if (data.status === 'PUBLISHED' && !publishedAt) {
-                publishedAt = new Date().toISOString();
-            }
-
-            // For scheduled, publishedAt is required
-            if (data.status === 'SCHEDULED' && !publishedAt) {
-                throw new Error('Please set a publish date for scheduled notices');
-            }
-
+            // Always publish with current time
             const payload = {
                 ...data,
+                status: 'PUBLISHED',
                 createdById: fullUser?.id,
                 fileUrl: uploadedImageUrl || null,
-                publishedAt,
-                issuedBy: data.issuedBy || fullUser?.name || 'Administration',
-                issuerRole: data.issuerRole || fullUser?.role?.name || 'Admin',
+                publishedAt: new Date().toISOString(),
+                issuedBy: fullUser?.name || 'Administration',
+                issuerRole: fullUser?.role?.name || 'Admin',
             };
 
             const res = await fetch(`/api/notices/${schoolId}`, {
@@ -278,13 +264,8 @@ export default function NoticeAdminPage() {
             }
             return res.json();
         },
-        onSuccess: (data, variables) => {
-            const statusMsg = variables.status === 'DRAFT'
-                ? 'Notice saved as draft!'
-                : variables.status === 'SCHEDULED'
-                    ? 'Notice scheduled successfully!'
-                    : 'Notice published successfully!';
-            toast.success(statusMsg);
+        onSuccess: () => {
+            toast.success('Notice published successfully!');
             clearDraft(); // Clear draft from localStorage on successful save
             queryClient.refetchQueries({ queryKey: ['notices', schoolId, fullUser?.id] });
             closeDialog(true);
@@ -337,9 +318,6 @@ export default function NoticeAdminPage() {
                 category: notice.category,
                 audience: notice.audience,
                 priority: notice.priority,
-                status: notice.status,
-                issuedBy: notice.issuedBy || '',
-                issuerRole: notice.issuerRole || '',
             });
             setUploadedImageUrl(notice.fileUrl || '');
         } else {
@@ -359,11 +337,6 @@ export default function NoticeAdminPage() {
                             category: draft.category || 'GENERAL',
                             audience: draft.audience || 'ALL',
                             priority: draft.priority || 'NORMAL',
-                            status: draft.status || 'DRAFT',
-                            issuedBy: draft.issuedBy || fullUser?.name || '',
-                            issuerRole: draft.issuerRole || fullUser?.role?.name || 'Administration',
-                            publishedAt: draft.publishedAt || '',
-                            expiryDate: draft.expiryDate || '',
                         });
                         setUploadedImageUrl(draft.uploadedImageUrl || '');
                         setHasDraft(true);
@@ -374,11 +347,8 @@ export default function NoticeAdminPage() {
             if (!restoredDraft) {
                 reset({
                     priority: 'NORMAL',
-                    status: 'DRAFT',
                     audience: 'ALL',
                     category: 'GENERAL',
-                    issuedBy: fullUser?.name || '',
-                    issuerRole: fullUser?.role?.name || 'Administration',
                 });
                 setUploadedImageUrl('');
                 setHasDraft(false);
@@ -812,11 +782,8 @@ export default function NoticeAdminPage() {
                                     skipDraftSave.current = true;
                                     reset({
                                         priority: 'NORMAL',
-                                        status: 'DRAFT',
                                         audience: 'ALL',
                                         category: 'GENERAL',
-                                        issuedBy: fullUser?.name || '',
-                                        issuerRole: fullUser?.role?.name || 'Administration',
                                     });
                                     setUploadedImageUrl('');
                                     setHasDraft(false);
@@ -939,88 +906,9 @@ export default function NoticeAdminPage() {
                             </Select>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            {/* Issued By */}
-                            <div className="space-y-2">
-                                <Label htmlFor="issuedBy">Issued By</Label>
-                                <Input
-                                    id="issuedBy"
-                                    {...register('issuedBy')}
-                                    placeholder="e.g., Principal"
-                                />
-                            </div>
 
-                            {/* Issuer Role */}
-                            <div className="space-y-2">
-                                <Label htmlFor="issuerRole">Issuer Role</Label>
-                                <Input
-                                    id="issuerRole"
-                                    {...register('issuerRole')}
-                                    placeholder="e.g., Administration"
-                                />
-                            </div>
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            {/* Publish Date */}
-                            <div className="space-y-2">
-                                <Label htmlFor="publishedAt">Publish Date</Label>
-                                <Input
-                                    id="publishedAt"
-                                    type="datetime-local"
-                                    {...register('publishedAt')}
-                                    className="[&::-webkit-calendar-picker-indicator]:opacity-50 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
-                                />
-                            </div>
 
-                            {/* Expiry Date */}
-                            <div className="space-y-2">
-                                <Label htmlFor="expiryDate">Expiry Date</Label>
-                                <Input
-                                    id="expiryDate"
-                                    type="datetime-local"
-                                    {...register('expiryDate')}
-                                    className="[&::-webkit-calendar-picker-indicator]:opacity-50 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Status */}
-                        <div className="space-y-2">
-                            <Label>Status</Label>
-                            <div className="grid grid-cols-3 gap-2">
-                                <Button
-                                    type="button"
-                                    variant={status === 'DRAFT' ? 'default' : 'outline'}
-                                    className="w-full"
-                                    onClick={() => setValue('status', 'DRAFT')}
-                                >
-                                    <Save className="mr-2 h-4 w-4" />
-                                    Draft
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant={status === 'SCHEDULED' ? 'default' : 'outline'}
-                                    className="w-full"
-                                    onClick={() => setValue('status', 'SCHEDULED')}
-                                >
-                                    <CalendarClock className="mr-2 h-4 w-4" />
-                                    Schedule
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant={status === 'PUBLISHED' ? 'default' : 'outline'}
-                                    className="w-full"
-                                    onClick={() => setValue('status', 'PUBLISHED')}
-                                >
-                                    <Send className="mr-2 h-4 w-4" />
-                                    Publish
-                                </Button>
-                            </div>
-                            {status === 'SCHEDULED' && !publishedAt && (
-                                <p className="text-xs text-amber-600">⚠️ Set a publish date above for scheduled notices</p>
-                            )}
-                        </div>
 
                         {/* Buttons */}
                         <div className="flex gap-2 justify-end pt-2">
@@ -1041,7 +929,7 @@ export default function NoticeAdminPage() {
                                 ) : (
                                     <>
                                         <Send className="mr-2 h-4 w-4" />
-                                        {status === 'PUBLISHED' ? 'Publish' : 'Save'}
+                                        Publish
                                     </>
                                 )}
                             </Button>
