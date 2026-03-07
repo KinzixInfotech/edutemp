@@ -150,7 +150,7 @@ export async function POST(request) {
             },
         });
 
-        // Generate filename for UploadThing
+        // Generate filename for R2
         // Format: studentName_academicYear_orderID_date.pdf
         const studentName = payment.student.user.name.replace(/\s+/g, '_');
         const academicYear = payment.academicYear?.name?.replace(/\s+/g, '_') || 'current';
@@ -159,7 +159,7 @@ export async function POST(request) {
         const filename = `${studentName}_${academicYear}_${orderId}_${date}.pdf`;
 
         // Note: Actual PDF generation will be done on the client side or via a separate service
-        // The client will upload the generated PDF using the feeReceiptUploader endpoint
+        // The client will upload the generated PDF using the R2 storage system
         // For now, we return the receipt data for client-side PDF generation
 
         // Invalidate cache

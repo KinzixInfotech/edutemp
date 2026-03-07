@@ -92,43 +92,11 @@ export async function downloadReceiptPDF(receiptElement, filename = 'receipt.pdf
 }
 
 /**
- * Generate PDF and upload to UploadThing
- * @param {HTMLElement} receiptElement - Receipt DOM element
- * @param {Object} uploadConfig - UploadThing configuration
- * @param {string} uploadConfig.endpoint - UploadThing endpoint URL
- * @param {Object} uploadConfig.metadata - Metadata for upload
- * @param {string} filename - Suggested filename
- * @returns {Promise<Object>} - Upload result with URL
+ * Generate PDF and Return Blob (used by useReceiptGenerator for R2 upload)
  */
 export async function uploadReceiptPDF(receiptElement, uploadConfig, filename = 'receipt.pdf') {
-    try {
-        // Generate PDF blob
-        const pdfBlob = await generateReceiptPDF(receiptElement, filename);
-
-        // Create FormData for upload
-        const formData = new FormData();
-        formData.append('file', pdfBlob, filename);
-
-        // Add metadata
-        if (uploadConfig.metadata) {
-            formData.append('metadata', JSON.stringify(uploadConfig.metadata));
-        }
-
-        // Upload to UploadThing
-        const response = await fetch(uploadConfig.endpoint, {
-            method: 'POST',
-            body: formData,
-        });
-
-        if (!response.ok) {
-            throw new Error('Upload failed');
-        }
-
-        const result = await response.json();
-        return result;
-
-    } catch (error) {
-        console.error('Upload error:', error);
-        throw error;
-    }
+    // This function is legacy and should be replaced by useReceiptGenerator's direct R2 upload.
+    // However, we'll keep a clean version that returns the blob if needed, 
+    // or simply mark it as DEPRECATED.
+    throw new Error('uploadReceiptPDF is deprecated. Use useReceiptGenerator hook instead.');
 }

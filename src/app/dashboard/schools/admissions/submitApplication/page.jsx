@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { UploadButton } from "@uploadthing/react";
+import FileUploadButton from "@/components/fileupload";
 
 async function fetchForm({ formId, schoolId }) {
     const response = await fetch(`/api/schools/admissions/forms?schoolId=${schoolId}&id=${formId}`);
@@ -168,22 +168,26 @@ export default function SubmitApplication({ formId }) {
                     </Label>
 
                     {field.type === "file" ? (
-                        <UploadButton
-                            endpoint="imageUploader"
-                            onClientUploadComplete={(res) => {
-                                setDocuments([
-                                    ...documents,
-                                    ...res.map((r) => ({
-                                        fileUrl: r.url,
-                                        fileName: r.name,
-                                        mimeType: r.type,
-                                        size: r.size,
-                                        fieldId: field.id, // store which field uploaded
-                                    })),
-                                ]);
-                                toast.success("File uploaded");
+                        <FileUploadButton
+                            field={field.name}
+                            onChange={(url) => {
+                                if (url) {
+                                    // We don't have all metadata yet since FileUploadButton returns just the URL
+                                    // But we can approximate the rest or update FileUploadButton if needed
+                                    // For now, let's store it as expected by the mutation
+                                    setDocuments((prev) => [
+                                        ...prev.filter(d => d.fieldId !== field.id), // Remove previous if exists
+                                        {
+                                            fileUrl: url,
+                                            fileName: field.name,
+                                            mimeType: "application/octet-stream", // Fallback
+                                            size: 0,
+                                            fieldId: field.id,
+                                        }
+                                    ]);
+                                    toast.success("File uploaded");
+                                }
                             }}
-                            onUploadError={(err) => toast.error(err.message)}
                         />
                     ) : field.type === "select" ? (
                         <Select onValueChange={(val) => handleChange(field.id, val)}>

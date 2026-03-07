@@ -1,9 +1,5 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "uploadthing/tw/v4";
-/* @source "../../node_modules/@uploadthing/react/dist";
-  */
-@source "../../../node_modules/@uploadthing/react/dist";
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -140,6 +136,7 @@
 [data-sidebar="sidebar"] [data-collapsed="true"]::-webkit-scrollbar {
   display: none;
 }
+
 .scrollbar-hide-collapsed {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -148,6 +145,7 @@
 .scrollbar-hide-collapsed::-webkit-scrollbar {
   display: none;
 }
+
 .rbc-btn-group:first-child {
   display: none !important;
 }
