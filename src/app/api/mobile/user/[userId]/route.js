@@ -324,24 +324,16 @@ export async function PUT(req, context) {
 
         console.log(`✅ [Mobile API] Profile picture updated for userId: ${userId}`);
 
-        // 4. Delete old image from UploadThing if it exists and is different
+        // 4. Delete old image from storage if it exists and is different
         if (currentUser?.profilePicture &&
             currentUser.profilePicture !== profilePicture &&
             currentUser.profilePicture !== 'default.png' &&
             currentUser.profilePicture.includes('http')) {
 
             try {
-                // Extract file key from URL
-                // Format: https://utfs.io/f/KEY or https://.../f/KEY
-                const urlParts = currentUser.profilePicture.split('/f/');
-                if (urlParts.length > 1) {
-                    const fileKey = urlParts[1];
-                    console.log(`🗑️ [Mobile API] Deleting old profile picture: ${fileKey}`);
-
-                    // Import dynamically to avoid circular dependency issues if any
-                    const { utapi } = await import("@/lib/server-uploadthing");
-                    await utapi.deleteFiles(fileKey);
-                }
+                const { deleteFileByUrl } = await import("@/lib/r2");
+                console.log(`🗑️ [Mobile API] Deleting old profile picture: ${currentUser.profilePicture}`);
+                await deleteFileByUrl(currentUser.profilePicture);
             } catch (deleteError) {
                 console.error('⚠️ [Mobile API] Failed to delete old profile picture:', deleteError);
                 // We don't fail the request if deletion fails, just log it

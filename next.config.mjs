@@ -86,6 +86,9 @@ const nextConfig = {
 
   images: {
     remotePatterns: [
+      // Cloudflare R2 CDN (new)
+      { protocol: "https", hostname: "cdn.edubreezy.com" },
+      // Legacy UploadThing domains (for existing images)
       { protocol: "https", hostname: "utfs.io" },
       { protocol: "https", hostname: "uploadthing.com" },
       { protocol: "https", hostname: "ufs.sh" },

@@ -277,6 +277,7 @@ export default function AlbumDetailPage() {
                                     aspectRatio="auto"
                                     resetKey={uploadResetKey}
                                     onChange={handleImageUploaded}
+                                    subFolder={albumId}
                                 />
                                 <p className="text-xs text-muted-foreground mt-3 text-center">
                                     Images are saved to Media Library and added to this album

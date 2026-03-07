@@ -15,7 +15,7 @@ import FileUploadButton from '@/components/fileupload'
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import CropImageDialog from "@/app/components/CropImageDialog"
-import { uploadFiles } from "@/app/components/utils/uploadThing"
+import { uploadFilesToR2 } from '@/hooks/useR2Upload'
 import { Loader2, UserPlus, AlertCircle, X, Check, ChevronsUpDown } from "lucide-react"
 
 function useDebounce(value, delay) {
@@ -295,17 +295,12 @@ export default function NewProfilePage() {
                         const file = new File([croppedBlob], filename, { type: "image/jpeg" })
                         try {
                             setUploading(true)
-                            const res = await uploadFiles("profilePictureUploader", {
+                            const res = await uploadFilesToR2('profiles', {
                                 files: [file],
-                                input: {
-                                    schoolId: schoolId,
-                                    username: form.name || form.studentName || form.guardianName || "User",
-                                    profileId: crypto.randomUUID()
-                                }
                             })
                             if (res && res[0]?.url) {
-                                updateForm("profilePicture", res[0].ufsUrl)
-                                setPreviewUrl(res[0].ufsUrl)
+                                updateForm("profilePicture", res[0].url)
+                                setPreviewUrl(res[0].url)
                                 toast.success("Image uploaded!")
                             } else {
                                 toast.error("Upload failed")

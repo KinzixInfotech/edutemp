@@ -244,6 +244,23 @@ export async function POST(req) {
             }
         });
 
+        // Track upload in prisma.upload table (Migrated from UploadThing callback)
+        if (fileUrl) {
+            try {
+                await prisma.upload.create({
+                    data: {
+                        schoolId,
+                        fileUrl: fileUrl,
+                        fileName: fileName || "Homework File",
+                        mimeType: "application/pdf",
+                        size: 0,
+                    },
+                });
+            } catch (err) {
+                console.error("Failed to track homework upload:", err);
+            }
+        }
+
         // Get students in this class/section
         const studentsWhere = {
             schoolId,

@@ -33,7 +33,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
-import { useUploadThing } from '@/lib/uploadthing';
+
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
 import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';

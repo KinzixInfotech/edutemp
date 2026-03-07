@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { Upload, X, FileIcon, Loader2, CheckCircle, ImageIcon, FileText, Music, Video } from "lucide-react";
-import { useUploadThing } from "@/lib/uploadthing";
+import { useR2Upload } from "@/hooks/useR2Upload";
 import { Button } from "@/components/ui/button";
 
 // File type configurations
@@ -53,14 +53,15 @@ export default function FormFileUpload({
     const config = FILE_TYPE_CONFIG[acceptedTypes] || FILE_TYPE_CONFIG.all;
     const maxSize = maxSizeMB * 1024 * 1024;
 
-    const { startUpload } = useUploadThing("formSubmissionUpload", {
+    const { startUpload } = useR2Upload({
+        folder: 'forms',
         onUploadBegin: () => {
             setIsUploading(true);
             setUploadError(null);
         },
-        onClientUploadComplete: (res) => {
-            if (res?.[0]?.ufsUrl) {
-                const url = res[0].ufsUrl;
+        onUploadComplete: (res) => {
+            if (res?.[0]?.url) {
+                const url = res[0].url;
                 setPreview(url);
                 setIsUploading(false);
                 onChange?.({
@@ -99,11 +100,10 @@ export default function FormFileUpload({
             setPreview(null);
         }
 
-        // Upload to UploadThing
+        // Upload to R2
         try {
             await startUpload([selectedFile], {
                 schoolId: schoolId || "public-form",
-                fieldName: fieldName || fieldId,
             });
         } catch (error) {
             console.error("Failed to upload:", error);

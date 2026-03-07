@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/context/AuthContext';
 import { useFileUpload } from '@/lib/useFileupload';
-import { uploadFiles } from '@/app/components/utils/uploadThing';
+import { uploadFilesToR2 } from '@/hooks/useR2Upload';
 
 // Custom Upload Component to handle specific file state
 const ImageUploader = ({ currentUrl, onUrlChange, type, label }) => {
@@ -37,7 +37,7 @@ const ImageUploader = ({ currentUrl, onUrlChange, type, label }) => {
 
     try {
       setUploading(true);
-      const res = await uploadFiles("logoupload", {
+      const res = await uploadFilesToR2("stamps", {
         files: [files[0].file],
       });
 

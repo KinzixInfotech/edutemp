@@ -46,7 +46,7 @@ import { Input } from './ui/input';
 import axios from 'axios';
 import { Fi } from 'zod/v4/locales';
 import CropImageDialog from "@/app/components/CropImageDialog";
-import { uploadFiles } from "@/app/components/utils/uploadThing";
+import { uploadFilesToR2 } from "@/hooks/useR2Upload";
 import { useRouter } from 'next/navigation';
 import { Calendar } from './ui/calendar';
 import { ChartRadialShape } from './chart-radial';
@@ -1056,17 +1056,14 @@ export function Profile() {
             try {
               setUploading(true)
 
-              const res = await uploadFiles("profilePictureUploader", {
+              const res = await uploadFilesToR2('profiles', {
                 files: [file],
                 input: {
-                  profileId: fullUser?.id || "no profile id",
-                  username: fullUser?.name || "User",
-                  schoolId: fullUser?.schoolId || null,
+                  schoolId: fullUser?.schoolId || 'global',
                 },
               });
               if (res && res[0]?.url) {
-                // setForm({ ...form, profilePicture: res[0].ufsUrl });
-                setPreviewUrl(res[0].ufsUrl);
+                setPreviewUrl(res[0].url);
                 toast.success("Image uploaded!")
                 setErrorupload(false);
               } else {

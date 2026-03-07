@@ -23,7 +23,7 @@ import {
 import { Label } from '@/components/ui/label';
 import FileUploadButton from '@/components/fileupload';
 import CropImageDialog from '@/app/components/CropImageDialog';
-import { uploadFiles } from '@/app/components/utils/uploadThing';
+import { uploadFilesToR2 } from '@/hooks/useR2Upload';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 
@@ -103,7 +103,7 @@ export default function Step1BasicInfo({ data, updateFormData, nextStep }) {
                         const filename = `${timestamp}.jpg`;
                         const file = new File([croppedBlob], filename, { type: 'image/jpeg' });
 
-                        const res = await uploadFiles('profilePictureUploader', {
+                        const res = await uploadFilesToR2('profiles', {
                             files: [file],
                             input: {
                                 profileId: crypto.randomUUID(),

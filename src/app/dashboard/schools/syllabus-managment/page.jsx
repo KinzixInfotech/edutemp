@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useUploadThing } from "@/app/components/utils/uploadThing";
+import { useR2Upload } from "@/hooks/useR2Upload";
 import { useAuth } from "@/context/AuthContext";
 import dynamic from "next/dynamic";
 import axios from "axios";
@@ -37,7 +37,7 @@ function useDebounce(value, delay = 400) {
 }
 
 export default function SyllabusManagement() {
-    const { startUpload } = useUploadThing("syllabus");
+    const { startUpload } = useR2Upload({ folder: 'documents' });
     const { fullUser } = useAuth();
     const queryClient = useQueryClient();
 
@@ -126,7 +126,6 @@ export default function SyllabusManagement() {
                 console.log('📤 Starting upload with file:', selectedFile.name, 'size:', selectedFile.size);
                 uploadRes = await startUpload([selectedFile], {
                     schoolId: fullUser?.schoolId,
-                    classId: formData?.classId,
                 });
             } catch (uploadError) {
                 console.error('📤 Upload error details:', uploadError);
@@ -140,7 +139,7 @@ export default function SyllabusManagement() {
             }
 
             const firstResult = uploadRes[0];
-            const fileUrl = firstResult.url || firstResult.ufsUrl || firstResult.serverData?.url || firstResult.fileUrl;
+            const fileUrl = firstResult.url || firstResult.key;
 
             console.log('📤 First result keys:', Object.keys(firstResult));
             console.log('📤 Extracted fileUrl:', fileUrl);

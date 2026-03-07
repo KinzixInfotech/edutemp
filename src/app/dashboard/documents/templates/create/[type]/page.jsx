@@ -37,7 +37,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import FileUploadButton from '@/components/fileupload';
 import CropImageDialog from '@/app/components/CropImageDialog';
-import { uploadFiles } from '@/app/components/utils/uploadThing';
+import { uploadFilesToR2 } from '@/hooks/useR2Upload';
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
 import { DEFAULT_TEMPLATES } from '@/lib/default-templates';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -279,7 +279,7 @@ export default function CreateTemplatePage() {
                         const file = new File([croppedBlob], filename, { type: "image/jpeg" });
                         try {
                             setUploading(true);
-                            const res = await uploadFiles("logoupload", { files: [file] });
+                            const res = await uploadFilesToR2("templates", { files: [file] });
                             if (res && res[0]?.url) {
                                 if (currentField === 'backgroundImage') {
                                     setEditorConfig(prev => ({ ...prev, backgroundImage: res[0].url }));

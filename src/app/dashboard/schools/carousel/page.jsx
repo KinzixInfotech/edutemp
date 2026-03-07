@@ -69,7 +69,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import CropImageDialog from '@/app/components/CropImageDialog';
-import { useUploadThing } from '@/lib/uploadthing';
+import { useR2Upload } from '@/hooks/useR2Upload';
 import { MediaLibraryDialog } from '@/components/media-library-dialog';
 
 // Audience options
@@ -323,12 +323,13 @@ export default function SchoolCarouselPage() {
 
     const CAROUSEL_OUTPUT_SIZE = { width: 1920, height: 1080 };
 
-    // Upload hook for carousel images
-    const { startUpload } = useUploadThing("schoolImageUpload", {
+    // Upload hook for carousel images (R2)
+    const { startUpload } = useR2Upload({
+        folder: 'carousel',
         onUploadBegin: () => setIsCarouselUploading(true),
-        onClientUploadComplete: (res) => {
-            if (res?.[0]?.ufsUrl) {
-                setNewImage(prev => ({ ...prev, imageUrl: res[0].ufsUrl }));
+        onUploadComplete: (res) => {
+            if (res?.[0]?.url) {
+                setNewImage(prev => ({ ...prev, imageUrl: res[0].url }));
             }
             setIsCarouselUploading(false);
         },
@@ -372,7 +373,6 @@ export default function SchoolCarouselPage() {
         const file = new File([croppedBlob], 'carousel-image.jpg', { type: 'image/jpeg' });
         await startUpload([file], {
             schoolId,
-            uploadedById: fullUser?.id,
         });
     };
 

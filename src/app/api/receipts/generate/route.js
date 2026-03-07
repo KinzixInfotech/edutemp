@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { generateReceiptNumber } from '@/lib/receipts/receipt-number-generator';
 import { generateKey, setCache, delCache } from '@/lib/cache';
-import { utapi } from '@/lib/server-uploadthing';
 
 /**
  * Generate receipt for a fee payment

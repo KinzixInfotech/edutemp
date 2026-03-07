@@ -38,7 +38,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
-import { useUploadThing } from '@/lib/uploadthing';
+import { useR2Upload } from '@/hooks/useR2Upload';
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
 
 const formSchema = z.object({
@@ -85,7 +85,7 @@ export default function BulkGenerateCertificatesPage() {
 
     const watchedValues = watch();
     // Reusing the ZIP uploader - accepts blob up to 32MB
-    const { startUpload } = useUploadThing("bulkCertificateZip");
+    const { startUpload } = useR2Upload({ folder: 'documents' });
 
     // Fetch classes
     const { data: classes, isLoading: loadingClasses } = useQuery({

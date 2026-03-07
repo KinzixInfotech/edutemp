@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
-import { useUploadThing } from "@/app/components/utils/uploadThing";
+import { useR2Upload } from "@/hooks/useR2Upload";
 import dynamic from "next/dynamic";
 import axios from "axios";
 import Link from "next/link";
@@ -39,7 +39,7 @@ function useDebounce(value, delay = 400) {
 
 export default function HomeworkManagement() {
     const { fullUser } = useAuth();
-    const { startUpload } = useUploadThing("homework");
+    const { startUpload } = useR2Upload({ folder: 'homework' });
     const queryClient = useQueryClient();
 
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -149,12 +149,11 @@ export default function HomeworkManagement() {
             if (selectedFile) {
                 const uploadRes = await startUpload([selectedFile], {
                     schoolId: fullUser?.schoolId,
-                    classId: formData?.classId,
                 });
 
-                if (!uploadRes || !uploadRes[0].ufsUrl) throw new Error('Upload failed');
+                if (!uploadRes || !uploadRes[0].url) throw new Error('Upload failed');
 
-                fileUrl = uploadRes[0].ufsUrl;
+                fileUrl = uploadRes[0].url;
                 fileName = formData.fileName || selectedFile.name;
             }
 

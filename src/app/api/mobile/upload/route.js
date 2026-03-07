@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { utapi } from "@/lib/server-uploadthing";
+import { uploadToR2, generateFileKey } from "@/lib/r2";
 import prisma from "@/lib/prisma";
 
 /**
  * Mobile Upload API
  * Handles image uploads from React Native app
- * Uses server-side UploadThing API
+ * Uses server-side R2 upload
  */
 export async function POST(req) {
     try {
@@ -29,25 +29,13 @@ export async function POST(req) {
             );
         }
 
-        // Convert file to buffer for UploadThing
+        // Convert file to buffer for R2 upload
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
-        // Create a File object for UploadThing
-        const uploadFile = new File([buffer], file.name, { type: file.type });
-
-        // Upload to UploadThing using server-side API
-        const response = await utapi.uploadFiles([uploadFile]);
-
-        if (!response?.[0]?.data?.ufsUrl) {
-            console.error("Upload failed:", response);
-            return NextResponse.json(
-                { error: "Upload failed" },
-                { status: 500 }
-            );
-        }
-
-        const fileUrl = response[0].data.ufsUrl;
+        // Upload to R2
+        const key = generateFileKey(file.name, { folder: type, schoolId });
+        const fileUrl = await uploadToR2(key, buffer, file.type);
 
         // Save to Upload table for tracking
         if (schoolId && userId) {

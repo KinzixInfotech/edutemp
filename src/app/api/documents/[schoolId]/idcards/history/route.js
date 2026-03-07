@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { uploadToR2, generateFileKey } from '@/lib/r2';
 import { v4 as uuidv4 } from 'uuid';
 import { sendNotification } from '@/lib/notifications/notificationHelper';
 
@@ -66,18 +67,17 @@ export async function POST(request, props) {
         // Server-side upload
         if (file) {
             try {
-                const { utapi } = await import('@/lib/server-uploadthing');
-                const response = await utapi.uploadFiles([file]);
-                if (response[0]?.data?.url) {
-                    const uploadedUrl = response[0].data.url;
-                    if (file.name.endsWith('.zip')) {
-                        zipUrl = uploadedUrl;
-                    } else if (students.length === 1) {
-                        students[0].fileUrl = uploadedUrl;
-                    }
+                const bytes = await file.arrayBuffer();
+                const buffer = Buffer.from(bytes);
+                const key = generateFileKey(file.name, { folder: 'certificates', schoolId });
+                const uploadedUrl = await uploadToR2(key, buffer, file.type);
+                if (file.name.endsWith('.zip')) {
+                    zipUrl = uploadedUrl;
+                } else if (students.length === 1) {
+                    students[0].fileUrl = uploadedUrl;
                 }
             } catch (err) {
-                console.error("Upload failed:", err);
+                console.error("R2 upload failed:", err);
                 return NextResponse.json({ error: "Upload failed" }, { status: 500 });
             }
         }

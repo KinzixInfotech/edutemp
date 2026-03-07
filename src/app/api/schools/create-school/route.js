@@ -4,7 +4,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { addYears, addDays } from "date-fns";
-import { deleteFileByUrl } from "@/lib/server-uploadthing";
 import { invalidatePattern } from "@/lib/cache";
 
 // Schema validation
@@ -385,6 +384,19 @@ export async function POST(req) {
           },
         },
       });
+
+      // Track logo upload in prisma.upload table (Migrated from UploadThing callback)
+      if (parsed.profilePicture && parsed.profilePicture.includes('r2.edubreezy.com')) {
+        await tx.upload.create({
+          data: {
+            schoolId: school.id,
+            fileUrl: parsed.profilePicture,
+            fileName: `School Logo - ${parsed.name}`,
+            mimeType: "image/jpeg",
+            size: 0,
+          },
+        });
+      }
 
       return { school, adminUser, directorUser, principalUser, subscription };
     }, {

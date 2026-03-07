@@ -40,7 +40,7 @@ import { useAuth } from '@/context/AuthContext';
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
 import FileUploadButton from '@/components/fileupload';
 import CropImageDialog from '@/app/components/CropImageDialog';
-import { uploadFiles } from '@/app/components/utils/uploadThing';
+import { uploadFilesToR2 } from '@/hooks/useR2Upload';
 import {
     AlertDialog,
     AlertDialogAction,

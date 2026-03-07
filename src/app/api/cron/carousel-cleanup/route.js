@@ -11,22 +11,13 @@
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { utapi } from '@/lib/server-uploadthing';
+import { deleteFileByUrl } from '@/lib/r2';
 import { delCache, generateKey } from '@/lib/cache';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-// Extract UploadThing file key from URL
-function extractFileKey(fileUrl) {
-    if (!fileUrl) return null;
-    try {
-        const urlParts = fileUrl.split('/');
-        return urlParts[urlParts.length - 1] || null;
-    } catch {
-        return null;
-    }
-}
+
 
 export async function GET(req) {
     const startTime = Date.now();
@@ -71,9 +62,9 @@ export async function GET(req) {
 
         console.log(`[CarouselCleanup] Found ${expiredImages.length} expired images.`);
 
-        // 2. Collect all file keys for batch UploadThing deletion
-        const fileKeys = expiredImages
-            .map(img => extractFileKey(img.imageUrl))
+        // 2. Collect image URLs for deletion
+        const imageUrls = expiredImages
+            .map(img => img.imageUrl)
             .filter(Boolean);
 
         // 3. Collect all IDs for batch DB deletion
@@ -84,13 +75,13 @@ export async function GET(req) {
 
         // 5. Run storage deletion and DB deletion in parallel
         const [storageResult, dbResult] = await Promise.allSettled([
-            // Batch delete from UploadThing (handles up to 100 at a time internally)
-            fileKeys.length > 0
-                ? utapi.deleteFiles(fileKeys).catch(err => {
-                    console.error('[CarouselCleanup] Storage batch delete error:', err);
-                    return { deletedCount: 0 };
-                })
-                : Promise.resolve({ deletedCount: 0 }),
+            // Delete files from R2 (handles both R2 and old UploadThing URLs)
+            Promise.allSettled(
+                imageUrls.map(url => deleteFileByUrl(url).catch(err => {
+                    console.error('[CarouselCleanup] Storage delete error:', err);
+                    return false;
+                }))
+            ),
 
             // Batch delete from DB in ONE query
             prisma.schoolCarouselImage.deleteMany({
@@ -111,7 +102,7 @@ export async function GET(req) {
 
         console.log(
             `[CarouselCleanup] Done in ${duration}ms: ` +
-            `${dbDeleted} DB rows, ${fileKeys.length} storage files, ` +
+            `${dbDeleted} DB rows, ${imageUrls.length} storage files, ` +
             `${affectedSchools.length} schools`
         );
 
@@ -119,7 +110,7 @@ export async function GET(req) {
             success: true,
             found: expiredImages.length,
             dbDeleted,
-            storageFiles: fileKeys.length,
+            storageFiles: imageUrls.length,
             affectedSchools: affectedSchools.length,
             duration: `${duration}ms`,
         });

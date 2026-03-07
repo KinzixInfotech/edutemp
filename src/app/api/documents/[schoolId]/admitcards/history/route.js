@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { uploadToR2, generateFileKey } from '@/lib/r2';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function GET(request, props) {
@@ -94,28 +95,21 @@ export async function POST(request, props) {
         if (file) {
             console.log("Uploading file server-side:", file.name, file.size);
             try {
-                const { utapi } = await import('@/lib/server-uploadthing');
-                const response = await utapi.uploadFiles([file]);
+                const bytes = await file.arrayBuffer();
+                const buffer = Buffer.from(bytes);
+                const key = generateFileKey(file.name, { folder: 'certificates', schoolId });
+                const uploadedUrl = await uploadToR2(key, buffer, file.type);
+                console.log("R2 upload success:", uploadedUrl);
 
-                if (response[0]?.data?.url) {
-                    const uploadedUrl = response[0].data.url;
-                    console.log("Server-side upload success:", uploadedUrl);
-
-                    // Determine if this is a ZIP or Single PDF based on context or mime
-                    if (file.name.endsWith('.zip')) {
-                        zipUrl = uploadedUrl;
-                    } else {
-                        // For single student, update their fileUrl
-                        if (students.length === 1) {
-                            students[0].fileUrl = uploadedUrl;
-                        }
-                    }
+                if (file.name.endsWith('.zip')) {
+                    zipUrl = uploadedUrl;
                 } else {
-                    console.error("UploadThing Error:", response[0]?.error);
-                    throw new Error("Failed to upload file to storage");
+                    if (students.length === 1) {
+                        students[0].fileUrl = uploadedUrl;
+                    }
                 }
             } catch (uploadError) {
-                console.error("Upload failed:", uploadError);
+                console.error("R2 upload failed:", uploadError);
                 return NextResponse.json(
                     { error: 'Failed to upload file', message: uploadError.message },
                     { status: 500 }

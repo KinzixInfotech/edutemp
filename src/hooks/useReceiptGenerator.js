@@ -4,7 +4,7 @@ import { useState, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { generateReceiptPDF } from '@/lib/pdf/receipt-pdf-generator';
-import { useUploadThing } from '@/lib/uploadthing';
+import { useR2Upload } from '@/hooks/useR2Upload';
 
 /**
  * Custom hook for generating and uploading fee receipts
@@ -15,7 +15,7 @@ export function useReceiptGenerator() {
     const queryClient = useQueryClient();
     const receiptRef = useRef(null);
 
-    const { startUpload } = useUploadThing('feeReceiptUploader');
+    const { startUpload } = useR2Upload({ folder: 'receipts' });
 
     /**
      * Generate receipt record (creates entry in database)
@@ -60,18 +60,16 @@ export function useReceiptGenerator() {
             // Create File object from blob
             const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
 
-            // Upload to UploadThing
+            // Upload to R2
             const uploadResult = await startUpload([pdfFile], {
-                paymentId,
                 schoolId,
-                receiptId,
             });
 
             if (!uploadResult || uploadResult.length === 0) {
                 throw new Error('Upload failed');
             }
 
-            const pdfUrl = uploadResult[0].ufsUrl || uploadResult[0].url;
+            const pdfUrl = uploadResult[0].url;
 
             toast.success('Receipt generated and saved successfully!');
 

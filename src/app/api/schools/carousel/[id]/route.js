@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { delCache, generateKey } from '@/lib/cache';
-import { deleteFileByUrl } from '@/lib/server-uploadthing';
+import { deleteFileByUrl } from '@/lib/r2';
 
 export async function DELETE(request, { params }) {
     try {

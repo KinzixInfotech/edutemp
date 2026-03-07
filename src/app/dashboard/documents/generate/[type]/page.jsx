@@ -42,7 +42,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
-import { useUploadThing } from '@/lib/uploadthing';
+import { useR2Upload } from '@/hooks/useR2Upload';
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
 import { DEFAULT_TEMPLATES } from '@/lib/default-templates';
 import * as htmlToImage from 'html-to-image';
@@ -123,7 +123,7 @@ export default function GenerateCertificatePage() {
 
     const certificateType = params?.type;
     const config = CERTIFICATE_CONFIGS[certificateType];
-    const { startUpload } = useUploadThing("certificatePdf");
+    const { startUpload } = useR2Upload({ folder: 'documents' });
 
     const {
         register,

@@ -416,6 +416,23 @@ export async function POST(req, context) {
             }
         );
 
+        // Track profile picture upload in prisma.upload table (Migrated from UploadThing callback)
+        if (parsed.profilePicture && parsed.profilePicture.includes('r2.edubreezy.com')) {
+            try {
+                await prisma.upload.create({
+                    data: {
+                        schoolId,
+                        fileUrl: parsed.profilePicture,
+                        fileName: `Profile Picture - ${userName}`,
+                        mimeType: "image/jpeg",
+                        size: 0,
+                    },
+                });
+            } catch (err) {
+                console.error("Failed to track profile picture upload:", err);
+            }
+        }
+
         return NextResponse.json({ success: true, ...created });
     } catch (error) {
         console.error("❌ User profile creation error:", error);

@@ -4,12 +4,11 @@ import { useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useBulkUpload } from '@/context/BulkUploadContext';
 import { useAuth } from '@/context/AuthContext';
-import { uploadFiles } from '@/lib/uploadthing';
+import { uploadFilesToR2 } from '@/hooks/useR2Upload';
 import { toast } from 'sonner';
 
 const MAX_IMAGE_SIZE = 50 * 1024 * 1024; // 50MB per raw image
 const COMPRESSION_TARGET = 2 * 1024 * 1024; // 2MB target after compression
-const BATCH_SIZE = 3;
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'tif']);
 
 function getExtension(filename) {
@@ -65,7 +64,8 @@ async function extractImagesFromZip(zipFile) {
 
 /**
  * Background upload + save pipeline.
- * Runs independently of UI — progress tracked via BulkUploadContext.
+ * Uses the same uploadFiles() as single image upload.
+ * Sequential (1 file at a time) with per-file retry + progress.
  */
 async function runUploadPipeline({ allImages, jobId, signal, albumId, schoolId, uploadedById, updateJob, queryClient }) {
     const successfulUploads = [];
@@ -73,78 +73,95 @@ async function runUploadPipeline({ allImages, jobId, signal, albumId, schoolId, 
     let totalFailed = 0;
     const failedFiles = [];
 
-    // 1. Persist uploads locally as they happen (failsafe)
+    // Persist uploads locally as failsafe
     const storageKey = `bulk_upload_pending_${jobId}`;
     const persistUploads = (uploads) => {
         try {
             localStorage.setItem(storageKey, JSON.stringify({
-                albumId,
-                schoolId,
-                uploadedById,
-                uploads
+                albumId, schoolId, uploadedById, uploads
             }));
         } catch (e) {
             console.warn('Failed to persist to localStorage:', e);
         }
     };
 
-    for (let i = 0; i < allImages.length; i += BATCH_SIZE) {
+    // 1. Compress all images (parallel via web workers)
+    updateJob(jobId, { status: 'compressing' });
+
+    const compressed = await Promise.all(
+        allImages.map(async (file) => {
+            try {
+                if (file.size > COMPRESSION_TARGET || file.type !== 'image/webp') {
+                    return await compressImage(file);
+                }
+                return file;
+            } catch {
+                return file;
+            }
+        })
+    );
+
+    if (signal.aborted) {
+        localStorage.removeItem(storageKey);
+        return;
+    }
+
+    // 2. Upload one file at a time (same method as single upload)
+    updateJob(jobId, { status: 'uploading' });
+
+    for (let i = 0; i < compressed.length; i++) {
         if (signal.aborted) {
             localStorage.removeItem(storageKey);
             break;
         }
 
-        const batch = allImages.slice(i, i + BATCH_SIZE);
+        const file = compressed[i];
+        let uploaded = false;
+        let retries = 0;
+        const maxRetries = 2;
 
-        // Compress + upload each file, updating progress per-file
-        await Promise.allSettled(
-            batch.map(async (file) => {
-                if (signal.aborted) throw new Error('Upload aborted');
-
-                // Compress
-                let compressed = file;
-                try {
-                    if (file.size > COMPRESSION_TARGET || file.type !== 'image/webp') {
-                        compressed = await compressImage(file);
-                    }
-                } catch {
-                    compressed = file;
-                }
-
-                // Upload
-                try {
-                    const res = await uploadFiles('galleryImageUpload', {
-                        files: [compressed],
-                        input: { schoolId, albumId, uploadedById },
-                    });
-                    const r = res[0];
-                    if (r) {
-                        totalCompleted++;
-                        successfulUploads.push({
-                            url: r.ufsUrl || r.url || r.serverData?.url,
-                            fileName: r.name || r.serverData?.fileName,
-                            fileSize: r.size || r.serverData?.fileSize,
-                            mimeType: r.type || r.serverData?.mimeType || 'image/webp',
-                        });
-                    }
-                } catch (err) {
-                    totalFailed++;
-                    failedFiles.push(err?.message || 'unknown');
-                    console.error('Upload failed:', err);
-                }
-
-                // Update progress immediately after each file
-                persistUploads(successfulUploads);
-                updateJob(jobId, {
-                    completed: totalCompleted,
-                    failed: totalFailed,
-                    failedFiles,
+        while (!uploaded && retries <= maxRetries) {
+            try {
+                // Same uploadFiles() used by single image upload UI
+                const res = await uploadFilesToR2('gallery', {
+                    files: [file],
+                    input: { schoolId, albumId, uploadedById, subFolder: albumId },
                 });
-            })
-        );
+                const r = res[0];
+                if (r) {
+                    totalCompleted++;
+                    successfulUploads.push({
+                        url: r.url,
+                        fileName: r.name,
+                        fileSize: r.size,
+                        mimeType: r.type || 'image/webp',
+                    });
+                    uploaded = true;
+                }
+            } catch (err) {
+                retries++;
+                console.warn(`Upload attempt ${retries} failed for ${file.name}:`, err?.message);
+                if (retries > maxRetries) {
+                    totalFailed++;
+                    failedFiles.push(file.name);
+                    console.error('Upload permanently failed:', file.name);
+                } else {
+                    // Backoff: 2s, 4s
+                    await new Promise(r => setTimeout(r, retries * 2000));
+                }
+            }
+        }
+
+        // Update progress after each file
+        persistUploads(successfulUploads);
+        updateJob(jobId, {
+            completed: totalCompleted,
+            failed: totalFailed,
+            failedFiles,
+        });
     }
 
-    // 2. Batch save to DB with RETRY logic
+    // 3. Batch save to DB with retry
     if (successfulUploads.length > 0 && !signal.aborted) {
         let attempts = 0;
         const maxAttempts = 3;
@@ -165,8 +182,7 @@ async function runUploadPipeline({ allImages, jobId, signal, albumId, schoolId, 
 
                 if (saveRes.ok) {
                     saved = true;
-                    localStorage.removeItem(storageKey); // Clear on success
-                    // Invalidate gallery queries so the page refreshes
+                    localStorage.removeItem(storageKey);
                     queryClient?.invalidateQueries({ queryKey: ['admin-gallery'] });
                     console.log('Bulk save successful on attempt', attempts);
                 } else {
@@ -175,7 +191,6 @@ async function runUploadPipeline({ allImages, jobId, signal, albumId, schoolId, 
                     if (attempts === maxAttempts) {
                         toast.error(err.message || 'Failed to save images after multiple attempts');
                     } else {
-                        // Exponential backoff
                         await new Promise(resolve => setTimeout(resolve, attempts * 1000));
                     }
                 }
@@ -217,7 +232,6 @@ export function useBulkGalleryUpload() {
             }
 
             try {
-                // Step 1: Extract ZIPs + validate (quick, sync-ish)
                 let allImages = [];
 
                 for (const file of files) {
@@ -249,7 +263,7 @@ export function useBulkGalleryUpload() {
                     return;
                 }
 
-                // Step 2: Create job — this returns IMMEDIATELY, dialog can close
+                // Create job — returns immediately so dialog can close
                 const { jobId, signal } = addJob({
                     albumId,
                     albumTitle,
@@ -258,8 +272,7 @@ export function useBulkGalleryUpload() {
 
                 isProcessing.current = false;
 
-                // Step 3: Fire-and-forget — uploads + save run in background
-                // NOT awaited, so the caller (dialog) returns immediately
+                // Fire-and-forget — uploads run in background
                 runUploadPipeline({
                     allImages,
                     jobId,
@@ -271,7 +284,6 @@ export function useBulkGalleryUpload() {
                     queryClient,
                 });
 
-                // Function returns here — dialog closes, uploads continue in background
             } catch (error) {
                 toast.error(`Upload failed: ${error.message}`);
                 isProcessing.current = false;

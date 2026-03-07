@@ -28,7 +28,7 @@ import {
     AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { UploadDropzone } from "@/app/components/utils/uploadThing";
+import { useR2Upload } from "@/hooks/useR2Upload";
 
 // Image component with error fallback
 function ImageWithFallback({ src, alt, className, onClick, ...props }) {
@@ -83,6 +83,55 @@ export default function MediaLibraryPage() {
     const [lightboxIndex, setLightboxIndex] = useState(0);
 
     const limit = 24;
+
+    // R2 upload hook
+    const { startUpload, isUploading, progress } = useR2Upload({
+        folder: 'media',
+        onUploadComplete: async (res) => {
+            try {
+                // We need to manually create the DB records that UploadThing used to do
+                await Promise.all(res.map(file =>
+                    fetch(`/api/schools/${user.schoolId}/media`, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            url: file.url,
+                            fileName: file.name,
+                            fileSize: file.size,
+                            mimeType: file.type,
+                            uploadedById: user.id
+                        })
+                    })
+                ));
+
+                toast.success(`Successfully uploaded ${res.length} image(s)`);
+                setUploadMode(false);
+                refetch();
+            } catch (err) {
+                console.error("Failed to save media records:", err);
+                toast.error("Images uploaded to storage but failed to save to database.");
+            }
+        },
+        onUploadError: (error) => {
+            toast.error(`Upload failed: ${error.message}`);
+        },
+    });
+
+    const handleFileSelect = async (e) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
+        await startUpload(files, { schoolId: user?.schoolId });
+    };
+
+    const handleDrop = async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+        if (files.length === 0) {
+            toast.error('Please drop image files only');
+            return;
+        }
+        await startUpload(files, { schoolId: user?.schoolId });
+    };
 
     const { data, isLoading, refetch, isFetching } = useQuery({
         queryKey: ["media-library", user?.schoolId, search, page],
@@ -301,25 +350,40 @@ export default function MediaLibraryPage() {
                             </CardHeader>
                             <CardContent>
                                 {user?.schoolId && user?.id ? (
-                                    <UploadDropzone
-                                        input={{
-                                            schoolId: user.schoolId,
-                                            uploadedById: user.id,
-                                        }}
-                                        endpoint="schoolImageUpload"
-                                        onClientUploadComplete={(res) => {
-                                            toast.success(`Successfully uploaded ${res.length} image(s)`);
-                                            setUploadMode(false);
-                                            refetch();
-                                        }}
-                                        onUploadError={(error) => {
-                                            toast.error(`Upload failed: ${error.message}`);
-                                        }}
-                                        appearance={{
-                                            button: "ut-ready:bg-primary ut-uploading:cursor-not-allowed bg-primary after:bg-primary",
-                                            container: "border-2 border-dashed",
-                                        }}
-                                    />
+                                    <div
+                                        onDrop={handleDrop}
+                                        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${isUploading ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'
+                                            }`}
+                                    >
+                                        {isUploading ? (
+                                            <div className="flex flex-col items-center gap-3">
+                                                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                                                <p className="text-sm font-medium">Uploading... {Math.round(progress)}%</p>
+                                                <div className="w-48 h-2 bg-muted rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-primary rounded-full transition-all"
+                                                        style={{ width: `${progress}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <label className="cursor-pointer flex flex-col items-center gap-3">
+                                                <Upload className="h-10 w-10 text-muted-foreground" />
+                                                <div>
+                                                    <p className="text-sm font-medium">Click to upload or drag and drop</p>
+                                                    <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WEBP up to 5MB each</p>
+                                                </div>
+                                                <input
+                                                    type="file"
+                                                    multiple
+                                                    accept="image/*"
+                                                    onChange={handleFileSelect}
+                                                    className="hidden"
+                                                />
+                                            </label>
+                                        )}
+                                    </div>
                                 ) : (
                                     <div className="text-center p-8 text-muted-foreground">
                                         Loading user information...

@@ -18,7 +18,7 @@ import { useFileUpload } from '@/lib/useFileupload'
 import { Button } from '@/components/ui/button'
 import { MediaLibraryDialog } from './media-library-dialog'
 import { useAuth } from "@/context/AuthContext"
-import { useUploadThing } from "@/lib/uploadthing"
+import { useR2Upload } from "@/hooks/useR2Upload"
 import { cn } from "@/lib/utils"
 
 export default function FileUploadButton({
@@ -31,6 +31,7 @@ export default function FileUploadButton({
     value = null,
     compact = false, // New: Compact mode for smaller spaces
     aspectRatio = "auto", // New: "square", "video", "auto"
+    subFolder = "", // Optional: sub-folder in R2 (e.g. albumId)
 }) {
     const maxSizeMB = 2
     const maxSize = maxSizeMB * 1024 * 1024
@@ -51,8 +52,9 @@ export default function FileUploadButton({
         }
     }, [value])
 
-    // Uploadthing hook for auto-upload
-    const { startUpload } = useUploadThing("schoolImageUpload", {
+    // R2 upload hook (replaces UploadThing)
+    const { startUpload } = useR2Upload({
+        folder: field || 'uploads',
         onUploadBegin: () => {
             setIsUploading(true)
             setUploadProgress(0)
@@ -61,9 +63,9 @@ export default function FileUploadButton({
         onUploadProgress: (progress) => {
             setUploadProgress(progress)
         },
-        onClientUploadComplete: (res) => {
-            if (res?.[0]?.ufsUrl) {
-                const url = res[0].ufsUrl
+        onUploadComplete: (res) => {
+            if (res?.[0]?.url) {
+                const url = res[0].url
                 setUploadedUrl(url)
                 setIsUploading(false)
                 setUploadProgress(100)
@@ -105,7 +107,7 @@ export default function FileUploadButton({
                     try {
                         await startUpload([file], {
                             schoolId: user.schoolId,
-                            uploadedById: user.id,
+                            subFolder,
                         })
                     } catch (error) {
                         console.error("Failed to start upload:", error)

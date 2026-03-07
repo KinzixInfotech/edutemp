@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import CropImageDialog from "@/app/components/CropImageDialog";
-import { uploadFiles } from "@/app/components/utils/uploadThing";
+import { uploadFilesToR2 } from "@/hooks/useR2Upload";
 import FileUploadButton from "@/components/fileupload";
 
 // ============================================
@@ -209,12 +209,8 @@ export default function CreateSuperadminPage() {
     };
 
     const retryUpload = async () => {
-        const res = await uploadFiles("profilePictureUploader", {
+        const res = await uploadFilesToR2("profiles", {
             files: [tempImage],
-            input: {
-                profileId: crypto.randomUUID(),
-                username: form.name || "User",
-            },
         });
         if (res && res[0]?.url) {
             setForm({ ...form, profilePicture: res[0].url });
@@ -255,12 +251,8 @@ export default function CreateSuperadminPage() {
                         const file = new File([croppedBlob], filename, { type: "image/jpeg" });
                         setTempImage(file);
 
-                        const res = await uploadFiles("profilePictureUploader", {
+                        const res = await uploadFilesToR2("profiles", {
                             files: [file],
-                            input: {
-                                profileId: crypto.randomUUID(),
-                                username: form.name || "User",
-                            },
                         });
 
                         if (res && res[0]?.url) {

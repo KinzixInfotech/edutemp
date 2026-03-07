@@ -8,7 +8,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { generateReceiptPdf } from "@/lib/generateReceiptPdf";
-import { utapi } from "@/app/api/lib";
+import { uploadToR2, generateFileKey } from '@/lib/r2';
 
 // Remove this line — not needed:
 // import { ourFileRouter } from "@/app/api/uploadthing/core";
@@ -199,26 +199,10 @@ export async function POST(req) {
                 amount: a.amount,
             })),
         });
-        // Create proper File object
-        const pdfFile = new File([pdfBuffer], `${payment.receiptNumber}.pdf`, {
-            type: "application/pdf",
-        });
-        // OFFICIAL SERVER-SIDE UPLOAD (2025)
-        const uploadResponse = await utapi.uploadFiles(pdfFile, {
-            metadata: {
-                paymentId: payment.id,
-                schoolId: schoolId,
-            },
-        });
-        const resultPdf = uploadResponse; // It's a single object now, not array
-        if (resultPdf.error) {
-            console.error("Upload failed:", resultPdf.error);
-            throw new Error("PDF upload failed: " + resultPdf.error.message);
-        }
-        const uploadedUrl = resultPdf.data.url;
+        // Upload PDF to R2
+        const pdfKey = generateFileKey(`${payment.receiptNumber}.pdf`, { folder: 'receipts', schoolId });
+        const uploadedUrl = await uploadToR2(pdfKey, pdfBuffer, 'application/pdf');
         console.log("PDF Uploaded Successfully:", uploadedUrl);
-
-        console.log("PDF Uploaded:", uploadedUrl);
 
         await prisma.feePayment.update({
             where: { id: payment.id },
