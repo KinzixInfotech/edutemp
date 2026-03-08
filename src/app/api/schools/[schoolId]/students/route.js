@@ -84,11 +84,14 @@ export async function GET(req, props) {
             take: limitNum
         });
 
-        const total = await prisma.student.count({
-            where: whereClause
-        });
+        const [total, activeCount] = await Promise.all([
+            prisma.student.count({ where: whereClause }),
+            prisma.student.count({
+                where: { schoolId, user: { status: "ACTIVE" } },
+            }),
+        ]);
 
-        return NextResponse.json({ students, total });
+        return NextResponse.json({ students, total, activeCount });
     } catch (err) {
         console.error(err);
         return NextResponse.json(

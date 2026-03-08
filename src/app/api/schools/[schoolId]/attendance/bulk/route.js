@@ -95,6 +95,7 @@ export async function GET(req, props) {
           section: { select: { name: true } },
           user: {
             select: {
+              profilePicture: true,
               attendance: {
                 where: {
                   date: {
@@ -146,6 +147,7 @@ export async function GET(req, props) {
           rollNumber: student.rollNumber,
           className: student.class?.className,
           sectionName: student.section?.name,
+          profilePicture: student.user?.profilePicture,
           attendance: student.user.attendance[0] || null,
           isMarked: !!student.user.attendance[0],
           attendancePercent: 0,

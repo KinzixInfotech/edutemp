@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
@@ -24,7 +24,8 @@ import {
     Users,
     IndianRupee,
     Save,
-    TrendingUp
+    TrendingUp,
+    Camera
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter, SheetClose } from '@/components/ui/sheet';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from "@/lib/utils";
+import { uploadFilesToR2 } from '@/hooks/useR2Upload';
 
 export default function StudentProfilePage() {
     const params = useParams();
@@ -50,6 +52,8 @@ export default function StudentProfilePage() {
     const [activeTab, setActiveTab] = useState('overview');
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [editForm, setEditForm] = useState({});
+    const [isUploadingImage, setIsUploadingImage] = useState(false);
+    const fileInputRef = useRef(null);
 
     // Fetch Student Data
     const { data: student, isLoading } = useQuery({
@@ -60,6 +64,7 @@ export default function StudentProfilePage() {
         },
         enabled: !!schoolId && !!studentId,
         staleTime: 1000 * 60 * 5,
+        refetchOnWindowFocus: true,
     });
 
     // Update mutation
@@ -70,13 +75,52 @@ export default function StudentProfilePage() {
         },
         onSuccess: () => {
             toast.success('Student updated successfully!');
-            queryClient.invalidateQueries(['student-profile', studentId]);
+            queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
+            queryClient.invalidateQueries({ queryKey: ['students'] });
             setIsEditOpen(false);
         },
         onError: (err) => {
             toast.error(err.response?.data?.error || 'Failed to update');
         }
     });
+
+    // Image upload handler
+    const handleImageUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            toast.error('Please select an image file');
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error('Image must be less than 5MB');
+            return;
+        }
+
+        try {
+            setIsUploadingImage(true);
+            const res = await uploadFilesToR2('profiles', {
+                files: [file],
+                input: { schoolId },
+            });
+
+            if (res?.[0]?.url) {
+                await axios.patch(`/api/students/${studentId}`, {
+                    profilePicture: res[0].url,
+                });
+                queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] });
+                queryClient.invalidateQueries({ queryKey: ['students'] });
+                toast.success('Profile picture updated!');
+            }
+        } catch (err) {
+            toast.error('Failed to upload image');
+        } finally {
+            setIsUploadingImage(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
 
     const handleEditOpen = () => {
         setEditForm({
@@ -228,12 +272,32 @@ export default function StudentProfilePage() {
             <Card>
                 <CardContent className="p-4 sm:p-6">
                     <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start">
-                        <Avatar className="h-16 w-16 sm:h-20 sm:w-20">
-                            <AvatarImage src={student.user?.profilePicture} className="object-cover" />
-                            <AvatarFallback className="text-xl font-bold bg-primary/10 text-primary">
-                                {student.name?.[0]?.toUpperCase()}
-                            </AvatarFallback>
-                        </Avatar>
+                        <div className="relative group">
+                            <Avatar className="h-16 w-16 sm:h-20 sm:w-20">
+                                <AvatarImage src={student.user?.profilePicture} className="object-cover" />
+                                <AvatarFallback className="text-xl font-bold bg-primary/10 text-primary">
+                                    {student.name?.[0]?.toUpperCase()}
+                                </AvatarFallback>
+                            </Avatar>
+                            <button
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={isUploadingImage}
+                                className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                            >
+                                {isUploadingImage ? (
+                                    <Loader2 className="h-5 w-5 text-white animate-spin" />
+                                ) : (
+                                    <Camera className="h-5 w-5 text-white" />
+                                )}
+                            </button>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleImageUpload}
+                            />
+                        </div>
                         <div className="flex-1 space-y-2">
                             <div className="flex flex-wrap items-center gap-2">
                                 <h2 className="text-xl font-bold">{student.name}</h2>

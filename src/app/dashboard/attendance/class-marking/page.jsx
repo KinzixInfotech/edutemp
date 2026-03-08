@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
 
@@ -142,6 +143,33 @@ export default function ClassAttendanceMarking() {
         s.rollNumber?.includes(searchQuery)
     );
 
+    // Derived stats for summary cards
+    const statsSummary = {
+        total: filteredStudents.length,
+        present: filteredStudents.filter(s => attendanceData[s.userId] === 'PRESENT').length,
+        absent: filteredStudents.filter(s => attendanceData[s.userId] === 'ABSENT').length,
+        pending: filteredStudents.filter(s => !attendanceData[s.userId]).length
+    };
+
+    // Grouping logic for section grouping
+    const groupedStudents = sectionId === 'all'
+        ? filteredStudents.reduce((acc, s) => {
+            const section = s.sectionName || 'No Section';
+            if (!acc[section]) acc[section] = [];
+            acc[section].push(s);
+            return acc;
+        }, {})
+        : { [studentsData?.students?.find(s => s.sectionId?.toString() === sectionId)?.sectionName || 'Selected Section']: filteredStudents };
+
+    const handleMarkSectionPresent = (sectionStudents) => {
+        const newData = { ...attendanceData };
+        sectionStudents.forEach(s => {
+            newData[s.userId] = 'PRESENT';
+        });
+        setAttendanceData(newData);
+        toast.success(`Marked all ${sectionStudents.length} students in section as Present`);
+    };
+
     const handleStatusToggle = (userId) => {
         const statuses = ['PRESENT', 'ABSENT', 'LATE', 'ON_LEAVE'];
         const current = attendanceData[userId] || '';
@@ -213,7 +241,7 @@ export default function ClassAttendanceMarking() {
                         Mark Class Attendance
                     </h1>
                     <p className="text-sm text-muted-foreground mt-1">
-                        Bulk attendance marking for class/section
+                        Select class and date to manage attendance for all students
                     </p>
                 </div>
             </div>
@@ -289,76 +317,135 @@ export default function ClassAttendanceMarking() {
                 </CardContent>
             </Card>
 
-            {/* Actions Bar */}
+            {/* Summary & Actions Bar */}
             {students.length > 0 && (
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex flex-col sm:flex-row gap-4">
-                            <div className="flex-1">
-                                <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                    <Input
-                                        placeholder="Search by name, admission no, roll no..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="pl-10"
-                                    />
+                <div className="space-y-4">
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <Card className="bg-blue-50/50 border-blue-100">
+                            <CardContent className="p-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-xs font-medium text-blue-600 uppercase tracking-wider">Total</p>
+                                        <p className="text-2xl font-bold">{statsSummary.total}</p>
+                                    </div>
+                                    <Users className="w-8 h-8 text-blue-200" />
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card className="bg-green-50/50 border-green-100">
+                            <CardContent className="p-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-xs font-medium text-green-600 uppercase tracking-wider">Present</p>
+                                        <p className="text-2xl font-bold text-green-600">{statsSummary.present}</p>
+                                    </div>
+                                    <CheckCircle className="w-8 h-8 text-green-200" />
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card className="bg-red-50/50 border-red-100">
+                            <CardContent className="p-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-xs font-medium text-red-600 uppercase tracking-wider">Absent</p>
+                                        <p className="text-2xl font-bold text-red-600">{statsSummary.absent}</p>
+                                    </div>
+                                    <XCircle className="w-8 h-8 text-red-200" />
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card className="bg-amber-50/50 border-amber-100">
+                            <CardContent className="p-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-xs font-medium text-amber-600 uppercase tracking-wider">Pending</p>
+                                        <p className="text-2xl font-bold text-amber-600">{statsSummary.pending}</p>
+                                    </div>
+                                    <Clock className="w-8 h-8 text-amber-200" />
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex flex-col sm:flex-row gap-4">
+                                <div className="flex-1">
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                        <Input
+                                            placeholder="Search by name, admission no, roll no..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="pl-10"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex gap-2 flex-wrap">
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => handleMarkAll('PRESENT')}
+                                        size="sm"
+                                        className="hover:bg-green-50 hover:text-green-600 hover:border-green-200"
+                                    >
+                                        <CheckCircle className="w-4 h-4 mr-2" />
+                                        All Present
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => handleMarkAll('ABSENT')}
+                                        size="sm"
+                                        className="hover:bg-red-50 hover:text-red-600 hover:border-red-200"
+                                    >
+                                        <XCircle className="w-4 h-4 mr-2" />
+                                        All Absent
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        onClick={handleClear}
+                                        size="sm"
+                                    >
+                                        <Undo className="w-4 h-4 mr-2" />
+                                        Clear
+                                    </Button>
                                 </div>
                             </div>
-                            <div className="flex gap-2 flex-wrap">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => handleMarkAll('PRESENT')}
-                                    size="sm"
-                                >
-                                    <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
-                                    All Present
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    onClick={() => handleMarkAll('ABSENT')}
-                                    size="sm"
-                                >
-                                    <XCircle className="w-4 h-4 mr-2 text-red-600" />
-                                    All Absent
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    onClick={handleClear}
-                                    size="sm"
-                                >
-                                    <Undo className="w-4 h-4 mr-2" />
-                                    Clear
-                                </Button>
-                            </div>
-                        </div>
 
-                        <div className="mt-4 flex items-center justify-between flex-wrap gap-4">
-                            <div className="text-sm text-muted-foreground">
-                                Marked: <span className="font-bold text-foreground text-lg">{markedCount}/{totalCount}</span>
-                                {isComplete && <Badge variant="success" className="ml-2">✓ Complete</Badge>}
+                            <div className="mt-6 flex items-center justify-between flex-wrap gap-4 border-t pt-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex -space-x-2">
+                                        {[...Array(Math.min(3, statsSummary.present))].map((_, i) => (
+                                            <div key={i} className="w-6 h-6 rounded-full border-2 border-background bg-green-500" />
+                                        ))}
+                                    </div>
+                                    <div className="text-sm text-muted-foreground">
+                                        Marked: <span className="font-bold text-foreground text-lg">{markedCount}/{totalCount}</span>
+                                        {isComplete && <Badge variant="success" className="ml-2">✓ Complete</Badge>}
+                                    </div>
+                                </div>
+                                <Button
+                                    onClick={() => submitMutation.mutate()}
+                                    disabled={markedCount === 0 || submitMutation.isPending}
+                                    className="bg-green-600 hover:bg-green-700 shadow-md ring-offset-2 focus:ring-2 ring-green-500 transition-all px-8"
+                                    size="lg"
+                                >
+                                    {submitMutation.isPending ? (
+                                        <>
+                                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                            Submitting Data...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Save className="w-4 h-4 mr-2" />
+                                            Submit Attendance
+                                        </>
+                                    )}
+                                </Button>
                             </div>
-                            <Button
-                                onClick={() => submitMutation.mutate()}
-                                disabled={markedCount === 0 || submitMutation.isPending}
-                                className="bg-green-600 hover:bg-green-700"
-                                size="lg"
-                            >
-                                {submitMutation.isPending ? (
-                                    <>
-                                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                                        Submitting...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Save className="w-4 h-4 mr-2" />
-                                        Submit Attendance ({markedCount})
-                                    </>
-                                )}
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
+                        </CardContent>
+                    </Card>
+                </div>
             )}
 
             {/* Students Grid */}
@@ -391,66 +478,103 @@ export default function ClassAttendanceMarking() {
                     </CardContent>
                 </Card>
             ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                    {filteredStudents.map((student) => {
-                        const status = attendanceData[student.userId] || '';
-                        const hasRemarks = remarksData[student.userId];
-                        const isAlreadyMarked = student.isMarked && !status;
+                <div className="space-y-8">
+                    {Object.entries(groupedStudents).map(([section, sectionStudents]) => (
+                        <div key={section} className="space-y-4">
+                            <div className="flex items-center justify-between border-b pb-2">
+                                <h3 className="text-lg font-semibold flex items-center gap-2">
+                                    <Users className="w-5 h-5 text-primary" />
+                                    Section {section}
+                                    <Badge variant="secondary" className="ml-2 px-2 py-0 h-5">
+                                        {sectionStudents.length} Students
+                                    </Badge>
+                                </h3>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-primary hover:text-primary hover:bg-primary/5"
+                                    onClick={() => handleMarkSectionPresent(sectionStudents)}
+                                >
+                                    <CheckCircle className="w-4 h-4 mr-1" />
+                                    All Present
+                                </Button>
+                            </div>
 
-                        return (
-                            <Card
-                                key={student.userId}
-                                className={`cursor-pointer transition-all hover:shadow-lg ${status ? 'ring-2 ring-offset-2' : ''
-                                    } ${status === 'PRESENT' ? 'ring-green-500' :
-                                        status === 'ABSENT' ? 'ring-red-500' :
-                                            status === 'LATE' ? 'ring-yellow-500' :
-                                                status === 'ON_LEAVE' ? 'ring-blue-500' : ''
-                                    }`}
-                                onClick={() => handleStatusToggle(student.userId)}
-                            >
-                                <CardContent className="pt-6 text-center">
-                                    {/* Photo */}
-                                    <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-md">
-                                        {student.name.charAt(0).toUpperCase()}
-                                    </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                                {sectionStudents.map((student) => {
+                                    const status = attendanceData[student.userId] || '';
+                                    const hasRemarks = remarksData[student.userId];
+                                    const isAlreadyMarked = student.isMarked && !status;
 
-                                    {/* Name */}
-                                    <h4 className="font-semibold text-sm mb-1 line-clamp-2 min-h-[2.5rem]">
-                                        {student.name}
-                                    </h4>
+                                    return (
+                                        <Card
+                                            key={student.userId}
+                                            className={`group relative overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${status ? 'ring-2 ring-offset-2' : 'hover:border-primary/50'
+                                                } ${status === 'PRESENT' ? 'ring-green-500 bg-green-50/10' :
+                                                    status === 'ABSENT' ? 'ring-red-500 bg-red-50/10' :
+                                                        status === 'LATE' ? 'ring-yellow-500 bg-yellow-50/10' :
+                                                            status === 'ON_LEAVE' ? 'ring-blue-500 bg-blue-50/10' : ''
+                                                }`}
+                                            onClick={() => handleStatusToggle(student.userId)}
+                                        >
+                                            <CardContent className="p-4 text-center">
+                                                {/* Profile Picture */}
+                                                <div className="relative w-16 h-16 mx-auto mb-3">
+                                                    <Avatar className="w-16 h-16 border-2 border-background shadow-md group-hover:scale-110 transition-transform duration-300">
+                                                        <AvatarImage src={student.profilePicture} />
+                                                        <AvatarFallback className="bg-gradient-to-br from-blue-400 to-indigo-600 text-white text-xl font-bold">
+                                                            {student.name.charAt(0)}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    {status && (
+                                                        <div className={`absolute -right-1 -bottom-1 p-1 rounded-full border-2 border-background ${getStatusColor(status)}`}>
+                                                            {getStatusIcon(status)}
+                                                        </div>
+                                                    )}
+                                                </div>
 
-                                    {/* Roll No */}
-                                    <p className="text-xs text-muted-foreground mb-2">
-                                        Roll: {student.rollNumber || 'N/A'}
-                                    </p>
+                                                {/* Name & ID */}
+                                                <div className="space-y-1">
+                                                    <h4 className="font-bold text-sm line-clamp-1 group-hover:text-primary transition-colors">
+                                                        {student.name}
+                                                    </h4>
+                                                    <div className="flex items-center justify-center gap-1.5">
+                                                        <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-medium">#{student.rollNumber || '00'}</span>
+                                                        <span className="text-[10px] text-muted-foreground font-mono">{student.admissionNo}</span>
+                                                    </div>
+                                                </div>
 
-                                    {/* Status Badge */}
-                                    {status && (
-                                        <div className={`mt-3 py-2 px-3 rounded-lg flex items-center justify-center gap-2 ${getStatusColor(status)}`}>
-                                            {getStatusIcon(status)}
-                                            <span className="text-xs font-medium">
-                                                {status.replace('_', ' ')}
-                                            </span>
-                                        </div>
-                                    )}
+                                                {/* Status Label */}
+                                                {status ? (
+                                                    <div className={`mt-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${status === 'PRESENT' ? 'text-green-700 bg-green-100' :
+                                                        status === 'ABSENT' ? 'text-red-700 bg-red-100' :
+                                                            status === 'LATE' ? 'text-yellow-700 bg-yellow-100' :
+                                                                status === 'ON_LEAVE' ? 'text-blue-700 bg-blue-100' : ''
+                                                        }`}>
+                                                        {status.replace('_', ' ')}
+                                                    </div>
+                                                ) : isAlreadyMarked ? (
+                                                    <Badge variant="outline" className="mt-3 text-[9px] font-normal border-green-200 text-green-600 bg-green-50/50">
+                                                        ✓ Marked
+                                                    </Badge>
+                                                ) : (
+                                                    <div className="mt-3 text-[10px] text-muted-foreground font-medium group-hover:text-primary opacity-0 group-hover:opacity-100 transition-all">
+                                                        Tap to Mark
+                                                    </div>
+                                                )}
 
-                                    {/* Already Marked Indicator */}
-                                    {isAlreadyMarked && (
-                                        <Badge variant="outline" className="mt-2 text-xs">
-                                            ✓ Already Marked
-                                        </Badge>
-                                    )}
-
-                                    {/* Remarks Indicator */}
-                                    {hasRemarks && (
-                                        <Badge variant="secondary" className="mt-2 text-xs">
-                                            📝 Note
-                                        </Badge>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        );
-                    })}
+                                                {hasRemarks && (
+                                                    <div className="absolute top-2 right-2 text-primary">
+                                                        <AlertCircle className="w-3 h-3" />
+                                                    </div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ))}
                 </div>
             )}
 

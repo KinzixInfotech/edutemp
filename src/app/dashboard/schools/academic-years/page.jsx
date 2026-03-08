@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Loader2, Plus, Trash2, CheckCircle, Power, Archive, Edit2, Layers } from "lucide-react"
+import { Loader2, Plus, Trash2, CheckCircle, Power, Archive, Edit2, Layers, GraduationCap, Users } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/context/AuthContext"
 import LoaderPage from "@/components/loader-page"
@@ -300,6 +300,8 @@ export default function AcademicYearsPage() {
     const activeYear = years.find(y => y.isActive);
     const totalYears = years.length;
     const archivedYears = years.filter(y => !y.isActive).length;
+    const activeTeachers = activeYear?._count?.TeachingStaff ?? 0;
+    const activeStudents = activeYear?._count?.students ?? 0;
 
     return (
         <div className="p-6 space-y-6">
@@ -318,7 +320,7 @@ export default function AcademicYearsPage() {
                 </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Sessions</CardTitle>
@@ -347,6 +349,26 @@ export default function AcademicYearsPage() {
                     <CardContent>
                         <div className="text-2xl font-bold">{archivedYears}</div>
                         <p className="text-xs text-muted-foreground">Past or inactive sessions</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Teachers</CardTitle>
+                        <Users className="h-4 w-4 text-blue-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{activeTeachers}</div>
+                        <p className="text-xs text-muted-foreground">In active session</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Students</CardTitle>
+                        <GraduationCap className="h-4 w-4 text-purple-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{activeStudents}</div>
+                        <p className="text-xs text-muted-foreground">In active session</p>
                     </CardContent>
                 </Card>
             </div>
@@ -489,6 +511,8 @@ export default function AcademicYearsPage() {
                                     <TableHead>Name</TableHead>
                                     <TableHead>Start Date</TableHead>
                                     <TableHead>End Date</TableHead>
+                                    <TableHead className="text-center">Teachers</TableHead>
+                                    <TableHead className="text-center">Students</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead ></TableHead>
                                 </TableRow>
@@ -496,7 +520,7 @@ export default function AcademicYearsPage() {
                             <TableBody>
                                 {loading ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="text-center py-10">
+                                        <TableCell colSpan={9} className="text-center py-10">
                                             <Loader2 className="animate-spin w-6 h-6 mx-auto text-muted-foreground" />
                                             <p className="text-sm mt-2 text-muted-foreground">Loading...</p>
                                         </TableCell>
@@ -526,6 +550,16 @@ export default function AcademicYearsPage() {
                                             </TableCell>
                                             <TableCell>
                                                 {new Date(year.endDate).toLocaleDateString("en-GB")}
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border-blue-200 dark:border-blue-800">
+                                                    {year._count?.TeachingStaff ?? 0}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                <Badge variant="outline" className="bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300 border-purple-200 dark:border-purple-800">
+                                                    {year._count?.students ?? 0}
+                                                </Badge>
                                             </TableCell>
                                             <TableCell>
                                                 {year.isActive ? (
@@ -575,7 +609,7 @@ export default function AcademicYearsPage() {
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                                        <TableCell colSpan={9} className="text-center py-6 text-muted-foreground">
                                             No academic year found. Please create one.
                                         </TableCell>
                                     </TableRow>

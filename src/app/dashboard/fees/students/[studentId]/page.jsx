@@ -802,6 +802,7 @@ export default function StudentFeeDetails({ params }) {
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="full_year">Full Year</SelectItem>
+                                    <SelectItem value="last_month">Last Month</SelectItem>
                                     <SelectItem value="till_date">Till Current Date</SelectItem>
                                     <SelectItem value="custom">Custom Range</SelectItem>
                                 </SelectContent>
@@ -832,6 +833,7 @@ export default function StudentFeeDetails({ params }) {
                         {/* Period description */}
                         <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
                             {statementPeriod === 'full_year' && 'Generates a statement with all installments for the full academic year.'}
+                            {statementPeriod === 'last_month' && `Generates a statement for installments due in the last 30 days (up to ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}).`}
                             {statementPeriod === 'till_date' && `Generates a statement with installments due up to today (${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}).`}
                             {statementPeriod === 'custom' && (customDateFrom && customDateTo
                                 ? `Generates a statement for installments due between ${new Date(customDateFrom).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} and ${new Date(customDateTo).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}.`

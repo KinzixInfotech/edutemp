@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -176,10 +177,10 @@ export default function LeaveManagement() {
 
     const getStatusBadge = (status) => {
         switch (status) {
-            case 'APPROVED': return <Badge className="bg-green-100 text-green-700">Approved</Badge>;
-            case 'REJECTED': return <Badge className="bg-red-100 text-red-700">Rejected</Badge>;
-            case 'CANCELLED': return <Badge className="bg-gray-100 text-gray-700">Cancelled</Badge>;
-            default: return <Badge className="bg-yellow-100 text-yellow-700">Pending</Badge>;
+            case 'APPROVED': return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">Approved</Badge>;
+            case 'REJECTED': return <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200">Rejected</Badge>;
+            case 'CANCELLED': return <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200">Cancelled</Badge>;
+            default: return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">Pending</Badge>;
         }
     };
 
@@ -436,97 +437,145 @@ export default function LeaveManagement() {
                                 </div>
                             ) : (
                                 <>
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                {statusFilter === 'PENDING' && canApprove && (
-                                                    <TableHead className="w-12">
-                                                        <Checkbox
-                                                            checked={selectedLeaves.length === paginatedLeaves.length && paginatedLeaves.length > 0}
-                                                            onCheckedChange={toggleSelectAll}
-                                                        />
-                                                    </TableHead>
-                                                )}
-                                                <TableHead>Employee</TableHead>
-                                                <TableHead>Leave Type</TableHead>
-                                                <TableHead>Duration</TableHead>
-                                                <TableHead>Dates</TableHead>
-                                                <TableHead>Reason</TableHead>
-                                                <TableHead>Status</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {paginatedLeaves.map((leave) => (
-                                                <TableRow key={leave.id} className={selectedLeaves.includes(leave.id) ? 'bg-blue-50 dark:bg-blue-950/20' : ''}>
+                                    <div className="border rounded-xl overflow-hidden bg-white dark:bg-card ">
+                                        <Table>
+                                            <TableHeader className="bg-muted/50">
+                                                <TableRow>
                                                     {statusFilter === 'PENDING' && canApprove && (
-                                                        <TableCell>
+                                                        <TableHead className="w-12 px-4">
                                                             <Checkbox
-                                                                checked={selectedLeaves.includes(leave.id)}
-                                                                onCheckedChange={() => toggleSelection(leave.id)}
+                                                                checked={selectedLeaves.length === paginatedLeaves.length && paginatedLeaves.length > 0}
+                                                                onCheckedChange={toggleSelectAll}
                                                             />
-                                                        </TableCell>
+                                                        </TableHead>
                                                     )}
-                                                    <TableCell>
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium text-sm">
-                                                                {leave.user?.name?.charAt(0) || '?'}
-                                                            </div>
-                                                            <div>
-                                                                <p className="font-medium">{leave.user?.name}</p>
-                                                                <p className="text-xs text-muted-foreground">
-                                                                    {leave.user?.teacher?.designation || leave.user?.role?.name}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge className={`${getLeaveTypeColor(leave.leaveType)} text-white`}>
-                                                            {leave.leaveType}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <span className="font-medium">{leave.totalDays}</span>
-                                                        <span className="text-muted-foreground"> day(s)</span>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <p className="text-sm">{formatDate(leave.startDate)}</p>
-                                                        <p className="text-xs text-muted-foreground">to {formatDate(leave.endDate)}</p>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <p className="text-sm line-clamp-2 max-w-[200px]">{leave.reason}</p>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {getStatusBadge(leave.status)}
-                                                    </TableCell>
+                                                    <TableHead className="px-4 font-semibold text-foreground">Employee</TableHead>
+                                                    <TableHead className="font-semibold text-foreground">Leave Type</TableHead>
+                                                    <TableHead className="font-semibold text-foreground text-center">Duration</TableHead>
+                                                    <TableHead className="font-semibold text-foreground">Dates</TableHead>
+                                                    <TableHead className="font-semibold text-foreground">Reason</TableHead>
+                                                    <TableHead className="px-4 font-semibold text-foreground">Status</TableHead>
                                                 </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {paginatedLeaves.map((leave) => (
+                                                    <TableRow key={leave.id} className={`${selectedLeaves.includes(leave.id) ? 'bg-primary/5' : 'hover:bg-muted/30'} transition-colors border-b border-border/50 last:border-0`}>
+                                                        {statusFilter === 'PENDING' && canApprove && (
+                                                            <TableCell className="px-4">
+                                                                <Checkbox
+                                                                    checked={selectedLeaves.includes(leave.id)}
+                                                                    onCheckedChange={() => toggleSelection(leave.id)}
+                                                                />
+                                                            </TableCell>
+                                                        )}
+                                                        <TableCell className="px-4">
+                                                            <div className="flex items-center gap-3">
+                                                                <Avatar className="h-9 w-9 border border-border/50">
+                                                                    <AvatarImage src={leave.user?.profilePicture} alt={leave.user?.name} />
+                                                                    <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary font-bold text-xs uppercase">
+                                                                        {leave.user?.name?.charAt(0) || '?'}
+                                                                    </AvatarFallback>
+                                                                </Avatar>
+                                                                <div className="flex flex-col">
+                                                                    <p className="font-semibold text-sm leading-none text-foreground">{leave.user?.name}</p>
+                                                                    <p className="text-[11px] text-muted-foreground mt-1.5 font-medium flex items-center gap-1.5">
+                                                                        <div className="w-1.5 h-1.5 rounded-full bg-primary/40" />
+                                                                        {leave.user?.teacher?.designation || leave.user?.role?.name}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge variant="outline" className={`${getLeaveTypeColor(leave.leaveType)} bg-opacity-10 border-transparent font-semibold text-[10px] tracking-wide uppercase px-2 py-0.5`}>
+                                                                {leave.leaveType}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-center">
+                                                            <div className="inline-flex flex-col items-center justify-center bg-muted/30 rounded-lg p-1 min-w-[48px]">
+                                                                <span className="font-bold text-sm text-foreground">{leave.totalDays}</span>
+                                                                <span className="text-[9px] uppercase text-muted-foreground font-bold tracking-tighter">days</span>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="flex flex-col gap-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <Calendar className="w-3 h-3 text-muted-foreground" />
+                                                                    <span className="text-xs font-semibold text-foreground whitespace-nowrap">{formatDate(leave.startDate)}</span>
+                                                                </div>
+                                                                <div className="flex items-center gap-2 opacity-60">
+                                                                    <ChevronRight className="w-3 h-3 text-muted-foreground" />
+                                                                    <span className="text-[10px] font-medium text-muted-foreground whitespace-nowrap">to {formatDate(leave.endDate)}</span>
+                                                                </div>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <p className="text-xs text-muted-foreground line-clamp-2 max-w-[200px] leading-relaxed italic">
+                                                                "{leave.reason}"
+                                                            </p>
+                                                        </TableCell>
+                                                        <TableCell className="px-4">
+                                                            {getStatusBadge(leave.status)}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
 
-                                    {/* Pagination */}
+                                    {/* Pagination Footer */}
                                     {totalPages > 1 && (
-                                        <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                                            <p className="text-sm text-muted-foreground">
-                                                Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredLeaves.length)} of {filteredLeaves.length}
-                                            </p>
-                                            <div className="flex gap-2">
+                                        <div className="flex items-center justify-between px-2 py-6 mt-4 border-t border-border/40">
+                                            <div className="text-sm text-muted-foreground font-medium">
+                                                Showing <span className="text-foreground font-semibold">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to <span className="text-foreground font-semibold">{Math.min(currentPage * ITEMS_PER_PAGE, filteredLeaves.length)}</span> of <span className="text-foreground font-semibold">{filteredLeaves.length}</span> requests
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
+                                                    className="h-8 px-3 text-xs font-semibold"
                                                     onClick={() => setCurrentPage(p => p - 1)}
                                                     disabled={currentPage === 1}
                                                 >
-                                                    <ChevronLeft className="h-4 w-4" />
-                                                    Previous
+                                                    <ChevronLeft className="h-3.5 w-3.5 mr-1" />
+                                                    Prev
                                                 </Button>
+
+                                                <div className="flex items-center gap-1">
+                                                    {/* Simplified pagination for many pages */}
+                                                    {totalPages <= 5 ? (
+                                                        Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                                                            <Button
+                                                                key={page}
+                                                                variant={currentPage === page ? "default" : "ghost"}
+                                                                size="icon"
+                                                                className="h-8 w-8 text-xs font-bold"
+                                                                onClick={() => setCurrentPage(page)}
+                                                            >
+                                                                {page}
+                                                            </Button>
+                                                        ))
+                                                    ) : (
+                                                        <>
+                                                            <Button variant={currentPage === 1 ? "default" : "ghost"} size="icon" className="h-8 w-8 text-xs font-bold" onClick={() => setCurrentPage(1)}>1</Button>
+                                                            {currentPage > 3 && <span className="text-muted-foreground px-1 self-end pb-1">...</span>}
+                                                            {currentPage > 2 && currentPage < totalPages && (
+                                                                <Button variant="default" size="icon" className="h-8 w-8 text-xs font-bold">{currentPage}</Button>
+                                                            )}
+                                                            {currentPage < totalPages - 2 && <span className="text-muted-foreground px-1 self-end pb-1">...</span>}
+                                                            <Button variant={currentPage === totalPages ? "default" : "ghost"} size="icon" className="h-8 w-8 text-xs font-bold" onClick={() => setCurrentPage(totalPages)}>{totalPages}</Button>
+                                                        </>
+                                                    )}
+                                                </div>
+
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
+                                                    className="h-8 px-3 text-xs font-semibold"
                                                     onClick={() => setCurrentPage(p => p + 1)}
                                                     disabled={currentPage === totalPages}
                                                 >
                                                     Next
-                                                    <ChevronRight className="h-4 w-4" />
+                                                    <ChevronRight className="h-3.5 w-3.5 ml-1" />
                                                 </Button>
                                             </div>
                                         </div>

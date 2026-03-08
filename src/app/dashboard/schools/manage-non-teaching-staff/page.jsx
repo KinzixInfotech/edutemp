@@ -78,8 +78,9 @@ export default function NonTeachingStaffPage() {
             return res.data;
         },
         enabled: !!schoolId,
-        keepPreviousData: true,
-        staleTime: 30 * 1000,
+        placeholderData: (prev) => prev,
+        staleTime: 15 * 1000,
+        refetchOnWindowFocus: true,
     });
 
     const staff = staffData.staff || [];
@@ -98,10 +99,12 @@ export default function NonTeachingStaffPage() {
         },
         enabled: !!schoolId,
         staleTime: 60 * 1000,
+        refetchOnWindowFocus: true,
     });
 
-    const activeCount = staff.filter(s => s.user?.status === 'ACTIVE').length;
-    const uniqueDesignations = [...new Set(staff.map(s => s.designation).filter(Boolean))].length;
+    // Stats from API response (use totals when available, fall back to current page)
+    const activeCount = staffData.activeCount ?? staff.filter(s => s.user?.status === 'ACTIVE').length;
+    const uniqueDesignations = staffData.uniqueDesignations ?? [...new Set(staff.map(s => s.designation).filter(Boolean))].length;
 
     // Delete mutation
     const deleteMutation = useMutation({
@@ -112,8 +115,8 @@ export default function NonTeachingStaffPage() {
             return res.data;
         },
         onSuccess: (data) => {
-            queryClient.invalidateQueries(['non-teaching-staff', schoolId]);
-            queryClient.invalidateQueries(['non-teaching-staff-designations', schoolId]);
+            queryClient.invalidateQueries({ queryKey: ['non-teaching-staff', schoolId] });
+            queryClient.invalidateQueries({ queryKey: ['non-teaching-staff-designations', schoolId] });
             toast.success(data.message || 'Staff members deleted successfully');
             setSelected([]);
             setDeleteDialog({ open: false, ids: [] });
@@ -134,7 +137,7 @@ export default function NonTeachingStaffPage() {
             return res.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['non-teaching-staff', schoolId]);
+            queryClient.invalidateQueries({ queryKey: ['non-teaching-staff', schoolId] });
             toast.success('Staff members inactivated successfully');
             setSelected([]);
         },
@@ -391,7 +394,7 @@ export default function NonTeachingStaffPage() {
                                 variant="outline"
                                 size="sm"
                                 className="bg-muted"
-                                onClick={() => queryClient.invalidateQueries(['non-teaching-staff', schoolId])}
+                                onClick={() => queryClient.invalidateQueries({ queryKey: ['non-teaching-staff', schoolId] })}
                                 disabled={isFetching}
                             >
                                 <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />

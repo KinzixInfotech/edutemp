@@ -567,7 +567,34 @@ export default function PaymentTracking() {
                         <RefreshCw className="w-4 h-4 mr-2" />
                         Refresh
                     </Button>
-                    <Button>
+                    <Button
+                        onClick={() => {
+                            if (!processedStudents?.length) {
+                                toast.error('No data to export');
+                                return;
+                            }
+                            const headers = ['Student Name', 'Admission No', 'Class', 'Section', 'Total Fee', 'Paid', 'Balance', 'Status'];
+                            const rows = processedStudents.map(s => [
+                                s.name,
+                                s.admissionNo,
+                                s.class?.className || '-',
+                                s.section?.name || '-',
+                                s.fee?.finalAmount || 0,
+                                s.fee?.paidAmount || 0,
+                                s.fee?.balanceAmount || 0,
+                                s.fee?.status || 'NO_FEE',
+                            ]);
+                            const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+                            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `fee-payments-${new Date().toISOString().split('T')[0]}.csv`;
+                            a.click();
+                            URL.revokeObjectURL(url);
+                            toast.success('CSV exported successfully');
+                        }}
+                    >
                         <Download className="w-4 h-4 mr-2" />
                         Export
                     </Button>

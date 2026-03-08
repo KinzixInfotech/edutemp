@@ -6492,7 +6492,7 @@ model BiometricAttendanceEvent {
   @@index([resolvedUserId])
 }
 
-// ─── App Version & Config Management ───
+// ─── App Version & Config Management ─── 
 model AppConfig {
   id String @id @default(uuid()) @db.Uuid
 

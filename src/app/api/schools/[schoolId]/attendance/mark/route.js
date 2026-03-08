@@ -164,19 +164,8 @@ export async function POST(req, props) {
                     };
                 }
 
-                if (now > checkInDeadline) {
-                    return {
-                        success: false,
-                        json: {
-                            success: false,
-                            message: `Check-in window closed at ${checkInDeadline.toLocaleTimeString('en-US', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                            })}`,
-                            closedAt: checkInDeadline.toISOString(),
-                        }
-                    };
-                }
+                // NOTE: No hard block for late check-in. Teachers can check in anytime
+                // after school start. They will be marked as LATE if past grace period.
 
                 // Calculate if late using grace period from config
                 const gracePeriod = new Date(schoolStart);

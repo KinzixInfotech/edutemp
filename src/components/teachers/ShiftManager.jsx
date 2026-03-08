@@ -27,7 +27,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Loader2, Lock, AlertTriangle, RefreshCw, Info, UserCheck } from "lucide-react";
+import { Loader2, Lock, AlertTriangle, RefreshCw, Info, UserCheck, Clock, Users, CalendarDays, LayoutGrid } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 export default function ShiftManager() {
@@ -212,6 +212,50 @@ export default function ShiftManager() {
         </div>
     ) : (
         <div className="space-y-6">
+            {/* Stats Cards */}
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Today's Periods</CardTitle>
+                        <LayoutGrid className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{dailySchedule.length}</div>
+                        <p className="text-xs text-muted-foreground">Scheduled for {date ? format(date, "EEE") : "today"}</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Assigned</CardTitle>
+                        <UserCheck className="h-4 w-4 text-green-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{dailySchedule.filter(i => i.teacher).length}</div>
+                        <p className="text-xs text-muted-foreground">With teachers</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Substitutes</CardTitle>
+                        <CalendarDays className="h-4 w-4 text-orange-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{dailySchedule.filter(i => i.isOverride).length}</div>
+                        <p className="text-xs text-muted-foreground">Override assignments</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Unassigned</CardTitle>
+                        <Clock className="h-4 w-4 text-red-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{dailySchedule.filter(i => i.isEmpty).length}</div>
+                        <p className="text-xs text-muted-foreground">No teacher assigned</p>
+                    </CardContent>
+                </Card>
+            </div>
+
             {/* Info Banner */}
             <Alert>
                 <Info className="h-4 w-4" />
@@ -234,6 +278,27 @@ export default function ShiftManager() {
                                 selected={date}
                                 onSelect={setDate}
                                 className="rounded-md border-0 w-full"
+                                modifiers={{
+                                    hasEntries: (day) => {
+                                        const dow = getDay(day);
+                                        return dow >= 1 && dow <= 6; // Mon-Sat (weekdays with potential timetable)
+                                    },
+                                    hasOverride: (day) => {
+                                        return overrideShifts.some(s => {
+                                            const shiftDate = new Date(s.date);
+                                            return shiftDate.toDateString() === day.toDateString();
+                                        });
+                                    }
+                                }}
+                                modifiersStyles={{
+                                    hasEntries: {
+                                        fontWeight: 'bold',
+                                    },
+                                    hasOverride: {
+                                        border: '2px solid hsl(var(--primary))',
+                                        borderRadius: '50%',
+                                    }
+                                }}
                             />
                         </CardContent>
                     </Card>
@@ -269,10 +334,10 @@ export default function ShiftManager() {
                                         <div
                                             key={item.slot.id}
                                             className={`flex items-center justify-between p-4 border rounded-lg transition-colors ${item.isOverride
-                                                    ? 'border-orange-300 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/20'
-                                                    : item.isFromTimetable
-                                                        ? 'hover:bg-muted/50'
-                                                        : 'border-dashed'
+                                                ? 'border-orange-300 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/20'
+                                                : item.isFromTimetable
+                                                    ? 'hover:bg-muted/50'
+                                                    : 'border-dashed'
                                                 }`}
                                         >
                                             <div className="flex-1">

@@ -163,6 +163,11 @@ export async function GET(request) {
         let filteredRows = ledgerRows;
         if (period === 'till_date') {
             filteredRows = ledgerRows.filter(row => row.rawDueDate <= today);
+        } else if (period === 'last_month') {
+            const oneMonthAgo = new Date();
+            oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+            oneMonthAgo.setHours(0, 0, 0, 0);
+            filteredRows = ledgerRows.filter(row => row.rawDueDate >= oneMonthAgo && row.rawDueDate <= today);
         } else if (period === 'custom' && fromDate && toDate) {
             const from = new Date(fromDate);
             from.setHours(0, 0, 0, 0);
@@ -179,6 +184,12 @@ export async function GET(request) {
             .filter(inst => {
                 const d = new Date(inst.dueDate);
                 if (period === 'till_date') return d <= today;
+                if (period === 'last_month') {
+                    const oneMonthAgo = new Date();
+                    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+                    oneMonthAgo.setHours(0, 0, 0, 0);
+                    return d >= oneMonthAgo && d <= today;
+                }
                 if (period === 'custom' && fromDate && toDate) {
                     const from = new Date(fromDate);
                     from.setHours(0, 0, 0, 0);
@@ -204,7 +215,7 @@ export async function GET(request) {
             feeSummary: {
                 totalFee,
                 totalPaid,
-                totalDiscount: 0,
+                totalDiscount: studentFee.discountAmount || 0,
                 balanceDue
             },
             ledgerData: filteredRows,

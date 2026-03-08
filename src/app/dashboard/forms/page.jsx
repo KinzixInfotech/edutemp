@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
     Loader2, Plus, FileText, Trash2, Edit, Link2, ExternalLink,
     ArrowUpDown, ChevronLeft, ChevronRight, ClipboardList, CheckCircle,
@@ -39,6 +40,16 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -113,6 +124,11 @@ export default function FormListPage() {
     // Row-level loading state (set of form IDs currently updating)
     const [updatingRows, setUpdatingRows] = useState(new Set());
 
+    // Multi-select state
+    const [selectedForms, setSelectedForms] = useState(new Set());
+    const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+    const [bulkDeleting, setBulkDeleting] = useState(false);
+
     // Debounce search (300ms) then throttle (200ms) for combined effect
     const debouncedSearch = useDebounce(searchQuery, 300);
     const throttledSearch = useThrottle(debouncedSearch, 200);
@@ -175,6 +191,60 @@ export default function FormListPage() {
         } catch (error) {
             console.error("Error deleting form:", error);
             toast.error("Failed to delete form");
+        }
+    };
+
+    // Bulk delete
+    const bulkDeleteForms = async () => {
+        setBulkDeleting(true);
+        const ids = Array.from(selectedForms);
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const formId of ids) {
+            try {
+                await axios.delete(`/api/schools/${fullUser.schoolId}/forms/${formId}`);
+                successCount++;
+            } catch {
+                failCount++;
+            }
+        }
+
+        if (successCount > 0) toast.success(`${successCount} form(s) deleted successfully`);
+        if (failCount > 0) toast.error(`${failCount} form(s) failed to delete`);
+
+        setSelectedForms(new Set());
+        setBulkDeleteOpen(false);
+        setBulkDeleting(false);
+        fetchForms();
+    };
+
+    // Toggle form selection
+    const toggleFormSelect = (formId) => {
+        setSelectedForms(prev => {
+            const next = new Set(prev);
+            if (next.has(formId)) next.delete(formId);
+            else next.add(formId);
+            return next;
+        });
+    };
+
+    // Toggle all on current page
+    const toggleSelectAll = () => {
+        const pageIds = paginatedForms.map(f => f.id);
+        const allSelected = pageIds.every(id => selectedForms.has(id));
+        if (allSelected) {
+            setSelectedForms(prev => {
+                const next = new Set(prev);
+                pageIds.forEach(id => next.delete(id));
+                return next;
+            });
+        } else {
+            setSelectedForms(prev => {
+                const next = new Set(prev);
+                pageIds.forEach(id => next.add(id));
+                return next;
+            });
         }
     };
 
@@ -339,6 +409,7 @@ export default function FormListPage() {
     // Loading skeleton for a single row
     const SkeletonRow = ({ index }) => (
         <TableRow className={index % 2 === 0 ? "bg-muted dark:bg-background/50" : ""}>
+            <TableCell><Skeleton className="h-4 w-4" /></TableCell>
             <TableCell><Skeleton className="h-4 w-40" /></TableCell>
             <TableCell><Skeleton className="h-4 w-20" /></TableCell>
             <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
@@ -585,6 +656,13 @@ export default function FormListPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow className="dark:bg-background/50 bg-muted/50">
+                                    <TableHead className="w-10">
+                                        <Checkbox
+                                            checked={paginatedForms.length > 0 && paginatedForms.every(f => selectedForms.has(f.id))}
+                                            onCheckedChange={toggleSelectAll}
+                                            aria-label="Select all"
+                                        />
+                                    </TableHead>
                                     <SortableHeader column="title">Title</SortableHeader>
                                     <SortableHeader column="category">Category</SortableHeader>
                                     <SortableHeader column="status">Status</SortableHeader>
@@ -598,7 +676,7 @@ export default function FormListPage() {
                                     <TableLoadingRows />
                                 ) : paginatedForms.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="text-center py-12">
+                                        <TableCell colSpan={7} className="text-center py-12">
                                             <div className="flex flex-col items-center gap-2">
                                                 <FileText className="w-12 h-12 text-muted-foreground/50" />
                                                 <p className="text-muted-foreground">
@@ -622,7 +700,14 @@ export default function FormListPage() {
                                             // Skeleton row while this specific form's status is updating
                                             <SkeletonRow key={form.id} index={index} />
                                         ) : (
-                                            <TableRow key={form.id} className={`hover:bg-muted/30 dark:hover:bg-background/30 ${index % 2 === 0 ? "bg-muted dark:bg-background/50" : ""}`}>
+                                            <TableRow key={form.id} className={`hover:bg-muted/30 dark:hover:bg-background/30 ${selectedForms.has(form.id) ? "bg-blue-50/50 dark:bg-blue-950/20" : index % 2 === 0 ? "bg-muted dark:bg-background/50" : ""}`}>
+                                                <TableCell>
+                                                    <Checkbox
+                                                        checked={selectedForms.has(form.id)}
+                                                        onCheckedChange={() => toggleFormSelect(form.id)}
+                                                        aria-label={`Select ${form.title}`}
+                                                    />
+                                                </TableCell>
                                                 <TableCell className="font-medium">
                                                     <div className="flex flex-col">
                                                         <span>{form.title}</span>
@@ -741,6 +826,59 @@ export default function FormListPage() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* Floating bulk delete bar */}
+            {selectedForms.size > 0 && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+                    <div className="bg-background border shadow-lg rounded-lg px-4 py-3 flex items-center gap-4">
+                        <span className="text-sm font-medium">
+                            {selectedForms.size} form{selectedForms.size > 1 ? 's' : ''} selected
+                        </span>
+                        <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => setBulkDeleteOpen(true)}
+                        >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete Selected
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectedForms(new Set())}
+                        >
+                            <X className="h-4 w-4 mr-1" />
+                            Clear
+                        </Button>
+                    </div>
+                </div>
+            )}
+
+            {/* Bulk delete confirmation */}
+            <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete {selectedForms.size} Form{selectedForms.size > 1 ? 's' : ''}?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently delete the selected forms and all their submissions. This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={bulkDeleting}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-red-600 hover:bg-red-700"
+                            onClick={bulkDeleteForms}
+                            disabled={bulkDeleting}
+                        >
+                            {bulkDeleting ? (
+                                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Deleting...</>
+                            ) : (
+                                <>Delete {selectedForms.size} Form{selectedForms.size > 1 ? 's' : ''}</>
+                            )}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

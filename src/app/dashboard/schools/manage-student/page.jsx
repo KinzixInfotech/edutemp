@@ -25,7 +25,8 @@ import {
     ChevronRight,
     UserX,
     GraduationCap,
-    BookOpen
+    BookOpen,
+    Camera
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
@@ -49,6 +50,11 @@ export default function StudentListPage() {
     const [page, setPage] = useState(1);
     const itemsPerPage = 10;
 
+    // Bulk image upload dialog
+    const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
+    const [bulkClass, setBulkClass] = useState('');
+    const [bulkSection, setBulkSection] = useState('');
+
     // Fetch classes & sections
     const { data: allClasses = [] } = useQuery({
         queryKey: ['classes', schoolId],
@@ -60,6 +66,10 @@ export default function StudentListPage() {
         enabled: !!schoolId,
         staleTime: 5 * 60 * 1000,
     });
+
+    const bulkSections = bulkClass
+        ? allClasses.find(c => String(c.id) === String(bulkClass))?.sections || []
+        : [];
 
     // Derive sections dynamically based on selected class
     const allSections = classFilter === 'ALL'
@@ -80,8 +90,9 @@ export default function StudentListPage() {
             return res.data || {};
         },
         enabled: !!schoolId,
-        keepPreviousData: true,
-        staleTime: 30 * 1000,
+        placeholderData: (prev) => prev,
+        staleTime: 15 * 1000,
+        refetchOnWindowFocus: true,
     });
 
     const students = studentData.students || [];
@@ -108,7 +119,7 @@ export default function StudentListPage() {
             return res.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['students', schoolId]);
+            queryClient.invalidateQueries({ queryKey: ['students', schoolId] });
             toast.success('Students deleted successfully');
             setSelected([]);
         },
@@ -127,7 +138,7 @@ export default function StudentListPage() {
             return res.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['students', schoolId]);
+            queryClient.invalidateQueries({ queryKey: ['students', schoolId] });
             toast.success('Students inactivated successfully');
             setSelected([]);
         },
@@ -145,7 +156,7 @@ export default function StudentListPage() {
             return res.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['students', schoolId]);
+            queryClient.invalidateQueries({ queryKey: ['students', schoolId] });
             toast.success('Parent linked successfully');
             setDialogData(null);
         },
@@ -184,8 +195,8 @@ export default function StudentListPage() {
         }
     };
 
-    // Calculate stats
-    const activeCount = students.filter(s => s.user?.status === 'ACTIVE').length;
+    // Stats - use API totals when available, fallback to current page data
+    const activeCount = studentData.activeCount ?? students.filter(s => s.user?.status === 'ACTIVE').length;
     const uniqueClasses = [...new Set(students.map(s => s.class?.className).filter(Boolean))].length;
 
     if (!schoolId) {
@@ -209,12 +220,84 @@ export default function StudentListPage() {
                         Manage your students and their information
                     </p>
                 </div>
-                <Link href={`/dashboard/schools/${schoolId}/profiles/students/new`}>
-                    <Button className="w-full sm:w-auto dark:text-white" size="sm">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Student
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setBulkUploadOpen(true)}
+                    >
+                        <Camera className="mr-2 h-4 w-4" />
+                        Bulk Upload Images
                     </Button>
-                </Link>
+                    <Link href={`/dashboard/schools/${schoolId}/profiles/students/new`}>
+                        <Button className="dark:text-white" size="sm">
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add Student
+                        </Button>
+                    </Link>
+                </div>
+
+                {/* Bulk Image Upload Dialog */}
+                <Dialog open={bulkUploadOpen} onOpenChange={setBulkUploadOpen}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <Camera className="w-5 h-5" />
+                                Bulk Image Upload
+                            </DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 pt-2">
+                            <p className="text-sm text-muted-foreground">
+                                Select a class and section to upload profile pictures for all students at once.
+                            </p>
+                            <div className="space-y-3">
+                                <Select value={bulkClass} onValueChange={(val) => { setBulkClass(val); setBulkSection(''); }}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select Class" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {allClasses.map(cls => (
+                                            <SelectItem key={cls.id} value={String(cls.id)}>
+                                                {cls.className}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Select value={bulkSection} onValueChange={setBulkSection} disabled={!bulkClass}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select Section" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {bulkSections.map(sec => (
+                                            <SelectItem key={sec.id} value={String(sec.id)}>
+                                                {sec.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2">
+                                <Button variant="outline" onClick={() => setBulkUploadOpen(false)}>
+                                    Cancel
+                                </Button>
+                                <Button
+                                    disabled={!bulkClass || !bulkSection}
+                                    onClick={() => {
+                                        const cls = allClasses.find(c => String(c.id) === String(bulkClass));
+                                        const sec = bulkSections.find(s => String(s.id) === String(bulkSection));
+                                        router.push(
+                                            `/dashboard/schools/manage-student/bulk-images?classId=${bulkClass}&sectionId=${bulkSection}&className=${encodeURIComponent(cls?.className || '')}&sectionName=${encodeURIComponent(sec?.name || '')}`
+                                        );
+                                        setBulkUploadOpen(false);
+                                    }}
+                                    className="dark:text-white"
+                                >
+                                    Continue
+                                </Button>
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
             </div>
 
             {/* Stats Cards */}
@@ -331,7 +414,7 @@ export default function StudentListPage() {
                                 variant="outline"
                                 size="sm"
                                 className="bg-muted"
-                                onClick={() => queryClient.invalidateQueries(['students', schoolId])}
+                                onClick={() => queryClient.invalidateQueries({ queryKey: ['students', schoolId] })}
                                 disabled={isFetching}
                             >
                                 <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />

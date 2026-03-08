@@ -28,7 +28,7 @@ export async function GET(req, props) {
                 }),
             };
 
-            const [parents, total] = await Promise.all([
+            const [parents, total, activeCount] = await Promise.all([
                 prisma.parent.findMany({
                     where,
                     skip,
@@ -46,9 +46,11 @@ export async function GET(req, props) {
                                 student: {
                                     select: {
                                         name: true,
+                                        userId: true,
                                         admissionNo: true,
                                         class: { select: { className: true } },
                                         section: { select: { name: true } },
+                                        user: { select: { profilePicture: true } },
                                     },
                                 },
                             },
@@ -57,13 +59,15 @@ export async function GET(req, props) {
                     orderBy: { createdAt: "desc" },
                 }),
                 prisma.parent.count({ where }),
+                prisma.parent.count({
+                    where: { schoolId, user: { status: "ACTIVE" } },
+                }),
             ]);
 
-            return { parents, total };
+            return { parents, total, activeCount, page, limit, totalPages: Math.ceil(total / limit) };
         }, 300); // 5 minutes cache
 
-        // Return parents array for backward compatibility
-        return NextResponse.json(result.parents);
+        return NextResponse.json(result);
     } catch (error) {
         console.error("[PARENTS_GET]", error);
         return NextResponse.json(

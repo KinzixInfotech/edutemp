@@ -34,7 +34,9 @@ import {
     AlertCircle,
     X,
     Check,
-    ChevronsUpDown
+    ChevronsUpDown,
+    UserCheck,
+    ExternalLink
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
@@ -68,13 +70,16 @@ export default function ParentListPage() {
             return res.data || {};
         },
         enabled: !!schoolId,
-        keepPreviousData: true,
-        staleTime: 30 * 1000,
+        placeholderData: (prev) => prev,
+        staleTime: 15 * 1000,
+        refetchOnWindowFocus: true,
     });
 
-    const parents = parentData || [];
+    const parents = parentData.parents || [];
     const total = parentData.total || 0;
+    const activeCount = parentData.activeCount ?? parents.filter(p => p.user?.status === 'ACTIVE').length;
     const pageCount = Math.ceil(total / itemsPerPage);
+    const linkedCount = parents.filter(p => p.studentLinks?.length > 0).length;
 
     // Fetch students for linking (with search)
     const { data: studentsData, isLoading: studentsLoading } = useQuery({
@@ -98,7 +103,7 @@ export default function ParentListPage() {
             return res.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['parents', schoolId]);
+            queryClient.invalidateQueries({ queryKey: ['parents', schoolId] });
             toast.success('Parents deleted successfully');
             setSelected([]);
         },
@@ -117,7 +122,7 @@ export default function ParentListPage() {
             return res.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['parents', schoolId]);
+            queryClient.invalidateQueries({ queryKey: ['parents', schoolId] });
             toast.success('Parents inactivated successfully');
             setSelected([]);
         },
@@ -136,7 +141,7 @@ export default function ParentListPage() {
             return res.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['parents', schoolId]);
+            queryClient.invalidateQueries({ queryKey: ['parents', schoolId] });
             toast.success('Parents activated successfully');
             setSelected([]);
         },
@@ -156,7 +161,7 @@ export default function ParentListPage() {
             return Promise.all(promises);
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['parents', schoolId]);
+            queryClient.invalidateQueries({ queryKey: ['parents', schoolId] });
             toast.success('Students linked successfully');
             setDialogData(null);
             setSelectedStudents([]);
@@ -173,7 +178,7 @@ export default function ParentListPage() {
             return res.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['parents', schoolId]);
+            queryClient.invalidateQueries({ queryKey: ['parents', schoolId] });
             toast.success('Student unlinked successfully');
 
         },
@@ -265,6 +270,62 @@ export default function ParentListPage() {
                 </Link>
             </div>
 
+            {/* Stats Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Card>
+                    <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-primary/10">
+                                <Users className="h-4 w-4 text-primary" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-muted-foreground">Total Parents</p>
+                                <p className="text-lg font-bold">{total}</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-green-100 dark:bg-green-950">
+                                <UserCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-muted-foreground">Active</p>
+                                <p className="text-lg font-bold">{activeCount}</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950">
+                                <LinkIcon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-muted-foreground">Linked</p>
+                                <p className="text-lg font-bold">{linkedCount}</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-950">
+                                <UserX className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-muted-foreground">Inactive</p>
+                                <p className="text-lg font-bold">{total - activeCount}</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
             {/* Search Card */}
             <Card>
                 <CardContent className="pt-4 sm:pt-6">
@@ -285,7 +346,7 @@ export default function ParentListPage() {
                             variant="outline"
                             size="sm"
                             className="bg-muted"
-                            onClick={() => queryClient.invalidateQueries(['parents', schoolId])}
+                            onClick={() => queryClient.invalidateQueries({ queryKey: ['parents', schoolId] })}
                             disabled={isFetching}
                         >
                             <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
@@ -477,14 +538,21 @@ export default function ParentListPage() {
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => openDialog(parent)}
-                                            >
-                                                <Eye className="mr-1.5 h-3.5 w-3.5" />
-                                                View
-                                            </Button>
+                                            <div className="flex items-center gap-1 justify-end">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => openDialog(parent)}
+                                                >
+                                                    <Eye className="mr-1.5 h-3.5 w-3.5" />
+                                                    View
+                                                </Button>
+                                                <Link href={`/dashboard/schools/profiles/parents/${parent.userId}`}>
+                                                    <Button variant="ghost" size="sm">
+                                                        <ExternalLink className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </Link>
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))

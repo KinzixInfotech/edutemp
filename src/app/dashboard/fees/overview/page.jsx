@@ -1,7 +1,7 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
-  BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
+  BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
@@ -21,7 +21,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
-  ExternalLink
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  Percent
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,6 +34,11 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
+
+const STORAGE_KEY = 'fee-overview-chart-range';
+const CLASS_ITEMS_PER_PAGE = 5;
+const OVERDUE_ITEMS_PER_PAGE = 10;
+
 export default function AdminFeeDashboard() {
   const { fullUser } = useAuth();
   const schoolId = fullUser?.schoolId;
@@ -41,8 +49,28 @@ export default function AdminFeeDashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
-  const [feeChartRange, setFeeChartRange] = useState('all');
   const ITEMS_PER_PAGE = 10;
+
+  // Persist chart range in localStorage
+  const [feeChartRange, setFeeChartRange] = useState('all');
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved && ['3m', '6m', '1y', 'all'].includes(saved)) {
+      setFeeChartRange(saved);
+    }
+  }, []);
+  const handleChartRangeChange = (val) => {
+    setFeeChartRange(val);
+    localStorage.setItem(STORAGE_KEY, val);
+  };
+
+  // Overdue tab pagination + search
+  const [overdueSearch, setOverdueSearch] = useState('');
+  const [overdueCurrentPage, setOverdueCurrentPage] = useState(1);
+  const [expandedClasses, setExpandedClasses] = useState({});
+
+  // Class-wise stats pagination
+  const [classStatsPage, setClassStatsPage] = useState(1);
 
   // Fetch active academic year
   const { data: academicYears } = useQuery({
@@ -53,6 +81,7 @@ export default function AdminFeeDashboard() {
       return res.json();
     },
     enabled: !!schoolId,
+    staleTime: 1000 * 60 * 5,
   });
   const activeAcademicYear = academicYears?.find(y => y.isActive);
   const academicYearId = activeAcademicYear?.id;
@@ -90,14 +119,19 @@ export default function AdminFeeDashboard() {
       const res = await fetch(`/api/schools/${schoolId}/classes?limit=-1`);
       if (!res.ok) throw new Error('Failed');
       const json = await res.json();
-      // API returns plain array when limit=-1, or paginated object otherwise
       return Array.isArray(json) ? json : (json.data ?? []);
     },
     enabled: !!schoolId,
+    staleTime: 1000 * 60 * 5,
   });
 
   // Destructure BEFORE any early return to keep hooks order stable
   const { summary, statusCounts, recentPayments, overdueStudents, classWiseStats, paymentMethodStats, monthlyCollection } = dashboardData || {};
+
+  // Compute effective outstanding = totalBalance - totalDiscount
+  // But the DB `balanceAmount` already reflects discounts so totalBalance is the real outstanding.
+  // The discount card shows how much was given away.
+  // The "Fees Due" shows the real remaining amount (already net of discount).
 
   // Prepare class-wise chart data
   const classChartData = useMemo(() => {
@@ -109,6 +143,61 @@ export default function AdminFeeDashboard() {
       due: s.balance || 0,
     }));
   }, [classWiseStats]);
+
+  // Paginate class-wise stats
+  const paginatedClassStats = useMemo(() => {
+    if (!classWiseStats) return { items: [], totalPages: 0 };
+    const totalPages = Math.ceil(classWiseStats.length / CLASS_ITEMS_PER_PAGE);
+    const items = classWiseStats.slice(
+      (classStatsPage - 1) * CLASS_ITEMS_PER_PAGE,
+      classStatsPage * CLASS_ITEMS_PER_PAGE
+    );
+    return { items, totalPages, total: classWiseStats.length };
+  }, [classWiseStats, classStatsPage]);
+
+  // Group overdue students by class then section
+  const groupedOverdueStudents = useMemo(() => {
+    if (!overdueStudents) return [];
+
+    let filtered = overdueStudents;
+    if (overdueSearch) {
+      const term = overdueSearch.toLowerCase();
+      filtered = overdueStudents.filter(s =>
+        s.name?.toLowerCase().includes(term) ||
+        s.admissionNo?.toLowerCase().includes(term) ||
+        s.class?.className?.toLowerCase().includes(term)
+      );
+    }
+
+    // Group by class -> section
+    const groups = {};
+    filtered.forEach(student => {
+      const className = student.class?.className || 'Unassigned';
+      const sectionName = student.section?.name || 'No Section';
+      const key = `${className} - ${sectionName}`;
+      if (!groups[key]) {
+        groups[key] = {
+          className,
+          sectionName,
+          key,
+          students: [],
+          totalOverdue: 0,
+        };
+      }
+      groups[key].students.push(student);
+      groups[key].totalOverdue += student.balanceAmount || 0;
+    });
+
+    return Object.values(groups).sort((a, b) => a.className.localeCompare(b.className));
+  }, [overdueStudents, overdueSearch]);
+
+  // Paginate grouped overdue (page across groups)
+  const paginatedOverdueGroups = useMemo(() => {
+    // Flatten all students across groups for pagination
+    const allStudents = groupedOverdueStudents.flatMap(g => g.students);
+    const totalPages = Math.ceil(allStudents.length / OVERDUE_ITEMS_PER_PAGE);
+    return { groups: groupedOverdueStudents, totalPages, total: allStudents.length };
+  }, [groupedOverdueStudents]);
 
   // Prepare monthly collection chart data (filtered by range)
   const monthlyChartData = useMemo(() => {
@@ -170,6 +259,10 @@ export default function AdminFeeDashboard() {
         )}
       </div>
     );
+  };
+
+  const toggleClassExpand = (key) => {
+    setExpandedClasses(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   if (isLoading) {
@@ -239,7 +332,7 @@ export default function AdminFeeDashboard() {
         </CardContent>
       </Card>
 
-      {/* Stats Cards + Collection Trend Chart (like attendance dashboard) */}
+      {/* Stats Cards + Collection Trend Chart */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Left: Stats Cards in 2x4 grid */}
         <div className="lg:col-span-1 grid grid-cols-2 gap-4">
@@ -265,18 +358,20 @@ export default function AdminFeeDashboard() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Fees Due</CardTitle>
+              <CardTitle className="text-sm font-medium">Outstanding</CardTitle>
               <AlertCircle className="h-4 w-4 text-red-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-600">{formatCurrency(summary?.totalBalance)}</div>
-              <p className="text-xs text-muted-foreground">{statusCounts?.overdue || 0} overdue</p>
+              <div className="text-2xl font-bold text-red-600">
+                {formatCurrency((summary?.totalBalance || 0) - (summary?.totalDiscount || 0))}
+              </div>
+              <p className="text-xs text-muted-foreground">Net of ₹{((summary?.totalDiscount || 0) / 1000).toFixed(0)}k discount</p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Discount</CardTitle>
-              <TrendingUp className="h-4 w-4 text-purple-500" />
+              <Percent className="h-4 w-4 text-purple-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-purple-600">{formatCurrency(summary?.totalDiscount)}</div>
@@ -296,7 +391,7 @@ export default function AdminFeeDashboard() {
                 </CardDescription>
               </div>
               <div className="flex items-center gap-3">
-                <Select value={feeChartRange} onValueChange={setFeeChartRange}>
+                <Select value={feeChartRange} onValueChange={handleChartRangeChange}>
                   <SelectTrigger className="w-[150px] h-8 text-xs">
                     <SelectValue />
                   </SelectTrigger>
@@ -475,10 +570,10 @@ export default function AdminFeeDashboard() {
 
                 return (
                   <>
-                    <div className="overflow-x-auto rounded-md border">
+                    <div className="overflow-x-auto rounded-lg border">
                       <Table className="min-w-[900px]">
-                        <TableHeader className="bg-muted sticky top-0 z-10">
-                          <TableRow>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50 dark:bg-background/50">
                             <TableHead className="w-12">#</TableHead>
                             <TableHead>Receipt No</TableHead>
                             <TableHead>Student</TableHead>
@@ -494,7 +589,7 @@ export default function AdminFeeDashboard() {
                         <TableBody>
                           {paginatedPayments.length > 0 ? (
                             paginatedPayments.map((payment, idx) => (
-                              <TableRow key={payment.id} className={idx % 2 === 0 ? 'bg-background' : 'bg-muted/50'}>
+                              <TableRow key={payment.id} className={idx % 2 === 0 ? 'bg-background' : 'bg-muted/30'}>
                                 <TableCell className="text-muted-foreground">
                                   {(currentPage - 1) * ITEMS_PER_PAGE + idx + 1}
                                 </TableCell>
@@ -592,81 +687,178 @@ export default function AdminFeeDashboard() {
           </Card>
         </TabsContent>
 
+        {/* OVERDUE STUDENTS - Grouped by Class & Section */}
         <TabsContent value="overdue">
           <Card>
             <CardHeader>
-              <CardTitle>Overdue Students</CardTitle>
-              <CardDescription>{overdueStudents?.length || 0} students with pending payments</CardDescription>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <CardTitle>Overdue Students</CardTitle>
+                  <CardDescription>{paginatedOverdueGroups.total || 0} students with pending payments</CardDescription>
+                </div>
+                <div className="relative w-64">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name, admission no, class..."
+                    className="pl-8"
+                    value={overdueSearch}
+                    onChange={(e) => { setOverdueSearch(e.target.value); setOverdueCurrentPage(1); }}
+                  />
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {overdueStudents?.map((student) => (
-                  <div key={student.userId} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{student.name}</span>
-                        <Badge variant="destructive" className="text-xs">
-                          {student.overdueInstallments?.length || 0} Overdue
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {student.admissionNo} • {student.class?.className}
-                      </p>
+              {groupedOverdueStudents.length > 0 ? (
+                <div className="space-y-3">
+                  {groupedOverdueStudents.map((group) => (
+                    <div key={group.key} className="border rounded-lg overflow-hidden">
+                      {/* Group Header */}
+                      <button
+                        onClick={() => toggleClassExpand(group.key)}
+                        className="w-full flex items-center justify-between p-4 bg-muted/50 hover:bg-muted/70 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline" className="font-semibold text-sm">
+                            {group.className} - {group.sectionName}
+                          </Badge>
+                          <span className="text-sm text-muted-foreground">
+                            {group.students.length} student{group.students.length !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-bold text-red-600">
+                            {formatCurrency(group.totalOverdue)}
+                          </span>
+                          {expandedClasses[group.key] ? (
+                            <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                          )}
+                        </div>
+                      </button>
+
+                      {/* Expanded Students */}
+                      {(expandedClasses[group.key] ?? true) && (
+                        <div className="divide-y">
+                          {group.students.map((student) => (
+                            <div key={student.userId} className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">{student.name}</span>
+                                  <Badge variant="destructive" className="text-xs">
+                                    {student.overdueInstallments?.length || 0} Overdue
+                                  </Badge>
+                                </div>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  {student.admissionNo}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-bold text-lg text-red-600">{formatCurrency(student.balanceAmount)}</p>
+                                <Link href={`/dashboard/fees/students/${student.userId}`}>
+                                  <Button variant="outline" size="sm" className="mt-1">
+                                    <Eye className="w-4 h-4 mr-1" />
+                                    View
+                                  </Button>
+                                </Link>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-lg text-red-600">{formatCurrency(student.balanceAmount)}</p>
-                      <Link href={`/dashboard/fee/students/${student.userId}`}>
-                        <Button variant="outline" size="sm" className="mt-1">
-                          <Eye className="w-4 h-4 mr-1" />
-                          View
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  <CheckCircle className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                  <p>No overdue students found</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* CLASS-WISE STATS with Pagination */}
         <TabsContent value="classwise">
           <Card>
             <CardHeader>
-              <CardTitle>Class-wise Collection</CardTitle>
-              <CardDescription>Fee collection breakdown by class</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Class-wise Collection</CardTitle>
+                  <CardDescription>Fee collection breakdown by class ({classWiseStats?.length || 0} classes)</CardDescription>
+                </div>
+                {paginatedClassStats.totalPages > 1 && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setClassStatsPage(p => Math.max(1, p - 1))}
+                      disabled={classStatsPage === 1}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      {classStatsPage} / {paginatedClassStats.totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setClassStatsPage(p => Math.min(paginatedClassStats.totalPages, p + 1))}
+                      disabled={classStatsPage === paginatedClassStats.totalPages}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {classWiseStats?.map((stat) => (
-                  <div key={stat.classId} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-semibold">{stat.className}</h3>
-                      <Badge>{stat.count} Students</Badge>
+                {paginatedClassStats.items.map((stat) => {
+                  const percentage = stat.expected > 0 ? ((stat.collected / stat.expected) * 100) : 0;
+                  return (
+                    <div key={stat.classId} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-semibold">{stat.className}</h3>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">{stat.count} Students</Badge>
+                          <Badge className={
+                            percentage >= 80 ? 'bg-green-100 text-green-700' :
+                              percentage >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-red-100 text-red-700'
+                          }>
+                            {percentage.toFixed(0)}%
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">Expected</p>
+                          <p className="font-semibold">{formatCurrency(stat.expected)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Collected</p>
+                          <p className="font-semibold text-green-600">{formatCurrency(stat.collected)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Fees Due</p>
+                          <p className="font-semibold text-red-600">{formatCurrency(stat.balance)}</p>
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full transition-all duration-500 ${percentage >= 80 ? 'bg-green-600' :
+                              percentage >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+                              }`}
+                            style={{ width: `${Math.min(percentage, 100)}%` }}
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <p className="text-muted-foreground">Expected</p>
-                        <p className="font-semibold">{formatCurrency(stat.expected)}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Collected</p>
-                        <p className="font-semibold text-green-600">{formatCurrency(stat.collected)}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Fees Due</p>
-                        <p className="font-semibold text-red-600">{formatCurrency(stat.balance)}</p>
-                      </div>
-                    </div>
-                    <div className="mt-2">
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-green-600 h-2 rounded-full"
-                          style={{ width: `${(stat.collected / stat.expected) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
     Table,
     TableBody,
@@ -141,18 +142,19 @@ export default function AttendanceRegularization() {
 
     const getStatusBadge = (status) => {
         switch (status) {
-            case 'APPROVED': return <Badge className="bg-green-100 text-green-700">Approved</Badge>;
-            case 'REJECTED': return <Badge className="bg-red-100 text-red-700">Rejected</Badge>;
-            default: return <Badge className="bg-yellow-100 text-yellow-700">Pending</Badge>;
+            case 'APPROVED': return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">Approved</Badge>;
+            case 'REJECTED': return <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200">Rejected</Badge>;
+            default: return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">Pending</Badge>;
         }
     };
 
     const getRequestedStatusBadge = (status) => {
         switch (status) {
-            case 'PRESENT': return <Badge className="bg-green-100 text-green-700">Present</Badge>;
-            case 'HALF_DAY': return <Badge className="bg-orange-100 text-orange-700">Half Day</Badge>;
-            case 'ON_LEAVE': return <Badge className="bg-purple-100 text-purple-700">On Leave</Badge>;
-            default: return <Badge variant="secondary">{status}</Badge>;
+            case 'PRESENT': return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-transparent font-bold">Present</Badge>;
+            case 'HALF_DAY': return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-transparent font-bold">Half Day</Badge>;
+            case 'ON_LEAVE': return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-transparent font-bold">On Leave</Badge>;
+            case 'ABSENT': return <Badge variant="outline" className="bg-rose-50 text-rose-700 border-transparent font-bold">Absent</Badge>;
+            default: return <Badge variant="secondary" className="font-bold">{status}</Badge>;
         }
     };
 
@@ -367,99 +369,140 @@ export default function AttendanceRegularization() {
                                 </div>
                             ) : (
                                 <>
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                {statusFilter === 'PENDING' && (
-                                                    <TableHead className="w-12">
-                                                        <Checkbox
-                                                            checked={selectedRequests.length === paginatedRequests.length && paginatedRequests.length > 0}
-                                                            onCheckedChange={toggleSelectAll}
-                                                        />
-                                                    </TableHead>
-                                                )}
-                                                <TableHead>Employee</TableHead>
-                                                <TableHead>Date</TableHead>
-                                                <TableHead>Requested Status</TableHead>
-                                                <TableHead>Reason</TableHead>
-                                                <TableHead>Days Old</TableHead>
-                                                <TableHead>Status</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {paginatedRequests.map((request) => (
-                                                <TableRow key={request.id} className={selectedRequests.includes(request.id) ? 'bg-blue-50 dark:bg-blue-950/20' : ''}>
+                                    <div className="border rounded-xl overflow-hidden bg-white dark:bg-card shadow-sm">
+                                        <Table>
+                                            <TableHeader className="bg-muted/50">
+                                                <TableRow>
                                                     {statusFilter === 'PENDING' && (
-                                                        <TableCell>
+                                                        <TableHead className="w-12 px-4">
                                                             <Checkbox
-                                                                checked={selectedRequests.includes(request.id)}
-                                                                onCheckedChange={() => toggleSelection(request.id)}
+                                                                checked={selectedRequests.length === paginatedRequests.length && paginatedRequests.length > 0}
+                                                                onCheckedChange={toggleSelectAll}
                                                             />
-                                                        </TableCell>
+                                                        </TableHead>
                                                     )}
-                                                    <TableCell>
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium text-sm">
-                                                                {request.user?.name?.charAt(0) || '?'}
-                                                            </div>
-                                                            <div>
-                                                                <p className="font-medium">{request.user?.name}</p>
-                                                                <p className="text-xs text-muted-foreground">
-                                                                    {request.user?.role?.name}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <p className="font-medium">{formatDate(request.date)}</p>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {getRequestedStatusBadge(request.status)}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <p className="text-sm line-clamp-2 max-w-[200px]">{request.remarks || '-'}</p>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {request.daysOld > 0 ? (
-                                                            <Badge variant="outline" className="text-orange-600">
-                                                                {request.daysOld} days
-                                                            </Badge>
-                                                        ) : (
-                                                            <span className="text-muted-foreground">Today</span>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {getStatusBadge(request.approvalStatus)}
-                                                    </TableCell>
+                                                    <TableHead className="px-4 font-semibold text-foreground">Employee</TableHead>
+                                                    <TableHead className="font-semibold text-foreground">Date</TableHead>
+                                                    <TableHead className="font-semibold text-foreground">Requested Status</TableHead>
+                                                    <TableHead className="font-semibold text-foreground">Reason</TableHead>
+                                                    <TableHead className="font-semibold text-foreground">Age</TableHead>
+                                                    <TableHead className="px-4 font-semibold text-foreground">Status</TableHead>
                                                 </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {paginatedRequests.map((request) => (
+                                                    <TableRow key={request.id} className={`${selectedRequests.includes(request.id) ? 'bg-primary/5' : 'hover:bg-muted/30'} transition-colors border-b border-border/50 last:border-0`}>
+                                                        {statusFilter === 'PENDING' && (
+                                                            <TableCell className="px-4">
+                                                                <Checkbox
+                                                                    checked={selectedRequests.includes(request.id)}
+                                                                    onCheckedChange={() => toggleSelection(request.id)}
+                                                                />
+                                                            </TableCell>
+                                                        )}
+                                                        <TableCell className="px-4 py-3">
+                                                            <div className="flex items-center gap-3">
+                                                                <Avatar className="h-9 w-9 border border-border/50">
+                                                                    <AvatarImage src={request.user?.profilePicture} alt={request.user?.name} />
+                                                                    <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary font-bold text-xs uppercase">
+                                                                        {request.user?.name?.charAt(0) || '?'}
+                                                                    </AvatarFallback>
+                                                                </Avatar>
+                                                                <div className="flex flex-col">
+                                                                    <p className="font-semibold text-sm leading-none text-foreground">{request.user?.name}</p>
+                                                                    <p className="text-[11px] text-muted-foreground mt-1.5 font-medium flex items-center gap-1.5">
+                                                                        <div className="w-1.5 h-1.5 rounded-full bg-primary/40" />
+                                                                        {request.user?.role?.name}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="flex flex-col gap-0.5">
+                                                                <p className="font-bold text-sm text-foreground">{formatDate(request.date)}</p>
+                                                                <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-tight">ATTENDANCE DATE</p>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {getRequestedStatusBadge(request.status)}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <p className="text-xs text-muted-foreground line-clamp-2 max-w-[200px] leading-relaxed italic">
+                                                                "{request.remarks || 'No remarks provided'}"
+                                                            </p>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {request.daysOld > 0 ? (
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <Clock className="w-3.5 h-3.5 text-orange-500" />
+                                                                    <span className="text-xs font-bold text-orange-600">{request.daysOld} days old</span>
+                                                                </div>
+                                                            ) : (
+                                                                <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 text-[10px] font-bold">TODAY</Badge>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="px-4">
+                                                            {getStatusBadge(request.approvalStatus)}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
 
-                                    {/* Pagination */}
+                                    {/* Pagination Footer */}
                                     {totalPages > 1 && (
-                                        <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                                            <p className="text-sm text-muted-foreground">
-                                                Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredRequests.length)} of {filteredRequests.length}
-                                            </p>
-                                            <div className="flex gap-2">
+                                        <div className="flex items-center justify-between px-2 py-6 mt-4 border-t border-border/40">
+                                            <div className="text-sm text-muted-foreground font-medium">
+                                                Showing <span className="text-foreground font-semibold">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to <span className="text-foreground font-semibold">{Math.min(currentPage * ITEMS_PER_PAGE, filteredRequests.length)}</span> of <span className="text-foreground font-semibold">{filteredRequests.length}</span> requests
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
+                                                    className="h-8 px-3 text-xs font-semibold"
                                                     onClick={() => setCurrentPage(p => p - 1)}
                                                     disabled={currentPage === 1}
                                                 >
-                                                    <ChevronLeft className="h-4 w-4" />
-                                                    Previous
+                                                    <ChevronLeft className="h-3.5 w-3.5 mr-1" />
+                                                    Prev
                                                 </Button>
+
+                                                <div className="flex items-center gap-1">
+                                                    {totalPages <= 5 ? (
+                                                        Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                                                            <Button
+                                                                key={page}
+                                                                variant={currentPage === page ? "default" : "ghost"}
+                                                                size="icon"
+                                                                className="h-8 w-8 text-xs font-bold"
+                                                                onClick={() => setCurrentPage(page)}
+                                                            >
+                                                                {page}
+                                                            </Button>
+                                                        ))
+                                                    ) : (
+                                                        <>
+                                                            <Button variant={currentPage === 1 ? "default" : "ghost"} size="icon" className="h-8 w-8 text-xs font-bold" onClick={() => setCurrentPage(1)}>1</Button>
+                                                            {currentPage > 3 && <span className="text-muted-foreground px-1 self-end pb-1">...</span>}
+                                                            {currentPage > 2 && currentPage < totalPages && (
+                                                                <Button variant="default" size="icon" className="h-8 w-8 text-xs font-bold">{currentPage}</Button>
+                                                            )}
+                                                            {currentPage < totalPages - 2 && <span className="text-muted-foreground px-1 self-end pb-1">...</span>}
+                                                            <Button variant={currentPage === totalPages ? "default" : "ghost"} size="icon" className="h-8 w-8 text-xs font-bold" onClick={() => setCurrentPage(totalPages)}>{totalPages}</Button>
+                                                        </>
+                                                    )}
+                                                </div>
+
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
+                                                    className="h-8 px-3 text-xs font-semibold"
                                                     onClick={() => setCurrentPage(p => p + 1)}
                                                     disabled={currentPage === totalPages}
                                                 >
                                                     Next
-                                                    <ChevronRight className="h-4 w-4" />
+                                                    <ChevronRight className="h-3.5 w-3.5 ml-1" />
                                                 </Button>
                                             </div>
                                         </div>

@@ -198,19 +198,20 @@ export async function PATCH(req, { params }) {
 
         // Destructure known fields
         const {
-            name, email, // User model
+            name, email, profilePicture, // User model
             ...studentData // Student model
         } = body;
 
         // Transaction to update both
         const result = await prisma.$transaction(async (tx) => {
             // Update User if needed
-            if (name || email) {
+            if (name || email || profilePicture) {
                 await tx.user.update({
                     where: { id: studentId },
                     data: {
                         ...(name && { name }),
                         ...(email && { email }),
+                        ...(profilePicture && { profilePicture }),
                     }
                 });
             }

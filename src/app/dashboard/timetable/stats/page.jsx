@@ -22,6 +22,8 @@ export default function TimetableStatsPage() {
     const { fullUser } = useAuth();
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState(null);
+    const [showAllTeachers, setShowAllTeachers] = useState(false);
+    const [showAllSubjects, setShowAllSubjects] = useState(false);
 
     useEffect(() => {
         if (fullUser?.schoolId) {
@@ -135,6 +137,18 @@ export default function TimetableStatsPage() {
                         </p>
                     </CardContent>
                 </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Subjects</CardTitle>
+                        <BookOpen className="h-4 w-4 text-purple-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{stats.subjectwiseStats?.length || 0}</div>
+                        <p className="text-xs text-muted-foreground">
+                            Unique subjects scheduled
+                        </p>
+                    </CardContent>
+                </Card>
             </div>
 
             {/* Teacher Workload */}
@@ -160,27 +174,44 @@ export default function TimetableStatsPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {stats.teacherwiseStats.slice(0, 10).map((teacher) => (
-                                    <TableRow key={teacher.teacherId}>
-                                        <TableCell className="font-medium">{teacher.teacherName}</TableCell>
-                                        <TableCell className="text-right">
-                                            <Badge variant="outline">{teacher.periodCount}</Badge>
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <div className="flex justify-end">
-                                                <div
-                                                    className="h-2 bg-primary rounded"
-                                                    style={{
-                                                        width: `${Math.min((teacher.periodCount / 40) * 100, 100)}%`,
-                                                        minWidth: "20px",
-                                                    }}
-                                                />
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
+                                {stats.teacherwiseStats
+                                    .slice(0, showAllTeachers ? undefined : 10)
+                                    .map((teacher) => {
+                                        const workloadPercent = Math.min((teacher.periodCount / 40) * 100, 100);
+                                        return (
+                                            <TableRow key={teacher.teacherId}>
+                                                <TableCell className="font-medium">{teacher.teacherName}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <Badge variant="outline">{teacher.periodCount}</Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                                                            <div
+                                                                className={`h-full rounded-full ${workloadPercent > 80 ? 'bg-red-500' : workloadPercent > 50 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                                                                style={{
+                                                                    width: `${workloadPercent}%`,
+                                                                    minWidth: "8px",
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <span className="text-xs text-muted-foreground w-10">
+                                                            {Math.round(workloadPercent)}%
+                                                        </span>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
                             </TableBody>
                         </Table>
+                    )}
+                    {stats.teacherwiseStats.length > 10 && (
+                        <div className="pt-2 text-center">
+                            <Button variant="ghost" size="sm" onClick={() => setShowAllTeachers(!showAllTeachers)}>
+                                {showAllTeachers ? 'Show Less' : `Show All (${stats.teacherwiseStats.length})`}
+                            </Button>
+                        </div>
                     )}
                 </CardContent>
             </Card>
@@ -243,7 +274,7 @@ export default function TimetableStatsPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {stats.subjectwiseStats.slice(0, 10).map((subject) => (
+                                {stats.subjectwiseStats.slice(0, showAllSubjects ? undefined : 10).map((subject) => (
                                     <TableRow key={subject.subjectId}>
                                         <TableCell className="font-medium">{subject.subjectName}</TableCell>
                                         <TableCell className="text-right">
@@ -253,6 +284,13 @@ export default function TimetableStatsPage() {
                                 ))}
                             </TableBody>
                         </Table>
+                    )}
+                    {stats.subjectwiseStats.length > 10 && (
+                        <div className="pt-2 text-center">
+                            <Button variant="ghost" size="sm" onClick={() => setShowAllSubjects(!showAllSubjects)}>
+                                {showAllSubjects ? 'Show Less' : `Show All (${stats.subjectwiseStats.length})`}
+                            </Button>
+                        </div>
                     )}
                 </CardContent>
             </Card>

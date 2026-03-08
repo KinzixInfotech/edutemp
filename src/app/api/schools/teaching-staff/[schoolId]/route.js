@@ -96,7 +96,7 @@ export async function GET(req, props) {
             async () => {
                 const skip = (page - 1) * limit;
 
-                const [staff, total] = await Promise.all([
+                const [staff, total, activeCount, designations] = await Promise.all([
                     prisma.teachingStaff.findMany({
                         where,
                         include,
@@ -105,9 +105,19 @@ export async function GET(req, props) {
                         take: limit,
                     }),
                     prisma.teachingStaff.count({ where }),
+                    prisma.teachingStaff.count({
+                        where: { schoolId, user: { status: "ACTIVE" } },
+                    }),
+                    prisma.teachingStaff.findMany({
+                        where: { schoolId },
+                        select: { designation: true },
+                        distinct: ["designation"],
+                    }),
                 ]);
 
-                return { staff, total, page, limit, totalPages: Math.ceil(total / limit) };
+                const uniqueDesignations = designations.filter(d => d.designation).length;
+
+                return { staff, total, page, limit, totalPages: Math.ceil(total / limit), activeCount, uniqueDesignations };
             },
             300
         );

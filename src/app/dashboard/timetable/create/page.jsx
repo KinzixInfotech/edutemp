@@ -20,7 +20,7 @@ import { Separator } from "@/components/ui/separator";
 import {
     Loader2, Save, ArrowLeft, Clock, User2, BookOpen, MapPin, Coffee,
     Calendar, CheckCircle2, Circle, AlertTriangle, GraduationCap,
-    Users, Layers, ChevronRight, Sparkles
+    Users, Layers, ChevronRight, Sparkles, Search
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -58,6 +58,7 @@ export default function CreateTimetablePage() {
     const [allSchoolEntries, setAllSchoolEntries] = useState([]);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [initialTimetable, setInitialTimetable] = useState({});
+    const [teacherSearch, setTeacherSearch] = useState("");
 
     useEffect(() => {
         if (fullUser?.schoolId) {
@@ -607,14 +608,34 @@ export default function CreateTimetablePage() {
                                                                         <SelectValue placeholder="Select teacher" />
                                                                     </SelectTrigger>
                                                                     <SelectContent>
-                                                                        {teachers.map((teacher) => (
-                                                                            <SelectItem key={teacher.userId} value={teacher.userId}>
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <User2 className="h-4 w-4 text-blue-500" />
-                                                                                    {teacher.name}
-                                                                                </div>
-                                                                            </SelectItem>
-                                                                        ))}
+                                                                        <div className="px-2 pb-2">
+                                                                            <div className="relative">
+                                                                                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                                                                                <input
+                                                                                    className="w-full pl-7 pr-2 py-1.5 text-sm border rounded-md outline-none focus:ring-1 focus:ring-primary bg-background"
+                                                                                    placeholder="Search teachers..."
+                                                                                    value={teacherSearch}
+                                                                                    onChange={(e) => setTeacherSearch(e.target.value)}
+                                                                                    onClick={(e) => e.stopPropagation()}
+                                                                                    onKeyDown={(e) => e.stopPropagation()}
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                        {teachers
+                                                                            .filter(t => !teacherSearch || t.name?.toLowerCase().includes(teacherSearch.toLowerCase()))
+                                                                            .map((teacher) => (
+                                                                                <SelectItem key={teacher.userId} value={teacher.userId}>
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <User2 className="h-4 w-4 text-blue-500" />
+                                                                                        {teacher.name}
+                                                                                    </div>
+                                                                                </SelectItem>
+                                                                            ))}
+                                                                        {teachers.filter(t => !teacherSearch || t.name?.toLowerCase().includes(teacherSearch.toLowerCase())).length === 0 && (
+                                                                            <div className="px-2 py-3 text-sm text-center text-muted-foreground">
+                                                                                No teachers found
+                                                                            </div>
+                                                                        )}
                                                                     </SelectContent>
                                                                 </Select>
                                                                 {teacherConflict && (

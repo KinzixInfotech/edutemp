@@ -73,6 +73,16 @@ export default function LeaveBucketsPage() {
 
     const [showDialog, setShowDialog] = useState(false);
     const [editBucket, setEditBucket] = useState(null);
+    const [formData, setFormData] = useState({
+        leaveType: "",
+        yearlyLimit: 12,
+        monthlyLimit: "",
+        carryForwardLimit: 0,
+        encashmentLimit: 0,
+        encashmentPerDayRate: "",
+        applicableToTeaching: true,
+        applicableToNonTeaching: true,
+    });
 
     // Fetch leave buckets (API auto-fetches current academic year)
     const { data: buckets, isLoading, refetch } = useQuery({
@@ -130,27 +140,44 @@ export default function LeaveBucketsPage() {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        const formData = new FormData(e.target);
 
         saveMutation.mutate({
-            leaveType: formData.get("leaveType"),
-            yearlyLimit: parseInt(formData.get("yearlyLimit")) || 0,
-            monthlyLimit: formData.get("monthlyLimit") ? parseInt(formData.get("monthlyLimit")) : null,
-            carryForwardLimit: parseInt(formData.get("carryForwardLimit")) || 0,
-            encashmentLimit: parseInt(formData.get("encashmentLimit")) || 0,
-            encashmentPerDayRate: formData.get("encashmentPerDayRate") ? parseFloat(formData.get("encashmentPerDayRate")) : null,
-            applicableToTeaching: formData.get("applicableToTeaching") === "on",
-            applicableToNonTeaching: formData.get("applicableToNonTeaching") === "on",
+            ...formData,
+            yearlyLimit: parseInt(formData.yearlyLimit) || 0,
+            monthlyLimit: formData.monthlyLimit ? parseInt(formData.monthlyLimit) : null,
+            carryForwardLimit: parseInt(formData.carryForwardLimit) || 0,
+            encashmentLimit: parseInt(formData.encashmentLimit) || 0,
+            encashmentPerDayRate: formData.encashmentPerDayRate ? parseFloat(formData.encashmentPerDayRate) : null,
         });
     };
 
     const openEdit = (bucket) => {
         setEditBucket(bucket);
+        setFormData({
+            leaveType: bucket.leaveType,
+            yearlyLimit: bucket.yearlyLimit,
+            monthlyLimit: bucket.monthlyLimit || "",
+            carryForwardLimit: bucket.carryForwardLimit || 0,
+            encashmentLimit: bucket.encashmentLimit || 0,
+            encashmentPerDayRate: bucket.encashmentPerDayRate || "",
+            applicableToTeaching: bucket.applicableToTeaching,
+            applicableToNonTeaching: bucket.applicableToNonTeaching,
+        });
         setShowDialog(true);
     };
 
     const openCreate = () => {
         setEditBucket(null);
+        setFormData({
+            leaveType: "",
+            yearlyLimit: 12,
+            monthlyLimit: "",
+            carryForwardLimit: 0,
+            encashmentLimit: 0,
+            encashmentPerDayRate: "",
+            applicableToTeaching: true,
+            applicableToNonTeaching: true,
+        });
         setShowDialog(true);
     };
 
@@ -228,66 +255,97 @@ export default function LeaveBucketsPage() {
                             {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full" />)}
                         </div>
                     ) : buckets?.length > 0 ? (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Leave Type</TableHead>
-                                    <TableHead>Yearly Limit</TableHead>
-                                    <TableHead>Monthly Limit</TableHead>
-                                    <TableHead>Carry Forward</TableHead>
-                                    <TableHead>Encashment</TableHead>
-                                    <TableHead>Applicable To</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {buckets.map(bucket => (
-                                    <TableRow key={bucket.id}>
-                                        <TableCell>
-                                            <div className="flex items-center gap-2">
-                                                <div className={`w-2 h-2 rounded-full ${getLeaveTypeColor(bucket.leaveType)}`} />
-                                                <span className="font-medium">{getLeaveTypeLabel(bucket.leaveType)}</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>{bucket.yearlyLimit} days</TableCell>
-                                        <TableCell>{bucket.monthlyLimit ? `${bucket.monthlyLimit} days` : "-"}</TableCell>
-                                        <TableCell>{bucket.carryForwardLimit > 0 ? `${bucket.carryForwardLimit} days` : "-"}</TableCell>
-                                        <TableCell>
-                                            {bucket.encashmentLimit > 0 ? (
-                                                <span>{bucket.encashmentLimit} days @ ₹{bucket.encashmentPerDayRate || 0}/day</span>
-                                            ) : "-"}
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex gap-1">
-                                                {bucket.applicableToTeaching && <Badge variant="outline" className="text-xs">Teaching</Badge>}
-                                                {bucket.applicableToNonTeaching && <Badge variant="outline" className="text-xs">Non-Teaching</Badge>}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge variant={bucket.isActive ? "success" : "secondary"}>
-                                                {bucket.isActive ? "Active" : "Inactive"}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <div className="flex gap-1 justify-end">
-                                                <Button variant="ghost" size="sm" onClick={() => openEdit(bucket)}>
-                                                    <Edit className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="text-destructive"
-                                                    onClick={() => deleteMutation.mutate(bucket.id)}
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        </TableCell>
+                        <div className="border rounded-xl overflow-hidden bg-white dark:bg-card shadow-sm">
+                            <Table>
+                                <TableHeader className="bg-muted/50">
+                                    <TableRow>
+                                        <TableHead className="px-4 font-semibold text-foreground">Leave Type</TableHead>
+                                        <TableHead className="font-semibold text-foreground">Yearly Limit</TableHead>
+                                        <TableHead className="font-semibold text-foreground">Monthly Limit</TableHead>
+                                        <TableHead className="font-semibold text-foreground text-center">Carry Forward</TableHead>
+                                        <TableHead className="font-semibold text-foreground">Encashment</TableHead>
+                                        <TableHead className="font-semibold text-foreground">Applicable To</TableHead>
+                                        <TableHead className="font-semibold text-foreground">Status</TableHead>
+                                        <TableHead className="text-right px-4 font-semibold text-foreground">Actions</TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                </TableHeader>
+                                <TableBody>
+                                    {buckets.map(bucket => (
+                                        <TableRow key={bucket.id} className="hover:bg-muted/30 transition-colors border-b border-border/50 last:border-0">
+                                            <TableCell className="px-4 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-3 h-3 rounded-full ${getLeaveTypeColor(bucket.leaveType)} shadow-sm`} />
+                                                    <div className="flex flex-col">
+                                                        <span className="font-bold text-sm text-foreground">{getLeaveTypeLabel(bucket.leaveType)}</span>
+                                                        <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-tight">System Type</span>
+                                                    </div>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-col">
+                                                    <span className="font-bold text-sm text-foreground">{bucket.yearlyLimit} days</span>
+                                                    <span className="text-[10px] text-muted-foreground font-medium uppercase">per academic year</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                {bucket.monthlyLimit ? (
+                                                    <Badge variant="secondary" className="bg-muted/50 text-foreground font-bold border-none px-2 py-0.5 text-[10px]">
+                                                        {bucket.monthlyLimit} days/mo
+                                                    </Badge>
+                                                ) : <span className="text-muted-foreground text-xs italic">No cap</span>}
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                {bucket.carryForwardLimit > 0 ? (
+                                                    <span className="font-bold text-sm text-primary">{bucket.carryForwardLimit} <span className="text-[10px] text-muted-foreground font-medium">days</span></span>
+                                                ) : <span className="text-muted-foreground">—</span>}
+                                            </TableCell>
+                                            <TableCell>
+                                                {bucket.encashmentLimit > 0 ? (
+                                                    <div className="flex flex-col">
+                                                        <span className="text-xs font-bold text-foreground">{bucket.encashmentLimit} days max</span>
+                                                        <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-tight">₹{bucket.encashmentPerDayRate || 0}/day</span>
+                                                    </div>
+                                                ) : <span className="text-muted-foreground text-xs">—</span>}
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-wrap gap-1.5 min-w-[120px]">
+                                                    {bucket.applicableToTeaching && (
+                                                        <Badge variant="outline" className="text-[9px] font-bold uppercase tracking-wider bg-primary/5 border-primary/20 text-primary px-1.5 py-0">
+                                                            Teaching
+                                                        </Badge>
+                                                    )}
+                                                    {bucket.applicableToNonTeaching && (
+                                                        <Badge variant="outline" className="text-[9px] font-bold uppercase tracking-wider bg-orange-50 border-orange-200 text-orange-700 px-1.5 py-0">
+                                                            Staff
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline" className={`${bucket.isActive ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-50 text-slate-700 border-slate-200"} text-[10px] font-bold uppercase px-2 py-0.5`}>
+                                                    {bucket.isActive ? "Active" : "Inactive"}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right px-4">
+                                                <div className="flex gap-1 justify-end">
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/10 hover:text-primary transition-colors" onClick={() => openEdit(bucket)}>
+                                                        <Edit className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-destructive hover:bg-destructive/10 transition-colors"
+                                                        onClick={() => deleteMutation.mutate(bucket.id)}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
                     ) : (
                         <div className="text-center py-8">
                             <Calendar className="mx-auto h-12 w-12 mb-4 text-muted-foreground opacity-50" />
@@ -346,8 +404,12 @@ export default function LeaveBucketsPage() {
                             {!editBucket && (
                                 <div className="space-y-2">
                                     <Label>Leave Type *</Label>
-                                    <Select name="leaveType" required>
-                                        <SelectTrigger className="mt-1.5">
+                                    <Select
+                                        value={formData.leaveType}
+                                        onValueChange={(val) => setFormData(prev => ({ ...prev, leaveType: val }))}
+                                        required
+                                    >
+                                        <SelectTrigger className="mt-1.5 focus:ring-primary/20 transition-all">
                                             <SelectValue placeholder="Select leave type" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -368,23 +430,23 @@ export default function LeaveBucketsPage() {
                                 <div className="space-y-2">
                                     <Label>Yearly Limit (days) *</Label>
                                     <Input
-                                        name="yearlyLimit"
                                         type="number"
                                         min="0"
-                                        className="mt-1.5"
-                                        defaultValue={editBucket?.yearlyLimit || 12}
+                                        className="mt-1.5 focus:ring-primary/20 transition-all"
+                                        value={formData.yearlyLimit}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, yearlyLimit: e.target.value }))}
                                         required
                                     />
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Monthly Limit (days)</Label>
                                     <Input
-                                        name="monthlyLimit"
                                         type="number"
                                         min="0"
                                         placeholder="Optional"
-                                        className="mt-1.5"
-                                        defaultValue={editBucket?.monthlyLimit || ""}
+                                        className="mt-1.5 focus:ring-primary/20 transition-all"
+                                        value={formData.monthlyLimit}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, monthlyLimit: e.target.value }))}
                                     />
                                 </div>
                             </div>
@@ -393,53 +455,62 @@ export default function LeaveBucketsPage() {
                                 <div className="space-y-2">
                                     <Label>Carry Forward Limit</Label>
                                     <Input
-                                        name="carryForwardLimit"
                                         type="number"
                                         min="0"
-                                        className="mt-1.5"
-                                        defaultValue={editBucket?.carryForwardLimit || 0}
+                                        className="mt-1.5 focus:ring-primary/20 transition-all"
+                                        value={formData.carryForwardLimit}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, carryForwardLimit: e.target.value }))}
                                     />
-                                    <p className="text-xs text-muted-foreground">Max days to carry forward</p>
+                                    <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-tight mt-1">Max days to carry forward</p>
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Encashment Limit</Label>
                                     <Input
-                                        name="encashmentLimit"
                                         type="number"
                                         min="0"
-                                        className="mt-1.5"
-                                        defaultValue={editBucket?.encashmentLimit || 0}
+                                        className="mt-1.5 focus:ring-primary/20 transition-all"
+                                        value={formData.encashmentLimit}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, encashmentLimit: e.target.value }))}
                                     />
-                                    <p className="text-xs text-muted-foreground">Max days encashable</p>
+                                    <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-tight mt-1">Max days encashable</p>
                                 </div>
                             </div>
 
                             <div className="space-y-2">
                                 <Label>Encashment Rate (₹ per day)</Label>
                                 <Input
-                                    name="encashmentPerDayRate"
                                     type="number"
                                     step="0.01"
                                     placeholder="Optional"
-                                    className="mt-1.5"
-                                    defaultValue={editBucket?.encashmentPerDayRate || ""}
+                                    className="mt-1.5 focus:ring-primary/20 transition-all"
+                                    value={formData.encashmentPerDayRate}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, encashmentPerDayRate: e.target.value }))}
                                 />
                             </div>
 
-                            <div className="space-y-4 pt-2 border-t">
-                                <Label>Applicable To</Label>
-                                <div className="flex items-center justify-between py-1">
-                                    <span className="text-sm">Teaching Staff</span>
+                            <div className="space-y-5 pt-4 border-t border-border/50">
+                                <div className="flex flex-col gap-1">
+                                    <Label className="text-sm">Applicable To</Label>
+                                    <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-tight">Select staff categories eligible for this leave</p>
+                                </div>
+                                <div className="flex items-center justify-between py-2 border rounded-lg px-4 bg-muted/20">
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-semibold text-foreground">Teaching Staff</span>
+                                        <span className="text-[10px] text-muted-foreground font-medium">Teachers & Academic Staff</span>
+                                    </div>
                                     <Switch
-                                        name="applicableToTeaching"
-                                        defaultChecked={editBucket?.applicableToTeaching ?? true}
+                                        checked={formData.applicableToTeaching}
+                                        onCheckedChange={(val) => setFormData(prev => ({ ...prev, applicableToTeaching: val }))}
                                     />
                                 </div>
-                                <div className="flex items-center justify-between py-1">
-                                    <span className="text-sm">Non-Teaching Staff</span>
+                                <div className="flex items-center justify-between py-2 border rounded-lg px-4 bg-muted/20">
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-semibold text-foreground">Non-Teaching Staff</span>
+                                        <span className="text-[10px] text-muted-foreground font-medium">Admin & Support Staff</span>
+                                    </div>
                                     <Switch
-                                        name="applicableToNonTeaching"
-                                        defaultChecked={editBucket?.applicableToNonTeaching ?? true}
+                                        checked={formData.applicableToNonTeaching}
+                                        onCheckedChange={(val) => setFormData(prev => ({ ...prev, applicableToNonTeaching: val }))}
                                     />
                                 </div>
                             </div>
