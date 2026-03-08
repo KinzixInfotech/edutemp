@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -18,6 +18,7 @@ import {
     Loader2,
     Trash2,
     Users,
+    CheckCircle,
     Search,
     Filter,
     Eye,
@@ -266,7 +267,7 @@ export default function NonTeachingStaffPage() {
     }
 
     return (
-        <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-4 sm:space-y-6">
+        <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
             {/* Header */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-1">
@@ -294,37 +295,34 @@ export default function NonTeachingStaffPage() {
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
-                    <CardContent className="p-4 flex items-center justify-between">
-                        <div>
-                            <p className="text-sm text-muted-foreground">Total Staff</p>
-                            <p className="text-2xl font-bold">{total}</p>
-                        </div>
-                        <div className="p-3 rounded-full bg-purple-500/20">
-                            <Users className="h-6 w-6 text-purple-500" />
-                        </div>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Total Staff</CardTitle>
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{total}</div>
+                        <p className="text-xs text-muted-foreground">Total registered staff</p>
                     </CardContent>
                 </Card>
-                <Card className="bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
-                    <CardContent className="p-4 flex items-center justify-between">
-                        <div>
-                            <p className="text-sm text-muted-foreground">Active Staff</p>
-                            <p className="text-2xl font-bold">{activeCount}</p>
-                        </div>
-                        <div className="p-3 rounded-full bg-green-500/20">
-                            <Users className="h-6 w-6 text-green-500" />
-                        </div>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Active Staff</CardTitle>
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{activeCount}</div>
+                        <p className="text-xs text-muted-foreground">Currently active</p>
                     </CardContent>
                 </Card>
-                <Card className="bg-gradient-to-br from-amber-500/10 to-amber-600/5 border-amber-500/20">
-                    <CardContent className="p-4 flex items-center justify-between">
-                        <div>
-                            <p className="text-sm text-muted-foreground">Active Designations</p>
-                            <p className="text-2xl font-bold">{uniqueDesignations}</p>
-                        </div>
-                        <div className="p-3 rounded-full bg-amber-500/20">
-                            <Briefcase className="h-6 w-6 text-amber-500" />
-                        </div>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Active Designations</CardTitle>
+                        <Briefcase className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{uniqueDesignations}</div>
+                        <p className="text-xs text-muted-foreground">Unique roles</p>
                     </CardContent>
                 </Card>
             </div>
@@ -446,7 +444,7 @@ export default function NonTeachingStaffPage() {
             )}
 
             {/* Staff Table */}
-            <div className="border rounded-2xl bg-white dark:bg-muted/30">
+            <div className="border overflow-hidden rounded-2xl bg-white dark:bg-muted/30">
                 <div className="overflow-x-auto">
                     <Table>
                         <TableHeader className="bg-muted sticky top-0 z-10">

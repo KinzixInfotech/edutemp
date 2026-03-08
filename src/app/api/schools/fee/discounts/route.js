@@ -65,6 +65,8 @@ export async function POST(req) {
             const newDiscountTotal = studentFee.discountAmount + discountAmount;
             const newFinalAmount = studentFee.originalAmount - newDiscountTotal;
             const newBalanceAmount = newFinalAmount - studentFee.paidAmount;
+            // `balance` is the field used by the outstanding fees dashboard aggregate
+            const newBalance = Math.max(0, newBalanceAmount);
 
             await tx.studentFee.update({
                 where: { id: studentFeeId },
@@ -72,6 +74,7 @@ export async function POST(req) {
                     discountAmount: newDiscountTotal,
                     finalAmount: newFinalAmount,
                     balanceAmount: newBalanceAmount,
+                    balance: newBalance,
                 },
             });
 

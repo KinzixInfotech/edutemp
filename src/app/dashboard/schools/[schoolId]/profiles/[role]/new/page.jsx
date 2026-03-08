@@ -37,6 +37,8 @@ export default function NewProfilePage() {
     const [rawImage, setRawImage] = useState(null)
     const [cropDialogOpen, setCropDialogOpen] = useState(false)
     const [errors, setErrors] = useState({})
+    const [emailToCheck, setEmailToCheck] = useState("")
+    const [phoneToCheck, setPhoneToCheck] = useState("")
 
     const [studentSearchOpen, setStudentSearchOpen] = useState(false)
     const [studentSearchQuery, setStudentSearchQuery] = useState("")
@@ -47,6 +49,8 @@ export default function NewProfilePage() {
 
     const debouncedStudentSearch = useDebounce(studentSearchQuery, 500)
     const debouncedParentSearch = useDebounce(parentSearchQuery, 500)
+    const debouncedEmail = useDebounce(emailToCheck, 600)
+    const debouncedPhone = useDebounce(phoneToCheck, 600)
 
     const baseForm = {
         studentName: "", name: "", email: "", password: "", dob: null, gender: "",
@@ -104,6 +108,22 @@ export default function NewProfilePage() {
 
     const students = studentsData?.students || []
     const parents = parentsData?.parents || []
+
+    // Real-time duplicate checking
+    const { data: duplicateData } = useQuery({
+        queryKey: ['check-duplicate', schoolId, debouncedEmail, debouncedPhone, role],
+        queryFn: async () => {
+            const params = new URLSearchParams()
+            if (debouncedEmail) params.set('email', debouncedEmail)
+            if (debouncedPhone) params.set('phone', debouncedPhone)
+            if (role) params.set('role', role)
+            const res = await fetch(`/api/schools/${schoolId}/profiles/check-duplicate?${params}`)
+            if (!res.ok) throw new Error('Failed to check duplicates')
+            return res.json()
+        },
+        enabled: !!schoolId && (!!debouncedEmail || !!debouncedPhone),
+        staleTime: 10000,
+    })
 
     const createProfileMutation = useMutation({
         mutationFn: async (formData) => {
@@ -173,10 +193,40 @@ export default function NewProfilePage() {
         const newErrors = {}
         const roleType = role?.toLowerCase()
 
+        // --- Common validations ---
         if (!form.name && !form.studentName && !form.guardianName) newErrors.name = "Name is required"
         if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) newErrors.email = "Invalid email format"
 
+        // Duplicate checks from real-time API
+        if (duplicateData?.emailExists) newErrors.email = "This email is already registered"
+        if (duplicateData?.phoneExists) newErrors.contactNumber = "This phone number is already registered in this school"
+
+        // Aadhaar validation (12 digits)
+        if (form.adhaarNo && !/^\d{12}$/.test(form.adhaarNo)) newErrors.adhaarNo = "Aadhaar number must be 12 digits"
+
+        // Postal code validation (6 digits for India)
+        if (form.postalCode && !/^\d{6}$/.test(form.postalCode)) newErrors.postalCode = "Postal code must be 6 digits"
+
+        // DOB age-range validation
+        if (form.dob) {
+            const dobDate = new Date(form.dob)
+            if (dobDate > new Date()) {
+                newErrors.dob = "Date of birth cannot be in the future"
+            } else {
+                const age = differenceInYears(new Date(), dobDate)
+                if (roleType === "students" && age < 3) {
+                    newErrors.dob = "Student must be at least 3 years old"
+                } else if (["teacher", "staff", "non-teaching"].includes(roleType) && age < 18) {
+                    newErrors.dob = "Staff must be at least 18 years old"
+                } else if (age > 100) {
+                    newErrors.dob = "Please enter a valid date of birth"
+                }
+            }
+        }
+
+        // --- Role-specific validations ---
         if (roleType === "students") {
+            if (!form.studentName) newErrors.name = "Student name is required"
             if (!form.admissionNo) newErrors.admissionNo = "Admission number is required"
             if (!form.classId) newErrors.classId = "Class is required"
             if (!form.sectionId) newErrors.sectionId = "Section is required"
@@ -185,29 +235,42 @@ export default function NewProfilePage() {
             if (form.guardianType === "PARENTS") {
                 if (!form.fatherName) newErrors.fatherName = "Father's name is required"
                 if (!form.fatherMobileNumber) newErrors.fatherMobileNumber = "Father's mobile is required"
-                else if (!/^\d{10}$/.test(form.fatherMobileNumber)) newErrors.fatherMobileNumber = "Invalid mobile number"
+                else if (!/^\d{10}$/.test(form.fatherMobileNumber)) newErrors.fatherMobileNumber = "Must be 10 digits"
             }
-
             if (form.guardianType === "GUARDIAN") {
                 if (!form.guardianName) newErrors.guardianName = "Guardian's name is required"
                 if (!form.guardianMobileNo) newErrors.guardianMobileNo = "Guardian's mobile is required"
+                else if (!/^\d{10}$/.test(form.guardianMobileNo)) newErrors.guardianMobileNo = "Must be 10 digits"
             }
+            if (form.motherMobileNumber && !/^\d{10}$/.test(form.motherMobileNumber)) newErrors.motherMobileNumber = "Must be 10 digits"
+            if (form.contactNumber && !/^\d{10}$/.test(form.contactNumber)) newErrors.contactNumber = "Must be 10 digits"
         }
 
         if (roleType === "parents") {
             if (!form.guardianName) newErrors.guardianName = "Guardian name is required"
-            if (!form.email) newErrors.email = "Email is required"
-            if (!form.contactNumber) newErrors.contactNumber = "Contact number is required"
-            else if (!/^\d{10}$/.test(form.contactNumber)) newErrors.contactNumber = "Invalid contact number (must be 10 digits)"
+            if (!form.email) newErrors.email = newErrors.email || "Email is required"
+            if (!form.contactNumber) newErrors.contactNumber = newErrors.contactNumber || "Contact number is required"
+            else if (!/^\d{10}$/.test(form.contactNumber)) newErrors.contactNumber = "Must be 10 digits"
             if (!form.gender) newErrors.gender = "Gender is required"
             if (!form.password) newErrors.password = "Password is required"
             else if (form.password.length < 6) newErrors.password = "Password must be at least 6 characters"
-            if (form.alternateNumber && !/^\d{10}$/.test(form.alternateNumber)) newErrors.alternateNumber = "Invalid alternate number"
-            if (form.emergencyContactNumber && !/^\d{10}$/.test(form.emergencyContactNumber)) newErrors.emergencyContactNumber = "Invalid emergency number"
+            if (form.alternateNumber && !/^\d{10}$/.test(form.alternateNumber)) newErrors.alternateNumber = "Must be 10 digits"
+            if (form.emergencyContactNumber && !/^\d{10}$/.test(form.emergencyContactNumber)) newErrors.emergencyContactNumber = "Must be 10 digits"
         }
 
-        if ((roleType === "teacher" || roleType === "staff") && form.contactNumber && !/^\d{10}$/.test(form.contactNumber)) {
-            newErrors.contactNumber = "Invalid contact number"
+        if (["teacher", "staff", "non-teaching"].includes(roleType)) {
+            if (!form.name) newErrors.name = "Name is required"
+            if (!form.email) newErrors.email = newErrors.email || "Email is required"
+            if (!form.password) newErrors.password = "Password is required"
+            else if (form.password.length < 6) newErrors.password = "Password must be at least 6 characters"
+            if (form.contactNumber && !/^\d{10}$/.test(form.contactNumber)) newErrors.contactNumber = "Must be 10 digits"
+        }
+
+        if (["accountants", "librarians", "labassistants", "busdrivers"].includes(roleType)) {
+            if (!form.name) newErrors.name = "Name is required"
+            if (!form.email) newErrors.email = newErrors.email || "Email is required"
+            if (!form.password) newErrors.password = "Password is required"
+            else if (form.password.length < 6) newErrors.password = "Password must be at least 6 characters"
         }
 
         setErrors(newErrors)
@@ -245,6 +308,7 @@ export default function NewProfilePage() {
         const titles = {
             teacher: "Teacher", students: "Student", parents: "Parent",
             accountants: "Accountant", librarians: "Librarian", staff: "Staff",
+            "non-teaching": "Non-Teaching Staff",
             labassistants: "Lab Assistant", busdrivers: "Bus Driver"
         }
         return titles[role?.toLowerCase()] || "Profile"
@@ -346,7 +410,7 @@ export default function NewProfilePage() {
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    {(roleType === "teacher" || roleType === "staff") && (
+                                    {(roleType === "teacher" || roleType === "staff" || roleType === "non-teaching") && (
                                         <>
                                             <div className="col-span-full"><h3 className="text-lg font-semibold mb-4">Basic Information</h3></div>
                                             <div className="space-y-2">
@@ -377,13 +441,15 @@ export default function NewProfilePage() {
                                                 <Input type="date" value={form.dob} onChange={(e) => updateForm("dob", e.target.value)} />
                                             </div>
                                             <div className="space-y-2">
-                                                <Label className="text-sm font-medium">Age</Label>
-                                                <Input type="number" value={form.age} onChange={(e) => updateForm("age", e.target.value)} placeholder="Enter age" />
+                                                <Label className="text-sm font-medium">Age {form.dob ? <span className="text-xs text-muted-foreground">(auto-calculated)</span> : null}</Label>
+                                                <Input type="number" value={form.age} readOnly className="bg-muted cursor-not-allowed" placeholder="Calculated from DOB" />
                                             </div>
+                                            {errors.dob && <p className="text-xs text-red-500 flex items-center gap-1 -mt-1"><AlertCircle className="h-3 w-3" />{errors.dob}</p>}
                                             <div className="space-y-2">
                                                 <Label className="text-sm font-medium">Email Address *</Label>
-                                                <Input type="email" value={form.email} onChange={(e) => updateForm("email", e.target.value)} placeholder={`${roleType}@example.com`} className={errors.email ? "border-red-500" : ""} />
+                                                <Input type="email" value={form.email} onChange={(e) => updateForm("email", e.target.value)} onBlur={(e) => setEmailToCheck(e.target.value)} placeholder={`${roleType}@example.com`} className={errors.email || duplicateData?.emailExists ? "border-red-500" : ""} />
                                                 {errors.email && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.email}</p>}
+                                                {!errors.email && duplicateData?.emailExists && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />This email is already registered</p>}
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-sm font-medium">Password *</Label>
@@ -396,8 +462,9 @@ export default function NewProfilePage() {
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-sm font-medium">Contact Number *</Label>
-                                                <Input value={form.contactNumber} onChange={(e) => updateForm("contactNumber", e.target.value)} placeholder="10-digit mobile number" className={errors.contactNumber ? "border-red-500" : ""} />
+                                                <Input value={form.contactNumber} onChange={(e) => updateForm("contactNumber", e.target.value.replace(/\D/g, '').slice(0, 10))} onBlur={(e) => setPhoneToCheck(e.target.value)} placeholder="10-digit mobile number" className={errors.contactNumber || duplicateData?.phoneExists ? "border-red-500" : ""} maxLength={10} />
                                                 {errors.contactNumber && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.contactNumber}</p>}
+                                                {!errors.contactNumber && duplicateData?.phoneExists && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />This number is already registered</p>}
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-sm font-medium">Gender</Label>
@@ -711,8 +778,9 @@ export default function NewProfilePage() {
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-sm font-medium">Email Address *</Label>
-                                                <Input type="email" value={form.email} onChange={(e) => updateForm("email", e.target.value)} placeholder="parent@example.com" className={errors.email ? "border-red-500" : ""} />
+                                                <Input type="email" value={form.email} onChange={(e) => updateForm("email", e.target.value)} onBlur={(e) => setEmailToCheck(e.target.value)} placeholder="parent@example.com" className={errors.email || duplicateData?.emailExists ? "border-red-500" : ""} />
                                                 {errors.email && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.email}</p>}
+                                                {!errors.email && duplicateData?.emailExists && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />This email is already registered</p>}
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-sm font-medium">Password *</Label>
@@ -721,8 +789,9 @@ export default function NewProfilePage() {
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-sm font-medium">Contact Number *</Label>
-                                                <Input value={form.contactNumber} onChange={(e) => updateForm("contactNumber", e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="10-digit mobile number" className={errors.contactNumber ? "border-red-500" : ""} maxLength={10} />
+                                                <Input value={form.contactNumber} onChange={(e) => updateForm("contactNumber", e.target.value.replace(/\D/g, '').slice(0, 10))} onBlur={(e) => setPhoneToCheck(e.target.value)} placeholder="10-digit mobile number" className={errors.contactNumber || duplicateData?.phoneExists ? "border-red-500" : ""} maxLength={10} />
                                                 {errors.contactNumber && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />{errors.contactNumber}</p>}
+                                                {!errors.contactNumber && duplicateData?.phoneExists && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" />This number is already registered</p>}
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-sm font-medium">Alternate Number</Label>
@@ -1065,7 +1134,7 @@ export default function NewProfilePage() {
                                     <div className="col-span-full pt-4 border-t">
                                         <Button
                                             onClick={handleSubmit}
-                                            disabled={createProfileMutation.isPending}
+                                            disabled={createProfileMutation.isPending || duplicateData?.emailExists || duplicateData?.phoneExists}
                                             className="w-full md:w-auto min-w-[200px] h-11 text-base font-medium"
                                             size="lg"
                                         >

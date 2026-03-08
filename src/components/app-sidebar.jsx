@@ -373,7 +373,6 @@ export const SidebarData = [
                     { label: "Create Timetable", url: "/dashboard/timetable/create", roles: ["ADMIN"] },
                     { label: "Time Slots", url: "/dashboard/timetable/slots", roles: ["ADMIN"] },
                     { label: "Teacher Shifts", url: "/dashboard/teachers/shifts", roles: ["ADMIN"] },
-                    { label: "Statistics", url: "/dashboard/timetable/stats", roles: ["ADMIN"] },
                 ],
             },
         ],

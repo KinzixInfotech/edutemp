@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { MoreVertical } from "lucide-react";
 import {
     Table,
     TableBody,
@@ -746,24 +747,38 @@ export default function FormListPage() {
                                                 <TableCell className="text-muted-foreground">{form._count?.applications || 0}</TableCell>
                                                 <TableCell className="text-muted-foreground">{format(new Date(form.createdAt), "MMM d, yyyy")}</TableCell>
                                                 <TableCell className="text-right">
-                                                    <div className="flex justify-end gap-1">
-                                                        <Button variant="ghost" size="icon" onClick={() => copyFormUrl(form.id)} title="Copy Public Link">
-                                                            <Link2 className="h-4 w-4" />
-                                                        </Button>
-                                                        <Link href={`/dashboard/forms/${form.id}/submissions`}>
-                                                            <Button variant="ghost" size="icon" title="View Submissions">
-                                                                <FileText className="h-4 w-4" />
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon">
+                                                                <MoreVertical className="h-4 w-4" />
                                                             </Button>
-                                                        </Link>
-                                                        <Link href={`/dashboard/forms/builder/${form.id}`}>
-                                                            <Button variant="ghost" size="icon" title="Edit Form">
-                                                                <Edit className="h-4 w-4" />
-                                                            </Button>
-                                                        </Link>
-                                                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => deleteForm(form.id)} title="Delete Form">
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    </div>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuItem onClick={() => copyFormUrl(form.id)}>
+                                                                <Link2 className="h-4 w-4 mr-2" />
+                                                                Copy Public Link
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem asChild>
+                                                                <Link href={`/dashboard/forms/${form.id}/submissions`} className="flex items-center">
+                                                                    <FileText className="h-4 w-4 mr-2" />
+                                                                    View Submissions
+                                                                </Link>
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem asChild>
+                                                                <Link href={`/dashboard/forms/builder/${form.id}`} className="flex items-center">
+                                                                    <Edit className="h-4 w-4 mr-2" />
+                                                                    Edit Form
+                                                                </Link>
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                className="text-destructive focus:text-destructive"
+                                                                onClick={() => deleteForm(form.id)}
+                                                            >
+                                                                <Trash2 className="h-4 w-4 mr-2" />
+                                                                Delete Form
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
                                                 </TableCell>
                                             </TableRow>
                                         )

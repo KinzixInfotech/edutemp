@@ -143,6 +143,7 @@ export async function POST(req) {
                     discountAmount: newDiscountAmount,
                     finalAmount: newFinalAmount,
                     balanceAmount: Math.max(0, newBalanceAmount),
+                    balance: Math.max(0, newBalanceAmount),
                     status: newStatus,
                 },
             });
@@ -208,6 +209,7 @@ export async function DELETE(req) {
                     discountAmount: newDiscountAmount,
                     finalAmount: newFinalAmount,
                     balanceAmount: Math.max(0, newBalanceAmount),
+                    balance: Math.max(0, newBalanceAmount),
                     status: newStatus,
                 },
             });

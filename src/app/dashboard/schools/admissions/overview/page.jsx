@@ -86,7 +86,7 @@ function StageDonutChart({ stages, total }) {
             </svg>
             <div className="flex flex-col gap-1.5 flex-1 min-w-0">
                 {stages.map((stage, i) => (
-                    <div key={stage.name} className="flex items-center gap-2 text-sm">
+                    <div key={stage.name} className="flex  items-center gap-2 text-sm">
                         <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: colors[i % colors.length] }} />
                         <span className="truncate flex-1 text-muted-foreground">{stage.name}</span>
                         <span className="font-medium tabular-nums">{stage.count}</span>

@@ -1,12 +1,15 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supbase-admin";
+import { verifyAdminAccess } from "@/lib/api-auth";
 import { z } from "zod";
+import { differenceInYears } from "date-fns";
 
 const roleMap = {
     students: "STUDENT",
     teacher: "TEACHING_STAFF",
     parents: "PARENT",
+    "non-teaching": "NON_TEACHING_STAFF",
     staff: "NON_TEACHING_STAFF",
     labassistants: "NON_TEACHING_STAFF",
     librarians: "NON_TEACHING_STAFF",
@@ -23,12 +26,11 @@ const baseUserSchema = z.object({
 const studentSchema = baseUserSchema.extend({
     studentName: z.string(),
     admissionNo: z.string(),
-    // academicYearId: z.string(),
     schoolId: z.string().uuid(),
-    dob: z.coerce.date(),
-    profilePicture: z.string(),
+    dob: z.coerce.date().optional().nullable(),
+    profilePicture: z.string().optional().nullable(),
     gender: z.string().toUpperCase(),
-    address: z.string(),
+    address: z.string().optional().default(""),
     fatherName: z.string().optional(),
     motherName: z.string().optional(),
     fatherMobileNumber: z.string().optional(),
@@ -59,53 +61,49 @@ const studentSchema = baseUserSchema.extend({
 const teacherSchema = baseUserSchema.extend({
     name: z.string(),
     departmentId: z.string().optional(),
-
-    profilePicture: z.string(),
-    designation: z.string(),
-    empployeeId: z.string(),
-    gender: z.string(),
-    age: z.string(),
-    bloodGroup: z.string(),
-    address: z.string(),
-    dob: z.coerce.date(),
-    city: z.string(),
-    district: z.string(),
-    state: z.string(),
-    country: z.string(),
-    postalCode: z.string(),
-    contactNumber: z.string(),
+    profilePicture: z.string().optional().nullable(),
+    designation: z.string().optional().default(""),
+    empployeeId: z.string().optional().default(""),
+    gender: z.string().optional().default(""),
+    age: z.string().optional().default(""),
+    bloodGroup: z.string().optional().default(""),
+    address: z.string().optional().default(""),
+    dob: z.coerce.date().optional().nullable(),
+    city: z.string().optional().default(""),
+    district: z.string().optional().default(""),
+    state: z.string().optional().default(""),
+    country: z.string().optional().default(""),
+    postalCode: z.string().optional().default(""),
+    contactNumber: z.string().optional().default(""),
     schoolId: z.string().uuid(),
     department: z.string().optional(),
-    designation: z.string(),
 });
 
 const staffSchema = baseUserSchema.extend({
     name: z.string(),
     departmentId: z.string().optional(),
-
-    profilePicture: z.string(),
-    designation: z.string(),
-    empployeeId: z.string(),
-    gender: z.string(),
-    age: z.string(),
-    bloodGroup: z.string(),
-    address: z.string(),
-    dob: z.coerce.date(),
-    city: z.string(),
-    district: z.string(),
-    state: z.string(),
-    country: z.string(),
-    postalCode: z.string(),
-    contactNumber: z.string(),
+    profilePicture: z.string().optional().nullable(),
+    designation: z.string().optional().default(""),
+    empployeeId: z.string().optional().default(""),
+    gender: z.string().optional().default(""),
+    age: z.string().optional().default(""),
+    bloodGroup: z.string().optional().default(""),
+    address: z.string().optional().default(""),
+    dob: z.coerce.date().optional().nullable(),
+    city: z.string().optional().default(""),
+    district: z.string().optional().default(""),
+    state: z.string().optional().default(""),
+    country: z.string().optional().default(""),
+    postalCode: z.string().optional().default(""),
+    contactNumber: z.string().optional().default(""),
     schoolId: z.string().uuid(),
     department: z.string().optional(),
-    designation: z.string(),
 });
 
 const parentSchema = baseUserSchema.extend({
     guardianName: z.string(),
     email: z.string().email(),
-    contactNumber: z.string(),
+    contactNumber: z.string().regex(/^\d{10}$/, "Contact number must be 10 digits"),
     alternateNumber: z.string().optional(),
     address: z.string().optional(),
     city: z.string().optional(),
@@ -116,11 +114,13 @@ const parentSchema = baseUserSchema.extend({
     qualification: z.string().optional(),
     annualIncome: z.string().optional(),
     bloodGroup: z.string().optional(),
+    gender: z.string().optional(),
     emergencyContactName: z.string().optional(),
     emergencyContactNumber: z.string().optional(),
     emergencyContactRelation: z.string().optional(),
     linkedStudentIds: z.array(z.string().uuid()).optional(),
     schoolId: z.string().uuid(),
+    profilePicture: z.string().optional().nullable(),
 });
 
 
@@ -130,6 +130,11 @@ export async function POST(req, context) {
     try {
         const rawRole = (await context.params).role;
         const schoolId = (await context.params).schoolId;
+
+        // ✅ Session auth + admin role + school access verification
+        const auth = await verifyAdminAccess(req, schoolId);
+        if (auth.error) return auth.response;
+
         const mappedRole = roleMap[rawRole?.toLowerCase()];
         const validRoles = ["STUDENT", "TEACHING_STAFF", "PARENT", "NON_TEACHING_STAFF"];
 
@@ -138,7 +143,6 @@ export async function POST(req, context) {
         }
 
         const body = await req.json();
-        console.log(body, "from edu");
 
         let parsed;
 
@@ -159,6 +163,64 @@ export async function POST(req, context) {
                 return NextResponse.json({ error: "Unsupported role" }, { status: 400 });
         }
 
+        // ✅ Duplicate email check
+        const existingUser = await prisma.user.findUnique({
+            where: { email: parsed.email },
+        });
+        if (existingUser) {
+            return NextResponse.json(
+                { error: "A user with this email already exists" },
+                { status: 409 }
+            );
+        }
+
+        // ✅ Duplicate phone check (role-specific, within same school)
+        if (parsed.contactNumber && parsed.contactNumber.length >= 10) {
+            let phoneExists = false;
+            if (mappedRole === "TEACHING_STAFF") {
+                phoneExists = await prisma.teachingStaff.findFirst({
+                    where: { schoolId, contactNumber: parsed.contactNumber },
+                });
+            } else if (mappedRole === "NON_TEACHING_STAFF") {
+                phoneExists = await prisma.nonTeachingStaff.findFirst({
+                    where: { schoolId, contactNumber: parsed.contactNumber },
+                });
+            } else if (mappedRole === "PARENT") {
+                phoneExists = await prisma.parent.findFirst({
+                    where: { schoolId, contactNumber: parsed.contactNumber },
+                });
+            }
+            if (phoneExists) {
+                return NextResponse.json(
+                    { error: "A profile with this contact number already exists in this school" },
+                    { status: 409 }
+                );
+            }
+        }
+
+        // ✅ DOB age validation
+        if (parsed.dob) {
+            const age = differenceInYears(new Date(), new Date(parsed.dob));
+            if (age < 3) {
+                return NextResponse.json(
+                    { error: "Date of birth results in age less than 3 years" },
+                    { status: 400 }
+                );
+            }
+            if (age > 100) {
+                return NextResponse.json(
+                    { error: "Date of birth results in age greater than 100 years" },
+                    { status: 400 }
+                );
+            }
+            if (new Date(parsed.dob) > new Date()) {
+                return NextResponse.json(
+                    { error: "Date of birth cannot be in the future" },
+                    { status: 400 }
+                );
+            }
+        }
+
         //  Fetch active academic year only for student/staff
         let activeAcademicYear = null;
         if (["STUDENT", "TEACHING_STAFF", "NON_TEACHING_STAFF"].includes(mappedRole)) {
@@ -173,14 +235,14 @@ export async function POST(req, context) {
             }
         }
 
-        // ✅ Determine the correct name field based on role
+        // Determine the correct name field based on role
         const userName = mappedRole === "STUDENT"
             ? parsed.studentName
             : mappedRole === "PARENT"
                 ? parsed.guardianName
                 : parsed.name;
 
-        // ✅ Supabase user creation
+        // Supabase user creation
         const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
             user_metadata: { name: userName },
             email: parsed.email,
@@ -208,7 +270,7 @@ export async function POST(req, context) {
                     data: {
                         id: createdUserId,
                         password: parsed.password,
-                        profilePicture: parsed.profilePicture,
+                        profilePicture: parsed.profilePicture || null,
                         name: userName,
                         email: parsed.email,
                         school: { connect: { id: parsed.schoolId } },
@@ -232,10 +294,10 @@ export async function POST(req, context) {
                                 school: { connect: { id: parsed.schoolId } },
                                 user: { connect: { id: user.id } },
                                 class: { connect: { id: parsed.classId } },
-                                dob: parsed.dob.toISOString(),
+                                dob: parsed.dob ? parsed.dob.toISOString() : "",
                                 gender: parsed.gender,
                                 PreviousSchoolName: parsed.previousSchoolName,
-                                Address: parsed.address,
+                                Address: parsed.address || "",
                                 FatherName: parsed.fatherName,
                                 MotherName: parsed.motherName,
                                 FatherNumber: parsed.fatherMobileNumber || "",
@@ -243,7 +305,6 @@ export async function POST(req, context) {
                                 bloodGroup: parsed.bloodGroup || "",
                                 contactNumber: parsed.contactNumber || "",
                                 email: parsed.email,
-                                // FeeStatus: "PENDING",
                                 admissionDate:
                                     parsed.admissionDate?.toISOString() || new Date().toISOString(),
                                 rollNumber: parsed.rollNumber || "",
@@ -262,8 +323,8 @@ export async function POST(req, context) {
                                         studentParentLinks: {
                                             create: parsed.linkedParentIds.map(parentId => ({
                                                 parent: { connect: { id: parentId } },
-                                                relation: "GUARDIAN", // or determine from form
-                                                isPrimary: false // or determine from form
+                                                relation: "GUARDIAN",
+                                                isPrimary: false
                                             })),
                                         },
                                     }
@@ -277,17 +338,17 @@ export async function POST(req, context) {
                             data: {
                                 school: { connect: { id: parsed.schoolId } },
                                 user: { connect: { id: user.id } },
-                                designation: parsed.designation,
-                                gender: parsed.gender,
-                                employeeId: parsed.empployeeId,
+                                designation: parsed.designation || "",
+                                gender: parsed.gender || "",
+                                employeeId: parsed.empployeeId || "",
                                 name: parsed.name,
-                                age: parsed.age,
-                                bloodGroup: parsed.bloodGroup,
-                                dob: parsed.dob.toISOString(),
-                                contactNumber: parsed.contactNumber,
+                                age: parsed.age || "",
+                                bloodGroup: parsed.bloodGroup || "",
+                                dob: parsed.dob ? parsed.dob.toISOString() : "",
+                                contactNumber: parsed.contactNumber || "",
                                 email: parsed.email,
-                                address: parsed.address,
-                                City: parsed.city,
+                                address: parsed.address || "",
+                                City: parsed.city || "",
                                 district: parsed.district || "",
                                 state: parsed.state || "",
                                 country: parsed.country || "",
@@ -296,7 +357,7 @@ export async function POST(req, context) {
                             },
                         });
 
-                        // ✅ Auto-create payroll profile for teaching staff
+                        // Auto-create payroll profile for teaching staff
                         await tx.employeePayrollProfile.create({
                             data: {
                                 schoolId: parsed.schoolId,
@@ -311,22 +372,21 @@ export async function POST(req, context) {
 
                     case "NON_TEACHING_STAFF":
                         if (rawRole?.toLowerCase() === "busdrivers") {
-                            // ❌ Bus drivers: no academic year
                             profile = await tx.NonTeachingStaff.create({
                                 data: {
                                     school: { connect: { id: parsed.schoolId } },
                                     user: { connect: { id: user.id } },
-                                    designation: parsed.designation,
-                                    gender: parsed.gender,
-                                    employeeId: parsed.empployeeId,
+                                    designation: parsed.designation || "",
+                                    gender: parsed.gender || "",
+                                    employeeId: parsed.empployeeId || "",
                                     name: parsed.name,
-                                    age: parsed.age,
-                                    bloodGroup: parsed.bloodGroup,
-                                    dob: parsed.dob.toISOString(),
-                                    contactNumber: parsed.contactNumber,
+                                    age: parsed.age || "",
+                                    bloodGroup: parsed.bloodGroup || "",
+                                    dob: parsed.dob ? parsed.dob.toISOString() : "",
+                                    contactNumber: parsed.contactNumber || "",
                                     email: parsed.email,
-                                    address: parsed.address,
-                                    City: parsed.city,
+                                    address: parsed.address || "",
+                                    City: parsed.city || "",
                                     district: parsed.district || "",
                                     state: parsed.state || "",
                                     country: parsed.country || "",
@@ -334,22 +394,21 @@ export async function POST(req, context) {
                                 },
                             });
                         } else {
-                            // ✅ Other non-teaching staff: with academic year
                             profile = await tx.NonTeachingStaff.create({
                                 data: {
                                     school: { connect: { id: parsed.schoolId } },
                                     user: { connect: { id: user.id } },
-                                    designation: parsed.designation,
-                                    gender: parsed.gender,
-                                    employeeId: parsed.empployeeId,
+                                    designation: parsed.designation || "",
+                                    gender: parsed.gender || "",
+                                    employeeId: parsed.empployeeId || "",
                                     name: parsed.name,
-                                    age: parsed.age,
-                                    bloodGroup: parsed.bloodGroup,
-                                    dob: parsed.dob.toISOString(),
-                                    contactNumber: parsed.contactNumber,
+                                    age: parsed.age || "",
+                                    bloodGroup: parsed.bloodGroup || "",
+                                    dob: parsed.dob ? parsed.dob.toISOString() : "",
+                                    contactNumber: parsed.contactNumber || "",
                                     email: parsed.email,
-                                    address: parsed.address,
-                                    City: parsed.city,
+                                    address: parsed.address || "",
+                                    City: parsed.city || "",
                                     district: parsed.district || "",
                                     state: parsed.state || "",
                                     country: parsed.country || "",
@@ -359,7 +418,7 @@ export async function POST(req, context) {
                             });
                         }
 
-                        // ✅ Auto-create payroll profile for non-teaching staff
+                        // Auto-create payroll profile for non-teaching staff
                         await tx.employeePayrollProfile.create({
                             data: {
                                 schoolId: parsed.schoolId,
@@ -393,7 +452,6 @@ export async function POST(req, context) {
                                 emergencyContactName: parsed.emergencyContactName || null,
                                 emergencyContactNumber: parsed.emergencyContactNumber || null,
                                 emergencyContactRelation: parsed.emergencyContactRelation || null,
-                                // Only create student link if childId is provided
                                 ...(parsed.linkedStudentIds && parsed.linkedStudentIds.length
                                     ? {
                                         studentLinks: {
@@ -416,7 +474,7 @@ export async function POST(req, context) {
             }
         );
 
-        // Track profile picture upload in prisma.upload table (Migrated from UploadThing callback)
+        // Track profile picture upload in prisma.upload table
         if (parsed.profilePicture && parsed.profilePicture.includes('r2.edubreezy.com')) {
             try {
                 await prisma.upload.create({

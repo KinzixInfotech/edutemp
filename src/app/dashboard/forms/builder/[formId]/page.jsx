@@ -414,7 +414,7 @@ export default function FormBuilderPage() {
                                 <CardTitle>Form Settings</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-6">
-                                <div className="flex items-center justify-between">
+                                {/* <div className="flex items-center justify-between">
                                     <div className="space-y-0.5">
                                         <Label className="text-base">Public Access</Label>
                                         <p className="text-sm text-muted-foreground">Allow anyone with the link to view and submit this form.</p>
@@ -423,7 +423,7 @@ export default function FormBuilderPage() {
                                         checked={settings.isPublic}
                                         onCheckedChange={(c) => setSettings({ ...settings, isPublic: c })}
                                     />
-                                </div>
+                                </div> */}
                                 <div className="flex items-center justify-between">
                                     <div className="space-y-0.5">
                                         <Label className="text-base">Allow Multiple Submissions</Label>

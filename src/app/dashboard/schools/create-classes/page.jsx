@@ -298,6 +298,8 @@ export default function ManageClassSectionPage() {
         staleTime: 1000 * 60 * 5,
     })
 
+
+
     // Capacity: stacked bar (students + remaining)
     const sectionCapacityData = useMemo(() => {
         const data = []
@@ -339,22 +341,7 @@ export default function ManageClassSectionPage() {
         return data.sort((a, b) => b.students - a.students).slice(0, 10)
     }, [allClassesForCharts])
 
-    // Teacher workload: sorted desc, with warning threshold
-    const teacherWorkloadData = useMemo(() => {
-        const map = {}
-        allClassesForCharts.forEach(cls => {
-            cls.sections?.forEach(sec => {
-                if (sec.teachingStaff?.name) {
-                    map[sec.teachingStaff.name] = (map[sec.teachingStaff.name] || 0) + 1
-                }
-            })
-        })
-        return Object.entries(map)
-            .filter(([, count]) => count >= 1)
-            .map(([name, sections]) => ({ name, sections }))
-            .sort((a, b) => b.sections - a.sections)
-            .slice(0, 10)
-    }, [allClassesForCharts])
+
 
     const handleChartBarClick = useCallback((entry) => {
         if (!entry) return
@@ -846,34 +833,7 @@ export default function ManageClassSectionPage() {
                                     </CardContent>
                                 </Card>
 
-                                {/* Teacher Workload — Horizontal with warning colors */}
-                                <Card className="border shadow-none">
-                                    <CardHeader className="pb-1 pt-4 px-4">
-                                        <CardTitle className="text-sm">Teacher Workload</CardTitle>
-                                        <p className="text-[11px] text-muted-foreground">Green ≤2 · Orange 3 · Red 4+</p>
-                                    </CardHeader>
-                                    <CardContent className="px-4 pb-4">
-                                        {teacherWorkloadData.length === 0 ? (
-                                            <div className="h-[200px] flex items-center justify-center text-xs text-muted-foreground">No teachers assigned yet</div>
-                                        ) : (
-                                            <div className="h-[200px] w-full">
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <BarChart data={teacherWorkloadData} layout="vertical" margin={{ top: 5, right: 15, left: 5, bottom: 5 }}>
-                                                        <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                                                        <XAxis type="number" tick={{ fontSize: 10 }} className="text-muted-foreground" allowDecimals={false} />
-                                                        <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} width={90} className="text-muted-foreground" />
-                                                        <Tooltip content={<ChartTooltip />} />
-                                                        <Bar dataKey="sections" name="Sections" radius={[0, 4, 4, 0]} cursor="pointer" onClick={(d) => { if (d?.payload?.name) { setSearchQuery(d.payload.name); setPage(1) } }}>
-                                                            {teacherWorkloadData.map((entry, idx) => (
-                                                                <Cell key={idx} fill={entry.sections >= 4 ? 'hsl(0, 72%, 51%)' : entry.sections === 3 ? 'hsl(25, 95%, 53%)' : 'hsl(142, 71%, 45%)'} />
-                                                            ))}
-                                                        </Bar>
-                                                    </BarChart>
-                                                </ResponsiveContainer>
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
+
                             </div>
                         )}
                     </CardContent>
