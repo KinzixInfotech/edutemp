@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useDebounce } from '@/hooks/useDebounce';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from "@/lib/utils";
 import { Badge } from '@/components/ui/badge';
@@ -54,6 +55,7 @@ export default function ParentListPage() {
     console.log(dialogData);
 
     const [search, setSearch] = useState('');
+    const debouncedSearch = useDebounce(search, 400);
     const [studentSearchOpen, setStudentSearchOpen] = useState(false);
     const [studentSearchQuery, setStudentSearchQuery] = useState('');
     const [selectedStudents, setSelectedStudents] = useState([]);
@@ -62,10 +64,10 @@ export default function ParentListPage() {
 
     // Fetch parents with pagination
     const { data: parentData = {}, isLoading: parentsLoading, isFetching } = useQuery({
-        queryKey: ['parents', schoolId, page, search],
+        queryKey: ['parents', schoolId, page, debouncedSearch],
         queryFn: async () => {
             const res = await axios.get(`/api/schools/${schoolId}/parents`, {
-                params: { page, limit: itemsPerPage, search }
+                params: { page, limit: itemsPerPage, search: debouncedSearch }
             });
             return res.data || {};
         },

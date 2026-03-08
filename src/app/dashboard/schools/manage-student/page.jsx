@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useDebounce } from '@/hooks/useDebounce';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from "@/lib/utils";
 import { Badge } from '@/components/ui/badge';
@@ -43,6 +44,7 @@ export default function StudentListPage() {
     const [selected, setSelected] = useState([]);
     const [dialogData, setDialogData] = useState(null);
     const [search, setSearch] = useState('');
+    const debouncedSearch = useDebounce(search, 400);
     const [selectedParentId, setSelectedParentId] = useState(null);
     const [classFilter, setClassFilter] = useState('ALL');
     const [sectionFilter, setSectionFilter] = useState('ALL');
@@ -78,14 +80,14 @@ export default function StudentListPage() {
 
     // Fetch students with optimized query
     const { data: studentData = {}, isLoading: studentsLoading, isFetching } = useQuery({
-        queryKey: ['students', schoolId, page, search, classFilter, sectionFilter, sortBy],
+        queryKey: ['students', schoolId, page, debouncedSearch, classFilter, sectionFilter, sortBy],
         queryFn: async () => {
             const selectedClass = allClasses.find(c => c.className === classFilter);
             const classId = classFilter === 'ALL' ? '' : selectedClass?.id || '';
             const selectedSection = allSections.find(s => s.name === sectionFilter);
             const sectionId = sectionFilter === 'ALL' ? '' : selectedSection?.id || '';
             const res = await axios.get(`/api/schools/${schoolId}/students`, {
-                params: { page, limit: itemsPerPage, classId, sectionId, search, sortBy }
+                params: { page, limit: itemsPerPage, classId, sectionId, search: debouncedSearch, sortBy }
             });
             return res.data || {};
         },
@@ -208,7 +210,7 @@ export default function StudentListPage() {
     }
 
     return (
-        <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-4 sm:space-y-6">
+        <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
             {/* Header */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-1">
@@ -302,36 +304,45 @@ export default function StudentListPage() {
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
-                    <CardContent className="p-4 flex items-center justify-between">
-                        <div>
-                            <p className="text-sm text-muted-foreground">Total Students</p>
-                            <p className="text-2xl font-bold">{total}</p>
-                        </div>
-                        <div className="p-3 rounded-full bg-blue-500/20">
-                            <Users className="h-6 w-6 text-blue-500" />
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card className="bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
-                    <CardContent className="p-4 flex items-center justify-between">
-                        <div>
-                            <p className="text-sm text-muted-foreground">Active Students</p>
-                            <p className="text-2xl font-bold">{activeCount}</p>
-                        </div>
-                        <div className="p-3 rounded-full bg-green-500/20">
-                            <Users className="h-6 w-6 text-green-500" />
+                <Card>
+                    <CardContent className="pt-5 pb-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Students</p>
+                                <p className="text-2xl font-bold mt-1">{total}</p>
+                                <p className="text-xs text-muted-foreground mt-1">Enrolled in school</p>
+                            </div>
+                            <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                                <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
-                <Card className="bg-gradient-to-br from-amber-500/10 to-amber-600/5 border-amber-500/20">
-                    <CardContent className="p-4 flex items-center justify-between">
-                        <div>
-                            <p className="text-sm text-muted-foreground">Classes</p>
-                            <p className="text-2xl font-bold">{allClasses.length}</p>
+                <Card>
+                    <CardContent className="pt-5 pb-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Active Students</p>
+                                <p className="text-2xl font-bold mt-1">{activeCount}</p>
+                                <p className="text-xs text-muted-foreground mt-1">Currently active</p>
+                            </div>
+                            <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                                <Users className="h-5 w-5 text-green-600 dark:text-green-400" />
+                            </div>
                         </div>
-                        <div className="p-3 rounded-full bg-amber-500/20">
-                            <BookOpen className="h-6 w-6 text-amber-500" />
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardContent className="pt-5 pb-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Classes</p>
+                                <p className="text-2xl font-bold mt-1">{allClasses.length}</p>
+                                <p className="text-xs text-muted-foreground mt-1">Available classes</p>
+                            </div>
+                            <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                                <BookOpen className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -466,7 +477,7 @@ export default function StudentListPage() {
             )}
 
             {/* Students Table */}
-            <Card>
+            <Card className={'py-0 overflow-hidden'}>
                 <div className="overflow-x-auto">
                     <Table className="min-w-[800px]">
                         <TableHeader className="bg-muted sticky top-0 z-10">

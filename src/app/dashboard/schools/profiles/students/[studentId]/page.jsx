@@ -67,6 +67,26 @@ export default function StudentProfilePage() {
         refetchOnWindowFocus: true,
     });
 
+    // Fetch Classes for editing
+    const { data: schoolClasses } = useQuery({
+        queryKey: ['school-classes', schoolId],
+        queryFn: async () => {
+            const res = await axios.get(`/api/schools/${schoolId}/classes`);
+            return Array.isArray(res.data) ? res.data : res.data?.data || [];
+        },
+        enabled: !!schoolId && isEditOpen,
+    });
+
+    // Fetch Academic Years for editing
+    const { data: academicYears } = useQuery({
+        queryKey: ['academic-years', schoolId],
+        queryFn: async () => {
+            const res = await axios.get(`/api/schools/academic-years?schoolId=${schoolId}`);
+            return res.data;
+        },
+        enabled: !!schoolId && isEditOpen,
+    });
+
     // Update mutation
     const updateMutation = useMutation({
         mutationFn: async (data) => {
@@ -134,12 +154,20 @@ export default function StudentProfilePage() {
             city: student?.city || '',
             state: student?.state || '',
             postalCode: student?.postalCode || '',
+            classId: student?.classId?.toString() || '',
+            sectionId: student?.sectionId?.toString() || '',
+            academicYearId: student?.academicYearId || '',
+            admissionNo: student?.admissionNo || '',
+            admissionDate: student?.admissionDate ? new Date(student.admissionDate).toISOString().split('T')[0] : '',
         });
         setIsEditOpen(true);
     };
 
     const handleSave = () => {
-        updateMutation.mutate(editForm);
+        const payload = { ...editForm };
+        if (payload.classId) payload.classId = parseInt(payload.classId);
+        if (payload.sectionId) payload.sectionId = parseInt(payload.sectionId);
+        updateMutation.mutate(payload);
     };
 
     if (isLoading) {
@@ -188,81 +216,194 @@ export default function StudentProfilePage() {
                             <Edit className="mr-2 h-4 w-4" /> Edit Profile
                         </Button>
                     </SheetTrigger>
-                    <SheetContent className="sm:max-w-lg overflow-y-auto">
-                        <SheetHeader>
-                            <SheetTitle>Edit Student</SheetTitle>
-                            <SheetDescription>Update student information</SheetDescription>
+                    <SheetContent className="sm:max-w-xl p-0 flex flex-col h-full border-l shadow-2xl">
+                        <SheetHeader className="px-6 py-5 border-b bg-muted/30">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-primary/10 rounded-lg">
+                                    <User className="w-5 h-5 text-primary" />
+                                </div>
+                                <div>
+                                    <SheetTitle className="text-xl font-bold">Edit Student Profile</SheetTitle>
+                                    <SheetDescription>Make changes to the student's personal and academic records</SheetDescription>
+                                </div>
+                            </div>
                         </SheetHeader>
-                        <div className="grid gap-4 py-6">
-                            <div className="grid gap-2">
-                                <Label>Full Name</Label>
-                                <Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label>Email</Label>
-                                <Input type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="grid gap-2">
-                                    <Label>Roll Number</Label>
-                                    <Input value={editForm.rollNumber} onChange={(e) => setEditForm({ ...editForm, rollNumber: e.target.value })} />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label>Date of Birth</Label>
-                                    <Input type="date" value={editForm.dob} onChange={(e) => setEditForm({ ...editForm, dob: e.target.value })} />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="grid gap-2">
-                                    <Label>Gender</Label>
-                                    <Select value={editForm.gender} onValueChange={(val) => setEditForm({ ...editForm, gender: val })}>
-                                        <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="MALE">Male</SelectItem>
-                                            <SelectItem value="FEMALE">Female</SelectItem>
-                                            <SelectItem value="OTHER">Other</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label>Blood Group</Label>
-                                    <Select value={editForm.bloodGroup} onValueChange={(val) => setEditForm({ ...editForm, bloodGroup: val })}>
-                                        <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                                        <SelectContent>
-                                            {['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'].map(bg => (
-                                                <SelectItem key={bg} value={bg}>{bg}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-                            <div className="grid gap-2">
-                                <Label>Address</Label>
-                                <Input value={editForm.Address} onChange={(e) => setEditForm({ ...editForm, Address: e.target.value })} />
-                            </div>
-                            <div className="grid grid-cols-3 gap-4">
-                                <div className="grid gap-2">
-                                    <Label>City</Label>
-                                    <Input value={editForm.city} onChange={(e) => setEditForm({ ...editForm, city: e.target.value })} />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label>State</Label>
-                                    <Input value={editForm.state} onChange={(e) => setEditForm({ ...editForm, state: e.target.value })} />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label>ZIP</Label>
-                                    <Input value={editForm.postalCode} onChange={(e) => setEditForm({ ...editForm, postalCode: e.target.value })} />
-                                </div>
+
+                        <div className="flex-1 overflow-y-auto px-6 py-6 custom-scrollbar">
+                            <div className="space-y-8 pb-10">
+                                {/* Academic Status */}
+                                <section className="space-y-4">
+                                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground/70 flex items-center gap-2">
+                                        <div className="h-px w-4 bg-muted-foreground/30" /> Academic Information
+                                    </h4>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-semibold">Class</Label>
+                                            <Select
+                                                value={editForm.classId}
+                                                onValueChange={(val) => {
+                                                    setEditForm({ ...editForm, classId: val, sectionId: '' });
+                                                }}
+                                            >
+                                                <SelectTrigger className="h-10 bg-muted/20">
+                                                    <SelectValue placeholder="Select Class" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {schoolClasses?.map((cls) => (
+                                                        <SelectItem key={cls.id} value={cls.id.toString()}>{cls.className}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-semibold">Section</Label>
+                                            <Select
+                                                value={editForm.sectionId}
+                                                onValueChange={(val) => setEditForm({ ...editForm, sectionId: val })}
+                                                disabled={!editForm.classId}
+                                            >
+                                                <SelectTrigger className="h-10 bg-muted/20">
+                                                    <SelectValue placeholder="Select Section" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {schoolClasses?.find(c => c.id.toString() === editForm.classId)?.sections?.map((sec) => (
+                                                        <SelectItem key={sec.id} value={sec.id.toString()}>{sec.name}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-semibold">Admission No.</Label>
+                                            <Input
+                                                value={editForm.admissionNo}
+                                                onChange={(e) => setEditForm({ ...editForm, admissionNo: e.target.value })}
+                                                className="h-10 bg-muted/20"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-semibold">Roll Number</Label>
+                                            <Input
+                                                value={editForm.rollNumber}
+                                                onChange={(e) => setEditForm({ ...editForm, rollNumber: e.target.value })}
+                                                className="h-10 bg-muted/20"
+                                            />
+                                        </div>
+                                    </div>
+                                </section>
+
+                                {/* Personal Details */}
+                                <section className="space-y-4 pt-2">
+                                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground/70 flex items-center gap-2">
+                                        <div className="h-px w-4 bg-muted-foreground/30" /> Personal Details
+                                    </h4>
+                                    <div className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-semibold">Full Name</Label>
+                                            <Input
+                                                value={editForm.name}
+                                                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                                                className="h-10 border-primary/20 focus-visible:ring-primary/30"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-semibold">Email Address</Label>
+                                            <Input
+                                                type="email"
+                                                value={editForm.email}
+                                                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                                                className="h-10 border-primary/20 focus-visible:ring-primary/30"
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs font-semibold">Date of Birth</Label>
+                                                <Input
+                                                    type="date"
+                                                    value={editForm.dob}
+                                                    onChange={(e) => setEditForm({ ...editForm, dob: e.target.value })}
+                                                    className="h-10 bg-muted/20"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-xs font-semibold">Gender</Label>
+                                                <Select value={editForm.gender} onValueChange={(val) => setEditForm({ ...editForm, gender: val })}>
+                                                    <SelectTrigger className="h-10 bg-muted/20"><SelectValue placeholder="Select" /></SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="MALE">Male</SelectItem>
+                                                        <SelectItem value="FEMALE">Female</SelectItem>
+                                                        <SelectItem value="OTHER">Other</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                {/* Address & Contact */}
+                                <section className="space-y-4 pt-2">
+                                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground/70 flex items-center gap-2">
+                                        <div className="h-px w-4 bg-muted-foreground/30" /> Address & Location
+                                    </h4>
+                                    <div className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label className="text-xs font-semibold">Permanent Address</Label>
+                                            <Input
+                                                value={editForm.Address}
+                                                onChange={(e) => setEditForm({ ...editForm, Address: e.target.value })}
+                                                className="h-10 bg-muted/20"
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-3">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs font-semibold">City</Label>
+                                                <Input
+                                                    value={editForm.city}
+                                                    onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                                                    className="h-10 bg-muted/20"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-xs font-semibold">State</Label>
+                                                <Input
+                                                    value={editForm.state}
+                                                    onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}
+                                                    className="h-10 bg-muted/20"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-xs font-semibold">ZIP Code</Label>
+                                                <Input
+                                                    value={editForm.postalCode}
+                                                    onChange={(e) => setEditForm({ ...editForm, postalCode: e.target.value })}
+                                                    className="h-10 bg-muted/20"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
                             </div>
                         </div>
-                        <SheetFooter>
-                            <SheetClose asChild>
-                                <Button variant="outline">Cancel</Button>
-                            </SheetClose>
-                            <Button onClick={handleSave} disabled={updateMutation.isPending}>
-                                {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Save Changes
-                            </Button>
+
+                        <SheetFooter className="px-6 py-5 border-t bg-muted/10 shrink-0">
+                            <div className="flex w-full gap-3">
+                                <SheetClose asChild>
+                                    <Button variant="outline" className="flex-1 h-11 border-muted-foreground/20 hover:bg-muted/50">
+                                        Discard Changes
+                                    </Button>
+                                </SheetClose>
+                                <Button
+                                    onClick={handleSave}
+                                    disabled={updateMutation.isPending}
+                                    className="flex-1 h-11 bg-primary hover:bg-primary/90 shadow-md shadow-primary/20"
+                                >
+                                    {updateMutation.isPending ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Save className="mr-2 h-4 w-4" />
+                                    )}
+                                    Update Record
+                                </Button>
+                            </div>
                         </SheetFooter>
                     </SheetContent>
                 </Sheet>
