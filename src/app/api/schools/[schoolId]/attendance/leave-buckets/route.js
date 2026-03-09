@@ -27,16 +27,26 @@ export async function GET(req, props) {
         const cacheKey = generateKey('leave:buckets', { schoolId, academicYearId, isActive });
 
         const buckets = await remember(cacheKey, async () => {
-            return prisma.leaveBucket.findMany({
+            const rawBuckets = await prisma.leaveBucket.findMany({
                 where: {
                     schoolId,
                     ...(academicYearId && { academicYearId }),
-                    ...(isActive !== null && isActive !== undefined && { isActive: isActive === 'true' })
                 },
                 orderBy: [
                     { leaveType: 'asc' }
                 ]
             });
+
+            // Map schema fields back to what the UI expects for compatibility
+            return rawBuckets.map(bucket => ({
+                ...bucket,
+                carryForwardLimit: bucket.maxCarryForward,
+                encashmentLimit: bucket.encashable ? 1 : 0, // Schema lacks encashment limit, so we use a flag
+                encashmentPerDayRate: bucket.encashmentRate,
+                applicableToTeaching: bucket.applicableTo.includes('TEACHING'),
+                applicableToNonTeaching: bucket.applicableTo.includes('NON_TEACHING'),
+                isActive: true // Schema lacks isActive, so we default to true
+            }));
         }, 600); // Cache for 10 minutes
 
         return NextResponse.json(buckets);
@@ -105,17 +115,20 @@ export async function POST(req, props) {
 
         const bucket = await prisma.leaveBucket.create({
             data: {
-                schoolId,
-                academicYearId,
-                leaveType,
-                yearlyLimit,
-                monthlyLimit: monthlyLimit || null,
-                carryForwardLimit: carryForwardLimit || 0,
-                encashmentLimit: encashmentLimit || 0,
-                encashmentPerDayRate: encashmentPerDayRate || null,
-                applicableToTeaching: applicableToTeaching ?? true,
-                applicableToNonTeaching: applicableToNonTeaching ?? true,
-                isActive: true
+                school: { connect: { id: schoolId } },
+                academicYearId: academicYearId,
+                leaveType: leaveType,
+                yearlyLimit: parseInt(yearlyLimit) || 0,
+                monthlyLimit: parseInt(monthlyLimit) || 0,
+                carryForward: (parseInt(carryForwardLimit) || 0) > 0,
+                maxCarryForward: parseInt(carryForwardLimit) || 0,
+                encashable: (parseInt(encashmentLimit) || 0) > 0,
+                encashmentRate: parseFloat(encashmentPerDayRate) || null,
+                applicableTo: [
+                    ...(applicableToTeaching ? ['TEACHING'] : []),
+                    ...(applicableToNonTeaching ? ['NON_TEACHING'] : [])
+                ],
+                description: data.description || null
             }
         });
 
@@ -170,14 +183,17 @@ export async function PUT(req, props) {
         const bucket = await prisma.leaveBucket.update({
             where: { id },
             data: {
-                yearlyLimit: updateData.yearlyLimit,
-                monthlyLimit: updateData.monthlyLimit,
-                carryForwardLimit: updateData.carryForwardLimit,
-                encashmentLimit: updateData.encashmentLimit,
-                encashmentPerDayRate: updateData.encashmentPerDayRate,
-                applicableToTeaching: updateData.applicableToTeaching,
-                applicableToNonTeaching: updateData.applicableToNonTeaching,
-                isActive: updateData.isActive
+                yearlyLimit: parseInt(updateData.yearlyLimit),
+                monthlyLimit: parseInt(updateData.monthlyLimit),
+                carryForward: (parseInt(updateData.carryForwardLimit) || 0) > 0,
+                maxCarryForward: parseInt(updateData.carryForwardLimit),
+                encashable: (parseInt(updateData.encashmentLimit) || 0) > 0,
+                encashmentRate: parseFloat(updateData.encashmentPerDayRate),
+                applicableTo: [
+                    ...(updateData.applicableToTeaching ? ['TEACHING'] : []),
+                    ...(updateData.applicableToNonTeaching ? ['NON_TEACHING'] : [])
+                ],
+                description: updateData.description
             }
         });
 
