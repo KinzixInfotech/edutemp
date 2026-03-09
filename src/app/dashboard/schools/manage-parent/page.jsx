@@ -252,7 +252,7 @@ export default function ParentListPage() {
     }
 
     return (
-        <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-4 sm:space-y-6">
+        <div className="p-4 sm:p-6 lg:p-8  space-y-4 sm:space-y-6">
             {/* Header */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-1">
@@ -412,7 +412,7 @@ export default function ParentListPage() {
             )}
 
             {/* Parents Table */}
-            <Card>
+            <Card className={'py-0 overflow-hidden'}>
                 <div className="overflow-x-auto">
                     <Table className="min-w-[900px]">
                         <TableHeader className="bg-muted sticky top-0 z-10">
@@ -549,7 +549,7 @@ export default function ParentListPage() {
                                                     <Eye className="mr-1.5 h-3.5 w-3.5" />
                                                     View
                                                 </Button>
-                                                <Link href={`/dashboard/schools/profiles/parents/${parent.userId}`}>
+                                                <Link href={`/dashboard/schools/profiles/parents/${parent.id}`}>
                                                     <Button variant="ghost" size="sm">
                                                         <ExternalLink className="h-3.5 w-3.5" />
                                                     </Button>

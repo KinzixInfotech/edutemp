@@ -341,7 +341,17 @@ export default function ManageClassSectionPage() {
         return data.sort((a, b) => b.students - a.students).slice(0, 10)
     }, [allClassesForCharts])
 
-
+    // Workload: teachers and their section counts
+    const teacherWorkloadData = useMemo(() => {
+        return teachers
+            .filter(t => t._sectionCount > 0)
+            .map(t => ({
+                name: t.name,
+                sections: t._sectionCount,
+            }))
+            .sort((a, b) => b.sections - a.sections)
+            .slice(0, 10)
+    }, [teachers])
 
     const handleChartBarClick = useCallback((entry) => {
         if (!entry) return
