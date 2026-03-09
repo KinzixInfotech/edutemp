@@ -8,7 +8,8 @@ import {
     User, ArrowLeft, Mail, Phone, MapPin, Calendar, Users, Briefcase,
     GraduationCap, Heart, ShieldAlert, Loader2, ExternalLink, School,
     FileText, X, Check, Building2, CreditCard, BadgeInfo,
-    PhoneCall, Globe, Hash, UserCheck, Clock, AlertCircle, Pencil
+    PhoneCall, Globe, Hash, UserCheck, Clock, AlertCircle, Pencil,
+    Plus, Search, Link as LinkIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,22 +18,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
+import { useDebounce } from '@/hooks/useDebounce';
 
-// Relation badge color map
+// Relation badge color map (restricted to allowed types)
 const RELATION_COLORS = {
     FATHER: 'bg-blue-50 text-blue-700 border-blue-200',
     MOTHER: 'bg-pink-50 text-pink-700 border-pink-200',
     GUARDIAN: 'bg-purple-50 text-purple-700 border-purple-200',
-    GRANDFATHER: 'bg-amber-50 text-amber-700 border-amber-200',
-    GRANDMOTHER: 'bg-orange-50 text-orange-700 border-orange-200',
-    UNCLE: 'bg-teal-50 text-teal-700 border-teal-200',
-    AUNT: 'bg-cyan-50 text-cyan-700 border-cyan-200',
-    SIBLING: 'bg-green-50 text-green-700 border-green-200',
     OTHER: 'bg-gray-50 text-gray-700 border-gray-200',
 };
+
+const ALLOWED_RELATIONS = [
+    { value: 'FATHER', label: 'Father' },
+    { value: 'MOTHER', label: 'Mother' },
+    { value: 'GUARDIAN', label: 'Guardian' },
+];
 
 function RelationBadge({ relation }) {
     const color = RELATION_COLORS[relation] || RELATION_COLORS.OTHER;
@@ -145,6 +150,14 @@ export default function ParentProfilePage() {
     const [editingField, setEditingField] = useState(null);
     const [editValues, setEditValues] = useState({});
 
+    // Link student dialog state
+    const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+    const [studentSearch, setStudentSearch] = useState('');
+    const debouncedStudentSearch = useDebounce(studentSearch, 400);
+    const [selectedStudent, setSelectedStudent] = useState(null);
+    const [linkRelation, setLinkRelation] = useState('GUARDIAN');
+    const [linkIsPrimary, setLinkIsPrimary] = useState(false);
+
     const { data: parent, isLoading } = useQuery({
         queryKey: ['parent-profile', parentId],
         queryFn: async () => {
@@ -153,6 +166,19 @@ export default function ParentProfilePage() {
         },
         enabled: !!schoolId && !!parentId,
     });
+
+    // Search students for linking
+    const { data: searchResults, isFetching: searchingStudents } = useQuery({
+        queryKey: ['students-search', schoolId, debouncedStudentSearch],
+        queryFn: async () => {
+            const res = await axios.get(`/api/schools/${schoolId}/students/search?q=${encodeURIComponent(debouncedStudentSearch)}`);
+            return res.data;
+        },
+        enabled: !!schoolId && linkDialogOpen && debouncedStudentSearch.length >= 2,
+        staleTime: 30000,
+    });
+
+    const searchedStudents = searchResults?.students || [];
 
     const updateMutation = useMutation({
         mutationFn: async (data) => {
@@ -166,6 +192,62 @@ export default function ParentProfilePage() {
         },
         onError: () => toast.error('Failed to update'),
     });
+
+    // Link student mutation
+    const linkStudentMutation = useMutation({
+        mutationFn: async ({ studentId, relation, isPrimary }) => {
+            const res = await axios.patch(`/api/schools/${schoolId}/parents/${parentId}/link-student`, {
+                studentId, relation, isPrimary
+            });
+            return res.data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['parent-profile', parentId] });
+            toast.success('Student linked successfully');
+            resetLinkDialog();
+        },
+        onError: (error) => {
+            toast.error(error.response?.data?.error || 'Failed to link student');
+        }
+    });
+
+    // Unlink student mutation
+    const unlinkStudentMutation = useMutation({
+        mutationFn: async (studentId) => {
+            const res = await axios.delete(`/api/schools/${schoolId}/parents/${parentId}/link-student?studentId=${studentId}`);
+            return res.data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['parent-profile', parentId] });
+            toast.success('Student unlinked successfully');
+        },
+        onError: (error) => {
+            toast.error(error.response?.data?.error || 'Failed to unlink student');
+        }
+    });
+
+    const resetLinkDialog = () => {
+        setLinkDialogOpen(false);
+        setStudentSearch('');
+        setSelectedStudent(null);
+        setLinkRelation('GUARDIAN');
+        setLinkIsPrimary(false);
+    };
+
+    const handleLinkStudent = () => {
+        if (!selectedStudent) return;
+        linkStudentMutation.mutate({
+            studentId: selectedStudent.userId,
+            relation: linkRelation,
+            isPrimary: linkIsPrimary
+        });
+    };
+
+    const handleUnlinkStudent = (studentId, studentName) => {
+        if (window.confirm(`Unlink ${studentName} from this parent?`)) {
+            unlinkStudentMutation.mutate(studentId);
+        }
+    };
 
     const handleEdit = (field, value) => { setEditingField(field); setEditValues((p) => ({ ...p, [field]: value })); };
     const handleChange = (field, val) => setEditValues((p) => ({ ...p, [field]: val }));
@@ -436,6 +518,17 @@ export default function ParentProfilePage() {
 
                 {/* ═══ STUDENTS ═══ */}
                 <TabsContent value="students" className="mt-4 space-y-5">
+                    {/* Link Student Button */}
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm font-semibold">{studentCount} Linked Student{studentCount !== 1 ? 's' : ''}</span>
+                        </div>
+                        <Button size="sm" className="gap-1.5" onClick={() => setLinkDialogOpen(true)}>
+                            <Plus className="h-3.5 w-3.5" />Link Student
+                        </Button>
+                    </div>
+
                     {studentCount > 0 ? (
                         parent.studentLinks.map((link) => {
                             const student = link.student;
@@ -463,7 +556,6 @@ export default function ParentProfilePage() {
                                                 >
                                                     {student.name}
                                                 </h3>
-                                                {/* This parent's relation to this student */}
                                                 <RelationBadge relation={link.relation} />
                                                 {link.isPrimary && (
                                                     <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold uppercase">Primary Contact</span>
@@ -481,37 +573,29 @@ export default function ParentProfilePage() {
                                                 {student.bloodGroup && <span className="flex items-center gap-1 text-red-600"><Heart className="h-3 w-3" />{student.bloodGroup}</span>}
                                             </div>
                                         </div>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="shrink-0 text-xs gap-1.5"
-                                            onClick={() => router.push(`/dashboard/schools/profiles/students/${student.userId}`)}
-                                        >
-                                            <ExternalLink className="h-3.5 w-3.5" />View Profile
-                                        </Button>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="text-xs gap-1.5"
+                                                onClick={() => router.push(`/dashboard/schools/profiles/students/${student.userId}`)}
+                                            >
+                                                <ExternalLink className="h-3.5 w-3.5" />View Profile
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                onClick={() => handleUnlinkStudent(link.studentId, student.name)}
+                                                disabled={unlinkStudentMutation.isPending}
+                                            >
+                                                <X className="h-3.5 w-3.5" />
+                                            </Button>
+                                        </div>
                                     </div>
 
                                     <CardContent className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-5">
-                                        {/* Left: This parent's permissions for this student */}
-                                        {/* <div>
-                                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Permissions for this Student</p>
-                                            <div className="grid grid-cols-3 gap-2">
-                                                <div className={cn('flex flex-col items-center gap-1 p-3 rounded-lg border text-center', link.canPickup ? 'bg-green-50 border-green-200' : 'bg-muted/30 border-border/50 opacity-50')}>
-                                                    <span className="text-lg">{link.canPickup ? '✅' : '🚫'}</span>
-                                                    <span className="text-[10px] font-semibold text-muted-foreground uppercase leading-tight">Can Pickup</span>
-                                                </div>
-                                                <div className={cn('flex flex-col items-center gap-1 p-3 rounded-lg border text-center', link.canViewReports ? 'bg-blue-50 border-blue-200' : 'bg-muted/30 border-border/50 opacity-50')}>
-                                                    <span className="text-lg">{link.canViewReports ? '✅' : '🚫'}</span>
-                                                    <span className="text-[10px] font-semibold text-muted-foreground uppercase leading-tight">View Reports</span>
-                                                </div>
-                                                <div className={cn('flex flex-col items-center gap-1 p-3 rounded-lg border text-center', link.canViewFees ? 'bg-violet-50 border-violet-200' : 'bg-muted/30 border-border/50 opacity-50')}>
-                                                    <span className="text-lg">{link.canViewFees ? '✅' : '🚫'}</span>
-                                                    <span className="text-[10px] font-semibold text-muted-foreground uppercase leading-tight">View Fees</span>
-                                                </div>
-                                            </div>
-                                        </div> */}
-
-                                        {/* Right: Other parents of this same student */}
+                                        {/* Other parents of this same student */}
                                         <div>
                                             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
                                                 Other Parents / Guardians of {student.name.split(' ')[0]}
@@ -538,14 +622,196 @@ export default function ParentProfilePage() {
                             );
                         })
                     ) : (
-                        <div className="py-16 text-center space-y-2">
+                        <div className="py-16 text-center space-y-3">
                             <GraduationCap className="h-10 w-10 text-muted-foreground/30 mx-auto" />
                             <p className="font-semibold text-muted-foreground text-sm">No Students Linked</p>
                             <p className="text-xs text-muted-foreground">No students are linked to this parent account.</p>
+                            <Button size="sm" variant="outline" className="gap-1.5 mt-2" onClick={() => setLinkDialogOpen(true)}>
+                                <Plus className="h-3.5 w-3.5" />Link a Student
+                            </Button>
                         </div>
                     )}
                 </TabsContent>
             </Tabs>
+
+            {/* ═══ LINK STUDENT DIALOG ═══ */}
+            <Dialog open={linkDialogOpen} onOpenChange={(open) => { if (!open) resetLinkDialog(); }}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <LinkIcon className="h-5 w-5 text-primary" />
+                            Link Student to {parent.name}
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-5 mt-2">
+                        {/* Student Search */}
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Search Student</label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search by name, admission no, or email..."
+                                    value={studentSearch}
+                                    onChange={(e) => setStudentSearch(e.target.value)}
+                                    className="pl-9"
+                                />
+                            </div>
+
+                            {/* Search Results */}
+                            {debouncedStudentSearch.length >= 2 && (
+                                <div className="border rounded-lg max-h-48 overflow-y-auto">
+                                    {searchingStudents ? (
+                                        <div className="flex items-center justify-center py-6">
+                                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                            <span className="text-xs text-muted-foreground ml-2">Searching...</span>
+                                        </div>
+                                    ) : searchedStudents.length > 0 ? (
+                                        searchedStudents.map((student) => {
+                                            const isAlreadyLinked = parent.studentLinks?.some(
+                                                (link) => link.student.userId === student.userId
+                                            );
+                                            const isSelected = selectedStudent?.userId === student.userId;
+
+                                            return (
+                                                <div
+                                                    key={student.userId}
+                                                    className={cn(
+                                                        'flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors border-b last:border-b-0',
+                                                        isSelected ? 'bg-primary/10 border-primary/20' : 'hover:bg-muted/50',
+                                                        isAlreadyLinked && 'opacity-50 cursor-not-allowed'
+                                                    )}
+                                                    onClick={() => {
+                                                        if (!isAlreadyLinked) setSelectedStudent(student);
+                                                    }}
+                                                >
+                                                    <div className={cn(
+                                                        'h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors',
+                                                        isSelected ? 'border-primary bg-primary' : 'border-muted-foreground/30'
+                                                    )}>
+                                                        {isSelected && <Check className="h-3 w-3 text-white" />}
+                                                    </div>
+                                                    <Avatar className="h-8 w-8 shrink-0">
+                                                        <AvatarImage src={student.user?.profilePicture} className="object-cover" />
+                                                        <AvatarFallback className="text-[10px] font-bold bg-muted">{student.name?.[0]}</AvatarFallback>
+                                                    </Avatar>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-medium truncate">{student.name}</p>
+                                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                            <span>{student.admissionNo}</span>
+                                                            {student.class && (
+                                                                <>
+                                                                    <span>•</span>
+                                                                    <span>Class {student.class.className}{student.section ? ` – ${student.section.name}` : ''}</span>
+                                                                </>
+                                                            )}
+                                                            {student.section?.classTeacher && (
+                                                                <>
+                                                                    <span>•</span>
+                                                                    <span className="text-primary/70">CT: {student.section.classTeacher.name}</span>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    {isAlreadyLinked && (
+                                                        <Badge variant="secondary" className="text-[10px] shrink-0">Already Linked</Badge>
+                                                    )}
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        <div className="flex items-center justify-center py-6 text-xs text-muted-foreground">
+                                            No students found
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Selected Student Preview */}
+                            {selectedStudent && (
+                                <div className="flex items-center gap-3 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2.5">
+                                    <Avatar className="h-9 w-9 shrink-0">
+                                        <AvatarImage src={selectedStudent.user?.profilePicture} className="object-cover" />
+                                        <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">{selectedStudent.name?.[0]}</AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold truncate">{selectedStudent.name}</p>
+                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                            <span>{selectedStudent.admissionNo}</span>
+                                            {selectedStudent.class && (
+                                                <>
+                                                    <span>•</span>
+                                                    <span>Class {selectedStudent.class.className}{selectedStudent.section ? ` – ${selectedStudent.section.name}` : ''}</span>
+                                                </>
+                                            )}
+                                            {selectedStudent.section?.classTeacher && (
+                                                <>
+                                                    <span>•</span>
+                                                    <span className="text-primary/70">CT: {selectedStudent.section.classTeacher.name}</span>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setSelectedStudent(null)} className="text-muted-foreground hover:text-destructive transition-colors shrink-0">
+                                        <X className="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Relation Type */}
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Relation Type</label>
+                            <Select value={linkRelation} onValueChange={setLinkRelation}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {ALLOWED_RELATIONS.map((r) => (
+                                        <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Primary Contact Toggle */}
+                        <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+                            <div>
+                                <p className="text-sm font-medium">Primary Contact</p>
+                                <p className="text-xs text-muted-foreground">Mark this parent as the primary contact for this student</p>
+                            </div>
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={linkIsPrimary}
+                                onClick={() => setLinkIsPrimary(!linkIsPrimary)}
+                                className={cn(
+                                    'relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0',
+                                    linkIsPrimary ? 'bg-primary' : 'bg-muted-foreground/20'
+                                )}
+                            >
+                                <span className={cn(
+                                    'inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm',
+                                    linkIsPrimary ? 'translate-x-6' : 'translate-x-1'
+                                )} />
+                            </button>
+                        </div>
+
+                        {/* Submit */}
+                        <Button
+                            className="w-full gap-2"
+                            disabled={!selectedStudent || linkStudentMutation.isPending}
+                            onClick={handleLinkStudent}
+                        >
+                            {linkStudentMutation.isPending ? (
+                                <><Loader2 className="h-4 w-4 animate-spin" />Linking...</>
+                            ) : (
+                                <><LinkIcon className="h-4 w-4" />Link Student</>
+                            )}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

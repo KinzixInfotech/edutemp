@@ -9,11 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from "@/lib/utils";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Command, CommandInput, CommandItem, CommandList, CommandGroup, CommandEmpty } from '@/components/ui/command';
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import {
     Plus,
     RefreshCw,
@@ -21,23 +17,14 @@ import {
     Trash2,
     Users,
     Search,
-    Eye,
-    Link as LinkIcon,
     ChevronLeft,
     ChevronRight,
     UserX,
     Phone,
-    Mail,
-    MapPin,
-    Briefcase,
-    GraduationCap,
-    DollarSign,
-    AlertCircle,
-    X,
     Check,
-    ChevronsUpDown,
     UserCheck,
-    ExternalLink
+    ExternalLink,
+    LinkIcon
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
@@ -45,20 +32,23 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { toast } from 'sonner';
 
+// Relation badge colors
+const RELATION_COLORS = {
+    FATHER: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800',
+    MOTHER: 'bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-950 dark:text-pink-400 dark:border-pink-800',
+    GUARDIAN: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-400 dark:border-purple-800',
+    OTHER: 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700',
+};
+
 export default function ParentListPage() {
     const router = useRouter();
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;
     const queryClient = useQueryClient();
     const [selected, setSelected] = useState([]);
-    const [dialogData, setDialogData] = useState(null);
-    console.log(dialogData);
 
     const [search, setSearch] = useState('');
     const debouncedSearch = useDebounce(search, 400);
-    const [studentSearchOpen, setStudentSearchOpen] = useState(false);
-    const [studentSearchQuery, setStudentSearchQuery] = useState('');
-    const [selectedStudents, setSelectedStudents] = useState([]);
     const [page, setPage] = useState(1);
     const itemsPerPage = 10;
 
@@ -83,19 +73,6 @@ export default function ParentListPage() {
     const pageCount = Math.ceil(total / itemsPerPage);
     const linkedCount = parents.filter(p => p.studentLinks?.length > 0).length;
 
-    // Fetch students for linking (with search)
-    const { data: studentsData, isLoading: studentsLoading } = useQuery({
-        queryKey: ['students-search', schoolId, studentSearchQuery],
-        queryFn: async () => {
-            const res = await axios.get(`/api/schools/${schoolId}/students/search?q=${encodeURIComponent(studentSearchQuery)}`);
-            return res.data; // ✅ axios response data is already parsed
-        },
-        enabled: !!schoolId && studentSearchOpen && !!dialogData,
-        staleTime: 30000,
-    });
-
-
-    const students = studentsData?.students || [];
     // Delete mutation
     const deleteMutation = useMutation({
         mutationFn: async (ids) => {
@@ -152,43 +129,6 @@ export default function ParentListPage() {
         }
     });
 
-    // Link student mutation
-    const linkStudentMutation = useMutation({
-        mutationFn: async ({ parentId, studentIds }) => {
-            const promises = studentIds.map(studentId =>
-                axios.patch(`/api/schools/${schoolId}/parents/${parentId}/link-student`, {
-                    studentId
-                })
-            );
-            return Promise.all(promises);
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['parents', schoolId] });
-            toast.success('Students linked successfully');
-            setDialogData(null);
-            setSelectedStudents([]);
-        },
-        onError: (error) => {
-            toast.error(error.response?.data?.error || 'Failed to link students');
-        }
-    });
-
-    // Unlink student mutation
-    const unlinkStudentMutation = useMutation({
-        mutationFn: async ({ parentId, studentId }) => {
-            const res = await axios.delete(`/api/schools/${schoolId}/parents/${parentId}/link-student?studentId=${studentId}`);
-            return res.data;
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['parents', schoolId] });
-            toast.success('Student unlinked successfully');
-
-        },
-        onError: (error) => {
-            toast.error(error.response?.data?.error || 'Failed to unlink student');
-        }
-    });
-
     const toggleSelect = (id) => {
         setSelected(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
     };
@@ -208,38 +148,6 @@ export default function ParentListPage() {
     const handleActivateSelected = () => {
         if (window.confirm(`Activate ${selected.length} parent(s)?`)) {
             activateMutation.mutate(selected);
-        }
-    };
-
-    const openDialog = (parent) => {
-        setDialogData(parent);
-        setSelectedStudents([]);
-    };
-
-    const handleStudentSelect = (student) => {
-        const isSelected = selectedStudents.some(s => s.userId === student.userId);
-        if (isSelected) {
-            setSelectedStudents(prev => prev.filter(s => s.userId !== student.userId));
-        } else {
-            setSelectedStudents(prev => [...prev, student]);
-        }
-    };
-
-    const handleLinkStudents = () => {
-        if (selectedStudents.length > 0 && dialogData) {
-            linkStudentMutation.mutate({
-                parentId: dialogData.id,
-                studentIds: selectedStudents.map(s => s.userId)
-            });
-        }
-    };
-
-    const handleUnlinkStudent = (studentId) => {
-        if (window.confirm('Unlink this student from parent?')) {
-            unlinkStudentMutation.mutate({
-                parentId: dialogData.id,
-                studentId
-            });
         }
     };
 
@@ -510,15 +418,23 @@ export default function ParentListPage() {
                                         </TableCell>
                                         <TableCell className="text-sm">
                                             {parent.studentLinks?.length > 0 ? (
-                                                <div className="flex flex-wrap gap-1">
+                                                <div className="space-y-1.5">
                                                     {parent.studentLinks.slice(0, 2).map((link) => (
-                                                        <Badge key={link.id} variant="outline" className="text-xs">
-                                                            {link.student.name}
-                                                        </Badge>
+                                                        <div key={link.id} className="flex items-center gap-1.5">
+                                                            <span className="text-xs font-medium truncate max-w-[120px]">
+                                                                {link.student.name}
+                                                            </span>
+                                                            <span className={cn(
+                                                                'inline-flex items-center px-1.5 py-0.5 rounded border text-[9px] font-bold uppercase tracking-wider',
+                                                                RELATION_COLORS[link.relation] || RELATION_COLORS.OTHER
+                                                            )}>
+                                                                {link.relation}
+                                                            </span>
+                                                        </div>
                                                     ))}
                                                     {parent.studentLinks.length > 2 && (
                                                         <Badge variant="outline" className="text-xs">
-                                                            +{parent.studentLinks.length - 2}
+                                                            +{parent.studentLinks.length - 2} more
                                                         </Badge>
                                                     )}
                                                 </div>
@@ -540,21 +456,12 @@ export default function ParentListPage() {
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <div className="flex items-center gap-1 justify-end">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => openDialog(parent)}
-                                                >
-                                                    <Eye className="mr-1.5 h-3.5 w-3.5" />
-                                                    View
+                                            <Link href={`/dashboard/schools/profiles/parents/${parent.id}`}>
+                                                <Button variant="outline" size="sm" className="gap-1.5">
+                                                    <ExternalLink className="h-3.5 w-3.5" />
+                                                    View Profile
                                                 </Button>
-                                                <Link href={`/dashboard/schools/profiles/parents/${parent.id}`}>
-                                                    <Button variant="ghost" size="sm">
-                                                        <ExternalLink className="h-3.5 w-3.5" />
-                                                    </Button>
-                                                </Link>
-                                            </div>
+                                            </Link>
                                         </TableCell>
                                     </TableRow>
                                 ))
@@ -600,327 +507,6 @@ export default function ParentListPage() {
                 )}
             </Card>
 
-            {/* Parent Details Dialog */}
-            {dialogData && (
-                <Dialog open={!!dialogData} onOpenChange={() => {
-                    setDialogData(null);
-                    setSelectedStudents([]);
-                }} >
-                    <DialogContent className="max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-                        <DialogHeader>
-                            <div className="flex items-start gap-4 pb-4 border-b">
-                                <Avatar className="w-16 h-16">
-                                    <AvatarImage src={dialogData.user?.profilePicture} />
-                                    <AvatarFallback className="text-lg">
-                                        {dialogData.name?.[0]?.toUpperCase() || "P"}
-                                    </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1 min-w-0">
-                                    <DialogTitle className="text-xl font-bold mb-1">
-                                        {dialogData.name}
-                                    </DialogTitle>
-                                    <div className="flex flex-wrap gap-2 mb-2">
-                                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                                            <Mail className="h-3.5 w-3.5" />
-                                            {dialogData.email}
-                                        </div>
-                                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                                            <Phone className="h-3.5 w-3.5" />
-                                            {dialogData.contactNumber}
-                                        </div>
-                                    </div>
-                                    <Badge
-                                        variant="outline"
-                                        className={cn(
-                                            dialogData.user?.status === "ACTIVE"
-                                                ? "bg-green-100 text-green-700 border-green-200"
-                                                : "bg-red-100 text-red-700 border-red-200"
-                                        )}
-                                    >
-                                        {dialogData.user?.status}
-                                    </Badge>
-                                </div>
-                            </div>
-                        </DialogHeader>
-
-                        <div className="space-y-6 mt-4">
-                            {/* Contact Information */}
-                            <div>
-                                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                                    <Phone className="h-4 w-4" />
-                                    Contact Information
-                                </h3>
-                                <div className="grid grid-cols-2 gap-3 text-sm">
-                                    {[
-                                        { label: 'Primary Phone', value: dialogData.contactNumber, icon: Phone },
-                                        { label: 'Alternate Phone', value: dialogData.alternateNumber, icon: Phone },
-                                        { label: 'Email', value: dialogData.email, icon: Mail },
-                                        { label: 'Blood Group', value: dialogData.bloodGroup },
-                                    ].map((item, i) => (
-                                        <div key={i} className="p-3 rounded-lg bg-muted">
-                                            <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                                                {item.icon && <item.icon className="h-3 w-3" />}
-                                                {item.label}
-                                            </div>
-                                            <div className="font-medium">{item.value || 'N/A'}</div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Professional Information */}
-                            <div>
-                                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                                    <Briefcase className="h-4 w-4" />
-                                    Professional Information
-                                </h3>
-                                <div className="grid grid-cols-2 gap-3 text-sm">
-                                    {[
-                                        { label: 'Occupation', value: dialogData.occupation, icon: Briefcase },
-                                        { label: 'Qualification', value: dialogData.qualification, icon: GraduationCap },
-                                        { label: 'Annual Income', value: dialogData.annualIncome, icon: DollarSign },
-                                    ].map((item, i) => (
-                                        <div key={i} className="p-3 rounded-lg bg-muted">
-                                            <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                                                {item.icon && <item.icon className="h-3 w-3" />}
-                                                {item.label}
-                                            </div>
-                                            <div className="font-medium">{item.value || 'N/A'}</div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Address Information */}
-                            {(dialogData.address || dialogData.city || dialogData.state) && (
-                                <div>
-                                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                                        <MapPin className="h-4 w-4" />
-                                        Address Information
-                                    </h3>
-                                    <div className="grid grid-cols-2 gap-3 text-sm">
-                                        {[
-                                            { label: 'Address', value: dialogData.address },
-                                            { label: 'City', value: dialogData.city },
-                                            { label: 'State', value: dialogData.state },
-                                            { label: 'Country', value: dialogData.country },
-                                            { label: 'Postal Code', value: dialogData.postalCode },
-                                        ].map((item, i) => (
-                                            <div key={i} className="p-3 rounded-lg bg-muted">
-                                                <div className="text-xs text-muted-foreground mb-1">{item.label}</div>
-                                                <div className="font-medium">{item.value || 'N/A'}</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Emergency Contact */}
-                            {(dialogData.emergencyContactName || dialogData.emergencyContactNumber) && (
-                                <div>
-                                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                                        <AlertCircle className="h-4 w-4" />
-                                        Emergency Contact
-                                    </h3>
-                                    <div className="grid grid-cols-2 gap-3 text-sm">
-                                        {[
-                                            { label: 'Name', value: dialogData.emergencyContactName },
-                                            { label: 'Number', value: dialogData.emergencyContactNumber },
-                                            { label: 'Relation', value: dialogData.emergencyContactRelation },
-                                        ].map((item, i) => (
-                                            <div key={i} className="p-3 rounded-lg bg-muted">
-                                                <div className="text-xs text-muted-foreground mb-1">{item.label}</div>
-                                                <div className="font-medium">{item.value || 'N/A'}</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Linked Students Section */}
-                            <div>
-                                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                                    <Users className="h-4 w-4" />
-                                    Linked Students ({dialogData.studentLinks?.length || 0})
-                                </h3>
-
-                                {dialogData.studentLinks && dialogData.studentLinks.length > 0 ? (
-                                    <div className="space-y-2 mb-4">
-                                        {dialogData.studentLinks.map((link) => (
-                                            <div key={link.id} className="flex items-center justify-between p-3 rounded-lg bg-muted">
-                                                <div className="flex items-center gap-3">
-                                                    <Avatar className="h-10 w-10">
-                                                        <AvatarImage src={link.student.user?.profilePicture} />
-                                                        <AvatarFallback>
-                                                            {link.student.name?.[0]?.toUpperCase()}
-                                                        </AvatarFallback>
-                                                    </Avatar>
-                                                    <div>
-                                                        <p className="font-medium text-sm">{link.student.name}</p>
-                                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                                            <span>{link.student.class?.className}</span>
-                                                            <span>•</span>
-                                                            <span>{link.student.section?.name}</span>
-                                                            <span>•</span>
-                                                            <span>{link.student.admissionNo}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => handleUnlinkStudent(link.studentId)}
-                                                    disabled={unlinkStudentMutation.isPending}
-                                                >
-                                                    <X className="h-4 w-4 text-destructive" />
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="text-center py-6 bg-muted rounded-lg mb-4">
-                                        <Users className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                                        <p className="text-sm text-muted-foreground">No students linked yet</p>
-                                    </div>
-                                )}
-
-                                {/* Link Students Interface */}
-                                <div className="p-4 rounded-lg border bg-card">
-                                    <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                                        <LinkIcon className="h-4 w-4" />
-                                        Link New Students
-                                    </h4>
-
-                                    <div className="space-y-3">
-                                        <Popover open={studentSearchOpen} onOpenChange={setStudentSearchOpen}>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    role="combobox"
-                                                    className="w-full justify-between"
-                                                >
-                                                    {selectedStudents.length > 0
-                                                        ? `${selectedStudents.length} student(s) selected`
-                                                        : "Search and select students"}
-                                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-[400px] p-0" align="start">
-                                                <Command shouldFilter={false}>
-                                                    <CommandInput
-                                                        placeholder="Search students by name, admission no..."
-                                                        value={studentSearchQuery}
-                                                        onValueChange={setStudentSearchQuery}
-                                                    />
-                                                    <CommandList>
-                                                        <CommandEmpty>
-                                                            {studentsLoading ? "Searching..." : "No students found."}
-                                                        </CommandEmpty>
-                                                        <CommandGroup>
-                                                            {students.map((student) => {
-                                                                const isAlreadyLinked = dialogData.studentLinks?.some(
-                                                                    link => link.student.userId === student.userId
-                                                                );
-                                                                const isSelected = selectedStudents.some(
-                                                                    s => s.userId === student.userId
-                                                                );
-
-                                                                return (
-                                                                    <CommandItem
-                                                                        key={student.userId}
-                                                                        onSelect={() => {
-                                                                            if (!isAlreadyLinked) {
-                                                                                handleStudentSelect(student);
-                                                                            }
-                                                                        }}
-                                                                        className={cn(
-                                                                            "cursor-pointer",
-                                                                            isAlreadyLinked && "opacity-50 cursor-not-allowed"
-                                                                        )}
-                                                                        disabled={isAlreadyLinked}
-                                                                    >
-                                                                        <div className="flex items-center gap-2 flex-1">
-                                                                            <div className={cn(
-                                                                                "h-4 w-4 border rounded flex items-center justify-center",
-                                                                                isSelected ? 'bg-primary border-primary' : 'border-gray-300',
-                                                                                isAlreadyLinked && 'bg-muted'
-                                                                            )}>
-                                                                                {isSelected && <Check className="h-3 w-3 text-white" />}
-                                                                                {isAlreadyLinked && <Check className="h-3 w-3 text-muted-foreground" />}
-                                                                            </div>
-                                                                            <div className="flex-1">
-                                                                                <p className="font-medium">{student.name}</p>
-                                                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                                                                    <span>{student.admissionNo}</span>
-                                                                                    {student.class && (
-                                                                                        <>
-                                                                                            <span>•</span>
-                                                                                            <span>{student.class.className}</span>
-                                                                                        </>
-                                                                                    )}
-                                                                                </div>
-                                                                            </div>
-                                                                            {isAlreadyLinked && (
-                                                                                <Badge variant="secondary" className="text-xs">
-                                                                                    Already Linked
-                                                                                </Badge>
-                                                                            )}
-                                                                        </div>
-                                                                    </CommandItem>
-                                                                );
-                                                            })}
-                                                        </CommandGroup>
-                                                    </CommandList>
-                                                </Command>
-                                            </PopoverContent>
-                                        </Popover>
-
-                                        {selectedStudents.length > 0 && (
-                                            <div className="space-y-2">
-                                                <div className="flex flex-wrap gap-2">
-                                                    {selectedStudents.map((student) => (
-                                                        <div
-                                                            key={student.userId}
-                                                            className="flex items-center gap-2 bg-primary/10 px-3 py-1.5 rounded-md"
-                                                        >
-                                                            <span className="text-sm">{student.name}</span>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleStudentSelect(student)}
-                                                                className="hover:bg-primary/20 rounded-full p-0.5"
-                                                            >
-                                                                <X className="h-3 w-3" />
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                                <Button
-                                                    onClick={handleLinkStudents}
-                                                    disabled={linkStudentMutation.isPending}
-                                                    className="w-full"
-                                                    size="sm"
-                                                >
-                                                    {linkStudentMutation.isPending ? (
-                                                        <>
-                                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                            Linking...
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <LinkIcon className="mr-2 h-4 w-4" />
-                                                            Link {selectedStudents.length} Student(s)
-                                                        </>
-                                                    )}
-                                                </Button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </DialogContent>
-                </Dialog>
-            )}
         </div>
     );
 }

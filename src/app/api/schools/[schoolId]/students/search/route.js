@@ -47,10 +47,28 @@ export async function GET(req, props) {
             select: {
                 userId: true,
                 name: true,
-                admissionNo:true,
+                admissionNo: true,
                 email: true,
-                class: true,
-                // profilePhoto: true,
+                class: {
+                    select: {
+                        className: true,
+                    }
+                },
+                section: {
+                    select: {
+                        name: true,
+                        classTeacher: {
+                            select: {
+                                name: true,
+                            }
+                        }
+                    }
+                },
+                user: {
+                    select: {
+                        profilePicture: true,
+                    }
+                },
             },
             orderBy: {
                 name: "asc",
