@@ -106,9 +106,8 @@ export default function HomePage() {
 // Hero Section - Typewriter Animation with Glowing Cursor
 function HeroSection() {
     const [isVideoOpen, setIsVideoOpen] = useState(false);
-    const videoSrc = "https://www.youtube.com/embed/dQw4w9WgXcQ";
+    const videoSrc = "https://www.youtube.com/embed/Zzjt4PxEd9k?si=jiNdA82wruE5wien&rel=0";
 
-    // Refs for direct DOM manipulation (avoids re-rendering entire section per character)
     const line1Ref = useRef(null);
     const line2Ref = useRef(null);
     const line2WrapperRef = useRef(null);
@@ -119,46 +118,38 @@ function HeroSection() {
 
     useEffect(() => {
         let cancelled = false;
-        const line1 = "Modern School Management";
+        const line1 = "The Modern School ERP";
         const line2 = "Built for Real Schools";
 
         const typeText = async () => {
-            // Show cursor on line1, blink idle 2 times (~1.2s)
             if (cursor1Ref.current) cursor1Ref.current.style.display = 'inline-block';
             if (cursor1Ref.current) cursor1Ref.current.classList.add('typewriter-cursor-idle');
             await new Promise(r => setTimeout(r, 1200));
             if (cancelled) return;
-            // Start typing - remove idle blink
             if (cursor1Ref.current) cursor1Ref.current.classList.remove('typewriter-cursor-idle');
 
-            // Type line 1 - direct DOM
             for (let i = 0; i <= line1.length; i++) {
                 if (cancelled) return;
                 if (line1Ref.current) line1Ref.current.textContent = line1.slice(0, i);
                 await new Promise(r => setTimeout(r, 55 + Math.random() * 45));
             }
 
-            // Pause between lines
             await new Promise(r => setTimeout(r, 350));
             if (cancelled) return;
 
-            // Hide cursor1, show line2 wrapper + cursor2
             if (cursor1Ref.current) cursor1Ref.current.style.display = 'none';
             if (line2WrapperRef.current) line2WrapperRef.current.style.display = 'inline-block';
             if (cursor2Ref.current) cursor2Ref.current.style.display = 'inline-block';
 
-            // Type line 2 - direct DOM
             for (let i = 0; i <= line2.length; i++) {
                 if (cancelled) return;
                 if (line2Ref.current) line2Ref.current.textContent = line2.slice(0, i);
                 await new Promise(r => setTimeout(r, 55 + Math.random() * 45));
             }
 
-            // Done typing
             await new Promise(r => setTimeout(r, 400));
             if (cancelled) return;
 
-            // Hide typing cursor, show fade cursor briefly
             if (cursor2Ref.current) cursor2Ref.current.style.display = 'none';
             if (cursorFadeRef.current) cursorFadeRef.current.style.display = 'inline-block';
 
@@ -166,7 +157,6 @@ function HeroSection() {
             if (cancelled) return;
             if (cursorFadeRef.current) cursorFadeRef.current.style.display = 'none';
 
-            // Single state update to reveal content
             setShowContent(true);
         };
 
@@ -175,7 +165,7 @@ function HeroSection() {
     }, []);
 
     return (
-        <section className="relative min-h-screen  lg:pt-0 pt-20 flex items-center justify-center overflow-hidden bg-white">
+        <section className="relative min-h-screen flex items-start lg:items-center justify-center overflow-hidden bg-white pt-24 md:pt-28 lg:pt-10">
             {/* Interactive Grid Pattern Background */}
             <InteractiveGridPattern
                 className="absolute opacity-40 inset-0 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,white_40%,transparent_70%)]"
@@ -184,71 +174,99 @@ function HeroSection() {
 
             {/* Large Background Text "ERP" */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
-                <span className="text-[clamp(12rem,35vw,28rem)] font-black text-gray-100/30 leading-none tracking-tighter">
+                <span className="text-[clamp(8rem,35vw,28rem)] font-black text-gray-100/30 leading-none tracking-tighter">
                     ERP
                 </span>
             </div>
 
             {/* Floating School Icons - Left Side */}
             <div className="absolute top-[12%] left-[5%] md:left-[8%] opacity-[0.05] pointer-events-none animate-float-slow">
-                <GraduationCap className="w-10 h-10 md:w-16 md:h-16 text-black rotate-[-15deg]" strokeWidth={1} />
+                <GraduationCap className="w-8 h-8 md:w-16 md:h-16 text-black rotate-[-15deg]" strokeWidth={1} />
             </div>
             <div className="absolute top-[68%] left-[6%] md:left-[10%] opacity-[0.06] pointer-events-none animate-float-slow" style={{ animationDelay: '2s' }}>
-                <Calculator className="w-9 h-9 md:w-14 md:h-14 text-black rotate-[-8deg]" strokeWidth={1} />
+                <Calculator className="w-7 h-7 md:w-14 md:h-14 text-black rotate-[-8deg]" strokeWidth={1} />
             </div>
             <div className="absolute top-[85%] left-[5%] md:left-[7%] opacity-[0.04] pointer-events-none animate-float-slower" style={{ animationDelay: '0.5s' }}>
-                <Pencil className="w-7 h-7 md:w-11 md:h-11 text-black rotate-[20deg]" strokeWidth={1} />
+                <Pencil className="w-6 h-6 md:w-11 md:h-11 text-black rotate-[20deg]" strokeWidth={1} />
             </div>
             <div className="absolute top-[45%] left-[4%] md:left-[6%] opacity-[0.05] pointer-events-none animate-float-slower" style={{ animationDelay: '2.5s' }}>
-                <Library className="w-8 h-8 md:w-13 md:h-13 text-black rotate-[15deg]" strokeWidth={1} />
+                <Library className="w-6 h-6 md:w-13 md:h-13 text-black rotate-[15deg]" strokeWidth={1} />
             </div>
             <div className="absolute top-[28%] left-[5%] md:left-[7%] opacity-[0.06] pointer-events-none animate-float-slower" style={{ animationDelay: '1s' }}>
-                <BookOpen className="w-8 h-8 md:w-12 md:h-12 text-black rotate-[12deg]" strokeWidth={1} />
+                <BookOpen className="w-6 h-6 md:w-12 md:h-12 text-black rotate-[12deg]" strokeWidth={1} />
             </div>
 
             {/* Floating School Icons - Right Side */}
             <div className="absolute top-[10%] right-[5%] md:right-[8%] opacity-[0.05] pointer-events-none animate-float-slower" style={{ animationDelay: '0.8s' }}>
-                <BookMarked className="w-9 h-9 md:w-14 md:h-14 text-black rotate-[18deg]" strokeWidth={1} />
+                <BookMarked className="w-7 h-7 md:w-14 md:h-14 text-black rotate-[18deg]" strokeWidth={1} />
             </div>
             <div className="absolute top-[70%] right-[6%] md:right-[10%] opacity-[0.06] pointer-events-none animate-float-slower" style={{ animationDelay: '2.2s' }}>
-                <Trophy className="w-10 h-10 md:w-15 md:h-15 text-black rotate-[10deg]" strokeWidth={1} />
+                <Trophy className="w-8 h-8 md:w-15 md:h-15 text-black rotate-[10deg]" strokeWidth={1} />
             </div>
             <div className="absolute top-[88%] right-[5%] md:right-[7%] opacity-[0.05] pointer-events-none animate-float-slow" style={{ animationDelay: '0.3s' }}>
-                <Microscope className="w-9 h-9 md:w-14 md:h-14 text-black rotate-[-15deg]" strokeWidth={1} />
+                <Microscope className="w-7 h-7 md:w-14 md:h-14 text-black rotate-[-15deg]" strokeWidth={1} />
             </div>
             <div className="absolute top-[50%] right-[4%] md:right-[6%] opacity-[0.04] pointer-events-none animate-float-slow" style={{ animationDelay: '2.8s' }}>
-                <Bell className="w-7 h-7 md:w-11 md:h-11 text-black rotate-[-8deg]" strokeWidth={1} />
+                <Bell className="w-6 h-6 md:w-11 md:h-11 text-black rotate-[-8deg]" strokeWidth={1} />
             </div>
             <div className="absolute top-[25%] right-[5%] md:right-[7%] opacity-[0.06] pointer-events-none animate-float-slow" style={{ animationDelay: '1.8s' }}>
-                <Ruler className="w-8 h-8 md:w-12 md:h-12 text-black rotate-[-12deg]" strokeWidth={1} />
+                <Ruler className="w-6 h-6 md:w-12 md:h-12 text-black rotate-[-12deg]" strokeWidth={1} />
             </div>
 
-            {/* Gradient Orb - Top Right */}
-            <div className="absolute top-20 right-0 w-[400px] h-[400px] bg-[#0469ff]/5 rounded-full blur-3xl" />
+            {/* Gradient Orb */}
+            <div className="absolute top-20 right-0 w-[300px] h-[300px] md:w-[400px] md:h-[400px] bg-[#0469ff]/5 rounded-full blur-3xl" />
 
-            <div className="relative max-w-[1400px] mx-auto px-6 py-20 z-10 w-full">
+            <div className="relative max-w-[1400px] mx-auto px-3 sm:px-6 py-10 md:py-16 lg:py-20 z-10 w-full">
                 {/* Hero Content */}
-                <div className="text-center space-y-8">
-                    {/* Badge - fades in after typing */}
+                <div className="text-center space-y-5 md:space-y-8">
+
+                    {/* Badge */}
                     <div
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 border-[#0469ff]/20 bg-[#0469ff]/5 transition-all duration-700"
+                        className="inline-flex items-center gap-2 sm:gap-2.5 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-full transition-all duration-700"
                         style={{
                             opacity: showContent ? 1 : 0,
                             transform: showContent ? 'translateY(0)' : 'translateY(12px)',
+                            background: 'linear-gradient(135deg, rgba(4,105,255,0.08) 0%, rgba(4,105,255,0.04) 100%)',
+                            border: '1px solid rgba(4,105,255,0.2)',
+                            boxShadow: '0 0 0 1px rgba(4,105,255,0.06), 0 2px 16px rgba(4,105,255,0.08), inset 0 1px 0 rgba(255,255,255,0.8)',
                         }}
                     >
-                        <div className="w-2 h-2 rounded-full bg-[#0469ff] animate-pulse" />
-                        <span className="text-sm font-semibold text-[#0469ff]">AI Powered School ERP</span>
+                        <span className="relative flex items-center justify-center w-2 h-2">
+                            <span className="absolute inline-flex w-full h-full rounded-full bg-[#0469ff]/40 animate-ping" style={{ animationDuration: '2s' }} />
+                            <span className="relative w-2 h-2 rounded-full bg-[#0469ff]" style={{ boxShadow: '0 0 6px rgba(4,105,255,0.8)' }} />
+                        </span>
+                        <span
+                            className="text-xs sm:text-sm font-semibold tracking-wide"
+                            style={{
+                                background: 'linear-gradient(90deg, #0358dd 0%, #0469ff 40%, #3b8fff 60%, #0469ff 100%)',
+                                backgroundSize: '200% auto',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                backgroundClip: 'text',
+                                animation: 'badgeShimmer 3s linear infinite',
+                            }}
+                        >
+                            AI Powered School ERP
+                        </span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.7 }}>
+                            <path d="M12 2L13.5 9.5L21 11L13.5 12.5L12 20L10.5 12.5L3 11L10.5 9.5L12 2Z" fill="#0469ff" />
+                        </svg>
+                        <style>{`
+                            @keyframes badgeShimmer {
+                                0% { background-position: 200% center; }
+                                100% { background-position: -200% center; }
+                            }
+                        `}</style>
                     </div>
 
                     {/* Main Heading with Typewriter */}
-                    <h1 className="text-[clamp(2.8rem,8vw,6.5rem)] font-bold leading-[1.05] tracking-tight">
+                    <h1 className="text-[clamp(2rem,7.5vw,6.5rem)] font-bold leading-[1.08] tracking-tight px-0">
                         <span className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent">
                             <span ref={line1Ref}></span>
                             <span ref={cursor1Ref} className="typewriter-cursor" style={{ display: 'none' }} />
                         </span>
                         <br />
-                        <span ref={line2WrapperRef} className="relative inline-block mt-2" style={{ display: 'none' }}>
+                        <span ref={line2WrapperRef} className="relative inline-block mt-1 md:mt-2" style={{ display: 'none' }}>
                             <span className="text-[#0469ff]">
                                 <span ref={line2Ref}></span>
                                 <span ref={cursor2Ref} className="typewriter-cursor" style={{ display: 'none' }} />
@@ -257,82 +275,102 @@ function HeroSection() {
                         <span ref={cursorFadeRef} className="typewriter-cursor typewriter-cursor-fade" style={{ display: 'none' }} />
                     </h1>
 
-                    {/* Subtitle - fades in after typing */}
+                    {/* Subtitle */}
                     <p
-                        className="text-xl md:text-2xl text-gray-600 max-w-[800px] mx-auto leading-relaxed font-medium transition-all duration-700 delay-100"
+                        className="text-base sm:text-lg md:text-xl text-gray-600 max-w-[95%] sm:max-w-[600px] md:max-w-[800px] mx-auto leading-relaxed font-medium transition-all duration-700 delay-100"
                         style={{
                             opacity: showContent ? 1 : 0,
                             transform: showContent ? 'translateY(0)' : 'translateY(18px)',
                         }}
                     >
-                        An all-in-one school ERP with smart insights and modern UI/UX that simplifies administration and improves outcomes.
+                        EduBreezy helps schools manage admissions, fees, attendance, payroll, and communication with a clean interface and powerful automation.
                     </p>
 
-                    {/* CTA Buttons - fade in after typing */}
+                    {/* CTA + Video Section */}
                     <div
-                        className="flex items-center justify-center gap-5 flex-wrap pt-6 transition-all duration-700 delay-200"
+                        className="flex flex-col items-center justify-center gap-5 md:gap-6 pt-2 md:pt-4 transition-all duration-700 delay-200"
                         style={{
                             opacity: showContent ? 1 : 0,
                             transform: showContent ? 'translateY(0)' : 'translateY(22px)',
                         }}
                     >
-                        <Link href="/contact">
-                            <button className="group relative px-10 py-4 rounded-full font-bold text-lg text-white bg-[#0469ff] hover:shadow-2xl transition-all duration-300 overflow-hidden">
-                                <span className="absolute inset-0 bg-[#0358dd] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                                <span className="relative flex items-center gap-3">
-                                    Get Started
-                                    <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center">
-                                        <ArrowRight className="w-5 h-5 text-[#0469ff] transition-transform duration-300 group-hover:translate-x-0.5" />
+                        {/* See it in action label */}
+                        <div className="flex items-center justify-center gap-3">
+                            <div className="h-px w-8 sm:w-12 bg-gradient-to-r from-transparent to-gray-300" />
+                            <span className="text-xs sm:text-sm font-semibold text-gray-400 tracking-widest uppercase">See it in action</span>
+                            <div className="h-px w-8 sm:w-12 bg-gradient-to-l from-transparent to-gray-300" />
+                        </div>
+
+                        {/* Video Card */}
+                        <div className="relative group w-full max-w-5xl rounded-2xl md:rounded-3xl overflow-hidden shadow-[0_8px_60px_rgba(4,105,255,0.12)] border border-gray-100">
+                            {!isVideoOpen ? (
+                                <div className="relative cursor-pointer" onClick={() => setIsVideoOpen(true)}>
+                                    <img
+                                        src="/thumb_2.png"
+                                        alt="Product Demo"
+                                        className="w-full aspect-video object-cover"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
+                                    <div className="absolute inset-0 bg-[#0469ff]/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                                    {/* Play button */}
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <div className="relative">
+                                            <div className="absolute inset-0 rounded-full bg-white/20 animate-ping" style={{ animationDuration: '2s' }} />
+                                            <div className="absolute inset-0 rounded-full bg-white/10 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.5s' }} />
+                                            <div className="relative w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-full bg-white shadow-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                                                <Play className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-[#0469ff] ml-1" fill="#0469ff" />
+                                            </div>
+                                        </div>
                                     </div>
-                                </span>
-                            </button>
-                        </Link>
-                        <button
-                            // onClick={() => setIsVideoOpen(true)}
-                            className="group px-10 hover:shadow-lg py-4 rounded-full font-bold text-lg text-[#0469ff] bg-[#f8f9fb] border transition-all duration-300 flex items-center gap-3"
-                        >
-                            Watch Demo
-                            <Play className="w-5 h-5" />
-                        </button>
+
+                                    {/* Bottom caption */}
+                                    <div className="absolute bottom-0 left-0 right-0 px-4 sm:px-8 py-3 sm:py-5 flex items-center justify-between">
+                                        <div>
+                                            <p className="text-white font-bold text-sm sm:text-lg leading-tight">Full Product Walkthrough</p>
+                                            <p className="text-white/70 text-xs sm:text-sm mt-0.5 hidden sm:block">See every module in action</p>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 sm:gap-2 bg-white/15 backdrop-blur-sm border border-white/20 rounded-full px-3 sm:px-4 py-1.5 sm:py-2">
+                                            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500 animate-pulse" />
+                                            <span className="text-white text-xs sm:text-sm font-semibold">Watch</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="relative aspect-video">
+                                    <iframe
+                                        src={`${videoSrc}&autoplay=1`}
+                                        className="w-full h-full"
+                                        allowFullScreen
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    />
+                                    <button
+                                        onClick={() => setIsVideoOpen(false)}
+                                        className="absolute top-3 right-3 sm:top-4 sm:right-4 p-1.5 sm:p-2 rounded-full bg-black/50 backdrop-blur-sm text-white hover:bg-black/70 transition-colors"
+                                    >
+                                        <XIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Get Started Button */}
+                        <div className="flex items-center justify-center gap-5 flex-wrap pt-1">
+                            <Link href="/contact">
+                                <button className="group relative px-8 sm:px-10 py-3.5 sm:py-4 rounded-full font-bold text-base sm:text-lg text-white bg-[#0469ff] hover:shadow-2xl transition-all duration-300 overflow-hidden">
+                                    <span className="absolute inset-0 bg-[#0358dd] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                    <span className="relative flex items-center gap-2 sm:gap-3">
+                                        Get Started
+                                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white flex items-center justify-center">
+                                            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-[#0469ff] transition-transform duration-300 group-hover:translate-x-0.5" />
+                                        </div>
+                                    </span>
+                                </button>
+                            </Link>
+                        </div>
                     </div>
                 </div>
             </div>
-
-            {/* Video Dialog */}
-            <AnimatePresence>
-                {isVideoOpen && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        onClick={() => setIsVideoOpen(false)}
-                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-                    >
-                        <motion.div
-                            initial={{ scale: 0.95, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.95, opacity: 0 }}
-                            className="relative mx-4 aspect-video w-full max-w-5xl"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <button
-                                onClick={() => setIsVideoOpen(false)}
-                                className="absolute -top-14 right-0 p-3 rounded-full bg-white text-gray-700 hover:bg-gray-100 transition-colors shadow-lg"
-                            >
-                                <XIcon className="w-6 h-6" />
-                            </button>
-                            <div className="relative overflow-hidden rounded-2xl border-4 border-white shadow-2xl">
-                                <iframe
-                                    src={videoSrc}
-                                    className="w-full h-full"
-                                    allowFullScreen
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                />
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
 
             <style jsx>{`
                 @keyframes float-slow {
@@ -343,24 +381,8 @@ function HeroSection() {
                     0%, 100% { transform: translateY(0px); }
                     50% { transform: translateY(-20px); }
                 }
-                .animate-float-slow {
-                    animation: float-slow 7s ease-in-out infinite;
-                }
-                .animate-float-slower {
-                    animation: float-slower 9s ease-in-out infinite;
-                }
-                .perspective-1000 {
-                    perspective: 1000px;
-                }
-                .scrollbar-hide {
-                    -ms-overflow-style: none;
-                    scrollbar-width: none;
-                }
-                .scrollbar-hide::-webkit-scrollbar {
-                    display: none;
-                }
-
-                /* Glowing Typewriter Cursor */
+                .animate-float-slow { animation: float-slow 7s ease-in-out infinite; }
+                .animate-float-slower { animation: float-slower 9s ease-in-out infinite; }
                 .typewriter-cursor {
                     display: inline-block;
                     position: relative;
@@ -369,10 +391,9 @@ function HeroSection() {
                     margin-left: 3px;
                     vertical-align: middle;
                     border-radius: 4px 4px 6px 6px;
-                    background: linear-gradient(180deg, #0567fe 0%, #037a7b 45%, rgba(3, 122, 123, 0.4) 75%, rgba(0, 0, 0, 0.08) 100%);
+                    background: linear-gradient(180deg, #0567fe 0%, #037a7b 45%, rgba(3,122,123,0.4) 75%, rgba(0,0,0,0.08) 100%);
                     animation: cursorGlow 2s ease-in-out infinite;
                 }
-                /* Blurred glow at the bottom of cursor */
                 .typewriter-cursor::after {
                     content: '';
                     position: absolute;
@@ -382,11 +403,10 @@ function HeroSection() {
                     width: 10px;
                     height: 14px;
                     border-radius: 50%;
-                    background: radial-gradient(ellipse, rgba(3, 122, 123, 0.35) 0%, rgba(5, 103, 254, 0.15) 40%, transparent 70%);
+                    background: radial-gradient(ellipse, rgba(3,122,123,0.35) 0%, rgba(5,103,254,0.15) 40%, transparent 70%);
                     filter: blur(3px);
                     pointer-events: none;
                 }
-                /* Idle blink before typing starts */
                 .typewriter-cursor-idle {
                     animation: cursorBlink 0.6s steps(1) infinite, cursorGlow 2s ease-in-out infinite;
                 }
@@ -398,18 +418,8 @@ function HeroSection() {
                     51%, 100% { opacity: 0; }
                 }
                 @keyframes cursorGlow {
-                    0%, 100% {
-                        box-shadow:
-                            0 0 6px rgba(5, 103, 254, 0.5),
-                            0 0 14px rgba(3, 122, 123, 0.3),
-                            0 0 20px rgba(5, 103, 254, 0.15);
-                    }
-                    50% {
-                        box-shadow:
-                            0 0 10px rgba(5, 103, 254, 0.7),
-                            0 0 22px rgba(3, 122, 123, 0.5),
-                            0 0 32px rgba(5, 103, 254, 0.3);
-                    }
+                    0%, 100% { box-shadow: 0 0 6px rgba(5,103,254,0.5), 0 0 14px rgba(3,122,123,0.3), 0 0 20px rgba(5,103,254,0.15); }
+                    50% { box-shadow: 0 0 10px rgba(5,103,254,0.7), 0 0 22px rgba(3,122,123,0.5), 0 0 32px rgba(5,103,254,0.3); }
                 }
                 @keyframes cursorFadeOut {
                     0% { opacity: 1; }
@@ -419,7 +429,6 @@ function HeroSection() {
         </section>
     );
 }
-
 
 function AttendanceSection() {
     return (
