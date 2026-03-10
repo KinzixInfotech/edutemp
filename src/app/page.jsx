@@ -355,7 +355,7 @@ function HeroSection() {
                         </div>
 
                         {/* Get Started Button */}
-                        <div className="flex items-center justify-center gap-5 flex-wrap pt-1">
+                        <div className="flex items-center justify-center gap-3 sm:gap-4 flex-wrap pt-1">
                             <Link href="/contact">
                                 <button className="group relative px-8 sm:px-10 py-3.5 sm:py-4 rounded-full font-bold text-base sm:text-lg text-white bg-[#0469ff] hover:shadow-2xl transition-all duration-300 overflow-hidden">
                                     <span className="absolute inset-0 bg-[#0358dd] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -365,6 +365,16 @@ function HeroSection() {
                                             <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-[#0469ff] transition-transform duration-300 group-hover:translate-x-0.5" />
                                         </div>
                                     </span>
+                                </button>
+                            </Link>
+
+                            <Link href="https://play.google.com/store/apps/details?id=com.kinzix.edubreezy" target="_blank">
+                                <button className="group px-8 sm:px-10 py-3.5 sm:py-4 rounded-full font-bold text-base sm:text-lg text-[#0469ff] bg-muted border hover:border-[#0469ff]/20 transition-all duration-300 flex items-center gap-2 sm:gap-3">
+                                    <svg className="w-5 h-5 text-[#0469ff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M12 3v13M7 11l5 5 5-5" />
+                                        <path d="M3 19h18" />
+                                    </svg>
+                                    Download App
                                 </button>
                             </Link>
                         </div>
