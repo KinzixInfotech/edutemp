@@ -1,11 +1,10 @@
-import { AuditAction, SubscriptionAction } from "@prisma/client";
+import { AuditAction, SubscriptionAction } from "@/app/generated/prisma/client";
 import { supabaseAdmin } from "@/lib/supbase-admin";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { addYears, addDays } from "date-fns";
 import { invalidatePattern } from "@/lib/cache";
-
 // Schema validation
 const schoolSchema = z.object({
   name: z.string(),

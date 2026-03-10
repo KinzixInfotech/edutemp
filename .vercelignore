@@ -1,0 +1,4 @@
+scripts/
+prisma/seed*
+debug*
+check_fee_data.js

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { SubscriptionAction } from "@prisma/client";
+import { SubscriptionAction } from "@/app/generated/prisma/client";
 import { z } from "zod";
 
 // GET - Fetch school subscription (for School Admin dashboard or Super Admin)

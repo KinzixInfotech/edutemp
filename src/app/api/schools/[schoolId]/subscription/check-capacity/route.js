@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { SubscriptionAction } from "@prisma/client";
+import { SubscriptionAction } from "@/app/generated/prisma";
 
 // GET - Check if school can add more students
 export async function GET(req, { params }) {

@@ -5,14 +5,12 @@
 // ============================================
 
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
 import { remember, generateKey } from "@/lib/cache";
+import prisma from "@/lib/prisma";
 
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
-
     // Sanitize UUIDs - remove any trailing characters like :200
     const sanitizeUUID = (uuid) => {
       if (!uuid) return null;
