@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { remember, generateKey } from "@/lib/cache";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(request, { params }) {
     try {
         const { schoolId } = await params;
 
         const cacheKey = generateKey('inventory:stats', { schoolId });
-
         const stats = await remember(cacheKey, async () => {
             const [
                 totalItems,
@@ -15,6 +14,7 @@ export async function GET(request, { params }) {
                 sales,
                 recentSales,
             ] = await Promise.all([
+
                 // Total inventory items count
                 prisma.inventoryItem.count({ where: { schoolId } }),
 
