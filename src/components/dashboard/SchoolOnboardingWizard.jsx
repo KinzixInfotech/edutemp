@@ -23,7 +23,7 @@ import {
     X,
     Sparkles,
     Rocket,
-    ExternalLink,
+
     ChevronRight,
     Loader2,
     CalendarDays,
@@ -1085,10 +1085,9 @@ function SetupStepsView({ steps, progress, schoolId, onComplete, onDismiss, onDi
                                 {/* Action */}
                                 <Link
                                     href={step.href}
-                                    target="_blank"
                                     className="flex-shrink-0"
                                     onClick={() => {
-                                        // Dismiss wizard so target page doesn't show it again
+                                        // Dismiss wizard so it doesn't show on the target page
                                         if (onDismissForNav) onDismissForNav();
                                     }}
                                 >
@@ -1098,7 +1097,7 @@ function SetupStepsView({ steps, progress, schoolId, onComplete, onDismiss, onDi
                                         className="gap-1.5"
                                     >
                                         {step.isComplete ? "View" : "Add"}
-                                        <ExternalLink className="h-3.5 w-3.5" />
+                                        <ChevronRight className="h-3.5 w-3.5" />
                                     </Button>
                                 </Link>
                             </div>
@@ -1162,7 +1161,7 @@ function SetupStepsView({ steps, progress, schoolId, onComplete, onDismiss, onDi
 
             {/* Help text */}
             <p className="text-center text-xs text-muted-foreground">
-                Tip: Open each step in a new tab, add data, then click "Refresh Progress"
+                Tip: Complete each step, then click "Refresh Progress" to update
             </p>
         </motion.div>
     );

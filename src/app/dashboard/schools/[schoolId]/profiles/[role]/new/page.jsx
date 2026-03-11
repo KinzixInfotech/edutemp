@@ -438,7 +438,7 @@ export default function NewProfilePage() {
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-sm font-medium">Date of Birth</Label>
-                                                <Input type="date" value={form.dob} onChange={(e) => updateForm("dob", e.target.value)} />
+                                                <Input type="date" value={form.dob || ""} onChange={(e) => updateForm("dob", e.target.value)} />
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-sm font-medium">Age {form.dob ? <span className="text-xs text-muted-foreground">(auto-calculated)</span> : null}</Label>
