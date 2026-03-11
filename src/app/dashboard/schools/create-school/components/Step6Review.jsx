@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { CheckCircle2, School, Globe, User, UserCog, GraduationCap, Mail, Phone, MapPin, Lock, Link2, Code, Users, IndianRupee, Calendar, Sparkles } from 'lucide-react';
+import { CheckCircle2, School, Globe, User, UserCog, GraduationCap, Mail, Phone, MapPin, Lock, Link2, Code, Users, IndianRupee, Calendar, Sparkles, Building2, Flag } from 'lucide-react';
 
 export default function Step6Review({ data }) {
     const domain = data.domainMode === 'tenant'
@@ -62,7 +62,10 @@ export default function Step6Review({ data }) {
                         <InfoItem icon={School} label="School Name" value={data.name} />
                         <InfoItem icon={Mail} label="Email" value={data.email} />
                         <InfoItem icon={Phone} label="Phone" value={data.phone} />
-                        <InfoItem icon={MapPin} label="Location" value={data.location} />
+                        <InfoItem icon={MapPin} label="Address" value={data.location} />
+                        <InfoItem icon={Building2} label="City" value={data.city} />
+                        <InfoItem icon={MapPin} label="State" value={data.state} />
+                        <InfoItem icon={Flag} label="Country" value={data.country} />
                         <div className="flex items-center justify-between pt-3 border-t mt-3">
                             <span className="text-sm text-muted-foreground">Subscription</span>
                             <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">

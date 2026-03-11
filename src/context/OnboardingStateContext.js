@@ -16,6 +16,7 @@ const OnboardingContext = createContext({
     resumeWizard: () => { },
     completeOnboarding: () => { },
     dismissBanner: () => { },
+    updateStage: () => { },
 });
 
 export const useOnboarding = () => useContext(OnboardingContext);
@@ -48,11 +49,11 @@ export function OnboardingProvider({ children }) {
 
     // Mutation to update onboarding status
     const updateMutation = useMutation({
-        mutationFn: async ({ onboardingComplete, onboardingDismissed }) => {
+        mutationFn: async (payload) => {
             const res = await fetch("/api/schools/onboarding", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ schoolId, onboardingComplete, onboardingDismissed }),
+                body: JSON.stringify({ schoolId, ...payload }),
             });
             if (!res.ok) throw new Error("Failed to update");
             return res.json();
@@ -117,6 +118,11 @@ export function OnboardingProvider({ children }) {
         setBannerDismissed(true);
     }, []);
 
+    // Update the wizard stage server-side
+    const updateStage = useCallback((stage) => {
+        updateMutation.mutate({ onboardingStage: stage });
+    }, [updateMutation]);
+
     return (
         <OnboardingContext.Provider
             value={{
@@ -128,6 +134,7 @@ export function OnboardingProvider({ children }) {
                 resumeWizard,
                 completeOnboarding,
                 dismissBanner,
+                updateStage,
             }}
         >
             {children}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { useOnboarding } from "@/context/OnboardingStateContext";
@@ -78,10 +78,11 @@ const STARTUP_SOUND_URL = "/startup_fx.mp3";
 
 export default function SchoolOnboardingWizard() {
     const { fullUser } = useAuth();
-    const { showWizard, onboardingData, isLoading, dismissWizard, completeOnboarding } = useOnboarding();
+    const { showWizard, onboardingData, isLoading, dismissWizard, completeOnboarding, updateStage } = useOnboarding();
     const queryClient = useQueryClient();
     const [hasSeenIntro, setHasSeenIntro] = useState(false);
-    const [currentStep, setCurrentStep] = useState(0); // 0=welcome, 1=academic year, 2=school timing, 3=setup steps
+    const [currentStep, setCurrentStep] = useState(0); // 0=welcome, 1=academic year, 2=school timing, 3=location, 4=checklist
+    const [stageInitialized, setStageInitialized] = useState(false);
     const [loading, setLoading] = useState(false);
     const [soundPlayed, setSoundPlayed] = useState(false);
 
@@ -152,27 +153,44 @@ export default function SchoolOnboardingWizard() {
         audio.play().catch(() => { });
     };
 
-    // Check localStorage to see if intro was already shown for this school
+    // Initialize step from server data, then auto-advance past completed steps
     useEffect(() => {
-        if (schoolId) {
-            const key = `onboarding-intro-shown-${schoolId}`;
-            const shown = localStorage.getItem(key);
-            if (shown === "true") {
-                setHasSeenIntro(true);
-                // Check if academic year exists - if yes, skip to step 3
-                const academicYearKey = `onboarding-academic-year-done-${schoolId}`;
-                const timingKey = `onboarding-timing-done-${schoolId}`;
+        if (!schoolId || !onboardingData || stageInitialized) return;
 
-                if (localStorage.getItem(academicYearKey) === "true" && localStorage.getItem(timingKey) === "true") {
-                    setCurrentStep(3); // Skip to setup steps
-                } else if (localStorage.getItem(academicYearKey) === "true") {
-                    setCurrentStep(2); // Skip to timing
-                } else {
-                    setCurrentStep(1); // Go to academic year
-                }
-            }
+        const serverStage = onboardingData.school?.onboardingStage ?? 0;
+        const existing = onboardingData.existingData || {};
+
+        // Start from the server-saved stage
+        let resolvedStep = serverStage;
+
+        // If intro was already seen (stage > 0), mark it
+        if (serverStage > 0) {
+            setHasSeenIntro(true);
         }
-    }, [schoolId]);
+
+        // Auto-advance past steps where data already exists
+        // Step 1 = Academic Year — skip if already created
+        if (resolvedStep === 1 && existing.hasAcademicYear) {
+            resolvedStep = 2;
+        }
+        // Step 2 = Timing — skip if already configured  
+        if (resolvedStep === 2 && existing.hasTimingConfig) {
+            resolvedStep = 3;
+        }
+        // Step 3 = Location — skip if already set
+        if (resolvedStep === 3 && existing.hasLocation) {
+            resolvedStep = 4;
+        }
+
+        setCurrentStep(resolvedStep);
+        setStageInitialized(true);
+
+        // Also check localStorage for intro
+        const introKey = `onboarding-intro-shown-${schoolId}`;
+        if (localStorage.getItem(introKey) === "true") {
+            setHasSeenIntro(true);
+        }
+    }, [schoolId, onboardingData, stageInitialized]);
 
     const markIntroAsSeen = () => {
         if (schoolId) {
@@ -190,6 +208,12 @@ export default function SchoolOnboardingWizard() {
                 : [...prev.workingDays, day].sort((a, b) => a - b),
         }));
     };
+
+    // Helper to change step and persist to server
+    const goToStep = useCallback((step) => {
+        setCurrentStep(step);
+        updateStage(step);
+    }, [updateStage]);
 
     const handleCreateAcademicYear = async () => {
         try {
@@ -218,7 +242,7 @@ export default function SchoolOnboardingWizard() {
 
             toast.success("Academic Year Created Successfully!");
             localStorage.setItem(`onboarding-academic-year-done-${schoolId}`, "true");
-            setCurrentStep(2); // Move to school timing step
+            goToStep(2); // Move to school timing step
 
         } catch (err) {
             toast.error(err.message || "Failed to create academic year");
@@ -247,7 +271,8 @@ export default function SchoolOnboardingWizard() {
 
             toast.success("School Timing Saved!");
             localStorage.setItem(`onboarding-timing-done-${schoolId}`, "true");
-            setCurrentStep(3); // Move to school location step
+            goToStep(3); // Move to school location step
+
 
         } catch (err) {
             toast.error(err.message || "Failed to save school timing");
@@ -305,7 +330,7 @@ export default function SchoolOnboardingWizard() {
 
             toast.success("School Location Saved!");
             localStorage.setItem(`onboarding-location-done-${schoolId}`, "true");
-            setCurrentStep(4); // Move to setup checklist
+            goToStep(4); // Move to setup checklist
 
         } catch (err) {
             toast.error(err.message || "Failed to save school location");
@@ -317,19 +342,19 @@ export default function SchoolOnboardingWizard() {
     const skipAcademicYear = () => {
         toast.info("You can configure academic year later in Settings");
         localStorage.setItem(`onboarding-academic-year-done-${schoolId}`, "true");
-        setCurrentStep(2);
+        goToStep(2);
     };
 
     const skipTiming = () => {
         toast.info("You can configure school timing later in Settings");
         localStorage.setItem(`onboarding-timing-done-${schoolId}`, "true");
-        setCurrentStep(3);
+        goToStep(3);
     };
 
     const skipLocation = () => {
         toast.info("You can configure school location later in Settings");
         localStorage.setItem(`onboarding-location-done-${schoolId}`, "true");
-        setCurrentStep(4);
+        goToStep(4);
     };
 
     const handleDismiss = () => {
@@ -481,7 +506,7 @@ export default function SchoolOnboardingWizard() {
                                 schoolName={fullUser?.school?.name}
                                 onContinue={() => {
                                     markIntroAsSeen();
-                                    setCurrentStep(1);
+                                    goToStep(1);
                                 }}
                             />
                         )}
@@ -492,7 +517,7 @@ export default function SchoolOnboardingWizard() {
                                 form={academicYearForm}
                                 setForm={setAcademicYearForm}
                                 loading={loading}
-                                onBack={() => setCurrentStep(0)}
+                                onBack={() => goToStep(0)}
                                 onNext={handleCreateAcademicYear}
                                 onSkip={skipAcademicYear}
                             />
@@ -505,7 +530,7 @@ export default function SchoolOnboardingWizard() {
                                 setForm={setTimingForm}
                                 toggleWorkingDay={toggleWorkingDay}
                                 loading={loading}
-                                onBack={() => setCurrentStep(1)}
+                                onBack={() => goToStep(1)}
                                 onNext={handleSaveSchoolTiming}
                                 onSkip={skipTiming}
                             />
@@ -519,7 +544,7 @@ export default function SchoolOnboardingWizard() {
                                 loading={loading}
                                 isDetecting={isDetectingLocation}
                                 onDetect={detectCurrentLocation}
-                                onBack={() => setCurrentStep(2)}
+                                onBack={() => goToStep(2)}
                                 onNext={handleSaveSchoolLocation}
                                 onSkip={skipLocation}
                             />
@@ -533,6 +558,7 @@ export default function SchoolOnboardingWizard() {
                                 schoolId={schoolId}
                                 onComplete={handleComplete}
                                 onDismiss={handleDismiss}
+                                onDismissForNav={dismissWizard}
                                 onRefresh={async () => {
                                     await queryClient.invalidateQueries({ queryKey: ["school-onboarding", schoolId] });
                                     await queryClient.refetchQueries({ queryKey: ["school-onboarding", schoolId] });
@@ -923,7 +949,7 @@ const getManuallyCompletedSteps = (schoolId) => {
     }
 };
 
-function SetupStepsView({ steps, progress, schoolId, onComplete, onDismiss, onRefresh }) {
+function SetupStepsView({ steps, progress, schoolId, onComplete, onDismiss, onDismissForNav, onRefresh }) {
     const [refreshing, setRefreshing] = useState(false);
     const [manualSteps, setManualSteps] = useState([]);
 
@@ -1057,7 +1083,15 @@ function SetupStepsView({ steps, progress, schoolId, onComplete, onDismiss, onRe
                                 </div>
 
                                 {/* Action */}
-                                <Link href={step.href} target="_blank" className="flex-shrink-0">
+                                <Link
+                                    href={step.href}
+                                    target="_blank"
+                                    className="flex-shrink-0"
+                                    onClick={() => {
+                                        // Dismiss wizard so target page doesn't show it again
+                                        if (onDismissForNav) onDismissForNav();
+                                    }}
+                                >
                                     <Button
                                         size="sm"
                                         variant={step.isComplete ? "outline" : "default"}

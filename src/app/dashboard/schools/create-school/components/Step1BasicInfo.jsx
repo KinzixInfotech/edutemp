@@ -40,6 +40,15 @@ const step1Schema = z.object({
     location: z.string()
         .min(5, 'Please enter a complete address')
         .max(200, 'Address cannot exceed 200 characters'),
+    city: z.string()
+        .min(2, 'City name must be at least 2 characters')
+        .max(100, 'City name cannot exceed 100 characters'),
+    state: z.string()
+        .min(2, 'State name must be at least 2 characters')
+        .max(100, 'State name cannot exceed 100 characters'),
+    country: z.string()
+        .min(2, 'Country name must be at least 2 characters')
+        .max(100, 'Country name cannot exceed 100 characters'),
     subscriptionType: z.enum(['A', 'B', 'C'], {
         required_error: 'Please select a subscription type',
     }),
@@ -52,7 +61,8 @@ export default function Step1BasicInfo({ data, updateFormData, nextStep }) {
     const [uploading, setUploading] = useState(false);
     const [rawImage, setRawImage] = useState(null);
     const [cropDialogOpen, setCropDialogOpen] = useState(false);
-    const [resetKey, setResetKey] = useState(0); // For resetting file upload after cancel
+    const [resetKey, setResetKey] = useState(0);
+    const [localPreview, setLocalPreview] = useState(data.profilePicture || null);
 
     const form = useForm({
         resolver: zodResolver(step1Schema),
@@ -61,10 +71,13 @@ export default function Step1BasicInfo({ data, updateFormData, nextStep }) {
             email: data.email || '',
             phone: data.phone || '',
             location: data.location || '',
+            city: data.city || '',
+            state: data.state || '',
+            country: data.country || 'India',
             subscriptionType: data.subscriptionType || 'A',
             language: data.language || 'en',
         },
-        mode: 'onChange', // Enable live validation
+        mode: 'onChange',
     });
 
     const handleImageUpload = (previewUrl) => {
@@ -77,6 +90,9 @@ export default function Step1BasicInfo({ data, updateFormData, nextStep }) {
         updateFormData(formValues);
         nextStep();
     };
+
+    // Determine what preview to show
+    const displayPreview = data.profilePicture || localPreview;
 
     return (
         <>
@@ -91,31 +107,42 @@ export default function Step1BasicInfo({ data, updateFormData, nextStep }) {
                         setRawImage(null);
                     }}
                     onCancel={() => {
-                        // User cancelled - reset state to allow re-upload
                         setRawImage(null);
                         setResetKey(prev => prev + 1);
                     }}
                     onCropComplete={async (croppedBlob) => {
-                        const now = new Date();
-                        const iso = now.toISOString().replace(/[:.]/g, '-');
-                        const perf = Math.floor(performance.now() * 1000);
-                        const timestamp = `${iso}-${perf}`;
-                        const filename = `${timestamp}.jpg`;
-                        const file = new File([croppedBlob], filename, { type: 'image/jpeg' });
+                        try {
+                            const now = new Date();
+                            const iso = now.toISOString().replace(/[:.]/g, '-');
+                            const perf = Math.floor(performance.now() * 1000);
+                            const timestamp = `${iso}-${perf}`;
+                            const filename = `${timestamp}.jpg`;
+                            const file = new File([croppedBlob], filename, { type: 'image/jpeg' });
 
-                        const res = await uploadFilesToR2('profiles', {
-                            files: [file],
-                            input: {
-                                profileId: crypto.randomUUID(),
-                                username: form.getValues('name') || 'School',
-                            },
-                        });
+                            // Show local preview immediately from blob
+                            const blobUrl = URL.createObjectURL(croppedBlob);
+                            setLocalPreview(blobUrl);
 
-                        if (res && res[0]?.url) {
-                            updateFormData({ profilePicture: res[0].url });
-                            // Success toast handled by dialog
-                        } else {
-                            throw new Error('Upload failed - no URL returned');
+                            const res = await uploadFilesToR2('profiles', {
+                                files: [file],
+                                input: {
+                                    profileId: crypto.randomUUID(),
+                                    username: form.getValues('name') || 'School',
+                                },
+                            });
+
+                            if (res && res[0]?.url) {
+                                updateFormData({ profilePicture: res[0].url });
+                                setLocalPreview(res[0].url);
+                            } else {
+                                // Keep blob preview even if upload fails
+                                toast.error('Upload failed - please try again');
+                                setLocalPreview(null);
+                            }
+                        } catch (err) {
+                            console.error('Upload error:', err);
+                            toast.error('Upload failed - please try again');
+                            setLocalPreview(null);
                         }
                     }}
                 />
@@ -180,7 +207,7 @@ export default function Step1BasicInfo({ data, updateFormData, nextStep }) {
                         />
                     </div>
 
-                    {/* Location */}
+                    {/* Address */}
                     <FormField
                         control={form.control}
                         name="location"
@@ -188,20 +215,65 @@ export default function Step1BasicInfo({ data, updateFormData, nextStep }) {
                             <FormItem>
                                 <FormLabel>Address *</FormLabel>
                                 <FormControl>
-                                    <Input placeholder="Delhi, India" {...field} />
+                                    <Input placeholder="e.g., 123, Main Street, Near Park" {...field} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
                         )}
                     />
 
+                    {/* City, State, Country */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <FormField
+                            control={form.control}
+                            name="city"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>City *</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="e.g., Delhi" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        <FormField
+                            control={form.control}
+                            name="state"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>State *</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="e.g., Delhi" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        <FormField
+                            control={form.control}
+                            name="country"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Country *</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="e.g., India" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
+
                     {/* Logo Upload */}
                     <div className="space-y-2">
                         <Label>School Logo</Label>
-                        {data.profilePicture ? (
+                        {displayPreview ? (
                             <div className="relative border border-dashed rounded-xl p-4 min-h-52 flex flex-col items-center justify-center">
                                 <img
-                                    src={data.profilePicture}
+                                    src={displayPreview}
                                     alt="School Logo"
                                     className="max-h-40 rounded object-contain"
                                 />
@@ -211,7 +283,10 @@ export default function Step1BasicInfo({ data, updateFormData, nextStep }) {
                                     variant="outline"
                                     size="sm"
                                     className="mt-2"
-                                    onClick={() => updateFormData({ profilePicture: '' })}
+                                    onClick={() => {
+                                        updateFormData({ profilePicture: '' });
+                                        setLocalPreview(null);
+                                    }}
                                 >
                                     Change Logo
                                 </Button>

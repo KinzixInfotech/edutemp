@@ -127,6 +127,9 @@ exports.Prisma.SchoolScalarFieldEnum = {
   schoolCode: 'schoolCode',
   profilePicture: 'profilePicture',
   location: 'location',
+  city: 'city',
+  state: 'state',
+  country: 'country',
   contactNumber: 'contactNumber',
   websiteConfig: 'websiteConfig',
   signatureUrl: 'signatureUrl',
@@ -139,6 +142,7 @@ exports.Prisma.SchoolScalarFieldEnum = {
   biometricAgentKey: 'biometricAgentKey',
   onboardingComplete: 'onboardingComplete',
   onboardingDismissed: 'onboardingDismissed',
+  onboardingStage: 'onboardingStage',
   statuses: 'statuses'
 };
 

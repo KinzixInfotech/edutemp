@@ -19,6 +19,7 @@ export async function GET(request) {
                 name: true,
                 onboardingComplete: true,
                 onboardingDismissed: true,
+                onboardingStage: true,
                 _count: {
                     select: {
                         classes: true,
@@ -35,6 +36,20 @@ export async function GET(request) {
         if (!school) {
             return NextResponse.json({ error: "School not found" }, { status: 404 });
         }
+
+        // Check if prerequisite data exists (for smart step advancement)
+        const [academicYearCount, attendanceConfig, schoolSettings] = await Promise.all([
+            prisma.academicYear.count({ where: { schoolId } }),
+            prisma.attendanceConfig.findUnique({ where: { schoolId }, select: { id: true } }),
+            prisma.schoolSettings.findUnique({
+                where: { schoolId },
+                select: { schoolLatitude: true, schoolLongitude: true }
+            }),
+        ]);
+
+        const hasAcademicYear = academicYearCount > 0;
+        const hasTimingConfig = !!attendanceConfig;
+        const hasLocation = !!(schoolSettings?.schoolLatitude && schoolSettings?.schoolLongitude);
 
         // Calculate step statuses
         const steps = [
@@ -108,6 +123,7 @@ export async function GET(request) {
                 name: school.name,
                 onboardingComplete: isComplete,
                 onboardingDismissed: isDismissed,
+                onboardingStage: school.onboardingStage ?? 0,
             },
             steps,
             progress: {
@@ -115,6 +131,12 @@ export async function GET(request) {
                 totalSteps,
                 percentage: Math.round((completedSteps / totalSteps) * 100),
                 allComplete,
+            },
+            // Existing data flags for smart step advancement
+            existingData: {
+                hasAcademicYear,
+                hasTimingConfig,
+                hasLocation,
             },
             // Show wizard if: not complete AND not dismissed
             shouldShowWizard: !isComplete && !isDismissed,
@@ -131,7 +153,7 @@ export async function GET(request) {
 export async function PATCH(request) {
     try {
         const body = await request.json();
-        const { schoolId, onboardingComplete, onboardingDismissed } = body;
+        const { schoolId, onboardingComplete, onboardingDismissed, onboardingStage } = body;
 
         if (!schoolId) {
             return NextResponse.json({ error: "schoolId is required" }, { status: 400 });
@@ -143,6 +165,9 @@ export async function PATCH(request) {
         }
         if (typeof onboardingDismissed === "boolean") {
             updateData.onboardingDismissed = onboardingDismissed;
+        }
+        if (typeof onboardingStage === "number") {
+            updateData.onboardingStage = onboardingStage;
         }
 
         if (Object.keys(updateData).length === 0) {
@@ -156,6 +181,7 @@ export async function PATCH(request) {
                 id: true,
                 onboardingComplete: true,
                 onboardingDismissed: true,
+                onboardingStage: true,
             }
         });
 

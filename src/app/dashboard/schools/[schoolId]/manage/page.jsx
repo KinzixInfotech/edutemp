@@ -230,7 +230,10 @@ export default function ManageSchoolPage({ params }) {
                         {/* Details grid */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 flex-1">
                             {[
-                                { icon: MapPin, label: 'Location', value: school.location },
+                                { icon: MapPin, label: 'Address', value: school.location },
+                                { icon: Building2, label: 'City', value: school.city },
+                                { icon: MapPin, label: 'State', value: school.state },
+                                { icon: MapPin, label: 'Country', value: school.country },
                                 { icon: Phone, label: 'Contact', value: school.contactNumber },
                                 { icon: Globe, label: 'Domain', value: school.currentDomain || school.domain },
                                 { icon: ShieldCheck, label: 'Subscription', value: school.SubscriptionType ? `Plan ${school.SubscriptionType}` : null },
@@ -423,8 +426,8 @@ export default function ManageSchoolPage({ params }) {
                             {/* Capacity Warning */}
                             {(plan.isNearLimit || plan.isOverLimit) && (
                                 <div className={`rounded-lg p-4 border ${plan.isOverLimit
-                                        ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                                        : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+                                    ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                                    : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
                                     }`}>
                                     <div className="flex items-start gap-3">
                                         <AlertCircle className={`w-5 h-5 mt-0.5 ${plan.isOverLimit ? 'text-red-600' : 'text-amber-600'}`} />
