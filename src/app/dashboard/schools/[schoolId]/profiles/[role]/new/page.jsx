@@ -127,14 +127,26 @@ export default function NewProfilePage() {
 
     const createProfileMutation = useMutation({
         mutationFn: async (formData) => {
+            const { data: { session } } = await (await import("@/lib/supabase")).supabase.auth.getSession()
+            const token = session?.access_token
+            if (!token) throw new Error("Not authenticated. Please login again.")
+
             const res = await fetch(`/api/schools/${schoolId}/profiles/${role}`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
                 body: JSON.stringify(formData)
             })
             if (!res.ok) {
-                const error = await res.json()
-                throw new Error(error.message || "Failed to create profile")
+                const errorData = await res.json()
+                // Attach field errors to the thrown error for the onError handler
+                const err = new Error(errorData.message || errorData.error || "Failed to create profile")
+                err.fieldErrors = errorData.fieldErrors || null
+                err.details = errorData.details || null
+                err.status = res.status
+                throw err
             }
             return res.json()
         },
@@ -148,7 +160,16 @@ export default function NewProfilePage() {
             router.back()
         },
         onError: (error) => {
-            toast.error(error.message || "Creation failed")
+            // If API returned field-level Zod errors, merge them into the form errors state
+            if (error.fieldErrors) {
+                setErrors(prev => ({ ...prev, ...error.fieldErrors }))
+                // Show each field error as a toast
+                Object.entries(error.fieldErrors).forEach(([field, msg]) => {
+                    toast.error(`${field}: ${msg}`)
+                })
+            } else {
+                toast.error(error.message || "Creation failed")
+            }
         }
     })
 

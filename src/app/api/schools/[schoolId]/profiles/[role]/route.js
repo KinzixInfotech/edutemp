@@ -504,6 +504,27 @@ export async function POST(req, context) {
             }
         }
 
+        // Return structured Zod validation errors
+        if (error instanceof z.ZodError) {
+            const fieldErrors = {};
+            error.errors.forEach((e) => {
+                const field = e.path.join(".");
+                fieldErrors[field] = e.message;
+            });
+            return NextResponse.json(
+                {
+                    error: "Validation failed",
+                    message: "Please fix the following errors",
+                    fieldErrors,
+                    details: error.errors.map((e) => ({
+                        field: e.path.join("."),
+                        message: e.message,
+                    })),
+                },
+                { status: 400 }
+            );
+        }
+
         return NextResponse.json(
             { error: error.message || "Failed to create profile" },
             { status: 500 }
