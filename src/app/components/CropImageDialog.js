@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import Cropper from "react-easy-crop";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
@@ -37,6 +37,17 @@ const ASPECT_RATIOS = [
   { label: "Banner", value: 21 / 9, icon: Maximize2 },
 ];
 
+/**
+ * Proxy CDN URLs through our API to bypass CORS for canvas/crop operations.
+ */
+function getProxiedImageUrl(url) {
+  if (!url || url.startsWith('blob:') || url.startsWith('data:')) return url;
+  if (url.includes('cdn.edubreezy.com')) {
+    return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+}
+
 export default function CropImageDialog({
   image,
   open,
@@ -71,6 +82,9 @@ export default function CropImageDialog({
   const isSuccess = uploadStatus === "success";
   const isError = uploadStatus === "error";
 
+  // Proxy CDN URLs to avoid CORS when loading images on canvas
+  const proxiedImage = useMemo(() => getProxiedImageUrl(image), [image]);
+
   // Prevent page refresh/close while uploading
   useEffect(() => {
     const handleBeforeUnload = (e) => {
@@ -97,7 +111,7 @@ export default function CropImageDialog({
       setUploadStatus("uploading");
       setErrorMessage("");
 
-      const croppedImage = await getCroppedImg(image, croppedAreaPixels, rotation, { flipH, flipV }, outputSize);
+      const croppedImage = await getCroppedImg(proxiedImage, croppedAreaPixels, rotation, { flipH, flipV }, outputSize);
 
       // Call parent's upload handler
       await onCropComplete(croppedImage);
@@ -231,7 +245,7 @@ export default function CropImageDialog({
         {/* Crop Area */}
         <div className="relative w-full h-[200px] sm:h-[300px] md:h-[350px] bg-muted/50">
           <Cropper
-            image={image}
+            image={proxiedImage}
             crop={crop}
             zoom={zoom}
             rotation={rotation}

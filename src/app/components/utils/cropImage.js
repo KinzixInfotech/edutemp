@@ -111,14 +111,30 @@ function rotateSize(width, height, rotation) {
 }
 
 /**
+ * Proxy CDN URLs through our API to bypass CORS restrictions for canvas operations.
+ * Local blobs and data URIs are returned as-is.
+ */
+function getProxiedUrl(url) {
+    if (!url || url.startsWith('blob:') || url.startsWith('data:')) return url;
+    if (url.includes('cdn.edubreezy.com')) {
+        return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+    }
+    return url;
+}
+
+/**
  * Create an Image object from a URL
  */
 function createImage(url) {
     return new Promise((resolve, reject) => {
         const img = new Image();
-        img.crossOrigin = "anonymous"; // Handle CORS
+        const proxiedUrl = getProxiedUrl(url);
+        // Only set crossOrigin for external URLs (not our proxy or local blobs)
+        if (proxiedUrl === url && !url.startsWith('blob:') && !url.startsWith('data:')) {
+            img.crossOrigin = "anonymous";
+        }
         img.addEventListener("load", () => resolve(img));
         img.addEventListener("error", (err) => reject(err));
-        img.src = url;
+        img.src = proxiedUrl;
     });
 }
