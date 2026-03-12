@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supbase-admin";
 import { verifyAdminAccess } from "@/lib/api-auth";
 import { z } from "zod";
 import { differenceInYears } from "date-fns";
+import { invalidatePattern } from "@/lib/cache";
 
 const roleMap = {
     students: "STUDENT",
@@ -489,6 +490,22 @@ export async function POST(req, context) {
             } catch (err) {
                 console.error("Failed to track profile picture upload:", err);
             }
+        }
+
+        // Invalidate server-side Redis cache for the list APIs
+        try {
+            const roleCacheMap = {
+                students: 'students',
+                teacher: 'teaching-staff',
+                'non-teaching': 'non-teaching-staff',
+                parents: 'parents',
+            };
+            const cachePrefix = roleCacheMap[role] || role;
+            await invalidatePattern(`${cachePrefix}*`);
+            // Also invalidate parents:list cache if creating a parent
+            if (role === 'parents') await invalidatePattern('parents:list*');
+        } catch (cacheErr) {
+            console.warn('Cache invalidation warning:', cacheErr?.message);
         }
 
         return NextResponse.json({ success: true, ...created });

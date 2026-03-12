@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { remember, generateKey, invalidatePattern } from "@/lib/cache";
 
 export async function GET(req, props) {
     const params = await props.params;
@@ -21,7 +22,6 @@ export async function GET(req, props) {
 
     const pageNum = Number(page) > 0 ? Number(page) : 1;
     const limitNum = Number(limit) > 0 ? Number(limit) : 10;
-    const skip = (pageNum - 1) * limitNum;
 
     // Handle ALL / undefined filters
     const parsedClassId =
@@ -63,35 +63,54 @@ export async function GET(req, props) {
                 : {})
         };
 
-        const students = await prisma.student.findMany({
-            where: whereClause,
-            include: {
-                user: true,
-                class: { select: { className: true } },
-                section: { select: { name: true } },
-                studentParentLinks: {
-                    include: {
-                        parent: {
-                            include: {
-                                user: { select: { email: true, profilePicture: true } }
-                            }
-                        }
-                    }
-                }
-            },
-            orderBy,
-            skip,
-            take: limitNum
+        const cacheKey = generateKey("students", {
+            schoolId,
+            page: pageNum,
+            limit: limitNum,
+            search,
+            classId: parsedClassId || "ALL",
+            sectionId: parsedSectionId || "ALL",
+            sortBy,
         });
 
-        const [total, activeCount] = await Promise.all([
-            prisma.student.count({ where: whereClause }),
-            prisma.student.count({
-                where: { schoolId, user: { status: "ACTIVE" } },
-            }),
-        ]);
+        const result = await remember(
+            cacheKey,
+            async () => {
+                const skip = (pageNum - 1) * limitNum;
 
-        return NextResponse.json({ students, total, activeCount });
+                const [students, total, activeCount] = await Promise.all([
+                    prisma.student.findMany({
+                        where: whereClause,
+                        include: {
+                            user: true,
+                            class: { select: { className: true } },
+                            section: { select: { name: true } },
+                            studentParentLinks: {
+                                include: {
+                                    parent: {
+                                        include: {
+                                            user: { select: { email: true, profilePicture: true } }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        orderBy,
+                        skip,
+                        take: limitNum
+                    }),
+                    prisma.student.count({ where: whereClause }),
+                    prisma.student.count({
+                        where: { schoolId, user: { status: "ACTIVE" } },
+                    }),
+                ]);
+
+                return { students, total, activeCount };
+            },
+            300 // 5 minutes cache
+        );
+
+        return NextResponse.json(result);
     } catch (err) {
         console.error(err);
         return NextResponse.json(

@@ -205,7 +205,16 @@ export default function NewProfilePage() {
             try { localStorage.removeItem(DRAFT_KEY) } catch { /* ignore */ }
             isDirtyRef.current = false
             toast.success(`${role.charAt(0).toUpperCase() + role.slice(1)} Profile Created Successfully`)
-            queryClient.invalidateQueries(['profiles', schoolId])
+            // Invalidate the correct list query for this role
+            const roleQueryKeyMap = {
+                'teacher': 'teaching-staff',
+                'students': 'students',
+                'non-teaching': 'non-teaching-staff',
+                'parents': 'parents',
+            }
+            const listKey = roleQueryKeyMap[role] || role
+            queryClient.invalidateQueries({ queryKey: [listKey] })
+            queryClient.invalidateQueries({ queryKey: ['profiles', schoolId] })
             setResetKey((prev) => prev + 1)
             setForm(baseForm)
             setSelectedStudents([])
