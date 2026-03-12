@@ -270,7 +270,7 @@ export async function POST(req, context) {
                     data: {
                         id: createdUserId,
                         password: parsed.password,
-                        profilePicture: parsed.profilePicture || null,
+                        profilePicture: parsed.profilePicture || "default.png",
                         name: userName,
                         email: parsed.email,
                         school: { connect: { id: parsed.schoolId } },
@@ -525,8 +525,56 @@ export async function POST(req, context) {
             );
         }
 
+        // --- Prisma error sanitization ---
+        // Unique constraint violation (e.g. duplicate email)
+        if (error?.constructor?.name === "PrismaClientKnownRequestError") {
+            if (error.code === "P2002") {
+                const target = error.meta?.target;
+                const field = Array.isArray(target) ? target.join(", ") : target || "field";
+                return NextResponse.json(
+                    { error: "Duplicate entry", message: `A record with this ${field} already exists.` },
+                    { status: 409 }
+                );
+            }
+            // Foreign key constraint (e.g. invalid classId)
+            if (error.code === "P2003") {
+                return NextResponse.json(
+                    { error: "Invalid reference", message: "One of the selected references (class, section, etc.) is invalid." },
+                    { status: 400 }
+                );
+            }
+            // Record not found
+            if (error.code === "P2025") {
+                return NextResponse.json(
+                    { error: "Not found", message: "A required related record was not found." },
+                    { status: 404 }
+                );
+            }
+            return NextResponse.json(
+                { error: "Database error", message: "A database error occurred. Please try again." },
+                { status: 500 }
+            );
+        }
+
+        // Prisma validation error (wrong types, missing required fields, etc.)
+        if (error?.constructor?.name === "PrismaClientValidationError") {
+            return NextResponse.json(
+                { error: "Invalid data", message: "Some of the submitted data is invalid. Please review your form and try again." },
+                { status: 400 }
+            );
+        }
+
+        // Prisma connection / initialization error
+        if (error?.constructor?.name === "PrismaClientInitializationError") {
+            return NextResponse.json(
+                { error: "Service unavailable", message: "Unable to connect to the database. Please try again later." },
+                { status: 503 }
+            );
+        }
+
+        // Generic fallback — never leak raw error.message
         return NextResponse.json(
-            { error: error.message || "Failed to create profile" },
+            { error: "Failed to create profile", message: "An unexpected error occurred. Please try again." },
             { status: 500 }
         );
     }

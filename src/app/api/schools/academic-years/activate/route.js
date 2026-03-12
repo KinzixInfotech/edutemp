@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma"
 import { NextResponse } from "next/server"
+import { delCache, generateKey } from "@/lib/cache"
 
 export async function POST(req) {
     try {
@@ -35,6 +36,10 @@ export async function POST(req) {
                 data: { isActive: true }
             })
         ])
+
+        // 3. Invalidate the cache so the sidebar gets fresh data
+        const cacheKey = generateKey('academic-years', { schoolId });
+        await delCache(cacheKey);
 
         return NextResponse.json({ success: true })
     } catch (error) {

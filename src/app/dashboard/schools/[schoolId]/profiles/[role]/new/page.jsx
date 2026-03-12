@@ -1,5 +1,5 @@
 "use client"
-import React, { useEffect, useState, useCallback } from "react"
+import React, { useEffect, useState, useCallback, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -68,8 +68,58 @@ export default function NewProfilePage() {
     }
 
     const [form, setForm] = useState(baseForm)
+    const isDirtyRef = useRef(false)
+
+    // --- Draft persistence (localStorage) ---
+    const DRAFT_KEY = `edubreezy_profile_draft_${schoolId}_${role}`
+
+    // Restore draft on mount
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem(DRAFT_KEY)
+            if (saved) {
+                const parsed = JSON.parse(saved)
+                if (parsed && typeof parsed === "object") {
+                    const confirmed = window.confirm(
+                        "You have an unsaved draft for this profile. Would you like to restore it?"
+                    )
+                    if (confirmed) {
+                        setForm(prev => ({ ...prev, ...parsed }))
+                        if (parsed.profilePicture) setPreviewUrl(parsed.profilePicture)
+                        toast.info("Draft restored")
+                    } else {
+                        localStorage.removeItem(DRAFT_KEY)
+                    }
+                }
+            }
+        } catch { /* ignore corrupted drafts */ }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
+    // Auto-save draft (debounced)
+    const debouncedForm = useDebounce(form, 1500)
+    useEffect(() => {
+        if (!isDirtyRef.current) return
+        try {
+            // Don't persist the password field for security
+            const { password, ...safeForm } = debouncedForm
+            localStorage.setItem(DRAFT_KEY, JSON.stringify(safeForm))
+        } catch { /* localStorage full or unavailable */ }
+    }, [debouncedForm, DRAFT_KEY])
+
+    // Warn before closing tab with unsaved changes
+    useEffect(() => {
+        const handler = (e) => {
+            if (!isDirtyRef.current) return
+            e.preventDefault()
+            e.returnValue = ""
+        }
+        window.addEventListener("beforeunload", handler)
+        return () => window.removeEventListener("beforeunload", handler)
+    }, [])
 
     const updateForm = useCallback((field, value) => {
+        isDirtyRef.current = true
         setForm(prev => ({ ...prev, [field]: value }))
     }, [])
 
@@ -151,6 +201,9 @@ export default function NewProfilePage() {
             return res.json()
         },
         onSuccess: () => {
+            // Clear draft on successful creation
+            try { localStorage.removeItem(DRAFT_KEY) } catch { /* ignore */ }
+            isDirtyRef.current = false
             toast.success(`${role.charAt(0).toUpperCase() + role.slice(1)} Profile Created Successfully`)
             queryClient.invalidateQueries(['profiles', schoolId])
             setResetKey((prev) => prev + 1)

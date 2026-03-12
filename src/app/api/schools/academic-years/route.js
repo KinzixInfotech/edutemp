@@ -1,12 +1,12 @@
 import prisma from "@/lib/prisma"
 import { NextResponse } from "next/server"
-import { remember, invalidatePattern, generateKey } from "@/lib/cache"
+import { remember, delCache, generateKey } from "@/lib/cache"
 
 // 👉 Create new academic year
 export async function POST(req) {
     try {
         const body = await req.json()
-        const { name, startDate, endDate, schoolId } = body
+        const { name, startDate, endDate, schoolId, isActive } = body
         console.log(body);
 
         if (!name || !startDate || !endDate) {
@@ -27,18 +27,27 @@ export async function POST(req) {
             return NextResponse.json({ error: "Academic year with this name already exists" }, { status: 409 })
         }
 
+        // If isActive is true, deactivate all other academic years for this school first
+        if (isActive) {
+            await prisma.academicYear.updateMany({
+                where: { schoolId, isActive: true },
+                data: { isActive: false },
+            })
+        }
+
         const academicYear = await prisma.academicYear.create({
             data: {
                 name,
                 startDate: new Date(startDate),
                 endDate: new Date(endDate),
+                isActive: isActive || false,
                 school: { connect: { id: schoolId } },
-                // schoolId: schoolId,
             },
         })
 
         // Invalidate cache for this school's academic years
-        await invalidatePattern(`academic-years:${schoolId}*`)
+        const cacheKey = generateKey('academic-years', { schoolId });
+        await delCache(cacheKey);
 
         return NextResponse.json(academicYear)
     } catch (err) {

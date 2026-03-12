@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma"
 import { NextResponse } from "next/server"
+import { delCache, generateKey } from "@/lib/cache"
 
 // 👉 Update academic year status
 // 👉 Update academic year status or details
@@ -65,6 +66,10 @@ export async function PATCH(req, props) {
             data: updateData,
         })
 
+        // Invalidate cache so sidebar reflects changes
+        const cacheKey = generateKey('academic-years', { schoolId: year.schoolId });
+        await delCache(cacheKey);
+
         return NextResponse.json(updatedYear)
     } catch (err) {
         console.error(err)
@@ -77,9 +82,16 @@ export async function DELETE(req, props) {
     const params = await props.params;
     const { id } = params
     try {
+        const year = await prisma.academicYear.findUnique({ where: { id }, select: { schoolId: true } })
         await prisma.academicYear.delete({
             where: { id },
         })
+
+        // Invalidate cache
+        if (year) {
+            const cacheKey = generateKey('academic-years', { schoolId: year.schoolId });
+            await delCache(cacheKey);
+        }
 
         return NextResponse.json({ message: "Academic year deleted successfully" })
     } catch (err) {
