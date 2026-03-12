@@ -112,10 +112,12 @@ function rotateSize(width, height, rotation) {
 
 /**
  * Proxy CDN URLs through our API to bypass CORS restrictions for canvas operations.
- * Local blobs and data URIs are returned as-is.
+ * Local blobs, data URIs, and already-proxied URLs are returned as-is.
  */
 function getProxiedUrl(url) {
     if (!url || url.startsWith('blob:') || url.startsWith('data:')) return url;
+    // Skip if already proxied
+    if (url.startsWith('/api/image-proxy')) return url;
     if (url.includes('cdn.edubreezy.com')) {
         return `/api/image-proxy?url=${encodeURIComponent(url)}`;
     }
