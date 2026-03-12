@@ -200,12 +200,13 @@ export default function NewProfilePage() {
             }
             return res.json()
         },
-        onSuccess: () => {
+        onSuccess: async () => {
             // Clear draft on successful creation
             try { localStorage.removeItem(DRAFT_KEY) } catch { /* ignore */ }
             isDirtyRef.current = false
             toast.success(`${role.charAt(0).toUpperCase() + role.slice(1)} Profile Created Successfully`)
-            // Invalidate the correct list query for this role
+
+            // Map role param to the list page query key prefix
             const roleQueryKeyMap = {
                 'teacher': 'teaching-staff',
                 'students': 'students',
@@ -213,12 +214,31 @@ export default function NewProfilePage() {
                 'parents': 'parents',
             }
             const listKey = roleQueryKeyMap[role] || role
-            queryClient.invalidateQueries({ queryKey: [listKey] })
-            queryClient.invalidateQueries({ queryKey: ['profiles', schoolId] })
+
+            // 1) Remove ALL cached data for this list so stale data is never shown
+            queryClient.removeQueries({ queryKey: [listKey] })
+            queryClient.removeQueries({ queryKey: ['profiles', schoolId] })
+
+            // Also remove related designation queries
+            if (listKey === 'teaching-staff') {
+                queryClient.removeQueries({ queryKey: ['teaching-staff-designations'] })
+            }
+            if (listKey === 'non-teaching-staff') {
+                queryClient.removeQueries({ queryKey: ['non-teaching-staff-designations'] })
+            }
+
+            // 2) Trigger fresh refetch (await so data is ready before navigation)
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: [listKey] }),
+                queryClient.invalidateQueries({ queryKey: ['profiles', schoolId] }),
+            ])
+
             setResetKey((prev) => prev + 1)
             setForm(baseForm)
             setSelectedStudents([])
             setSelectedParents([])
+
+            // 3) Navigate AFTER cache is cleared and refetch is triggered
             router.back()
         },
         onError: (error) => {
