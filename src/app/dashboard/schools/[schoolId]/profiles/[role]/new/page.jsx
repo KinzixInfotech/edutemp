@@ -238,8 +238,14 @@ export default function NewProfilePage() {
             setSelectedStudents([])
             setSelectedParents([])
 
-            // 3) Navigate AFTER cache is cleared and refetch is triggered
-            router.back()
+            // 3) Navigate to the list page (push instead of back for clean mount)
+            const listUrlMap = {
+                'teacher': '/dashboard/schools/manage-teaching-staff',
+                'students': '/dashboard/schools/manage-student',
+                'non-teaching': '/dashboard/schools/manage-non-teaching-staff',
+                'parents': '/dashboard/schools/manage-parent',
+            }
+            router.push(listUrlMap[role] || `/dashboard/schools/${schoolId}/profiles/${role}`)
         },
         onError: (error) => {
             // If API returned field-level Zod errors, merge them into the form errors state
