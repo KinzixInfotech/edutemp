@@ -150,6 +150,9 @@ model School {
   // Profile Change Requests
   profileChangeRequests ProfileChangeRequest[]
 
+  // Chat / Messaging System
+  conversations Conversation[]
+
   @@index([name])
 }
 
@@ -1729,6 +1732,7 @@ model User {
   director   Director?
   principal  Principal?
   fcmToken   String?
+  lastSeenAt DateTime?
 
   AuditLog              AuditLog[]
   Document              Document[]
@@ -1810,6 +1814,12 @@ model User {
   // Profile Change Requests
   submittedProfileChanges ProfileChangeRequest[] @relation("ProfileChangeRequester")
   reviewedProfileChanges  ProfileChangeRequest[] @relation("ProfileChangeReviewer")
+
+  // Chat / Messaging System
+  createdConversations     Conversation[]            @relation("ConversationCreator")
+  conversationParticipants ConversationParticipant[]
+  sentMessages             Message[]                 @relation("MessageSender")
+  deletedMessages          Message[]                 @relation("MessageDeleter")
 
   @@index([schoolId])
   @@index([roleId])
@@ -2244,6 +2254,9 @@ model Class {
   examEvaluators         ExamEvaluator[]
   nepStage               NEPStage? // NEP 2020 Learning Stage for HPC
 
+  // Chat / Messaging System
+  chatConversations Conversation[]
+
   @@unique([id, schoolId])
   @@index([schoolId])
 }
@@ -2289,6 +2302,9 @@ model Section {
   alumni                 Alumni[]
   promotionHistoriesFrom PromotionHistory[]      @relation("PromotionFromSection")
   promotionHistoriesTo   PromotionHistory[]      @relation("PromotionToSection")
+
+  // Chat / Messaging System
+  chatConversations Conversation[]
 
   @@unique([classId, name])
   @@index([classId])
@@ -6577,4 +6593,114 @@ model StoryStatusView {
   @@unique([statusId, viewerId])
   @@index([statusId])
   @@index([viewerId])
+}
+
+// ============================================
+// CHAT / MESSAGING SYSTEM
+// ============================================
+
+enum ConversationType {
+  PARENT_TEACHER
+  TEACHER_CLASS
+  TEACHER_TEACHER
+  DIRECT
+  COMMUNITY
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+}
+
+model Conversation {
+  id       String           @id @default(uuid()) @db.Uuid
+  schoolId String           @db.Uuid
+  type     ConversationType
+  title    String?
+
+  // Class context (for TEACHER_CLASS conversations)
+  classId   Int?
+  sectionId Int?
+
+  // Metadata
+  lastMessageAt   DateTime?
+  lastMessageText String?
+  createdById     String    @db.Uuid
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  school       School                    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class        Class?                    @relation(fields: [classId], references: [id])
+  section      Section?                  @relation(fields: [sectionId], references: [id])
+  createdBy    User                      @relation("ConversationCreator", fields: [createdById], references: [id])
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([schoolId])
+  @@index([lastMessageAt])
+  @@index([type])
+  @@index([schoolId, type])
+}
+
+model ConversationParticipant {
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @db.Uuid
+  userId         String   @db.Uuid
+  role           String   @default("MEMBER") // MEMBER, ADMIN
+  joinedAt       DateTime @default(now())
+
+  // Mute settings
+  mutedUntil DateTime?
+
+  // Read tracking
+  lastReadAt    DateTime?
+  lastReadMsgId String?   @db.Uuid
+
+  // Status
+  isActive Boolean @default(true)
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@index([conversationId])
+  @@index([userId, isActive])
+}
+
+model Message {
+  id             String @id @default(uuid()) @db.Uuid
+  conversationId String @db.Uuid
+  senderId       String @db.Uuid
+
+  // Content
+  content String @db.Text
+
+  // Attachments (stored in R2)
+  attachments Json? // [{url, fileName, fileSize, mimeType}]
+
+  // Status
+  status MessageStatus @default(SENT)
+
+  // Soft delete
+  deletedAt   DateTime?
+  deletedById String?   @db.Uuid
+
+  // Reply threading
+  replyToId String? @db.Uuid
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("MessageSender", fields: [senderId], references: [id])
+  deletedBy    User?        @relation("MessageDeleter", fields: [deletedById], references: [id])
+  replyTo      Message?     @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies      Message[]    @relation("MessageReplies")
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+  @@index([conversationId])
 }

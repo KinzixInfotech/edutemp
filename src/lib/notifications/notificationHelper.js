@@ -134,7 +134,7 @@ export async function enqueueDelayedRetry(payload, attempt = 1, maxAttempts = 3)
 
 /**
  * Send notification to users (Wrapper)
- * Validates inputs and enqueues background job
+ * Validates vs and enqueues background job
  */
 export async function sendNotification(params) {
     try {

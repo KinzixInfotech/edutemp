@@ -978,7 +978,8 @@ exports.Prisma.UserScalarFieldEnum = {
   twoFactorSecret: 'twoFactorSecret',
   twoFactorTempSecret: 'twoFactorTempSecret',
   twoFactorBackupCodes: 'twoFactorBackupCodes',
-  fcmToken: 'fcmToken'
+  fcmToken: 'fcmToken',
+  lastSeenAt: 'lastSeenAt'
 };
 
 exports.Prisma.GmailAccountScalarFieldEnum = {
@@ -3269,6 +3270,46 @@ exports.Prisma.StoryStatusViewScalarFieldEnum = {
   viewedAt: 'viewedAt'
 };
 
+exports.Prisma.ConversationScalarFieldEnum = {
+  id: 'id',
+  schoolId: 'schoolId',
+  type: 'type',
+  title: 'title',
+  classId: 'classId',
+  sectionId: 'sectionId',
+  lastMessageAt: 'lastMessageAt',
+  lastMessageText: 'lastMessageText',
+  createdById: 'createdById',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.ConversationParticipantScalarFieldEnum = {
+  id: 'id',
+  conversationId: 'conversationId',
+  userId: 'userId',
+  role: 'role',
+  joinedAt: 'joinedAt',
+  mutedUntil: 'mutedUntil',
+  lastReadAt: 'lastReadAt',
+  lastReadMsgId: 'lastReadMsgId',
+  isActive: 'isActive'
+};
+
+exports.Prisma.MessageScalarFieldEnum = {
+  id: 'id',
+  conversationId: 'conversationId',
+  senderId: 'senderId',
+  content: 'content',
+  attachments: 'attachments',
+  status: 'status',
+  deletedAt: 'deletedAt',
+  deletedById: 'deletedById',
+  replyToId: 'replyToId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -3945,6 +3986,20 @@ exports.MappingStatus = exports.$Enums.MappingStatus = {
   CANCELLED: 'CANCELLED'
 };
 
+exports.ConversationType = exports.$Enums.ConversationType = {
+  PARENT_TEACHER: 'PARENT_TEACHER',
+  TEACHER_CLASS: 'TEACHER_CLASS',
+  TEACHER_TEACHER: 'TEACHER_TEACHER',
+  DIRECT: 'DIRECT',
+  COMMUNITY: 'COMMUNITY'
+};
+
+exports.MessageStatus = exports.$Enums.MessageStatus = {
+  SENT: 'SENT',
+  DELIVERED: 'DELIVERED',
+  READ: 'READ'
+};
+
 exports.Prisma.ModelName = {
   School: 'School',
   SchoolSubscription: 'SchoolSubscription',
@@ -4152,7 +4207,10 @@ exports.Prisma.ModelName = {
   BiometricAttendanceEvent: 'BiometricAttendanceEvent',
   AppConfig: 'AppConfig',
   StoryStatus: 'StoryStatus',
-  StoryStatusView: 'StoryStatusView'
+  StoryStatusView: 'StoryStatusView',
+  Conversation: 'Conversation',
+  ConversationParticipant: 'ConversationParticipant',
+  Message: 'Message'
 };
 
 /**
