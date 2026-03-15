@@ -158,15 +158,14 @@ export default function Footer() {
                             <a href="/terms" className="hover:text-slate-900 transition-colors">
                                 Terms
                             </a>
-                            <span>•</span>
-                            <span className="inline-block px-2 py-1 bg-amber-100 text-amber-800 rounded-full text-xs">
-                                🚧 In Development
-                            </span>
                         </div>
                     </div>
 
-                    {/* Copyright */}
+                    {/* AI Transparency & Copyright */}
                     <div className="text-center mt-8 text-sm text-slate-500">
+                        <p className="mb-2 text-xs text-slate-400 max-w-2xl mx-auto">
+                            <strong>AI Transparency:</strong> EduBreezy utilizes Google Gemini AI to power intelligent features across our platform, enhancing school management and user experiences.
+                        </p>
                         <p className="mt-2 text-xs">
                             © {new Date().getFullYear()} Kinzix Infotech. All rights reserved.
                         </p>

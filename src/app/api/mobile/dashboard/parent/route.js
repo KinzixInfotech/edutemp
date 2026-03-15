@@ -84,7 +84,13 @@ async function fetchChildren(schoolId, parentId) {
             where: { parentId },
             include: {
                 student: {
-                    include: {
+                    select: {
+                        userId: true,
+                        admissionNo: true,
+                        name: true,
+                        rollNumber: true,
+                        classId: true,
+                        sectionId: true,
                         user: { select: { profilePicture: true } },
                         class: { select: { id: true, className: true } },
                         section: { select: { id: true, name: true } }
@@ -94,8 +100,9 @@ async function fetchChildren(schoolId, parentId) {
         });
 
         return links.map(link => ({
-            id: link.student.id,
+            id: link.student.userId,
             studentId: link.studentId,
+            admissionNo: link.student.admissionNo,
             name: link.student.name,
             class: link.student.class?.className,
             classId: link.student.classId,
@@ -105,6 +112,7 @@ async function fetchChildren(schoolId, parentId) {
             profilePicture: link.student.user?.profilePicture,
             relation: link.relation
         }));
+
     } catch (error) {
         console.error('fetchChildren error:', error);
         return [];
@@ -340,7 +348,7 @@ async function fetchChildExams(schoolId, studentId) {
             take: 10,
             include: {
                 exam: {
-                    select: { name: true, startDate: true }
+                    select: { title: true, startDate: true }
                 },
                 subject: {
                     select: { subjectName: true }
