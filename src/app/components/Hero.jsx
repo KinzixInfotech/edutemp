@@ -1,16 +1,15 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import Link from "next/link";
 import { ArrowRight, Loader2, AlertCircle, CheckCircle, MapPin, Search, School, Navigation, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { InteractiveGridPattern } from "@/components/ui/interactive-grid-pattern";
 import { useRouter } from "next/navigation";
 
 const SCHOOLS_PER_PAGE = 4;
 const LOCATION_CACHE_KEY = 'eb_nearby_schools';
-const LOCATION_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
-const SEARCH_CACHE_TTL = 5 * 60 * 1000;     // 5 minutes
-const SEARCH_CACHE_MAX = 50;                  // max cached queries
+const LOCATION_CACHE_TTL = 15 * 60 * 1000;
+const SEARCH_CACHE_TTL = 5 * 60 * 1000;
+const SEARCH_CACHE_MAX = 50;
 
 // ─── In-memory search cache (LRU) ───
 const searchCache = new Map();
@@ -23,7 +22,6 @@ function getCachedSearch(query) {
         searchCache.delete(key);
         return null;
     }
-    // Move to end (most recently used)
     searchCache.delete(key);
     searchCache.set(key, entry);
     return entry.data;
@@ -31,7 +29,6 @@ function getCachedSearch(query) {
 
 function setCachedSearch(query, data) {
     const key = query.toLowerCase().trim();
-    // Evict oldest if at capacity
     if (searchCache.size >= SEARCH_CACHE_MAX) {
         const oldest = searchCache.keys().next().value;
         searchCache.delete(oldest);
@@ -39,7 +36,7 @@ function setCachedSearch(query, data) {
     searchCache.set(key, { data, ts: Date.now() });
 }
 
-// ─── SessionStorage helpers for location cache ───
+// ─── SessionStorage helpers ───
 function getLocationCache() {
     try {
         const raw = sessionStorage.getItem(LOCATION_CACHE_KEY);
@@ -55,12 +52,45 @@ function getLocationCache() {
 
 function setLocationCache(city, schools) {
     try {
-        sessionStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify({
-            city,
-            schools,
-            ts: Date.now(),
-        }));
+        sessionStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify({ city, schools, ts: Date.now() }));
     } catch { }
+}
+
+function extractSearchTerms(address) {
+    const fieldPriority = [
+        'city',
+        'town',
+        'village',
+        'suburb',
+        'city_district',
+        'district',
+        'county',
+        'state_district',
+        'state',
+    ];
+    const seen = new Set();
+    const terms = [];
+    for (const field of fieldPriority) {
+        const val = address[field];
+        if (val && !seen.has(val.toLowerCase())) {
+            seen.add(val.toLowerCase());
+            terms.push(val);
+        }
+    }
+    return terms;
+}
+
+function extractDisplayCity(address) {
+    return (
+        address.city ||
+        address.town ||
+        address.village ||
+        address.city_district ||
+        address.suburb ||
+        address.county ||
+        address.state_district ||
+        ''
+    );
 }
 
 const Hero = () => {
@@ -70,55 +100,63 @@ const Hero = () => {
     const [error, setError] = useState("");
     const [schoolFound, setSchoolFound] = useState(null);
 
-    // School search state
     const [searchQuery, setSearchQuery] = useState("");
     const [searchResults, setSearchResults] = useState([]);
     const [searching, setSearching] = useState(false);
     const [nearbySchools, setNearbySchools] = useState([]);
     const [locationLoading, setLocationLoading] = useState(false);
+    const [locationError, setLocationError] = useState("");
     const [userCity, setUserCity] = useState("");
     const [currentPage, setCurrentPage] = useState(0);
     const searchTimeout = useRef(null);
     const hasFetchedLocation = useRef(false);
 
-    // ─── Fetch nearby schools (stale-while-revalidate) ───
+    // ─── Fetch nearby schools ───
     const fetchNearbySchools = useCallback(async (skipCache = false) => {
-        if (!navigator.geolocation) return;
-        if (hasFetchedLocation.current && !skipCache) return;
+        if (hasFetchedLocation.current && !skipCache && nearbySchools.length > 0) return;
         hasFetchedLocation.current = true;
+        setLocationError("");
 
-        // 1. Serve from cache instantly
+        // Serve stale cache immediately while revalidating in background
         const cached = getLocationCache();
         if (cached && !skipCache) {
             setUserCity(cached.city);
             setNearbySchools(cached.schools);
-            // Still refresh in background (stale-while-revalidate)
         }
 
-        // 2. Fetch fresh in background (or foreground if no cache)
-        if (!cached) setLocationLoading(true);
+        if (!navigator.geolocation) {
+            setLocationError("Geolocation is not supported by your browser.");
+            return;
+        }
+
+        if (!cached || skipCache) setLocationLoading(true);
 
         navigator.geolocation.getCurrentPosition(
             async (position) => {
                 try {
                     const { latitude, longitude } = position.coords;
 
-                    const geoRes = await fetch(
-                        `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&addressdetails=1`,
-                        { headers: { 'Accept-Language': 'en' } }
-                    );
+                    if (process.env.NODE_ENV !== 'production') {
+                        console.log('[Location] Coords:', latitude, longitude);
+                    }
+
+                    const geoRes = await fetch(`/api/location/reverse?lat=${latitude}&lon=${longitude}`);
+                    if (!geoRes.ok) throw new Error(`Geocode error: ${geoRes.status}`);
                     const geoData = await geoRes.json();
                     const address = geoData?.address || {};
 
-                    const searchTerms = [
-                        address.city,
-                        address.town,
-                        address.county,
-                        address.state_district,
-                        address.state,
-                    ].filter(Boolean);
+                    if (process.env.NODE_ENV !== 'production') {
+                        console.log('[Location] Address fields:', address);
+                    }
 
-                    const displayCity = address.city || address.town || address.county || address.state_district || '';
+                    const displayCity = extractDisplayCity(address);
+                    const searchTerms = extractSearchTerms(address);
+
+                    if (process.env.NODE_ENV !== 'production') {
+                        console.log('[Location] Display city:', displayCity);
+                        console.log('[Location] Search terms:', searchTerms);
+                    }
+
                     setUserCity(displayCity);
 
                     if (searchTerms.length === 0) {
@@ -126,14 +164,13 @@ const Hero = () => {
                         return;
                     }
 
-                    // Parallel fetch all location terms at once
                     const results = await Promise.allSettled(
                         searchTerms.map(async (term) => {
-                            // Check in-memory cache first
                             const cachedResult = getCachedSearch(term);
                             if (cachedResult) return cachedResult;
 
                             const res = await fetch(`/api/schools/search?q=${encodeURIComponent(term)}`);
+                            if (!res.ok) return [];
                             const data = await res.json();
                             const schools = data?.schools || [];
                             setCachedSearch(term, schools);
@@ -143,32 +180,57 @@ const Hero = () => {
 
                     const allSchools = new Map();
                     results.forEach((r) => {
-                        if (r.status === 'fulfilled') {
+                        if (r.status === 'fulfilled' && Array.isArray(r.value)) {
                             r.value.forEach((s) => allSchools.set(s.id, s));
                         }
                     });
 
                     const schoolList = Array.from(allSchools.values());
-                    setNearbySchools(schoolList);
 
-                    // Persist to sessionStorage
+                    if (process.env.NODE_ENV !== 'production') {
+                        console.log(`[Location] Found ${schoolList.length} unique nearby schools`);
+                    }
+
+                    setNearbySchools(schoolList);
                     setLocationCache(displayCity, schoolList);
+
                 } catch (err) {
-                    console.log('Location fetch error:', err);
+                    console.error('[Location] Fetch error:', err);
+                    setLocationError("Couldn't fetch nearby schools.");
                 } finally {
                     setLocationLoading(false);
                 }
             },
-            () => setLocationLoading(false),
-            { enableHighAccuracy: false, timeout: 10000 }
+            (geoError) => {
+                setLocationLoading(false);
+                hasFetchedLocation.current = false;
+
+                if (geoError.code === 1) {
+                    setLocationError("Location access denied. Allow location or search by name.");
+                } else if (geoError.code === 2) {
+                    setLocationError("Location unavailable. Try searching by name.");
+                } else {
+                    setLocationError("Location timed out. Try searching by name.");
+                }
+
+                if (process.env.NODE_ENV !== 'production') {
+                    console.warn('[Location] Geolocation error:', geoError.code, geoError.message);
+                }
+            },
+            {
+                enableHighAccuracy: false,
+                timeout: 10000,
+                maximumAge: LOCATION_CACHE_TTL,
+            }
         );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
         fetchNearbySchools();
     }, [fetchNearbySchools]);
 
-    // ─── Debounced School Search (with cache) ───
+    // ─── Debounced School Search ───
     const handleSearch = useCallback((text) => {
         setSearchQuery(text);
         setCurrentPage(0);
@@ -182,7 +244,6 @@ const Hero = () => {
             return;
         }
 
-        // Check cache first — instant result
         const cached = getCachedSearch(trimmed);
         if (cached) {
             setSearchResults(cached);
@@ -256,7 +317,6 @@ const Hero = () => {
         if (e.key === 'Enter' && code) handleContinue();
     };
 
-    // Determine which schools to show
     const displaySchools = searchQuery.trim().length >= 2 ? searchResults : nearbySchools;
     const totalPages = Math.ceil(displaySchools.length / SCHOOLS_PER_PAGE);
     const paginatedSchools = displaySchools.slice(
@@ -268,19 +328,17 @@ const Hero = () => {
 
     return (
         <section className="relative min-h-screen mt-6 md:mt-18 border-b flex overflow-hidden bg-white">
-            {/* LEFT SIDE - Decorative */}
+            {/* LEFT SIDE */}
             <div className="hidden lg:flex flex-1 relative items-center justify-center bg-[#f5f7fa]">
                 <InteractiveGridPattern
                     className="absolute opacity-50 inset-0 [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,white_20%,transparent_70%)]"
                     squares={[40, 40]}
                 />
-
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
                     <span className="text-[clamp(10rem,22vw,20rem)] font-black text-gray-200/50 leading-none tracking-tighter">
                         ERP
                     </span>
                 </div>
-
                 <div className="relative z-10 text-center px-12">
                     <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#1a1a2e] mb-4">
                         School Login Portal
@@ -295,7 +353,7 @@ const Hero = () => {
             <div className="flex-1 flex items-center justify-center px-4 md:px-6 py-8 md:py-12 lg:py-0">
                 <div className="w-full max-w-md space-y-5">
 
-                    {/* ─── Search Bar (always visible) ─── */}
+                    {/* Search Bar */}
                     <div>
                         <div className="flex items-center gap-2 bg-[#f8f9fb] border border-gray-200 rounded-xl px-3 py-2.5 focus-within:ring-2 focus-within:ring-[#0569ff]/20 focus-within:border-[#0569ff] transition-all">
                             <Search className="w-4 h-4 text-gray-400 shrink-0" />
@@ -307,7 +365,10 @@ const Hero = () => {
                                 className="flex-1 bg-transparent text-sm outline-none text-gray-800 placeholder:text-gray-400"
                             />
                             {searchQuery && (
-                                <button onClick={() => { setSearchQuery(''); setSearchResults([]); setCurrentPage(0); }} className="p-1 hover:bg-gray-200 rounded-full transition-colors">
+                                <button
+                                    onClick={() => { setSearchQuery(''); setSearchResults([]); setCurrentPage(0); }}
+                                    className="p-1 hover:bg-gray-200 rounded-full transition-colors"
+                                >
                                     <X className="w-3.5 h-3.5 text-gray-400" />
                                 </button>
                             )}
@@ -315,8 +376,8 @@ const Hero = () => {
                         </div>
                     </div>
 
-                    {/* ─── Schools Section (always visible) ─── */}
-                    <div className="rounded-2xl border border-gray-100 bg-white overflow-hidden shadow-none">
+                    {/* Schools Section */}
+                    <div className="rounded-2xl border border-gray-100 bg-white overflow-hidden">
                         {/* Header */}
                         <div className="px-4 py-2.5 bg-gray-50/80 flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -325,11 +386,22 @@ const Hero = () => {
                                 ) : (
                                     <MapPin className="w-3.5 h-3.5 text-[#0569ff]" />
                                 )}
-                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
                                     {isSearchActive
                                         ? `${displaySchools.length} result${displaySchools.length !== 1 ? 's' : ''} found`
                                         : locationLoading
-                                            ? 'Detecting location...'
+                                            ? <>
+                                                Detecting location
+                                                <span className="flex gap-0.5 items-center">
+                                                    {[0, 1, 2].map(i => (
+                                                        <span
+                                                            key={i}
+                                                            className="w-1 h-1 rounded-full bg-gray-400 animate-bounce inline-block"
+                                                            style={{ animationDelay: `${i * 150}ms` }}
+                                                        />
+                                                    ))}
+                                                </span>
+                                            </>
                                             : userCity
                                                 ? `Schools near ${userCity}`
                                                 : 'Nearby Schools'}
@@ -360,21 +432,71 @@ const Hero = () => {
 
                         {/* School List */}
                         <div className="divide-y divide-gray-50">
+
+                            {/* State 1: Loading skeleton */}
                             {locationLoading && !isSearchActive && (
-                                <div className="flex items-center justify-center gap-2 py-10 text-gray-400">
-                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                    <span className="text-sm">Finding schools near you...</span>
+                                <>
+                                    {[...Array(3)].map((_, i) => (
+                                        <div key={i} className="flex items-center gap-3 px-4 py-3">
+                                            {/* Avatar skeleton */}
+                                            <div className="w-10 h-10 rounded-xl bg-gray-100 animate-pulse shrink-0" />
+                                            {/* Text skeletons */}
+                                            <div className="flex-1 space-y-2">
+                                                <div
+                                                    className="h-3.5 bg-gray-100 rounded-full animate-pulse"
+                                                    style={{ width: `${55 + i * 13}%`, animationDelay: `${i * 80}ms` }}
+                                                />
+                                                <div
+                                                    className="h-2.5 bg-gray-100 rounded-full animate-pulse"
+                                                    style={{ width: `${35 + i * 8}%`, animationDelay: `${i * 80 + 40}ms` }}
+                                                />
+                                            </div>
+                                            {/* Code badge skeleton */}
+                                            <div
+                                                className="h-6 w-16 bg-gray-100 rounded-lg animate-pulse shrink-0"
+                                                style={{ animationDelay: `${i * 80 + 80}ms` }}
+                                            />
+                                        </div>
+                                    ))}
+                                </>
+                            )}
+
+                            {/* State 2: Location/geocode error */}
+                            {!locationLoading && locationError && !isSearchActive && !hasSchools && (
+                                <div className="py-8 text-center px-4">
+                                    <div className="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center mx-auto mb-3">
+                                        <Navigation className="w-5 h-5 text-orange-400" />
+                                    </div>
+                                    <p className="text-sm font-medium text-gray-600">{locationError}</p>
+                                    <button
+                                        onClick={() => fetchNearbySchools(true)}
+                                        className="mt-3 text-xs font-semibold text-[#0569ff] hover:text-[#0358dd] transition-colors"
+                                    >
+                                        Try Again →
+                                    </button>
                                 </div>
                             )}
 
-                            {!locationLoading && !searching && !hasSchools && !isSearchActive && (
+                            {/* State 3: Location detected but no schools in DB matched */}
+                            {!locationLoading && !locationError && userCity && !hasSchools && !isSearchActive && (
+                                <div className="py-8 text-center px-4">
+                                    <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center mx-auto mb-3">
+                                        <School className="w-5 h-5 text-gray-300" />
+                                    </div>
+                                    <p className="text-sm font-medium text-gray-500">No schools found near {userCity}</p>
+                                    <p className="text-xs text-gray-400 mt-1">Try searching by school name or code above</p>
+                                </div>
+                            )}
+
+                            {/* State 4: Location never granted (no userCity, no error) */}
+                            {!locationLoading && !locationError && !userCity && !hasSchools && !isSearchActive && (
                                 <div className="py-8 text-center px-4">
                                     <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-3">
                                         <Navigation className="w-5 h-5 text-[#0569ff]" />
                                     </div>
                                     <p className="text-sm font-medium text-gray-600">Enable location to find nearby schools</p>
                                     <button
-                                        onClick={fetchNearbySchools}
+                                        onClick={() => fetchNearbySchools(true)}
                                         className="mt-3 text-xs font-semibold text-[#0569ff] hover:text-[#0358dd] transition-colors"
                                     >
                                         Allow Location Access →
@@ -382,6 +504,7 @@ const Hero = () => {
                                 </div>
                             )}
 
+                            {/* State 5: Search active, no results */}
                             {!searching && isSearchActive && !hasSchools && (
                                 <div className="py-8 text-center">
                                     <School className="w-8 h-8 text-gray-200 mx-auto mb-2" />
@@ -390,19 +513,16 @@ const Hero = () => {
                                 </div>
                             )}
 
+                            {/* School rows */}
                             {paginatedSchools.map((school) => (
                                 <button
                                     key={school.id}
                                     onClick={() => handleSchoolSelect(school)}
                                     className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#0569ff]/[0.03] transition-all text-left group/item"
                                 >
-                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0569ff]/10 to-[#0569ff]/5 flex items-center justify-center shrink-0 group-hover/item:from-[#0569ff]/20 group-hover/item:to-[#0569ff]/10 transition-colors overflow-hidden">
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0569ff]/10 to-[#0569ff]/05 flex items-center justify-center shrink-0 group-hover/item:from-[#0569ff]/20 group-hover/item:to-[#0569ff]/10 transition-colors overflow-hidden">
                                         {school.profilePicture ? (
-                                            <img
-                                                src={school.profilePicture}
-                                                alt=""
-                                                className="w-full h-full object-cover rounded-xl"
-                                            />
+                                            <img src={school.profilePicture} alt="" className="w-full h-full object-cover rounded-xl" />
                                         ) : (
                                             <School className="w-5 h-5 text-[#0569ff]" />
                                         )}
@@ -426,23 +546,23 @@ const Hero = () => {
                         </div>
                     </div>
 
-                    {/* ─── OR Divider ─── */}
+                    {/* OR Divider */}
                     <div className="flex items-center gap-3">
                         <div className="flex-1 h-px bg-gray-200" />
                         <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">or enter code</span>
                         <div className="flex-1 h-px bg-gray-200" />
                     </div>
 
-                    {/* ─── School Code Input ─── */}
+                    {/* School Code Input */}
                     <label className="block text-sm font-semibold text-[#1a1a2e]">
                         School Code *
                     </label>
 
                     <div className={`flex items-center gap-2 md:gap-3 bg-[#f8f9fb] border rounded-xl px-3 py-3 md:px-4 md:py-4 transition-all ${error
-                        ? 'border-red-300 ring-2 ring-red-100'
-                        : schoolFound
-                            ? 'border-green-300 ring-2 ring-green-100'
-                            : 'border-gray-200 focus-within:ring-2 focus-within:ring-[#0569ff]/20 focus-within:border-[#0569ff]'
+                            ? 'border-red-300 ring-2 ring-red-100'
+                            : schoolFound
+                                ? 'border-green-300 ring-2 ring-green-100'
+                                : 'border-gray-200 focus-within:ring-2 focus-within:ring-[#0569ff]/20 focus-within:border-[#0569ff]'
                         }`}>
                         <div className="text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold text-xs md:text-sm bg-[#0569ff] shrink-0">
                             EB -
@@ -461,15 +581,10 @@ const Hero = () => {
                             disabled={isChecking}
                             className="flex-1 bg-transparent text-base md:text-lg font-semibold outline-none text-[#1a1a2e] placeholder:text-gray-400 placeholder:font-normal disabled:opacity-50 min-w-0"
                         />
-                        {isChecking && (
-                            <Loader2 className="w-4 h-4 md:w-5 md:h-5 text-[#0569ff] animate-spin shrink-0" />
-                        )}
-                        {schoolFound && !isChecking && (
-                            <CheckCircle className="w-4 h-4 md:w-5 md:h-5 text-green-500 shrink-0" />
-                        )}
+                        {isChecking && <Loader2 className="w-4 h-4 md:w-5 md:h-5 text-[#0569ff] animate-spin shrink-0" />}
+                        {schoolFound && !isChecking && <CheckCircle className="w-4 h-4 md:w-5 md:h-5 text-green-500 shrink-0" />}
                     </div>
 
-                    {/* Error Message */}
                     {error && (
                         <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 px-4 py-3 rounded-lg">
                             <AlertCircle className="w-4 h-4 shrink-0" />
@@ -477,7 +592,6 @@ const Hero = () => {
                         </div>
                     )}
 
-                    {/* Success Message */}
                     {schoolFound && !isChecking && (
                         <div className="flex items-center gap-3 text-green-700 text-sm bg-green-50 px-4 py-3 rounded-lg">
                             <CheckCircle className="w-5 h-5 shrink-0" />
@@ -488,19 +602,17 @@ const Hero = () => {
                         </div>
                     )}
 
-                    {/* Submit Button */}
                     <button
                         onClick={handleContinue}
                         disabled={!code || isChecking}
                         className={`group w-full relative px-6 py-3.5 md:px-8 md:py-4 rounded-xl font-bold text-base transition-all duration-300 overflow-hidden flex items-center justify-center gap-3 ${code && !isChecking
-                            ? 'bg-[#0569ff] text-white shadow-[0_4px_20px_rgba(5,105,255,0.3)] hover:shadow-[0_8px_30px_rgba(5,105,255,0.4)]'
-                            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                ? 'bg-[#0569ff] text-white shadow-[0_4px_20px_rgba(5,105,255,0.3)] hover:shadow-[0_8px_30px_rgba(5,105,255,0.4)]'
+                                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                             }`}
                     >
                         {code && !isChecking && (
                             <span className="absolute inset-0 bg-[#0358dd] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                         )}
-
                         {isChecking ? (
                             <>
                                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -509,9 +621,7 @@ const Hero = () => {
                         ) : (
                             <>
                                 <span className="relative">Continue</span>
-                                {code && (
-                                    <ArrowRight className="relative w-5 h-5 transition-transform duration-300 group-hover:translate-x-0.5" />
-                                )}
+                                {code && <ArrowRight className="relative w-5 h-5 transition-transform duration-300 group-hover:translate-x-0.5" />}
                             </>
                         )}
                     </button>
