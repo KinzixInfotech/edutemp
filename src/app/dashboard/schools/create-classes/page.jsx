@@ -25,13 +25,23 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 import {
     Loader2, Users, School, BookOpen, TrendingUp, Eye, Plus, Search,
     Trash2, GraduationCap, AlertTriangle, UserX, ChevronLeft, ChevronRight,
     ChevronsLeft, ChevronsRight, Download, ChevronDown,
     ChevronUp, X, Calendar, FileSpreadsheet, Filter,
-    RefreshCw, Settings2, Info
+    RefreshCw, Settings2, Info, ChevronsDownUp, ChevronsUpDown,
 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"
@@ -205,9 +215,24 @@ export default function ManageClassSectionPage() {
     const [addSectionName, setAddSectionName] = useState("")
     const [expandedClasses, setExpandedClasses] = useState(new Set())
 
+    // ─── NEW: Selection state ──────────────────────────────────────
+    // selectedItems: Set of section IDs
+    const [selectedSections, setSelectedSections] = useState(new Set())
+    // selectedClasses: Set of class IDs (for whole-class deletion)
+    const [selectedClasses, setSelectedClasses] = useState(new Set())
+    // Delete confirmation dialog
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+    // What we are about to delete: 'sections' | 'classes' | 'mixed'
+    const [deleteTarget, setDeleteTarget] = useState(null)
 
     // Reset page on filters
     useEffect(() => { setPage(1) }, [debouncedSearch, teacherFilter, capacityFilter])
+
+    // Clear selection when page/filters change
+    useEffect(() => {
+        setSelectedSections(new Set())
+        setSelectedClasses(new Set())
+    }, [debouncedSearch, teacherFilter, capacityFilter, page])
 
     // ─── Queries ───────────────────────────────────────────────────
     const { data: stats } = useQuery({
@@ -268,6 +293,14 @@ export default function ManageClassSectionPage() {
         }
     }, [classes])
 
+    // ─── Expand / Collapse All ─────────────────────────────────────
+    const allExpanded = classes.length > 0 && classes.every(c => expandedClasses.has(c.id))
+    const allCollapsed = classes.length > 0 && classes.every(c => !expandedClasses.has(c.id))
+
+    const handleExpandAll = () => setExpandedClasses(new Set(classes.map(c => c.id)))
+    const handleCollapseAll = () => setExpandedClasses(new Set())
+    const handleToggleExpandAll = () => allExpanded ? handleCollapseAll() : handleExpandAll()
+
     // Active academic year
     const activeYear = classes.find(c => c.AcademicYear)?.AcademicYear
     const academicYearLabel = activeYear?.name || activeYear?.year || 'Current'
@@ -298,8 +331,6 @@ export default function ManageClassSectionPage() {
         staleTime: 1000 * 60 * 5,
     })
 
-
-
     // Capacity: stacked bar (students + remaining)
     const sectionCapacityData = useMemo(() => {
         const data = []
@@ -322,7 +353,6 @@ export default function ManageClassSectionPage() {
         return data.sort((a, b) => b.utilization - a.utilization).slice(0, 10)
     }, [allClassesForCharts])
 
-    // Distribution: sorted by student count, with over-capacity flag
     const studentDistributionData = useMemo(() => {
         const data = []
         allClassesForCharts.forEach(cls => {
@@ -341,7 +371,6 @@ export default function ManageClassSectionPage() {
         return data.sort((a, b) => b.students - a.students).slice(0, 10)
     }, [allClassesForCharts])
 
-    // Workload: teachers and their section counts
     const teacherWorkloadData = useMemo(() => {
         return teachers
             .filter(t => t._sectionCount > 0)
@@ -419,6 +448,94 @@ export default function ManageClassSectionPage() {
         return pages
     }
 
+    // ─── Selection helpers ────────────────────────────────────────
+    const getClassSectionIds = (cls) => cls.sections?.map(s => s.id) || []
+
+    const isClassFullySelected = (cls) => {
+        const sectionIds = getClassSectionIds(cls)
+        if (sectionIds.length === 0) return selectedClasses.has(cls.id)
+        return sectionIds.every(id => selectedSections.has(id))
+    }
+
+    const isClassPartiallySelected = (cls) => {
+        const sectionIds = getClassSectionIds(cls)
+        if (sectionIds.length === 0) return false
+        const someSelected = sectionIds.some(id => selectedSections.has(id))
+        return someSelected && !isClassFullySelected(cls)
+    }
+
+    const toggleClassSelection = (cls) => {
+        const sectionIds = getClassSectionIds(cls)
+        if (sectionIds.length === 0) {
+            // No sections: toggle the class itself
+            setSelectedClasses(prev => {
+                const next = new Set(prev)
+                if (next.has(cls.id)) next.delete(cls.id)
+                else next.add(cls.id)
+                return next
+            })
+            return
+        }
+        const fullySelected = isClassFullySelected(cls)
+        setSelectedSections(prev => {
+            const next = new Set(prev)
+            if (fullySelected) {
+                sectionIds.forEach(id => next.delete(id))
+            } else {
+                sectionIds.forEach(id => next.add(id))
+            }
+            return next
+        })
+    }
+
+    const toggleSectionSelection = (sectionId) => {
+        setSelectedSections(prev => {
+            const next = new Set(prev)
+            if (next.has(sectionId)) next.delete(sectionId)
+            else next.add(sectionId)
+            return next
+        })
+    }
+
+    const totalSelected = selectedSections.size + selectedClasses.size
+    const hasSelection = totalSelected > 0
+
+    const clearSelection = () => {
+        setSelectedSections(new Set())
+        setSelectedClasses(new Set())
+    }
+
+    // ─── Delete summary for dialog ─────────────────────────────────
+    const deleteSummary = useMemo(() => {
+        const lines = []
+        // Whole classes selected (no sections)
+        selectedClasses.forEach(classId => {
+            const cls = classes.find(c => c.id === classId)
+            if (cls) lines.push({ type: 'class', label: `Class ${displayClassName(cls.className)} (entire class)`, cls })
+        })
+        // Individual sections selected
+        classes.forEach(cls => {
+            cls.sections?.forEach(sec => {
+                if (selectedSections.has(sec.id)) {
+                    lines.push({ type: 'section', label: `${displayClassName(cls.className)} – Section ${sec.name}`, sec, cls })
+                }
+            })
+        })
+        return lines
+    }, [selectedSections, selectedClasses, classes])
+
+    const totalStudentsAffected = useMemo(() => {
+        let count = 0
+        deleteSummary.forEach(item => {
+            if (item.type === 'class') {
+                count += item.cls.sections?.reduce((s, sec) => s + (sec._count?.students || 0), 0) || 0
+            } else {
+                count += item.sec._count?.students || 0
+            }
+        })
+        return count
+    }, [deleteSummary])
+
     // ─── Mutations ─────────────────────────────────────────────────
     const createClassMutation = useMutation({
         mutationFn: async (classData) => {
@@ -459,7 +576,6 @@ export default function ManageClassSectionPage() {
         },
         onSuccess: async () => {
             toast.success("Section added")
-            // Auto-expand the class that just got a new section
             if (addSectionClassId) {
                 setExpandedClasses(prev => {
                     const next = new Set(prev)
@@ -470,7 +586,6 @@ export default function ManageClassSectionPage() {
             setAddSectionOpen(false)
             setAddSectionName("")
             setAddSectionClassId(null)
-            // Bust server-side Redis cache first, then refetch
             await fetch(`/api/schools/${schoolId}/classes?noCache=true&limit=1`).catch(() => { })
             queryClient.invalidateQueries({ queryKey: ['classes'], refetchType: 'all' })
             queryClient.invalidateQueries({ queryKey: ['class-stats'], refetchType: 'all' })
@@ -495,6 +610,60 @@ export default function ManageClassSectionPage() {
         },
         onError: () => toast.error("Failed to assign teacher")
     })
+
+    // ─── NEW: Delete mutation ──────────────────────────────────────
+    const deleteMutation = useMutation({
+        mutationFn: async ({ classIds, sectionIds }) => {
+            // Fire all deletions in parallel
+            const promises = []
+
+            // Delete whole classes (cascade handled by DB)
+            classIds.forEach(classId => {
+                promises.push(
+                    fetch(`/api/schools/${schoolId}/classes/${classId}`, { method: "DELETE" })
+                        .then(res => { if (!res.ok) throw new Error(`Failed to delete class ${classId}`) })
+                )
+            })
+
+            // Delete individual sections
+            sectionIds.forEach(sectionId => {
+                // Find classId for this section
+                let parentClassId = null
+                classes.forEach(cls => {
+                    if (cls.sections?.some(s => s.id === sectionId)) parentClassId = cls.id
+                })
+                if (!parentClassId) return
+                promises.push(
+                    fetch(`/api/schools/${schoolId}/classes/${parentClassId}/sections/${sectionId}`, { method: "DELETE" })
+                        .then(res => { if (!res.ok) throw new Error(`Failed to delete section ${sectionId}`) })
+                )
+            })
+
+            await Promise.all(promises)
+        },
+        onSuccess: () => {
+            const parts = []
+            if (selectedClasses.size > 0) parts.push(`${selectedClasses.size} class${selectedClasses.size !== 1 ? 'es' : ''}`)
+            if (selectedSections.size > 0) parts.push(`${selectedSections.size} section${selectedSections.size !== 1 ? 's' : ''}`)
+            toast.success(`Deleted ${parts.join(' and ')} successfully`)
+            clearSelection()
+            setDeleteDialogOpen(false)
+            queryClient.invalidateQueries({ queryKey: ['classes'], refetchType: 'all' })
+            queryClient.invalidateQueries({ queryKey: ['class-stats'], refetchType: 'all' })
+            queryClient.invalidateQueries({ queryKey: ['classes-chart-data'], refetchType: 'all' })
+        },
+        onError: (err) => {
+            toast.error(err.message || "Failed to delete. Please try again.")
+            setDeleteDialogOpen(false)
+        }
+    })
+
+    const handleConfirmDelete = () => {
+        deleteMutation.mutate({
+            classIds: Array.from(selectedClasses),
+            sectionIds: Array.from(selectedSections),
+        })
+    }
 
     // ─── Handlers ──────────────────────────────────────────────────
     const resetCreateForm = () => {
@@ -591,6 +760,7 @@ export default function ManageClassSectionPage() {
     // Skeleton row
     const SkeletonRow = () => (
         <TableRow>
+            <TableCell><Skeleton className="h-4 w-4" /></TableCell>
             <TableCell><Skeleton className="h-5 w-16" /></TableCell>
             <TableCell><Skeleton className="h-5 w-8" /></TableCell>
             <TableCell><Skeleton className="h-5 w-20" /></TableCell>
@@ -619,6 +789,73 @@ export default function ManageClassSectionPage() {
                 confirmText="Yes, assign"
                 confirmName=""
             />
+
+            {/* ─── Delete Confirmation AlertDialog ────────────────── */}
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogContent className="sm:max-w-md">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                            <AlertTriangle className="h-5 w-5" />
+                            Confirm Deletion
+                        </AlertDialogTitle>
+                        <AlertDialogDescription asChild>
+                            <div className="space-y-3 text-sm text-muted-foreground">
+                                <p>
+                                    You are about to permanently delete the following. This action{" "}
+                                    <strong className="text-foreground">cannot be undone</strong>. All related data
+                                    including student assignments, fee structures, and subject mappings will be
+                                    automatically removed.
+                                </p>
+
+                                {/* Items to be deleted */}
+                                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-1.5 max-h-40 overflow-y-auto">
+                                    {deleteSummary.map((item, i) => (
+                                        <div key={i} className="flex items-center gap-2 text-xs text-foreground">
+                                            <div className={cn(
+                                                "h-1.5 w-1.5 rounded-full flex-shrink-0",
+                                                item.type === 'class' ? "bg-red-500" : "bg-orange-500"
+                                            )} />
+                                            <span>{item.label}</span>
+                                            {(item.type === 'class'
+                                                ? (item.cls.sections?.reduce((s, sec) => s + (sec._count?.students || 0), 0) || 0)
+                                                : (item.sec._count?.students || 0)) > 0 && (
+                                                    <Badge variant="destructive" className="text-[10px] h-4 px-1.5 ml-auto flex-shrink-0">
+                                                        {item.type === 'class'
+                                                            ? item.cls.sections?.reduce((s, sec) => s + (sec._count?.students || 0), 0)
+                                                            : item.sec._count?.students} students
+                                                    </Badge>
+                                                )}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Student impact warning */}
+                                {totalStudentsAffected > 0 && (
+                                    <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-3">
+                                        <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                                        <p className="text-xs text-amber-800 dark:text-amber-300">
+                                            <strong>{totalStudentsAffected} enrolled student{totalStudentsAffected !== 1 ? 's' : ''}</strong> will be
+                                            unlinked from their class/section. Their student records will remain but they
+                                            will need to be re-enrolled.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleConfirmDelete}
+                            disabled={deleteMutation.isPending}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-2"
+                        >
+                            {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                            Delete {deleteSummary.length} item{deleteSummary.length !== 1 ? 's' : ''}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             {/* ─── Header ─────────────────────────────────────────── */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -842,8 +1079,6 @@ export default function ManageClassSectionPage() {
                                         )}
                                     </CardContent>
                                 </Card>
-
-
                             </div>
                         )}
                     </CardContent>
@@ -905,9 +1140,7 @@ export default function ManageClassSectionPage() {
                                 size="sm"
                                 className="bg-muted"
                                 onClick={async () => {
-                                    // Bust server-side Redis cache by fetching with noCache
                                     await fetch(`/api/schools/${schoolId}/classes?noCache=true&limit=1`)
-                                    // Then invalidate client-side queries to refetch fresh data
                                     queryClient.invalidateQueries({ queryKey: ['classes'], refetchType: 'all' })
                                     queryClient.invalidateQueries({ queryKey: ['class-stats'], refetchType: 'all' })
                                 }}
@@ -922,15 +1155,81 @@ export default function ManageClassSectionPage() {
 
             {/* ─── Classes Table ───────────────────────────────────── */}
             <div className="border rounded-2xl bg-white dark:bg-muted/30">
+
+                {/* ─── Bulk Action Bar (appears when items are selected) ── */}
+                {hasSelection && (
+                    <div className="flex items-center justify-between px-4 py-2.5 bg-primary/5 border-b rounded-t-2xl">
+                        <div className="flex items-center gap-2.5 text-sm">
+                            <div className="flex items-center justify-center h-5 w-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
+                                {totalSelected}
+                            </div>
+                            <span className="font-medium text-foreground">
+                                {totalSelected} item{totalSelected !== 1 ? 's' : ''} selected
+                            </span>
+                            <span className="text-muted-foreground hidden sm:inline">
+                                ({selectedClasses.size > 0 && `${selectedClasses.size} class${selectedClasses.size !== 1 ? 'es' : ''}`}
+                                {selectedClasses.size > 0 && selectedSections.size > 0 && ', '}
+                                {selectedSections.size > 0 && `${selectedSections.size} section${selectedSections.size !== 1 ? 's' : ''}`})
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={clearSelection}
+                            >
+                                <X className="h-3.5 w-3.5 mr-1" /> Clear
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                size="sm"
+                                className="h-7 text-xs gap-1.5"
+                                onClick={() => setDeleteDialogOpen(true)}
+                                disabled={deleteMutation.isPending}
+                            >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Delete Selected
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
                 <div className="overflow-x-auto">
                     <Table>
                         <TableHeader className="bg-muted sticky top-0 z-10">
                             <TableRow>
+                                {/* Checkbox column */}
+                                <TableHead className="w-10 pl-4">
+                                    {/* No "select all" at top level since items are grouped — kept empty intentionally */}
+                                </TableHead>
                                 <TableHead>Class</TableHead>
                                 <TableHead>Section</TableHead>
                                 <TableHead>Students</TableHead>
                                 <TableHead className="min-w-[200px]">Class Teacher</TableHead>
-                                <TableHead className="text-right">Action</TableHead>
+                                <TableHead className="text-right pr-4">
+                                    {/* Expand / Collapse All toggle */}
+                                    {classes.length > 0 && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-7 text-xs font-normal text-muted-foreground hover:text-foreground"
+                                            onClick={handleToggleExpandAll}
+                                        >
+                                            {allExpanded ? (
+                                                <>
+                                                    <ChevronsDownUp className="h-3.5 w-3.5 mr-1" />
+                                                    Collapse All
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <ChevronsUpDown className="h-3.5 w-3.5 mr-1" />
+                                                    Expand All
+                                                </>
+                                            )}
+                                        </Button>
+                                    )}
+                                </TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -938,7 +1237,7 @@ export default function ManageClassSectionPage() {
                                 Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)
                             ) : classes.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="text-center py-12">
+                                    <TableCell colSpan={6} className="text-center py-12">
                                         <School className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
                                         <h3 className="text-lg font-semibold mb-2">
                                             {searchQuery || teacherFilter !== 'ALL' || capacityFilter !== 'ALL'
@@ -962,6 +1261,9 @@ export default function ManageClassSectionPage() {
                                     const isExpanded = expandedClasses.has(cls.id)
                                     const totalStudents = cls.sections?.reduce((sum, s) => sum + (s._count?.students || 0), 0) || 0
                                     const sectionCount = cls.sections?.length || 0
+                                    const fullySelected = isClassFullySelected(cls)
+                                    const partiallySelected = isClassPartiallySelected(cls)
+
                                     const toggleExpand = () => {
                                         setExpandedClasses(prev => {
                                             const next = new Set(prev)
@@ -975,10 +1277,26 @@ export default function ManageClassSectionPage() {
                                         <Fragment key={cls.id}>
                                             {/* Class Group Header */}
                                             <TableRow
-                                                className="bg-muted/40 hover:bg-muted/60 cursor-pointer transition-colors"
-                                                onClick={toggleExpand}
+                                                className={cn(
+                                                    "bg-muted/40 hover:bg-muted/60 cursor-pointer transition-colors",
+                                                    (fullySelected || partiallySelected) && "bg-primary/5 hover:bg-primary/8"
+                                                )}
                                             >
-                                                <TableCell colSpan={5}>
+                                                {/* Class-level checkbox */}
+                                                <TableCell className="pl-4 w-10" onClick={(e) => e.stopPropagation()}>
+                                                    <Checkbox
+                                                        checked={fullySelected}
+                                                        // indeterminate state via data attribute
+                                                        data-indeterminate={partiallySelected ? "true" : undefined}
+                                                        ref={(el) => {
+                                                            if (el) el.indeterminate = partiallySelected
+                                                        }}
+                                                        onCheckedChange={() => toggleClassSelection(cls)}
+                                                        aria-label={`Select class ${displayClassName(cls.className)}`}
+                                                        className={cn(partiallySelected && "data-[state=unchecked]:bg-primary/20")}
+                                                    />
+                                                </TableCell>
+                                                <TableCell colSpan={5} onClick={toggleExpand}>
                                                     <div className="flex items-center justify-between">
                                                         <div className="flex items-center gap-2.5">
                                                             {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
@@ -1006,6 +1324,7 @@ export default function ManageClassSectionPage() {
                                                 <>
                                                     {!cls.sections?.length ? (
                                                         <TableRow>
+                                                            <TableCell className="pl-4 w-10" />
                                                             <TableCell colSpan={5} className="py-4 text-center">
                                                                 <span className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                                                                     <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
@@ -1020,42 +1339,60 @@ export default function ManageClassSectionPage() {
                                                             </TableCell>
                                                         </TableRow>
                                                     ) : (
-                                                        cls.sections.map(sec => (
-                                                            <TableRow key={sec.id} className="hover:bg-muted/50 transition-colors group">
-                                                                <TableCell className="pl-10" />
-                                                                <TableCell>
-                                                                    <Badge variant="secondary" className="text-xs">{sec.name}</Badge>
-                                                                </TableCell>
-                                                                <TableCell>
-                                                                    <CapacityIndicator
-                                                                        current={sec._count?.students || 0}
-                                                                        max={cls.capacity}
-                                                                    />
-                                                                </TableCell>
-                                                                <TableCell>
-                                                                    <TeacherCombobox
-                                                                        teachers={teachers}
-                                                                        value={sec.teachingStaffUserId}
-                                                                        onChange={(teacherId) => handleSupervisorChange(sec.id, teacherId)}
-                                                                        disabled={assignSupervisorMutation.isPending}
-                                                                    />
-                                                                </TableCell>
-                                                                <TableCell className="text-right">
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        size="sm"
-                                                                        onClick={() => router.push(`/dashboard/schools/create-classes/${cls.id}/students`)}
-                                                                    >
-                                                                        <Eye className="mr-1.5 h-3.5 w-3.5" />
-                                                                        View
-                                                                    </Button>
-                                                                </TableCell>
-                                                            </TableRow>
-                                                        ))
+                                                        cls.sections.map(sec => {
+                                                            const isSectionSelected = selectedSections.has(sec.id)
+                                                            return (
+                                                                <TableRow
+                                                                    key={sec.id}
+                                                                    className={cn(
+                                                                        "hover:bg-muted/50 transition-colors group",
+                                                                        isSectionSelected && "bg-primary/5 hover:bg-primary/8"
+                                                                    )}
+                                                                >
+                                                                    {/* Section checkbox */}
+                                                                    <TableCell className="pl-4 w-10">
+                                                                        <Checkbox
+                                                                            checked={isSectionSelected}
+                                                                            onCheckedChange={() => toggleSectionSelection(sec.id)}
+                                                                            aria-label={`Select section ${sec.name}`}
+                                                                        />
+                                                                    </TableCell>
+                                                                    <TableCell className="pl-6" />
+                                                                    <TableCell>
+                                                                        <Badge variant="secondary" className="text-xs">{sec.name}</Badge>
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <CapacityIndicator
+                                                                            current={sec._count?.students || 0}
+                                                                            max={cls.capacity}
+                                                                        />
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <TeacherCombobox
+                                                                            teachers={teachers}
+                                                                            value={sec.teachingStaffUserId}
+                                                                            onChange={(teacherId) => handleSupervisorChange(sec.id, teacherId)}
+                                                                            disabled={assignSupervisorMutation.isPending}
+                                                                        />
+                                                                    </TableCell>
+                                                                    <TableCell className="text-right pr-4">
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            onClick={() => router.push(`/dashboard/schools/create-classes/${cls.id}/students`)}
+                                                                        >
+                                                                            <Eye className="mr-1.5 h-3.5 w-3.5" />
+                                                                            View
+                                                                        </Button>
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            )
+                                                        })
                                                     )}
                                                     {/* Optimistic skeleton row while section is being created */}
                                                     {(createSectionMutation.isPending && createSectionMutation.variables?.classId === cls.id) && (
                                                         <TableRow className="animate-pulse">
+                                                            <TableCell className="pl-4 w-10" />
                                                             <TableCell className="pl-10" />
                                                             <TableCell><div className="h-5 w-8 bg-muted rounded" /></TableCell>
                                                             <TableCell><div className="h-5 w-20 bg-muted rounded" /></TableCell>
