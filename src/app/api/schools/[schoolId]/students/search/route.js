@@ -57,7 +57,7 @@ export async function GET(req, props) {
                 section: {
                     select: {
                         name: true,
-                        classTeacher: {
+                        teachingStaff: {
                             select: {
                                 name: true,
                             }
