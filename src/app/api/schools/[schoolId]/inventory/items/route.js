@@ -4,18 +4,10 @@ import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { remember, invalidatePattern } from "@/lib/cache";
 import { getPagination } from "@/lib/api-utils";
+import { validateItemData } from "@/lib/inventory-validation";
 
 const NS = (schoolId) => `inv:${schoolId}`;
 const hashStr = (s) => s ? createHash("md5").update(s).digest("hex").slice(0, 10) : "none";
-
-const MAX_FIELD_LEN = { name: 200, unit: 50, vendorName: 200, vendorContact: 100, location: 200 };
-function validateLengths(fields) {
-    for (const [field, max] of Object.entries(MAX_FIELD_LEN)) {
-        if (fields[field] && fields[field].length > max)
-            return `${field} must be ${max} characters or fewer`;
-    }
-    return null;
-}
 
 export async function GET(request, { params }) {
     try {
@@ -60,8 +52,6 @@ export async function GET(request, { params }) {
                     ],
                 }),
                 ...(categoryId && categoryId !== "all" && { categoryId }),
-                // FIX: "low" filter matches items with qty<=5 OR status=LOW_STOCK/OUT_OF_STOCK
-                // Previously only checked quantity, missing manually-flagged items.
                 ...(status === "low" && {
                     OR: [
                         { quantity: { lte: 5 } },
@@ -69,7 +59,6 @@ export async function GET(request, { params }) {
                         { status: "OUT_OF_STOCK" },
                     ],
                 }),
-                // "in_stock" only shows items that are genuinely in stock both ways
                 ...(status === "in_stock" && {
                     quantity: { gt: 5 },
                     status: { notIn: ["LOW_STOCK", "OUT_OF_STOCK"] },
@@ -93,16 +82,20 @@ export async function POST(request, { params }) {
     try {
         const { schoolId } = await params;
         const body = await request.json();
-        const { name, categoryId, quantity, unit, purchaseDate, costPerUnit, sellingPrice, isSellable, vendorName, vendorContact, location, status, imageUrl } = body;
 
-        if (!name?.trim() || !unit?.trim() || costPerUnit === undefined)
-            return NextResponse.json({ error: "name, unit, and costPerUnit are required" }, { status: 400 });
+        // ── Shared validation — same rules as the UI ──────────────────────────
+        const validationError = validateItemData(body);
+        if (validationError) {
+            return NextResponse.json({ error: validationError.error }, { status: validationError.status });
+        }
 
-        const lenError = validateLengths({ name, unit, vendorName, vendorContact, location });
-        if (lenError) return NextResponse.json({ error: lenError }, { status: 400 });
+        const { name, categoryId, quantity, unit, purchaseDate, costPerUnit,
+            sellingPrice, isSellable, vendorName, vendorContact, location, status, imageUrl } = body;
 
         if (categoryId?.trim()) {
-            const cat = await prisma.inventoryCategory.findUnique({ where: { id: categoryId.trim() }, select: { schoolId: true } });
+            const cat = await prisma.inventoryCategory.findUnique({
+                where: { id: categoryId.trim() }, select: { schoolId: true },
+            });
             if (!cat || cat.schoolId !== schoolId)
                 return NextResponse.json({ error: "Category not found" }, { status: 400 });
         }
@@ -112,10 +105,13 @@ export async function POST(request, { params }) {
                 schoolId, name: name.trim(), categoryId: categoryId?.trim() || null,
                 quantity: parseInt(quantity) || 0, minimumQuantity: 5, maximumQuantity: 1000,
                 unit: unit.trim(), purchaseDate: purchaseDate ? new Date(purchaseDate) : new Date(),
-                costPerUnit: parseFloat(costPerUnit) || 0, sellingPrice: parseFloat(sellingPrice) || 0,
-                isSellable: isSellable || false, vendorName: vendorName?.trim() || "",
-                vendorContact: vendorContact?.trim() || "", location: location?.trim() || "",
-                status: (status || "IN_STOCK").toUpperCase(), imageUrl: imageUrl || null,
+                costPerUnit: parseFloat(costPerUnit) || 0,
+                sellingPrice: parseFloat(sellingPrice) || 0,
+                isSellable: isSellable || false,
+                vendorName: vendorName?.trim() || "", vendorContact: vendorContact?.trim() || "",
+                location: location?.trim() || "",
+                status: (status || "IN_STOCK").toUpperCase(),
+                imageUrl: imageUrl || null,
             },
         });
 

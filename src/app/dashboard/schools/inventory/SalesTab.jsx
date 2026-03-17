@@ -9,10 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { AlertCircle } from "lucide-react";
 import {
     ShoppingCart, Search, Receipt, DollarSign, Users, RotateCcw,
     ChevronDown, ChevronUp, Calendar, BarChart3, ArrowUpRight,
-    ArrowDownRight, ChevronLeft, ChevronRight,
+    ArrowDownRight, ChevronLeft, ChevronRight, TrendingDown,
 } from "lucide-react";
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -27,45 +28,55 @@ const toNum = (v) => {
 };
 const fmt = (v) => toNum(v).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// ─── FIX: month label format ──────────────────────────────────────────────────
-// Previously used { month: 'short', year: '2-digit' } which rendered "Mar 26"
-// Users read "26" as the day (March 26th) not the year (2026).
-// Fix: use a clear separator so "Mar '26" is unambiguous, or show full year.
-// We use a custom formatter that produces "Mar '26" with an explicit apostrophe.
+// ─── Month label: "Mar '26" not "Mar 26" ─────────────────────────────────────
 const monthLabel = (date) => {
     const mon = date.toLocaleString("default", { month: "short" });
     const yr = String(date.getFullYear()).slice(2);
     return `${mon} '${yr}`;
 };
 
+// ─── Sale line health check ───────────────────────────────────────────────────
+// Flags bad historical records in the expanded row so admins know which
+// past sales had the Decimal bug / data entry error.
+// Returns { type: 'error'|'warning', message } | null
+function checkSaleLine(si) {
+    const unitPrice = toNum(si.unitPrice);
+    const totalPrice = toNum(si.totalPrice);
+    const cost = toNum(si.item?.costPerUnit);
+
+    // unitPrice=0 → Decimal bug — stored as 0 when it should have been the selling price
+    if (unitPrice === 0)
+        return { type: "error", message: "Unit price recorded as ₹0 — this line has a data entry error" };
+
+    // unitPrice < cost → selling below cost (may be intentional, flag as warning)
+    if (cost > 0 && unitPrice < cost)
+        return { type: "warning", message: `Sold at ₹${unitPrice.toFixed(2)} below cost ₹${cost.toFixed(2)} — loss of ₹${(cost - unitPrice).toFixed(2)}/unit` };
+
+    // totalPrice mismatch → rounding or DB corruption
+    const expected = Math.round(unitPrice * si.quantity * 100) / 100;
+    if (Math.abs(totalPrice - expected) > 0.02)
+        return { type: "warning", message: `Total ₹${totalPrice.toFixed(2)} doesn't match unit×qty (₹${expected.toFixed(2)})` };
+
+    return null;
+}
+
+// ─── Chart colors ─────────────────────────────────────────────────────────────
 const CHART_COLORS = [
-    "hsl(221, 83%, 53%)",
-    "hsl(142, 71%, 45%)",
-    "hsl(38, 92%, 50%)",
-    "hsl(0, 84%, 60%)",
-    "hsl(262, 83%, 58%)",
-    "hsl(173, 80%, 40%)",
+    "hsl(221, 83%, 53%)", "hsl(142, 71%, 45%)", "hsl(38, 92%, 50%)",
+    "hsl(0, 84%, 60%)", "hsl(262, 83%, 58%)", "hsl(173, 80%, 40%)",
 ];
-
 const PAYMENT_COLORS = {
-    CASH: "hsl(142, 71%, 45%)",
-    ONLINE: "hsl(221, 83%, 53%)",
-    UPI: "hsl(262, 83%, 58%)",
-    CARD: "hsl(38, 92%, 50%)",
+    CASH: "hsl(142, 71%, 45%)", ONLINE: "hsl(221, 83%, 53%)",
+    UPI: "hsl(262, 83%, 58%)", CARD: "hsl(38, 92%, 50%)",
 };
-
 const BUYER_TYPE_COLORS = {
-    STUDENT: "hsl(221, 83%, 53%)",
-    STAFF: "hsl(142, 71%, 45%)",
-    EXTERNAL: "hsl(38, 92%, 50%)",
+    STUDENT: "hsl(221, 83%, 53%)", STAFF: "hsl(142, 71%, 45%)", EXTERNAL: "hsl(38, 92%, 50%)",
 };
 
 function EmptyState({ icon: Icon, title, description, action }) {
     return (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="rounded-full bg-muted p-4 mb-4">
-                <Icon className="h-8 w-8 text-muted-foreground" />
-            </div>
+            <div className="rounded-full bg-muted p-4 mb-4"><Icon className="h-8 w-8 text-muted-foreground" /></div>
             <h3 className="text-lg font-semibold mb-1">{title}</h3>
             <p className="text-sm text-muted-foreground max-w-sm mb-4">{description}</p>
             {action}
@@ -108,16 +119,14 @@ export default function SalesTab({ sales, onNewSale }) {
     const [filterEndDate, setFilterEndDate] = useState("");
     const [expandedSale, setExpandedSale] = useState(null);
     const [reportView, setReportView] = useState("overview");
-
-    // trendMonth: the last month in the 6-month window.
-    // month is 0-indexed (0 = January … 11 = December).
     const [trendMonth, setTrendMonth] = useState(() => {
         const now = new Date();
         return { year: now.getFullYear(), month: now.getMonth() };
     });
 
+    const now = new Date();
+
     const getDateRangeFilter = () => {
-        const now = new Date();
         switch (filterDateRange) {
             case "today": return new Date(now.getFullYear(), now.getMonth(), now.getDate());
             case "week": { const d = new Date(now); d.setDate(d.getDate() - 7); return d; }
@@ -130,18 +139,14 @@ export default function SalesTab({ sales, onNewSale }) {
 
     const filteredSales = useMemo(() => {
         const startFilter = getDateRangeFilter();
-        const endFilter = filterDateRange === "custom" && filterEndDate
-            ? new Date(filterEndDate + "T23:59:59") : null;
-
+        const endFilter = filterDateRange === "custom" && filterEndDate ? new Date(filterEndDate + "T23:59:59") : null;
         return [...sales]
             .filter((sale) => {
                 if (searchTerm) {
                     const q = searchTerm.toLowerCase();
-                    if (
-                        !sale.buyerName?.toLowerCase().includes(q) &&
+                    if (!sale.buyerName?.toLowerCase().includes(q) &&
                         !String(toNum(sale.totalAmount)).includes(q) &&
-                        !sale.items?.some(si => si.item?.name?.toLowerCase().includes(q))
-                    ) return false;
+                        !sale.items?.some(si => si.item?.name?.toLowerCase().includes(q))) return false;
                 }
                 if (filterBuyerType !== "all" && sale.buyerType !== filterBuyerType) return false;
                 if (filterPaymentMethod !== "all" && sale.paymentMethod !== filterPaymentMethod) return false;
@@ -155,38 +160,26 @@ export default function SalesTab({ sales, onNewSale }) {
             .sort((a, b) => new Date(b.saleDate) - new Date(a.saleDate));
     }, [sales, searchTerm, filterBuyerType, filterPaymentMethod, filterDateRange, filterStartDate, filterEndDate]);
 
-    // ── Monthly data for bar chart ────────────────────────────────────────────
-    // Builds 6 months ending at trendMonth (inclusive).
-    // FIX: use monthLabel() which renders "Mar '26" not "Mar 26" so users
-    // don't confuse the year suffix with a day-of-month.
+    // ── Monthly chart data ────────────────────────────────────────────────────
     const monthlyData = useMemo(() => {
         const { year, month } = trendMonth;
         return Array.from({ length: 6 }, (_, i) => {
-            // i=0 → 5 months ago, i=5 → trendMonth itself
             const date = new Date(year, month - (5 - i), 1);
             const monthSales = sales.filter(s => {
                 const sd = new Date(s.saleDate);
                 return sd.getFullYear() === date.getFullYear() && sd.getMonth() === date.getMonth();
             });
             return {
-                month: monthLabel(date),    // "Mar '26" — unambiguous
+                month: monthLabel(date),
                 revenue: monthSales.reduce((sum, s) => sum + toNum(s.totalAmount), 0),
                 count: monthSales.length,
             };
         });
     }, [sales, trendMonth]);
 
-    // ── Window label shown above the bar chart ────────────────────────────────
-    // FIX: windowEnd was `new Date(year, month)` which gives the 1st of trendMonth.
-    // But trendMonth itself IS the last month in the window — no +1 needed.
-    // Old: trendMonth={year:2026, month:2} → windowEnd=new Date(2026,2)=Mar 1
-    //      → rendered as "Mar 26" ✓ but user sees "26" as a day not year.
-    // Now: we use monthLabel() on both endpoints for the same "Mar '26" format.
     const windowStartDate = new Date(trendMonth.year, trendMonth.month - 5, 1);
     const windowEndDate = new Date(trendMonth.year, trendMonth.month, 1);
     const trendWindowLabel = `${monthLabel(windowStartDate)} — ${monthLabel(windowEndDate)}`;
-
-    const now = new Date();
     const isCurrentMonth = trendMonth.year === now.getFullYear() && trendMonth.month === now.getMonth();
 
     const goToPrevMonth = () => setTrendMonth(prev => {
@@ -198,10 +191,7 @@ export default function SalesTab({ sales, onNewSale }) {
         setTrendMonth(prev => {
             const d = new Date(prev.year, prev.month + 6, 1);
             const cap = new Date();
-            if (d.getFullYear() > cap.getFullYear() ||
-                (d.getFullYear() === cap.getFullYear() && d.getMonth() > cap.getMonth())) {
-                return { year: cap.getFullYear(), month: cap.getMonth() };
-            }
+            if (d > cap) return { year: cap.getFullYear(), month: cap.getMonth() };
             return { year: d.getFullYear(), month: d.getMonth() };
         });
     };
@@ -212,21 +202,13 @@ export default function SalesTab({ sales, onNewSale }) {
         const lastStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const lastEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
         const thisMonthSales = sales.filter(s => new Date(s.saleDate) >= thisStart);
-        const lastMonthSales = sales.filter(s => {
-            const d = new Date(s.saleDate);
-            return d >= lastStart && d <= lastEnd;
-        });
+        const lastMonthSales = sales.filter(s => { const d = new Date(s.saleDate); return d >= lastStart && d <= lastEnd; });
         const thisRevenue = thisMonthSales.reduce((sum, s) => sum + toNum(s.totalAmount), 0);
         const lastRevenue = lastMonthSales.reduce((sum, s) => sum + toNum(s.totalAmount), 0);
-        const revenueChange = lastRevenue > 0
-            ? ((thisRevenue - lastRevenue) / lastRevenue * 100)
-            : (thisRevenue > 0 ? 100 : 0);
-        const countChange = lastMonthSales.length > 0
-            ? ((thisMonthSales.length - lastMonthSales.length) / lastMonthSales.length * 100)
-            : (thisMonthSales.length > 0 ? 100 : 0);
+        const revenueChange = lastRevenue > 0 ? ((thisRevenue - lastRevenue) / lastRevenue * 100) : (thisRevenue > 0 ? 100 : 0);
+        const countChange = lastMonthSales.length > 0 ? ((thisMonthSales.length - lastMonthSales.length) / lastMonthSales.length * 100) : (thisMonthSales.length > 0 ? 100 : 0);
         return {
             thisMonth: { revenue: thisRevenue, count: thisMonthSales.length },
-            lastMonth: { revenue: lastRevenue, count: lastMonthSales.length },
             revenueChange: revenueChange.toFixed(1),
             countChange: countChange.toFixed(1),
         };
@@ -234,10 +216,7 @@ export default function SalesTab({ sales, onNewSale }) {
 
     const paymentBreakdown = useMemo(() => {
         const totals = {};
-        sales.forEach(s => {
-            const method = s.paymentMethod || "OTHER";
-            totals[method] = (totals[method] || 0) + toNum(s.totalAmount);
-        });
+        sales.forEach(s => { const m = s.paymentMethod || "OTHER"; totals[m] = (totals[m] || 0) + toNum(s.totalAmount); });
         const grand = Object.values(totals).reduce((s, v) => s + v, 0);
         return Object.entries(totals).map(([name, value]) => ({
             name, value,
@@ -248,10 +227,7 @@ export default function SalesTab({ sales, onNewSale }) {
 
     const buyerBreakdown = useMemo(() => {
         const totals = {};
-        sales.forEach(s => {
-            const type = s.buyerType || "OTHER";
-            totals[type] = (totals[type] || 0) + toNum(s.totalAmount);
-        });
+        sales.forEach(s => { const t = s.buyerType || "OTHER"; totals[t] = (totals[t] || 0) + toNum(s.totalAmount); });
         const grand = Object.values(totals).reduce((s, v) => s + v, 0);
         return Object.entries(totals).map(([name, value]) => ({
             name, value,
@@ -260,20 +236,14 @@ export default function SalesTab({ sales, onNewSale }) {
         }));
     }, [sales]);
 
-    // ── Daily trend — last 30 days ────────────────────────────────────────────
-    // FIX: was `now.getDate() - (29 - i)` which went backwards from today correctly,
-    // but the X axis label was "17 Feb" style — clear enough. Keeping as-is.
     const dailyTrend = useMemo(() => {
         return Array.from({ length: 30 }, (_, i) => {
             const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (29 - i));
             const daySales = sales.filter(s => {
                 const sd = new Date(s.saleDate);
-                return sd.getFullYear() === date.getFullYear() &&
-                    sd.getMonth() === date.getMonth() &&
-                    sd.getDate() === date.getDate();
+                return sd.getFullYear() === date.getFullYear() && sd.getMonth() === date.getMonth() && sd.getDate() === date.getDate();
             });
             return {
-                // Use "18 Mar" format — day first, no year, unambiguous
                 date: date.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
                 revenue: daySales.reduce((sum, s) => sum + toNum(s.totalAmount), 0),
                 count: daySales.length,
@@ -292,6 +262,14 @@ export default function SalesTab({ sales, onNewSale }) {
         };
     }, [filteredSales]);
 
+    // ── How many sales have at least one bad line ─────────────────────────────
+    // Shown as a warning banner above the table so admins know to investigate
+    const badSaleCount = useMemo(() => {
+        return sales.filter(sale =>
+            sale.items?.some(si => checkSaleLine(si) !== null)
+        ).length;
+    }, [sales]);
+
     const clearFilters = () => {
         setSearchTerm(""); setFilterBuyerType("all"); setFilterPaymentMethod("all");
         setFilterDateRange("all"); setFilterStartDate(""); setFilterEndDate("");
@@ -300,16 +278,14 @@ export default function SalesTab({ sales, onNewSale }) {
 
     if (sales.length === 0) {
         return (
-            <Card>
-                <CardContent className="pt-6">
-                    <EmptyState
-                        icon={Receipt}
-                        title="No sales recorded yet"
-                        description="Once you start selling inventory items, your sales history and reports will appear here."
-                        action={<Button onClick={onNewSale}><ShoppingCart className="h-4 w-4 mr-2" />Record First Sale</Button>}
-                    />
-                </CardContent>
-            </Card>
+            <Card><CardContent className="pt-6">
+                <EmptyState
+                    icon={Receipt}
+                    title="No sales recorded yet"
+                    description="Once you start selling inventory items, your sales history and reports will appear here."
+                    action={<Button onClick={onNewSale}><ShoppingCart className="h-4 w-4 mr-2" />Record First Sale</Button>}
+                />
+            </CardContent></Card>
         );
     }
 
@@ -338,7 +314,6 @@ export default function SalesTab({ sales, onNewSale }) {
                         </div>
                     </CardContent>
                 </Card>
-
                 <Card>
                     <CardContent className="pt-5 pb-4">
                         <div className="flex items-center justify-between">
@@ -360,7 +335,6 @@ export default function SalesTab({ sales, onNewSale }) {
                         </div>
                     </CardContent>
                 </Card>
-
                 <Card>
                     <CardContent className="pt-5 pb-4">
                         <div className="flex items-center justify-between">
@@ -375,7 +349,6 @@ export default function SalesTab({ sales, onNewSale }) {
                         </div>
                     </CardContent>
                 </Card>
-
                 <Card>
                     <CardContent className="pt-5 pb-4">
                         <div className="flex items-center justify-between">
@@ -398,23 +371,15 @@ export default function SalesTab({ sales, onNewSale }) {
                     <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
                             <div>
-                                <CardTitle className="text-base">
-                                    {reportView === "overview" ? "Monthly Revenue" : "Daily Trend (30 days)"}
-                                </CardTitle>
-                                <CardDescription>
-                                    {reportView === "overview" ? trendWindowLabel : "Last 30 days"}
-                                </CardDescription>
+                                <CardTitle className="text-base">{reportView === "overview" ? "Monthly Revenue" : "Daily Trend (30 days)"}</CardTitle>
+                                <CardDescription>{reportView === "overview" ? trendWindowLabel : "Last 30 days"}</CardDescription>
                             </div>
                             <div className="flex items-center gap-2">
                                 {reportView === "overview" && (
                                     <div className="flex items-center gap-1">
-                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goToPrevMonth}>
-                                            <ChevronLeft className="h-4 w-4" />
-                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goToPrevMonth}><ChevronLeft className="h-4 w-4" /></Button>
                                         <span className="text-xs font-medium min-w-[130px] text-center">{trendWindowLabel}</span>
-                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goToNextMonth} disabled={isCurrentMonth}>
-                                            <ChevronRight className="h-4 w-4" />
-                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goToNextMonth} disabled={isCurrentMonth}><ChevronRight className="h-4 w-4" /></Button>
                                     </div>
                                 )}
                                 <div className="flex gap-1">
@@ -430,11 +395,7 @@ export default function SalesTab({ sales, onNewSale }) {
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={monthlyData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                                         <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                                        <XAxis
-                                            dataKey="month"
-                                            tick={{ fontSize: 11 }}
-                                        // Each tick is "Mar '26" — the apostrophe makes clear it's year not day
-                                        />
+                                        <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                                         <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `₹${v >= 1000 ? (v / 1000).toFixed(0) + "k" : v}`} />
                                         <Tooltip content={<CustomTooltip />} />
                                         <Bar dataKey="revenue" name="Revenue" fill="hsl(221, 83%, 53%)" radius={[6, 6, 0, 0]} />
@@ -492,7 +453,6 @@ export default function SalesTab({ sales, onNewSale }) {
                             ) : <p className="text-sm text-muted-foreground text-center py-6">No data</p>}
                         </CardContent>
                     </Card>
-
                     <Card>
                         <CardHeader className="pb-2"><CardTitle className="text-base">By Buyer Type</CardTitle></CardHeader>
                         <CardContent>
@@ -530,6 +490,23 @@ export default function SalesTab({ sales, onNewSale }) {
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
+
+                    {/* ── Data quality banner ──────────────────────────────────
+                        Shown when historical records have unitPrice=0 or below-cost lines.
+                        Tells the admin exactly how many sales need investigation so they
+                        can fix them in Supabase before the bad data compounds. */}
+                    {badSaleCount > 0 && (
+                        <div className="flex items-start gap-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
+                            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                            <div className="text-sm text-amber-800 dark:text-amber-300">
+                                <span className="font-medium">{badSaleCount} sale{badSaleCount > 1 ? "s have" : " has"} a data quality issue</span>
+                                {" "}— expand those rows to see which line items had incorrect prices recorded.
+                                These may have affected your profit calculation.
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Filters */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                         <div className="relative lg:col-span-2">
                             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -613,66 +590,96 @@ export default function SalesTab({ sales, onNewSale }) {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {filteredSales.map((sale, index) => (
-                                        <React.Fragment key={sale.id}>
-                                            <TableRow
-                                                className={`cursor-pointer hover:bg-muted/30 dark:hover:bg-background/30 ${index % 2 === 0 ? "bg-muted/20 dark:bg-background/20" : ""}`}
-                                                onClick={() => setExpandedSale(expandedSale === sale.id ? null : sale.id)}
-                                            >
-                                                <TableCell className="pr-0">
-                                                    {expandedSale === sale.id
-                                                        ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                                                        : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-                                                </TableCell>
-                                                <TableCell className="whitespace-nowrap text-sm">
-                                                    {new Date(sale.saleDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
-                                                </TableCell>
-                                                <TableCell className="font-medium">{sale.buyerName}</TableCell>
-                                                <TableCell><Badge variant="outline" className="text-xs">{sale.buyerType}</Badge></TableCell>
-                                                <TableCell className="text-muted-foreground">{sale.items?.length || 0} item(s)</TableCell>
-                                                <TableCell className="text-right font-mono font-medium">₹{fmt(sale.totalAmount)}</TableCell>
-                                                <TableCell>
-                                                    <Badge variant="secondary" className="text-xs" style={{ backgroundColor: PAYMENT_COLORS[sale.paymentMethod] ? `${PAYMENT_COLORS[sale.paymentMethod]}20` : undefined, color: PAYMENT_COLORS[sale.paymentMethod] }}>
-                                                        {sale.paymentMethod}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-xs">
-                                                        {sale.status}
-                                                    </Badge>
-                                                </TableCell>
-                                            </TableRow>
+                                    {filteredSales.map((sale, index) => {
+                                        // Does this sale have any bad lines?
+                                        const saleHasBadLine = sale.items?.some(si => checkSaleLine(si) !== null);
 
-                                            {expandedSale === sale.id && sale.items && (
-                                                <TableRow className="bg-muted/10 dark:bg-background/10">
-                                                    <TableCell colSpan={8} className="py-3">
-                                                        <div className="ml-6 rounded-md border overflow-hidden">
-                                                            <Table>
-                                                                <TableHeader>
-                                                                    <TableRow className="bg-muted/40">
-                                                                        <TableHead className="text-xs py-2">Item</TableHead>
-                                                                        <TableHead className="text-xs py-2">Qty</TableHead>
-                                                                        <TableHead className="text-xs py-2 text-right">Unit Price</TableHead>
-                                                                        <TableHead className="text-xs py-2 text-right">Total</TableHead>
-                                                                    </TableRow>
-                                                                </TableHeader>
-                                                                <TableBody>
-                                                                    {sale.items.map((si) => (
-                                                                        <TableRow key={si.id}>
-                                                                            <TableCell className="text-sm py-1.5">{si.item?.name || si.itemId}</TableCell>
-                                                                            <TableCell className="text-sm py-1.5 font-mono">{si.quantity}</TableCell>
-                                                                            <TableCell className="text-sm py-1.5 text-right font-mono">₹{toNum(si.unitPrice).toFixed(2)}</TableCell>
-                                                                            <TableCell className="text-sm py-1.5 text-right font-mono font-medium">₹{toNum(si.totalPrice).toFixed(2)}</TableCell>
-                                                                        </TableRow>
-                                                                    ))}
-                                                                </TableBody>
-                                                            </Table>
-                                                        </div>
+                                        return (
+                                            <React.Fragment key={sale.id}>
+                                                <TableRow
+                                                    className={`cursor-pointer hover:bg-muted/30 dark:hover:bg-background/30 ${index % 2 === 0 ? "bg-muted/20 dark:bg-background/20" : ""}`}
+                                                    onClick={() => setExpandedSale(expandedSale === sale.id ? null : sale.id)}
+                                                >
+                                                    <TableCell className="pr-0">
+                                                        {expandedSale === sale.id
+                                                            ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                                                            : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                                                    </TableCell>
+                                                    <TableCell className="whitespace-nowrap text-sm">
+                                                        {new Date(sale.saleDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                                                    </TableCell>
+                                                    <TableCell className="font-medium">
+                                                        {sale.buyerName}
+                                                        {/* Small indicator dot on rows with bad data */}
+                                                        {saleHasBadLine && (
+                                                            <span className="ml-2 inline-flex h-1.5 w-1.5 rounded-full bg-amber-500" title="This sale has a data quality issue — expand to see details" />
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell><Badge variant="outline" className="text-xs">{sale.buyerType}</Badge></TableCell>
+                                                    <TableCell className="text-muted-foreground">{sale.items?.length || 0} item(s)</TableCell>
+                                                    <TableCell className="text-right font-mono font-medium">₹{fmt(sale.totalAmount)}</TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="secondary" className="text-xs" style={{ backgroundColor: PAYMENT_COLORS[sale.paymentMethod] ? `${PAYMENT_COLORS[sale.paymentMethod]}20` : undefined, color: PAYMENT_COLORS[sale.paymentMethod] }}>
+                                                            {sale.paymentMethod}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-xs">
+                                                            {sale.status}
+                                                        </Badge>
                                                     </TableCell>
                                                 </TableRow>
-                                            )}
-                                        </React.Fragment>
-                                    ))}
+
+                                                {/* Expanded row — shows line items with per-line validation */}
+                                                {expandedSale === sale.id && sale.items && (
+                                                    <TableRow className="bg-muted/10 dark:bg-background/10">
+                                                        <TableCell colSpan={8} className="py-3">
+                                                            <div className="ml-6 rounded-md border overflow-hidden">
+                                                                <Table>
+                                                                    <TableHeader>
+                                                                        <TableRow className="bg-muted/40">
+                                                                            <TableHead className="text-xs py-2">Item</TableHead>
+                                                                            <TableHead className="text-xs py-2">Qty</TableHead>
+                                                                            <TableHead className="text-xs py-2 text-right">Unit Price</TableHead>
+                                                                            <TableHead className="text-xs py-2 text-right">Total</TableHead>
+                                                                            <TableHead className="text-xs py-2">Status</TableHead>
+                                                                        </TableRow>
+                                                                    </TableHeader>
+                                                                    <TableBody>
+                                                                        {sale.items.map((si) => {
+                                                                            const lineCheck = checkSaleLine(si);
+                                                                            return (
+                                                                                <TableRow key={si.id} className={lineCheck?.type === "error" ? "bg-destructive/5" : lineCheck?.type === "warning" ? "bg-amber-50/50 dark:bg-amber-900/10" : ""}>
+                                                                                    <TableCell className="text-sm py-1.5">{si.item?.name || si.itemId}</TableCell>
+                                                                                    <TableCell className="text-sm py-1.5 font-mono">{si.quantity}</TableCell>
+                                                                                    <TableCell className={`text-sm py-1.5 text-right font-mono ${lineCheck?.type === "error" ? "text-destructive font-medium" : lineCheck?.type === "warning" ? "text-amber-600 dark:text-amber-400 font-medium" : ""}`}>
+                                                                                        ₹{toNum(si.unitPrice).toFixed(2)}
+                                                                                    </TableCell>
+                                                                                    <TableCell className="text-sm py-1.5 text-right font-mono font-medium">₹{toNum(si.totalPrice).toFixed(2)}</TableCell>
+                                                                                    <TableCell className="py-1.5">
+                                                                                        {lineCheck ? (
+                                                                                            <div className={`flex items-center gap-1 text-xs ${lineCheck.type === "error" ? "text-destructive" : "text-amber-600 dark:text-amber-400"}`}>
+                                                                                                {lineCheck.type === "error"
+                                                                                                    ? <AlertCircle className="h-3 w-3 flex-shrink-0" />
+                                                                                                    : <TrendingDown className="h-3 w-3 flex-shrink-0" />}
+                                                                                                <span>{lineCheck.message}</span>
+                                                                                            </div>
+                                                                                        ) : (
+                                                                                            <span className="text-xs text-green-600 dark:text-green-400">✓ OK</span>
+                                                                                        )}
+                                                                                    </TableCell>
+                                                                                </TableRow>
+                                                                            );
+                                                                        })}
+                                                                    </TableBody>
+                                                                </Table>
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )}
+                                            </React.Fragment>
+                                        );
+                                    })}
                                 </TableBody>
                             </Table>
                         </div>

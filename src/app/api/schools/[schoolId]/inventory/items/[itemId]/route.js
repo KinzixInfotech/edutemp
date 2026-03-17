@@ -2,25 +2,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { remember, invalidatePattern } from "@/lib/cache";
+import { validateItemData } from "@/lib/inventory-validation";
 
 const NS = (schoolId) => `inv:${schoolId}`;
-
-const MAX_FIELD_LEN = { name: 200, unit: 50, vendorName: 200, vendorContact: 100, location: 200 };
-function validateLengths(fields) {
-    for (const [field, max] of Object.entries(MAX_FIELD_LEN)) {
-        if (fields[field] && String(fields[field]).length > max)
-            return `${field} must be ${max} characters or fewer`;
-    }
-    return null;
-}
 
 export async function GET(request, { params }) {
     try {
         const { schoolId, itemId } = await params;
         const cacheKey = `${NS(schoolId)}:item:${itemId}`;
-        const item = await remember(cacheKey, async () => {
-            return prisma.inventoryItem.findUnique({ where: { id: itemId, schoolId } });
-        }, 120);
+        const item = await remember(cacheKey, async () =>
+            prisma.inventoryItem.findUnique({ where: { id: itemId, schoolId } }), 120
+        );
         if (!item) return NextResponse.json({ error: "Item not found" }, { status: 404 });
         return NextResponse.json(item);
     } catch (error) {
@@ -33,13 +25,29 @@ export async function PUT(request, { params }) {
     try {
         const { schoolId, itemId } = await params;
         const body = await request.json();
-        const { name, categoryId, quantity, unit, purchaseDate, costPerUnit, sellingPrice, isSellable, vendorName, vendorContact, location, status, imageUrl } = body;
 
-        const lenError = validateLengths({ name, unit, vendorName, vendorContact, location });
-        if (lenError) return NextResponse.json({ error: lenError }, { status: 400 });
+        // ── Shared validation — same rules as UI ──────────────────────────────
+        // For PUT we only validate fields that are present (partial update),
+        // but if cost/sell are both provided we still run the markup check.
+        const partialForValidation = {
+            name: body.name ?? "placeholder", // name always present in edit form
+            unit: body.unit ?? "placeholder",
+            costPerUnit: body.costPerUnit,
+            sellingPrice: body.sellingPrice,
+            quantity: body.quantity,
+            vendorName: body.vendorName,
+            vendorContact: body.vendorContact,
+            location: body.location,
+        };
+        const validationError = validateItemData(partialForValidation);
+        if (validationError) {
+            return NextResponse.json({ error: validationError.error }, { status: validationError.status });
+        }
 
-        if (categoryId?.trim()) {
-            const cat = await prisma.inventoryCategory.findUnique({ where: { id: categoryId.trim() }, select: { schoolId: true } });
+        if (body.categoryId?.trim()) {
+            const cat = await prisma.inventoryCategory.findUnique({
+                where: { id: body.categoryId.trim() }, select: { schoolId: true },
+            });
             if (!cat || cat.schoolId !== schoolId)
                 return NextResponse.json({ error: "Category not found" }, { status: 400 });
         }
@@ -49,19 +57,19 @@ export async function PUT(request, { params }) {
             updatedItem = await prisma.inventoryItem.update({
                 where: { id: itemId, schoolId },
                 data: {
-                    ...(name !== undefined && { name: name.trim() }),
-                    ...(categoryId !== undefined && { categoryId: categoryId?.trim() || null }),
-                    ...(quantity !== undefined && { quantity: parseInt(quantity) }),
-                    ...(unit !== undefined && { unit: unit.trim() }),
-                    ...(purchaseDate !== undefined && { purchaseDate: new Date(purchaseDate) }),
-                    ...(costPerUnit !== undefined && { costPerUnit: parseFloat(costPerUnit) }),
-                    ...(sellingPrice !== undefined && { sellingPrice: parseFloat(sellingPrice) }),
-                    ...(isSellable !== undefined && { isSellable }),
-                    ...(vendorName !== undefined && { vendorName: vendorName?.trim() }),
-                    ...(vendorContact !== undefined && { vendorContact: vendorContact?.trim() }),
-                    ...(location !== undefined && { location: location?.trim() }),
-                    ...(status !== undefined && { status: status.toUpperCase() }),
-                    ...(imageUrl !== undefined && { imageUrl: imageUrl || null }),
+                    ...(body.name !== undefined && { name: body.name.trim() }),
+                    ...(body.categoryId !== undefined && { categoryId: body.categoryId?.trim() || null }),
+                    ...(body.quantity !== undefined && { quantity: parseInt(body.quantity) }),
+                    ...(body.unit !== undefined && { unit: body.unit.trim() }),
+                    ...(body.purchaseDate !== undefined && { purchaseDate: new Date(body.purchaseDate) }),
+                    ...(body.costPerUnit !== undefined && { costPerUnit: parseFloat(body.costPerUnit) }),
+                    ...(body.sellingPrice !== undefined && { sellingPrice: parseFloat(body.sellingPrice) }),
+                    ...(body.isSellable !== undefined && { isSellable: body.isSellable }),
+                    ...(body.vendorName !== undefined && { vendorName: body.vendorName?.trim() }),
+                    ...(body.vendorContact !== undefined && { vendorContact: body.vendorContact?.trim() }),
+                    ...(body.location !== undefined && { location: body.location?.trim() }),
+                    ...(body.status !== undefined && { status: body.status.toUpperCase() }),
+                    ...(body.imageUrl !== undefined && { imageUrl: body.imageUrl || null }),
                 },
             });
         } catch (e) {
