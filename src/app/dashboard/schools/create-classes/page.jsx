@@ -41,7 +41,7 @@ import {
     Trash2, GraduationCap, AlertTriangle, UserX, ChevronLeft, ChevronRight,
     ChevronsLeft, ChevronsRight, Download, ChevronDown,
     ChevronUp, X, Calendar, FileSpreadsheet, Filter,
-    RefreshCw, Settings2, Info, ChevronsDownUp, ChevronsUpDown,
+    RefreshCw, Settings2, Info, ChevronsDownUp, ChevronsUpDown, Pencil, Check,
 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"
@@ -154,30 +154,42 @@ function TeacherCombobox({ teachers, value, onChange, disabled }) {
 }
 
 // ─── Capacity Indicator ────────────────────────────────────────────
-function CapacityIndicator({ current, max }) {
+function CapacityIndicator({ current, max, onEditClick }) {
     if (!max) {
-        return current > 0 ? (
-            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800 font-medium text-xs">
-                <Users className="h-3 w-3 mr-1" />{current} students
-            </Badge>
-        ) : (
-            <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800 font-medium text-xs">
-                0 students
-            </Badge>
+        return (
+            <div className="flex items-center gap-1.5 cursor-pointer" onClick={onEditClick} title="Click to set capacity">
+                {current > 0 ? (
+                    <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800 font-medium text-xs">
+                        <Users className="h-3 w-3 mr-1" />{current} students
+                    </Badge>
+                ) : (
+                    <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800 font-medium text-xs">
+                        0 students
+                    </Badge>
+                )}
+                {onEditClick && (
+                    <Pencil className="h-3 w-3 text-muted-foreground" />
+                )}
+            </div>
         )
     }
     const ratio = (current / max) * 100
     const color = ratio > 100 ? "bg-red-500" : ratio >= 80 ? "bg-orange-500" : "bg-green-500"
     const textColor = ratio > 100 ? "text-red-600" : ratio >= 80 ? "text-orange-600" : "text-green-600"
     return (
-        <div className="space-y-1 min-w-[100px]">
-            <div className="flex items-center justify-between text-xs">
-                <span className={cn("font-medium", textColor)}>{current}/{max}</span>
-                {ratio > 100 && <AlertTriangle className="h-3 w-3 text-red-500" />}
+        <div className="flex items-center gap-1.5 cursor-pointer" onClick={onEditClick} title="Click to edit capacity">
+            <div className="space-y-1 min-w-[100px]">
+                <div className="flex items-center justify-between text-xs">
+                    <span className={cn("font-medium", textColor)}>{current}/{max}</span>
+                    {ratio > 100 && <AlertTriangle className="h-3 w-3 text-red-500" />}
+                </div>
+                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div className={cn("h-full rounded-full transition-all", color)} style={{ width: `${Math.min(ratio, 100)}%` }} />
+                </div>
             </div>
-            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                <div className={cn("h-full rounded-full transition-all", color)} style={{ width: `${Math.min(ratio, 100)}%` }} />
-            </div>
+            {onEditClick && (
+                <Pencil className="h-3 w-3 text-muted-foreground" />
+            )}
         </div>
     )
 }
@@ -225,6 +237,10 @@ export default function ManageClassSectionPage() {
     // What we are about to delete: 'sections' | 'classes' | 'mixed'
     const [deleteTarget, setDeleteTarget] = useState(null)
 
+    // Capacity editing state
+    const [editingCapacityClassId, setEditingCapacityClassId] = useState(null)
+    const [editCapacityValue, setEditCapacityValue] = useState("")
+
     // Reset page on filters
     useEffect(() => { setPage(1) }, [debouncedSearch, teacherFilter, capacityFilter])
 
@@ -254,7 +270,7 @@ export default function ManageClassSectionPage() {
             return res.json()
         },
         enabled: !!schoolId,
-        staleTime: 1000 * 60 * 5,
+        staleTime: 1000 * 30, // 30 seconds — newly created teachers show up quickly
     })
     const rawTeachers = Array.isArray(teachersData) ? teachersData : (teachersData?.staff || [])
 
@@ -605,10 +621,34 @@ export default function ManageClassSectionPage() {
         },
         onSuccess: () => {
             toast.success("Class teacher assigned")
-            queryClient.invalidateQueries({ queryKey: ['classes'] })
+            queryClient.invalidateQueries({ queryKey: ['classes'], refetchType: 'all' })
+            queryClient.invalidateQueries({ queryKey: ['class-stats'], refetchType: 'all' })
+            queryClient.invalidateQueries({ queryKey: ['classes-chart-data'], refetchType: 'all' })
             setConfirmOpen(false)
         },
         onError: () => toast.error("Failed to assign teacher")
+    })
+
+    // ─── Update Capacity Mutation ──────────────────────────────────
+    const updateCapacityMutation = useMutation({
+        mutationFn: async ({ classId, capacity }) => {
+            const res = await fetch(`/api/schools/${schoolId}/classes/${classId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ capacity })
+            })
+            if (!res.ok) throw new Error('Failed to update capacity')
+            return res.json()
+        },
+        onSuccess: () => {
+            toast.success("Capacity updated")
+            setEditingCapacityClassId(null)
+            setEditCapacityValue("")
+            queryClient.invalidateQueries({ queryKey: ['classes'], refetchType: 'all' })
+            queryClient.invalidateQueries({ queryKey: ['class-stats'], refetchType: 'all' })
+            queryClient.invalidateQueries({ queryKey: ['classes-chart-data'], refetchType: 'all' })
+        },
+        onError: () => toast.error("Failed to update capacity")
     })
 
     // ─── NEW: Delete mutation ──────────────────────────────────────
@@ -1296,7 +1336,7 @@ export default function ManageClassSectionPage() {
                                                         className={cn(partiallySelected && "data-[state=unchecked]:bg-primary/20")}
                                                     />
                                                 </TableCell>
-                                                <TableCell colSpan={5} onClick={toggleExpand}>
+                                                <TableCell colSpan={3} onClick={toggleExpand}>
                                                     <div className="flex items-center justify-between">
                                                         <div className="flex items-center gap-2.5">
                                                             {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
@@ -1307,15 +1347,70 @@ export default function ManageClassSectionPage() {
                                                                 {sectionCount} {sectionCount === 1 ? 'section' : 'sections'} · {totalStudents} {totalStudents === 1 ? 'student' : 'students'}
                                                             </span>
                                                         </div>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className="h-7 text-xs"
-                                                            onClick={(e) => { e.stopPropagation(); setAddSectionClassId(cls.id); setAddSectionOpen(true) }}
-                                                        >
-                                                            <Plus className="h-3.5 w-3.5 mr-1" /> Section
-                                                        </Button>
                                                     </div>
+                                                </TableCell>
+                                                {/* Capacity edit cell in the class header */}
+                                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                                    {editingCapacityClassId === cls.id ? (
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-xs text-muted-foreground mr-1">Cap:</span>
+                                                            <Input
+                                                                type="number"
+                                                                min="1"
+                                                                max="500"
+                                                                className="h-7 w-20 text-xs"
+                                                                value={editCapacityValue}
+                                                                onChange={(e) => setEditCapacityValue(e.target.value)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') {
+                                                                        updateCapacityMutation.mutate({ classId: cls.id, capacity: editCapacityValue })
+                                                                    } else if (e.key === 'Escape') {
+                                                                        setEditingCapacityClassId(null)
+                                                                    }
+                                                                }}
+                                                                autoFocus
+                                                            />
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-6 w-6"
+                                                                onClick={() => updateCapacityMutation.mutate({ classId: cls.id, capacity: editCapacityValue })}
+                                                                disabled={updateCapacityMutation.isPending}
+                                                            >
+                                                                {updateCapacityMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                                                            </Button>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-6 w-6"
+                                                                onClick={() => setEditingCapacityClassId(null)}
+                                                            >
+                                                                <X className="h-3 w-3" />
+                                                            </Button>
+                                                        </div>
+                                                    ) : (
+                                                        <button
+                                                            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                                            onClick={() => {
+                                                                setEditingCapacityClassId(cls.id)
+                                                                setEditCapacityValue(cls.capacity?.toString() || "40")
+                                                            }}
+                                                        >
+                                                            <Pencil className="h-3 w-3" />
+                                                            {cls.capacity ? `Cap: ${cls.capacity}` : 'Set capacity'}
+                                                        </button>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell onClick={toggleExpand} />
+                                                <TableCell className="text-right pr-4" onClick={(e) => e.stopPropagation()}>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-7 text-xs"
+                                                        onClick={() => { setAddSectionClassId(cls.id); setAddSectionOpen(true) }}
+                                                    >
+                                                        <Plus className="h-3.5 w-3.5 mr-1" /> Section
+                                                    </Button>
                                                 </TableCell>
                                             </TableRow>
 

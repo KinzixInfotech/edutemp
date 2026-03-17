@@ -18,6 +18,7 @@ export async function POST(req, props) {
 
         // Invalidate classes cache so the table shows the new section immediately
         await invalidatePattern(`classes:*schoolId:${schoolId}*`);
+        await invalidatePattern('classes:stats*');
 
         return NextResponse.json(section, { status: 201 });
     } catch (error) {

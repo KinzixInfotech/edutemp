@@ -59,6 +59,7 @@ export async function POST(req) {
 
     // Invalidate classes cache (schoolId is in the middle of sorted key params)
     await invalidatePattern(`classes:*schoolId:${schoolId}*`)
+    await invalidatePattern('classes:stats*')
 
     return NextResponse.json(result, { status: 201 })
   } catch (error) {
