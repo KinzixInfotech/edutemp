@@ -39,6 +39,7 @@ import { Separator } from "@/components/ui/separator";
 import useDebounceValue from "@/hooks/useDebounceValue";
 import FileUploadButton from "@/components/fileupload";
 import SalesTab from "./SalesTab";
+import ProfitCard from "@/components/inventory/ProfitCard";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const normalizeStatus = (s) => (s || "IN_STOCK").toUpperCase();
@@ -728,21 +729,11 @@ export default function InventoryManagementPage() {
                         <p className="text-xs text-muted-foreground mt-1">From {sales.filter(s => !s.__optimistic).length} sales</p>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium">Total Profit</CardTitle>
-                        <TrendingUp className="h-4 w-4 text-blue-500" />
-                    </CardHeader>
-                    <CardContent>
-                        {/* FIX: show negative profit in red so it's obvious, not just blue */}
-                        <div className={`text-2xl font-bold ${(stats?.totalProfit || 0) < 0 ? "text-red-600" : "text-blue-600"}`}>
-                            ₹{Number(stats?.totalProfit || 0).toFixed(2)}
-                        </div>
-                        {(stats?.totalProfit || 0) < 0 && (
-                            <p className="text-xs text-red-500 mt-1">Check selling prices — some items may be priced below cost</p>
-                        )}
-                    </CardContent>
-                </Card>
+                <ProfitCard
+                    stats={stats}
+                    schoolId={schoolId}
+                    statsQueryKey={statsQueryKey}
+                />
             </div>
 
             {/* Tabs */}

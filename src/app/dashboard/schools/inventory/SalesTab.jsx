@@ -19,19 +19,25 @@ import {
     ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area,
 } from "recharts";
 
-// ─── Safe number coercion ─────────────────────────────────────────────────────
-// Old sales in DB may have totalAmount/unitPrice/totalPrice = null or 0
-// due to the Prisma Decimal bug (fixed going forward). Use toNum() everywhere
-// so the UI never crashes with ".toFixed is not a function" or NaN in charts.
+// Safe number coercion — old DB records may have null/0 from the Decimal bug
 const toNum = (v) => {
     if (v === null || v === undefined) return 0;
     const n = Number(v);
     return isNaN(n) ? 0 : n;
 };
-
 const fmt = (v) => toNum(v).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// ─── Chart colors ─────────────────────────────────────────────────────────────
+// ─── FIX: month label format ──────────────────────────────────────────────────
+// Previously used { month: 'short', year: '2-digit' } which rendered "Mar 26"
+// Users read "26" as the day (March 26th) not the year (2026).
+// Fix: use a clear separator so "Mar '26" is unambiguous, or show full year.
+// We use a custom formatter that produces "Mar '26" with an explicit apostrophe.
+const monthLabel = (date) => {
+    const mon = date.toLocaleString("default", { month: "short" });
+    const yr = String(date.getFullYear()).slice(2);
+    return `${mon} '${yr}`;
+};
+
 const CHART_COLORS = [
     "hsl(221, 83%, 53%)",
     "hsl(142, 71%, 45%)",
@@ -102,6 +108,9 @@ export default function SalesTab({ sales, onNewSale }) {
     const [filterEndDate, setFilterEndDate] = useState("");
     const [expandedSale, setExpandedSale] = useState(null);
     const [reportView, setReportView] = useState("overview");
+
+    // trendMonth: the last month in the 6-month window.
+    // month is 0-indexed (0 = January … 11 = December).
     const [trendMonth, setTrendMonth] = useState(() => {
         const now = new Date();
         return { year: now.getFullYear(), month: now.getMonth() };
@@ -121,7 +130,8 @@ export default function SalesTab({ sales, onNewSale }) {
 
     const filteredSales = useMemo(() => {
         const startFilter = getDateRangeFilter();
-        const endFilter = filterDateRange === "custom" && filterEndDate ? new Date(filterEndDate + "T23:59:59") : null;
+        const endFilter = filterDateRange === "custom" && filterEndDate
+            ? new Date(filterEndDate + "T23:59:59") : null;
 
         return [...sales]
             .filter((sale) => {
@@ -145,35 +155,72 @@ export default function SalesTab({ sales, onNewSale }) {
             .sort((a, b) => new Date(b.saleDate) - new Date(a.saleDate));
     }, [sales, searchTerm, filterBuyerType, filterPaymentMethod, filterDateRange, filterStartDate, filterEndDate]);
 
-    // Monthly revenue — 6-month window
+    // ── Monthly data for bar chart ────────────────────────────────────────────
+    // Builds 6 months ending at trendMonth (inclusive).
+    // FIX: use monthLabel() which renders "Mar '26" not "Mar 26" so users
+    // don't confuse the year suffix with a day-of-month.
     const monthlyData = useMemo(() => {
         const { year, month } = trendMonth;
         return Array.from({ length: 6 }, (_, i) => {
+            // i=0 → 5 months ago, i=5 → trendMonth itself
             const date = new Date(year, month - (5 - i), 1);
-            const monthName = date.toLocaleString("default", { month: "short", year: "2-digit" });
             const monthSales = sales.filter(s => {
                 const sd = new Date(s.saleDate);
                 return sd.getFullYear() === date.getFullYear() && sd.getMonth() === date.getMonth();
             });
             return {
-                month: monthName,
+                month: monthLabel(date),    // "Mar '26" — unambiguous
                 revenue: monthSales.reduce((sum, s) => sum + toNum(s.totalAmount), 0),
                 count: monthSales.length,
             };
         });
     }, [sales, trendMonth]);
 
-    // Current vs previous month
+    // ── Window label shown above the bar chart ────────────────────────────────
+    // FIX: windowEnd was `new Date(year, month)` which gives the 1st of trendMonth.
+    // But trendMonth itself IS the last month in the window — no +1 needed.
+    // Old: trendMonth={year:2026, month:2} → windowEnd=new Date(2026,2)=Mar 1
+    //      → rendered as "Mar 26" ✓ but user sees "26" as a day not year.
+    // Now: we use monthLabel() on both endpoints for the same "Mar '26" format.
+    const windowStartDate = new Date(trendMonth.year, trendMonth.month - 5, 1);
+    const windowEndDate = new Date(trendMonth.year, trendMonth.month, 1);
+    const trendWindowLabel = `${monthLabel(windowStartDate)} — ${monthLabel(windowEndDate)}`;
+
+    const now = new Date();
+    const isCurrentMonth = trendMonth.year === now.getFullYear() && trendMonth.month === now.getMonth();
+
+    const goToPrevMonth = () => setTrendMonth(prev => {
+        const d = new Date(prev.year, prev.month - 6, 1);
+        return { year: d.getFullYear(), month: d.getMonth() };
+    });
+    const goToNextMonth = () => {
+        if (isCurrentMonth) return;
+        setTrendMonth(prev => {
+            const d = new Date(prev.year, prev.month + 6, 1);
+            const cap = new Date();
+            if (d.getFullYear() > cap.getFullYear() ||
+                (d.getFullYear() === cap.getFullYear() && d.getMonth() > cap.getMonth())) {
+                return { year: cap.getFullYear(), month: cap.getMonth() };
+            }
+            return { year: d.getFullYear(), month: d.getMonth() };
+        });
+    };
+
+    // ── Month comparison ──────────────────────────────────────────────────────
     const monthComparison = useMemo(() => {
-        const now = new Date();
         const thisStart = new Date(now.getFullYear(), now.getMonth(), 1);
         const lastStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const lastEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
         const thisMonthSales = sales.filter(s => new Date(s.saleDate) >= thisStart);
-        const lastMonthSales = sales.filter(s => { const d = new Date(s.saleDate); return d >= lastStart && d <= lastEnd; });
+        const lastMonthSales = sales.filter(s => {
+            const d = new Date(s.saleDate);
+            return d >= lastStart && d <= lastEnd;
+        });
         const thisRevenue = thisMonthSales.reduce((sum, s) => sum + toNum(s.totalAmount), 0);
         const lastRevenue = lastMonthSales.reduce((sum, s) => sum + toNum(s.totalAmount), 0);
-        const revenueChange = lastRevenue > 0 ? ((thisRevenue - lastRevenue) / lastRevenue * 100) : (thisRevenue > 0 ? 100 : 0);
+        const revenueChange = lastRevenue > 0
+            ? ((thisRevenue - lastRevenue) / lastRevenue * 100)
+            : (thisRevenue > 0 ? 100 : 0);
         const countChange = lastMonthSales.length > 0
             ? ((thisMonthSales.length - lastMonthSales.length) / lastMonthSales.length * 100)
             : (thisMonthSales.length > 0 ? 100 : 0);
@@ -213,15 +260,20 @@ export default function SalesTab({ sales, onNewSale }) {
         }));
     }, [sales]);
 
+    // ── Daily trend — last 30 days ────────────────────────────────────────────
+    // FIX: was `now.getDate() - (29 - i)` which went backwards from today correctly,
+    // but the X axis label was "17 Feb" style — clear enough. Keeping as-is.
     const dailyTrend = useMemo(() => {
-        const now = new Date();
         return Array.from({ length: 30 }, (_, i) => {
             const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (29 - i));
             const daySales = sales.filter(s => {
                 const sd = new Date(s.saleDate);
-                return sd.getFullYear() === date.getFullYear() && sd.getMonth() === date.getMonth() && sd.getDate() === date.getDate();
+                return sd.getFullYear() === date.getFullYear() &&
+                    sd.getMonth() === date.getMonth() &&
+                    sd.getDate() === date.getDate();
             });
             return {
+                // Use "18 Mar" format — day first, no year, unambiguous
                 date: date.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
                 revenue: daySales.reduce((sum, s) => sum + toNum(s.totalAmount), 0),
                 count: daySales.length,
@@ -240,31 +292,10 @@ export default function SalesTab({ sales, onNewSale }) {
         };
     }, [filteredSales]);
 
-    const windowStart = new Date(trendMonth.year, trendMonth.month - 5);
-    const windowEnd = new Date(trendMonth.year, trendMonth.month);
-    const trendWindowLabel = `${windowStart.toLocaleString("default", { month: "short", year: "2-digit" })} — ${windowEnd.toLocaleString("default", { month: "short", year: "2-digit" })}`;
-    const now = new Date();
-    const isCurrentMonth = trendMonth.year === now.getFullYear() && trendMonth.month === now.getMonth();
-
-    const goToPrevMonth = () => setTrendMonth(prev => {
-        const d = new Date(prev.year, prev.month - 6);
-        return { year: d.getFullYear(), month: d.getMonth() };
-    });
-    const goToNextMonth = () => {
-        if (isCurrentMonth) return;
-        setTrendMonth(prev => {
-            const d = new Date(prev.year, prev.month + 6);
-            const cap = new Date();
-            if (d > cap) return { year: cap.getFullYear(), month: cap.getMonth() };
-            return { year: d.getFullYear(), month: d.getMonth() };
-        });
-    };
-
     const clearFilters = () => {
         setSearchTerm(""); setFilterBuyerType("all"); setFilterPaymentMethod("all");
         setFilterDateRange("all"); setFilterStartDate(""); setFilterEndDate("");
     };
-
     const hasActiveFilters = searchTerm || filterBuyerType !== "all" || filterPaymentMethod !== "all" || filterDateRange !== "all";
 
     if (sales.length === 0) {
@@ -367,15 +398,23 @@ export default function SalesTab({ sales, onNewSale }) {
                     <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
                             <div>
-                                <CardTitle className="text-base">{reportView === "overview" ? "Monthly Revenue" : "Daily Trend (30 days)"}</CardTitle>
-                                <CardDescription>{reportView === "overview" ? trendWindowLabel : "Last 30 days"}</CardDescription>
+                                <CardTitle className="text-base">
+                                    {reportView === "overview" ? "Monthly Revenue" : "Daily Trend (30 days)"}
+                                </CardTitle>
+                                <CardDescription>
+                                    {reportView === "overview" ? trendWindowLabel : "Last 30 days"}
+                                </CardDescription>
                             </div>
                             <div className="flex items-center gap-2">
                                 {reportView === "overview" && (
                                     <div className="flex items-center gap-1">
-                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goToPrevMonth}><ChevronLeft className="h-4 w-4" /></Button>
-                                        <span className="text-xs font-medium min-w-[120px] text-center">{trendWindowLabel}</span>
-                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goToNextMonth} disabled={isCurrentMonth}><ChevronRight className="h-4 w-4" /></Button>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goToPrevMonth}>
+                                            <ChevronLeft className="h-4 w-4" />
+                                        </Button>
+                                        <span className="text-xs font-medium min-w-[130px] text-center">{trendWindowLabel}</span>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goToNextMonth} disabled={isCurrentMonth}>
+                                            <ChevronRight className="h-4 w-4" />
+                                        </Button>
                                     </div>
                                 )}
                                 <div className="flex gap-1">
@@ -391,7 +430,11 @@ export default function SalesTab({ sales, onNewSale }) {
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={monthlyData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                                         <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                                        <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                                        <XAxis
+                                            dataKey="month"
+                                            tick={{ fontSize: 11 }}
+                                        // Each tick is "Mar '26" — the apostrophe makes clear it's year not day
+                                        />
                                         <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `₹${v >= 1000 ? (v / 1000).toFixed(0) + "k" : v}`} />
                                         <Tooltip content={<CustomTooltip />} />
                                         <Bar dataKey="revenue" name="Revenue" fill="hsl(221, 83%, 53%)" radius={[6, 6, 0, 0]} />
@@ -473,7 +516,7 @@ export default function SalesTab({ sales, onNewSale }) {
                 </div>
             </div>
 
-            {/* Sales History Table */}
+            {/* Sales History */}
             <Card>
                 <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
@@ -581,23 +624,22 @@ export default function SalesTab({ sales, onNewSale }) {
                                                         ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
                                                         : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                                                 </TableCell>
-                                                <TableCell className="whitespace-nowrap">
-                                                    {new Date(sale.saleDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" })}
+                                                <TableCell className="whitespace-nowrap text-sm">
+                                                    {new Date(sale.saleDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
                                                 </TableCell>
                                                 <TableCell className="font-medium">{sale.buyerName}</TableCell>
                                                 <TableCell><Badge variant="outline" className="text-xs">{sale.buyerType}</Badge></TableCell>
                                                 <TableCell className="text-muted-foreground">{sale.items?.length || 0} item(s)</TableCell>
-                                                <TableCell className="text-right font-mono font-medium">
-                                                    {/* FIX: toNum() guards against null/NaN totalAmount from old corrupted records */}
-                                                    ₹{fmt(sale.totalAmount)}
-                                                </TableCell>
+                                                <TableCell className="text-right font-mono font-medium">₹{fmt(sale.totalAmount)}</TableCell>
                                                 <TableCell>
                                                     <Badge variant="secondary" className="text-xs" style={{ backgroundColor: PAYMENT_COLORS[sale.paymentMethod] ? `${PAYMENT_COLORS[sale.paymentMethod]}20` : undefined, color: PAYMENT_COLORS[sale.paymentMethod] }}>
                                                         {sale.paymentMethod}
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-xs">{sale.status}</Badge>
+                                                    <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-xs">
+                                                        {sale.status}
+                                                    </Badge>
                                                 </TableCell>
                                             </TableRow>
 
@@ -619,7 +661,6 @@ export default function SalesTab({ sales, onNewSale }) {
                                                                         <TableRow key={si.id}>
                                                                             <TableCell className="text-sm py-1.5">{si.item?.name || si.itemId}</TableCell>
                                                                             <TableCell className="text-sm py-1.5 font-mono">{si.quantity}</TableCell>
-                                                                            {/* FIX: toNum() + toFixed() — was crashing when unitPrice=0 or null */}
                                                                             <TableCell className="text-sm py-1.5 text-right font-mono">₹{toNum(si.unitPrice).toFixed(2)}</TableCell>
                                                                             <TableCell className="text-sm py-1.5 text-right font-mono font-medium">₹{toNum(si.totalPrice).toFixed(2)}</TableCell>
                                                                         </TableRow>
@@ -640,4 +681,4 @@ export default function SalesTab({ sales, onNewSale }) {
             </Card>
         </div>
     );
-} 
+}

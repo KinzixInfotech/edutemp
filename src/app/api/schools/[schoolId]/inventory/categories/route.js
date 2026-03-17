@@ -5,13 +5,10 @@ import { remember, invalidatePattern } from "@/lib/cache";
 
 const NS = (schoolId) => `inv:${schoolId}`;
 
-// ─── GET ──────────────────────────────────────────────────────────────────────
 export async function GET(request, { params }) {
     try {
         const { schoolId } = await params;
-
         const cacheKey = `${NS(schoolId)}:categories`;
-
         const categories = await remember(cacheKey, async () => {
             return prisma.inventoryCategory.findMany({
                 where: { schoolId },
@@ -19,7 +16,6 @@ export async function GET(request, { params }) {
                 orderBy: { name: "asc" },
             });
         }, 120);
-
         return NextResponse.json(categories);
     } catch (error) {
         console.error("GET /inventory/categories error:", error);
@@ -27,41 +23,29 @@ export async function GET(request, { params }) {
     }
 }
 
-// ─── POST ─────────────────────────────────────────────────────────────────────
 export async function POST(request, { params }) {
     try {
         const { schoolId } = await params;
         const { name, description } = await request.json();
 
-        if (!name?.trim()) {
+        if (!name?.trim())
             return NextResponse.json({ error: "Category name is required" }, { status: 400 });
-        }
-
-        if (name.trim().length > 100) {
+        if (name.trim().length > 100)
             return NextResponse.json({ error: "Category name must be 100 characters or fewer" }, { status: 400 });
-        }
 
-        // Check for duplicate name within this school
         const existing = await prisma.inventoryCategory.findFirst({
             where: { schoolId, name: { equals: name.trim(), mode: "insensitive" } },
             select: { id: true },
         });
-        if (existing) {
+        if (existing)
             return NextResponse.json({ error: `Category "${name.trim()}" already exists` }, { status: 409 });
-        }
 
         const category = await prisma.inventoryCategory.create({
-            data: {
-                schoolId,
-                name: name.trim(),
-                description: description?.trim() || null,
-            },
+            data: { schoolId, name: name.trim(), description: description?.trim() || null },
             include: { _count: { select: { items: true } } },
         });
 
-        // Only invalidate the categories cache — items/stats are not affected
         await invalidatePattern(`${NS(schoolId)}:categories`);
-
         return NextResponse.json(category, { status: 201 });
     } catch (error) {
         console.error("POST /inventory/categories error:", error);

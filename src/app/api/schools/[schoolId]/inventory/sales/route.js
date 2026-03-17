@@ -6,20 +6,14 @@ import { remember, invalidatePattern } from "@/lib/cache";
 const NS = (schoolId) => `inv:${schoolId}`;
 const DEFAULT_WINDOW_MONTHS = 6;
 
-// ─── Safely coerce any value (Prisma Decimal, string, number) to a JS float ──
-// Prisma Decimal fields come back as Decimal objects from the ORM.
-// In JS arithmetic, Decimal objects behave unpredictably:
-//   - Decimal(0) is an object → TRUTHY → `|| fallback` never fires
-//   - Decimal(750) * 2 → calls valueOf() → "750" * 2 = 1500 (works by accident)
-//   - Decimal(0) * 40  → "0" * 40 = 0 (stored as 0 in DB — root cause of negative profit)
-// Always run all Prisma numeric fields through toNum() before any arithmetic.
+// Safely coerce Prisma Decimal / string / number → plain JS float
+// Decimal(0) is an object → truthy → `|| fallback` never fires without this
 const toNum = (v) => {
     if (v === null || v === undefined) return 0;
     const n = Number(v);
     return isNaN(n) ? 0 : n;
 };
 
-// ─── GET ──────────────────────────────────────────────────────────────────────
 export async function GET(request, { params }) {
     try {
         const { schoolId } = await params;
@@ -36,10 +30,7 @@ export async function GET(request, { params }) {
 
         const sales = await remember(cacheKey, async () => {
             return prisma.inventorySale.findMany({
-                where: {
-                    schoolId,
-                    saleDate: { gte: effectiveStart, lte: effectiveEnd },
-                },
+                where: { schoolId, saleDate: { gte: effectiveStart, lte: effectiveEnd } },
                 include: { items: { include: { item: true } } },
                 orderBy: { saleDate: "desc" },
             });
@@ -52,7 +43,6 @@ export async function GET(request, { params }) {
     }
 }
 
-// ─── POST ─────────────────────────────────────────────────────────────────────
 export async function POST(request, { params }) {
     try {
         const { schoolId } = await params;
@@ -60,13 +50,9 @@ export async function POST(request, { params }) {
         const { buyerName, buyerId, buyerType, items, paymentMethod } = body;
 
         if (!buyerName?.trim() || !items?.length) {
-            return NextResponse.json(
-                { error: "buyerName and at least one item are required" },
-                { status: 400 }
-            );
+            return NextResponse.json({ error: "buyerName and at least one item are required" }, { status: 400 });
         }
 
-        // Cross-school ownership check before opening a transaction
         const itemIds = [...new Set(items.map((i) => i.itemId))];
         const ownedItems = await prisma.inventoryItem.findMany({
             where: { id: { in: itemIds }, schoolId },
@@ -84,41 +70,26 @@ export async function POST(request, { params }) {
 
             for (const item of items) {
                 const inv = await tx.inventoryItem.findUnique({ where: { id: item.itemId } });
-
                 if (!inv) throw Object.assign(new Error(`Item not found: ${item.itemId}`), { status: 404 });
                 if (!inv.isSellable) throw Object.assign(new Error(`"${inv.name}" is not sellable`), { status: 400 });
 
-                // ── CRITICAL: coerce Prisma Decimal to plain JS number BEFORE any check ──
-                // inv.sellingPrice is a Decimal object. Decimal(0) is an OBJECT → truthy.
-                // `Decimal(0) || costPerUnit` returns Decimal(0) — fallback never fires.
-                // This was storing unitPrice=0 in DB → stats showed negative profit.
-                // Fix: explicit numeric comparison after Number() conversion.
+                // FIX: toNum() before comparison — Decimal(0) is truthy so `|| fallback`
+                // would return 0 without this, storing unitPrice=0 in DB (root of -₹41k profit)
                 const sellingPrice = toNum(inv.sellingPrice);
                 const costPerUnit = toNum(inv.costPerUnit);
                 const unitPrice = sellingPrice > 0 ? sellingPrice : costPerUnit;
 
-                // Atomic test-and-decrement — prevents negative stock under concurrency
                 const { count } = await tx.inventoryItem.updateMany({
                     where: { id: item.itemId, quantity: { gte: item.quantity } },
                     data: { quantity: { decrement: item.quantity } },
                 });
                 if (count === 0) {
-                    throw Object.assign(
-                        new Error(`Insufficient stock for "${inv.name}"`),
-                        { status: 409 }
-                    );
+                    throw Object.assign(new Error(`Insufficient stock for "${inv.name}"`), { status: 409 });
                 }
 
-                // Round to 2 decimal places to avoid float accumulation errors
                 const itemTotal = Math.round(unitPrice * item.quantity * 100) / 100;
                 totalAmount += itemTotal;
-
-                saleItems.push({
-                    itemId: item.itemId,
-                    quantity: item.quantity,
-                    unitPrice,                               // plain number, stored correctly
-                    totalPrice: itemTotal,
-                });
+                saleItems.push({ itemId: item.itemId, quantity: item.quantity, unitPrice, totalPrice: itemTotal });
 
                 await tx.inventoryTransaction.create({
                     data: {
@@ -130,7 +101,6 @@ export async function POST(request, { params }) {
                 });
             }
 
-            // Final rounding of totalAmount to avoid float accumulation drift
             totalAmount = Math.round(totalAmount * 100) / 100;
 
             return tx.inventorySale.create({
@@ -143,6 +113,7 @@ export async function POST(request, { params }) {
             });
         });
 
+        // Surgical invalidation using correct NS() prefix
         await Promise.all([
             invalidatePattern(`${NS(schoolId)}:items:*`),
             invalidatePattern(`${NS(schoolId)}:stats`),
