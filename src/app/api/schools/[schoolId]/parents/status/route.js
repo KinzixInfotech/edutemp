@@ -26,7 +26,9 @@ export async function PATCH(req, props) {
             data: { status },
         });
 
-        await invalidatePattern(`parents:*${schoolId}*`);
+        // Invalidate all parent list caches + profile caches
+        await invalidatePattern('parents:list*');
+        await invalidatePattern('parent:profile*');
 
         return NextResponse.json({ success: true });
     } catch (error) {

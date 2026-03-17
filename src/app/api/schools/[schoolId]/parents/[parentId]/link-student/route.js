@@ -78,7 +78,9 @@ export async function PATCH(req, props) {
         // Invalidate caches
         const profileKey = generateKey("parent:profile", { schoolId, parentId });
         await delCache(profileKey);
-        await invalidatePattern(`parents:${schoolId}:*`);
+        await invalidatePattern('parents:list*');
+        await invalidatePattern('parent:profile*');
+        await invalidatePattern('students*');
 
         return NextResponse.json({ success: true, link });
     } catch (error) {
@@ -111,7 +113,9 @@ export async function DELETE(req, props) {
         // Invalidate caches
         const profileKey = generateKey("parent:profile", { schoolId, parentId });
         await delCache(profileKey);
-        await invalidatePattern(`parents:${schoolId}:*`);
+        await invalidatePattern('parents:list*');
+        await invalidatePattern('parent:profile*');
+        await invalidatePattern('students*');
 
         return NextResponse.json({ success: true });
     } catch (error) {

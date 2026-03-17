@@ -106,7 +106,7 @@ export default function HomePage() {
 // Hero Section - Typewriter Animation with Glowing Cursor
 function HeroSection() {
     const [isVideoOpen, setIsVideoOpen] = useState(false);
-    const videoSrc = "https://www.youtube.com/embed/Zzjt4PxEd9k?si=jiNdA82wruE5wien&rel=0";
+    const videoSrc = "https://www.youtube.com/embed/Jj1yQMCjE9c?si=8e3HihKJEpKjZaOO";
 
     const line1Ref = useRef(null);
     const line2Ref = useRef(null);

@@ -92,7 +92,10 @@ export async function DELETE(req, props) {
             }),
         ]);
 
-        await invalidatePattern(`parents:*${schoolId}*`);
+        // Invalidate all parent list caches + profile caches + search caches
+        await invalidatePattern('parents:list*');
+        await invalidatePattern('parent:profile*');
+        await invalidatePattern('parents:search*');
 
         return NextResponse.json({ success: true });
     } catch (error) {

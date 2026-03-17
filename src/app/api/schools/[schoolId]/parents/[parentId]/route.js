@@ -128,9 +128,10 @@ export async function PATCH(req, props) {
         const cacheKey = generateKey('parent:profile', { schoolId, parentId });
         await setCache(cacheKey, null, 1); // expire in 1 second = effectively invalidate
 
-        // Invalidate parent list caches for this school
-        await invalidatePattern(`parents:list:schoolId:${schoolId}*`);
-        await invalidatePattern(`parents:detail:schoolId:${schoolId}*`);
+        // Invalidate parent list caches + profile caches
+        await invalidatePattern('parents:list*');
+        await invalidatePattern('parent:profile*');
+        await invalidatePattern('parents:search*');
 
         return NextResponse.json(updated);
     } catch (error) {

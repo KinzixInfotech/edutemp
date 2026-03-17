@@ -120,3 +120,116 @@ export async function GET(req, props) {
     }
 }
 
+export async function DELETE(req, props) {
+    const params = await props.params;
+    const { schoolId } = params;
+
+    if (!schoolId) {
+        return NextResponse.json({ error: "School ID is required" }, { status: 400 });
+    }
+
+    try {
+        const body = await req.json();
+        const { studentIds } = body;
+
+        if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
+            return NextResponse.json({ error: "studentIds array is required" }, { status: 400 });
+        }
+
+        // Verify all students belong to this school
+        const studentRecords = await prisma.student.findMany({
+            where: { userId: { in: studentIds }, schoolId },
+            select: { userId: true },
+        });
+
+        const validIds = studentRecords.map((s) => s.userId);
+        if (validIds.length === 0) {
+            return NextResponse.json({ error: "No valid students found for this school" }, { status: 404 });
+        }
+
+        // Cascade delete within a transaction
+        await prisma.$transaction(async (tx) => {
+            // 1. Delete student-parent links
+            await tx.studentParentLink.deleteMany({
+                where: { studentId: { in: validIds } },
+            });
+
+            // 2. Delete homework submissions
+            await tx.homeworkSubmission.deleteMany({
+                where: { studentId: { in: validIds } },
+            });
+
+            // 3. Delete exam results
+            await tx.examResult.deleteMany({
+                where: { studentId: { in: validIds } },
+            });
+
+            // 4. Delete student exam attempts
+            await tx.studentExamAttempt.deleteMany({
+                where: { studentId: { in: validIds } },
+            });
+
+            // 5. Delete exam issues
+            await tx.examIssue.deleteMany({
+                where: { studentId: { in: validIds } },
+            });
+
+            // 6. Delete student fee structures
+            await tx.studentFeeStructure.deleteMany({
+                where: { studentId: { in: validIds } },
+            });
+
+            // 7. Delete fee payments
+            await tx.feePayment.deleteMany({
+                where: { studentId: { in: validIds } },
+            });
+
+            // 8. Delete student fees
+            await tx.studentFee.deleteMany({
+                where: { studentId: { in: validIds } },
+            });
+
+            // 9. Delete fee reminders
+            await tx.feeReminder.deleteMany({
+                where: { studentId: { in: validIds } },
+            });
+
+            // 10. Delete attendance records
+            await tx.attendance.deleteMany({
+                where: { userId: { in: validIds } },
+            });
+
+            // 11. Delete transport assignments
+            await tx.studentRouteAssignment.deleteMany({
+                where: { studentId: { in: validIds } },
+            });
+
+            // 12. Delete student records
+            await tx.student.deleteMany({
+                where: { userId: { in: validIds } },
+            });
+
+            // 13. Soft-delete User records
+            await tx.user.updateMany({
+                where: { id: { in: validIds } },
+                data: { deletedAt: new Date(), status: "INACTIVE" },
+            });
+        });
+
+        // Invalidate student caches
+        await invalidatePattern("students*");
+        await invalidatePattern("student:*");
+
+        return NextResponse.json({
+            success: true,
+            message: `${validIds.length} student(s) deleted successfully`,
+            deletedCount: validIds.length,
+        });
+    } catch (error) {
+        console.error("❌ Delete students error:", error);
+        return NextResponse.json(
+            { error: "Failed to delete students", message: error.message },
+            { status: 500 }
+        );
+    }
+}
