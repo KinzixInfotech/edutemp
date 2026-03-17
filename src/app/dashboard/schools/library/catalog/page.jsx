@@ -125,7 +125,7 @@ export default function LibraryManagementPage() {
         queryFn: async () => (await axios.get(`/api/schools/${schoolId}/library/stats`)).data,
         enabled: !!schoolId,
         staleTime: 30_000,
-        refetchOnWindowFocus: true,
+        refetchOnWindowFocus: false,
     });
 
     // Books: fresh 10s, refetch on window focus
@@ -144,7 +144,7 @@ export default function LibraryManagementPage() {
         enabled: !!schoolId,
         placeholderData: keepPreviousData,
         staleTime: 10_000,
-        refetchOnWindowFocus: true,
+        refetchOnWindowFocus: false,
     });
 
     const books = booksResponse?.data || [];
