@@ -1,128 +1,130 @@
+// app/api/schools/[schoolId]/inventory/items/[itemId]/route.js
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { remember, invalidatePattern } from "@/lib/cache";
 
-// GET single inventory item
+const NS = (schoolId) => `inv:${schoolId}`;
+
+const MAX_FIELD_LEN = { name: 200, unit: 50, vendorName: 200, vendorContact: 100, location: 200 };
+
+function validateLengths(fields) {
+    for (const [field, max] of Object.entries(MAX_FIELD_LEN)) {
+        if (fields[field] && String(fields[field]).length > max) {
+            return `${field} must be ${max} characters or fewer`;
+        }
+    }
+    return null;
+}
+
+// ─── GET: single item ─────────────────────────────────────────────────────────
 export async function GET(request, { params }) {
     try {
         const { schoolId, itemId } = await params;
 
-        const item = await prisma.inventoryItem.findFirst({
-            where: {
-                id: itemId,
-                schoolId,
-            },
-            include: {
-                category: true,
-            },
-        });
+        const cacheKey = `${NS(schoolId)}:item:${itemId}`;
+        const item = await remember(cacheKey, async () => {
+            return prisma.inventoryItem.findUnique({ where: { id: itemId, schoolId } });
+        }, 120);
 
-        if (!item) {
-            return NextResponse.json(
-                { error: "Item not found" },
-                { status: 404 }
-            );
-        }
-
+        if (!item) return NextResponse.json({ error: "Item not found" }, { status: 404 });
         return NextResponse.json(item);
     } catch (error) {
-        console.error("Error fetching inventory item:", error);
-        return NextResponse.json(
-            { error: "Failed to fetch item" },
-            { status: 500 }
-        );
+        console.error("GET /inventory/items/[itemId] error:", error);
+        return NextResponse.json({ error: "Failed to fetch item" }, { status: 500 });
     }
 }
 
-// UPDATE inventory item
+// ─── PUT: Update ──────────────────────────────────────────────────────────────
 export async function PUT(request, { params }) {
     try {
         const { schoolId, itemId } = await params;
         const body = await request.json();
 
         const {
-            name,
-            categoryId,
-            quantity,
-            unit,
-            purchaseDate,
-            costPerUnit,
-            sellingPrice,
-            isSellable,
-            vendorName,
-            vendorContact,
-            location,
-            status,
-            imageUrl,
+            name, categoryId, quantity, unit, purchaseDate,
+            costPerUnit, sellingPrice, isSellable,
+            vendorName, vendorContact, location, status, imageUrl,
         } = body;
 
-        // Handle empty categoryId - convert to null if empty string
-        const validCategoryId = categoryId && categoryId.trim() !== "" ? categoryId : null;
+        // FIX: length validation
+        const lenError = validateLengths({ name, unit, vendorName, vendorContact, location });
+        if (lenError) return NextResponse.json({ error: lenError }, { status: 400 });
 
-        const updatedItem = await prisma.inventoryItem.update({
-            where: {
-                id: itemId,
-                schoolId,
-            },
-            data: {
-                name,
-                categoryId: validCategoryId,
-                quantity: parseInt(quantity) || 0,
-                unit,
-                purchaseDate: purchaseDate ? new Date(purchaseDate) : null,
-                costPerUnit: parseFloat(costPerUnit) || 0,
-                sellingPrice: parseFloat(sellingPrice) || null,
-                isSellable: Boolean(isSellable),
-                vendorName,
-                vendorContact,
-                location,
-                status,
-                imageUrl: imageUrl || null,
-            },
-        });
+        // FIX: categoryId cross-school ownership check
+        if (categoryId?.trim()) {
+            const cat = await prisma.inventoryCategory.findUnique({
+                where: { id: categoryId.trim() },
+                select: { schoolId: true },
+            });
+            if (!cat || cat.schoolId !== schoolId) {
+                return NextResponse.json({ error: "Category not found" }, { status: 400 });
+            }
+        }
+
+        // FIX: single round-trip — no pre-fetch findUnique.
+        // Prisma throws P2025 ("Record not found") if the item doesn't exist.
+        // We catch that specifically and return 404 — one DB call instead of two.
+        let updatedItem;
+        try {
+            updatedItem = await prisma.inventoryItem.update({
+                where: { id: itemId, schoolId }, // schoolId in where = ownership check
+                data: {
+                    ...(name !== undefined && { name: name.trim() }),
+                    ...(categoryId !== undefined && { categoryId: categoryId?.trim() || null }),
+                    ...(quantity !== undefined && { quantity: parseInt(quantity) }),
+                    ...(unit !== undefined && { unit: unit.trim() }),
+                    ...(purchaseDate !== undefined && { purchaseDate: new Date(purchaseDate) }),
+                    ...(costPerUnit !== undefined && { costPerUnit: parseFloat(costPerUnit) }),
+                    ...(sellingPrice !== undefined && { sellingPrice: parseFloat(sellingPrice) }),
+                    ...(isSellable !== undefined && { isSellable }),
+                    ...(vendorName !== undefined && { vendorName: vendorName?.trim() }),
+                    ...(vendorContact !== undefined && { vendorContact: vendorContact?.trim() }),
+                    ...(location !== undefined && { location: location?.trim() }),
+                    ...(status !== undefined && { status: status.toUpperCase() }),
+                    ...(imageUrl !== undefined && { imageUrl: imageUrl || null }),
+                },
+            });
+        } catch (e) {
+            if (e.code === "P2025") return NextResponse.json({ error: "Item not found" }, { status: 404 });
+            throw e;
+        }
+
+        // Surgical invalidation — categories unaffected by item updates
+        await Promise.all([
+            invalidatePattern(`${NS(schoolId)}:items:*`),
+            invalidatePattern(`${NS(schoolId)}:stats`),
+        ]);
 
         return NextResponse.json(updatedItem);
     } catch (error) {
-        console.error("Error updating inventory item:", error);
-        return NextResponse.json(
-            { error: "Failed to update item" },
-            { status: 500 }
-        );
+        console.error("PUT /inventory/items/[itemId] error:", error);
+        return NextResponse.json({ error: "Failed to update item" }, { status: 500 });
     }
 }
 
-// DELETE inventory item
+// ─── DELETE ───────────────────────────────────────────────────────────────────
 export async function DELETE(request, { params }) {
     try {
         const { schoolId, itemId } = await params;
 
-        // Check if item exists
-        const item = await prisma.inventoryItem.findFirst({
-            where: {
-                id: itemId,
-                schoolId,
-            },
-        });
-
-        if (!item) {
-            return NextResponse.json(
-                { error: "Item not found" },
-                { status: 404 }
-            );
+        // FIX: single round-trip — catch P2025 instead of pre-fetching
+        try {
+            await prisma.inventoryItem.delete({
+                where: { id: itemId, schoolId }, // schoolId in where = ownership check
+            });
+        } catch (e) {
+            if (e.code === "P2025") return NextResponse.json({ error: "Item not found" }, { status: 404 });
+            throw e;
         }
 
-        // Delete the item
-        await prisma.inventoryItem.delete({
-            where: {
-                id: itemId,
-            },
-        });
+        await Promise.all([
+            invalidatePattern(`${NS(schoolId)}:items:*`),
+            invalidatePattern(`${NS(schoolId)}:stats`),
+        ]);
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error("Error deleting inventory item:", error);
-        return NextResponse.json(
-            { error: "Failed to delete item" },
-            { status: 500 }
-        );
+        console.error("DELETE /inventory/items/[itemId] error:", error);
+        return NextResponse.json({ error: "Failed to delete item" }, { status: 500 });
     }
 }
