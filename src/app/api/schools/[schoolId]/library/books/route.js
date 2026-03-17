@@ -11,8 +11,11 @@ export async function GET(request, { params }) {
         const category = searchParams.get("category");
         const page = searchParams.get("page") ? parseInt(searchParams.get("page")) : null;
         const limit = searchParams.get("limit") ? parseInt(searchParams.get("limit")) : null;
+        
+        const sortColumn = searchParams.get("sortColumn");
+        const sortDirection = searchParams.get("sortDirection") === "desc" ? "desc" : "asc";
 
-        const cacheKey = generateKey('library:books', { schoolId, search, category, page, limit });
+        const cacheKey = generateKey('library:books', { schoolId, search, category, page, limit, sortColumn, sortDirection });
 
         const result = await remember(cacheKey, async () => {
             const where = {
@@ -27,19 +30,25 @@ export async function GET(request, { params }) {
                 ...(category && category !== "all" && { category }),
             };
 
+            // Validate sort column to prevent injection
+            const validSortColumns = ['title', 'author', 'category', 'createdAt'];
+            const validSortColumn = validSortColumns.includes(sortColumn) ? sortColumn : 'createdAt';
+
             // Build query options - only apply pagination if both page and limit are specified
             const queryOptions = {
                 where,
                 include: {
                     copies: true,
                 },
-                orderBy: { createdAt: "desc" },
+                orderBy: { [validSortColumn]: sortDirection },
             };
 
             // Apply pagination only if explicitly requested
+            let total = null;
             if (page && limit) {
                 queryOptions.skip = (page - 1) * limit;
                 queryOptions.take = limit;
+                total = await prisma.libraryBook.count({ where });
             }
 
             // Fetch books
@@ -57,6 +66,14 @@ export async function GET(request, { params }) {
                     availableCopies,
                 };
             });
+
+            if (page && limit) {
+                return {
+                    data: enhancedBooks,
+                    total,
+                    totalPages: Math.ceil(total / limit)
+                };
+            }
 
             return enhancedBooks;
         }, 5);

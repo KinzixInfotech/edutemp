@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,7 @@ import {
     BookMarked,
     Trash2,
     Eye,
+    Edit,
     MoreHorizontal,
     ArrowUpDown,
     ChevronLeft,
@@ -72,6 +73,84 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
+
+// ─── Helper: format large numbers nicely ───────────────────────────────────────
+function formatNumber(n) {
+    if (n === undefined || n === null) return "0";
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+    return n.toLocaleString();
+}
+
+// ─── Donut chart matching inventory page style ─────────────────────────────────
+const AVAILABILITY_COLORS = ["#22c55e", "#ef4444"]; // green, red — same palette as inventory
+
+function CopiesDonutChart({ availableCopies, issuedCopies, totalCopies }) {
+    const data = [
+        { name: "Available", value: availableCopies || 0 },
+        { name: "Issued / Not Available", value: issuedCopies || 0 },
+    ];
+
+    const CustomTooltip = ({ active, payload }) => {
+        if (active && payload && payload.length) {
+            const item = payload[0];
+            const pct = totalCopies ? ((item.value / totalCopies) * 100).toFixed(1) : 0;
+            return (
+                <div className="bg-popover border border-border rounded-lg px-3 py-2 shadow-md text-sm">
+                    <p className="font-medium text-foreground">{item.name}</p>
+                    <p className="text-muted-foreground">
+                        {item.value.toLocaleString()} copies ({pct}%)
+                    </p>
+                </div>
+            );
+        }
+        return null;
+    };
+
+    return (
+        <div className="flex flex-col items-center">
+            <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                    <Pie
+                        data={data}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={85}
+                        paddingAngle={3}
+                        dataKey="value"
+                        strokeWidth={0}
+                    >
+                        {data.map((_, index) => (
+                            <Cell key={`cell-${index}`} fill={AVAILABILITY_COLORS[index]} />
+                        ))}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip />} />
+                </PieChart>
+            </ResponsiveContainer>
+
+            {/* Legend — same style as inventory "By Payment Method" card */}
+            <div className="w-full space-y-2 mt-1 px-2">
+                {data.map((entry, index) => {
+                    const pct = totalCopies ? ((entry.value / totalCopies) * 100).toFixed(1) : "0.0";
+                    return (
+                        <div key={entry.name} className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                                <span
+                                    className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                    style={{ backgroundColor: AVAILABILITY_COLORS[index] }}
+                                />
+                                <span className="text-muted-foreground">{entry.name}</span>
+                            </div>
+                            <span className="font-medium text-foreground">{pct}%</span>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
 
 export default function LibraryManagementPage() {
     const { fullUser } = useAuth();
@@ -82,6 +161,8 @@ export default function LibraryManagementPage() {
     const [search, setSearch] = useState("");
     const [categoryFilter, setCategoryFilter] = useState("all");
     const [isAddBookOpen, setIsAddBookOpen] = useState(false);
+    const [isEditBookOpen, setIsEditBookOpen] = useState(false);
+    const [editBookForm, setEditBookForm] = useState(null);
     const [isAddCopiesOpen, setIsAddCopiesOpen] = useState(false);
     const [selectedBook, setSelectedBook] = useState(null);
     const [isRequestBookOpen, setIsRequestBookOpen] = useState(false);
@@ -125,18 +206,28 @@ export default function LibraryManagementPage() {
         enabled: !!schoolId,
     });
 
-    // Fetch books with server-side search
-    const { data: books = [], isLoading, refetch } = useQuery({
-        queryKey: ["library-books", schoolId, search, categoryFilter],
+    // Fetch books with server-side pagination, sorting, and search
+    const { data: booksResponse, isLoading, refetch } = useQuery({
+        queryKey: ["library-books", schoolId, search, categoryFilter, currentPage, pageSize, sortColumn, sortDirection],
         queryFn: async () => {
             const params = new URLSearchParams();
             if (search) params.set("search", search);
             if (categoryFilter && categoryFilter !== "all") params.set("category", categoryFilter);
+            params.set("page", currentPage);
+            params.set("limit", pageSize);
+            params.set("sortColumn", sortColumn);
+            params.set("sortDirection", sortDirection);
+
             const res = await axios.get(`/api/schools/${schoolId}/library/books?${params}`);
-            return res.data || [];
+            return res.data;
         },
         enabled: !!schoolId,
+        placeholderData: keepPreviousData,
     });
+
+    const books = booksResponse?.data || [];
+    const totalPages = booksResponse?.totalPages || 1;
+    const totalBooks = booksResponse?.total || 0;
 
     // Add book mutation
     const addBookMutation = useMutation({
@@ -193,6 +284,43 @@ export default function LibraryManagementPage() {
         },
     });
 
+    // Edit book mutation
+    const editBookMutation = useMutation({
+        mutationFn: async (data) => {
+            return axios.put(`/api/schools/${schoolId}/library/books/${data.id}`, data);
+        },
+        onMutate: async (updatedBook) => {
+            await queryClient.cancelQueries({ queryKey: ["library-books"] });
+            const previousData = queryClient.getQueryData(["library-books", schoolId, search, categoryFilter, currentPage, pageSize, sortColumn, sortDirection]);
+            queryClient.setQueryData(
+                ["library-books", schoolId, search, categoryFilter, currentPage, pageSize, sortColumn, sortDirection],
+                (old) => {
+                    if (!old || !old.data) return old;
+                    return {
+                        ...old,
+                        data: old.data.map((book) =>
+                            book.id === updatedBook.id ? { ...book, ...updatedBook } : book
+                        ),
+                    };
+                }
+            );
+            return { previousData };
+        },
+        onError: (err, newBook, context) => {
+            queryClient.setQueryData(
+                ["library-books", schoolId, search, categoryFilter, currentPage, pageSize, sortColumn, sortDirection],
+                context.previousData
+            );
+            toast.error(err.response?.data?.error || "Failed to edit book");
+        },
+        onSuccess: () => {
+            toast.success("Book updated successfully");
+            setIsEditBookOpen(false);
+            queryClient.invalidateQueries({ queryKey: ["library-books"] });
+            queryClient.invalidateQueries({ queryKey: ["library-stats"] });
+        },
+    });
+
     // Delete book mutation
     const deleteBookMutation = useMutation({
         mutationFn: async (bookId) => {
@@ -229,60 +357,9 @@ export default function LibraryManagementPage() {
         setCurrentPage(1);
     };
 
-    // Get unique categories from books
     const categories = useMemo(() => {
         return [...new Set(books.map((b) => b.category).filter(Boolean))];
     }, [books]);
-
-    // Sort and paginate books
-    const processedBooks = useMemo(() => {
-        let sorted = [...books];
-
-        sorted.sort((a, b) => {
-            let aVal, bVal;
-            switch (sortColumn) {
-                case "title":
-                    aVal = a.title || "";
-                    bVal = b.title || "";
-                    break;
-                case "author":
-                    aVal = a.author || "";
-                    bVal = b.author || "";
-                    break;
-                case "category":
-                    aVal = a.category || "";
-                    bVal = b.category || "";
-                    break;
-                case "available":
-                    aVal = a.availableCopies || 0;
-                    bVal = b.availableCopies || 0;
-                    break;
-                case "total":
-                    aVal = a.totalCopies || 0;
-                    bVal = b.totalCopies || 0;
-                    break;
-                default:
-                    aVal = a.title || "";
-                    bVal = b.title || "";
-            }
-
-            if (typeof aVal === "string") {
-                return sortDirection === "asc"
-                    ? aVal.localeCompare(bVal)
-                    : bVal.localeCompare(aVal);
-            }
-            return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
-        });
-
-        return sorted;
-    }, [books, sortColumn, sortDirection]);
-
-    // Pagination
-    const totalPages = Math.ceil(processedBooks.length / pageSize);
-    const paginatedBooks = processedBooks.slice(
-        (currentPage - 1) * pageSize,
-        currentPage * pageSize
-    );
 
     const handleSort = (column) => {
         if (sortColumn === column) {
@@ -315,7 +392,6 @@ export default function LibraryManagementPage() {
         return <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200">{available} / {total}</Badge>;
     };
 
-    // Table loading skeleton rows
     const TableLoadingRows = () => (
         <>
             {[1, 2, 3, 4, 5].map((i) => (
@@ -339,6 +415,11 @@ export default function LibraryManagementPage() {
             </div>
         );
     }
+
+    // Derived stats for chart
+    const totalCopies = stats?.totalCopies || 0;
+    const issuedCopies = stats?.issuedCopies || 0;
+    const availableCopies = stats?.availableCopies || 0;
 
     return (
         <div className="p-6 space-y-6">
@@ -449,50 +530,81 @@ export default function LibraryManagementPage() {
 
             <Separator />
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {/* ── Stats + Chart Row ─────────────────────────────────────────────── */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                {/* Left: 4 stat cards stacked 2×2 */}
+                <div className="lg:col-span-2 grid grid-cols-2 gap-4">
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="text-sm font-medium">Total Books</CardTitle>
+                            <Book className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{(stats?.totalBooks || 0).toLocaleString()}</div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                {formatNumber(totalCopies)} total copies
+                            </p>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="text-sm font-medium">Books Issued</CardTitle>
+                            <BookOpen className="h-4 w-4 text-blue-500" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold text-blue-600">{issuedCopies.toLocaleString()}</div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                {formatNumber(availableCopies)} available
+                            </p>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="text-sm font-medium">Overdue Books</CardTitle>
+                            <AlertCircle className="h-4 w-4 text-red-500" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold text-red-600">{(stats?.overdueBooks || 0).toLocaleString()}</div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="text-sm font-medium">Fines Collected</CardTitle>
+                            <DollarSign className="h-4 w-4 text-green-500" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold text-green-600">
+                                ₹{stats?.totalFinesCollected?.toFixed(2) || "0.00"}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Right: Copies Availability Donut Chart — matches inventory "By Payment Method" card */}
                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium">Total Books</CardTitle>
-                        <Book className="h-4 w-4 text-muted-foreground" />
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">Copies Availability</CardTitle>
+                        <CardDescription className="text-xs">
+                            {formatNumber(totalCopies)} total copies
+                        </CardDescription>
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{stats?.totalBooks || 0}</div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            {stats?.totalCopies || 0} total copies
-                        </p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium">Books Issued</CardTitle>
-                        <BookOpen className="h-4 w-4 text-blue-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-blue-600">{stats?.issuedCopies || 0}</div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            {stats?.availableCopies || 0} available
-                        </p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium">Overdue Books</CardTitle>
-                        <AlertCircle className="h-4 w-4 text-red-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-red-600">{stats?.overdueBooks || 0}</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium">Fines Collected</CardTitle>
-                        <DollarSign className="h-4 w-4 text-green-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-green-600">
-                            ₹{stats?.totalFinesCollected?.toFixed(2) || 0}
-                        </div>
+                    <CardContent className="pt-0">
+                        {totalCopies === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-48 text-muted-foreground text-sm gap-2">
+                                <Book className="w-8 h-8 opacity-30" />
+                                <p>No copies yet</p>
+                            </div>
+                        ) : (
+                            <CopiesDonutChart
+                                availableCopies={availableCopies}
+                                issuedCopies={issuedCopies}
+                                totalCopies={totalCopies}
+                            />
+                        )}
                     </CardContent>
                 </Card>
             </div>
@@ -536,7 +648,7 @@ export default function LibraryManagementPage() {
                 <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                         <div>
-                            <CardTitle>Books ({processedBooks.length})</CardTitle>
+                            <CardTitle>Books ({totalBooks.toLocaleString()})</CardTitle>
                             <CardDescription>All books in the library catalog</CardDescription>
                         </div>
                         <div className="flex items-center gap-2">
@@ -571,7 +683,7 @@ export default function LibraryManagementPage() {
                             <TableBody>
                                 {isLoading ? (
                                     <TableLoadingRows />
-                                ) : paginatedBooks.length === 0 ? (
+                                ) : books.length === 0 ? (
                                     <TableRow>
                                         <TableCell colSpan={7} className="text-center py-12">
                                             <div className="flex flex-col items-center gap-2">
@@ -584,7 +696,7 @@ export default function LibraryManagementPage() {
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    paginatedBooks.map((book, index) => (
+                                    books.map((book, index) => (
                                         <TableRow key={book.id} className={`hover:bg-muted/30 dark:hover:bg-background/30 ${index % 2 === 0 ? "bg-muted dark:bg-background/50" : ""}`}>
                                             <TableCell className="font-medium">{book.title}</TableCell>
                                             <TableCell className="text-muted-foreground">{book.author}</TableCell>
@@ -626,6 +738,24 @@ export default function LibraryManagementPage() {
                                                                 Request Book
                                                             </DropdownMenuItem>
                                                         )}
+                                                        <DropdownMenuItem onClick={() => {
+                                                            setSelectedBook(book);
+                                                            setEditBookForm({
+                                                                id: book.id,
+                                                                title: book.title || "",
+                                                                author: book.author || "",
+                                                                ISBN: book.ISBN || "",
+                                                                category: book.category || "",
+                                                                publisher: book.publisher || "",
+                                                                edition: book.edition || "",
+                                                                description: book.description || "",
+                                                                coverImage: book.coverImage || "",
+                                                            });
+                                                            setIsEditBookOpen(true);
+                                                        }}>
+                                                            <Edit className="w-4 h-4 mr-2" />
+                                                            Edit
+                                                        </DropdownMenuItem>
                                                         <DropdownMenuSeparator />
                                                         <DropdownMenuItem
                                                             className="text-red-600"
@@ -651,7 +781,7 @@ export default function LibraryManagementPage() {
                     {totalPages > 1 && (
                         <div className="flex items-center justify-between mt-4">
                             <p className="text-sm text-muted-foreground">
-                                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, processedBooks.length)} of {processedBooks.length} books
+                                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalBooks)} of {totalBooks.toLocaleString()} books
                             </p>
                             <div className="flex items-center gap-2">
                                 <Button
@@ -700,6 +830,83 @@ export default function LibraryManagementPage() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* Edit Book Dialog */}
+            <Dialog open={isEditBookOpen} onOpenChange={setIsEditBookOpen}>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Edit Book</DialogTitle>
+                    </DialogHeader>
+                    {editBookForm && (
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Title *</Label>
+                                <Input
+                                    value={editBookForm.title}
+                                    onChange={(e) => setEditBookForm({ ...editBookForm, title: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Author *</Label>
+                                <Input
+                                    value={editBookForm.author}
+                                    onChange={(e) => setEditBookForm({ ...editBookForm, author: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-2 col-span-2 sm:col-span-1">
+                                <Label>Category</Label>
+                                <Input
+                                    value={editBookForm.category}
+                                    onChange={(e) => setEditBookForm({ ...editBookForm, category: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Publisher</Label>
+                                <Input
+                                    value={editBookForm.publisher}
+                                    onChange={(e) => setEditBookForm({ ...editBookForm, publisher: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Edition</Label>
+                                <Input
+                                    value={editBookForm.edition}
+                                    onChange={(e) => setEditBookForm({ ...editBookForm, edition: e.target.value })}
+                                />
+                            </div>
+                            <div className="col-span-2 space-y-2">
+                                <Label>Description</Label>
+                                <Textarea
+                                    value={editBookForm.description}
+                                    onChange={(e) => setEditBookForm({ ...editBookForm, description: e.target.value })}
+                                    rows={3}
+                                />
+                            </div>
+                            <div className="col-span-2 space-y-2">
+                                <Label>Cover Image URL</Label>
+                                <Input
+                                    value={editBookForm.coverImage}
+                                    onChange={(e) => setEditBookForm({ ...editBookForm, coverImage: e.target.value })}
+                                />
+                            </div>
+                        </div>
+                    )}
+                    <Button
+                        onClick={() => editBookMutation.mutate(editBookForm)}
+                        className="w-full mt-4"
+                        disabled={editBookMutation.isPending}
+                    >
+                        {editBookMutation.isPending ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Saving...
+                            </>
+                        ) : (
+                            "Save Changes"
+                        )}
+                    </Button>
+                </DialogContent>
+            </Dialog>
 
             {/* Add Copies Dialog */}
             <Dialog open={isAddCopiesOpen} onOpenChange={setIsAddCopiesOpen}>

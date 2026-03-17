@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { invalidatePattern } from "@/lib/cache";
 
 export async function GET(req, props) {
     const params = await props.params;
@@ -150,6 +151,50 @@ export async function DELETE(req, props) {
         console.error("Error deleting book:", error);
         return NextResponse.json(
             { error: "Failed to delete book" },
+            { status: 500 }
+        );
+    }
+}
+
+// PUT - Update a book
+export async function PUT(req, props) {
+    const params = await props.params;
+    try {
+        const { schoolId, bookId } = params;
+        const body = await req.json();
+        const { title, author, category, publisher, edition, description, coverImage } = body;
+
+        if (!title || !author) {
+            return NextResponse.json(
+                { error: "Title and Author are required" },
+                { status: 400 }
+            );
+        }
+
+        const updatedBook = await prisma.libraryBook.update({
+            where: {
+                id: bookId,
+                schoolId: schoolId,
+            },
+            data: {
+                title,
+                author,
+                category: category || "General",
+                publisher,
+                edition,
+                description,
+                coverImage,
+            },
+        });
+
+        await invalidatePattern(`library:books:*${schoolId}*`);
+        await invalidatePattern(`library:stats:*${schoolId}*`);
+
+        return NextResponse.json(updatedBook);
+    } catch (error) {
+        console.error("Error updating book:", error);
+        return NextResponse.json(
+            { error: "Failed to update book" },
             { status: 500 }
         );
     }
