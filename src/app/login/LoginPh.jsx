@@ -521,8 +521,8 @@ export default function LoginPhoto() {
                                     </button>
                                     {/* Turnstile Widget - Hidden in development */}
                                     {process.env.NODE_ENV !== 'development' && (
-                                        <div className="pt-3 w-full overflow-hidden" style={{ height: '65px' }}>
-                                            <div style={{ transform: 'scaleX(1.2)', transformOrigin: 'center top' }}>
+                                        <div className="flex items-center justify-center">
+                                            <div>
                                                 <Turnstile
                                                     sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
                                                     onVerify={(token) => setTurnstileToken(token)}

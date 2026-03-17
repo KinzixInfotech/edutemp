@@ -112,12 +112,127 @@ const Hero = () => {
     const hasFetchedLocation = useRef(false);
 
     // ─── Fetch nearby schools ───
+    // const fetchNearbySchools = useCallback(async (skipCache = false) => {
+    //     if (hasFetchedLocation.current && !skipCache && nearbySchools.length > 0) return;
+    //     hasFetchedLocation.current = true;
+    //     setLocationError("");
+
+    //     // Serve stale cache immediately while revalidating in background
+    //     const cached = getLocationCache();
+    //     if (cached && !skipCache) {
+    //         setUserCity(cached.city);
+    //         setNearbySchools(cached.schools);
+    //     }
+
+    //     if (!navigator.geolocation) {
+    //         setLocationError("Geolocation is not supported by your browser.");
+    //         return;
+    //     }
+
+    //     if (!cached || skipCache) setLocationLoading(true);
+
+    //     navigator.geolocation.getCurrentPosition(
+    //         async (position) => {
+    //             try {
+    //                 const { latitude, longitude } = position.coords;
+
+    //                 if (process.env.NODE_ENV !== 'production') {
+    //                     console.log('[Location] Coords:', latitude, longitude);
+    //                 }
+
+    //                 const geoRes = await fetch(`/api/location/reverse?lat=${latitude}&lon=${longitude}`);
+    //                 if (!geoRes.ok) throw new Error(`Geocode error: ${geoRes.status}`);
+    //                 const geoData = await geoRes.json();
+    //                 const address = geoData?.address || {};
+
+    //                 if (process.env.NODE_ENV !== 'production') {
+    //                     console.log('[Location] Address fields:', address);
+    //                 }
+
+    //                 const displayCity = extractDisplayCity(address);
+    //                 const searchTerms = extractSearchTerms(address);
+
+    //                 if (process.env.NODE_ENV !== 'production') {
+    //                     console.log('[Location] Display city:', displayCity);
+    //                     console.log('[Location] Search terms:', searchTerms);
+    //                 }
+
+    //                 setUserCity(displayCity);
+
+    //                 if (searchTerms.length === 0) {
+    //                     setLocationLoading(false);
+    //                     return;
+    //                 }
+
+    //                 const results = await Promise.allSettled(
+    //                     searchTerms.map(async (term) => {
+    //                         const cachedResult = getCachedSearch(term);
+    //                         if (cachedResult) return cachedResult;
+
+    //                         const res = await fetch(`/api/schools/search?q=${encodeURIComponent(term)}`);
+    //                         if (!res.ok) return [];
+    //                         const data = await res.json();
+    //                         const schools = data?.schools || [];
+    //                         setCachedSearch(term, schools);
+    //                         return schools;
+    //                     })
+    //                 );
+
+    //                 const allSchools = new Map();
+    //                 results.forEach((r) => {
+    //                     if (r.status === 'fulfilled' && Array.isArray(r.value)) {
+    //                         r.value.forEach((s) => allSchools.set(s.id, s));
+    //                     }
+    //                 });
+
+    //                 const schoolList = Array.from(allSchools.values());
+
+    //                 if (process.env.NODE_ENV !== 'production') {
+    //                     console.log(`[Location] Found ${schoolList.length} unique nearby schools`);
+    //                 }
+
+    //                 setNearbySchools(schoolList);
+    //                 setLocationCache(displayCity, schoolList);
+
+    //             } catch (err) {
+    //                 console.error('[Location] Fetch error:', err);
+    //                 setLocationError("Couldn't fetch nearby schools.");
+    //             } finally {
+    //                 setLocationLoading(false);
+    //             }
+    //         },
+    //         (geoError) => {
+    //             setLocationLoading(false);
+    //             hasFetchedLocation.current = false;
+
+    //             if (geoError.code === 1) {
+    //                 setLocationError("Location access denied. Allow location or search by name.");
+    //             } else if (geoError.code === 2) {
+    //                 setLocationError("Location unavailable. Try searching by name.");
+    //             } else {
+    //                 setLocationError("Location timed out. Try searching by name.");
+    //             }
+
+    //             if (process.env.NODE_ENV !== 'production') {
+    //                 console.warn('[Location] Geolocation error:', geoError.code, geoError.message);
+    //             }
+    //         },
+    //         {
+    //             enableHighAccuracy: false,
+    //             timeout: 10000,
+    //             maximumAge: LOCATION_CACHE_TTL,
+    //         }
+    //     );
+    //     // eslint-disable-next-line react-hooks/exhaustive-deps
+    // }, []);
     const fetchNearbySchools = useCallback(async (skipCache = false) => {
-        if (hasFetchedLocation.current && !skipCache && nearbySchools.length > 0) return;
+        // 🚫 Prevent duplicate execution
+        if (hasFetchedLocation.current && !skipCache) return;
         hasFetchedLocation.current = true;
+
         setLocationError("");
 
-        // Serve stale cache immediately while revalidating in background
+        // ⚡ Serve cache instantly
         const cached = getLocationCache();
         if (cached && !skipCache) {
             setUserCity(cached.city);
@@ -136,66 +251,61 @@ const Hero = () => {
                 try {
                     const { latitude, longitude } = position.coords;
 
-                    if (process.env.NODE_ENV !== 'production') {
-                        console.log('[Location] Coords:', latitude, longitude);
-                    }
+                    const geoRes = await fetch(
+                        `/api/location/reverse?lat=${latitude}&lon=${longitude}`
+                    );
 
-                    const geoRes = await fetch(`/api/location/reverse?lat=${latitude}&lon=${longitude}`);
-                    if (!geoRes.ok) throw new Error(`Geocode error: ${geoRes.status}`);
+                    if (!geoRes.ok) throw new Error("Geocode failed");
+
                     const geoData = await geoRes.json();
                     const address = geoData?.address || {};
 
-                    if (process.env.NODE_ENV !== 'production') {
-                        console.log('[Location] Address fields:', address);
-                    }
+                    // 🎯 Get best fields
+                    const city =
+                        address.city ||
+                        address.town ||
+                        address.village ||
+                        address.suburb ||
+                        "";
 
-                    const displayCity = extractDisplayCity(address);
-                    const searchTerms = extractSearchTerms(address);
+                    const state = address.state || "";
 
-                    if (process.env.NODE_ENV !== 'production') {
-                        console.log('[Location] Display city:', displayCity);
-                        console.log('[Location] Search terms:', searchTerms);
-                    }
+                    setUserCity(city);
 
-                    setUserCity(displayCity);
-
-                    if (searchTerms.length === 0) {
+                    // 🚫 No valid search terms
+                    if (!city && !state) {
                         setLocationLoading(false);
                         return;
                     }
 
-                    const results = await Promise.allSettled(
-                        searchTerms.map(async (term) => {
-                            const cachedResult = getCachedSearch(term);
-                            if (cachedResult) return cachedResult;
+                    // 🔥 SINGLE QUERY (no spam)
+                    const combinedQuery = `${city} ${state}`.trim();
 
-                            const res = await fetch(`/api/schools/search?q=${encodeURIComponent(term)}`);
-                            if (!res.ok) return [];
-                            const data = await res.json();
-                            const schools = data?.schools || [];
-                            setCachedSearch(term, schools);
-                            return schools;
-                        })
-                    );
-
-                    const allSchools = new Map();
-                    results.forEach((r) => {
-                        if (r.status === 'fulfilled' && Array.isArray(r.value)) {
-                            r.value.forEach((s) => allSchools.set(s.id, s));
-                        }
-                    });
-
-                    const schoolList = Array.from(allSchools.values());
-
-                    if (process.env.NODE_ENV !== 'production') {
-                        console.log(`[Location] Found ${schoolList.length} unique nearby schools`);
+                    // ⚡ Check cache first
+                    const cachedResult = getCachedSearch(combinedQuery);
+                    if (cachedResult) {
+                        setNearbySchools(cachedResult);
+                        setLocationCache(city, cachedResult);
+                        setLocationLoading(false);
+                        return;
                     }
 
-                    setNearbySchools(schoolList);
-                    setLocationCache(displayCity, schoolList);
+                    // 🚀 ONE API CALL ONLY
+                    const res = await fetch(
+                        `/api/schools/search?q=${encodeURIComponent(combinedQuery)}`
+                    );
+
+                    if (!res.ok) throw new Error("Search failed");
+
+                    const data = await res.json();
+                    const schools = data?.schools || [];
+
+                    setCachedSearch(combinedQuery, schools);
+                    setNearbySchools(schools);
+                    setLocationCache(city, schools);
 
                 } catch (err) {
-                    console.error('[Location] Fetch error:', err);
+                    console.error("[Location] Error:", err);
                     setLocationError("Couldn't fetch nearby schools.");
                 } finally {
                     setLocationLoading(false);
@@ -206,15 +316,11 @@ const Hero = () => {
                 hasFetchedLocation.current = false;
 
                 if (geoError.code === 1) {
-                    setLocationError("Location access denied. Allow location or search by name.");
+                    setLocationError("Location access denied.");
                 } else if (geoError.code === 2) {
-                    setLocationError("Location unavailable. Try searching by name.");
+                    setLocationError("Location unavailable.");
                 } else {
-                    setLocationError("Location timed out. Try searching by name.");
-                }
-
-                if (process.env.NODE_ENV !== 'production') {
-                    console.warn('[Location] Geolocation error:', geoError.code, geoError.message);
+                    setLocationError("Location timeout.");
                 }
             },
             {
@@ -223,9 +329,7 @@ const Hero = () => {
                 maximumAge: LOCATION_CACHE_TTL,
             }
         );
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
     useEffect(() => {
         fetchNearbySchools();
     }, [fetchNearbySchools]);
@@ -559,10 +663,10 @@ const Hero = () => {
                     </label>
 
                     <div className={`flex items-center gap-2 md:gap-3 bg-[#f8f9fb] border rounded-xl px-3 py-3 md:px-4 md:py-4 transition-all ${error
-                            ? 'border-red-300 ring-2 ring-red-100'
-                            : schoolFound
-                                ? 'border-green-300 ring-2 ring-green-100'
-                                : 'border-gray-200 focus-within:ring-2 focus-within:ring-[#0569ff]/20 focus-within:border-[#0569ff]'
+                        ? 'border-red-300 ring-2 ring-red-100'
+                        : schoolFound
+                            ? 'border-green-300 ring-2 ring-green-100'
+                            : 'border-gray-200 focus-within:ring-2 focus-within:ring-[#0569ff]/20 focus-within:border-[#0569ff]'
                         }`}>
                         <div className="text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-bold text-xs md:text-sm bg-[#0569ff] shrink-0">
                             EB -
@@ -606,8 +710,8 @@ const Hero = () => {
                         onClick={handleContinue}
                         disabled={!code || isChecking}
                         className={`group w-full relative px-6 py-3.5 md:px-8 md:py-4 rounded-xl font-bold text-base transition-all duration-300 overflow-hidden flex items-center justify-center gap-3 ${code && !isChecking
-                                ? 'bg-[#0569ff] text-white shadow-[0_4px_20px_rgba(5,105,255,0.3)] hover:shadow-[0_8px_30px_rgba(5,105,255,0.4)]'
-                                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                            ? 'bg-[#0569ff] text-white shadow-[0_4px_20px_rgba(5,105,255,0.3)] hover:shadow-[0_8px_30px_rgba(5,105,255,0.4)]'
+                            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                             }`}
                     >
                         {code && !isChecking && (
