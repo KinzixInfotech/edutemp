@@ -11,7 +11,7 @@ export async function GET(request, { params }) {
         const category = searchParams.get("category");
         const page = searchParams.get("page") ? parseInt(searchParams.get("page")) : null;
         const limit = searchParams.get("limit") ? parseInt(searchParams.get("limit")) : null;
-        
+
         const sortColumn = searchParams.get("sortColumn");
         const sortDirection = searchParams.get("sortDirection") === "desc" ? "desc" : "asc";
 
@@ -30,20 +30,23 @@ export async function GET(request, { params }) {
                 ...(category && category !== "all" && { category }),
             };
 
-            // Validate sort column to prevent injection
             const validSortColumns = ['title', 'author', 'category', 'createdAt'];
             const validSortColumn = validSortColumns.includes(sortColumn) ? sortColumn : 'createdAt';
 
-            // Build query options - only apply pagination if both page and limit are specified
             const queryOptions = {
                 where,
-                include: {
-                    copies: true,
-                },
                 orderBy: { [validSortColumn]: sortDirection },
+                include: {
+                    // Total copies count — no data fetching
+                    _count: { select: { copies: true } },
+                    // Only fetch available copies (just id for minimal payload)
+                    copies: {
+                        where: { status: "AVAILABLE" },
+                        select: { id: true },
+                    },
+                },
             };
 
-            // Apply pagination only if explicitly requested
             let total = null;
             if (page && limit) {
                 queryOptions.skip = (page - 1) * limit;
@@ -51,34 +54,25 @@ export async function GET(request, { params }) {
                 total = await prisma.libraryBook.count({ where });
             }
 
-            // Fetch books
             const books = await prisma.libraryBook.findMany(queryOptions);
 
-            // Process books to add availability stats
-            const enhancedBooks = books.map((book) => {
-                const totalCopies = book.copies.length;
-                const availableCopies = book.copies.filter(
-                    (c) => c.status === "AVAILABLE"
-                ).length;
-                return {
-                    ...book,
-                    totalCopies,
-                    availableCopies,
-                };
-            });
+            const enhancedBooks = books.map(({ copies, _count, ...book }) => ({
+                ...book,
+                totalCopies: _count.copies,
+                availableCopies: copies.length,
+            }));
 
             if (page && limit) {
                 return {
                     data: enhancedBooks,
                     total,
-                    totalPages: Math.ceil(total / limit)
+                    totalPages: Math.ceil(total / limit),
                 };
             }
 
             return enhancedBooks;
         }, 5);
 
-        // Return data array
         return NextResponse.json(result);
     } catch (error) {
         console.error("Error fetching books:", error);

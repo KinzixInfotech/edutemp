@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { remember, generateKey } from "@/lib/cache";
+import { remember, generateKey, delCache } from "@/lib/cache";
 
 export async function GET(request, { params }) {
     try {
@@ -11,16 +11,28 @@ export async function GET(request, { params }) {
         const stats = await remember(cacheKey, async () => {
             const [
                 totalBooks,
+                booksWithCopies,
                 totalCopies,
                 issuedCopies,
                 overdueTransactions,
                 totalFines,
             ] = await Promise.all([
                 prisma.libraryBook.count({ where: { schoolId } }),
+
+                // Books that have at least one copy added
+                prisma.libraryBook.count({
+                    where: {
+                        schoolId,
+                        copies: { some: {} },
+                    },
+                }),
+
                 prisma.libraryBookCopy.count({ where: { book: { schoolId } } }),
+
                 prisma.libraryBookCopy.count({
                     where: { book: { schoolId }, status: "ISSUED" },
                 }),
+
                 prisma.libraryTransaction.count({
                     where: {
                         copy: { book: { schoolId } },
@@ -28,6 +40,7 @@ export async function GET(request, { params }) {
                         dueDate: { lt: new Date() },
                     },
                 }),
+
                 prisma.libraryTransaction.aggregate({
                     where: {
                         copy: { book: { schoolId } },
@@ -44,8 +57,11 @@ export async function GET(request, { params }) {
                 totalCopies,
                 issuedCopies,
                 availableCopies: totalCopies - issuedCopies,
+                booksWithCopies,
+                booksWithoutCopies: totalBooks - booksWithCopies,
                 overdueBooks: overdueTransactions,
                 totalFinesCollected: totalFines._sum.fineAmount || 0,
+                hello: "hello",
             };
         }, 300);
 
