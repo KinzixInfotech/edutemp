@@ -704,7 +704,7 @@ export default function FeeStructuresManagement() {
                             <p className="text-base font-semibold">{assigned} students</p>
                           </div>
                         </div>
-                        {isDraft && <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white">Assign to Students</Button>}
+                        {/* {isDraft && <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white">Assign to Students</Button>} */}
                         {isActive && <Badge variant="outline" className="text-green-600 border-green-300"><CheckCircle className="w-3 h-3 mr-1" />In Use</Badge>}
                       </div>
                     </div>

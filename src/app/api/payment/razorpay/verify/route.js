@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { PaymentGatewayFactory } from "@/lib/payment/PaymentGatewayFactory";
+import { processPayment } from "@/lib/fee/payment-engine";
 
 export async function POST(req) {
     try {
@@ -16,10 +17,7 @@ export async function POST(req) {
 
         // 1. Fetch Payment Record
         const payment = await prisma.feePayment.findFirst({
-            where: { gatewayOrderId: razorpay_order_id },
-            include: {
-                installmentPayments: true
-            }
+            where: { gatewayOrderId: razorpay_order_id, status: { not: 'SUCCESS' } }
         });
 
         if (!payment) {
@@ -63,87 +61,40 @@ export async function POST(req) {
             return NextResponse.json({ error: "Invalid Signature" }, { status: 400 });
         }
 
-        // 4. Update Payment Status in DB Transaction
-        await prisma.$transaction(async (tx) => {
-            // 4.1 Update FeePayment
-            await tx.feePayment.update({
-                where: { id: payment.id },
-                data: {
-                    status: 'SUCCESS',
-                    gatewayPaymentId: razorpay_payment_id,
-                    webhookVerified: true,
-                    paymentDate: new Date(),
-                    reconciledAt: new Date(),
-                    gatewayResponse: verification.rawResponse,
-                    settlementStatus: 'processed' // Assume processed for online
-                }
-            });
+        // 4. Update Payment Status / Run new ledger logic
 
-            // 4.2 Update Installments
-            if (payment.installmentPayments && payment.installmentPayments.length > 0) {
-                for (const instPayment of payment.installmentPayments) {
-                    const installment = await tx.studentFeeInstallment.findUnique({
-                        where: { id: instPayment.installmentId }
-                    });
+        // Find active fee session for the school
+        const session = await prisma.feeSession.findFirst({
+            where: { schoolId: payment.schoolId, isClosed: false },
+            orderBy: { createdAt: 'desc' }
+        });
 
-                    if (installment) {
-                        const newPaidAmount = installment.paidAmount + instPayment.amount;
-                        let newStatus = installment.status;
+        if (!session) {
+            return NextResponse.json({ error: "Payment session unavailable" }, { status: 503 });
+        }
 
-                        // Check if fully paid
-                        if (newPaidAmount >= (installment.amount + (installment.lateFee || 0))) {
-                            newStatus = 'PAID';
-                        } else if (newPaidAmount > 0) {
-                            newStatus = 'PARTIAL';
-                        }
+        const allocationResult = await processPayment({
+            studentId: payment.studentId,
+            schoolId: payment.schoolId,
+            academicYearId: payment.academicYearId,
+            feeSessionId: session.id,
+            amountPaid: payment.amount,
+            paymentMode: payment.paymentMode,
+            paymentMethod: "NET_BANKING",
+            existingPaymentId: payment.id,
+            remarks: "Online Razorpay Payment"
+        });
 
-                        await tx.studentFeeInstallment.update({
-                            where: { id: installment.id },
-                            data: {
-                                paidAmount: newPaidAmount,
-                                status: newStatus,
-                                paidDate: new Date(),
-                                isOverdue: false // Clear overdue flag if paid (or logically partial?)
-                                // Maybe only clear overdue if fully paid? 
-                                // For now, let's keep isOverdue as is unless FULLY paid.
-                            }
-                        });
-
-                        if (newStatus === 'PAID') {
-                            await tx.studentFeeInstallment.update({
-                                where: { id: installment.id },
-                                data: { isOverdue: false }
-                            });
-                        }
-                    }
-                }
-            }
-
-            // 4.3 Update Student Fee (Total)
-            const studentFee = await tx.studentFee.findUnique({
-                where: { id: payment.studentFeeId }
-            });
-
-            if (studentFee) {
-                const newPaidAmount = studentFee.paidAmount + payment.amount;
-                const newBalanceAmount = studentFee.finalAmount - newPaidAmount;
-
-                let newStatus = studentFee.status;
-                if (newBalanceAmount <= 1) { // Floating point tolerance
-                    newStatus = 'PAID';
-                } else if (newPaidAmount > 0) {
-                    newStatus = 'PARTIAL';
-                }
-
-                await tx.studentFee.update({
-                    where: { id: studentFee.id },
-                    data: {
-                        paidAmount: newPaidAmount,
-                        balanceAmount: Math.max(0, newBalanceAmount),
-                        status: newStatus,
-                        lastPaymentDate: new Date()
-                    }
-                });
+        // 5. Update extra gateway response fields outside the strict processPayment envelope 
+        // to record webhook data
+        await prisma.feePayment.update({
+            where: { id: payment.id },
+            data: {
+                gatewayPaymentId: razorpay_payment_id,
+                webhookVerified: true,
+                reconciledAt: new Date(),
+                gatewayResponse: verification.rawResponse,
+                settlementStatus: 'processed'
             }
         });
 
@@ -152,7 +103,7 @@ export async function POST(req) {
             message: "Payment verified successfully",
             payment: {
                 id: payment.id,
-                receiptNumber: payment.receiptNumber,
+                receiptNumber: allocationResult.receiptNumber,
                 amount: payment.amount,
                 date: new Date()
             }

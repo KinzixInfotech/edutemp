@@ -4935,12 +4935,12 @@ model LedgerAuditLog {
   action        LedgerAction
   oldValue      Json?
   newValue      Json?
-  doneBy        String       @db.Uuid
+  doneBy        String?      @db.Uuid
   remarks       String?
   createdAt     DateTime     @default(now())
 
   ledgerEntry StudentFeeLedger @relation(fields: [ledgerEntryId], references: [id], onDelete: Cascade)
-  user        User             @relation("LedgerAuditUser", fields: [doneBy], references: [id])
+  user        User?            @relation("LedgerAuditUser", fields: [doneBy], references: [id])
 
   @@index([ledgerEntryId])
   @@index([doneBy])

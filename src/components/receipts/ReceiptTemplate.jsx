@@ -56,7 +56,7 @@ const ReceiptTemplate = forwardRef(({
                 style={{
                     width: '80mm',
                     padding: '3mm',
-                    fontFamily: 'monospace, Arial, sans-serif',
+                    fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
                     fontSize: '11px',
                     color: '#000',
                     backgroundColor: '#fff',
@@ -64,296 +64,272 @@ const ReceiptTemplate = forwardRef(({
                 }}
             >
                 {/* Header */}
-                <div style={{ textAlign: 'center', borderBottom: '1px dashed #000', paddingBottom: '6px', marginBottom: '6px' }}>
-                    <div style={{ fontWeight: 'bold', fontSize: '14px', textTransform: 'uppercase' }}>{schoolName}</div>
-                    <div style={{ fontSize: '9px' }}>{schoolAddress}</div>
-                    {schoolContact && <div style={{ fontSize: '9px' }}>Ph: {schoolContact}</div>}
-                    <div style={{ fontWeight: 'bold', fontSize: '12px', marginTop: '4px' }}>FEE RECEIPT</div>
-                </div>
-
-                {/* Receipt Info */}
-                <div style={{ fontSize: '10px', marginBottom: '6px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>No: {receiptNumber}</span>
-                        <span>{receiptDate}</span>
-                    </div>
-                    <div>Student: {studentName}</div>
-                    {degree && <div>Class: {degree}</div>}
-                    {admissionNo && <div>Adm No: {admissionNo}</div>}
-                    {financialYear && <div>Session: {financialYear}</div>}
-                </div>
-
-                {/* Divider */}
-                <div style={{ borderBottom: '1px dashed #000', marginBottom: '6px' }} />
-
-                {/* Fee Items */}
-                {feeItems.length > 0 ? (
-                    feeItems.map((item, i) => (
-                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginBottom: '2px' }}>
-                            <span style={{ flex: 1 }}>{item.description}</span>
-                            <span>₹{item.amount?.toLocaleString('en-IN')}</span>
-                        </div>
-                    ))
-                ) : (
-                    <div style={{ fontSize: '10px', color: '#666' }}>No items</div>
-                )}
-
-                {/* Divider */}
-                <div style={{ borderBottom: '1px dashed #000', margin: '6px 0' }} />
-
-                {/* Total */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '12px' }}>
-                    <span>TOTAL PAID</span>
-                    <span>₹{calculatedTotal.toLocaleString('en-IN')}</span>
-                </div>
-
-                {showBalanceDue && balanceAfterPayment > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginTop: '2px' }}>
-                        <span>Balance Due</span>
-                        <span>₹{balanceAfterPayment.toLocaleString('en-IN')}</span>
-                    </div>
-                )}
-
-                {showPaymentMode && paymentMode && (
-                    <div style={{ fontSize: '9px', marginTop: '4px' }}>
-                        Mode: {paymentMode}
-                    </div>
-                )}
-
-                {transactionId && transactionId !== 'N/A' && (
-                    <div style={{ fontSize: '9px' }}>Txn: {transactionId}</div>
-                )}
-
-                <div style={{ borderBottom: '1px dashed #000', margin: '6px 0' }} />
-
-                {/* Footer */}
-                <div style={{ textAlign: 'center', fontSize: '9px' }}>
-                    <div>Computer Generated Receipt</div>
-                    {receiptFooterText && <div style={{ marginTop: '2px' }}>{receiptFooterText}</div>}
-                    {showSignatureLine && (
-                        <div style={{ marginTop: '12px', borderTop: '1px solid #000', display: 'inline-block', width: '40mm', paddingTop: '2px' }}>
-                            Authorized Sign
-                        </div>
+                <div style={{ textAlign: 'center', borderBottom: '1px dashed #000', paddingBottom: '6px', marginBottom: '8px' }}>
+                    {showSchoolLogo && schoolLogo && (
+                        <img
+                            src={schoolLogo}
+                            style={{ maxWidth: '40px', maxHeight: '40px', margin: '0 auto 4px auto', display: 'block' }}
+                            alt="Logo"
+                        />
                     )}
+                    <h2 style={{ margin: 0, fontSize: '14px', textTransform: 'uppercase' }}>{schoolName}</h2>
+                    <p style={{ margin: '2px 0', fontSize: '9px' }}>{schoolAddress}</p>
+                    <p style={{ margin: '2px 0', fontSize: '9px' }}>Phone: {schoolContact}</p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
+                        <span style={{ fontWeight: 'bold', textDecoration: 'underline', fontSize: '11px' }}>FEE RECEIPT</span>
+                        <span style={{ fontSize: '9px' }}>Student's Copy</span>
+                    </div>
                 </div>
+
+                {/* Info Table */}
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px', marginBottom: '10px' }}>
+                    <tbody>
+                        <tr>
+                            <td style={{ width: '25%', padding: '2px 0' }}>RcptNo</td>
+                            <td style={{ width: '75%', padding: '2px 0' }}>:{receiptNumber}</td>
+                        </tr>
+                        <tr>
+                            <td style={{ width: '25%', padding: '2px 0' }}>Admn No</td>
+                            <td style={{ width: '75%', padding: '2px 0' }}>:{admissionNo || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td style={{ padding: '2px 0' }}>Name</td>
+                            <td style={{ padding: '2px 0' }}>:{studentName}</td>
+                        </tr>
+                        <tr>
+                            <td style={{ padding: '2px 0' }}>Date</td>
+                            <td style={{ padding: '2px 0' }}>:{receiptDate}</td>
+                        </tr>
+                        <tr>
+                            <td style={{ padding: '2px 0' }}>F.Name</td>
+                            <td style={{ padding: '2px 0' }}>:{fatherName || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td style={{ padding: '2px 0' }}>Session</td>
+                            <td style={{ padding: '2px 0' }}>:{financialYear || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td style={{ padding: '2px 0' }}>Month</td>
+                            <td style={{ padding: '2px 0' }}>:{remarks || 'Current'}</td>
+                        </tr>
+                        <tr>
+                            <td style={{ padding: '2px 0' }}>Class</td>
+                            <td style={{ padding: '2px 0' }}>:{degree || 'N/A'}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                {/* Items Table */}
+                <table style={{ width: '100%', borderCollapse: 'collapse', borderTop: '1px solid #000', borderBottom: '1px solid #000', marginBottom: '8px', fontSize: '10px' }}>
+                    <thead>
+                        <tr>
+                            <th style={{ borderBottom: '1px solid #000', padding: '4px 0', textAlign: 'left', width: '50%' }}>Head Name</th>
+                            <th style={{ borderBottom: '1px solid #000', padding: '4px 0', textAlign: 'right', width: '25%' }}>Dues</th>
+                            <th style={{ borderBottom: '1px solid #000', padding: '4px 0', textAlign: 'right', width: '25%' }}>Amt</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {feeItems.length > 0 ? (
+                            feeItems.map((item, index) => (
+                                <tr key={index}>
+                                    <td style={{ padding: '4px 0', borderBottom: '1px dotted #ccc', textAlign: 'left' }}># {item.description.toUpperCase()}</td>
+                                    <td style={{ padding: '4px 0', borderBottom: '1px dotted #ccc', textAlign: 'right' }}>0.0</td>
+                                    <td style={{ padding: '4px 0', borderBottom: '1px dotted #ccc', textAlign: 'right' }}>{(item.amount || 0).toFixed(1)}</td>
+                                </tr>
+                            ))
+                        ) : (
+                            <tr>
+                                <td style={{ padding: '4px 0', borderBottom: '1px dotted #ccc', textAlign: 'left' }}># FEE PAYMENT</td>
+                                <td style={{ padding: '4px 0', borderBottom: '1px dotted #ccc', textAlign: 'right' }}>0.0</td>
+                                <td style={{ padding: '4px 0', borderBottom: '1px dotted #ccc', textAlign: 'right' }}>{calculatedTotal.toFixed(1)}</td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+
+                {/* Totals Box */}
+                <div style={{ fontSize: '10px', marginTop: '10px' }}>
+                    <div style={{ marginBottom: '6px' }}>
+                        Collected By: <b>SYSTEM</b><br />
+                        Time: {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}<br />
+                        {showPaymentMode ? `PayMode: By ${paymentMode}` : ''}
+                    </div>
+                    
+                    <table style={{ width: '100%' }}>
+                        <tbody>
+                            <tr><td style={{ padding: '2px 0' }}>Fee Total</td><td style={{ padding: '2px 0' }}>:</td><td style={{ padding: '2px 0', textAlign: 'right' }}>{calculatedTotal.toFixed(1)}</td></tr>
+                            <tr><td style={{ padding: '2px 0' }}>Grand Total</td><td style={{ padding: '2px 0' }}>:</td><td style={{ padding: '2px 0', textAlign: 'right' }}>{calculatedTotal.toFixed(1)}</td></tr>
+                            <tr><td colSpan="3"><hr style={{ borderTop: '1px dashed #000', margin: '2px 0' }} /></td></tr>
+                            <tr><td style={{ padding: '2px 0' }}>Payable Amt</td><td style={{ padding: '2px 0' }}>:</td><td style={{ padding: '2px 0', textAlign: 'right' }}>{calculatedTotal.toFixed(1)}</td></tr>
+                            <tr><td style={{ padding: '2px 0' }}>Paid Amt</td><td style={{ padding: '2px 0' }}>:</td><td style={{ padding: '2px 0', textAlign: 'right' }}>{calculatedTotal.toFixed(1)}</td></tr>
+                            {showBalanceDue ? <tr><td style={{ padding: '2px 0' }}>Curr. Dues</td><td style={{ padding: '2px 0' }}>:</td><td style={{ padding: '2px 0', textAlign: 'right' }}>{(balanceAfterPayment || 0).toFixed(1)}</td></tr> : null}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Words */}
+                <div style={{ fontStyle: 'italic', fontWeight: 'bold', borderTop: '1px solid #000', marginTop: '8px', paddingTop: '8px', fontSize: '9px' }}>
+                    Amount In Word: {totalInWords || 'Amount in words here'}
+                </div>
+
+                {/* Signatures */}
+                {showSignatureLine && (
+                    <div style={{ marginTop: '25px', display: 'flex', justifyContent: 'space-between' }}>
+                        <div style={{ borderTop: '1px solid #000', width: '45%', textAlign: 'center', fontSize: '9px', paddingTop: '4px' }}>Cashier Sign</div>
+                        <div style={{ borderTop: '1px solid #000', width: '45%', textAlign: 'center', fontSize: '9px', paddingTop: '4px' }}>Depositor Sign</div>
+                    </div>
+                )}
+
+                {/* Footer Text */}
+                {receiptFooterText && (
+                    <div style={{ textAlign: 'center', fontSize: '9px', marginTop: '15px', borderTop: '1px dashed #ccc', paddingTop: '8px' }}>
+                        {receiptFooterText}
+                    </div>
+                )}
             </div>
         );
     }
 
-    // ============ A4 / LETTER LAYOUT ============
+    // ============ OASIS STYLE (A4 / LETTER) LAYOUT ============
+    // Emulates the mobile app's receiptGenerator.js Oasis style structure
     return (
         <div
             ref={ref}
-            className="bg-white mx-auto"
             style={{
                 width: '8.5in',
-                height: '11in',
+                minHeight: '5.5in', // Half page or so
                 padding: '0.5in',
-                fontFamily: 'Arial, sans-serif',
-                fontSize: '11px',
+                fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
+                fontSize: '12px',
                 color: '#000',
+                backgroundColor: '#fff',
                 boxSizing: 'border-box',
-                border: '2px solid #8B0000',
-                display: 'flex',
-                flexDirection: 'column'
+                border: '1px solid #ccc', // Optional subtle border for preview isolation
             }}
         >
-            {/* Header Section with Logo and School Info */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: '8px', borderBottom: '3px solid #8B0000', paddingBottom: '8px' }}>
-                {/* Left Logo */}
+            {/* Header */}
+            <div style={{ textAlign: 'center', borderBottom: '1px dashed #000', paddingBottom: '10px', marginBottom: '10px' }}>
                 {showSchoolLogo && schoolLogo && (
-                    <div style={{ width: '60px', marginRight: '12px', flexShrink: 0 }}>
-                        <img
-                            src={schoolLogo}
-                            alt={schoolName}
-                            style={{ width: '60px', height: '60px', objectFit: 'contain', display: 'block' }}
-                        />
-                    </div>
+                    <img
+                        src={schoolLogo}
+                        style={{ maxWidth: '60px', maxHeight: '60px', marginBottom: '5px' }}
+                        alt="Logo"
+                    />
                 )}
-
-                {/* Center - School Name and Details */}
-                <div style={{ flex: 1, textAlign: 'center' }}>
-                    <h1 style={{ fontSize: '18px', fontWeight: 'bold', color: '#8B0000', margin: '0 0 4px 0', textTransform: 'uppercase' }}>
-                        {schoolName}
-                    </h1>
-                    <p style={{ margin: '2px 0', fontSize: '10px' }}>{schoolAddress}</p>
-                    <p style={{ margin: '2px 0', fontSize: '10px' }}>
-                        {schoolContact && `Phone: ${schoolContact}`}{schoolEmail ? ` | Email: ${schoolEmail}` : ''}
-                    </p>
-                </div>
-
-                {/* Right Logo/Seal */}
-                {showSchoolLogo && schoolLogo && (
-                    <div style={{ width: '60px', marginLeft: '12px', flexShrink: 0 }}>
-                        <img
-                            src={schoolLogo}
-                            alt={`${schoolName} Seal`}
-                            style={{
-                                width: '60px', height: '60px', objectFit: 'contain', display: 'block',
-                                borderRadius: '50%', border: '2px solid #8B0000', padding: '4px', boxSizing: 'border-box'
-                            }}
-                        />
-                    </div>
-                )}
-            </div>
-
-            {/* Maroon Header Bar */}
-            <div style={{ backgroundColor: '#8B0000', color: 'white', textAlign: 'center', padding: '6px', fontWeight: 'bold', fontSize: '14px', marginBottom: '12px' }}>
-                FEE RECEIPT
-            </div>
-
-            {/* Receipt Details - Two Columns */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '12px', fontSize: '11px' }}>
-                <div>
-                    <div style={{ display: 'flex', marginBottom: '4px' }}>
-                        <span style={{ fontWeight: 'bold', width: '120px' }}>Receipt No :</span>
-                        <span>{receiptNumber}</span>
-                    </div>
-                    <div style={{ display: 'flex', marginBottom: '4px' }}>
-                        <span style={{ fontWeight: 'bold', width: '120px' }}>Student :</span>
-                        <span>{studentName}</span>
-                    </div>
-                    {fatherName && (
-                        <div style={{ display: 'flex', marginBottom: '4px' }}>
-                            <span style={{ fontWeight: 'bold', width: '120px' }}>Father&apos;s Name :</span>
-                            <span>{fatherName}</span>
-                        </div>
-                    )}
-                    {admissionNo && (
-                        <div style={{ display: 'flex', marginBottom: '4px' }}>
-                            <span style={{ fontWeight: 'bold', width: '120px' }}>Admission No :</span>
-                            <span>{admissionNo}</span>
-                        </div>
-                    )}
-                </div>
-                <div>
-                    <div style={{ display: 'flex', marginBottom: '4px' }}>
-                        <span style={{ fontWeight: 'bold', width: '120px' }}>Receipt Date :</span>
-                        <span>{receiptDate}</span>
-                    </div>
-                    {degree && (
-                        <div style={{ display: 'flex', marginBottom: '4px' }}>
-                            <span style={{ fontWeight: 'bold', width: '120px' }}>Class :</span>
-                            <span>{degree}</span>
-                        </div>
-                    )}
-                    {financialYear && (
-                        <div style={{ display: 'flex', marginBottom: '4px' }}>
-                            <span style={{ fontWeight: 'bold', width: '120px' }}>Session :</span>
-                            <span>{financialYear}</span>
-                        </div>
-                    )}
+                <h2 style={{ margin: 0, fontSize: '18px', textTransform: 'uppercase' }}>{schoolName}</h2>
+                <p style={{ margin: '4px 0', fontSize: '11px' }}>{schoolAddress}</p>
+                {/* Slogan can go here if provided in schoolData but typically not in dashboard generic schoolData preview yet */}
+                <p style={{ margin: '4px 0', fontSize: '11px' }}>Phone: {schoolContact}</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px' }}>
+                    <span style={{ fontWeight: 'bold', textDecoration: 'underline', fontSize: '14px' }}>FEE RECEIPT</span>
+                    <span style={{ fontSize: '12px' }}>Student's Copy</span>
                 </div>
             </div>
 
-            {/* Fee Items Table */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '12px', border: '1px solid #000' }}>
+            {/* Info Table */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', marginBottom: '15px' }}>
+                <tbody>
+                    <tr>
+                        <td style={{ width: '15%', padding: '4px 0' }}>RcptNo</td>
+                        <td style={{ width: '35%', padding: '4px 0' }}>:{receiptNumber}</td>
+                        <td style={{ width: '15%', padding: '4px 0' }}>Admn No</td>
+                        <td style={{ width: '35%', padding: '4px 0' }}>:{admissionNo || 'N/A'}</td>
+                    </tr>
+                    <tr>
+                        <td style={{ padding: '4px 0' }}>Name</td>
+                        <td style={{ padding: '4px 0' }}>:{studentName}</td>
+                        <td style={{ padding: '4px 0' }}>Date</td>
+                        <td style={{ padding: '4px 0' }}>:{receiptDate}</td>
+                    </tr>
+                    <tr>
+                        <td style={{ padding: '4px 0' }}>F.Name</td>
+                        <td style={{ padding: '4px 0' }}>:{fatherName || 'N/A'}</td>
+                        <td style={{ padding: '4px 0' }}>Session</td>
+                        <td style={{ padding: '4px 0' }}>:{financialYear || 'N/A'}</td>
+                    </tr>
+                    <tr>
+                        <td style={{ padding: '4px 0' }}>Month</td>
+                        <td colSpan="3" style={{ padding: '4px 0' }}>:{remarks || 'Current'}</td>
+                    </tr>
+                    <tr>
+                        <td style={{ padding: '4px 0' }}>Class</td>
+                        <td colSpan="3" style={{ padding: '4px 0' }}>:{degree || 'N/A'}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            {/* Items Table */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', borderTop: '1px solid #000', borderBottom: '1px solid #000', marginBottom: '10px' }}>
                 <thead>
-                    <tr style={{ backgroundColor: '#f0f0f0' }}>
-                        <th style={{ border: '1px solid #000', padding: '6px', textAlign: 'left', fontWeight: 'bold', width: '60px' }}>S.NO</th>
-                        <th style={{ border: '1px solid #000', padding: '6px', textAlign: 'left', fontWeight: 'bold' }}>PARTICULARS</th>
-                        <th style={{ border: '1px solid #000', padding: '6px', textAlign: 'right', fontWeight: 'bold', width: '120px' }}>AMOUNT</th>
+                    <tr>
+                        <th style={{ borderBottom: '1px solid #000', padding: '8px 0', textAlign: 'left', width: '50%' }}>Head Name</th>
+                        <th style={{ borderBottom: '1px solid #000', padding: '8px 0', textAlign: 'right', width: '25%' }}>Prev. Dues</th>
+                        <th style={{ borderBottom: '1px solid #000', padding: '8px 0', textAlign: 'right', width: '25%' }}>Amount</th>
                     </tr>
                 </thead>
                 <tbody>
                     {feeItems.length > 0 ? (
                         feeItems.map((item, index) => (
                             <tr key={index}>
-                                <td style={{ border: '1px solid #000', padding: '6px', textAlign: 'center' }}>{index + 1}</td>
-                                <td style={{ border: '1px solid #000', padding: '6px' }}>{item.description}</td>
-                                <td style={{ border: '1px solid #000', padding: '6px', textAlign: 'right' }}>₹{(item.amount || 0).toLocaleString('en-IN')}</td>
+                                <td style={{ padding: '6px 0', borderBottom: '1px dotted #ccc', textAlign: 'left' }}># {item.description.toUpperCase()}</td>
+                                <td style={{ padding: '6px 0', borderBottom: '1px dotted #ccc', textAlign: 'right' }}>0.0</td>
+                                <td style={{ padding: '6px 0', borderBottom: '1px dotted #ccc', textAlign: 'right' }}>{(item.amount || 0).toFixed(1)}</td>
                             </tr>
                         ))
                     ) : (
                         <tr>
-                            <td style={{ border: '1px solid #000', padding: '6px', textAlign: 'center' }}>1</td>
-                            <td style={{ border: '1px solid #000', padding: '6px' }}>Fee Payment</td>
-                            <td style={{ border: '1px solid #000', padding: '6px', textAlign: 'right' }}>₹{calculatedTotal.toLocaleString('en-IN')}</td>
-                        </tr>
-                    )}
-
-                    {/* Empty rows for spacing */}
-                    {[...Array(Math.max(0, 5 - feeItems.length))].map((_, i) => (
-                        <tr key={`empty-${i}`}>
-                            <td style={{ border: '1px solid #000', padding: '6px', height: '25px' }}>&nbsp;</td>
-                            <td style={{ border: '1px solid #000', padding: '6px' }}>&nbsp;</td>
-                            <td style={{ border: '1px solid #000', padding: '6px' }}>&nbsp;</td>
-                        </tr>
-                    ))}
-
-                    {/* Total Row */}
-                    <tr style={{ backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
-                        <td colSpan="2" style={{ border: '1px solid #000', padding: '6px', textAlign: 'right' }}>Total Paid</td>
-                        <td style={{ border: '1px solid #000', padding: '6px', textAlign: 'right' }}>₹{calculatedTotal.toLocaleString('en-IN')}</td>
-                    </tr>
-
-                    {/* Remaining Balance Row */}
-                    {showBalanceDue && balanceAfterPayment > 0 && (
-                        <tr style={{ fontWeight: 'bold' }}>
-                            <td colSpan="2" style={{ border: '1px solid #000', padding: '6px', textAlign: 'right', color: '#c00' }}>Balance Due</td>
-                            <td style={{ border: '1px solid #000', padding: '6px', textAlign: 'right', color: '#c00' }}>₹{balanceAfterPayment.toLocaleString('en-IN')}</td>
+                            <td style={{ padding: '6px 0', borderBottom: '1px dotted #ccc', textAlign: 'left' }}># FEE PAYMENT</td>
+                            <td style={{ padding: '6px 0', borderBottom: '1px dotted #ccc', textAlign: 'right' }}>0.0</td>
+                            <td style={{ padding: '6px 0', borderBottom: '1px dotted #ccc', textAlign: 'right' }}>{calculatedTotal.toFixed(1)}</td>
                         </tr>
                     )}
                 </tbody>
             </table>
 
-            {/* Payment Details */}
-            <div style={{ fontSize: '10px', marginBottom: '12px' }}>
-                {totalInWords && (
-                    <div style={{ display: 'flex', marginBottom: '3px' }}>
-                        <span style={{ fontWeight: 'bold', width: '100px' }}>In words :</span>
-                        <span>{totalInWords}</span>
-                    </div>
-                )}
-                {showPaymentMode && paymentMode && (
-                    <div style={{ display: 'flex', marginBottom: '3px' }}>
-                        <span style={{ fontWeight: 'bold', width: '100px' }}>Payment Mode :</span>
-                        <span>{paymentMode}</span>
-                    </div>
-                )}
-                {transactionId && transactionId !== 'N/A' && (
-                    <div style={{ display: 'flex', marginBottom: '3px' }}>
-                        <span style={{ fontWeight: 'bold', width: '100px' }}>Transaction ID :</span>
-                        <span>{transactionId}</span>
-                    </div>
-                )}
-                {remarks && remarks !== 'N/A' && (
-                    <div style={{ display: 'flex', marginBottom: '3px' }}>
-                        <span style={{ fontWeight: 'bold', width: '100px' }}>Remarks :</span>
-                        <span>{remarks}</span>
-                    </div>
-                )}
+            {/* Totals Box */}
+            <table style={{ width: '100%', marginTop: '15px', fontSize: '11px' }}>
+                <tbody>
+                    <tr>
+                        <td style={{ verticalAlign: 'top', width: '45%', padding: '4px 0' }}>
+                            Collected By:<br /><b>SYSTEM</b><br /><br />
+                            Time: {new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}<br />
+                            {showPaymentMode ? `PayMode: By ${paymentMode}` : ''}
+                        </td>
+                        <td style={{ width: '55%', padding: '4px 0' }}>
+                            <table style={{ width: '100%' }}>
+                                <tbody>
+                                    <tr><td style={{ padding: '2px 0' }}>Fee Total</td><td style={{ padding: '2px 0' }}>:</td><td style={{ padding: '2px 0', textAlign: 'right' }}>{calculatedTotal.toFixed(1)}</td></tr>
+                                    <tr><td style={{ padding: '2px 0' }}>Grand Total</td><td style={{ padding: '2px 0' }}>:</td><td style={{ padding: '2px 0', textAlign: 'right' }}>{calculatedTotal.toFixed(1)}</td></tr>
+                                    <tr><td colSpan="3"><hr style={{ borderTop: '1px dashed #000', margin: '4px 0' }} /></td></tr>
+                                    <tr><td style={{ padding: '2px 0' }}>Payable Amt</td><td style={{ padding: '2px 0' }}>:</td><td style={{ padding: '2px 0', textAlign: 'right' }}>{calculatedTotal.toFixed(1)}</td></tr>
+                                    <tr><td style={{ padding: '2px 0' }}>Paid Amt</td><td style={{ padding: '2px 0' }}>:</td><td style={{ padding: '2px 0', textAlign: 'right' }}>{calculatedTotal.toFixed(1)}</td></tr>
+                                    {showBalanceDue ? <tr><td style={{ padding: '2px 0' }}>Curr. Dues</td><td style={{ padding: '2px 0' }}>:</td><td style={{ padding: '2px 0', textAlign: 'right' }}>{(balanceAfterPayment || 0).toFixed(1)}</td></tr> : null}
+                                </tbody>
+                            </table>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            {/* Words */}
+            <div style={{ fontStyle: 'italic', fontWeight: 'bold', borderTop: '1px solid #000', marginTop: '10px', paddingTop: '10px', fontSize: '11px' }}>
+                Amount In Word: {totalInWords || 'Amount in words here'}
             </div>
 
-            {/* Spacer */}
-            <div style={{ flex: 1 }} />
-
-            {/* Signature Line */}
+            {/* Signatures */}
             {showSignatureLine && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', fontSize: '10px' }}>
-                    <div style={{ textAlign: 'center' }}>
-                        <div style={{ borderTop: '1px solid #000', width: '180px', paddingTop: '4px' }}>
-                            Student / Parent Signature
-                        </div>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                        <div style={{ borderTop: '1px solid #000', width: '180px', paddingTop: '4px' }}>
-                            Authorized Signatory
-                        </div>
-                    </div>
+                <div style={{ marginTop: '40px', display: 'flex', justifyContent: 'space-between' }}>
+                    <div style={{ borderTop: '1px solid #000', width: '40%', textAlign: 'center', fontSize: '11px', paddingTop: '4px' }}>Signature of Cashier</div>
+                    <div style={{ borderTop: '1px solid #000', width: '40%', textAlign: 'center', fontSize: '11px', paddingTop: '4px' }}>Signature of Depositor</div>
                 </div>
             )}
 
-            {/* Footer */}
-            <div style={{ paddingTop: '8px', borderTop: '1px solid #ccc', fontSize: '10px', textAlign: 'center' }}>
-                <p style={{ margin: '4px 0', fontWeight: 'bold' }}>This is a Computer Generated Receipt</p>
-                {receiptFooterText && (
-                    <p style={{ margin: '4px 0', fontSize: '9px' }}>{receiptFooterText}</p>
-                )}
-                <p style={{ margin: '4px 0 0 0', fontSize: '9px', fontStyle: 'italic' }}>
-                    Fees/Amount once paid will not be refundable or transferable.
-                </p>
-            </div>
+            {/* Footer Text */}
+            {receiptFooterText && (
+                <div style={{ textAlign: 'center', fontSize: '10px', marginTop: '25px', borderTop: '1px dashed #ccc', paddingTop: '10px' }}>
+                    {receiptFooterText}
+                </div>
+            )}
         </div>
     );
 });

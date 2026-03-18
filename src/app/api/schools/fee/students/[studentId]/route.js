@@ -20,23 +20,23 @@ export async function GET(req, props) {
         }
 
         // Auto-resolve feeSessionId from academicYearId when they match or session ID is invalid
-        // Frontend passes academicYearId as feeSessionId which causes "Fee session not found"
+        let resolvedSession = null;
         if (feeSessionId) {
-            const sessionCheck = await prisma.feeSession.findUnique({ where: { id: feeSessionId } });
-            if (!sessionCheck) {
-                // feeSessionId is invalid (likely academicYearId was passed), try to resolve
-                const student = await prisma.student.findUnique({
-                    where: { userId: studentId },
-                    select: { schoolId: true },
+            resolvedSession = await prisma.feeSession.findUnique({ where: { id: feeSessionId } });
+        }
+        
+        if (!resolvedSession) {
+            const student = await prisma.student.findUnique({
+                where: { userId: studentId },
+                select: { schoolId: true },
+            });
+            if (student) {
+                resolvedSession = await prisma.feeSession.findFirst({
+                    where: { schoolId: student.schoolId, academicYearId, isActive: true },
                 });
-                if (student) {
-                    const session = await prisma.feeSession.findFirst({
-                        where: { schoolId: student.schoolId, academicYearId, isActive: true },
-                    });
-                    feeSessionId = session?.id || null;
-                } else {
-                    feeSessionId = null;
-                }
+                feeSessionId = resolvedSession?.id || null;
+            } else {
+                feeSessionId = null;
             }
         }
 
@@ -75,13 +75,15 @@ export async function GET(req, props) {
         const schoolId = student?.schoolId || studentFee?.student?.schoolId;
 
         let feeSettings = null;
+        let schoolPaymentSettings = null;
         if (schoolId) {
-            feeSettings = await prisma.schoolPaymentSettings.findUnique({
+            feeSettings = await prisma.feeSettings.findUnique({
+                where: { schoolId }
+            });
+            schoolPaymentSettings = await prisma.schoolPaymentSettings.findUnique({
                 where: { schoolId },
                 select: {
-                    isEnabled: true,
                     provider: true,
-                    testMode: true,
                 }
             });
         }
@@ -145,9 +147,18 @@ export async function GET(req, props) {
                 overdueCount: 0,
                 nextDueInstallment: null,
                 paymentOptions: {
-                    onlineEnabled: feeSettings?.isEnabled ?? false,
-                    gateway: feeSettings?.provider ?? null,
-                    testMode: feeSettings?.testMode ?? true,
+                    onlineEnabled: feeSettings?.onlinePaymentEnabled ?? false,
+                    gateway: schoolPaymentSettings?.provider ?? null,
+                    testMode: feeSettings?.sandboxMode ?? true,
+                    receiptSettings: {
+                        receiptPrefix: feeSettings?.receiptPrefix || 'REC',
+                        receiptPaperSize: feeSettings?.receiptPaperSize || 'a4',
+                        showSchoolLogo: feeSettings?.showSchoolLogo ?? true,
+                        showBalanceDue: feeSettings?.showBalanceDue ?? true,
+                        showPaymentMode: feeSettings?.showPaymentMode ?? true,
+                        showSignatureLine: feeSettings?.showSignatureLine ?? true,
+                        receiptFooterText: feeSettings?.receiptFooterText || null,
+                    },
                 },
             });
         }
@@ -195,9 +206,18 @@ export async function GET(req, props) {
             nextDueInstallment: enrichedInstallments.find(inst => inst.status === "PENDING" && !inst.isOverdue),
             // Payment options for mobile app
             paymentOptions: {
-                onlineEnabled: feeSettings?.isEnabled ?? false,
-                gateway: feeSettings?.provider ?? null,
-                testMode: feeSettings?.testMode ?? true,
+                onlineEnabled: feeSettings?.onlinePaymentEnabled ?? false,
+                gateway: schoolPaymentSettings?.provider ?? null,
+                testMode: feeSettings?.sandboxMode ?? true,
+                receiptSettings: {
+                    receiptPrefix: feeSettings?.receiptPrefix || 'REC',
+                    receiptPaperSize: feeSettings?.receiptPaperSize || 'a4',
+                    showSchoolLogo: feeSettings?.showSchoolLogo ?? true,
+                    showBalanceDue: feeSettings?.showBalanceDue ?? true,
+                    showPaymentMode: feeSettings?.showPaymentMode ?? true,
+                    showSignatureLine: feeSettings?.showSignatureLine ?? true,
+                    receiptFooterText: feeSettings?.receiptFooterText || null,
+                },
             },
         });
     } catch (error) {

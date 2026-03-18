@@ -5,8 +5,7 @@ import { PaymentGatewayFactory } from "@/lib/payment/PaymentGatewayFactory";
 export async function POST(req) {
     try {
         const body = await req.json();
-        const { studentFeeId, amount, paymentMode, studentId, schoolId, installments } = body;
-        // installments: { id, amount }[] - if partial/multiple installments
+        const { studentFeeId, amount, paymentMode, studentId, schoolId } = body;
 
         if (!studentFeeId || !amount || !schoolId) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -41,13 +40,6 @@ export async function POST(req) {
                 gatewayName: provider,
                 gatewayOrderId: orderId,
                 receiptNumber: orderId, // Temporary, will be updated to real receipt prefix on success
-                // Link installments if provided
-                installmentPayments: installments ? {
-                    create: installments.map(inst => ({
-                        installmentId: inst.id,
-                        amount: parseFloat(inst.amount)
-                    }))
-                } : undefined
             }
         });
 

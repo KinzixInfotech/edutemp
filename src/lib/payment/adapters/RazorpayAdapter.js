@@ -10,6 +10,7 @@ export class RazorpayAdapter extends PaymentAdapter {
         if (!this.config.merchantId || !this.config.secretKey) {
             throw new Error("Razorpay API keys (Key ID / Secret) are missing in settings");
         }
+        console.log("Razorpay API keys (Key ID / Secret) are missing in settings", this.config);
 
         const instance = new Razorpay({
             key_id: this.config.merchantId,
@@ -42,7 +43,8 @@ export class RazorpayAdapter extends PaymentAdapter {
             };
         } catch (error) {
             console.error("Razorpay Order Creation Failed:", error);
-            throw new Error("Failed to create Razorpay order: " + error.message);
+            const errorMessage = error?.error?.description || error?.message || JSON.stringify(error) || "Unknown error";
+            throw new Error("Failed to create Razorpay order: " + errorMessage);
         }
     }
 
