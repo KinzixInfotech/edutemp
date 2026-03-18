@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { invalidatePattern } from "@/lib/cache";
 
 // POST - Mark request as collected by pickup code OR book barcode
 export async function POST(req, props) {
@@ -130,6 +131,7 @@ export async function POST(req, props) {
             return { request: updatedReq, transaction };
         });
 
+        await invalidatePattern(`library:requests:*${schoolId}*`);
         return NextResponse.json({
             success: true,
             request: result.request,

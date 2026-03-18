@@ -1830,7 +1830,7 @@ model User {
   deletedMessages          Message[]                 @relation("MessageDeleter")
 
   // Financial Ledger Engine
-  ledgerAuditLogs  LedgerAuditLog[]  @relation("LedgerAuditUser")
+
   paymentReversals PaymentReversal[] @relation("PaymentReversalUser")
 
   @@index([schoolId])
@@ -2487,24 +2487,24 @@ model Document {
 }
 
 model GlobalSubject {
-  id        Int       @id @default(autoincrement())
-  name      String
-  code      String?
-  type      String    @default("CORE")
-  schoolId  String    @db.Uuid
-  school    School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  subjects  Subject[]
+  id       Int       @id @default(autoincrement())
+  name     String
+  code     String?
+  type     String    @default("CORE")
+  schoolId String    @db.Uuid
+  school   School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subjects Subject[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
 }
 
 model Subject {
-  id                    Int                     @id @default(autoincrement())
-  
-  globalSubjectId       Int?
-  globalSubject         GlobalSubject?          @relation(fields: [globalSubjectId], references: [id], onDelete: Cascade)
-  isOptional            Boolean                 @default(false)
+  id Int @id @default(autoincrement())
+
+  globalSubjectId Int?
+  globalSubject   GlobalSubject? @relation(fields: [globalSubjectId], references: [id], onDelete: Cascade)
+  isOptional      Boolean        @default(false)
 
   subjectName           String
   subjectCode           String?
@@ -4955,12 +4955,11 @@ model LedgerAuditLog {
   action        LedgerAction
   oldValue      Json?
   newValue      Json?
-  doneBy        String?      @db.Uuid
+  doneBy        String?
   remarks       String?
   createdAt     DateTime     @default(now())
 
   ledgerEntry StudentFeeLedger @relation(fields: [ledgerEntryId], references: [id], onDelete: Cascade)
-  user        User?            @relation("LedgerAuditUser", fields: [doneBy], references: [id])
 
   @@index([ledgerEntryId])
   @@index([doneBy])

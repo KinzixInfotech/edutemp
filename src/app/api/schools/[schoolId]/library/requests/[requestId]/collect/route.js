@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { invalidatePattern } from "@/lib/cache";
 
 // POST - Mark request as collected
 export async function POST(req, props) {
@@ -67,6 +68,7 @@ export async function POST(req, props) {
             },
         });
 
+        await invalidatePattern(`library:requests:*${schoolId}*`);
         return NextResponse.json({
             success: true,
             request: updatedRequest,

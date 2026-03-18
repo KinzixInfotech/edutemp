@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { sendNotification } from "@/lib/notifications/notificationHelper";
+import { invalidatePattern } from "@/lib/cache";
 
 // PATCH - Approve or Reject request
 export async function PATCH(req, props) {
@@ -178,6 +179,7 @@ export async function PATCH(req, props) {
             return NextResponse.json({ error: "Invalid action" }, { status: 400 });
         }
 
+        await invalidatePattern(`library:requests:*${schoolId}*`);
         return NextResponse.json(updatedRequest);
     } catch (error) {
         console.error("Error updating book request:", error);
@@ -216,6 +218,7 @@ export async function DELETE(req, props) {
             },
         });
 
+        await invalidatePattern(`library:requests:*${schoolId}*`);
         return NextResponse.json(updatedRequest);
     } catch (error) {
         console.error("Error cancelling book request:", error);

@@ -209,7 +209,7 @@ export async function POST(req) {
             return structure;
         });
 
-        await invalidatePattern(`fee-structures:${schoolId}*`);
+        await invalidatePattern(`fee-structures:*schoolId:${schoolId}*`);
 
         return NextResponse.json({
             message: 'Fee structure created successfully',
@@ -242,7 +242,7 @@ export async function PATCH(req) {
                 return NextResponse.json({ error: 'Only ACTIVE structures can be archived' }, { status: 400 });
             }
             const updated = await prisma.globalFeeStructure.update({ where: { id }, data: { status: 'ARCHIVED' } });
-            await invalidatePattern(`fee-structures:${structure.schoolId}*`);
+            await invalidatePattern(`fee-structures:*schoolId:${structure.schoolId}*`);
             return NextResponse.json({ message: 'Fee structure archived', structure: updated });
         }
 
@@ -252,7 +252,7 @@ export async function PATCH(req) {
                 return NextResponse.json({ error: 'Only ARCHIVED structures can be restored' }, { status: 400 });
             }
             const updated = await prisma.globalFeeStructure.update({ where: { id }, data: { status: 'ACTIVE' } });
-            await invalidatePattern(`fee-structures:${structure.schoolId}*`);
+            await invalidatePattern(`fee-structures:*schoolId:${structure.schoolId}*`);
             return NextResponse.json({ message: 'Fee structure restored to ACTIVE', structure: updated });
         }
 
@@ -322,7 +322,7 @@ export async function PATCH(req) {
                 return newStructure;
             });
 
-            await invalidatePattern(`fee-structures:${structure.schoolId}*`);
+            await invalidatePattern(`fee-structures:*schoolId:${structure.schoolId}*`);
             return NextResponse.json({ message: 'Fee structure cloned', structure: cloned }, { status: 201 });
         }
 
@@ -394,7 +394,7 @@ export async function PATCH(req) {
             return updated;
         });
 
-        await invalidatePattern(`fee-structures:${structure.schoolId}*`);
+        await invalidatePattern(`fee-structures:*schoolId:${structure.schoolId}*`);
         return NextResponse.json({ message: 'Fee structure updated successfully', structure: result });
 
     } catch (error) {
@@ -439,7 +439,7 @@ export async function DELETE(req) {
         }
 
         const deleted = await prisma.globalFeeStructure.delete({ where: { id } });
-        if (deleted?.schoolId) await invalidatePattern(`fee-structures:${deleted.schoolId}*`);
+        if (deleted?.schoolId) await invalidatePattern(`fee-structures:*schoolId:${deleted.schoolId}*`);
 
         return NextResponse.json({ message: 'Fee structure deleted successfully' });
 

@@ -1,11 +1,31 @@
-// ============================================
-// API: /api/fee/students/[studentId]/route.js
-// ENHANCED: Return detailed installment breakdowns + NEW Financial Ledger data
-// ============================================
-
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { calculateLateFees } from "@/lib/fee/late-fee-engine";
+import { generateStudentLedger, regenerateStudentLedger } from "@/lib/fee/ledger-engine";
+
+// Map GlobalFeeParticular enums → FeeComponent enums (same as ledger route)
+const TYPE_MAP = { MONTHLY: 'MONTHLY', ONE_TIME: 'ONE_TIME', ANNUAL: 'ANNUAL', TERM: 'TERM' };
+const CATEGORY_MAP = { TUITION: 'FEE_TUITION', TRANSPORT: 'FEE_TRANSPORT', ACTIVITY: 'FEE_ACTIVITY', ADMISSION: 'FEE_ADMISSION', EXAMINATION: 'FEE_EXAMINATION', LIBRARY: 'FEE_LIBRARY', LABORATORY: 'FEE_LABORATORY', SPORTS: 'FEE_SPORTS', HOSTEL: 'FEE_HOSTEL', DEVELOPMENT: 'FEE_DEVELOPMENT', FINE: 'FEE_FINE', MISCELLANEOUS: 'FEE_MISCELLANEOUS' };
+const CHARGE_MAP = { SESSION_START: 'CHARGE_SESSION_START', ON_ADMISSION: 'CHARGE_ON_ADMISSION', ON_PROMOTION: 'CHARGE_ON_PROMOTION', MONTHLY: 'CHARGE_MONTHLY' };
+
+async function syncFeeComponents(feeStructureId, session) {
+    if (!feeStructureId || !session) return 0;
+    const existing = await prisma.feeComponent.count({ where: { feeStructureId, feeSessionId: session.id } });
+    if (existing > 0) return existing;
+    const particulars = await prisma.globalFeeParticular.findMany({ where: { globalFeeStructureId: feeStructureId }, orderBy: { displayOrder: 'asc' } });
+    if (!particulars.length) return 0;
+    await prisma.feeComponent.createMany({
+        data: particulars.map((p, i) => ({
+            feeStructureId, feeSessionId: session.id, name: p.name, amount: p.amount,
+            type: TYPE_MAP[p.type] || 'MONTHLY', category: CATEGORY_MAP[p.category] || 'FEE_TUITION',
+            chargeTiming: CHARGE_MAP[p.chargeTiming] || 'CHARGE_MONTHLY', serviceId: p.serviceId || null,
+            lateFeeRuleId: p.lateFeeRuleId || null, isOptional: p.isOptional || false, isActive: true,
+            applicableMonths: p.applicableMonths ? JSON.parse(p.applicableMonths) : null, displayOrder: p.displayOrder ?? i,
+        })),
+        skipDuplicates: true,
+    });
+    return particulars.length;
+}
 
 export async function GET(req, props) {
     const params = await props.params;
@@ -94,14 +114,32 @@ export async function GET(req, props) {
             });
         }
         
-        // 🟢 V2: Fetch NEW Financial Ledger Data if session ID is provided
+        // 🟢 V2: Always regenerate ledger on every load to stay fresh
         let ledgerEntries = [];
         let walletBalance = 0;
         
-        if (feeSessionId) {
-            // Update late fees first
+        if (feeSessionId && studentFee?.globalFeeStructureId && resolvedSession) {
+            try {
+                // Sync FeeComponents from GlobalFeeParticular (no-op if already synced)
+                await syncFeeComponents(studentFee.globalFeeStructureId, resolvedSession);
+
+                // Always regenerate: deletes unfrozen entries & recreates from current data
+                // Frozen entries (with payments) are NEVER touched
+                await regenerateStudentLedger({
+                    studentId,
+                    feeSessionId: resolvedSession.id,
+                    feeStructureId: studentFee.globalFeeStructureId,
+                    userId: 'SYSTEM',
+                });
+            } catch (regenErr) {
+                console.error('[Ledger Auto-Regen] Non-fatal error:', regenErr.message);
+                // Continue — we'll still fetch whatever entries exist
+            }
+
+            // Calculate late fees
             await calculateLateFees(studentId, feeSessionId);
-            
+
+            // Fetch fresh ledger entries
             ledgerEntries = await prisma.studentFeeLedger.findMany({
                 where: { studentId, feeSessionId },
                 include: {
@@ -116,9 +154,55 @@ export async function GET(req, props) {
                 ]
             });
 
+            // Sync StudentFee totals from actual ledger data
+            if (ledgerEntries.length > 0 && studentFee) {
+                const totals = ledgerEntries.reduce((acc, e) => {
+                    acc.originalAmount += e.originalAmount || 0;
+                    acc.netAmount += e.netAmount || 0;
+                    acc.paidAmount += e.paidAmount || 0;
+                    acc.balanceAmount += e.balanceAmount || 0;
+                    return acc;
+                }, { originalAmount: 0, netAmount: 0, paidAmount: 0, balanceAmount: 0 });
+
+                // Update in DB and in-memory object so the response is always accurate
+                if (totals.netAmount !== studentFee.finalAmount || totals.paidAmount !== studentFee.paidAmount) {
+                    await prisma.studentFee.update({
+                        where: { id: studentFee.id },
+                        data: {
+                            originalAmount: totals.netAmount,
+                            finalAmount: totals.netAmount,
+                            paidAmount: totals.paidAmount,
+                            balanceAmount: totals.balanceAmount,
+                        }
+                    });
+                    studentFee.originalAmount = totals.netAmount;
+                    studentFee.finalAmount = totals.netAmount;
+                    studentFee.paidAmount = totals.paidAmount;
+                    studentFee.balanceAmount = totals.balanceAmount;
+                }
+            }
+
             const wallet = await prisma.studentWallet.findUnique({
                 where: { studentId }
             });
+            walletBalance = wallet?.balance || 0;
+        } else if (feeSessionId) {
+            // No fee structure assigned — just fetch existing entries
+            await calculateLateFees(studentId, feeSessionId);
+            ledgerEntries = await prisma.studentFeeLedger.findMany({
+                where: { studentId, feeSessionId },
+                include: {
+                    feeComponent: {
+                        select: { name: true, type: true, category: true, isOptional: true }
+                    }
+                },
+                orderBy: [
+                    { month: "asc" },
+                    { dueDate: "asc" },
+                    { feeComponent: { displayOrder: "asc" } }
+                ]
+            });
+            const wallet = await prisma.studentWallet.findUnique({ where: { studentId } });
             walletBalance = wallet?.balance || 0;
         }
 

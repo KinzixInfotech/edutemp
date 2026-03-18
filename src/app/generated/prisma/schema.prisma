@@ -1830,7 +1830,7 @@ model User {
   deletedMessages          Message[]                 @relation("MessageDeleter")
 
   // Financial Ledger Engine
-  ledgerAuditLogs  LedgerAuditLog[]  @relation("LedgerAuditUser")
+
   paymentReversals PaymentReversal[] @relation("PaymentReversalUser")
 
   @@index([schoolId])
@@ -4955,12 +4955,11 @@ model LedgerAuditLog {
   action        LedgerAction
   oldValue      Json?
   newValue      Json?
-  doneBy        String?      @db.Uuid
+  doneBy        String?
   remarks       String?
   createdAt     DateTime     @default(now())
 
   ledgerEntry StudentFeeLedger @relation(fields: [ledgerEntryId], references: [id], onDelete: Cascade)
-  user        User?            @relation("LedgerAuditUser", fields: [doneBy], references: [id])
 
   @@index([ledgerEntryId])
   @@index([doneBy])

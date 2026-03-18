@@ -42,7 +42,11 @@ export async function GET(req, { params }) {
                     where: { isActive: true },
                     include: {
                         parent: {
-                            include: {
+                            select: {
+                                id: true,
+                                name: true,
+                                contactNumber: true,
+                                email: true,
                                 user: {
                                     select: {
                                         name: true,
@@ -51,8 +55,7 @@ export async function GET(req, { params }) {
                                 }
                             }
                         }
-                    },
-                    take: 2
+                    }
                 }
             }
         });
@@ -60,13 +63,27 @@ export async function GET(req, { params }) {
             return NextResponse.json({ error: 'Student not found' }, { status: 404 });
         }
 
-        // Get primary parent info
-        const primaryParentLink = student.studentParentLinks?.find(l => l.isPrimary) || student.studentParentLinks?.[0];
-        const parentInfo = primaryParentLink?.parent;
+        // Resolve parent info from StudentParentLink (real Parent model) with fallback to inline fields
+        const parentLinks = student.studentParentLinks || [];
+        const fatherLink = parentLinks.find(l => l.relation === 'FATHER');
+        const motherLink = parentLinks.find(l => l.relation === 'MOTHER');
+        const guardianLink = parentLinks.find(l => l.relation === 'GUARDIAN' || l.relation === 'GRANDFATHER' || l.relation === 'GRANDMOTHER' || l.relation === 'UNCLE' || l.relation === 'AUNT' || l.relation === 'OTHER');
+
+        // Father: prefer linked Parent, fallback to inline fields
+        const fatherName = fatherLink?.parent?.name || fatherLink?.parent?.user?.name || student.FatherName || null;
+        const fatherPhone = fatherLink?.parent?.contactNumber || student.FatherNumber || null;
+
+        // Mother: prefer linked Parent, fallback to inline fields
+        const motherName = motherLink?.parent?.name || motherLink?.parent?.user?.name || student.MotherName || null;
+        const motherPhone = motherLink?.parent?.contactNumber || student.MotherNumber || null;
+
+        // Guardian: prefer linked Parent, fallback to inline fields
+        const guardianName = guardianLink?.parent?.name || guardianLink?.parent?.user?.name || student.GuardianName || null;
+        const guardianRelation = guardianLink?.relation || student.GuardianRelation || null;
+        const guardianPhone = guardianLink?.parent?.contactNumber || null;
 
         return NextResponse.json({
             id: student.userId,
-            // Use student.name (from Student model) or fallback to user.name
             name: student.name || student.user?.name || 'Unknown',
             email: student.email || student.user?.email,
             profilePicture: student.user?.profilePicture,
@@ -82,14 +99,13 @@ export async function GET(req, { params }) {
             country: student.country,
             postalCode: student.postalCode,
             contactNumber: student.contactNumber,
-            // Use correct field names from Student model (PascalCase)
-            fatherName: student.FatherName,
-            motherName: student.MotherName,
-            fatherPhone: student.FatherNumber,
-            motherPhone: student.MotherNumber,
-            guardianName: student.GuardianName,
-            guardianRelation: student.GuardianRelation,
-            guardianPhone: student.FatherNumber || student.MotherNumber,
+            fatherName,
+            motherName,
+            fatherPhone,
+            motherPhone,
+            guardianName,
+            guardianRelation,
+            guardianPhone,
             bloodGroup: student.bloodGroup,
             house: student.House,
             previousSchool: student.PreviousSchoolName,
@@ -102,11 +118,14 @@ export async function GET(req, { params }) {
                 id: student.sectionId,
                 name: student.section?.name
             },
-            parent: parentInfo ? {
-                name: parentInfo.name || parentInfo.user?.name,
-                email: parentInfo.user?.email,
-                phone: parentInfo.phone
-            } : null
+            // All linked parents for richer display
+            parents: parentLinks.map(link => ({
+                name: link.parent?.name || link.parent?.user?.name,
+                relation: link.relation,
+                phone: link.parent?.contactNumber,
+                email: link.parent?.user?.email || link.parent?.email,
+                isPrimary: link.isPrimary
+            }))
         });
     } catch (error) {
         console.error('[STUDENT DETAIL ERROR]', error);

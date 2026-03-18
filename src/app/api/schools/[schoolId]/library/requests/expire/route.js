@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { invalidatePattern } from "@/lib/cache";
 
 // POST - Check and expire overdue requests
 export async function POST(req, props) {
@@ -21,6 +22,7 @@ export async function POST(req, props) {
             },
         });
 
+        await invalidatePattern(`library:requests:*${schoolId}*`);
         return NextResponse.json({
             success: true,
             expiredCount: expiredRequests.count,
