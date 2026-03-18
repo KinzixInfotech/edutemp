@@ -12,6 +12,7 @@ import {
     Search,
     Download,
     Eye,
+    ExternalLink,
     CreditCard,
     Calendar,
     CheckCircle,
@@ -1041,7 +1042,7 @@ export default function PaymentTracking() {
                                     </Button>
                                 </div>
 
-                                {/* Ledger Components Picker */}
+                                {/* Ledger Components Picker — Grouped by Month */}
                                 {ledgerLoading ? (
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground p-3">
                                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -1052,37 +1053,78 @@ export default function PaymentTracking() {
                                         <Label className="text-xs text-muted-foreground">
                                             Select entries to prioritize (optional — leave empty to auto-allocate oldest first)
                                         </Label>
-                                        <div className="border rounded-lg divide-y max-h-40 overflow-y-auto">
-                                            {pendingLedgerEntries.map((entry) => {
-                                                const balance = entry.amount - (entry.paidAmount || 0);
-                                                const isOverdue = entry.status === 'OVERDUE';
-
-                                                return (
-                                                    <label
-                                                        key={entry.id}
-                                                        className="flex items-center gap-3 p-2.5 hover:bg-muted/50 cursor-pointer text-sm"
-                                                    >
-                                                        <Checkbox
-                                                            checked={selectedInstallmentIds.includes(entry.id)}
-                                                            onCheckedChange={() => toggleInstallment(entry.id)}
-                                                        />
-                                                        <div className="flex-1">
-                                                            <span className="font-medium">{entry.feeComponent?.name || 'Fee'} ({entry.month})</span>
-                                                            <span className="text-muted-foreground ml-2 text-xs">
-                                                                Due: {new Date(entry.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                                                            </span>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <span className={`font-medium ${isOverdue ? 'text-red-600' : ''}`}>
-                                                                {formatCurrency(balance)}
-                                                            </span>
-                                                            {isOverdue && (
-                                                                <span className="block text-[10px] text-red-500">Overdue</span>
-                                                            )}
-                                                        </div>
-                                                    </label>
+                                        <div className="border rounded-lg max-h-48 overflow-y-auto">
+                                            {(() => {
+                                                // Group entries by month
+                                                const monthOrder = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"];
+                                                const grouped = {};
+                                                pendingLedgerEntries.forEach(entry => {
+                                                    const month = entry.month || 'Other';
+                                                    if (!grouped[month]) grouped[month] = [];
+                                                    grouped[month].push(entry);
+                                                });
+                                                const sortedMonths = Object.keys(grouped).sort(
+                                                    (a, b) => monthOrder.indexOf(a) - monthOrder.indexOf(b)
                                                 );
-                                            })}
+
+                                                return sortedMonths.map((month, mIdx) => {
+                                                    const entries = grouped[month];
+                                                    const monthTotal = entries.reduce((sum, e) => sum + (e.amount - (e.paidAmount || 0)), 0);
+                                                    const hasOverdue = entries.some(e => e.status === 'OVERDUE');
+
+                                                    return (
+                                                        <div key={month}>
+                                                            {/* Month Header */}
+                                                            <div className={`flex items-center justify-between px-3 py-1.5 bg-muted/60 ${mIdx > 0 ? 'border-t' : ''}`}>
+                                                                <div className="flex items-center gap-2">
+                                                                    <Calendar className="w-3 h-3 text-muted-foreground" />
+                                                                    <span className="text-xs font-semibold">{month}</span>
+                                                                    {hasOverdue && (
+                                                                        <span className="text-[9px] font-medium text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full">OVERDUE</span>
+                                                                    )}
+                                                                </div>
+                                                                <span className={`text-xs font-semibold ${hasOverdue ? 'text-red-600' : 'text-muted-foreground'}`}>
+                                                                    {formatCurrency(monthTotal)}
+                                                                </span>
+                                                            </div>
+                                                            {/* Month Entries */}
+                                                            {entries.map((entry) => {
+                                                                const balance = entry.amount - (entry.paidAmount || 0);
+                                                                const isOverdue = entry.status === 'OVERDUE';
+                                                                const paidPercent = entry.amount > 0 ? Math.round(((entry.paidAmount || 0) / entry.amount) * 100) : 0;
+
+                                                                return (
+                                                                    <label
+                                                                        key={entry.id}
+                                                                        className="flex items-center gap-3 px-3 py-2 hover:bg-muted/30 cursor-pointer border-t text-sm transition-colors"
+                                                                    >
+                                                                        <Checkbox
+                                                                            checked={selectedInstallmentIds.includes(entry.id)}
+                                                                            onCheckedChange={() => toggleInstallment(entry.id)}
+                                                                        />
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <span className="font-medium text-xs truncate">{entry.feeComponent?.name || 'Fee'}</span>
+                                                                            </div>
+                                                                            <div className="flex items-center gap-2 mt-0.5">
+                                                                                <span className="text-[10px] text-muted-foreground">
+                                                                                    Due: {new Date(entry.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                                                                </span>
+                                                                                {paidPercent > 0 && paidPercent < 100 && (
+                                                                                    <span className="text-[10px] text-amber-600 font-medium">{paidPercent}% paid</span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                        <span className={`font-semibold text-xs tabular-nums ${isOverdue ? 'text-red-600' : ''}`}>
+                                                                            {formatCurrency(balance)}
+                                                                        </span>
+                                                                    </label>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    );
+                                                });
+                                            })()}
                                         </div>
                                     </div>
                                 )}
@@ -1207,18 +1249,38 @@ export default function PaymentTracking() {
                             </div>
 
                             <div className="flex flex-col gap-3 max-w-xs mx-auto">
-                                <Button
-                                    className="w-full"
-                                    onClick={() => handleReceiptDownload(lastPaymentResult.id, 'download')}
-                                    disabled={generatingReceipt}
-                                >
-                                    {generatingReceipt ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
-                                    Download Receipt
-                                </Button>
+                                {lastPaymentResult.receiptUrl ? (
+                                    <Button
+                                        className="w-full"
+                                        onClick={() => window.open(lastPaymentResult.receiptUrl, '_blank')}
+                                    >
+                                        <ExternalLink className="w-4 h-4 mr-2" />
+                                        View Receipt
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        className="w-full"
+                                        onClick={() => handleReceiptDownload(lastPaymentResult.id, 'download')}
+                                        disabled={generatingReceipt}
+                                    >
+                                        {generatingReceipt ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+                                        Download Receipt
+                                    </Button>
+                                )}
                                 <Button
                                     variant="outline"
                                     className="w-full"
-                                    onClick={() => handleReceiptDownload(lastPaymentResult.id, 'print')}
+                                    onClick={() => {
+                                        if (lastPaymentResult.receiptUrl) {
+                                            const printWindow = window.open(lastPaymentResult.receiptUrl, '_blank');
+                                            printWindow?.addEventListener('load', () => {
+                                                printWindow.focus();
+                                                printWindow.print();
+                                            });
+                                        } else {
+                                            handleReceiptDownload(lastPaymentResult.id, 'print');
+                                        }
+                                    }}
                                     disabled={generatingReceipt}
                                 >
                                     <Printer className="w-4 h-4 mr-2" />
@@ -1229,7 +1291,6 @@ export default function PaymentTracking() {
                                     className="w-full"
                                     onClick={() => {
                                         setRecordPaymentOpen(false);
-                                        // Reset optional
                                     }}
                                 >
                                     Done

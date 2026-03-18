@@ -21,7 +21,7 @@ export async function GET(req) {
 
     try {
         // Generate cache key based on params
-        const cacheKey = generateKey('student-transport-assignments', { schoolId, studentId: studentId || 'all' });
+        const cacheKey = generateKey('student-transport-assignments-v2', { schoolId, studentId: studentId || 'all' });
 
         const transformedAssignments = await remember(cacheKey, async () => {
             const where = { schoolId };
@@ -48,14 +48,36 @@ export async function GET(req) {
                         select: {
                             id: true,
                             name: true,
-                            vehicle: {
+                            routeAssignment: {
+                                where: { isActive: true },
                                 select: {
-                                    id: true,
-                                    licensePlate: true,
-                                    model: true,
-                                    capacity: true,
-                                    status: true,
-                                },
+                                    vehicle: {
+                                        select: {
+                                            id: true,
+                                            licensePlate: true,
+                                            model: true,
+                                            capacity: true,
+                                            status: true,
+                                        }
+                                    },
+                                    driver: {
+                                        select: {
+                                            id: true,
+                                            name: true,
+                                            contactNumber: true,
+                                            licenseNumber: true,
+                                            profilePicture: true,
+                                        }
+                                    },
+                                    conductor: {
+                                        select: {
+                                            id: true,
+                                            name: true,
+                                            contactNumber: true,
+                                            profilePicture: true,
+                                        }
+                                    }
+                                }
                             },
                             busStops: {
                                 select: {
@@ -109,11 +131,22 @@ export async function GET(req) {
             });
 
             // Transform the data to include vehicle and stop at top level
-            return assignments.map(assignment => ({
-                ...assignment,
-                vehicle: assignment.route?.vehicle || null,
-                stop: stopMap[`${assignment.studentId}-${assignment.routeId}`] || null,
-            }));
+            return assignments.map(assignment => {
+                const ra = assignment.route?.routeAssignment;
+                if (ra && assignment.route) {
+                    // Shim the data format so the App doesn't need to change its lookups
+                    assignment.route.vehicle = {
+                        ...ra.vehicle,
+                        routeAssignments: [ra]
+                    };
+                    delete assignment.route.routeAssignment;
+                }
+                return {
+                    ...assignment,
+                    vehicle: ra?.vehicle || null,
+                    stop: stopMap[`${assignment.studentId}-${assignment.routeId}`] || null,
+                };
+            });
         }, CACHE_TTL);
 
         return NextResponse.json({ assignments: transformedAssignments }, {

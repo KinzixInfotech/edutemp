@@ -4,6 +4,7 @@
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { sendNotification } from '@/lib/notifications/notificationHelper';
+import { invalidatePattern } from '@/lib/cache';
 
 // GET - List all permanent route assignments for a school
 export async function GET(req) {
@@ -125,6 +126,15 @@ export async function POST(req) {
             });
         }
 
+        // --- CLEAR STUDENT ROUTE CACHE ---
+        // So that parents see the new driver immediately
+        try {
+            await invalidatePattern('student-transport-assignments-v2:*');
+            await invalidatePattern(`route-${routeId}:*`);
+        } catch (cacheErr) {
+            console.error("Cache invalidation error:", cacheErr);
+        }
+
         // Notify old driver if different from new driver
         if (isUpdate && oldDriverId && oldDriverId !== driverUserId) {
             await sendNotification({
@@ -211,6 +221,14 @@ export async function DELETE(req) {
                 senderId,
                 metadata: { routeId, assignmentType: 'REMOVED' },
             });
+        }
+
+        // --- CLEAR STUDENT ROUTE CACHE ---
+        try {
+            await invalidatePattern('student-transport-assignments-v2:*');
+            await invalidatePattern(`route-${routeId}:*`);
+        } catch (cacheErr) {
+            console.error("Cache invalidation error:", cacheErr);
         }
 
         return NextResponse.json({ success: true, message: 'Assignment removed' });

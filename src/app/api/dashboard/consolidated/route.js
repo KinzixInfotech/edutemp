@@ -162,6 +162,7 @@ export async function GET(req) {
                                 paymentDate: true,
                                 status: true,
                                 receiptNumber: true,
+                                receiptUrl: true,
                                 paymentMethod: true,
                                 paymentMode: true,
                                 studentId: true,

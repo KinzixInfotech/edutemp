@@ -24,14 +24,11 @@ import {
     MoreVertical,
     Eye,
     Download,
+    ExternalLink,
     ChevronLeft,
     ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
-import jsPDF from 'jspdf';
-import { toJpeg } from 'html-to-image';
-import { createRoot } from 'react-dom/client';
-import ReceiptTemplate from '@/components/receipts/ReceiptTemplate';
 
 const PAGE_SIZE = 6;
 
@@ -84,84 +81,12 @@ export default function RecentPaymentsWidget({ fullUser, onRemove, recentPayment
         currentPage * PAGE_SIZE
     );
 
-    // Receipt download handler
-    const handleReceiptDownload = async (paymentId) => {
-        setGeneratingReceiptId(paymentId);
-        try {
-            const res = await fetch('/api/receipts/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ feePaymentId: paymentId, schoolId }),
-            });
-            if (!res.ok) throw new Error('Failed to generate receipt');
-            const data = await res.json();
-            const rd = data.receipt.receiptData;
-
-            const schoolProps = {
-                name: rd.schoolName,
-                profilePicture: rd.schoolLogo,
-                location: rd.schoolAddress,
-                contactNumber: rd.schoolContact,
-                email: rd.schoolEmail || '',
-            };
-            const receiptProps = {
-                receiptNumber: rd.receiptNumber,
-                receiptDate: rd.receiptDate,
-                studentName: rd.studentName,
-                fatherName: rd.parentName,
-                degree: rd.studentClass,
-                admissionNo: rd.admissionNo,
-                financialYear: rd.academicYear,
-                feeItems: rd.feeItems || [],
-                total: rd.totalPaid,
-                balanceAfterPayment: rd.balanceAfterPayment || 0,
-                paymentMode: rd.paymentMethod,
-                transactionId: rd.transactionId,
-            };
-            const settingsProps = {
-                showSchoolLogo: rd.showSchoolLogo ?? true,
-                showBalanceDue: rd.showBalanceDue ?? true,
-                showPaymentMode: rd.showPaymentMode ?? true,
-                showSignatureLine: rd.showSignatureLine ?? true,
-                paperSize: rd.paperSize || 'a4',
-                receiptFooterText: rd.footerText || '',
-            };
-
-            // Render off-screen and generate PDF
-            const container = document.createElement('div');
-            container.style.position = 'absolute';
-            container.style.left = '-9999px';
-            container.style.top = '0';
-            document.body.appendChild(container);
-
-            const root = createRoot(container);
-            root.render(<ReceiptTemplate schoolData={schoolProps} receiptData={receiptProps} settings={settingsProps} />);
-            await new Promise((r) => setTimeout(r, 500));
-
-            const el = container.firstChild;
-            if (!el) { root.unmount(); document.body.removeChild(container); return; }
-
-            const dataUrl = await toJpeg(el, { quality: 0.95, pixelRatio: 2 });
-            const img = new Image();
-            img.src = dataUrl;
-            await new Promise((r) => { img.onload = r; });
-
-            const isThermal = settingsProps.paperSize === 'thermal';
-            const pdfWidth = isThermal ? 80 : 215.9;
-            const pdfHeight = isThermal ? (img.height / img.width) * pdfWidth : 279.4;
-            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [pdfWidth, pdfHeight] });
-            const imgHeight = (img.height / img.width) * pdfWidth;
-            pdf.addImage(dataUrl, 'JPEG', 0, 0, pdfWidth, imgHeight);
-            pdf.save(`Receipt_${rd.receiptNumber || 'Payment'}.pdf`);
-
-            root.unmount();
-            document.body.removeChild(container);
-            toast.success('Receipt downloaded!');
-        } catch (err) {
-            console.error(err);
-            toast.error('Failed to generate receipt');
-        } finally {
-            setGeneratingReceiptId(null);
+    // Receipt download handler — uses CDN URL directly
+    const handleReceiptAction = (payment) => {
+        if (payment.receiptUrl) {
+            window.open(payment.receiptUrl, '_blank');
+        } else {
+            toast.error('Receipt not available for this payment');
         }
     };
 
@@ -306,14 +231,23 @@ export default function RecentPaymentsWidget({ fullUser, onRemove, recentPayment
                                                             View
                                                         </Link>
                                                     </DropdownMenuItem>
-                                                    <DropdownMenuItem
-                                                        onClick={() => handleReceiptDownload(payment.id)}
-                                                        disabled={generatingReceiptId === payment.id}
-                                                        className="flex items-center gap-2"
-                                                    >
-                                                        <Download className="h-3.5 w-3.5" />
-                                                        {generatingReceiptId === payment.id ? 'Generating...' : 'Download Receipt'}
-                                                    </DropdownMenuItem>
+                                                    {payment.receiptUrl ? (
+                                                        <DropdownMenuItem
+                                                            onClick={() => handleReceiptAction(payment)}
+                                                            className="flex items-center gap-2"
+                                                        >
+                                                            <ExternalLink className="h-3.5 w-3.5" />
+                                                            View Receipt
+                                                        </DropdownMenuItem>
+                                                    ) : (
+                                                        <DropdownMenuItem
+                                                            disabled
+                                                            className="flex items-center gap-2 text-muted-foreground"
+                                                        >
+                                                            <Download className="h-3.5 w-3.5" />
+                                                            No Receipt
+                                                        </DropdownMenuItem>
+                                                    )}
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </TableCell>
