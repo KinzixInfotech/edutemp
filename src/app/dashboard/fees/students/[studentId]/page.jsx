@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState, useMemo } from 'react';
+import { use, useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -12,7 +12,8 @@ import {
     ArrowLeft, Download, DollarSign, CheckCircle, Clock, AlertCircle,
     CreditCard, Percent, FileText, Send, Loader2, AlertTriangle,
     Printer, Plus, X, Edit2, Save, Bus, Zap, Shield, Tag,
-    RefreshCw, TrendingDown, Info,
+    RefreshCw, TrendingDown, Info, ChevronDown, ChevronRight,
+    BookOpen, CalendarDays, Receipt,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -48,11 +49,22 @@ const STATUS_LABELS = {
     LEDGER_WAIVED: 'Waived', LEDGER_CANCELLED: 'Cancelled',
     PAID: 'Paid', PARTIAL: 'Partial', PENDING: 'Pending', OVERDUE: 'Overdue',
 };
+const TYPE_META = {
+    MONTHLY:   { label: 'Monthly Fees',     icon: BookOpen,     color: 'text-blue-600',   bg: 'bg-blue-50 dark:bg-blue-950/20',     border: 'border-blue-200 dark:border-blue-800' },
+    ANNUAL:    { label: 'Annual Fees',       icon: CalendarDays, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950/20', border: 'border-emerald-200 dark:border-emerald-800' },
+    ONE_TIME:  { label: 'One-time Fees',     icon: Receipt,      color: 'text-amber-600',  bg: 'bg-amber-50 dark:bg-amber-950/20',   border: 'border-amber-200 dark:border-amber-800' },
+    TERM:      { label: 'Term Fees',         icon: CalendarDays, color: 'text-violet-600', bg: 'bg-violet-50 dark:bg-violet-950/20', border: 'border-violet-200 dark:border-violet-800' },
+    PROMOTION: { label: 'Promotion Fees',    icon: Tag,          color: 'text-pink-600',   bg: 'bg-pink-50 dark:bg-pink-950/20',     border: 'border-pink-200 dark:border-pink-800' },
+};
+const TYPE_ORDER = ['MONTHLY', 'ANNUAL', 'ONE_TIME', 'TERM', 'PROMOTION'];
 
 export default function StudentFeeDetails({ params }) {
     const { fullUser } = useAuth();
     const [token, setToken] = useState('');
-    supabase.auth.onAuthStateChange((_e, s) => setToken(s?.access_token || ''));
+    useEffect(() => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setToken(s?.access_token || ''));
+        return () => subscription?.unsubscribe();
+    }, []);
     const router = useRouter();
     const qc = useQueryClient();
     const schoolId = fullUser?.schoolId;
@@ -101,21 +113,31 @@ export default function StudentFeeDetails({ params }) {
 
     const derivedSchoolId = studentFee?.student?.schoolId || schoolId;
 
-    const { data: servicesRes, refetch: refetchServices } = useQuery({
-        queryKey: ['student-services', studentId],
-        queryFn: async () => { const r = await fetch(`/api/schools/fee/student-services?studentId=${studentId}`); return r.json(); },
-        enabled: !!studentId,
+    // Fetch optional components from the student's fee structure
+    const { data: optionalComponentsRes, refetch: refetchOptional } = useQuery({
+        queryKey: ['optional-components', studentFee?.globalFeeStructureId, schoolId],
+        queryFn: async () => {
+            const r = await fetch(`/api/schools/fee/global-structures?schoolId=${schoolId}&academicYearId=${academicYearId}`);
+            const data = await r.json();
+            const structure = Array.isArray(data) ? data.find(s => s.id === studentFee.globalFeeStructureId) : null;
+            const optionals = (structure?.particulars || []).filter(p => p.isOptional);
+            return { optionalComponents: optionals };
+        },
+        enabled: !!schoolId && !!studentFee?.globalFeeStructureId && !!academicYearId,
     });
-    const studentServices = servicesRes?.services || [];
-    const subscribedIds = new Set(studentServices.map(s => s.serviceId));
+    const optionalComponents = optionalComponentsRes?.optionalComponents || [];
 
-    const { data: allServicesRes } = useQuery({
-        queryKey: ['all-services', schoolId],
-        queryFn: async () => { const r = await fetch(`/api/schools/fee/services?schoolId=${schoolId}`); return r.json(); },
-        enabled: !!schoolId && addServiceOpen,
-    });
-    const allServices = allServicesRes?.services || [];
-    const availableToAdd = allServices.filter(s => !subscribedIds.has(s.id) && s.isActive);
+    // Check which optional components already have ledger entries (i.e. already activated)
+    const activatedComponentIds = new Set(
+        (studentFee?.ledger || []).map(l => l.feeComponent?.id || l.feeComponentId).filter(Boolean)
+    );
+    // Also check by name match against particulars that were removed by cleanup
+    const activatedNames = new Set(
+        (studentFee?.ledger || []).map(l => l.feeComponent?.name).filter(Boolean)
+    );
+    const availableToAdd = optionalComponents.filter(c =>
+        !activatedComponentIds.has(c.id) && !activatedNames.has(c.name)
+    );
 
     // ✅ FIX: uses academicYearId not activeYear?.id
     const { data: auditRes } = useQuery({
@@ -145,14 +167,14 @@ export default function StudentFeeDetails({ params }) {
     });
 
     const addServiceMutation = useMutation({
-        mutationFn: async ({ serviceId, overrideAmount }) => {
+        mutationFn: async ({ particularId, overrideAmount }) => {
             const r = await fetch('/api/schools/fee/student-services', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'subscribe', studentId, serviceId, schoolId: derivedSchoolId, academicYearId, feeSessionId: academicYearId, userId: fullUser?.id, overrideAmount: overrideAmount || null }),
+                body: JSON.stringify({ action: 'activate-optional', studentId, particularId, schoolId: derivedSchoolId, academicYearId, userId: fullUser?.id, overrideAmount: overrideAmount || null }),
             });
             const j = await r.json(); if (!r.ok) throw new Error(j.error); return j;
         },
-        onSuccess: () => { toast.success('Service added — ledger entries generated'); refetchServices(); refetchFee(); setAddServiceOpen(false); setServiceToAdd(''); setServiceOverride(''); },
+        onSuccess: (d) => { toast.success(`Optional fee activated — ${d.ledgerEntriesCreated || 0} ledger entries generated`); refetchOptional(); refetchFee(); setAddServiceOpen(false); setServiceToAdd(''); setServiceOverride(''); },
         onError: e => toast.error(e.message),
     });
 
@@ -246,6 +268,86 @@ export default function StudentFeeDetails({ params }) {
         };
     }, [studentFee]);
 
+    // ── Grouped ledger: Month → Type → Items ─────────────────────────
+    const [openMonths, setOpenMonths] = useState({});
+    const toggleMonth = (key) => setOpenMonths(prev => ({ ...prev, [key]: !prev[key] }));
+
+    const groupedLedger = useMemo(() => {
+        const entries = studentFee?.ledger || [];
+        
+        // Find session start using the exact FeeSession from the backend, or default to April
+        let sessionStartDate = new Date();
+        sessionStartDate.setMonth(3); // April
+        sessionStartDate.setDate(1);
+        sessionStartDate.setHours(0,0,0,0);
+        
+        if (studentFee?.session?.startMonth) {
+            sessionStartDate = new Date(studentFee.session.startMonth);
+            sessionStartDate.setDate(1); // Force it to the 1st of the month
+            sessionStartDate.setHours(0,0,0,0);
+        } else {
+            // Fallback just in case session is missing: use earliest month in ledger
+            const validMonths = entries.filter(e => e.month).map(e => new Date(e.month));
+            if (validMonths.length > 0) {
+                const minDate = new Date(Math.min(...validMonths));
+                // Only use it if it's roughly close to a normal academic year start
+                sessionStartDate = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+                // But wait, if someone joined late, this shifts the whole calendar!
+                // Best fallback is to find the lowest year and assume April of that year
+                sessionStartDate = new Date(minDate.getFullYear(), 3, 1);
+            }
+        }
+
+        // Generate exactly 12 continuous months for the academic session
+        const allMonths = [];
+        for (let i = 0; i < 12; i++) {
+            const d = new Date(sessionStartDate);
+            d.setMonth(d.getMonth() + i);
+            const mKey = d.toISOString().slice(0, 7);
+            const mLabel = d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+            allMonths.push({ key: mKey, label: mLabel, date: d.toISOString(), types: {}, entries: [] });
+        }
+
+        // Initialize our map with these 12 months
+        const byMonth = {};
+        allMonths.forEach(m => { byMonth[m.key] = m; });
+
+        // Populate with actual ledger entries
+        for (const e of entries) {
+            let mKey = e.month ? new Date(e.month).toISOString().slice(0, 7) : null;
+            
+            // If entry doesn't have a valid month or falls outside the 12 generated months, 
+            // put it in an 'other' bucket, or map to closest if needed. 
+            // For now, if mKey isn't in our 12 months (e.g. past dues), add it dynamically
+            if (!mKey) {
+                mKey = 'other';
+                if (!byMonth[mKey]) byMonth[mKey] = { key: mKey, label: e.monthLabel || 'Other', date: new Date().toISOString(), types: {}, entries: [] };
+            } else if (!byMonth[mKey]) {
+                const mLabel = new Date(e.month).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+                byMonth[mKey] = { key: mKey, label: mLabel, date: e.month, types: {}, entries: [] };
+            }
+
+            byMonth[mKey].entries.push(e);
+
+            // Group by component type within month
+            const cType = e.feeComponent?.type || 'ONE_TIME';
+            if (!byMonth[mKey].types[cType]) byMonth[mKey].types[cType] = [];
+            byMonth[mKey].types[cType].push(e);
+        }
+
+        // Sort chronologically (the 12 months are already in order, but just to be sure + handle 'other')
+        return Object.values(byMonth).sort((a, b) => new Date(a.date) - new Date(b.date));
+    }, [studentFee?.ledger]);
+
+    // Auto-open all months on first render
+    useEffect(() => {
+        if (groupedLedger.length > 0 && Object.keys(openMonths).length === 0) {
+            const open = {};
+            groupedLedger.forEach(m => { open[m.key] = true; });
+            setOpenMonths(open);
+        }
+    }, [groupedLedger]);
+
     if (isLoading) return <div className="flex items-center justify-center h-screen"><Loader2 className="h-12 w-12 animate-spin" /></div>;
     if (!studentFee) return null;
 
@@ -307,7 +409,7 @@ export default function StudentFeeDetails({ params }) {
                         <TabsList className="flex-wrap h-auto">
                             <TabsTrigger value="ledger">Ledger</TabsTrigger>
                             <TabsTrigger value="particulars">Particulars</TabsTrigger>
-                            <TabsTrigger value="services">Services {studentServices.length > 0 && <span className="ml-1 bg-primary/10 text-primary text-[10px] px-1.5 rounded-full">{studentServices.length}</span>}</TabsTrigger>
+                            <TabsTrigger value="services">Services {availableToAdd.length > 0 && <span className="ml-1 bg-primary/10 text-primary text-[10px] px-1.5 rounded-full">{availableToAdd.length}</span>}</TabsTrigger>
                             <TabsTrigger value="payments">Payments</TabsTrigger>
                             <TabsTrigger value="discounts">Discounts</TabsTrigger>
                             <TabsTrigger value="audit">Audit Log</TabsTrigger>
@@ -318,7 +420,15 @@ export default function StudentFeeDetails({ params }) {
                             <Card>
                                 <CardHeader className="pb-3">
                                     <div className="flex items-center justify-between flex-wrap gap-3">
-                                        <div><CardTitle>Financial Ledger</CardTitle><CardDescription>Month-wise breakdown with late fee calculation</CardDescription></div>
+                                        <div>
+                                            <CardTitle>Financial Ledger</CardTitle>
+                                            <CardDescription className="max-w-2xl mt-1.5 leading-relaxed">
+                                                Month-wise breakdown with late fee calculation. <br/>
+                                                <span className="text-amber-600 dark:text-amber-500 font-medium">
+                                                    Note: The system only generates recurring monthly fees starting from the student's Join Date ({studentFee.student?.admissionDate ? new Date(studentFee.student.admissionDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}). Previous months will be empty.
+                                                </span>
+                                            </CardDescription>
+                                        </div>
                                         <div className="flex items-center gap-2">
                                             {studentFee.walletBalance > 0 && <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Wallet: {INR(studentFee.walletBalance)}</Badge>}
                                             <Tooltip><TooltipTrigger asChild>
@@ -330,57 +440,140 @@ export default function StudentFeeDetails({ params }) {
                                     </div>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="rounded-md border overflow-x-auto">
-                                        <Table>
-                                            <TableHeader><TableRow className="bg-muted/50">
-                                                <TableHead>Month</TableHead><TableHead>Component</TableHead><TableHead>Due Date</TableHead>
-                                                <TableHead className="text-right">Net Amt</TableHead><TableHead className="text-right">Late Fee</TableHead>
-                                                <TableHead className="text-right">Paid</TableHead><TableHead className="text-right">Balance</TableHead>
-                                                <TableHead className="text-center">Status</TableHead><TableHead />
-                                            </TableRow></TableHeader>
-                                            <TableBody>
-                                                {studentFee.ledger?.length > 0 ? studentFee.ledger.map(e => {
-                                                    const monthLabel = e.month ? new Date(e.month).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) : (e.monthLabel || 'One-Time');
-                                                    const isOverdue = !['PAID', 'LEDGER_PAID', 'WAIVED', 'LEDGER_WAIVED', 'CANCELLED', 'LEDGER_CANCELLED'].includes(e.status) && e.dueDate && new Date(e.dueDate) < new Date();
-                                                    return (
-                                                        <TableRow key={e.id} className={`${e.isFrozen ? 'opacity-70 bg-muted/20' : ''} ${isOverdue ? 'bg-red-50/40 dark:bg-red-950/10' : ''}`}>
-                                                            <TableCell className="font-medium text-sm whitespace-nowrap">{monthLabel}</TableCell>
-                                                            <TableCell>
-                                                                <span className="text-sm">{e.feeComponent?.name}</span>
-                                                                {e.feeComponent?.isOptional && <span className="ml-1.5 text-[10px] text-orange-500 bg-orange-50 dark:bg-orange-950/20 px-1.5 py-0.5 rounded">Optional</span>}
-                                                                {e.isFrozen && <Clock className="inline w-3 h-3 ml-1.5 text-muted-foreground" />}
-                                                            </TableCell>
-                                                            <TableCell className="text-sm whitespace-nowrap">
-                                                                {e.dueDate ? fd(e.dueDate) : '—'}
-                                                                {isOverdue && <span className="ml-1 text-[10px] text-red-500 font-medium">Overdue</span>}
-                                                            </TableCell>
-                                                            <TableCell className="text-right font-medium tabular-nums">{INR(e.netAmount)}</TableCell>
-                                                            <TableCell className="text-right tabular-nums">
-                                                                {e.lateFeeAmount > 0 ? <span className="text-red-500 font-medium">+{INR(e.lateFeeAmount)}</span> : <span className="text-muted-foreground">—</span>}
-                                                            </TableCell>
-                                                            <TableCell className="text-right text-green-600 font-medium tabular-nums">{INR(e.paidAmount)}</TableCell>
-                                                            <TableCell className="text-right font-bold tabular-nums">{INR(e.balanceAmount)}</TableCell>
-                                                            <TableCell className="text-center"><Badge className={`text-[10px] ${STATUS_COLORS[e.status] || 'bg-slate-100 text-slate-700'}`}>{STATUS_LABELS[e.status] || e.status}</Badge></TableCell>
-                                                            <TableCell>
-                                                                {!e.isFrozen && !['PAID', 'LEDGER_PAID', 'WAIVED', 'LEDGER_WAIVED', 'CANCELLED', 'LEDGER_CANCELLED'].includes(e.status) && (
-                                                                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setAdjustEntry(e); setAdjustAction('discount'); setAdjustValue(''); setAdjustReason(''); setAdjustOpen(true); }}>Adjust</Button>
+                                    {groupedLedger.length > 0 ? (
+                                        <div className="space-y-3">
+                                            {groupedLedger.map(monthGroup => {
+                                                const isOpen = openMonths[monthGroup.key] !== false;
+                                                const mTotal = monthGroup.entries.reduce((s, e) => s + (e.netAmount || 0), 0);
+                                                const mPaid = monthGroup.entries.reduce((s, e) => s + (e.paidAmount || 0), 0);
+                                                const mBalance = monthGroup.entries.reduce((s, e) => s + (e.balanceAmount || 0), 0);
+                                                const mLateFee = monthGroup.entries.reduce((s, e) => s + (e.lateFeeAmount || 0), 0);
+                                                const hasOverdue = monthGroup.entries.some(e => !['PAID', 'LEDGER_PAID', 'WAIVED', 'LEDGER_WAIVED', 'CANCELLED', 'LEDGER_CANCELLED'].includes(e.status) && e.dueDate && new Date(e.dueDate) < new Date());
+                                                const allPaid = monthGroup.entries.length > 0 && monthGroup.entries.every(e => ['LEDGER_PAID', 'PAID', 'LEDGER_WAIVED', 'WAIVED', 'LEDGER_CANCELLED', 'CANCELLED'].includes(e.status));
+                                                
+                                                const monthStatus = monthGroup.entries.length === 0 ? 'No Dues' : (allPaid ? 'Paid' : hasOverdue ? 'Overdue' : 'Unpaid');
+                                                const monthStatusColor = monthGroup.entries.length === 0 ? 'bg-slate-100 text-slate-500 dark:bg-slate-800/50 dark:text-slate-400' 
+                                                    : allPaid ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
+                                                    : hasOverdue ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' 
+                                                    : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+
+                                                return (
+                                                    <div key={monthGroup.key} className="border rounded-xl overflow-hidden bg-card">
+                                                        {/* Month Header — collapsible */}
+                                                        <button onClick={() => toggleMonth(monthGroup.key)} className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-muted/50 transition-colors">
+                                                            <div className="flex items-center gap-3">
+                                                                {isOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                                                                <span className="font-semibold text-base">{monthGroup.label}</span>
+                                                                <Badge className={`text-[10px] ${monthStatusColor}`}>{monthStatus}</Badge>
+                                                                {mLateFee > 0 && <span className="text-[10px] text-red-500 font-medium">+{INR(mLateFee)} late</span>}
+                                                            </div>
+                                                            <div className="flex items-center gap-4 text-sm">
+                                                                {mPaid > 0 && <span className="text-green-600 font-medium">{INR(mPaid)} paid</span>}
+                                                                <span className="font-bold tabular-nums">{INR(mBalance)}</span>
+                                                            </div>
+                                                        </button>
+
+                                                        {/* Month Body */}
+                                                        {isOpen && (
+                                                            <div className="border-t px-4 pb-4 pt-2 space-y-4">
+                                                                {monthGroup.entries.length === 0 ? (
+                                                                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground/50 border border-dashed rounded-lg mt-2 bg-muted/10">
+                                                                        <FileText className="w-6 h-6 mb-1" />
+                                                                        <span className="text-sm">No fees scheduled for this month</span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <>
+                                                                        {TYPE_ORDER.filter(t => monthGroup.types[t]).map(typeKey => {
+                                                                            const meta = TYPE_META[typeKey] || TYPE_META.ONE_TIME;
+                                                                            const TypeIcon = meta.icon;
+                                                                            const items = monthGroup.types[typeKey];
+
+                                                                            return (
+                                                                                <div key={typeKey}>
+                                                                                    {/* Type Header */}
+                                                                                    <div className="flex items-center gap-2 mb-2">
+                                                                                        <div className={`w-6 h-6 rounded-md flex items-center justify-center ${meta.bg}`}>
+                                                                                            <TypeIcon className={`w-3.5 h-3.5 ${meta.color}`} />
+                                                                                        </div>
+                                                                                        <span className={`text-xs font-semibold uppercase tracking-wider ${meta.color}`}>{meta.label}</span>
+                                                                                    </div>
+
+                                                                                    {/* Items */}
+                                                                                    <div className={`rounded-lg border ${meta.border} overflow-hidden`}>
+                                                                                        <Table>
+                                                                                            <TableBody>
+                                                                                                {items.map(e => {
+                                                                                                    const isOverdue = !['PAID', 'LEDGER_PAID', 'WAIVED', 'LEDGER_WAIVED', 'CANCELLED', 'LEDGER_CANCELLED'].includes(e.status) && e.dueDate && new Date(e.dueDate) < new Date();
+                                                                                                    return (
+                                                                                                        <TableRow key={e.id} className={`${e.isFrozen ? 'opacity-60' : ''} ${isOverdue ? 'bg-red-50/30 dark:bg-red-950/5' : ''}`}>
+                                                                                                            <TableCell className="py-2.5">
+                                                                                                                <div className="flex items-center gap-2">
+                                                                                                                    <span className="text-sm font-medium">{e.feeComponent?.name}</span>
+                                                                                                                    {e.feeComponent?.isOptional && <span className="text-[9px] text-orange-500 bg-orange-50 dark:bg-orange-950/20 px-1.5 py-0.5 rounded font-medium">Optional</span>}
+                                                                                                                    {e.isFrozen && <Clock className="w-3 h-3 text-muted-foreground" />}
+                                                                                                                </div>
+                                                                                                                <div className="flex items-center gap-2 mt-0.5">
+                                                                                                                    <span className="text-[11px] text-muted-foreground">Due: {e.dueDate ? fd(e.dueDate) : '—'}</span>
+                                                                                                                    {isOverdue && <span className="text-[10px] text-red-500 font-semibold">Overdue</span>}
+                                                                                                                </div>
+                                                                                                            </TableCell>
+                                                                                                            <TableCell className="text-right py-2.5 w-[100px]">
+                                                                                                                {e.lateFeeAmount > 0 && (
+                                                                                                                    <Tooltip><TooltipTrigger asChild>
+                                                                                                                        <span className="text-[11px] text-red-500 font-medium cursor-help block">+{INR(e.lateFeeAmount)} late</span>
+                                                                                                                    </TooltipTrigger><TooltipContent>
+                                                                                                                        Late Fee ({Math.max(0, Math.floor((new Date() - new Date(e.dueDate)) / 86400000))} days overdue)
+                                                                                                                    </TooltipContent></Tooltip>
+                                                                                                                )}
+                                                                                                            </TableCell>
+                                                                                                            <TableCell className="text-right py-2.5 w-[90px]">
+                                                                                                                <span className="font-semibold tabular-nums text-sm">{INR(e.netAmount)}</span>
+                                                                                                                {e.paidAmount > 0 && <span className="block text-[11px] text-green-600 tabular-nums">{INR(e.paidAmount)} paid</span>}
+                                                                                                            </TableCell>
+                                                                                                            <TableCell className="text-center py-2.5 w-[70px]">
+                                                                                                                <Badge className={`text-[9px] ${STATUS_COLORS[e.status] || 'bg-slate-100 text-slate-700'}`}>{STATUS_LABELS[e.status] || e.status}</Badge>
+                                                                                                            </TableCell>
+                                                                                                            <TableCell className="py-2.5 w-[60px]">
+                                                                                                                {!e.isFrozen && !['PAID', 'LEDGER_PAID', 'WAIVED', 'LEDGER_WAIVED', 'CANCELLED', 'LEDGER_CANCELLED'].includes(e.status) && (
+                                                                                                                    <Button variant="ghost" size="sm" className="h-6 text-[11px] px-2" onClick={() => { setAdjustEntry(e); setAdjustAction('discount'); setAdjustValue(''); setAdjustReason(''); setAdjustOpen(true); }}>Adjust</Button>
+                                                                                                                )}
+                                                                                                            </TableCell>
+                                                                                                        </TableRow>
+                                                                                                    );
+                                                                                                })}
+                                                                                            </TableBody>
+                                                                                        </Table>
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+
+                                                                        {/* Month Footer */}
+                                                                        <div className="flex items-center justify-between pt-3 mt-2 border-t border-dashed">
+                                                                            <span className="text-xs text-muted-foreground font-medium">Total for {monthGroup.label}</span>
+                                                                            <div className="flex items-center gap-4">
+                                                                                {mPaid > 0 && <span className="text-xs text-green-600 font-medium tabular-nums">Paid: {INR(mPaid)}</span>}
+                                                                                <span className="text-sm font-bold tabular-nums">{INR(mTotal)}</span>
+                                                                                {mBalance > 0 && <span className="text-xs text-red-500 font-semibold tabular-nums">Due: {INR(mBalance)}</span>}
+                                                                            </div>
+                                                                        </div>
+                                                                    </>
                                                                 )}
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    );
-                                                }) : (
-                                                    <TableRow><TableCell colSpan={9} className="h-32 text-center">
-                                                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                                                            <FileText className="w-8 h-8 opacity-30" /><p>No ledger entries yet</p>
-                                                            <Button variant="outline" size="sm" onClick={() => regenerateMutation.mutate()} disabled={regenerateMutation.isPending}>
-                                                                {regenerateMutation.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}Generate Ledger
-                                                            </Button>
-                                                        </div>
-                                                    </TableCell></TableRow>
-                                                )}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col items-center gap-3 py-14 border-2 border-dashed rounded-xl text-center">
+                                            <FileText className="w-10 h-10 text-muted-foreground/30" />
+                                            <p className="text-muted-foreground font-medium">No ledger entries yet</p>
+                                            <Button variant="outline" size="sm" onClick={() => regenerateMutation.mutate()} disabled={regenerateMutation.isPending}>
+                                                {regenerateMutation.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}Generate Ledger
+                                            </Button>
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         </TabsContent>
@@ -395,85 +588,50 @@ export default function StudentFeeDetails({ params }) {
                                     </div>
                                 </CardHeader>
                                 <CardContent>
-                                    {studentServices.length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center py-14 border-2 border-dashed rounded-xl text-center">
-                                            <Bus className="w-12 h-12 text-muted-foreground/30 mb-3" />
-                                            <p className="font-medium text-muted-foreground">No services assigned</p>
-                                            <p className="text-xs text-muted-foreground/70 mt-1 mb-4">Assign transport, activity or hostel — charges appear in the ledger automatically</p>
-                                            <Button variant="outline" size="sm" onClick={() => setAddServiceOpen(true)}><Plus className="w-4 h-4 mr-1.5" />Add First Service</Button>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {studentServices.map(sub => {
-                                                const Icon = MODULE_ICONS[sub.service?.module] || Tag;
-                                                const colorCls = MODULE_COLORS[sub.service?.module] || MODULE_COLORS.SERVICE_CUSTOM;
-                                                const isEditing = editingOverrideId === sub.id;
-                                                const effAmt = sub.overrideAmount != null ? sub.overrideAmount : (sub.service?.monthlyFee ?? 0);
-                                                const hasOverride = sub.overrideAmount != null;
-                                                return (
-                                                    <div key={sub.id} className={`border rounded-xl overflow-hidden ${sub.isActive ? 'bg-white dark:bg-slate-950' : 'bg-muted/20 opacity-60'}`}>
+                                    {(() => {
+                                        // Derive activated optional components from ledger entries
+                                        const activatedMap = {};
+                                        (studentFee?.ledger || []).forEach(l => {
+                                            const comp = l.feeComponent;
+                                            if (comp?.isOptional && comp?.id) {
+                                                if (!activatedMap[comp.id]) {
+                                                    activatedMap[comp.id] = { id: comp.id, name: comp.name, amount: comp.amount, entries: 0, totalAmount: 0 };
+                                                }
+                                                activatedMap[comp.id].entries += 1;
+                                                activatedMap[comp.id].totalAmount += (l.netAmount || l.originalAmount || 0);
+                                            }
+                                        });
+                                        const activatedList = Object.values(activatedMap);
+
+                                        return activatedList.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center py-14 border-2 border-dashed rounded-xl text-center">
+                                                <Bus className="w-12 h-12 text-muted-foreground/30 mb-3" />
+                                                <p className="font-medium text-muted-foreground">No optional services activated</p>
+                                                <p className="text-xs text-muted-foreground/70 mt-1 mb-4">Activate transport, activity or hostel — charges appear in the ledger automatically</p>
+                                                <Button variant="outline" size="sm" onClick={() => setAddServiceOpen(true)}><Plus className="w-4 h-4 mr-1.5" />Activate Optional Fee</Button>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                {activatedList.map(comp => (
+                                                    <div key={comp.id} className="border rounded-xl overflow-hidden bg-white dark:bg-slate-950">
                                                         <div className="flex items-center gap-4 p-4">
-                                                            <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border ${colorCls}`}><Icon className="w-5 h-5" /></div>
+                                                            <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-600">
+                                                                <Bus className="w-5 h-5" />
+                                                            </div>
                                                             <div className="flex-1 min-w-0">
-                                                                <div className="flex items-center gap-2 flex-wrap">
-                                                                    <p className="font-semibold">{sub.service?.name}</p>
-                                                                    <Badge variant="outline" className="text-[10px] h-4 px-1.5">{sub.service?.module?.replace('SERVICE_', '')}</Badge>
-                                                                    {!sub.isActive && <Badge variant="outline" className="text-[10px] h-4 text-orange-600 border-orange-200">Paused</Badge>}
-                                                                </div>
-                                                                <p className="text-xs text-muted-foreground mt-0.5">Default: {INR(sub.service?.monthlyFee)}/mo · Started {fd(sub.startDate)}</p>
+                                                                <p className="font-semibold">{comp.name}</p>
+                                                                <p className="text-xs text-muted-foreground mt-0.5">{comp.entries} ledger entries · Total: {INR(comp.totalAmount)}</p>
                                                             </div>
-                                                            {/* Override editor */}
-                                                            <div className="shrink-0">
-                                                                {isEditing ? (
-                                                                    <div className="flex items-center gap-2">
-                                                                        <div className="relative"><span className="absolute left-2.5 top-1.5 text-muted-foreground text-sm">₹</span>
-                                                                            <Input type="number" value={overrideDraft} onChange={e => setOverrideDraft(e.target.value)} className="w-28 h-8 pl-6 text-sm" placeholder={String(sub.service?.monthlyFee || '')} autoFocus />
-                                                                        </div>
-                                                                        <Button size="sm" className="h-8 bg-green-600 hover:bg-green-700 text-white px-2.5"
-                                                                            onClick={() => updateServiceMutation.mutate({ subscriptionId: sub.id, overrideAmount: overrideDraft !== '' ? parseFloat(overrideDraft) : null })}
-                                                                            disabled={updateServiceMutation.isPending}>
-                                                                            {updateServiceMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                                                                        </Button>
-                                                                        <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setEditingOverrideId(null)}><X className="w-3 h-3" /></Button>
-                                                                    </div>
-                                                                ) : (
-                                                                    <div className="flex items-center gap-2">
-                                                                        <div className="text-right">
-                                                                            <p className="font-bold">{INR(effAmt)}<span className="text-xs font-normal text-muted-foreground">/mo</span></p>
-                                                                            {hasOverride && <p className="text-[10px] text-orange-500 font-medium flex items-center gap-0.5 justify-end"><TrendingDown className="w-2.5 h-2.5" />Custom</p>}
-                                                                        </div>
-                                                                        <Tooltip><TooltipTrigger asChild>
-                                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                                                                                onClick={() => { setEditingOverrideId(sub.id); setOverrideDraft(sub.overrideAmount != null ? String(sub.overrideAmount) : ''); }}>
-                                                                                <Edit2 className="w-3.5 h-3.5" />
-                                                                            </Button>
-                                                                        </TooltipTrigger><TooltipContent>Override monthly rate</TooltipContent></Tooltip>
-                                                                    </div>
-                                                                )}
+                                                            <div className="text-right shrink-0">
+                                                                <p className="font-bold">{INR(comp.amount)}<span className="text-xs font-normal text-muted-foreground">/mo</span></p>
+                                                                <Badge className="text-[10px] bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Active</Badge>
                                                             </div>
-                                                            {/* Toggle */}
-                                                            <div className="flex flex-col items-center gap-1 shrink-0">
-                                                                <Switch checked={sub.isActive} onCheckedChange={v => updateServiceMutation.mutate({ subscriptionId: sub.id, isActive: v })} disabled={updateServiceMutation.isPending} />
-                                                                <span className="text-[10px] text-muted-foreground">{sub.isActive ? 'Active' : 'Paused'}</span>
-                                                            </div>
-                                                            {/* Remove */}
-                                                            <Tooltip><TooltipTrigger asChild>
-                                                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 shrink-0 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20"
-                                                                    onClick={() => { if (confirm(`Remove "${sub.service?.name}"? Future ledger entries will be cancelled.`)) removeServiceMutation.mutate(sub.id); }}
-                                                                    disabled={removeServiceMutation.isPending}><X className="w-3.5 h-3.5" /></Button>
-                                                            </TooltipTrigger><TooltipContent>Remove service</TooltipContent></Tooltip>
-                                                        </div>
-                                                        <div className="flex items-center gap-6 px-4 py-2.5 border-t bg-muted/20 text-xs text-muted-foreground">
-                                                            <span>Monthly: <span className="font-medium text-foreground">{INR(effAmt)}</span></span>
-                                                            <span>Annual: <span className="font-medium text-foreground">{INR(effAmt * 12)}</span></span>
-                                                            {sub.endDate && <span>Ends: {fd(sub.endDate)}</span>}
-                                                            {hasOverride && <span className="ml-auto flex items-center gap-1 text-orange-500"><Info className="w-3 h-3" />Overrides default {INR(sub.service?.monthlyFee)}/mo</span>}
                                                         </div>
                                                     </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
+                                                ))}
+                                            </div>
+                                        );
+                                    })()}
                                 </CardContent>
                             </Card>
                         </TabsContent>
@@ -568,28 +726,28 @@ export default function StudentFeeDetails({ params }) {
                         </TabsContent>
                     </Tabs>
 
-                    {/* Add Service Dialog */}
+                    {/* Add Optional Component Dialog */}
                     <Dialog open={addServiceOpen} onOpenChange={setAddServiceOpen}>
-                        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>Add Service</DialogTitle><DialogDescription>Assign an optional service — ledger entries generated from current month</DialogDescription></DialogHeader>
+                        <DialogContent className="max-w-md"><DialogHeader><DialogTitle>Activate Optional Fee</DialogTitle><DialogDescription>Enable an optional fee component — ledger entries generated from current month</DialogDescription></DialogHeader>
                             <div className="space-y-4 py-2">
-                                <div className="space-y-1.5"><Label>Service *</Label>
-                                    <Select value={serviceToAdd} onValueChange={setServiceToAdd}><SelectTrigger><SelectValue placeholder="Select service…" /></SelectTrigger><SelectContent>
-                                        {availableToAdd.length === 0 && <div className="px-3 py-4 text-sm text-muted-foreground text-center">All services already assigned</div>}
-                                        {availableToAdd.map(s => { const I = MODULE_ICONS[s.module] || Tag; return (<SelectItem key={s.id} value={s.id}><div className="flex items-center gap-2"><I className="w-3.5 h-3.5" /><span>{s.name}</span><span className="text-muted-foreground text-xs">· {INR(s.monthlyFee)}/mo</span></div></SelectItem>); })}
+                                <div className="space-y-1.5"><Label>Optional Component *</Label>
+                                    <Select value={serviceToAdd} onValueChange={setServiceToAdd}><SelectTrigger><SelectValue placeholder="Select component…" /></SelectTrigger><SelectContent>
+                                        {availableToAdd.length === 0 && <div className="px-3 py-4 text-sm text-muted-foreground text-center">{optionalComponents.length === 0 ? 'No optional components in this fee structure' : 'All optional components already activated'}</div>}
+                                        {availableToAdd.map(c => (<SelectItem key={c.id} value={c.id}><div className="flex items-center gap-2"><Zap className="w-3.5 h-3.5" /><span>{c.name}</span><span className="text-muted-foreground text-xs">· {INR(c.amount)}/mo</span></div></SelectItem>))}
                                     </SelectContent></Select>
                                 </div>
                                 {serviceToAdd && (
                                     <div className="space-y-1.5"><Label>Custom Rate <span className="text-muted-foreground font-normal text-xs">(optional)</span></Label>
                                         <div className="relative"><span className="absolute left-3 top-2.5 text-muted-foreground text-sm">₹</span>
-                                            <Input type="number" className="pl-7" placeholder={String(allServices.find(s => s.id === serviceToAdd)?.monthlyFee || 'Default rate')} value={serviceOverride} onChange={e => setServiceOverride(e.target.value)} />
+                                            <Input type="number" className="pl-7" placeholder={String(availableToAdd.find(c => c.id === serviceToAdd)?.amount || 'Default rate')} value={serviceOverride} onChange={e => setServiceOverride(e.target.value)} />
                                         </div>
-                                        <p className="text-xs text-muted-foreground">Leave empty to use default. Ledger entries will use this rate.</p>
+                                        <p className="text-xs text-muted-foreground">Leave empty to use structure default. Ledger entries will use this rate.</p>
                                     </div>
                                 )}
                                 <div className="flex gap-2 pt-1">
                                     <Button variant="outline" className="flex-1" onClick={() => setAddServiceOpen(false)}>Cancel</Button>
-                                    <Button className="flex-1 bg-green-600 hover:bg-green-700 text-white" onClick={() => addServiceMutation.mutate({ serviceId: serviceToAdd, overrideAmount: serviceOverride ? parseFloat(serviceOverride) : null })} disabled={!serviceToAdd || addServiceMutation.isPending}>
-                                        {addServiceMutation.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Adding…</> : <><Plus className="w-4 h-4 mr-2" />Add & Generate Entries</>}
+                                    <Button className="flex-1 bg-green-600 hover:bg-green-700 text-white" onClick={() => addServiceMutation.mutate({ particularId: serviceToAdd, overrideAmount: serviceOverride ? parseFloat(serviceOverride) : null })} disabled={!serviceToAdd || addServiceMutation.isPending}>
+                                        {addServiceMutation.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Activating…</> : <><Plus className="w-4 h-4 mr-2" />Activate & Generate Entries</>}
                                     </Button>
                                 </div>
                             </div>

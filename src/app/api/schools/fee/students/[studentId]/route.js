@@ -13,10 +13,31 @@ export async function GET(req, props) {
         const { studentId } = params;
         const { searchParams } = new URL(req.url);
         const academicYearId = searchParams.get("academicYearId");
-        const feeSessionId = searchParams.get("feeSessionId"); // 🟢 New Ledger Support
+        let feeSessionId = searchParams.get("feeSessionId"); // 🟢 New Ledger Support
 
         if (!academicYearId) {
             return NextResponse.json({ error: "academicYearId required" }, { status: 400 });
+        }
+
+        // Auto-resolve feeSessionId from academicYearId when they match or session ID is invalid
+        // Frontend passes academicYearId as feeSessionId which causes "Fee session not found"
+        if (feeSessionId) {
+            const sessionCheck = await prisma.feeSession.findUnique({ where: { id: feeSessionId } });
+            if (!sessionCheck) {
+                // feeSessionId is invalid (likely academicYearId was passed), try to resolve
+                const student = await prisma.student.findUnique({
+                    where: { userId: studentId },
+                    select: { schoolId: true },
+                });
+                if (student) {
+                    const session = await prisma.feeSession.findFirst({
+                        where: { schoolId: student.schoolId, academicYearId, isActive: true },
+                    });
+                    feeSessionId = session?.id || null;
+                } else {
+                    feeSessionId = null;
+                }
+            }
         }
 
         // Fetch student fee and settings in parallel
@@ -26,7 +47,7 @@ export async function GET(req, props) {
                 include: {
                     student: {
                         select: {
-                            userId: true, name: true, admissionNo: true, rollNumber: true,
+                            userId: true, name: true, admissionNo: true, rollNumber: true, admissionDate: true,
                             class: { select: { className: true } },
                             section: { select: { name: true } },
                             schoolId: true,
@@ -64,6 +85,12 @@ export async function GET(req, props) {
                 }
             });
         }
+        let sessionData = null;
+        if (feeSessionId) {
+            sessionData = await prisma.feeSession.findUnique({
+                where: { id: feeSessionId }
+            });
+        }
         
         // 🟢 V2: Fetch NEW Financial Ledger Data if session ID is provided
         let ledgerEntries = [];
@@ -98,7 +125,7 @@ export async function GET(req, props) {
             const studentDetails = await prisma.student.findUnique({
                 where: { userId: studentId },
                 select: {
-                    userId: true, name: true, admissionNo: true, rollNumber: true,
+                    userId: true, name: true, admissionNo: true, rollNumber: true, admissionDate: true,
                     class: { select: { className: true } },
                     section: { select: { name: true } },
                     schoolId: true,
@@ -108,6 +135,7 @@ export async function GET(req, props) {
             return NextResponse.json({
                 isUnassigned: !feeSessionId || ledgerEntries.length === 0, // V1 flag compatibility
                 student: studentDetails,
+                session: sessionData,  // 🟢 Inject Session Data
                 originalAmount: 0,
                 paidAmount: 0,
                 balanceAmount: 0,
@@ -159,6 +187,7 @@ export async function GET(req, props) {
 
         return NextResponse.json({
             ...studentFee,
+            session: sessionData,       // 🟢 Inject Session Data
             installments: enrichedInstallments,
             ledger: ledgerEntries,      // 🟢 Inject Ledger Data
             walletBalance,              // 🟢 Inject Wallet Data

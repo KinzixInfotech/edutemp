@@ -12,9 +12,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
-import { Loader2, Plus, Search, Users, Route, GraduationCap, Trash2, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Loader2, Plus, Search, Users, Route, GraduationCap, Trash2, ChevronLeft, ChevronRight, X, AlertTriangle, Bus, IndianRupee, Info } from "lucide-react";
+
+const INR = (n) => `₹${(n || 0).toLocaleString('en-IN')}`;
 
 async function fetchAssignments({ schoolId, search, page = 1, limit = 10 }) {
     const params = new URLSearchParams({ schoolId });
@@ -86,9 +89,27 @@ export default function StudentAssignments() {
     const [showStudentDropdown, setShowStudentDropdown] = useState(false);
     const debouncedStudentSearch = useDebounce(studentSearch, 300);
 
+    // Fee activation state
+    const [activateTransportFee, setActivateTransportFee] = useState(true);
+    const [transportParticular, setTransportParticular] = useState(null);
+    const [feeCheckStatus, setFeeCheckStatus] = useState(null); // 'loading' | 'found' | 'not-found' | 'no-structure' | null
+
     const queryClient = useQueryClient();
     const schoolId = fullUser?.schoolId;
     const limit = 10;
+
+    // Get active academic year
+    const { data: academicYears = [] } = useQuery({
+        queryKey: ['academic-years', schoolId],
+        queryFn: async () => {
+            const r = await fetch(`/api/schools/academic-years?schoolId=${schoolId}`);
+            const d = await r.json();
+            return Array.isArray(d) ? d : (d.academicYears || []);
+        },
+        enabled: !!schoolId,
+        staleTime: 5 * 60 * 1000,
+    });
+    const activeYear = academicYears.find(y => y.isActive);
 
     const { data: { assignments = [], total = 0 } = {}, isLoading } = useQuery({
         queryKey: ["student-assignments", schoolId, search, page],
@@ -111,13 +132,106 @@ export default function StudentAssignments() {
         enabled: !!schoolId && dialogOpen,
     });
 
+    // When a student is selected, check their fee structure for transport particular
+    useEffect(() => {
+        if (!selectedStudent || !activeYear?.id || !schoolId) {
+            setTransportParticular(null);
+            setFeeCheckStatus(null);
+            return;
+        }
+
+        setFeeCheckStatus('loading');
+
+        (async () => {
+            try {
+                // Fetch the student's fee structure
+                const r = await fetch(`/api/schools/fee/global-structures?schoolId=${schoolId}&academicYearId=${activeYear.id}`);
+                const structures = await r.json();
+                if (!Array.isArray(structures) || structures.length === 0) {
+                    setFeeCheckStatus('no-structure');
+                    setTransportParticular(null);
+                    return;
+                }
+
+                // Find the student's class to match the right structure
+                const studentClass = selectedStudent.section?.class?.id || selectedStudent.classId;
+
+                // Try to find a structure matching the student's class, or use the first one
+                let structure = structures.find(s => s.classId === studentClass) || structures[0];
+
+                // Look for an optional particular with "transport" in the name
+                const transportPart = (structure?.particulars || []).find(
+                    p => p.isOptional && p.name?.toLowerCase().includes('transport')
+                );
+
+                if (transportPart) {
+                    setTransportParticular(transportPart);
+                    setFeeCheckStatus('found');
+                } else {
+                    setTransportParticular(null);
+                    setFeeCheckStatus('not-found');
+                }
+            } catch (err) {
+                console.error("Fee check error:", err);
+                setFeeCheckStatus('no-structure');
+                setTransportParticular(null);
+            }
+        })();
+    }, [selectedStudent, activeYear?.id, schoolId]);
+
     const createMutation = useMutation({
-        mutationFn: createAssignment,
+        mutationFn: async (data) => {
+            // 1. Create the route assignment
+            const result = await createAssignment(data);
+
+            // 2. If fee activation is checked and transport particular found, activate it
+            if (activateTransportFee && transportParticular && activeYear?.id) {
+                try {
+                    const feeRes = await fetch('/api/schools/fee/student-services', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'activate-optional',
+                            studentId: data.studentId,
+                            particularId: transportParticular.id,
+                            schoolId,
+                            academicYearId: activeYear.id,
+                            userId: fullUser?.id,
+                        }),
+                    });
+                    const feeData = await feeRes.json();
+                    if (feeRes.ok) {
+                        result.feeActivated = true;
+                        result.ledgerEntries = feeData.ledgerEntriesCreated;
+                        result.feeAmount = feeData.monthlyAmount;
+                    } else if (feeData.alreadyActive) {
+                        result.feeActivated = false;
+                        result.feeMessage = "Transport fee already active";
+                    } else {
+                        console.warn("Fee activation failed:", feeData.error);
+                        result.feeActivated = false;
+                        result.feeMessage = feeData.error;
+                    }
+                } catch (feeErr) {
+                    console.error("Fee activation error:", feeErr);
+                    result.feeActivated = false;
+                    result.feeMessage = "Fee activation failed — can be done manually";
+                }
+            }
+
+            return result;
+        },
         onMutate: () => setSaving(true),
-        onSuccess: () => {
+        onSuccess: (result) => {
             queryClient.invalidateQueries(["student-assignments"]);
             setDialogOpen(false);
-            toast.success("Student assigned successfully");
+            if (result.feeActivated) {
+                toast.success(`Student assigned to route! Transport fee activated — ${result.ledgerEntries} ledger entries (${INR(result.feeAmount)}/mo)`);
+            } else if (result.feeMessage) {
+                toast.success("Student assigned to route!", { description: result.feeMessage });
+            } else {
+                toast.success("Student assigned successfully");
+            }
         },
         onSettled: () => setSaving(false),
         onError: (error) => toast.error(error.message),
@@ -151,6 +265,9 @@ export default function StudentAssignments() {
         setFormErrors({});
         setSelectedStudent(null);
         setStudentSearch("");
+        setTransportParticular(null);
+        setFeeCheckStatus(null);
+        setActivateTransportFee(true);
         setDialogOpen(true);
     };
 
@@ -276,6 +393,7 @@ export default function StudentAssignments() {
                 )}
             </div>
 
+            {/* Assign Student Dialog */}
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
@@ -343,7 +461,7 @@ export default function StudentAssignments() {
                                                 ))
                                             ) : (
                                                 <div className="p-4 text-center text-sm text-muted-foreground">
-                                                    No students found matching "{studentSearch}"
+                                                    No students found matching &quot;{studentSearch}&quot;
                                                 </div>
                                             )}
                                         </div>
@@ -370,6 +488,65 @@ export default function StudentAssignments() {
                             </Select>
                             {formErrors.routeId && <p className="text-xs text-destructive">{formErrors.routeId}</p>}
                         </div>
+
+                        {/* Transport Fee Activation */}
+                        {selectedStudent && (
+                            <div className="rounded-lg border p-3 space-y-2">
+                                <div className="flex items-center gap-2 text-sm font-medium">
+                                    <Bus className="h-4 w-4 text-blue-600" />
+                                    <span>Transport Fee</span>
+                                </div>
+
+                                {feeCheckStatus === 'loading' && (
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        Checking fee structure...
+                                    </div>
+                                )}
+
+                                {feeCheckStatus === 'found' && transportParticular && (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between p-2 rounded-md bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                                            <div className="flex items-center gap-2">
+                                                <IndianRupee className="h-3.5 w-3.5 text-green-600" />
+                                                <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                                                    {transportParticular.name}: {INR(transportParticular.amount)}/mo
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Checkbox
+                                                id="activateFee"
+                                                checked={activateTransportFee}
+                                                onCheckedChange={setActivateTransportFee}
+                                            />
+                                            <Label htmlFor="activateFee" className="text-sm cursor-pointer">
+                                                Activate transport fee & generate ledger entries
+                                            </Label>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {feeCheckStatus === 'not-found' && (
+                                    <div className="flex items-start gap-2 p-2 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                                        <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                                        <p className="text-xs text-amber-700 dark:text-amber-400">
+                                            No optional transport fee found in this student&apos;s fee structure. 
+                                            Add a &quot;Transport Fee&quot; component (marked as <strong>optional</strong>) in the fee structure editor to enable auto-charging.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {feeCheckStatus === 'no-structure' && (
+                                    <div className="flex items-start gap-2 p-2 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                                        <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
+                                        <p className="text-xs text-red-700 dark:text-red-400">
+                                            No fee structure assigned. Assign a fee structure first from Fee Management → Assign Structure.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                     <DialogFooter className="gap-2 sm:gap-0">
                         <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>

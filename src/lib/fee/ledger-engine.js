@@ -234,24 +234,22 @@ export async function regenerateStudentLedger({
         });
     }
 
-    // 3. Fetch student to get join date
+    // AFTER — fall back to session.academicYearId when student.academicYearId is null
     const student = await db.student.findUnique({
         where: { userId: studentId },
         select: { admissionDate: true, schoolId: true, academicYearId: true },
     });
 
-    // 4. Re-generate (will skip existing frozen entries)
     const result = await generateStudentLedger({
         studentId,
         schoolId: student.schoolId,
-        academicYearId: student.academicYearId,
+        academicYearId: student.academicYearId || session.academicYearId,  // ← FIXED
         feeSessionId,
         feeStructureId,
         joinDate: student.admissionDate || session.startMonth,
         userId,
         tx: db,
     });
-
     return {
         deleted: deletedIds.length,
         regenerated: result.created,
@@ -339,14 +337,21 @@ function getMonthsForComponent(component, session, joinDate) {
         }
 
         case "ONE_TIME": {
-            // One entry at join month (or session start if already enrolled)
+            // Use chargeTiming to determine the correct month
+            if (component.chargeTiming === "CHARGE_ON_ADMISSION") {
+                // Always use actual join month, regardless of session boundaries
+                return [getFirstOfMonth(joinDate)];
+            }
+            // Use effective start (session start, or join date for late admissions)
             return [effectiveStart];
         }
 
         case "ANNUAL": {
-            // One entry at session start (regardless of join date)
-            // Student pays full annual fee even if joining mid-year
-            return [sessionStart];
+            if (component.chargeTiming === "CHARGE_ON_ADMISSION") {
+                return [getFirstOfMonth(joinDate)];
+            }
+            // Use effective start here as well to prevent backdating
+            return [effectiveStart];
         }
 
         case "TERM": {

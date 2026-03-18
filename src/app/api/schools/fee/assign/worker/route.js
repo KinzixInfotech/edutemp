@@ -160,6 +160,10 @@ async function notifyAdmin(job, structureName, done, failed) {
 async function assignFeeToStudent({ studentId, structure, academicYearId, schoolId }) {
     const { id: globalFeeStructureId, totalAmount, particulars, installmentRules } = structure;
 
+    // Filter out optional particulars — they require per-student opt-in via Services tab
+    const requiredParticulars = particulars.filter(p => !p.isOptional);
+    const requiredTotal = requiredParticulars.reduce((sum, p) => sum + p.amount, 0);
+
     await prisma.$transaction(async tx => {
         const studentFee = await tx.studentFee.create({
             data: {
@@ -167,19 +171,19 @@ async function assignFeeToStudent({ studentId, structure, academicYearId, school
                 schoolId,
                 academicYearId,
                 globalFeeStructureId,
-                originalAmount: totalAmount,
+                originalAmount: requiredTotal,
                 discountAmount: 0,
-                finalAmount: totalAmount,
+                finalAmount: requiredTotal,
                 paidAmount: 0,
-                balanceAmount: totalAmount,
+                balanceAmount: requiredTotal,
                 status: 'UNPAID',
                 isCustom: false,
             },
         });
 
-        if (particulars.length > 0) {
+        if (requiredParticulars.length > 0) {
             await tx.studentFeeParticular.createMany({
-                data: particulars.map(p => ({
+                data: requiredParticulars.map(p => ({
                     studentFeeId: studentFee.id,
                     globalParticularId: p.id,
                     name: p.name,

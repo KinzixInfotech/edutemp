@@ -1,7 +1,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
-import { Loader2, Search, FileText, Clock, CheckCircle, XCircle, Eye, ChevronLeft, ChevronRight, DollarSign } from "lucide-react";
+import { Loader2, Search, FileText, Clock, CheckCircle, XCircle, Eye, ChevronLeft, ChevronRight, Bus, IndianRupee, AlertTriangle } from "lucide-react";
+
+const INR = (n) => `₹${(n || 0).toLocaleString('en-IN')}`;
 
 async function fetchRequests({ schoolId, search, status, page = 1, limit = 10 }) {
     const params = new URLSearchParams({ schoolId });
@@ -43,12 +45,6 @@ async function fetchStops({ schoolId, routeId }) {
     return response.json();
 }
 
-async function fetchTransportFees({ schoolId }) {
-    const response = await fetch(`/api/schools/transport/fees?schoolId=${schoolId}&isActive=true`);
-    if (!response.ok) throw new Error("Failed to fetch transport fees");
-    return response.json();
-}
-
 async function processRequest({ id, ...data }) {
     const response = await fetch(`/api/schools/transport/requests/${id}`, {
         method: "PUT",
@@ -71,9 +67,27 @@ export default function BusRequestManagement() {
     const [processData, setProcessData] = useState({});
     const [selectedRouteId, setSelectedRouteId] = useState("");
 
+    // Fee activation state
+    const [activateTransportFee, setActivateTransportFee] = useState(true);
+    const [transportParticular, setTransportParticular] = useState(null);
+    const [feeCheckStatus, setFeeCheckStatus] = useState(null);
+
     const queryClient = useQueryClient();
     const schoolId = fullUser?.schoolId;
     const limit = 10;
+
+    // Get active academic year
+    const { data: academicYears = [] } = useQuery({
+        queryKey: ['academic-years', schoolId],
+        queryFn: async () => {
+            const r = await fetch(`/api/schools/academic-years?schoolId=${schoolId}`);
+            const d = await r.json();
+            return Array.isArray(d) ? d : (d.academicYears || []);
+        },
+        enabled: !!schoolId,
+        staleTime: 5 * 60 * 1000,
+    });
+    const activeYear = academicYears.find(y => y.isActive);
 
     const { data: { requests = [], total = 0 } = {}, isLoading } = useQuery({
         queryKey: ["bus-requests", schoolId, search, statusFilter, page],
@@ -94,20 +108,97 @@ export default function BusRequestManagement() {
         enabled: !!schoolId && !!selectedRouteId && processDialogOpen,
     });
 
-    const { data: { fees: transportFees = [] } = {} } = useQuery({
-        queryKey: ["transport-fees", schoolId],
-        queryFn: () => fetchTransportFees({ schoolId }),
-        enabled: !!schoolId && processDialogOpen,
-    });
+    // When process dialog opens for APPROVE, check the student's fee structure
+    useEffect(() => {
+        if (!processDialogOpen || processData.status !== 'APPROVED' || !selectedRequest?.studentId || !activeYear?.id || !schoolId) {
+            return;
+        }
+
+        setFeeCheckStatus('loading');
+        setTransportParticular(null);
+
+        (async () => {
+            try {
+                const r = await fetch(`/api/schools/fee/global-structures?schoolId=${schoolId}&academicYearId=${activeYear.id}`);
+                const structures = await r.json();
+                if (!Array.isArray(structures) || structures.length === 0) {
+                    setFeeCheckStatus('no-structure');
+                    return;
+                }
+
+                // Look for the transport particular in any structure (we'll match by student's class ideally)
+                let transportPart = null;
+                for (const structure of structures) {
+                    const found = (structure?.particulars || []).find(
+                        p => p.isOptional && p.name?.toLowerCase().includes('transport')
+                    );
+                    if (found) {
+                        transportPart = found;
+                        break;
+                    }
+                }
+
+                if (transportPart) {
+                    setTransportParticular(transportPart);
+                    setFeeCheckStatus('found');
+                } else {
+                    setFeeCheckStatus('not-found');
+                }
+            } catch (err) {
+                console.error("Fee check error:", err);
+                setFeeCheckStatus('no-structure');
+            }
+        })();
+    }, [processDialogOpen, processData.status, selectedRequest?.studentId, activeYear?.id, schoolId]);
 
     const processMutation = useMutation({
-        mutationFn: processRequest,
+        mutationFn: async (data) => {
+            const { id, ...payload } = data;
+            const result = await processRequest({ id, ...payload });
+
+            // If approving and fee activation is checked, activate transport fee
+            if (payload.status === 'APPROVED' && activateTransportFee && transportParticular && activeYear?.id && selectedRequest?.studentId) {
+                try {
+                    const feeRes = await fetch('/api/schools/fee/student-services', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'activate-optional',
+                            studentId: selectedRequest.studentId,
+                            particularId: transportParticular.id,
+                            schoolId,
+                            academicYearId: activeYear.id,
+                            userId: fullUser?.id,
+                        }),
+                    });
+                    const feeData = await feeRes.json();
+                    if (feeRes.ok) {
+                        result.feeActivated = true;
+                        result.ledgerEntries = feeData.ledgerEntriesCreated;
+                        result.feeAmount = feeData.monthlyAmount;
+                    } else if (feeData.alreadyActive) {
+                        result.feeMessage = "Transport fee already active";
+                    } else {
+                        result.feeMessage = feeData.error;
+                    }
+                } catch (err) {
+                    result.feeMessage = "Fee activation failed — can be done manually";
+                }
+            }
+
+            return result;
+        },
         onMutate: () => setSaving(true),
-        onSuccess: () => {
+        onSuccess: (result) => {
             queryClient.invalidateQueries(["bus-requests"]);
-            queryClient.invalidateQueries(["transport-fees"]);
             setProcessDialogOpen(false);
-            toast.success("Request processed successfully");
+            if (result.feeActivated) {
+                toast.success(`Request approved! Transport fee activated — ${result.ledgerEntries} ledger entries (${INR(result.feeAmount)}/mo)`);
+            } else if (result.feeMessage) {
+                toast.success("Request processed", { description: result.feeMessage });
+            } else {
+                toast.success("Request processed successfully");
+            }
         },
         onSettled: () => setSaving(false),
         onError: () => toast.error("Failed to process request"),
@@ -115,8 +206,11 @@ export default function BusRequestManagement() {
 
     const handleProcess = (request, action) => {
         setSelectedRequest(request);
-        setProcessData({ status: action, adminNotes: "", assignFee: true, transportFeeId: "" });
+        setProcessData({ status: action, adminNotes: "" });
         setSelectedRouteId("");
+        setActivateTransportFee(true);
+        setTransportParticular(null);
+        setFeeCheckStatus(null);
         setProcessDialogOpen(true);
     };
 
@@ -300,7 +394,7 @@ export default function BusRequestManagement() {
                         <DialogTitle>{processData.status === 'APPROVED' ? 'Approve Request' : 'Reject Request'}</DialogTitle>
                         <DialogDescription>
                             {processData.status === 'APPROVED'
-                                ? 'Assign a route and stop for this student'
+                                ? 'Assign a route and stop, and optionally activate transport fee'
                                 : 'Provide a reason for rejection'}
                         </DialogDescription>
                     </DialogHeader>
@@ -338,43 +432,59 @@ export default function BusRequestManagement() {
                                     </Select>
                                 </div>
 
-                                {/* Transport Fee Assignment */}
-                                <div className="p-3 rounded-lg border bg-muted/30 space-y-3">
-                                    <div className="flex items-center gap-2">
-                                        <Checkbox
-                                            id="assignFee"
-                                            checked={processData.assignFee}
-                                            onCheckedChange={(checked) => setProcessData({ ...processData, assignFee: checked, transportFeeId: checked ? processData.transportFeeId : "" })}
-                                        />
-                                        <Label htmlFor="assignFee" className="flex items-center gap-2 cursor-pointer">
-                                            <DollarSign className="h-4 w-4 text-green-600" />
-                                            Assign Transport Fee
-                                        </Label>
+                                {/* Transport Fee Activation */}
+                                <div className="rounded-lg border p-3 space-y-2">
+                                    <div className="flex items-center gap-2 text-sm font-medium">
+                                        <Bus className="h-4 w-4 text-blue-600" />
+                                        <span>Transport Fee</span>
                                     </div>
-                                    {processData.assignFee && (
+
+                                    {feeCheckStatus === 'loading' && (
+                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                            Checking fee structure...
+                                        </div>
+                                    )}
+
+                                    {feeCheckStatus === 'found' && transportParticular && (
                                         <div className="space-y-2">
-                                            <Label>Transport Fee Structure</Label>
-                                            <Select
-                                                value={processData.transportFeeId || ""}
-                                                onValueChange={(val) => setProcessData({ ...processData, transportFeeId: val })}
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select fee structure" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {transportFees.map((fee) => (
-                                                        <SelectItem key={fee.id} value={fee.id}>
-                                                            <div className="flex items-center justify-between w-full gap-4">
-                                                                <span>{fee.name}</span>
-                                                                <span className="text-muted-foreground text-xs">₹{fee.amount?.toLocaleString()} / {fee.frequency?.toLowerCase()}</span>
-                                                            </div>
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            {transportFees.length === 0 && (
-                                                <p className="text-xs text-muted-foreground">No transport fee structures found. Create one in Transport → Fees.</p>
-                                            )}
+                                            <div className="flex items-center justify-between p-2 rounded-md bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                                                <div className="flex items-center gap-2">
+                                                    <IndianRupee className="h-3.5 w-3.5 text-green-600" />
+                                                    <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                                                        {transportParticular.name}: {INR(transportParticular.amount)}/mo
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Checkbox
+                                                    id="activateFeeRequest"
+                                                    checked={activateTransportFee}
+                                                    onCheckedChange={setActivateTransportFee}
+                                                />
+                                                <Label htmlFor="activateFeeRequest" className="text-sm cursor-pointer">
+                                                    Activate transport fee & generate ledger entries
+                                                </Label>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {feeCheckStatus === 'not-found' && (
+                                        <div className="flex items-start gap-2 p-2 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                                            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                                            <p className="text-xs text-amber-700 dark:text-amber-400">
+                                                No optional transport fee found in the fee structure.
+                                                Add a &quot;Transport Fee&quot; component (marked as <strong>optional</strong>) in Fee Structure editor.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {feeCheckStatus === 'no-structure' && (
+                                        <div className="flex items-start gap-2 p-2 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                                            <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
+                                            <p className="text-xs text-red-700 dark:text-red-400">
+                                                No fee structure found. Can still approve the route — fee can be set up later.
+                                            </p>
                                         </div>
                                     )}
                                 </div>

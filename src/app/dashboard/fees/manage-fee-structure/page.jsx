@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -68,7 +68,6 @@ const TYPE_CONFIG = {
   TERM: { label: 'Per Term', hint: '× 4 entries', per: '/ term' },
 };
 
-// Groups for visual section grouping in the modal
 const GROUPS = [
   {
     key: 'monthly',
@@ -100,6 +99,8 @@ const MONTHS = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', '
 const INR = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
 const defaultParticular = () => ({ name: '', amount: 0, type: 'MONTHLY', category: 'TUITION', chargeTiming: 'SESSION_START', serviceId: null, lateFeeRuleId: null, isOptional: false, applicableMonths: null });
 
+const LS_KEY = 'fee_structure_draft';
+
 // ─── Month range label ────────────────────────────────────────────────────────
 function monthRangeLabel(months) {
   if (!months || months.length === 0) return 'Apr – Mar';
@@ -109,8 +110,21 @@ function monthRangeLabel(months) {
 }
 
 // ─── Particular Row ───────────────────────────────────────────────────────────
-function ParticularRow({ index, register, watch, setValue, remove, canRemove, lateFeeRules, services }) {
+function ParticularRow({ index, register, watch, setValue, remove, canRemove, lateFeeRules, services, isNew, onNewMounted }) {
   const [expanded, setExpanded] = useState(true);
+  const rowRef = useRef(null);
+  const nameInputRef = useRef(null);
+
+  // Auto-scroll into view and focus the name input when newly added
+  useEffect(() => {
+    if (!isNew) return;
+    const timer = setTimeout(() => {
+      rowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      nameInputRef.current?.focus();
+      onNewMounted?.();
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [isNew]);
   const type = watch(`particulars.${index}.type`);
   const category = watch(`particulars.${index}.category`);
   const months = watch(`particulars.${index}.applicableMonths`) || [];
@@ -134,7 +148,7 @@ function ParticularRow({ index, register, watch, setValue, remove, canRemove, la
   };
 
   return (
-    <div className="border rounded-lg overflow-hidden bg-white dark:bg-background">
+    <div ref={rowRef} className="border rounded-lg overflow-hidden bg-white dark:bg-background">
       {/* Header */}
       <div
         className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none bg-muted/30 hover:bg-muted/50 transition-colors"
@@ -150,9 +164,7 @@ function ParticularRow({ index, register, watch, setValue, remove, canRemove, la
             {name || <span className="text-muted-foreground italic">Unnamed component</span>}
           </p>
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-            {/* ✅ TYPE BADGE */}
             <Badge variant="outline" className="text-[10px] h-4 px-1.5">{TYPE_CONFIG[type]?.label}</Badge>
-            {/* ✅ MONTHLY RANGE */}
             {type === 'MONTHLY' && (
               <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
                 <Calendar className="w-2.5 h-2.5" />{monthRangeLabel(months)}
@@ -164,7 +176,6 @@ function ParticularRow({ index, register, watch, setValue, remove, canRemove, la
           </div>
         </div>
 
-        {/* ✅ AMOUNT WITH FREQUENCY */}
         <div className="text-right shrink-0">
           <p className="text-sm font-semibold">{INR(amount)}<span className="text-[10px] text-muted-foreground font-normal ml-1">{TYPE_CONFIG[type]?.per}</span></p>
           {(type === 'MONTHLY' || type === 'TERM') && (
@@ -190,7 +201,15 @@ function ParticularRow({ index, register, watch, setValue, remove, canRemove, la
           <div className="grid grid-cols-12 gap-3">
             <div className="col-span-5 space-y-1.5">
               <Label className="text-xs text-muted-foreground">Component Name</Label>
-              <Input {...register(`particulars.${index}.name`)} placeholder="e.g. Tuition Fee" className="h-9" />
+              <Input
+                {...register(`particulars.${index}.name`)}
+                ref={(el) => {
+                  register(`particulars.${index}.name`).ref(el);
+                  nameInputRef.current = el;
+                }}
+                placeholder="e.g. Tuition Fee"
+                className="h-9"
+              />
             </div>
             <div className="col-span-3 space-y-1.5">
               <Label className="text-xs text-muted-foreground">Amount (₹)</Label>
@@ -302,12 +321,11 @@ function ParticularRow({ index, register, watch, setValue, remove, canRemove, la
 }
 
 // ─── Grouped Section in Dialog ────────────────────────────────────────────────
-function GroupSection({ group, fields, register, watch, setValue, remove, append, lateFeeRules, services }) {
+function GroupSection({ group, fields, register, watch, setValue, remove, append, lateFeeRules, services, newlyAddedIndex, onNewMounted }) {
   const groupFields = fields.map((f, i) => ({ ...f, _idx: i })).filter(f => group.match(watch(`particulars.${f._idx}`)));
 
   return (
     <div className={`border rounded-lg overflow-hidden ${group.color}`}>
-      {/* Group header */}
       <div className="flex items-center justify-between px-4 py-2.5">
         <div>
           <p className={`text-sm font-semibold ${group.headerColor}`}>{group.label}</p>
@@ -326,7 +344,6 @@ function GroupSection({ group, fields, register, watch, setValue, remove, append
         </button>
       </div>
 
-      {/* Components in this group */}
       <div className="space-y-2 p-2 bg-background/60">
         {groupFields.length === 0 ? (
           <p className="text-xs text-muted-foreground text-center py-3 italic">No components yet — click Add</p>
@@ -342,6 +359,8 @@ function GroupSection({ group, fields, register, watch, setValue, remove, append
               canRemove={fields.length > 1}
               lateFeeRules={lateFeeRules}
               services={services}
+              isNew={f._idx === newlyAddedIndex}
+              onNewMounted={onNewMounted}
             />
           ))
         )}
@@ -365,12 +384,105 @@ export default function FeeStructuresManagement() {
   const [cloneName, setCloneName] = useState('');
   const [cloneYearId, setCloneYearId] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [hasDraftRestored, setHasDraftRestored] = useState(false);
+  const [newlyAddedIndex, setNewlyAddedIndex] = useState(null);
 
   const { register, control, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm({
     resolver: zodResolver(feeSchema),
     defaultValues: { name: '', description: '', particulars: [defaultParticular()] },
   });
   const { fields, append, remove } = useFieldArray({ control, name: 'particulars' });
+
+  // ── LocalStorage persistence: save form on every change ──
+  const watchedValues = watch();
+  useEffect(() => {
+    if (!isDialogOpen) return;
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify({
+        values: watchedValues,
+        isEditing,
+        selectedStructureId: selectedStructure?.id || null,
+        savedAt: Date.now(),
+      }));
+    } catch (_) { }
+  }, [JSON.stringify(watchedValues), isDialogOpen]);
+
+  // ── LocalStorage persistence: restore on open if draft exists ──
+  const openCreate = () => {
+    setIsEditing(false);
+    setSelected(null);
+
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        // Only restore if it was a "create" draft (no selectedStructureId) and less than 24h old
+        const age = Date.now() - (parsed.savedAt || 0);
+        if (!parsed.selectedStructureId && !parsed.isEditing && age < 86400000 && parsed.values?.name) {
+          reset(parsed.values);
+          setIsDialogOpen(true);
+          setHasDraftRestored(true);
+          return;
+        }
+      }
+    } catch (_) { }
+
+    reset({ name: '', description: '', particulars: [defaultParticular()] });
+    setIsDialogOpen(true);
+    setHasDraftRestored(false);
+  };
+
+  const openEdit = (s) => {
+    setSelected(s);
+    setIsEditing(true);
+    setHasDraftRestored(false);
+
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const age = Date.now() - (parsed.savedAt || 0);
+        if (parsed.selectedStructureId === s.id && parsed.isEditing && age < 86400000) {
+          reset(parsed.values);
+          setIsDialogOpen(true);
+          setHasDraftRestored(true);
+          return;
+        }
+      }
+    } catch (_) { }
+
+    reset({
+      name: s.name,
+      description: s.description || '',
+      classId: s.classId,
+      particulars: s.particulars.map(p => ({
+        name: p.name,
+        amount: p.amount,
+        type: p.type || 'MONTHLY',
+        category: p.category,
+        chargeTiming: p.chargeTiming || 'SESSION_START',
+        serviceId: p.serviceId || null,
+        lateFeeRuleId: p.lateFeeRuleId || null,
+        isOptional: p.isOptional,
+        applicableMonths: p.applicableMonths ? JSON.parse(p.applicableMonths) : null,
+      })),
+    });
+    setIsDialogOpen(true);
+  };
+
+  const closeDialog = () => {
+    setIsDialogOpen(false);
+    setIsEditing(false);
+    setSelected(null);
+    setHasDraftRestored(false);
+    reset({ name: '', description: '', particulars: [defaultParticular()] });
+    // Clear localStorage draft on intentional close via Cancel / Save
+  };
+
+  const clearDraftAndClose = () => {
+    try { localStorage.removeItem(LS_KEY); } catch (_) { }
+    closeDialog();
+  };
 
   // ── Queries ──
   const { data: academicYears } = useQuery({
@@ -409,24 +521,30 @@ export default function FeeStructuresManagement() {
 
   // ── Mutations ──
   const inv = () => queryClient.invalidateQueries({ queryKey: ['fee-structures'] });
-  const createMutation = useMutation({ mutationFn: async (data) => { const r = await fetch('/api/schools/fee/global-structures', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, schoolId, academicYearId }) }); const d = await r.json(); if (!r.ok) throw new Error(d.error); return d; }, onSuccess: () => { toast.success('Fee structure created'); inv(); closeDialog(); }, onError: e => toast.error(e.message) });
-  const updateMutation = useMutation({ mutationFn: async (data) => { const r = await fetch('/api/schools/fee/global-structures', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, id: selectedStructure?.id }) }); const d = await r.json(); if (!r.ok) throw new Error(d.error); return d; }, onSuccess: () => { toast.success('Structure updated'); inv(); closeDialog(); }, onError: e => toast.error(e.message) });
+  const createMutation = useMutation({
+    mutationFn: async (data) => {
+      const r = await fetch('/api/schools/fee/global-structures', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, schoolId, academicYearId }) });
+      const d = await r.json(); if (!r.ok) throw new Error(d.error); return d;
+    },
+    onSuccess: () => { toast.success('Fee structure created'); inv(); try { localStorage.removeItem(LS_KEY); } catch (_) { } closeDialog(); },
+    onError: e => toast.error(e.message),
+  });
+  const updateMutation = useMutation({
+    mutationFn: async (data) => {
+      const r = await fetch('/api/schools/fee/global-structures', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, id: selectedStructure?.id }) });
+      const d = await r.json(); if (!r.ok) throw new Error(d.error); return d;
+    },
+    onSuccess: () => { toast.success('Structure updated'); inv(); try { localStorage.removeItem(LS_KEY); } catch (_) { } closeDialog(); },
+    onError: e => toast.error(e.message),
+  });
   const deleteMutation = useMutation({ mutationFn: async (id) => { const r = await fetch(`/api/schools/fee/global-structures?id=${id}`, { method: 'DELETE' }); const d = await r.json(); if (!r.ok) throw new Error(d.error); return d; }, onSuccess: () => { toast.success('Deleted'); inv(); }, onError: e => toast.error(e.message) });
   const archiveMutation = useMutation({ mutationFn: async (id) => { const r = await fetch('/api/schools/fee/global-structures', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action: 'archive' }) }); const d = await r.json(); if (!r.ok) throw new Error(d.error); return d; }, onSuccess: () => { toast.success('Archived'); inv(); }, onError: e => toast.error(e.message) });
   const unarchiveMutation = useMutation({ mutationFn: async (id) => { const r = await fetch('/api/schools/fee/global-structures', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action: 'unarchive' }) }); const d = await r.json(); if (!r.ok) throw new Error(d.error); return d; }, onSuccess: () => { toast.success('Restored to Active'); inv(); }, onError: e => toast.error(e.message) });
   const cloneMutation = useMutation({ mutationFn: async ({ id, newName, targetAcademicYearId }) => { const r = await fetch('/api/schools/fee/global-structures', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action: 'clone', newName, targetAcademicYearId }) }); const d = await r.json(); if (!r.ok) throw new Error(d.error); return d; }, onSuccess: () => { toast.success('Cloned as Draft'); inv(); setCloneOpen(false); }, onError: e => toast.error(e.message) });
 
-  // ── Helpers ──
-  const closeDialog = () => { setIsDialogOpen(false); setIsEditing(false); setSelected(null); reset({ name: '', description: '', particulars: [defaultParticular()] }); };
-  const openCreate = () => { setIsEditing(false); reset({ name: '', description: '', particulars: [defaultParticular()] }); setIsDialogOpen(true); };
-  const openEdit = (s) => {
-    setSelected(s); setIsEditing(true);
-    reset({ name: s.name, description: s.description || '', classId: s.classId, particulars: s.particulars.map(p => ({ name: p.name, amount: p.amount, type: p.type || 'MONTHLY', category: p.category, chargeTiming: p.chargeTiming || 'SESSION_START', serviceId: p.serviceId || null, lateFeeRuleId: p.lateFeeRuleId || null, isOptional: p.isOptional, applicableMonths: p.applicableMonths ? JSON.parse(p.applicableMonths) : null })) });
-    setIsDialogOpen(true);
-  };
   const onSubmit = (data) => isEditing ? updateMutation.mutate(data) : createMutation.mutate(data);
 
-  // ✅ Separate required vs optional totals
+  // ── Totals ──
   const allParticulars = watch('particulars') || [];
   const requiredTotal = allParticulars.filter(p => !p.isOptional).reduce((sum, p) => {
     const mult = p.type === 'MONTHLY' ? 12 : p.type === 'TERM' ? 4 : 1;
@@ -514,7 +632,6 @@ export default function FeeStructuresManagement() {
                   const isArchived = s.status === 'ARCHIVED';
                   const assigned = s._count?.studentFees || 0;
 
-                  // ✅ Group particulars for card summary
                   const monthly = s.particulars?.filter(p => p.type === 'MONTHLY' && !p.isOptional) || [];
                   const annual = s.particulars?.filter(p => (p.type === 'ANNUAL' || p.type === 'TERM') && !p.isOptional) || [];
                   const oneTime = s.particulars?.filter(p => p.type === 'ONE_TIME' && !p.isOptional) || [];
@@ -535,7 +652,6 @@ export default function FeeStructuresManagement() {
                             {s.class?.className} &middot; {s.particulars?.length || 0} components &middot; Created {new Date(s.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </p>
 
-                          {/* ✅ Component group pills */}
                           <div className="flex flex-wrap gap-1.5 mt-2">
                             {monthly.length > 0 && (
                               <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800">
@@ -599,69 +715,137 @@ export default function FeeStructuresManagement() {
           </CardContent>
         </Card>
 
-        {/* ══ CREATE / EDIT DIALOG ══ */}
-        <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) closeDialog(); }}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <div className="flex items-start justify-between">
-                <div>
-                  <DialogTitle>{isEditing ? 'Edit Fee Structure' : 'Create Fee Structure'}</DialogTitle>
-                  <DialogDescription className="mt-1">
-                    {isEditing ? 'Only DRAFT structures can be edited.' : 'Starts as Draft — goes Active when assigned to students.'}
-                  </DialogDescription>
+        {/* ══ CREATE / EDIT DIALOG — LANDSCAPE GRID LAYOUT ══ */}
+        <Dialog open={isDialogOpen} onOpenChange={(open) => {
+          // When closed via backdrop/Escape (not Cancel/Save), preserve draft in localStorage
+          if (!open) {
+            setIsDialogOpen(false);
+            setIsEditing(false);
+            setSelected(null);
+            setHasDraftRestored(false);
+            // Do NOT reset form or clear localStorage — draft is preserved
+          }
+        }}>
+          <DialogContent
+            className="p-0 overflow-hidden flex flex-col !max-w-none"
+            style={{ width: 'min(95vw, 1100px)', height: '90vh', maxHeight: '90vh' }}
+          >
+            {/* ── Dialog Header ── */}
+            <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b shrink-0 bg-background">
+              <div className="min-w-0">
+                <DialogTitle className="text-lg font-bold">
+                  {isEditing ? 'Edit Fee Structure' : 'Create Fee Structure'}
+                </DialogTitle>
+                <DialogDescription className="mt-0.5 text-xs">
+                  {isEditing ? 'Only DRAFT structures can be edited.' : 'Starts as Draft — goes Active when assigned to students.'}
                   {(watch('classId') || isEditing) && (
-                    <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                      <span className="text-muted-foreground/60">Applies to:</span>
-                      <span className="font-medium text-foreground">
-                        {classes?.find(c => c.id === watch('classId'))?.className || selectedStructure?.class?.className || '—'}
-                      </span>
-                      <span className="text-muted-foreground/40">•</span>
-                      <span className="font-medium text-foreground">
-                        {academicYears?.find(y => y.id === academicYearId)?.name || '—'}
-                      </span>
-                    </p>
+                    <span className="ml-2 text-foreground font-medium">
+                      {classes?.find(c => c.id === watch('classId'))?.className || selectedStructure?.class?.className || ''}
+                      {' · '}
+                      {academicYears?.find(y => y.id === academicYearId)?.name || ''}
+                    </span>
                   )}
-                </div>
-                {/* ✅ Live total in header */}
-                <div className="text-right ml-4 shrink-0">
-                  <p className="text-xs text-muted-foreground">Est. Annual (required)</p>
-                  <p className="text-xl font-bold text-green-600">{INR(requiredTotal)}</p>
-                  {hasOptional && (
-                    <p className="text-[10px] text-muted-foreground">+{INR(optionalTotal)} optional</p>
-                  )}
-                </div>
-              </div>
-            </DialogHeader>
-
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 mt-2">
-              {/* Basic Info */}
-              <div className="space-y-3">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Basic Info</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="col-span-2 space-y-1.5">
-                    <Label>Structure Name *</Label>
-                    <Input {...register('name')} placeholder="e.g. Class 1 Annual Fee 2025–26" className={errors.name ? 'border-red-400' : ''} />
-                    {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Class *</Label>
-                    <Select value={watch('classId')?.toString() || ''} onValueChange={v => setValue('classId', parseInt(v))}>
-                      <SelectTrigger className={errors.classId ? 'border-red-400' : ''}><SelectValue placeholder="Select class" /></SelectTrigger>
-                      <SelectContent>{classes?.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.className}</SelectItem>)}</SelectContent>
-                    </Select>
-                    {errors.classId && <p className="text-xs text-red-500">{errors.classId.message}</p>}
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Description</Label>
-                    <Input {...register('description')} placeholder="Optional note" />
-                  </div>
-                </div>
+                </DialogDescription>
               </div>
 
-              {/* ✅ GROUPED FEE COMPONENTS */}
-              <div className="space-y-3">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Fee Components</p>
-                <div className="space-y-3">
+              {/* Draft restored banner */}
+              {hasDraftRestored && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-xs font-medium">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  Unsaved draft restored
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try { localStorage.removeItem(LS_KEY); } catch (_) { }
+                      reset({ name: '', description: '', particulars: [defaultParticular()] });
+                      setHasDraftRestored(false);
+                    }}
+                    className="ml-1 underline text-amber-600 hover:text-amber-800"
+                  >
+                    Discard
+                  </button>
+                </div>
+              )}
+
+              {/* Live total */}
+              <div className="text-right ml-4 shrink-0">
+                <p className="text-xs text-muted-foreground">Est. Annual (required)</p>
+                <p className="text-xl font-bold text-green-600">{INR(requiredTotal)}</p>
+                {hasOptional && (
+                  <p className="text-[10px] text-muted-foreground">+{INR(optionalTotal)} optional</p>
+                )}
+              </div>
+            </div>
+
+            {/* ── Two-column grid body ── */}
+            <form onSubmit={handleSubmit(onSubmit)} className="flex-1 overflow-hidden flex flex-col min-h-0">
+              <div className="flex-1 overflow-hidden flex flex-col md:grid md:grid-cols-[320px_1fr] divide-y md:divide-y-0 md:divide-x">
+
+                {/* ── LEFT PANEL: Basic Info + Summary + Actions ── */}
+                <div className="flex flex-col overflow-y-auto p-5 space-y-5 bg-muted/20 md:h-full h-auto">
+
+                  {/* Basic Info */}
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Basic Info</p>
+
+                    <div className="space-y-1.5">
+                      <Label>Structure Name *</Label>
+                      <Input {...register('name')} placeholder="e.g. Class 1 Annual Fee 2025–26" className={errors.name ? 'border-red-400' : ''} />
+                      {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label>Class *</Label>
+                      <Select value={watch('classId')?.toString() || ''} onValueChange={v => setValue('classId', parseInt(v))}>
+                        <SelectTrigger className={errors.classId ? 'border-red-400' : ''}><SelectValue placeholder="Select class" /></SelectTrigger>
+                        <SelectContent>{classes?.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.className}</SelectItem>)}</SelectContent>
+                      </Select>
+                      {errors.classId && <p className="text-xs text-red-500">{errors.classId.message}</p>}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label>Description</Label>
+                      <Input {...register('description')} placeholder="Optional note" />
+                    </div>
+                  </div>
+
+                  {/* Spacer */}
+                  <div className="flex-1" />
+
+                  {/* Summary card */}
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 bg-muted/40">
+                      <div>
+                        <p className="text-sm font-medium">Estimated Annual Total</p>
+                        <p className="text-xs text-muted-foreground">MONTHLY×12, TERM×4, others×1</p>
+                      </div>
+                      <p className="text-2xl font-bold text-green-600">{INR(requiredTotal)}</p>
+                    </div>
+                    {hasOptional && (
+                      <div className="flex items-center justify-between px-4 py-2.5 border-t bg-orange-50/50 dark:bg-orange-950/10">
+                        <p className="text-xs text-orange-600 dark:text-orange-400 flex items-center gap-1">
+                          <Star className="w-3 h-3" />Optional services (excluded)
+                        </p>
+                        <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">+{INR(optionalTotal)}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" className="flex-1" onClick={clearDraftAndClose}>Cancel</Button>
+                    <Button type="submit" disabled={isPending} className="flex-1 bg-green-600 hover:bg-green-700 text-white">
+                      {isPending
+                        ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{isEditing ? 'Saving…' : 'Creating…'}</>
+                        : <><Save className="w-4 h-4 mr-2" />{isEditing ? 'Save Changes' : 'Save as Draft'}</>
+                      }
+                    </Button>
+                  </div>
+                </div>
+
+                {/* ── RIGHT PANEL: Fee Components (scrollable) ── */}
+                <div className="overflow-y-auto p-5 space-y-4 md:h-full">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Fee Components</p>
                   {GROUPS.map(group => (
                     <GroupSection
                       key={group.key}
@@ -671,42 +855,18 @@ export default function FeeStructuresManagement() {
                       watch={watch}
                       setValue={setValue}
                       remove={remove}
-                      append={append}
+                      append={(item) => {
+                        const nextIndex = fields.length;
+                        append(item);
+                        setNewlyAddedIndex(nextIndex);
+                      }}
                       lateFeeRules={lateFeeRules}
                       services={services}
+                      newlyAddedIndex={newlyAddedIndex}
+                      onNewMounted={() => setNewlyAddedIndex(null)}
                     />
                   ))}
                 </div>
-              </div>
-
-              {/* ✅ SPLIT TOTAL SUMMARY */}
-              <div className="border rounded-lg overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 bg-muted/40">
-                  <div>
-                    <p className="text-sm font-medium">Estimated Annual Total</p>
-                    <p className="text-xs text-muted-foreground">MONTHLY×12, TERM×4, others×1</p>
-                  </div>
-                  <p className="text-2xl font-bold text-green-600">{INR(requiredTotal)}</p>
-                </div>
-                {hasOptional && (
-                  <div className="flex items-center justify-between px-4 py-2.5 border-t bg-orange-50/50 dark:bg-orange-950/10">
-                    <p className="text-xs text-orange-600 dark:text-orange-400 flex items-center gap-1">
-                      <Star className="w-3 h-3" />Optional services (excluded from total)
-                    </p>
-                    <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">+{INR(optionalTotal)}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-2 justify-end pt-1">
-                <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>
-                <Button type="submit" disabled={isPending} className="bg-green-600 hover:bg-green-700 text-white min-w-[130px]">
-                  {isPending
-                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{isEditing ? 'Saving…' : 'Creating…'}</>
-                    : <><Save className="w-4 h-4 mr-2" />{isEditing ? 'Save Changes' : 'Save as Draft'}</>
-                  }
-                </Button>
               </div>
             </form>
           </DialogContent>
@@ -725,7 +885,6 @@ export default function FeeStructuresManagement() {
               </DialogHeader>
 
               <div className="space-y-2 max-h-[55vh] overflow-y-auto">
-                {/* ✅ Grouped view */}
                 {GROUPS.map(group => {
                   const groupItems = selectedStructure.particulars?.filter(p => group.match(p)) || [];
                   if (groupItems.length === 0) return null;
@@ -753,7 +912,6 @@ export default function FeeStructuresManagement() {
                     </div>
                   );
                 })}
-                {/* Optional items */}
                 {selectedStructure.particulars?.filter(p => p.isOptional).length > 0 && (
                   <div>
                     <p className="text-xs font-semibold mb-1.5 text-orange-600">⭐ Optional Services</p>
@@ -820,4 +978,4 @@ export default function FeeStructuresManagement() {
       </div>
     </TooltipProvider>
   );
-} 
+}
