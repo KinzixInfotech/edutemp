@@ -1291,8 +1291,18 @@ exports.Prisma.DocumentScalarFieldEnum = {
   uploadedAt: 'uploadedAt'
 };
 
+exports.Prisma.GlobalSubjectScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  code: 'code',
+  type: 'type',
+  schoolId: 'schoolId'
+};
+
 exports.Prisma.SubjectScalarFieldEnum = {
   id: 'id',
+  globalSubjectId: 'globalSubjectId',
+  isOptional: 'isOptional',
   subjectName: 'subjectName',
   subjectCode: 'subjectCode',
   classId: 'classId',
@@ -4283,6 +4293,7 @@ exports.Prisma.ModelName = {
   TimetableTemplate: 'TimetableTemplate',
   Timetable: 'Timetable',
   Document: 'Document',
+  GlobalSubject: 'GlobalSubject',
   Subject: 'Subject',
   Department: 'Department',
   Homework: 'Homework',

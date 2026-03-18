@@ -159,6 +159,7 @@ model School {
   lateFeeRules     LateFeeRule[]
   feeLedgerEntries StudentFeeLedger[]
   studentWallets   StudentWallet[]
+  globalSubjects   GlobalSubject[]
 
   @@index([name])
 }
@@ -2485,8 +2486,26 @@ model Document {
   @@index([type])
 }
 
+model GlobalSubject {
+  id        Int       @id @default(autoincrement())
+  name      String
+  code      String?
+  type      String    @default("CORE")
+  schoolId  String    @db.Uuid
+  school    School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subjects  Subject[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+}
+
 model Subject {
   id                    Int                     @id @default(autoincrement())
+  
+  globalSubjectId       Int?
+  globalSubject         GlobalSubject?          @relation(fields: [globalSubjectId], references: [id], onDelete: Cascade)
+  isOptional            Boolean                 @default(false)
+
   subjectName           String
   subjectCode           String?
   classId               Int
@@ -2504,6 +2523,7 @@ model Subject {
   examHallInvigilators  ExamHallInvigilator[]
   competencies          Competency[]
 
+  @@index([globalSubjectId])
   @@index([classId])
   @@index([departmentId])
 }

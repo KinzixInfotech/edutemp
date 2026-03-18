@@ -36,39 +36,43 @@ export async function GET(req, props) {
 
 // POST /api/schools/[schoolId]/subjects
 export async function POST(req, props) {
-  const params = await props.params;
+    const params = await props.params;
     try {
         const { schoolId } = params;
         const body = await req.json();
-        const { subjectName, subjectCode, classId, departmentId } = body;
+        const { subjectName, subjectCode, type = 'CORE', classIds, departmentId } = body;
 
-        if (!subjectName || !classId) {
+        // Support both legacy `classId` and new `classIds`
+        let targetClassIds = classIds || [];
+        if (body.classId && targetClassIds.length === 0) {
+            targetClassIds = [body.classId];
+        }
+
+        if (!subjectName || targetClassIds.length === 0) {
             return NextResponse.json(
-                { error: 'Subject name and class are required' },
+                { error: 'Subject name and at least one class are required' },
                 { status: 400 }
             );
         }
 
-        // Verify that class belongs to this school
-        const classExists = await prisma.class.findFirst({
+        // Verify that classes belong to this school
+        const classesExist = await prisma.class.findMany({
             where: {
-                id: parseInt(classId),
+                id: { in: targetClassIds.map(id => parseInt(id)) },
                 schoolId: schoolId,
             },
         });
 
-        if (!classExists) {
+        if (classesExist.length !== targetClassIds.length) {
             return NextResponse.json(
-                { error: 'Class not found or does not belong to this school' },
+                { error: 'One or more classes not found or do not belong to this school' },
                 { status: 404 }
             );
         }
 
-        // Use a default department if not provided (get first department or create default)
+        // Use a default department if not provided
         let finalDepartmentId = departmentId ? parseInt(departmentId) : null;
-
         if (!finalDepartmentId) {
-            // Get or create a default "General" department
             let defaultDept = await prisma.department.findFirst({
                 where: { name: 'General' },
             });
@@ -78,35 +82,75 @@ export async function POST(req, props) {
                     data: { name: 'General' },
                 });
             }
-
             finalDepartmentId = defaultDept.id;
         }
 
-        const subject = await prisma.subject.create({
-            data: {
-                subjectName,
-                subjectCode: subjectCode || null,
-                classId: parseInt(classId),
-                departmentId: finalDepartmentId,
-            },
-            include: {
-                class: {
-                    select: {
-                        className: true,
-                    },
-                },
-                department: {
-                    select: {
-                        name: true,
-                    },
-                },
-            },
+        // Transaction to create Global Subject & Class Mappings
+        const result = await prisma.$transaction(async (tx) => {
+            // Check if GlobalSubject already exists
+            let globalSubject = await tx.globalSubject.findFirst({
+                where: {
+                    schoolId,
+                    name: { equals: subjectName, mode: 'insensitive' }
+                }
+            });
+
+            if (!globalSubject) {
+                globalSubject = await tx.globalSubject.create({
+                    data: {
+                        name: subjectName,
+                        code: subjectCode || null,
+                        type: type,
+                        schoolId: schoolId
+                    }
+                });
+            } else if (globalSubject.type !== type || globalSubject.code !== subjectCode) {
+                 // Optionally update global stats if they try to recreate
+                 globalSubject = await tx.globalSubject.update({
+                     where: { id: globalSubject.id },
+                     data: { type, code: subjectCode || null }
+                 });
+            }
+
+            // Create subject mapping for each class if it doesn't already exist
+            const createdSubjects = [];
+            for (const cClass of classesExist) {
+                const existingMapping = await tx.subject.findFirst({
+                    where: {
+                        globalSubjectId: globalSubject.id,
+                        classId: cClass.id
+                    }
+                });
+
+                if (!existingMapping) {
+                    const mappedSubject = await tx.subject.create({
+                        data: {
+                            globalSubjectId: globalSubject.id,
+                            subjectName,
+                            subjectCode: subjectCode || null,
+                            isOptional: type === 'OPTIONAL',
+                            classId: cClass.id,
+                            departmentId: finalDepartmentId,
+                        },
+                        include: {
+                            class: { select: { className: true } },
+                            department: { select: { name: true } }
+                        }
+                    });
+                    createdSubjects.push(mappedSubject);
+                }
+            }
+
+            return createdSubjects;
         });
 
         // Invalidate subjects cache
         await invalidatePattern(`subjects:${schoolId}*`);
 
-        return NextResponse.json(subject);
+        // Return the array of created subjects or standard response
+        return NextResponse.json(
+            result.length === 1 ? result[0] : { message: "Bulk subjects created", count: result.length, subjects: result }
+        );
     } catch (error) {
         console.error('Error creating subject:', error);
         return NextResponse.json(
