@@ -69,20 +69,35 @@ export async function POST(request) {
             feeSettings?.receiptPrefix || 'REC'
         );
 
-        // Build fee items from student fee particulars (fee head breakup)
+        // Check if an immutable receipt snapshot already exists for this payment
+        let receipt = await prisma.receipt.findFirst({
+            where: { feePaymentId }
+        });
+
         let feeItems = [];
-        const particulars = payment.studentFee?.particulars || [];
-        if (particulars.length > 0) {
-            feeItems = particulars.map(p => ({
-                description: p.name,
-                amount: p.amount,
+        let totalPaidAmount = payment.amount;
+
+        if (receipt && receipt.receiptData?.allocations) {
+            // New Ledger System: Use the exact allocations from the time of payment
+            feeItems = receipt.receiptData.allocations.map(a => ({
+                description: `${a.component} (${a.month})`,
+                amount: a.amount
             }));
+            totalPaidAmount = receipt.receiptData.amountPaid || payment.amount;
         } else {
-            // Fallback to single line item
-            feeItems = [{
-                description: payment.studentFee?.feeStructure?.name || 'Fee Payment',
-                amount: payment.amount,
-            }];
+            // Legacy System / Fallback: Use current fee particulars
+            const particulars = payment.studentFee?.particulars || [];
+            if (particulars.length > 0) {
+                feeItems = particulars.map(p => ({
+                    description: p.name,
+                    amount: p.amount,
+                }));
+            } else {
+                feeItems = [{
+                    description: payment.studentFee?.feeStructure?.name || 'Fee Payment',
+                    amount: payment.amount,
+                }];
+            }
         }
 
         // Calculate balance
@@ -90,45 +105,36 @@ export async function POST(request) {
         const totalPaidSoFar = payment.studentFee?.paidAmount || payment.amount;
         const balanceAfterPayment = totalFee - totalPaidSoFar;
 
-        // Prepare receipt data snapshot
+        // Prepare full receipt display payload (merging immutable financial data + static display info)
         const receiptData = {
-            // School Info
             schoolName: payment.school.name,
             schoolLogo: payment.school.profilePicture,
             schoolAddress: payment.school.location,
             schoolContact: payment.school.contactNumber,
             schoolEmail: payment.school.email || '',
 
-            // Receipt Info
-            receiptNumber,
-            receiptDate: new Date().toLocaleDateString('en-IN'),
+            receiptNumber: receipt ? receipt.receiptNumber : receiptNumber,
+            receiptDate: receipt ? new Date(receipt.createdAt).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN'),
 
-            // Student Info
             studentName: payment.student.user.name,
             studentClass: `${payment.student.class?.name || ''}-${payment.student.section?.name || ''}`,
             admissionNo: payment.student.admissionNo,
 
-            // Parent Info
             parentName: payment.student.parent?.name || 'N/A',
             parentContact: payment.student.parent?.contactNumber || 'N/A',
 
-            // Payment Info
             paymentId: payment.id,
             academicYear: payment.academicYear?.name || '',
             paymentDate: payment.paymentDate.toLocaleDateString('en-IN'),
             paymentMethod: payment.paymentMethod,
             transactionId: payment.transactionId || payment.gatewayPaymentId || 'N/A',
 
-            // Fee Items (individual fee heads)
             feeItems,
-
-            // Amounts
-            subtotal: payment.amount,
+            subtotal: totalPaidAmount,
             discount: 0,
-            totalPaid: payment.amount,
+            totalPaid: totalPaidAmount,
             balanceAfterPayment: Math.max(0, balanceAfterPayment),
 
-            // Display Settings
             showSchoolLogo: feeSettings?.showSchoolLogo ?? true,
             showBalanceDue: feeSettings?.showBalanceDue ?? true,
             showPaymentMode: feeSettings?.showPaymentMode ?? true,
@@ -137,18 +143,21 @@ export async function POST(request) {
             footerText: feeSettings?.receiptFooterText || '',
         };
 
-        // Create receipt record
-        const receipt = await prisma.receipt.create({
-            data: {
-                schoolId,
-                receiptNumber,
-                feePaymentId,
-                studentId: payment.studentId,
-                parentId: payment.student.parentId,
-                receiptData,
-                pdfGenerated: false, // Will be updated after PDF generation
-            },
-        });
+        if (!receipt) {
+            // Create legacy receipt record if it didn't exist
+            receipt = await prisma.receipt.create({
+                data: {
+                    schoolId,
+                    receiptNumber,
+                    feePaymentId,
+                    studentId: payment.studentId,
+                    parentId: payment.student.parentId,
+                    receiptData,
+                    pdfGenerated: false,
+                },
+            });
+        }
+
 
         // Generate filename for R2
         // Format: studentName_academicYear_orderID_date.pdf

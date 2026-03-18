@@ -1202,7 +1202,8 @@ exports.Prisma.SectionScalarFieldEnum = {
   name: 'name',
   classId: 'classId',
   schoolId: 'schoolId',
-  teachingStaffUserId: 'teachingStaffUserId'
+  teachingStaffUserId: 'teachingStaffUserId',
+  capacity: 'capacity'
 };
 
 exports.Prisma.SectionSubjectTeacherScalarFieldEnum = {
@@ -2091,7 +2092,12 @@ exports.Prisma.GlobalFeeParticularScalarFieldEnum = {
   amount: 'amount',
   isOptional: 'isOptional',
   category: 'category',
-  displayOrder: 'displayOrder'
+  displayOrder: 'displayOrder',
+  type: 'type',
+  chargeTiming: 'chargeTiming',
+  serviceId: 'serviceId',
+  lateFeeRuleId: 'lateFeeRuleId',
+  applicableMonths: 'applicableMonths'
 };
 
 exports.Prisma.FeeInstallmentRuleScalarFieldEnum = {
@@ -2255,6 +2261,142 @@ exports.Prisma.EventReminderScalarFieldEnum = {
   scheduledAt: 'scheduledAt',
   isSent: 'isSent',
   sentAt: 'sentAt'
+};
+
+exports.Prisma.FeeSessionScalarFieldEnum = {
+  id: 'id',
+  schoolId: 'schoolId',
+  academicYearId: 'academicYearId',
+  name: 'name',
+  isActive: 'isActive',
+  isClosed: 'isClosed',
+  closedAt: 'closedAt',
+  closedBy: 'closedBy',
+  startMonth: 'startMonth',
+  endMonth: 'endMonth',
+  dueDayOfMonth: 'dueDayOfMonth',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.ServiceScalarFieldEnum = {
+  id: 'id',
+  schoolId: 'schoolId',
+  name: 'name',
+  module: 'module',
+  monthlyFee: 'monthlyFee',
+  isActive: 'isActive',
+  metadata: 'metadata',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.FeeComponentScalarFieldEnum = {
+  id: 'id',
+  feeStructureId: 'feeStructureId',
+  feeSessionId: 'feeSessionId',
+  name: 'name',
+  amount: 'amount',
+  type: 'type',
+  category: 'category',
+  chargeTiming: 'chargeTiming',
+  serviceId: 'serviceId',
+  isOptional: 'isOptional',
+  isActive: 'isActive',
+  applicableMonths: 'applicableMonths',
+  lateFeeRuleId: 'lateFeeRuleId',
+  displayOrder: 'displayOrder',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.StudentServiceScalarFieldEnum = {
+  id: 'id',
+  studentId: 'studentId',
+  serviceId: 'serviceId',
+  startDate: 'startDate',
+  endDate: 'endDate',
+  isActive: 'isActive',
+  overrideAmount: 'overrideAmount',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.StudentFeeLedgerScalarFieldEnum = {
+  id: 'id',
+  studentId: 'studentId',
+  schoolId: 'schoolId',
+  academicYearId: 'academicYearId',
+  feeSessionId: 'feeSessionId',
+  feeComponentId: 'feeComponentId',
+  month: 'month',
+  monthLabel: 'monthLabel',
+  originalAmount: 'originalAmount',
+  discountAmount: 'discountAmount',
+  lateFeeAmount: 'lateFeeAmount',
+  netAmount: 'netAmount',
+  paidAmount: 'paidAmount',
+  balanceAmount: 'balanceAmount',
+  status: 'status',
+  dueDate: 'dueDate',
+  isFrozen: 'isFrozen',
+  version: 'version',
+  lateFeeCalculatedAt: 'lateFeeCalculatedAt',
+  paidDate: 'paidDate',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.LateFeeRuleScalarFieldEnum = {
+  id: 'id',
+  schoolId: 'schoolId',
+  name: 'name',
+  type: 'type',
+  amount: 'amount',
+  percentage: 'percentage',
+  graceDays: 'graceDays',
+  maxAmount: 'maxAmount',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.PaymentAllocationScalarFieldEnum = {
+  id: 'id',
+  paymentId: 'paymentId',
+  ledgerEntryId: 'ledgerEntryId',
+  amount: 'amount',
+  allocatedAt: 'allocatedAt'
+};
+
+exports.Prisma.StudentWalletScalarFieldEnum = {
+  id: 'id',
+  studentId: 'studentId',
+  schoolId: 'schoolId',
+  balance: 'balance',
+  lastUpdatedAt: 'lastUpdatedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.LedgerAuditLogScalarFieldEnum = {
+  id: 'id',
+  ledgerEntryId: 'ledgerEntryId',
+  action: 'action',
+  oldValue: 'oldValue',
+  newValue: 'newValue',
+  doneBy: 'doneBy',
+  remarks: 'remarks',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.PaymentReversalScalarFieldEnum = {
+  id: 'id',
+  paymentId: 'paymentId',
+  amount: 'amount',
+  reason: 'reason',
+  reversedBy: 'reversedBy',
+  createdAt: 'createdAt'
 };
 
 exports.Prisma.OnlineExamQuestionScalarFieldEnum = {
@@ -3692,7 +3834,9 @@ exports.FeeCategory = exports.$Enums.FeeCategory = {
   HOSTEL: 'HOSTEL',
   MISCELLANEOUS: 'MISCELLANEOUS',
   DEVELOPMENT: 'DEVELOPMENT',
-  CAUTION_MONEY: 'CAUTION_MONEY'
+  CAUTION_MONEY: 'CAUTION_MONEY',
+  ACTIVITY: 'ACTIVITY',
+  FINE: 'FINE'
 };
 
 exports.FeeStatus = exports.$Enums.FeeStatus = {
@@ -3772,6 +3916,63 @@ exports.EventStatus = exports.$Enums.EventStatus = {
   COMPLETED: 'COMPLETED',
   CANCELLED: 'CANCELLED',
   POSTPONED: 'POSTPONED'
+};
+
+exports.ServiceModule = exports.$Enums.ServiceModule = {
+  SERVICE_TRANSPORT: 'SERVICE_TRANSPORT',
+  SERVICE_ACTIVITY: 'SERVICE_ACTIVITY',
+  SERVICE_HOSTEL: 'SERVICE_HOSTEL',
+  SERVICE_CUSTOM: 'SERVICE_CUSTOM'
+};
+
+exports.FeeComponentType = exports.$Enums.FeeComponentType = {
+  MONTHLY: 'MONTHLY',
+  ONE_TIME: 'ONE_TIME',
+  ANNUAL: 'ANNUAL',
+  TERM: 'TERM',
+  PROMOTION: 'PROMOTION'
+};
+
+exports.FeeComponentCategory = exports.$Enums.FeeComponentCategory = {
+  FEE_TUITION: 'FEE_TUITION',
+  FEE_TRANSPORT: 'FEE_TRANSPORT',
+  FEE_ACTIVITY: 'FEE_ACTIVITY',
+  FEE_ADMISSION: 'FEE_ADMISSION',
+  FEE_EXAMINATION: 'FEE_EXAMINATION',
+  FEE_LIBRARY: 'FEE_LIBRARY',
+  FEE_LABORATORY: 'FEE_LABORATORY',
+  FEE_SPORTS: 'FEE_SPORTS',
+  FEE_HOSTEL: 'FEE_HOSTEL',
+  FEE_DEVELOPMENT: 'FEE_DEVELOPMENT',
+  FEE_FINE: 'FEE_FINE',
+  FEE_MISCELLANEOUS: 'FEE_MISCELLANEOUS'
+};
+
+exports.ChargeTiming = exports.$Enums.ChargeTiming = {
+  CHARGE_SESSION_START: 'CHARGE_SESSION_START',
+  CHARGE_ON_ADMISSION: 'CHARGE_ON_ADMISSION',
+  CHARGE_ON_PROMOTION: 'CHARGE_ON_PROMOTION',
+  CHARGE_MONTHLY: 'CHARGE_MONTHLY'
+};
+
+exports.LedgerStatus = exports.$Enums.LedgerStatus = {
+  LEDGER_UNPAID: 'LEDGER_UNPAID',
+  LEDGER_PARTIAL: 'LEDGER_PARTIAL',
+  LEDGER_PAID: 'LEDGER_PAID',
+  LEDGER_WAIVED: 'LEDGER_WAIVED',
+  LEDGER_CANCELLED: 'LEDGER_CANCELLED'
+};
+
+exports.LedgerAction = exports.$Enums.LedgerAction = {
+  LEDGER_CREATED: 'LEDGER_CREATED',
+  LEDGER_UPDATED: 'LEDGER_UPDATED',
+  LEDGER_WAIVED: 'LEDGER_WAIVED',
+  LEDGER_PAID: 'LEDGER_PAID',
+  LEDGER_REVERSED: 'LEDGER_REVERSED',
+  LEDGER_DISCOUNT_APPLIED: 'LEDGER_DISCOUNT_APPLIED',
+  LEDGER_LATE_FEE_APPLIED: 'LEDGER_LATE_FEE_APPLIED',
+  LEDGER_FROZEN: 'LEDGER_FROZEN',
+  LEDGER_REGENERATED: 'LEDGER_REGENERATED'
 };
 
 exports.MarkStatus = exports.$Enums.MarkStatus = {
@@ -4144,6 +4345,16 @@ exports.Prisma.ModelName = {
   CalendarEvent: 'CalendarEvent',
   CalendarEventTarget: 'CalendarEventTarget',
   EventReminder: 'EventReminder',
+  FeeSession: 'FeeSession',
+  Service: 'Service',
+  FeeComponent: 'FeeComponent',
+  StudentService: 'StudentService',
+  StudentFeeLedger: 'StudentFeeLedger',
+  LateFeeRule: 'LateFeeRule',
+  PaymentAllocation: 'PaymentAllocation',
+  StudentWallet: 'StudentWallet',
+  LedgerAuditLog: 'LedgerAuditLog',
+  PaymentReversal: 'PaymentReversal',
   OnlineExamQuestion: 'OnlineExamQuestion',
   StudentExamAttempt: 'StudentExamAttempt',
   StudentExamAnswer: 'StudentExamAnswer',

@@ -153,6 +153,13 @@ model School {
   // Chat / Messaging System
   conversations Conversation[]
 
+  // Financial Ledger Engine
+  feeSessions      FeeSession[]
+  services         Service[]
+  lateFeeRules     LateFeeRule[]
+  feeLedgerEntries StudentFeeLedger[]
+  studentWallets   StudentWallet[]
+
   @@index([name])
 }
 
@@ -1821,6 +1828,10 @@ model User {
   sentMessages             Message[]                 @relation("MessageSender")
   deletedMessages          Message[]                 @relation("MessageDeleter")
 
+  // Financial Ledger Engine
+  ledgerAuditLogs  LedgerAuditLog[]  @relation("LedgerAuditUser")
+  paymentReversals PaymentReversal[] @relation("PaymentReversalUser")
+
   @@index([schoolId])
   @@index([roleId])
 }
@@ -1993,6 +2004,11 @@ model Student {
   teacherFeedbacks       TeacherFeedback[]
   parentFeedbacks        ParentFeedback[]
   hpcreports             HPCReport[]
+
+  // Financial Ledger Engine
+  feeLedgerEntries StudentFeeLedger[]
+  studentServices  StudentService[]
+  studentWallet    StudentWallet?
 
   @@index([classId])
   @@index([sectionId])
@@ -2285,6 +2301,7 @@ model Section {
   classId             Int
   schoolId            String  @db.Uuid
   teachingStaffUserId String? @db.Uuid
+  capacity            Int?
 
   // Relations
   class                  Class                   @relation(fields: [classId], references: [id])
@@ -2719,6 +2736,10 @@ model AcademicYear {
   parentFeedbacks        ParentFeedback[]
   hpcreports             HPCReport[]
   termLocks              TermLock[]
+
+  // Financial Ledger Engine
+  feeSessions      FeeSession[]
+  feeLedgerEntries StudentFeeLedger[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -4151,6 +4172,7 @@ model GlobalFeeStructure {
   particulars      GlobalFeeParticular[]
   studentFees      StudentFee[]
   installmentRules FeeInstallmentRule[]
+  feeComponents    FeeComponent[] // Financial Ledger Engine
 
   @@unique([schoolId, academicYearId, classId])
   @@index([schoolId, academicYearId])
@@ -4159,14 +4181,35 @@ model GlobalFeeStructure {
 }
 
 // Fee Components (Tuition, Books, Transport, etc.)
+// model GlobalFeeParticular {
+//   id                   String      @id @default(uuid()) @db.Uuid
+//   globalFeeStructureId String      @db.Uuid
+//   name                 String // "Tuition Fee", "Transport Fee", etc.
+//   amount               Float
+//   isOptional           Boolean     @default(false)
+//   category             FeeCategory @default(TUITION)
+//   displayOrder         Int         @default(0)
+
+//   globalFeeStructure GlobalFeeStructure     @relation(fields: [globalFeeStructureId], references: [id], onDelete: Cascade)
+//   studentParticulars StudentFeeParticular[]
+
+//   @@index([globalFeeStructureId])
+// }
 model GlobalFeeParticular {
   id                   String      @id @default(uuid()) @db.Uuid
   globalFeeStructureId String      @db.Uuid
-  name                 String // "Tuition Fee", "Transport Fee", etc.
+  name                 String
   amount               Float
   isOptional           Boolean     @default(false)
   category             FeeCategory @default(TUITION)
   displayOrder         Int         @default(0)
+
+  // ← ADD THESE 5 FIELDS
+  type             String  @default("MONTHLY") // MONTHLY, ONE_TIME, ANNUAL, TERM
+  chargeTiming     String  @default("SESSION_START") // SESSION_START, ON_ADMISSION, ON_PROMOTION, MONTHLY
+  serviceId        String? @db.Uuid
+  lateFeeRuleId    String? @db.Uuid
+  applicableMonths String? // stored as JSON string
 
   globalFeeStructure GlobalFeeStructure     @relation(fields: [globalFeeStructureId], references: [id], onDelete: Cascade)
   studentParticulars StudentFeeParticular[]
@@ -4359,6 +4402,10 @@ model FeePayment {
   studentFeeStructure   StudentFeeStructure?    @relation(fields: [studentFeeStructureId], references: [id])
   studentFeeStructureId String?                 @db.Uuid
   receipts              Receipt[]
+
+  // Financial Ledger Engine
+  paymentAllocations PaymentAllocation[]
+  paymentReversals   PaymentReversal[]
 
   @@index([studentFeeId])
   @@index([studentId])
@@ -4562,6 +4609,8 @@ enum FeeCategory {
   MISCELLANEOUS
   DEVELOPMENT
   CAUTION_MONEY
+  ACTIVITY
+  FINE
 }
 
 enum FeeMode {
@@ -4625,6 +4674,292 @@ enum ReminderType {
   OVERDUE
   PAYMENT_CONFIRMATION
   INSTALLMENT_DUE
+}
+
+// ============================================
+// FINANCIAL LEDGER ENGINE — ENUMS
+// ============================================
+
+enum FeeComponentType {
+  MONTHLY
+  ONE_TIME
+  ANNUAL
+  TERM
+  PROMOTION
+}
+
+enum FeeComponentCategory {
+  FEE_TUITION
+  FEE_TRANSPORT
+  FEE_ACTIVITY
+  FEE_ADMISSION
+  FEE_EXAMINATION
+  FEE_LIBRARY
+  FEE_LABORATORY
+  FEE_SPORTS
+  FEE_HOSTEL
+  FEE_DEVELOPMENT
+  FEE_FINE
+  FEE_MISCELLANEOUS
+}
+
+enum LedgerStatus {
+  LEDGER_UNPAID
+  LEDGER_PARTIAL
+  LEDGER_PAID
+  LEDGER_WAIVED
+  LEDGER_CANCELLED
+}
+
+enum ServiceModule {
+  SERVICE_TRANSPORT
+  SERVICE_ACTIVITY
+  SERVICE_HOSTEL
+  SERVICE_CUSTOM
+}
+
+enum ChargeTiming {
+  CHARGE_SESSION_START
+  CHARGE_ON_ADMISSION
+  CHARGE_ON_PROMOTION
+  CHARGE_MONTHLY
+}
+
+enum LedgerAction {
+  LEDGER_CREATED
+  LEDGER_UPDATED
+  LEDGER_WAIVED
+  LEDGER_PAID
+  LEDGER_REVERSED
+  LEDGER_DISCOUNT_APPLIED
+  LEDGER_LATE_FEE_APPLIED
+  LEDGER_FROZEN
+  LEDGER_REGENERATED
+}
+
+// ============================================
+// FINANCIAL LEDGER ENGINE — MODELS
+// ============================================
+
+model FeeSession {
+  id             String    @id @default(uuid()) @db.Uuid
+  schoolId       String    @db.Uuid
+  academicYearId String    @db.Uuid
+  name           String
+  isActive       Boolean   @default(true)
+  isClosed       Boolean   @default(false)
+  closedAt       DateTime?
+  closedBy       String?   @db.Uuid
+  startMonth     DateTime
+  endMonth       DateTime
+  dueDayOfMonth  Int       @default(10)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  school        School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear  AcademicYear       @relation(fields: [academicYearId], references: [id])
+  ledgerEntries StudentFeeLedger[]
+  components    FeeComponent[]
+
+  @@unique([schoolId, academicYearId])
+  @@index([schoolId])
+  @@index([isActive])
+}
+
+model Service {
+  id         String        @id @default(uuid()) @db.Uuid
+  schoolId   String        @db.Uuid
+  name       String
+  module     ServiceModule @default(SERVICE_CUSTOM)
+  monthlyFee Float
+  isActive   Boolean       @default(true)
+  metadata   Json?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  school     School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  students   StudentService[]
+  components FeeComponent[]
+
+  @@index([schoolId])
+  @@index([module])
+}
+
+model FeeComponent {
+  id               String               @id @default(uuid()) @db.Uuid
+  feeStructureId   String               @db.Uuid
+  feeSessionId     String               @db.Uuid
+  name             String
+  amount           Float
+  type             FeeComponentType     @default(MONTHLY)
+  category         FeeComponentCategory @default(FEE_TUITION)
+  chargeTiming     ChargeTiming         @default(CHARGE_MONTHLY)
+  serviceId        String?              @db.Uuid
+  isOptional       Boolean              @default(false)
+  isActive         Boolean              @default(true)
+  applicableMonths Json?
+  lateFeeRuleId    String?              @db.Uuid
+  displayOrder     Int                  @default(0)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  feeStructure  GlobalFeeStructure @relation(fields: [feeStructureId], references: [id], onDelete: Cascade)
+  feeSession    FeeSession         @relation(fields: [feeSessionId], references: [id])
+  service       Service?           @relation(fields: [serviceId], references: [id])
+  lateFeeRule   LateFeeRule?       @relation(fields: [lateFeeRuleId], references: [id])
+  ledgerEntries StudentFeeLedger[]
+
+  @@index([feeStructureId])
+  @@index([feeSessionId])
+  @@index([type])
+  @@index([category])
+}
+
+model StudentService {
+  id             String    @id @default(uuid()) @db.Uuid
+  studentId      String    @db.Uuid
+  serviceId      String    @db.Uuid
+  startDate      DateTime  @default(now())
+  endDate        DateTime?
+  isActive       Boolean   @default(true)
+  overrideAmount Float?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  student Student @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, serviceId])
+  @@index([studentId])
+  @@index([serviceId])
+}
+
+model StudentFeeLedger {
+  id             String @id @default(uuid()) @db.Uuid
+  studentId      String @db.Uuid
+  schoolId       String @db.Uuid
+  academicYearId String @db.Uuid
+  feeSessionId   String @db.Uuid
+  feeComponentId String @db.Uuid
+
+  month          DateTime
+  monthLabel     String
+  originalAmount Float
+  discountAmount Float        @default(0)
+  lateFeeAmount  Float        @default(0)
+  netAmount      Float
+  paidAmount     Float        @default(0)
+  balanceAmount  Float
+  status         LedgerStatus @default(LEDGER_UNPAID)
+  dueDate        DateTime
+
+  // Freeze / version control
+  isFrozen            Boolean   @default(false)
+  version             Int       @default(1)
+  lateFeeCalculatedAt DateTime?
+
+  paidDate  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  student      Student             @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  school       School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear        @relation(fields: [academicYearId], references: [id])
+  feeSession   FeeSession          @relation(fields: [feeSessionId], references: [id])
+  feeComponent FeeComponent        @relation(fields: [feeComponentId], references: [id])
+  allocations  PaymentAllocation[]
+  auditLogs    LedgerAuditLog[]
+
+  @@index([studentId, academicYearId])
+  @@index([studentId, status, dueDate])
+  @@index([schoolId, status, dueDate])
+  @@index([schoolId, academicYearId, status])
+  @@index([month])
+  @@index([dueDate])
+  @@index([status])
+  @@index([feeSessionId])
+  @@index([feeComponentId])
+}
+
+model LateFeeRule {
+  id         String   @id @default(uuid()) @db.Uuid
+  schoolId   String   @db.Uuid
+  name       String
+  type       String   @default("FIXED")
+  amount     Float    @default(0)
+  percentage Float    @default(0)
+  graceDays  Int      @default(15)
+  maxAmount  Float?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  school     School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  components FeeComponent[]
+
+  @@index([schoolId])
+}
+
+model PaymentAllocation {
+  id            String   @id @default(uuid()) @db.Uuid
+  paymentId     String   @db.Uuid
+  ledgerEntryId String   @db.Uuid
+  amount        Float
+  allocatedAt   DateTime @default(now())
+
+  payment     FeePayment       @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  ledgerEntry StudentFeeLedger @relation(fields: [ledgerEntryId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId])
+  @@index([ledgerEntryId])
+}
+
+model StudentWallet {
+  id            String   @id @default(uuid()) @db.Uuid
+  studentId     String   @unique @db.Uuid
+  schoolId      String   @db.Uuid
+  balance       Float    @default(0)
+  lastUpdatedAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  student Student @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  school  School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+}
+
+model LedgerAuditLog {
+  id            String       @id @default(uuid()) @db.Uuid
+  ledgerEntryId String       @db.Uuid
+  action        LedgerAction
+  oldValue      Json?
+  newValue      Json?
+  doneBy        String       @db.Uuid
+  remarks       String?
+  createdAt     DateTime     @default(now())
+
+  ledgerEntry StudentFeeLedger @relation(fields: [ledgerEntryId], references: [id], onDelete: Cascade)
+  user        User             @relation("LedgerAuditUser", fields: [doneBy], references: [id])
+
+  @@index([ledgerEntryId])
+  @@index([doneBy])
+  @@index([createdAt])
+}
+
+model PaymentReversal {
+  id         String   @id @default(uuid()) @db.Uuid
+  paymentId  String   @db.Uuid
+  amount     Float
+  reason     String
+  reversedBy String   @db.Uuid
+  createdAt  DateTime @default(now())
+
+  payment FeePayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  user    User       @relation("PaymentReversalUser", fields: [reversedBy], references: [id])
+
+  @@index([paymentId])
+  @@index([reversedBy])
 }
 
 // ============================================

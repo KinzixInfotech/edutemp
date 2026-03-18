@@ -25,3 +25,34 @@ export async function DELETE(req, props) {
         )
     }
 }
+
+export async function PATCH(req, props) {
+    const { schoolId, classId, sectionId } = await props.params;
+
+    try {
+        const body = await req.json();
+        const { capacity } = body;
+
+        let data = {};
+        if (capacity !== undefined) {
+            data.capacity = capacity ? parseInt(capacity, 10) : null;
+        }
+
+        const section = await prisma.section.update({
+            where: {
+                id: parseInt(sectionId, 10),
+                classId: parseInt(classId, 10),
+            },
+            data,
+        });
+
+        // Invalidate caches
+        await invalidatePattern('classes:*');
+        await invalidatePattern('classes:stats*');
+
+        return NextResponse.json(section);
+    } catch (error) {
+        console.error('[SECTION_PATCH]', error);
+        return NextResponse.json({ error: "Failed to update section" }, { status: 500 });
+    }
+}

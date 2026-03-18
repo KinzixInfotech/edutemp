@@ -92,6 +92,7 @@ export const SidebarData = [
         ],
     },
     {
+        title: "Partner Dashboard",
         items: [
             { label: "Home", url: "/dashboard", icon: House, roles: ["PARTNER"] },
             { label: "Leads", url: "/dashboard/partnerprogram/leads", icon: User, roles: ["PARTNER"] },
@@ -99,12 +100,12 @@ export const SidebarData = [
             { label: "Resources", url: "/dashboard/partnerprogram/resources", icon: BookCopy, roles: ["PARTNER"] },
             { label: "Earnings", url: "/dashboard/partnerprogram/earnings", icon: DollarSign, roles: ["PARTNER"] },
             { label: "Profile", url: "/dashboard/partnerprogram/profile", icon: UserPen, roles: ["PARTNER"] },
-
         ],
     },
     {
-        title: "School APP",
+        title: "School APP & Web",
         items: [
+            { label: "Manage Website", url: "/dashboard/schools/website", icon: MonitorCog, roles: ['ADMIN'] },
             { label: "App Carousel", url: "/dashboard/schools/carousel", icon: GalleryHorizontal, roles: ['ADMIN'] },
             { label: "School Gallery", url: "/dashboard/schools/gallery", icon: Images, roles: ['ADMIN'] },
             { label: "Status Updates", url: "/dashboard/schools/status", icon: Play, roles: ['ADMIN'] },
@@ -306,13 +307,11 @@ export const SidebarData = [
         ],
     },
     {
+        title: "Academics & Operations",
         items: [
             { label: "Inventory", url: "/dashboard/schools/inventory", icon: Blocks, roles: ["SUPER_ADMIN", "STUDENT", "ADMIN", "MASTER_ADMIN", "TEACHER", "STAFF"] },
             { label: "Syllabus Management", url: "/dashboard/schools/syllabus-managment/", icon: ScrollText, roles: ["ADMIN"] },
-            { label: "HomeWork", url: "/dashboard/schools/homework/", icon: BookA, roles: ["ADMIN"] },
-            { label: "Create Super Admin", url: "/dashboard/edubreezy/add-user", icon: IconListDetails, roles: ["SUPER_ADMIN"] },
-            { label: "Audit Log", url: "/dashboard/auditlog", icon: IconChartBar, roles: ["SUPER_ADMIN"] },
-            // { label: "Edu AI", url: "/dashboard/schools/eduai", icon: BotMessageSquare, roles: ["ADMIN"] },
+            { label: "Homework", url: "/dashboard/schools/homework/", icon: BookA, roles: ["ADMIN"] },
         ]
     },
     {
@@ -321,25 +320,19 @@ export const SidebarData = [
             {
                 label: "Manage Staff", url: "/dashboard/schools/teaching-staff", icon: UserPen, roles: ["ADMIN"],
                 submenu: [
-                    { label: "Manage Teaching Staff", url: "/dashboard/schools/manage-teaching-staff", roles: ["ADMIN"] },
-                    { label: "Manage Non Teaching Staff", url: "/dashboard/schools/manage-non-teaching-staff", roles: ["ADMIN"] },
+                    { label: "Teaching Staff", url: "/dashboard/schools/manage-teaching-staff", roles: ["ADMIN"] },
+                    { label: "Non Teaching Staff", url: "/dashboard/schools/manage-non-teaching-staff", roles: ["ADMIN"] },
                 ],
             },
-
-            { label: "All Schools", url: "/dashboard/schools/all-schools", icon: IconDatabase, roles: ['SUPER_ADMIN'] },
-            { label: "Manage Website", url: "/dashboard/schools/website", icon: MonitorCog, roles: ['ADMIN'] },
-
         ],
     },
     {
-        title: "Manage Classes",
+        title: "Administration",
         items: [
-            { label: "Manage Classes", url: "/dashboard/schools/create-classes", icon: BookMarked, roles: ["ADMIN"] },
-            { label: "Manage Student", url: "/dashboard/schools/manage-student", icon: Baby, roles: ["ADMIN"] },
-            // { label: "Student Promotion", url: "/dashboard/schools/academic/promotion", icon: TrendingUp, roles: ["ADMIN"] },
-            { label: "Manage Parent", url: "/dashboard/schools/manage-parent", icon: User, roles: ["ADMIN"] },
-            { label: "Manage Academic Year", url: "/dashboard/schools/academic-years", icon: CalendarCog, roles: ["ADMIN"] },
-            // { label: "Notices & Circulars", url: "/dashboard/schools/manage-notice", icon: Flag, roles: ["ADMIN"] },
+            { label: "Classes & Sections", url: "/dashboard/schools/create-classes", icon: BookMarked, roles: ["ADMIN"] },
+            { label: "Manage Students", url: "/dashboard/schools/manage-student", icon: Baby, roles: ["ADMIN"] },
+            { label: "Manage Parents", url: "/dashboard/schools/manage-parent", icon: User, roles: ["ADMIN"] },
+            { label: "Academic Years", url: "/dashboard/schools/academic-years", icon: CalendarCog, roles: ["ADMIN"] },
         ]
     },
     {
@@ -378,7 +371,7 @@ export const SidebarData = [
         ],
     },
     {
-        // title: "Management Attendance",
+        title: "Attendance Management",
         items: [
             {
                 label: "Manage Attendance",
@@ -535,7 +528,8 @@ export const SidebarData = [
             { label: "Home", url: "/dashboard", icon: House, roles: ["ACCOUNTANT"] },
             { label: "Fee Overview", url: "/dashboard/fees/overview", icon: LayoutDashboard, roles: ["ACCOUNTANT"] },
             { label: "Manage Fee Structure", url: "/dashboard/fees/manage-fee-structure", icon: FileSpreadsheet, roles: ["ACCOUNTANT"] },
-            { label: "Track Payments", url: "/dashboard/fees/payments", icon: CreditCard, roles: ["ACCOUNTANT"] },
+            { label: "Assign Structure", url: "/dashboard/fees/assign", icon: ArrowLeftRight, roles: ["ACCOUNTANT"] },
+            { label: "Student Fees", url: "/dashboard/fees/payments", icon: CreditCard, roles: ["ACCOUNTANT"] },
             { label: "Reports", url: "/dashboard/fees/reports", icon: BarChart3, roles: ["ACCOUNTANT"] },
             { label: "Fee Settings", url: "/dashboard/fees/settings", icon: Settings, roles: ["ACCOUNTANT"] },
         ],
@@ -608,11 +602,14 @@ export const SidebarData = [
     },
 
     {
-        title: "Edu Employees",
+        title: "Master Admin & Super Admin",
         items: [
-
+            { label: "All Schools", url: "/dashboard/schools/all-schools", icon: IconDatabase, roles: ['SUPER_ADMIN'] },
+            { label: "Create Super Admin", url: "/dashboard/edubreezy/add-user", icon: IconListDetails, roles: ["SUPER_ADMIN"] },
+            { label: "Audit Log", url: "/dashboard/auditlog", icon: IconChartBar, roles: ["SUPER_ADMIN"] },
             { label: "All Employees", url: "/dashboard/edubreezy/employees", icon: IconDatabase, roles: ['SUPER_ADMIN'] },
             { label: "Add Employee", url: "#", icon: IconReport, roles: ['SUPER_ADMIN'] },
+            { label: "Profile Reviews", url: "/dashboard/master-admin/profile-reviews", icon: Shield, roles: ["SUPER_ADMIN"] },
         ],
     },
     {
@@ -630,12 +627,6 @@ export const SidebarData = [
         title: "App Management",
         items: [
             { label: "App Config", url: "/dashboard/edubreezy/app-config", icon: Smartphone, roles: ["SUPER_ADMIN"] },
-        ],
-    },
-    {
-        title: "Master Admin",
-        items: [
-            { label: "Profile Reviews", url: "/dashboard/master-admin/profile-reviews", icon: Shield, roles: ["SUPER_ADMIN"] },
         ],
     },
     {

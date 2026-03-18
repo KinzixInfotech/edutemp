@@ -239,6 +239,7 @@ export default function ManageClassSectionPage() {
 
     // Capacity editing state
     const [editingCapacityClassId, setEditingCapacityClassId] = useState(null)
+    const [editingCapacitySectionId, setEditingCapacitySectionId] = useState(null)
     const [editCapacityValue, setEditCapacityValue] = useState("")
 
     // Reset page on filters
@@ -643,6 +644,27 @@ export default function ManageClassSectionPage() {
         onSuccess: () => {
             toast.success("Capacity updated")
             setEditingCapacityClassId(null)
+            setEditCapacityValue("")
+            queryClient.invalidateQueries({ queryKey: ['classes'], refetchType: 'all' })
+            queryClient.invalidateQueries({ queryKey: ['class-stats'], refetchType: 'all' })
+            queryClient.invalidateQueries({ queryKey: ['classes-chart-data'], refetchType: 'all' })
+        },
+        onError: () => toast.error("Failed to update capacity")
+    })
+
+    const updateSectionCapacityMutation = useMutation({
+        mutationFn: async ({ classId, sectionId, capacity }) => {
+            const res = await fetch(`/api/schools/${schoolId}/classes/${classId}/sections/${sectionId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ capacity })
+            })
+            if (!res.ok) throw new Error('Failed to update capacity')
+            return res.json()
+        },
+        onSuccess: () => {
+            toast.success("Section capacity updated")
+            setEditingCapacitySectionId(null)
             setEditCapacityValue("")
             queryClient.invalidateQueries({ queryKey: ['classes'], refetchType: 'all' })
             queryClient.invalidateQueries({ queryKey: ['class-stats'], refetchType: 'all' })
@@ -1349,57 +1371,11 @@ export default function ManageClassSectionPage() {
                                                         </div>
                                                     </div>
                                                 </TableCell>
-                                                {/* Capacity edit cell in the class header */}
+                                                {/* Capacity cell in the class header - hidden or read-only if they only want section-level */}
                                                 <TableCell onClick={(e) => e.stopPropagation()}>
-                                                    {editingCapacityClassId === cls.id ? (
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="text-xs text-muted-foreground mr-1">Cap:</span>
-                                                            <Input
-                                                                type="number"
-                                                                min="1"
-                                                                max="500"
-                                                                className="h-7 w-20 text-xs"
-                                                                value={editCapacityValue}
-                                                                onChange={(e) => setEditCapacityValue(e.target.value)}
-                                                                onKeyDown={(e) => {
-                                                                    if (e.key === 'Enter') {
-                                                                        updateCapacityMutation.mutate({ classId: cls.id, capacity: editCapacityValue })
-                                                                    } else if (e.key === 'Escape') {
-                                                                        setEditingCapacityClassId(null)
-                                                                    }
-                                                                }}
-                                                                autoFocus
-                                                            />
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-6 w-6"
-                                                                onClick={() => updateCapacityMutation.mutate({ classId: cls.id, capacity: editCapacityValue })}
-                                                                disabled={updateCapacityMutation.isPending}
-                                                            >
-                                                                {updateCapacityMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                                                            </Button>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-6 w-6"
-                                                                onClick={() => setEditingCapacityClassId(null)}
-                                                            >
-                                                                <X className="h-3 w-3" />
-                                                            </Button>
-                                                        </div>
-                                                    ) : (
-                                                        <button
-                                                            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                                                            onClick={() => {
-                                                                setEditingCapacityClassId(cls.id)
-                                                                setEditCapacityValue(cls.capacity?.toString() || "40")
-                                                            }}
-                                                        >
-                                                            <Pencil className="h-3 w-3" />
-                                                            {cls.capacity ? `Cap: ${cls.capacity}` : 'Set capacity'}
-                                                        </button>
-                                                    )}
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {cls.capacity ? `Default Cap: ${cls.capacity}` : ''}
+                                                    </span>
                                                 </TableCell>
                                                 <TableCell onClick={toggleExpand} />
                                                 <TableCell className="text-right pr-4" onClick={(e) => e.stopPropagation()}>
@@ -1457,10 +1433,52 @@ export default function ManageClassSectionPage() {
                                                                         <Badge variant="secondary" className="text-xs">{sec.name}</Badge>
                                                                     </TableCell>
                                                                     <TableCell>
-                                                                        <CapacityIndicator
-                                                                            current={sec._count?.students || 0}
-                                                                            max={cls.capacity}
-                                                                        />
+                                                                        {editingCapacitySectionId === sec.id ? (
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <Input
+                                                                                    type="number"
+                                                                                    min="1"
+                                                                                    max="500"
+                                                                                    className="h-7 w-20 text-xs"
+                                                                                    value={editCapacityValue}
+                                                                                    onChange={(e) => setEditCapacityValue(e.target.value)}
+                                                                                    onKeyDown={(e) => {
+                                                                                        if (e.key === 'Enter') {
+                                                                                            updateSectionCapacityMutation.mutate({ classId: cls.id, sectionId: sec.id, capacity: editCapacityValue })
+                                                                                        } else if (e.key === 'Escape') {
+                                                                                            setEditingCapacitySectionId(null)
+                                                                                        }
+                                                                                    }}
+                                                                                    autoFocus
+                                                                                />
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="icon"
+                                                                                    className="h-6 w-6"
+                                                                                    onClick={() => updateSectionCapacityMutation.mutate({ classId: cls.id, sectionId: sec.id, capacity: editCapacityValue })}
+                                                                                    disabled={updateSectionCapacityMutation.isPending}
+                                                                                >
+                                                                                    {updateSectionCapacityMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                                                                                </Button>
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="icon"
+                                                                                    className="h-6 w-6"
+                                                                                    onClick={() => setEditingCapacitySectionId(null)}
+                                                                                >
+                                                                                    <X className="h-3 w-3" />
+                                                                                </Button>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <CapacityIndicator
+                                                                                current={sec._count?.students || 0}
+                                                                                max={sec.capacity || cls.capacity}
+                                                                                onEditClick={() => {
+                                                                                    setEditingCapacitySectionId(sec.id)
+                                                                                    setEditCapacityValue((sec.capacity || cls.capacity || 40).toString())
+                                                                                }}
+                                                                            />
+                                                                        )}
                                                                     </TableCell>
                                                                     <TableCell>
                                                                         <TeacherCombobox

@@ -11,6 +11,7 @@ import pkg from "../../../package.json";
 import { useEffect, useState, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
+import { FeeAssignJobProvider } from '@/context/FeeAssignJobContext';
 import { useLoader } from "@/app/dashboard/context/Loader";
 import SchoolOnboardingWizard from "../dashboard/SchoolOnboardingWizard";
 import { OnboardingSetupBannerProvider } from "../OnboardingSetupBanner";
@@ -430,7 +431,9 @@ export default function ClientLayout({ children }) {
                                             ) : (
                                                 <>
                                                     <WebPushListener />
-                                                    {children}
+                                                    <FeeAssignJobProvider>
+                                                        {children}
+                                                    </FeeAssignJobProvider>
                                                 </>
                                             )}
                                         </main>

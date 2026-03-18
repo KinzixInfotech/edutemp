@@ -1,222 +1,139 @@
-// ============================================
-// FIX: Proper Installment Creation Based on Fee Mode
-// app/api/schools/fee/assign/route.js
-// ============================================
+// ═══════════════════════════════════════════════════════════════
+// FILE: app/api/schools/fee/assign/route.js
+// ═══════════════════════════════════════════════════════════════
 
-import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
+import redis from '@/lib/redis';
+import { Client as QStashClient } from '@upstash/qstash';
 
+// ── QStash client ─────────────────────────────────────────────
+const qstash = new QStashClient({ token: process.env.QSTASH_TOKEN });
+
+// ── Job helpers (exported so worker + status routes can import) ─
+const JOB_TTL = 60 * 60 * 2; // 2 hours
+
+export async function setJob(jobId, data) {
+  await redis.set(`fee_assign_job:${jobId}`, JSON.stringify(data), { ex: JOB_TTL });
+}
+
+export async function getJob(jobId) {
+  const raw = await redis.get(`fee_assign_job:${jobId}`);
+  if (!raw) return null;
+  return typeof raw === 'string' ? JSON.parse(raw) : raw;
+}
+
+export async function updateJob(jobId, patch) {
+  const job = await getJob(jobId);
+  if (!job) return;
+  await setJob(jobId, { ...job, ...patch });
+}
+
+// ── POST /api/schools/fee/assign ──────────────────────────────
 export async function POST(req) {
   try {
-    const { globalFeeStructureId, studentIds, applyToClass, classId, sectionId, academicYearId, schoolId } = await req.json();
+    const body = await req.json();
+    const {
+      globalFeeStructureId,
+      studentIds,
+      applyToClass,
+      classId,
+      sectionId,
+      academicYearId,
+      schoolId,
+    } = body;
 
-    if (!schoolId || !academicYearId) {
-      return NextResponse.json({ error: "schoolId and academicYearId required" }, { status: 400 });
+    if (!globalFeeStructureId || !schoolId || !academicYearId) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Fetch global structure and academic year together
-    const [globalStructure, academicYear] = await Promise.all([
-      prisma.globalFeeStructure.findUnique({
-        where: { id: globalFeeStructureId },
-        include: {
-          particulars: { orderBy: { displayOrder: 'asc' } },
-          installmentRules: { orderBy: { installmentNumber: 'asc' } },
-        },
-      }),
-      prisma.academicYear.findUnique({
-        where: { id: academicYearId },
-        select: { startDate: true, endDate: true }
-      })
-    ]);
+    // ── 1. Resolve student list ────────────────────────────
+    let targetIds = studentIds || [];
 
-    if (!globalStructure) throw new Error("Fee structure not found");
-    if (!academicYear) throw new Error("Academic year not found");
-    if (globalStructure.status === 'ARCHIVED') throw new Error("Cannot assign to ARCHIVED fee structure");
-
-    // Fetch students
-    let studentsToAssign = [];
     if (applyToClass && classId) {
-      studentsToAssign = await prisma.student.findMany({
+      const students = await prisma.student.findMany({
         where: {
           schoolId,
           classId: parseInt(classId),
-          ...(sectionId && !isNaN(parseInt(sectionId)) && { sectionId: parseInt(sectionId) }),
+          ...(sectionId && sectionId !== 'all' && { sectionId: parseInt(sectionId) }),
         },
+        select: { userId: true },
       });
-    } else if (studentIds?.length > 0) {
-      studentsToAssign = await prisma.student.findMany({
-        where: { userId: { in: studentIds }, schoolId },
+      targetIds = students.map(s => s.userId);
+    }
+
+    if (!targetIds.length) {
+      return NextResponse.json({ error: 'No students to assign' }, { status: 400 });
+    }
+
+    // ── 2. Filter already-assigned ─────────────────────────
+    const existing = await prisma.studentFee.findMany({
+      where: { studentId: { in: targetIds }, academicYearId },
+      select: { studentId: true },
+    });
+    const alreadyAssigned = new Set(existing.map(f => f.studentId));
+    const toAssign = targetIds.filter(id => !alreadyAssigned.has(id));
+
+    if (!toAssign.length) {
+      return NextResponse.json({
+        jobId: null,
+        message: 'All selected students already have fees assigned',
+        skipped: targetIds.length,
+        assigned: 0,
       });
+    }
+
+    // ── 3. Create job in Redis ─────────────────────────────
+    const jobId = `feeassign_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+    await setJob(jobId, {
+      jobId,
+      status: 'running',
+      total: toAssign.length,
+      done: 0,
+      failed: 0,
+      skipped: alreadyAssigned.size,
+      globalFeeStructureId,
+      academicYearId,
+      schoolId,
+      studentIds: toAssign,
+      processedCount: 0, // tracks how many have been processed across QStash hops
+      startedAt: Date.now(),
+    });
+
+    // ── 4. Kick worker ─────────────────────────────────────
+    const base = process.env.APP_URL || 'https://www.edubreezy.com';
+    const workerUrl = `${base}/api/schools/fee/assign/worker`;
+    const isDev = process.env.NODE_ENV === 'development';
+
+    if (isDev) {
+      // Local dev: QStash can't reach localhost, call directly
+      fetch(workerUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-key': process.env.INTERNAL_API_KEY || 'edubreezy_internal',
+        },
+        body: JSON.stringify({ jobId }),
+      }).catch(e => console.error('[FeeAssign] Worker kick failed:', e));
     } else {
-      throw new Error("No students specified");
-    }
-
-    if (studentsToAssign.length === 0) throw new Error("No eligible students found");
-
-    // Auto-transition DRAFT to ACTIVE
-    if (globalStructure.status === 'DRAFT') {
-      await prisma.globalFeeStructure.update({
-        where: { id: globalFeeStructureId },
-        data: { status: 'ACTIVE' },
+      // Production: use QStash (handles retries + no timeout)
+      await qstash.publishJSON({
+        url: workerUrl,
+        body: { jobId },
+        retries: 3,
       });
-    }
-
-    const assignedStudents = [], skippedStudents = [];
-
-    // Assign Loop
-    for (const student of studentsToAssign) {
-      try {
-        await prisma.$transaction(async (tx) => {
-          const existing = await tx.studentFee.findFirst({
-            where: { studentId: student.userId, academicYearId },
-          });
-
-          if (existing) {
-            skippedStudents.push({ studentId: student.userId, name: student.name, reason: "Already assigned" });
-            return;
-          }
-
-          // Create StudentFee
-          const studentFee = await tx.studentFee.create({
-            data: {
-              studentId: student.userId, schoolId, academicYearId,
-              globalFeeStructureId: globalStructure.id,
-              originalAmount: globalStructure.totalAmount,
-              finalAmount: globalStructure.totalAmount,
-              balanceAmount: globalStructure.totalAmount,
-              status: "UNPAID",
-            },
-          });
-
-          // Create StudentFeeParticulars
-          const createdParticulars = await Promise.all(
-            globalStructure.particulars.map(p =>
-              tx.studentFeeParticular.create({
-                data: {
-                  studentFeeId: studentFee.id,
-                  globalParticularId: p.id,
-                  name: p.name,
-                  amount: p.amount,
-                  status: "UNPAID",
-                },
-              })
-            )
-          );
-
-          // Get installments (from rules or generate)
-          const installments = globalStructure.installmentRules?.length > 0
-            ? globalStructure.installmentRules.map(r => ({
-              installmentNumber: r.installmentNumber,
-              dueDate: r.dueDate,
-              amount: r.amount,
-              percentage: r.percentage,
-              ruleId: r.id,
-            }))
-            : getInstallmentsByMode(globalStructure.mode, globalStructure.totalAmount, academicYear.startDate, academicYear.endDate);
-
-          // Create installments with particular breakdowns
-          for (const inst of installments) {
-            const installment = await tx.studentFeeInstallment.create({
-              data: {
-                studentFeeId: studentFee.id,
-                installmentRuleId: inst.ruleId || null,
-                installmentNumber: inst.installmentNumber,
-                dueDate: inst.dueDate,
-                amount: inst.amount,
-                status: "PENDING",
-              },
-            });
-
-            // Create particular breakdowns
-            const percentage = inst.percentage / 100;
-            await tx.installmentParticular.createMany({
-              data: createdParticulars.map(p => ({
-                installmentId: installment.id,
-                particularId: p.id,
-                amount: p.amount * percentage,
-                paidAmount: 0,
-              })),
-            });
-          }
-
-          assignedStudents.push({ studentId: student.userId, name: student.name });
-        }, { maxWait: 5000, timeout: 10000 });
-
-      } catch (err) {
-        skippedStudents.push({
-          studentId: student.userId,
-          name: student.name,
-          reason: err.code === 'P2002' ? "Already assigned" : err.message,
-        });
-      }
     }
 
     return NextResponse.json({
-      message: "Fee assignment completed",
-      assigned: assignedStudents.length,
-      skipped: skippedStudents.length,
-      assignedStudents,
-      skippedStudents,
+      jobId,
+      total: toAssign.length,
+      skipped: alreadyAssigned.size,
+      status: 'running',
     });
+
   } catch (error) {
-    console.error("Assign Fee Error:", error);
-    return NextResponse.json({ error: error.message || "Failed to assign fees" }, { status: 400 });
+    console.error('[FeeAssign POST]', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
-}
-
-// ===================================
-// HELPER: Generate installments using academic year dates
-// ===================================
-function getInstallmentsByMode(mode, totalAmount, yearStart, yearEnd) {
-  const startDate = new Date(yearStart);
-  const endDate = yearEnd ? new Date(yearEnd) : null;
-
-  let numberOfInstallments = 1;
-
-  // Calculate actual months if MONTHLY and we have end date
-  if (endDate && mode === "MONTHLY") {
-    const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
-      (endDate.getMonth() - startDate.getMonth()) + 1;
-    numberOfInstallments = Math.max(1, Math.min(months, 12));
-  } else {
-    switch (mode) {
-      case "MONTHLY": numberOfInstallments = 12; break;
-      case "QUARTERLY": numberOfInstallments = 4; break;
-      case "HALF_YEARLY": numberOfInstallments = 2; break;
-      default: numberOfInstallments = 1;
-    }
-  }
-
-  // Proper rounding
-  const baseAmount = Math.floor((totalAmount / numberOfInstallments) * 100) / 100;
-  const remainder = Math.round((totalAmount - baseAmount * numberOfInstallments) * 100) / 100;
-  const percentagePerInstallment = Math.round((100 / numberOfInstallments) * 100) / 100;
-
-  const installments = [];
-  for (let i = 0; i < numberOfInstallments; i++) {
-    const dueDate = new Date(startDate);
-
-    if (mode === "MONTHLY") {
-      dueDate.setMonth(startDate.getMonth() + i);
-      dueDate.setDate(10);
-    } else if (mode === "QUARTERLY") {
-      dueDate.setMonth(startDate.getMonth() + (i * 3));
-      dueDate.setDate(15);
-    } else if (mode === "HALF_YEARLY") {
-      dueDate.setMonth(startDate.getMonth() + (i * 6));
-      dueDate.setDate(15);
-    } else {
-      dueDate.setDate(15);
-    }
-
-    const isLast = i === numberOfInstallments - 1;
-    installments.push({
-      installmentNumber: i + 1,
-      dueDate,
-      amount: isLast ? baseAmount + remainder : baseAmount,
-      percentage: percentagePerInstallment,
-    });
-  }
-
-  return installments;
 }

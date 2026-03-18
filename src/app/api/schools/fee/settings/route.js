@@ -200,6 +200,18 @@ export async function POST(req) {
                     },
                 });
                 break;
+
+            case "session_management":
+                if (!settings.feeSessionId) throw new Error("Fee Session ID required");
+                await prisma.feeSession.update({
+                    where: { id: settings.feeSessionId },
+                    data: {
+                        isClosed: settings.isClosed,
+                        closedAt: settings.isClosed ? new Date() : null,
+                        closedBy: settings.isClosed ? settings.userId : null
+                    }
+                });
+                break;
         }
 
         // Invalidate cache for payment portal when payment gateway settings change

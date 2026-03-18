@@ -9,7 +9,7 @@ export default function Error({ error, reset }) {
         console.error('[Error Boundary]', error);
     }, [error]);
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center p-4">
+        <div className="min-h-screen bg-white flex items-center justify-center p-4">
             <div className="max-w-lg w-full text-center space-y-8">
 
                 {/* Logo */}

@@ -34,8 +34,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
-import FeeStatementTemplate from '@/components/receipts/FeeStatementTemplate';
 import ReceiptTemplate from '@/components/receipts/ReceiptTemplate';
 import { supabase } from '@/lib/supabase';
 
@@ -60,6 +61,14 @@ export default function StudentFeeDetails({ params }) {
     const [discountType, setDiscountType] = useState('PERCENTAGE');
     const [discountValue, setDiscountValue] = useState('');
     const [discountReason, setDiscountReason] = useState('');
+    
+    // Adjust/Waive state
+    const [adjustOpen, setAdjustOpen] = useState(false);
+    const [adjustEntry, setAdjustEntry] = useState(null);
+    const [adjustAction, setAdjustAction] = useState('discount'); // 'discount' or 'waive'
+    const [adjustValue, setAdjustValue] = useState('');
+    const [adjustReason, setAdjustReason] = useState('');
+
     const [statementDialogOpen, setStatementDialogOpen] = useState(false);
     const [statementPeriod, setStatementPeriod] = useState('full_year');
     const [customDateFrom, setCustomDateFrom] = useState('');
@@ -206,17 +215,49 @@ export default function StudentFeeDetails({ params }) {
 
     const academicYearId = academicYears?.find(y => y.isActive)?.id;
 
-    // Fetch student fee details
     const { data: studentFee, isLoading } = useQuery({
         queryKey: ['student-fee', studentId, academicYearId],
         queryFn: async () => {
-            const params = new URLSearchParams({ academicYearId });
+            const params = new URLSearchParams({ 
+                academicYearId,
+                feeSessionId: activeYear?.id || academicYearId // Pass current session for ledger
+            });
             const res = await fetch(`/api/schools/fee/students/${studentId}?${params}`);
             if (!res.ok) throw new Error('Failed');
             return res.json();
         },
         enabled: !!studentId && !!academicYearId,
     });
+
+    // Fetch student subscribed services
+    const { data: studentServicesResponse } = useQuery({
+        queryKey: ['student-services', studentId],
+        queryFn: async () => {
+            const res = await fetch(`/api/schools/fee/student-services?studentId=${studentId}`);
+            if (!res.ok) throw new Error('Failed to fetch services');
+            return res.json();
+        },
+        enabled: !!studentId,
+    });
+    
+    const studentServices = studentServicesResponse?.services || [];
+
+    // Fetch ledger audit logs
+    const { data: auditLogsResponse } = useQuery({
+        queryKey: ['ledger-audit', studentId, activeYear?.id || academicYearId],
+        queryFn: async () => {
+            const params = new URLSearchParams({
+                studentId,
+                feeSessionId: activeYear?.id || academicYearId
+            });
+            const res = await fetch(`/api/schools/fee/ledger/audit?${params}`);
+            if (!res.ok) throw new Error('Failed to fetch audit logs');
+            return res.json();
+        },
+        enabled: !!studentId && !!academicYearId,
+    });
+
+    const auditLogs = auditLogsResponse?.logs || [];
 
 
     // Apply discount mutation
@@ -260,6 +301,53 @@ export default function StudentFeeDetails({ params }) {
         });
     };
 
+    // Adjust/Waive Ledger Entry Mutation
+    const adjustLedgerMutation = useMutation({
+        mutationFn: async (data) => {
+            const res = await fetch('/api/schools/fee/ledger', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.error || 'Failed to adjust ledger');
+            }
+            return res.json();
+        },
+        onSuccess: () => {
+            toast.success('Ledger adjusted successfully');
+            queryClient.invalidateQueries(['student-fee']);
+            setAdjustOpen(false);
+            setAdjustEntry(null);
+            setAdjustValue('');
+            setAdjustReason('');
+        },
+        onError: (error) => {
+            toast.error(error.message);
+        },
+    });
+
+    const handleAdjustLedger = () => {
+        if (!adjustEntry) return;
+        if (adjustAction === 'discount' && !adjustValue) {
+            toast.error('Please enter a discount amount');
+            return;
+        }
+        if (!adjustReason) {
+            toast.error('Please enter a reason');
+            return;
+        }
+
+        adjustLedgerMutation.mutate({
+            action: adjustAction,
+            ledgerEntryId: adjustEntry.id,
+            discountAmount: adjustAction === 'discount' ? parseFloat(adjustValue) : undefined,
+            reason: adjustReason,
+            userId: fullUser?.id,
+        });
+    };
+
     const formatCurrency = (amount) => {
         return new Intl.NumberFormat('en-IN', {
             style: 'currency',
@@ -294,8 +382,8 @@ export default function StudentFeeDetails({ params }) {
         const balance = studentFee.balanceAmount || 0;
         const progressPercent = Math.min(Math.round((paid / total) * 100), 100);
 
-        const overdueInstallments = studentFee.installments?.filter(i => i.isOverdue && i.status !== 'PAID') || [];
-        const overdueCount = overdueInstallments.length;
+        const overdueEntries = studentFee.ledger?.filter(l => l.status !== 'PAID' && l.dueDate && new Date(l.dueDate) < new Date()) || [];
+        const overdueCount = overdueEntries.length;
         const hasOverdue = overdueCount > 0;
 
         // Balance card color logic
@@ -319,14 +407,6 @@ export default function StudentFeeDetails({ params }) {
         return { progressPercent, overdueCount, hasOverdue, balanceColor, balanceBg, balanceIconColor };
     }, [studentFee]);
 
-    // Calculate overdue days for an installment
-    const getOverdueDays = (dueDate) => {
-        const due = new Date(dueDate);
-        const today = new Date();
-        const diffTime = today - due;
-        return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-    };
-
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-screen">
@@ -335,15 +415,7 @@ export default function StudentFeeDetails({ params }) {
         );
     }
 
-    if (!studentFee) {
-        return (
-            <div className="p-8 text-center">
-                <AlertCircle className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                <h2 className="text-2xl font-bold mb-2">No Fee Assigned</h2>
-                <p className="text-muted-foreground">This student doesn't have a fee structure assigned yet.</p>
-            </div>
-        );
-    }
+    if (!studentFee) return null;
 
     return (
         <div className="p-4 sm:p-6 lg:p-8 space-y-6">
@@ -355,30 +427,42 @@ export default function StudentFeeDetails({ params }) {
                     </Button>
                     <div>
                         <h1 className="text-2xl sm:text-3xl font-bold">
-                            {studentFee.student.name}
+                            {studentFee.student?.name || 'Unknown Student'}
                         </h1>
-                        <p className="text-sm text-muted-foreground mt-1">
-                            {studentFee.student.admissionNo} • {studentFee.student.class?.className} •
-                            Roll: {studentFee.student.rollNumber}
-                        </p>
+                        {studentFee.student && (
+                            <p className="text-sm text-muted-foreground mt-1">
+                                {studentFee.student.admissionNo} • {studentFee.student.class?.className} •
+                                Roll: {studentFee.student.rollNumber}
+                            </p>
+                        )}
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <Button variant="outline">
-                        <Send className="w-4 h-4 mr-2" />
-                        Send Reminder
-                    </Button>
+                {!studentFee.isUnassigned && (
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline">
+                            <Send className="w-4 h-4 mr-2" />
+                            Send Reminder
+                        </Button>
 
-                    <Button
-                        onClick={() => setStatementDialogOpen(true)}
-                    >
-                        <FileText className="w-4 h-4 mr-2" />
-                        Download Statement
-                    </Button>
-                </div>
+                        <Button
+                            onClick={() => setStatementDialogOpen(true)}
+                        >
+                            <FileText className="w-4 h-4 mr-2" />
+                            Download Statement
+                        </Button>
+                    </div>
+                )}
             </div>
 
-            {/* Summary Cards */}
+            {studentFee.isUnassigned ? (
+                <div className="p-8 mt-12 text-center rounded-2xl border bg-muted/20">
+                    <AlertCircle className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                    <h2 className="text-2xl font-bold mb-2">No Fee Assigned</h2>
+                    <p className="text-muted-foreground">This student doesn't have a fee structure assigned yet.</p>
+                </div>
+            ) : (
+                <>
+                    {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Card>
                     <CardContent className="pt-6">
@@ -435,7 +519,7 @@ export default function StudentFeeDetails({ params }) {
                                     <div className="flex items-center gap-1 mt-1">
                                         <AlertTriangle className="w-3 h-3 text-red-500" />
                                         <span className="text-xs text-red-600 font-medium">
-                                            {feeMetrics.overdueCount} overdue installment{feeMetrics.overdueCount > 1 ? 's' : ''}
+                                            {feeMetrics.overdueCount} overdue entr{feeMetrics.overdueCount > 1 ? 'ies' : 'y'}
                                         </span>
                                     </div>
                                 )}
@@ -459,118 +543,161 @@ export default function StudentFeeDetails({ params }) {
             </div>
 
             {/* Tabs */}
-            <Tabs defaultValue="installments" className="space-y-4">
+            <Tabs defaultValue="ledger" className="space-y-4">
                 <TabsList>
-                    <TabsTrigger value="installments">Installments</TabsTrigger>
+                    <TabsTrigger value="ledger">Ledger</TabsTrigger>
                     <TabsTrigger value="particulars">Fee Particulars</TabsTrigger>
+                    <TabsTrigger value="services">Services</TabsTrigger>
                     <TabsTrigger value="payments">Payment History</TabsTrigger>
                     <TabsTrigger value="discounts">Discounts</TabsTrigger>
+                    <TabsTrigger value="audit">Audit Log</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="installments">
+                <TabsContent value="ledger">
                     <Card>
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <CardTitle>Payment Schedule</CardTitle>
+                                    <CardTitle>Financial Ledger</CardTitle>
                                     <CardDescription>
-                                        {studentFee.globalFeeStructure?.mode} installments
+                                        Detailed breakdown of all charges and payments for this session.
                                     </CardDescription>
                                 </div>
-                                {studentFee.nextDueInstallment && (
-                                    <Badge variant="outline">
-                                        Next Due: {formatDate(studentFee.nextDueInstallment.dueDate)}
+                                {studentFee.walletBalance > 0 && (
+                                    <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+                                        Wallet Balance: {formatCurrency(studentFee.walletBalance)}
                                     </Badge>
                                 )}
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div className="space-y-3">
-                                {studentFee.installments?.map((inst) => {
-                                    const overdueDays = inst.isOverdue && inst.status !== 'PAID' ? getOverdueDays(inst.dueDate) : 0;
-                                    const installmentBalance = inst.amount - (inst.paidAmount || 0);
-                                    const installmentProgress = inst.amount > 0 ? Math.round(((inst.paidAmount || 0) / inst.amount) * 100) : 0;
-
-                                    return (
-                                        <div
-                                            key={inst.id}
-                                            className={`p-4 border rounded-lg transition-colors ${inst.status === 'PAID' ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800' :
-                                                inst.status === 'PARTIAL' ? 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800' :
-                                                    inst.isOverdue ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800' :
-                                                        'bg-muted/30'
-                                                }`}
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${inst.status === 'PAID' ? 'bg-green-500' :
-                                                        inst.status === 'PARTIAL' ? 'bg-yellow-500' :
-                                                            inst.isOverdue ? 'bg-red-500' : 'bg-blue-500'
-                                                        } text-white font-bold`}>
-                                                        {inst.installmentNumber}
-                                                    </div>
-                                                    <div>
-                                                        <div className="flex items-center gap-2">
-                                                            <p className="font-semibold">Installment {inst.installmentNumber}</p>
-                                                            {overdueDays > 0 && (
-                                                                <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-                                                                    {overdueDays}d overdue
-                                                                </Badge>
+                            <div className="rounded-md border overflow-hidden">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="bg-muted/50">
+                                            <TableHead>Charge Month</TableHead>
+                                            <TableHead>Component</TableHead>
+                                            <TableHead>Due Date</TableHead>
+                                            <TableHead className="text-right">Net Amount</TableHead>
+                                            <TableHead className="text-right">Late/Fine</TableHead>
+                                            <TableHead className="text-right">Paid</TableHead>
+                                            <TableHead className="text-right">Balance</TableHead>
+                                            <TableHead className="text-center">Status</TableHead>
+                                            <TableHead></TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {studentFee.ledger?.length > 0 ? (
+                                            studentFee.ledger.map((entry) => {
+                                                const dtMonth = entry.month ? new Date(entry.month) : null;
+                                                const monthLabel = dtMonth ? dtMonth.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) : 'One-Time';
+                                                
+                                                return (
+                                                    <TableRow key={entry.id} className={entry.isFrozen ? "opacity-80 bg-muted/20" : ""}>
+                                                        <TableCell className="font-medium">{monthLabel}</TableCell>
+                                                        <TableCell>
+                                                            {entry.feeComponent?.name}
+                                                            {entry.isFrozen && <Clock className="inline w-3 h-3 ml-2 text-muted-foreground" title="Frozen (Paid)" />}
+                                                        </TableCell>
+                                                        <TableCell>{entry.dueDate ? formatDate(entry.dueDate) : '-'}</TableCell>
+                                                        <TableCell className="text-right font-medium">{formatCurrency(entry.netAmount)}</TableCell>
+                                                        <TableCell className="text-right text-red-500">{entry.lateFeeAmount > 0 ? formatCurrency(entry.lateFeeAmount) : '-'}</TableCell>
+                                                        <TableCell className="text-right text-green-600 font-medium">{formatCurrency(entry.paidAmount)}</TableCell>
+                                                        <TableCell className="text-right font-bold">{formatCurrency(entry.balanceAmount)}</TableCell>
+                                                        <TableCell className="text-center">
+                                                            <Badge className={getStatusColor(entry.status)}>
+                                                                {entry.status}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            {!entry.isFrozen && entry.status !== 'PAID' && entry.status !== 'WAIVED' && entry.status !== 'CANCELLED' && (
+                                                                <Button variant="ghost" size="sm" className="h-8 shadow-none" onClick={() => {
+                                                                    setAdjustEntry(entry);
+                                                                    setAdjustAction('discount');
+                                                                    setAdjustValue('');
+                                                                    setAdjustReason('');
+                                                                    setAdjustOpen(true);
+                                                                }}>
+                                                                    Adjust
+                                                                </Button>
                                                             )}
-                                                        </div>
-                                                        <p className="text-sm text-muted-foreground">
-                                                            Due: {formatDate(inst.dueDate)}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="font-bold text-lg">{formatCurrency(inst.amount)}</p>
-                                                    <Badge className={getStatusColor(inst.status)}>
-                                                        {inst.status}
-                                                    </Badge>
-                                                </div>
-                                            </div>
-
-                                            {/* Payment breakdown for partial/overdue */}
-                                            {inst.status !== 'PAID' && inst.status !== 'PENDING' && (
-                                                <div className="mt-3 space-y-2">
-                                                    <div className="flex justify-between text-sm">
-                                                        <span className="text-green-600">Paid: {formatCurrency(inst.paidAmount)}</span>
-                                                        <span className="text-red-600 font-medium">Due: {formatCurrency(installmentBalance)}</span>
-                                                    </div>
-                                                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                                                        <div
-                                                            className="h-full bg-green-500 rounded-full transition-all"
-                                                            style={{ width: `${installmentProgress}%` }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Late fee indicator */}
-                                            {inst.lateFee > 0 && (
-                                                <div className="mt-2 flex items-center gap-1 text-sm text-red-600">
-                                                    <AlertTriangle className="w-3 h-3" />
-                                                    Late fee: {formatCurrency(inst.lateFee)}
-                                                </div>
-                                            )}
-
-                                            {/* Pending installment — no payments */}
-                                            {inst.status === 'PENDING' && !inst.isOverdue && (
-                                                <div className="mt-2 text-sm text-muted-foreground flex items-center gap-1">
-                                                    <Clock className="w-3 h-3" />
-                                                    Upcoming
-                                                </div>
-                                            )}
-
-                                            {inst.paidDate && inst.status === 'PAID' && (
-                                                <div className="mt-2 text-sm text-green-600 flex items-center gap-1">
-                                                    <CheckCircle className="w-3 h-3" />
-                                                    Paid on {formatDate(inst.paidDate)}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={9} className="h-24 text-center">
+                                                    No ledger entries generated yet.
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+                
+                <TabsContent value="services">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Subscribed Services</CardTitle>
+                            <CardDescription>Manage optional services like Transport and Activities for this student.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                {studentServices.length > 0 ? (
+                                    <div className="rounded-md border overflow-hidden">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow className="bg-muted/50">
+                                                    <TableHead>Service Name</TableHead>
+                                                    <TableHead>Module</TableHead>
+                                                    <TableHead>Default Price</TableHead>
+                                                    <TableHead>Override Amount</TableHead>
+                                                    <TableHead className="text-center">Status</TableHead>
+                                                    <TableHead></TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {studentServices.map((sub) => (
+                                                    <TableRow key={sub.id}>
+                                                        <TableCell className="font-medium">{sub.service?.name}</TableCell>
+                                                        <TableCell>
+                                                            <Badge variant="outline">{sub.service?.module}</Badge>
+                                                        </TableCell>
+                                                        <TableCell>{formatCurrency(sub.service?.defaultPrice)}</TableCell>
+                                                        <TableCell>
+                                                            {sub.overrideAmount !== null ? (
+                                                                <span className="font-medium">{formatCurrency(sub.overrideAmount)}</span>
+                                                            ) : (
+                                                                <span className="text-muted-foreground italic">None</span>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="text-center">
+                                                            <Badge className={sub.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                                                                {sub.isActive ? "Active" : "Inactive"}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <Button variant="outline" size="sm" className="h-8 shadow-none">
+                                                                Manage
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                ) : (
+                                    <div className="text-center p-8 border border-dashed rounded-lg bg-muted/20">
+                                        <p className="text-muted-foreground">This student is not subscribed to any optional services yet.</p>
+                                        <Button variant="outline" className="mt-4 shadow-none">
+                                            Assign Service
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -779,7 +906,152 @@ export default function StudentFeeDetails({ params }) {
                         </CardContent>
                     </Card>
                 </TabsContent>
+
+                <TabsContent value="audit">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Ledger Audit Log</CardTitle>
+                            <CardDescription>Comprehensive history of all automated and manual changes to the ledger.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                {auditLogs.length > 0 ? (
+                                    <div className="rounded-md border overflow-hidden">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow className="bg-muted/50">
+                                                    <TableHead>Date & Time</TableHead>
+                                                    <TableHead>Ledger Entry</TableHead>
+                                                    <TableHead>Action</TableHead>
+                                                    <TableHead>Reason</TableHead>
+                                                    <TableHead>Performed By</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {auditLogs.map((log) => (
+                                                    <TableRow key={log.id}>
+                                                        <TableCell className="text-sm">
+                                                            {new Date(log.createdAt).toLocaleString('en-IN', {
+                                                                day: 'numeric', month: 'short', year: 'numeric',
+                                                                hour: '2-digit', minute: '2-digit'
+                                                            })}
+                                                        </TableCell>
+                                                        <TableCell className="font-medium">
+                                                            {log.ledgerEntry?.feeComponent?.name} ({log.ledgerEntry?.monthLabel})
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge variant="outline">{log.action}</Badge>
+                                                        </TableCell>
+                                                        <TableCell className="max-w-xs truncate text-muted-foreground">
+                                                            {log.remarks || '-'}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {log.user?.name || 'System Auto'}
+                                                            {log.user?.email && <span className="block text-xs text-muted-foreground">{log.user.email}</span>}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                ) : (
+                                    <div className="text-center p-8 text-muted-foreground border rounded-lg">
+                                        No audit logs found for this session.
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
             </Tabs>
+
+            {/* Adjust/Waive Ledger Entry Dialog */}
+            <Dialog open={adjustOpen} onOpenChange={setAdjustOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Adjust Ledger Entry</DialogTitle>
+                        <DialogDescription>
+                            Waive or apply a discount to a specific ledger component ({adjustEntry?.feeComponent?.name} - {adjustEntry?.monthLabel}).
+                        </DialogDescription>
+                    </DialogHeader>
+                    {adjustEntry && (
+                        <div className="space-y-4">
+                            <div className="p-3 bg-muted rounded-lg text-sm mb-2 flex justify-between items-center">
+                                <div>
+                                    <p className="font-medium">{adjustEntry.feeComponent?.name} ({adjustEntry.monthLabel})</p>
+                                    <p className="text-muted-foreground mt-0.5">Net Amount: {formatCurrency(adjustEntry.netAmount)}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="font-bold text-lg">{formatCurrency(adjustEntry.balanceAmount)}</p>
+                                    <p className="text-xs text-muted-foreground">Current Balance</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Action</Label>
+                                <Select value={adjustAction} onValueChange={setAdjustAction}>
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                        <SelectContent>
+                                        <SelectItem value="discount">Apply Partial Discount</SelectItem>
+                                        <SelectItem value="waive">Waive Full Balance</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {adjustAction === 'discount' && (
+                                <div className="space-y-2">
+                                    <Label>Discount Amount (₹) *</Label>
+                                    <Input
+                                        type="number"
+                                        placeholder="e.g. 500"
+                                        value={adjustValue}
+                                        onChange={(e) => setAdjustValue(e.target.value)}
+                                        max={adjustEntry.balanceAmount}
+                                    />
+                                    <p className="text-xs text-muted-foreground">Maximum allowed: {formatCurrency(adjustEntry.balanceAmount)}</p>
+                                </div>
+                            )}
+
+                            <div className="space-y-2">
+                                <Label>Reason *</Label>
+                                <Input
+                                    placeholder="Enter reason for this adjustment"
+                                    value={adjustReason}
+                                    onChange={(e) => setAdjustReason(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                                <Button
+                                    variant="outline"
+                                    className="flex-1"
+                                    onClick={() => setAdjustOpen(false)}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    className="flex-1"
+                                    onClick={handleAdjustLedger}
+                                    disabled={adjustLedgerMutation.isPending}
+                                >
+                                    {adjustLedgerMutation.isPending ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                            Processing...
+                                        </>
+                                    ) : adjustAction === 'waive' ? (
+                                        'Waive Balance'
+                                    ) : (
+                                        'Apply Discount'
+                                    )}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
 
             {/* Statement Download Dialog */}
             <Dialog open={statementDialogOpen} onOpenChange={setStatementDialogOpen}>
@@ -832,11 +1104,11 @@ export default function StudentFeeDetails({ params }) {
 
                         {/* Period description */}
                         <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
-                            {statementPeriod === 'full_year' && 'Generates a statement with all installments for the full academic year.'}
-                            {statementPeriod === 'last_month' && `Generates a statement for installments due in the last 30 days (up to ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}).`}
-                            {statementPeriod === 'till_date' && `Generates a statement with installments due up to today (${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}).`}
+                            {statementPeriod === 'full_year' && 'Generates a statement with all ledger entries for the full academic year.'}
+                            {statementPeriod === 'last_month' && `Generates a statement for ledger entries due in the last 30 days (up to ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}).`}
+                            {statementPeriod === 'till_date' && `Generates a statement with ledger entries due up to today (${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}).`}
                             {statementPeriod === 'custom' && (customDateFrom && customDateTo
-                                ? `Generates a statement for installments due between ${new Date(customDateFrom).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} and ${new Date(customDateTo).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}.`
+                                ? `Generates a statement for ledger entries due between ${new Date(customDateFrom).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} and ${new Date(customDateTo).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}.`
                                 : 'Please select both From and To dates.')}
                         </div>
 
@@ -967,6 +1239,8 @@ export default function StudentFeeDetails({ params }) {
                     </div>
                 </DialogContent>
             </Dialog>
+            </>
+            )}
         </div>
     );
 }

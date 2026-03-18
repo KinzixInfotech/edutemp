@@ -1,10 +1,11 @@
 // ============================================
 // API: /api/fee/students/[studentId]/route.js
-// ENHANCED: Return detailed installment breakdowns + payment settings
+// ENHANCED: Return detailed installment breakdowns + NEW Financial Ledger data
 // ============================================
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { calculateLateFees } from "@/lib/fee/late-fee-engine";
 
 export async function GET(req, props) {
     const params = await props.params;
@@ -12,6 +13,7 @@ export async function GET(req, props) {
         const { studentId } = params;
         const { searchParams } = new URL(req.url);
         const academicYearId = searchParams.get("academicYearId");
+        const feeSessionId = searchParams.get("feeSessionId"); // 🟢 New Ledger Support
 
         if (!academicYearId) {
             return NextResponse.json({ error: "academicYearId required" }, { status: 400 });
@@ -62,15 +64,56 @@ export async function GET(req, props) {
                 }
             });
         }
+        
+        // 🟢 V2: Fetch NEW Financial Ledger Data if session ID is provided
+        let ledgerEntries = [];
+        let walletBalance = 0;
+        
+        if (feeSessionId) {
+            // Update late fees first
+            await calculateLateFees(studentId, feeSessionId);
+            
+            ledgerEntries = await prisma.studentFeeLedger.findMany({
+                where: { studentId, feeSessionId },
+                include: {
+                    feeComponent: {
+                        select: { name: true, type: true, category: true, isOptional: true }
+                    }
+                },
+                orderBy: [
+                    { month: "asc" },
+                    { dueDate: "asc" },
+                    { feeComponent: { displayOrder: "asc" } }
+                ]
+            });
+
+            const wallet = await prisma.studentWallet.findUnique({
+                where: { studentId }
+            });
+            walletBalance = wallet?.balance || 0;
+        }
 
         if (!studentFee) {
-            // Return empty structure instead of 404 to avoid frontend errors
-            // Return empty structure instead of 404 to avoid frontend errors
+            // Fetch student details so the frontend can at least display the header
+            const studentDetails = await prisma.student.findUnique({
+                where: { userId: studentId },
+                select: {
+                    userId: true, name: true, admissionNo: true, rollNumber: true,
+                    class: { select: { className: true } },
+                    section: { select: { name: true } },
+                    schoolId: true,
+                }
+            });
+
             return NextResponse.json({
+                isUnassigned: !feeSessionId || ledgerEntries.length === 0, // V1 flag compatibility
+                student: studentDetails,
                 originalAmount: 0,
                 paidAmount: 0,
                 balanceAmount: 0,
                 installments: [],
+                ledger: ledgerEntries, // 🟢 Inject Ledger Data
+                walletBalance,         // 🟢 Inject Wallet Data
                 overdueCount: 0,
                 nextDueInstallment: null,
                 paymentOptions: {
@@ -81,7 +124,7 @@ export async function GET(req, props) {
             });
         }
 
-        // Calculate installment breakdowns
+        // Calculate installment breakdowns (V1 Legacy logic)
         const enrichedInstallments = studentFee.installments.map(installment => {
             const rule = studentFee.globalFeeStructure?.installmentRules?.find(
                 r => r.installmentNumber === installment.installmentNumber
@@ -117,6 +160,8 @@ export async function GET(req, props) {
         return NextResponse.json({
             ...studentFee,
             installments: enrichedInstallments,
+            ledger: ledgerEntries,      // 🟢 Inject Ledger Data
+            walletBalance,              // 🟢 Inject Wallet Data
             overdueCount: overdueInstallments.length,
             nextDueInstallment: enrichedInstallments.find(inst => inst.status === "PENDING" && !inst.isOverdue),
             // Payment options for mobile app

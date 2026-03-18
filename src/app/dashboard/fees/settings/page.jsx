@@ -42,6 +42,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import ReceiptPreview from '@/components/receipts/ReceiptPreview';
 import FeeStatementTemplate from '@/components/receipts/FeeStatementTemplate';
 
+import SessionManagementTab from '@/components/fee-settings/SessionManagementTab';
+import ServicesTab from '@/components/fee-settings/ServicesTab';
+
 export default function FeeSettings() {
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;
@@ -136,6 +139,9 @@ export default function FeeSettings() {
             return res.json();
         },
         enabled: !!schoolId,
+        staleTime: 1000 * 60 * 5,      // ← data stays fresh for 5 minutes
+        gcTime: 1000 * 60 * 10,        // ← keep in cache for 10 minutes (was cacheTime in v4)
+        refetchOnWindowFocus: false,   // ← don't refetch when user switches browser tabs
     });
 
     // Populate state when settings load
@@ -420,7 +426,9 @@ export default function FeeSettings() {
             },
             enabled: !!schoolId,
             refetchInterval: 30000,
-        });
+            staleTime: 1000 * 60 * 2,     // ← 2 min fresh (shorter since it polls anyway)
+            refetchOnWindowFocus: false,  // ← stop refetch on focus
+        })
 
         const startOnboardingMutation = useMutation({
             mutationFn: async () => {
@@ -809,12 +817,14 @@ export default function FeeSettings() {
 
 
             <Tabs defaultValue="general" className="space-y-4">
-                <TabsList className="grid bg-[#eef1f3] dark:bg-muted border grid-cols-2 lg:grid-cols-5 gap-1">
+                <TabsList className="grid bg-[#eef1f3] dark:bg-muted border grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-1 h-auto py-1">
                     <TabsTrigger value="general">General</TabsTrigger>
                     <TabsTrigger value="payments">Payments</TabsTrigger>
                     <TabsTrigger value="notifications">Notifications</TabsTrigger>
                     <TabsTrigger value="receipts">Receipts</TabsTrigger>
                     <TabsTrigger value="discounts">Discounts</TabsTrigger>
+                    <TabsTrigger value="sessions">Sessions</TabsTrigger>
+                    <TabsTrigger value="services">Services</TabsTrigger>
                 </TabsList>
 
                 {/* ====== GENERAL SETTINGS ====== */}
@@ -838,9 +848,9 @@ export default function FeeSettings() {
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="INR">INR - Indian Rupee (₹)</SelectItem>
-                                            <SelectItem value="USD">USD - US Dollar ($)</SelectItem>
+                                            {/* <SelectItem value="USD">USD - US Dollar ($)</SelectItem>
                                             <SelectItem value="EUR">EUR - Euro (€)</SelectItem>
-                                            <SelectItem value="GBP">GBP - British Pound (£)</SelectItem>
+                                            <SelectItem value="GBP">GBP - British Pound (£)</SelectItem> */}
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -1744,6 +1754,18 @@ export default function FeeSettings() {
                             </Button>
                         </CardContent>
                     </Card>
+                </TabsContent>
+
+
+
+                {/* Session Management Tab */}
+                <TabsContent value="sessions">
+                    <SessionManagementTab schoolId={schoolId} userId={fullUser?.id} />
+                </TabsContent>
+
+                {/* Services Tab */}
+                <TabsContent value="services">
+                    <ServicesTab schoolId={schoolId} />
                 </TabsContent>
             </Tabs>
             <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200">

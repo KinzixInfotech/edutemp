@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -8,991 +8,816 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
 import {
-  Plus,
-  Trash2,
-  Edit,
-  Eye,
-  Loader2,
-  Save,
-  X,
-  DollarSign,
-  Calendar,
-  Users,
-  FileText,
-  Copy,
-  Archive,
-  Lock,
-  CheckCircle,
-  AlertCircle,
-  Filter,
-  MoreVertical
+  Plus, Trash2, Edit, Eye, Loader2, Save, X,
+  FileText, Copy, Archive, Lock, CheckCircle,
+  AlertCircle, MoreVertical, GripVertical,
+  ChevronDown, ChevronRight, Check, Tag,
+  Shield, Info, Bus, BookOpen, Zap, Sparkles,
+  Calendar, CreditCard, Star
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
+// ─── Schema ───────────────────────────────────────────────────────────────────
 const feeSchema = z.object({
   name: z.string().min(1, 'Name required'),
   description: z.string().optional(),
-  classId: z.number().positive(),
-  mode: z.enum(['MONTHLY', 'QUARTERLY', 'HALF_YEARLY', 'YEARLY', 'ONE_TIME']),
-  enableInstallments: z.boolean().default(true),
+  classId: z.number().positive('Class required'),
   particulars: z.array(z.object({
-    name: z.string().min(1),
-    amount: z.number().positive(),
-    category: z.string(),
+    name: z.string().min(1, 'Required'),
+    amount: z.number().positive('Must be > 0'),
+    type: z.enum(['MONTHLY', 'ONE_TIME', 'ANNUAL', 'TERM']).default('MONTHLY'),
+    category: z.enum(['TUITION', 'TRANSPORT', 'ACTIVITY', 'ADMISSION', 'EXAMINATION', 'LIBRARY', 'LABORATORY', 'SPORTS', 'HOSTEL', 'DEVELOPMENT', 'FINE', 'MISCELLANEOUS']).default('TUITION'),
+    chargeTiming: z.enum(['SESSION_START', 'ON_ADMISSION', 'ON_PROMOTION', 'MONTHLY']).default('SESSION_START'),
+    serviceId: z.string().uuid().nullable().optional(),
+    lateFeeRuleId: z.string().uuid().nullable().optional(),
     isOptional: z.boolean().default(false),
+    applicableMonths: z.array(z.string()).nullable().optional(),
   })).min(1),
 });
 
+// ─── Constants ────────────────────────────────────────────────────────────────
 const STATUS_COLORS = {
-  DRAFT: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-  ACTIVE: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  ARCHIVED: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
+  DRAFT: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  ACTIVE: 'bg-green-100 text-green-700 border-green-200',
+  ARCHIVED: 'bg-gray-100 text-gray-700 border-gray-200',
+};
+const STATUS_LABELS = { DRAFT: 'Draft', ACTIVE: 'Active', ARCHIVED: 'Archived' };
+const STATUS_ICONS = { DRAFT: Edit, ACTIVE: CheckCircle, ARCHIVED: Archive };
+
+const CATEGORY_ICONS = {
+  TUITION: BookOpen, ADMISSION: FileText, EXAMINATION: FileText,
+  LIBRARY: BookOpen, LABORATORY: Zap, SPORTS: Zap, ACTIVITY: Sparkles,
+  TRANSPORT: Bus, HOSTEL: Shield, DEVELOPMENT: Sparkles,
+  FINE: AlertCircle, MISCELLANEOUS: Tag,
 };
 
-const STATUS_LABELS = {
-  DRAFT: 'Draft',
-  ACTIVE: 'Active (Assigned)',
-  ARCHIVED: 'Archived (Read-only)',
+const TYPE_CONFIG = {
+  MONTHLY: { label: 'Monthly', hint: '× 12 entries', per: '/ month' },
+  ONE_TIME: { label: 'One-time', hint: '× 1 entry', per: 'one-time' },
+  ANNUAL: { label: 'Annual', hint: '× 1 entry', per: '/ year' },
+  TERM: { label: 'Per Term', hint: '× 4 entries', per: '/ term' },
 };
 
-const STATUS_ICONS = {
-  DRAFT: Edit,
-  ACTIVE: CheckCircle,
-  ARCHIVED: Archive,
-};
+// Groups for visual section grouping in the modal
+const GROUPS = [
+  {
+    key: 'monthly',
+    label: '📘 Monthly Fees',
+    description: 'Recurring monthly charges',
+    color: 'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800',
+    headerColor: 'text-blue-700 dark:text-blue-300',
+    match: (p) => p.type === 'MONTHLY',
+  },
+  {
+    key: 'annual',
+    label: '📅 Annual / Term Fees',
+    description: 'Charged once per session or per term',
+    color: 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800',
+    headerColor: 'text-emerald-700 dark:text-emerald-300',
+    match: (p) => p.type === 'ANNUAL' || p.type === 'TERM',
+  },
+  {
+    key: 'onetime',
+    label: '🧾 One-time / Admission Fees',
+    description: 'Charged once on joining',
+    color: 'bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800',
+    headerColor: 'text-purple-700 dark:text-purple-300',
+    match: (p) => p.type === 'ONE_TIME',
+  },
+];
 
+const MONTHS = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
+const INR = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
+const defaultParticular = () => ({ name: '', amount: 0, type: 'MONTHLY', category: 'TUITION', chargeTiming: 'SESSION_START', serviceId: null, lateFeeRuleId: null, isOptional: false, applicableMonths: null });
+
+// ─── Month range label ────────────────────────────────────────────────────────
+function monthRangeLabel(months) {
+  if (!months || months.length === 0) return 'Apr – Mar';
+  if (months.length === 12) return 'Apr – Mar';
+  if (months.length === 1) return months[0];
+  return `${months[0]} – ${months[months.length - 1]}`;
+}
+
+// ─── Particular Row ───────────────────────────────────────────────────────────
+function ParticularRow({ index, register, watch, setValue, remove, canRemove, lateFeeRules, services }) {
+  const [expanded, setExpanded] = useState(true);
+  const type = watch(`particulars.${index}.type`);
+  const category = watch(`particulars.${index}.category`);
+  const months = watch(`particulars.${index}.applicableMonths`) || [];
+  const optional = watch(`particulars.${index}.isOptional`);
+  const amount = watch(`particulars.${index}.amount`) || 0;
+  const name = watch(`particulars.${index}.name`);
+  const CatIcon = CATEGORY_ICONS[category] || Tag;
+  const annualTotal = type === 'MONTHLY' ? amount * 12 : type === 'TERM' ? amount * 4 : amount;
+
+  const handleTypeChange = (val) => {
+    setValue(`particulars.${index}.type`, val);
+    if (val === 'MONTHLY') setValue(`particulars.${index}.chargeTiming`, 'MONTHLY');
+    if (val === 'ANNUAL') setValue(`particulars.${index}.chargeTiming`, 'SESSION_START');
+    if (val === 'ONE_TIME') setValue(`particulars.${index}.chargeTiming`, 'ON_ADMISSION');
+    if (val === 'TERM') setValue(`particulars.${index}.chargeTiming`, 'SESSION_START');
+  };
+
+  const toggleMonth = (m) => {
+    const cur = watch(`particulars.${index}.applicableMonths`) || [];
+    setValue(`particulars.${index}.applicableMonths`, cur.includes(m) ? cur.filter(x => x !== m) : [...cur, m]);
+  };
+
+  return (
+    <div className="border rounded-lg overflow-hidden bg-white dark:bg-background">
+      {/* Header */}
+      <div
+        className="flex items-center gap-3 px-4 py-3 cursor-pointer select-none bg-muted/30 hover:bg-muted/50 transition-colors"
+        onClick={() => setExpanded(e => !e)}
+      >
+        <GripVertical className="w-4 h-4 text-muted-foreground shrink-0 cursor-grab" />
+        <div className="w-7 h-7 rounded-md bg-background border flex items-center justify-center shrink-0">
+          <CatIcon className="w-3.5 h-3.5 text-muted-foreground" />
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate">
+            {name || <span className="text-muted-foreground italic">Unnamed component</span>}
+          </p>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            {/* ✅ TYPE BADGE */}
+            <Badge variant="outline" className="text-[10px] h-4 px-1.5">{TYPE_CONFIG[type]?.label}</Badge>
+            {/* ✅ MONTHLY RANGE */}
+            {type === 'MONTHLY' && (
+              <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                <Calendar className="w-2.5 h-2.5" />{monthRangeLabel(months)}
+              </span>
+            )}
+            {optional && (
+              <span className="text-[10px] text-orange-500 font-medium bg-orange-50 dark:bg-orange-950/20 px-1.5 py-0.5 rounded">Optional</span>
+            )}
+          </div>
+        </div>
+
+        {/* ✅ AMOUNT WITH FREQUENCY */}
+        <div className="text-right shrink-0">
+          <p className="text-sm font-semibold">{INR(amount)}<span className="text-[10px] text-muted-foreground font-normal ml-1">{TYPE_CONFIG[type]?.per}</span></p>
+          {(type === 'MONTHLY' || type === 'TERM') && (
+            <p className="text-[10px] text-muted-foreground">{INR(annualTotal)} / yr</p>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+          {canRemove && (
+            <button type="button" onClick={(e) => { e.stopPropagation(); remove(index); }}
+              className="p-1 rounded text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {expanded ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+        </div>
+      </div>
+
+      {/* Body */}
+      {expanded && (
+        <div className="p-4 space-y-4 border-t">
+          {/* Name + Amount + Category */}
+          <div className="grid grid-cols-12 gap-3">
+            <div className="col-span-5 space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Component Name</Label>
+              <Input {...register(`particulars.${index}.name`)} placeholder="e.g. Tuition Fee" className="h-9" />
+            </div>
+            <div className="col-span-3 space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Amount (₹)</Label>
+              <Input type="number" {...register(`particulars.${index}.amount`, { valueAsNumber: true })} placeholder="0" className="h-9" />
+            </div>
+            <div className="col-span-4 space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Category</Label>
+              <Select value={category} onValueChange={v => setValue(`particulars.${index}.category`, v)}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {['TUITION', 'ADMISSION', 'EXAMINATION', 'LIBRARY', 'LABORATORY', 'SPORTS', 'TRANSPORT', 'HOSTEL', 'DEVELOPMENT', 'ACTIVITY', 'FINE', 'MISCELLANEOUS'].map(c => (
+                    <SelectItem key={c} value={c}>{c.charAt(0) + c.slice(1).toLowerCase()}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Billing Type pills */}
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Billing Type</Label>
+            <div className="grid grid-cols-4 gap-2">
+              {Object.entries(TYPE_CONFIG).map(([val, cfg]) => (
+                <button key={val} type="button" onClick={() => handleTypeChange(val)}
+                  className={`relative flex flex-col items-start px-3 py-2 rounded-lg border-2 text-left transition-all ${type === val ? 'border-green-500 bg-green-50 dark:bg-green-950/20' : 'border-border hover:border-muted-foreground/40'
+                    }`}>
+                  {type === val && (
+                    <div className="absolute top-1.5 right-1.5 w-3.5 h-3.5 rounded-full bg-green-500 flex items-center justify-center">
+                      <Check className="w-2 h-2 text-white" />
+                    </div>
+                  )}
+                  <span className={`text-xs font-semibold ${type === val ? 'text-green-700 dark:text-green-400' : ''}`}>{cfg.label}</span>
+                  <span className="text-[10px] text-muted-foreground mt-0.5">{cfg.hint}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Applicable months */}
+          {type === 'MONTHLY' && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-muted-foreground">Applicable Months</Label>
+                {months.length === 0
+                  ? <span className="text-[10px] bg-green-50 dark:bg-green-950/20 text-green-600 px-2 py-0.5 rounded-full">All 12 months (Apr – Mar)</span>
+                  : <button type="button" onClick={() => setValue(`particulars.${index}.applicableMonths`, [])} className="text-[10px] text-muted-foreground underline">Reset to all</button>
+                }
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {MONTHS.map(m => (
+                  <button key={m} type="button" onClick={() => toggleMonth(m)}
+                    className={`w-10 h-7 rounded text-xs font-medium transition-all ${months.includes(m) ? 'bg-green-600 text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      }`}>
+                    {m}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Late Fee Rule + Service */}
+          <div className="grid grid-cols-2 gap-3 pt-1 border-t">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1">
+                <Label className="text-xs text-muted-foreground">Late Fee Rule</Label>
+                <Tooltip>
+                  <TooltipTrigger type="button"><Info className="w-3 h-3 text-muted-foreground/50" /></TooltipTrigger>
+                  <TooltipContent><p className="text-xs">Per-component rule overrides school default</p></TooltipContent>
+                </Tooltip>
+              </div>
+              <Select value={watch(`particulars.${index}.lateFeeRuleId`) || 'none'} onValueChange={v => setValue(`particulars.${index}.lateFeeRuleId`, v === 'none' ? null : v)}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="School default" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none"><span className="text-muted-foreground">None (school default)</span></SelectItem>
+                  {lateFeeRules?.map(r => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.name} — {r.type === 'FIXED' ? `₹${r.amount}` : `${r.percentage}%`} after {r.graceDays}d
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Linked Service</Label>
+              <Select value={watch(`particulars.${index}.serviceId`) || 'none'} onValueChange={v => setValue(`particulars.${index}.serviceId`, v === 'none' ? null : v)}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="None" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none"><span className="text-muted-foreground">None</span></SelectItem>
+                  {services?.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.name} — ₹{s.monthlyFee}/mo</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Optional toggle */}
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border">
+            <div>
+              <p className="text-sm font-medium">Optional Component</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Only applied when manually selected per student. Excluded from annual total.</p>
+            </div>
+            <Switch checked={optional} onCheckedChange={v => setValue(`particulars.${index}.isOptional`, v)} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Grouped Section in Dialog ────────────────────────────────────────────────
+function GroupSection({ group, fields, register, watch, setValue, remove, append, lateFeeRules, services }) {
+  const groupFields = fields.map((f, i) => ({ ...f, _idx: i })).filter(f => group.match(watch(`particulars.${f._idx}`)));
+
+  return (
+    <div className={`border rounded-lg overflow-hidden ${group.color}`}>
+      {/* Group header */}
+      <div className="flex items-center justify-between px-4 py-2.5">
+        <div>
+          <p className={`text-sm font-semibold ${group.headerColor}`}>{group.label}</p>
+          <p className="text-xs text-muted-foreground">{group.description}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            const defaultType = group.key === 'monthly' ? 'MONTHLY' : group.key === 'annual' ? 'ANNUAL' : 'ONE_TIME';
+            const defaultTiming = defaultType === 'MONTHLY' ? 'MONTHLY' : defaultType === 'ONE_TIME' ? 'ON_ADMISSION' : 'SESSION_START';
+            append({ ...defaultParticular(), type: defaultType, chargeTiming: defaultTiming });
+          }}
+          className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-background/60"
+        >
+          <Plus className="w-3 h-3" />Add
+        </button>
+      </div>
+
+      {/* Components in this group */}
+      <div className="space-y-2 p-2 bg-background/60">
+        {groupFields.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-3 italic">No components yet — click Add</p>
+        ) : (
+          groupFields.map(f => (
+            <ParticularRow
+              key={f.id}
+              index={f._idx}
+              register={register}
+              watch={watch}
+              setValue={setValue}
+              remove={remove}
+              canRemove={fields.length > 1}
+              lateFeeRules={lateFeeRules}
+              services={services}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
 export default function FeeStructuresManagement() {
   const { fullUser } = useAuth();
   const schoolId = fullUser?.schoolId;
   const queryClient = useQueryClient();
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [selectedStructure, setSelectedStructure] = useState(null);
-  const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
-  const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
+
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [selectedStructure, setSelected] = useState(null);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [cloneOpen, setCloneOpen] = useState(false);
   const [cloneTarget, setCloneTarget] = useState(null);
   const [cloneName, setCloneName] = useState('');
-  const [cloneTargetYearId, setCloneTargetYearId] = useState('');
+  const [cloneYearId, setCloneYearId] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [isEditing, setIsEditing] = useState(false);
 
   const { register, control, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm({
     resolver: zodResolver(feeSchema),
-    defaultValues: {
-      enableInstallments: true,
-      particulars: [{ name: '', amount: 0, category: 'TUITION', isOptional: false }]
-    }
+    defaultValues: { name: '', description: '', particulars: [defaultParticular()] },
   });
-
   const { fields, append, remove } = useFieldArray({ control, name: 'particulars' });
 
-  // Fetch academic years
+  // ── Queries ──
   const { data: academicYears } = useQuery({
     queryKey: ['academic-years', schoolId],
-    queryFn: async () => {
-      const res = await fetch(`/api/schools/academic-years?schoolId=${schoolId}`);
-      if (!res.ok) throw new Error('Failed');
-      return res.json();
-    },
-    enabled: !!schoolId,
+    queryFn: async () => { const r = await fetch(`/api/schools/academic-years?schoolId=${schoolId}`); if (!r.ok) throw new Error('Failed'); return r.json(); },
+    enabled: !!schoolId, staleTime: 1000 * 60 * 10, refetchOnWindowFocus: false,
+  });
+  const { data: classes } = useQuery({
+    queryKey: ['classes', schoolId],
+    queryFn: async () => { const r = await fetch(`/api/schools/${schoolId}/classes`); if (!r.ok) throw new Error('Failed'); return r.json(); },
+    enabled: !!schoolId, staleTime: 1000 * 60 * 10, refetchOnWindowFocus: false,
+  });
+  const { data: lateFeeRules } = useQuery({
+    queryKey: ['late-fee-rules', schoolId],
+    queryFn: async () => { const r = await fetch(`/api/schools/fee/late-fee-rules?schoolId=${schoolId}`); if (!r.ok) throw new Error('Failed'); return (await r.json()).rules; },
+    enabled: !!schoolId, staleTime: 1000 * 60 * 5, refetchOnWindowFocus: false,
+  });
+  const { data: services } = useQuery({
+    queryKey: ['fee-services', schoolId],
+    queryFn: async () => { const r = await fetch(`/api/schools/fee/services?schoolId=${schoolId}`); if (!r.ok) throw new Error('Failed'); return (await r.json()).services; },
+    enabled: !!schoolId, staleTime: 1000 * 60 * 5, refetchOnWindowFocus: false,
   });
 
   const academicYearId = academicYears?.find(y => y.isActive)?.id;
 
-  // Fetch classes
-  const { data: classes } = useQuery({
-    queryKey: ['classes', schoolId],
-    queryFn: async () => {
-      const res = await fetch(`/api/schools/${schoolId}/classes`);
-      if (!res.ok) throw new Error('Failed');
-      return res.json();
-    },
-    enabled: !!schoolId,
-  });
-
-  // Fetch fee structures
   const { data: structures, isLoading } = useQuery({
     queryKey: ['fee-structures', schoolId, academicYearId, statusFilter],
     queryFn: async () => {
-      const params = new URLSearchParams({
-        schoolId,
-        academicYearId,
-        ...(statusFilter !== 'all' && { status: statusFilter }),
-        includeArchived: statusFilter === 'ARCHIVED' || statusFilter === 'all' ? 'true' : 'false',
-      });
-      const res = await fetch(`/api/schools/fee/global-structures?${params}`);
-      if (!res.ok) throw new Error('Failed');
-      return res.json();
+      const params = new URLSearchParams({ schoolId, academicYearId, ...(statusFilter !== 'all' && { status: statusFilter }), includeArchived: statusFilter === 'ARCHIVED' || statusFilter === 'all' ? 'true' : 'false' });
+      const r = await fetch(`/api/schools/fee/global-structures?${params}`);
+      if (!r.ok) throw new Error('Failed');
+      return r.json();
     },
-    enabled: !!schoolId && !!academicYearId,
+    enabled: !!schoolId && !!academicYearId, staleTime: 1000 * 60 * 2, refetchOnWindowFocus: false,
   });
 
-  // Create mutation
-  const createMutation = useMutation({
-    mutationFn: async (data) => {
-      const res = await fetch('/api/schools/fee/global-structures', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...data,
-          schoolId,
-          academicYearId,
-        }),
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error);
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      toast.success('Fee structure created successfully');
-      queryClient.invalidateQueries(['fee-structures']);
-      setIsCreateOpen(false);
-      reset();
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
+  // ── Mutations ──
+  const inv = () => queryClient.invalidateQueries({ queryKey: ['fee-structures'] });
+  const createMutation = useMutation({ mutationFn: async (data) => { const r = await fetch('/api/schools/fee/global-structures', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, schoolId, academicYearId }) }); const d = await r.json(); if (!r.ok) throw new Error(d.error); return d; }, onSuccess: () => { toast.success('Fee structure created'); inv(); closeDialog(); }, onError: e => toast.error(e.message) });
+  const updateMutation = useMutation({ mutationFn: async (data) => { const r = await fetch('/api/schools/fee/global-structures', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, id: selectedStructure?.id }) }); const d = await r.json(); if (!r.ok) throw new Error(d.error); return d; }, onSuccess: () => { toast.success('Structure updated'); inv(); closeDialog(); }, onError: e => toast.error(e.message) });
+  const deleteMutation = useMutation({ mutationFn: async (id) => { const r = await fetch(`/api/schools/fee/global-structures?id=${id}`, { method: 'DELETE' }); const d = await r.json(); if (!r.ok) throw new Error(d.error); return d; }, onSuccess: () => { toast.success('Deleted'); inv(); }, onError: e => toast.error(e.message) });
+  const archiveMutation = useMutation({ mutationFn: async (id) => { const r = await fetch('/api/schools/fee/global-structures', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action: 'archive' }) }); const d = await r.json(); if (!r.ok) throw new Error(d.error); return d; }, onSuccess: () => { toast.success('Archived'); inv(); }, onError: e => toast.error(e.message) });
+  const unarchiveMutation = useMutation({ mutationFn: async (id) => { const r = await fetch('/api/schools/fee/global-structures', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action: 'unarchive' }) }); const d = await r.json(); if (!r.ok) throw new Error(d.error); return d; }, onSuccess: () => { toast.success('Restored to Active'); inv(); }, onError: e => toast.error(e.message) });
+  const cloneMutation = useMutation({ mutationFn: async ({ id, newName, targetAcademicYearId }) => { const r = await fetch('/api/schools/fee/global-structures', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action: 'clone', newName, targetAcademicYearId }) }); const d = await r.json(); if (!r.ok) throw new Error(d.error); return d; }, onSuccess: () => { toast.success('Cloned as Draft'); inv(); setCloneOpen(false); }, onError: e => toast.error(e.message) });
 
-  // Update mutation
-  const updateMutation = useMutation({
-    mutationFn: async (data) => {
-      const res = await fetch('/api/schools/fee/global-structures', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...data, id: selectedStructure?.id }),
-      });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error);
-      return result;
-    },
-    onSuccess: () => {
-      toast.success('Fee structure updated');
-      queryClient.invalidateQueries(['fee-structures']);
-      setIsCreateOpen(false);
-      setIsEditing(false);
-      setSelectedStructure(null);
-      reset({
-        enableInstallments: true,
-        particulars: [{ name: '', amount: 0, category: 'TUITION', isOptional: false }]
-      });
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    }
-  });
-
-  // Delete mutation
-  const deleteMutation = useMutation({
-    mutationFn: async (id) => {
-      const res = await fetch(`/api/schools/fee/global-structures?id=${id}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      return data;
-    },
-    onSuccess: () => {
-      toast.success('Fee structure deleted');
-      queryClient.invalidateQueries(['fee-structures']);
-    },
-    onError: (error) => {
-      if (error.message.includes('Archive')) {
-        toast.error(error.message, {
-          action: {
-            label: 'Archive Instead',
-            onClick: () => handleArchive(deleteMutation.variables),
-          },
-        });
-      } else {
-        toast.error(error.message);
-      }
-    },
-  });
-
-  // Archive mutation
-  const archiveMutation = useMutation({
-    mutationFn: async (id) => {
-      const res = await fetch('/api/schools/fee/global-structures', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, action: 'archive' }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      return data;
-    },
-    onSuccess: () => {
-      toast.success('Fee structure archived');
-      queryClient.invalidateQueries(['fee-structures']);
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
-
-  // Clone mutation
-  const cloneMutation = useMutation({
-    mutationFn: async ({ id, newName, targetAcademicYearId }) => {
-      const res = await fetch('/api/schools/fee/global-structures', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, action: 'clone', newName, targetAcademicYearId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      return data;
-    },
-    onSuccess: () => {
-      toast.success('Fee structure cloned as DRAFT');
-      queryClient.invalidateQueries(['fee-structures']);
-      setCloneDialogOpen(false);
-      setCloneTarget(null);
-      setCloneName('');
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
-
-  // Unarchive mutation
-  const unarchiveMutation = useMutation({
-    mutationFn: async (id) => {
-      const res = await fetch('/api/schools/fee/global-structures', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, action: 'unarchive' }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      return data;
-    },
-    onSuccess: () => {
-      toast.success('Fee structure restored to ACTIVE');
-      queryClient.invalidateQueries(['fee-structures']);
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
-
-  const onSubmit = (data) => {
-    if (isEditing) {
-      updateMutation.mutate(data);
-    } else {
-      createMutation.mutate(data);
-    }
+  // ── Helpers ──
+  const closeDialog = () => { setIsDialogOpen(false); setIsEditing(false); setSelected(null); reset({ name: '', description: '', particulars: [defaultParticular()] }); };
+  const openCreate = () => { setIsEditing(false); reset({ name: '', description: '', particulars: [defaultParticular()] }); setIsDialogOpen(true); };
+  const openEdit = (s) => {
+    setSelected(s); setIsEditing(true);
+    reset({ name: s.name, description: s.description || '', classId: s.classId, particulars: s.particulars.map(p => ({ name: p.name, amount: p.amount, type: p.type || 'MONTHLY', category: p.category, chargeTiming: p.chargeTiming || 'SESSION_START', serviceId: p.serviceId || null, lateFeeRuleId: p.lateFeeRuleId || null, isOptional: p.isOptional, applicableMonths: p.applicableMonths ? JSON.parse(p.applicableMonths) : null })) });
+    setIsDialogOpen(true);
   };
+  const onSubmit = (data) => isEditing ? updateMutation.mutate(data) : createMutation.mutate(data);
 
-  const handleEdit = (structure) => {
-    setSelectedStructure(structure);
-    setIsEditing(true);
-    reset({
-      name: structure.name,
-      description: structure.description || '',
-      classId: structure.classId,
-      mode: structure.mode,
-      enableInstallments: structure.enableInstallments,
-      particulars: structure.particulars.map(p => ({
-        name: p.name,
-        amount: p.amount,
-        category: p.category,
-        isOptional: p.isOptional
-      }))
-    });
-    setIsCreateOpen(true);
-  };
+  // ✅ Separate required vs optional totals
+  const allParticulars = watch('particulars') || [];
+  const requiredTotal = allParticulars.filter(p => !p.isOptional).reduce((sum, p) => {
+    const mult = p.type === 'MONTHLY' ? 12 : p.type === 'TERM' ? 4 : 1;
+    return sum + ((Number(p.amount) || 0) * mult);
+  }, 0);
+  const optionalTotal = allParticulars.filter(p => p.isOptional).reduce((sum, p) => {
+    const mult = p.type === 'MONTHLY' ? 12 : p.type === 'TERM' ? 4 : 1;
+    return sum + ((Number(p.amount) || 0) * mult);
+  }, 0);
+  const hasOptional = optionalTotal > 0;
 
-  const handleArchive = (id) => {
-    archiveMutation.mutate(id);
-  };
-
-  const handleUnarchive = (id) => {
-    unarchiveMutation.mutate(id);
-  };
-
-  const handleCloneClick = (structure) => {
-    setCloneTarget(structure);
-    setCloneName(`${structure.name} (Copy)`);
-    setCloneTargetYearId(academicYearId); // Default to current active year
-    setCloneDialogOpen(true);
-  };
-
-  const handleCloneConfirm = () => {
-    if (cloneTarget && cloneName) {
-      cloneMutation.mutate({
-        id: cloneTarget.id,
-        newName: cloneName,
-        targetAcademicYearId: cloneTargetYearId,
-      });
-    }
-  };
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0
-    }).format(amount || 0);
-  };
-
-  const totalAmount = watch('particulars')?.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) || 0;
-  const enableInstallments = watch('enableInstallments');
-  const selectedMode = watch('mode');
-
-  const getInstallmentCount = (mode) => {
-    switch (mode) {
-      case 'MONTHLY': return 12;
-      case 'QUARTERLY': return 4;
-      case 'HALF_YEARLY': return 2;
-      default: return 1;
-    }
-  };
-
-  // Stats
-  const stats = {
-    total: structures?.length || 0,
-    draft: structures?.filter(s => s.status === 'DRAFT').length || 0,
-    active: structures?.filter(s => s.status === 'ACTIVE').length || 0,
-    archived: structures?.filter(s => s.status === 'ARCHIVED').length || 0,
-  };
+  const stats = { total: structures?.length || 0, draft: structures?.filter(s => s.status === 'DRAFT').length || 0, active: structures?.filter(s => s.status === 'ACTIVE').length || 0, archived: structures?.filter(s => s.status === 'ARCHIVED').length || 0 };
+  const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
     <TooltipProvider>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
-              <FileText className="w-8 h-8 text-blue-600" />
-              Fee Structures Management
+              <FileText className="w-8 h-8 text-green-600" />Fee Structures
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">Create and manage fee templates with installment options</p>
+            <p className="text-sm text-muted-foreground mt-1">Manage fee templates by class</p>
           </div>
-          <Dialog open={isCreateOpen} onOpenChange={(open) => {
-            setIsCreateOpen(open);
-            if (!open) {
-              setIsEditing(false);
-              setSelectedStructure(null);
-              reset({
-                enableInstallments: true,
-                particulars: [{ name: '', amount: 0, category: 'TUITION', isOptional: false }]
-              });
-            }
-          }}>
-            <DialogTrigger asChild>
-              <Button onClick={() => {
-                setIsEditing(false);
-                reset({
-                  enableInstallments: true,
-                  particulars: [{ name: '', amount: 0, category: 'TUITION', isOptional: false }]
-                });
-              }}>
-                <Plus className="w-4 h-4 mr-2" />
-                Create Structure
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>{isEditing ? 'Edit Fee Structure' : 'Create Fee Structure'}</DialogTitle>
-                <DialogDescription>
-                  {isEditing ? 'Modify format and particulars. Only DRAFT structures can be edited.' : 'New structures start as DRAFT and become ACTIVE when assigned to students'}
-                </DialogDescription>
-              </DialogHeader>
-
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                {/* Name */}
-                <div className="space-y-2">
-                  <Label>Structure Name *</Label>
-                  <Input
-                    {...register('name')}
-                    placeholder="e.g., Class 10 Annual Fees 2024-25"
-                  />
-                  {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
-                </div>
-
-                {/* Description */}
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Textarea
-                    {...register('description')}
-                    placeholder="Optional description..."
-                    rows={2}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 gap-4">
-                  {/* Class */}
-                  <div className="space-y-2">
-                    <Label>Class *</Label>
-                    <Select onValueChange={(value) => setValue('classId', parseInt(value))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select Class" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {classes?.map((cls) => (
-                          <SelectItem key={cls.id} value={cls.id.toString()}>
-                            {cls.className}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {errors.classId && <p className="text-xs text-red-500">{errors.classId.message}</p>}
-                  </div>
-
-                  {/* Installments Toggle */}
-                  <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
-                    <div>
-                      <Label className="font-medium">Enable Installments</Label>
-                      <p className="text-xs text-muted-foreground">
-                        Split total amount into multiple payments
-                      </p>
-                    </div>
-                    <Switch
-                      checked={enableInstallments}
-                      onCheckedChange={(v) => {
-                        setValue('enableInstallments', v);
-                        if (!v) setValue('mode', 'YEARLY');
-                      }}
-                    />
-                  </div>
-
-                  {/* Mode (Conditional) */}
-                  {enableInstallments && (
-                    <div className="space-y-2">
-                      <Label>Payment Mode *</Label>
-                      <Select onValueChange={(value) => setValue('mode', value)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Mode" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="MONTHLY">Monthly (12 installments)</SelectItem>
-                          <SelectItem value="QUARTERLY">Quarterly (4 installments)</SelectItem>
-                          <SelectItem value="HALF_YEARLY">Half Yearly (2 installments)</SelectItem>
-                          <SelectItem value="YEARLY">Yearly (1 payment)</SelectItem>
-                          <SelectItem value="ONE_TIME">One Time</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {errors.mode && <p className="text-xs text-red-500">{errors.mode.message}</p>}
-                    </div>
-                  )}
-                </div>
-
-
-                {/* Installment Preview */}
-                {enableInstallments && selectedMode && totalAmount > 0 && (
-                  <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
-                    <p className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-2">
-                      Installment Preview
-                    </p>
-                    <div className="grid grid-cols-4 gap-2 text-xs">
-                      {Array(Math.min(getInstallmentCount(selectedMode), 4)).fill(0).map((_, i) => (
-                        <div key={i} className="text-center p-2 bg-white dark:bg-gray-800 rounded">
-                          <p className="font-medium">Inst. {i + 1}</p>
-                          <p>{formatCurrency(totalAmount / getInstallmentCount(selectedMode))}</p>
-                        </div>
-                      ))}
-                    </div>
-                    {getInstallmentCount(selectedMode) > 4 && (
-                      <p className="text-xs text-muted-foreground mt-2">
-                        +{getInstallmentCount(selectedMode) - 4} more installments
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {/* Fee Particulars */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Fee Particulars *</Label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => append({ name: '', amount: 0, category: 'TUITION', isOptional: false })}
-                    >
-                      <Plus className="w-4 h-4 mr-1" />
-                      Add
-                    </Button>
-                  </div>
-                  <div className="space-y-2">
-                    {fields.map((field, index) => (
-                      <div key={field.id} className="flex gap-2 items-start p-3 border rounded-lg">
-                        <div className="flex-1 space-y-2">
-                          <Input
-                            {...register(`particulars.${index}.name`)}
-                            placeholder="Name (e.g., Tuition Fee)"
-                          />
-                          <div className="grid grid-cols-2 gap-2">
-                            <Input
-                              type="number"
-                              {...register(`particulars.${index}.amount`, { valueAsNumber: true })}
-                              placeholder="Amount"
-                            />
-                            <Select
-                              value={watch(`particulars.${index}.category`)}
-                              onValueChange={(value) => setValue(`particulars.${index}.category`, value)}
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="TUITION">Tuition</SelectItem>
-                                <SelectItem value="ADMISSION">Admission</SelectItem>
-                                <SelectItem value="EXAMINATION">Examination</SelectItem>
-                                <SelectItem value="LIBRARY">Library</SelectItem>
-                                <SelectItem value="LABORATORY">Laboratory</SelectItem>
-                                <SelectItem value="SPORTS">Sports</SelectItem>
-                                <SelectItem value="TRANSPORT">Transport</SelectItem>
-                                <SelectItem value="MISCELLANEOUS">Miscellaneous</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        {fields.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => remove(index)}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Total */}
-                <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-                  <span className="font-semibold">Total Amount:</span>
-                  <span className="text-2xl font-bold">{formatCurrency(totalAmount)}</span>
-                </div>
-
-                {/* Submit */}
-                <div className="flex gap-2 justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsCreateOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                    {(createMutation.isPending || updateMutation.isPending) ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        {isEditing ? 'Saving...' : 'Creating...'}
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4 mr-2" />
-                        {isEditing ? 'Save Changes' : 'Create as Draft'}
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={openCreate}>
+            <Plus className="w-4 h-4 mr-2" />Create Structure
+          </Button>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="cursor-pointer hover:border-primary transition-colors" onClick={() => setStatusFilter('all')}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">All Structures</p>
-                  <p className="text-2xl font-bold">{stats.total}</p>
-                </div>
-                <FileText className="w-8 h-8 text-blue-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="cursor-pointer hover:border-yellow-500 transition-colors" onClick={() => setStatusFilter('DRAFT')}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Draft</p>
-                  <p className="text-2xl font-bold">{stats.draft}</p>
-                </div>
-                <Edit className="w-8 h-8 text-yellow-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="cursor-pointer hover:border-green-500 transition-colors" onClick={() => setStatusFilter('ACTIVE')}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Active</p>
-                  <p className="text-2xl font-bold">{stats.active}</p>
-                </div>
-                <CheckCircle className="w-8 h-8 text-green-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="cursor-pointer hover:border-gray-500 transition-colors" onClick={() => setStatusFilter('ARCHIVED')}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Archived</p>
-                  <p className="text-2xl font-bold">{stats.archived}</p>
-                </div>
-                <Archive className="w-8 h-8 text-gray-500" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filter Pills */}
-        <div className="flex gap-2 flex-wrap">
-          {['all', 'DRAFT', 'ACTIVE', 'ARCHIVED'].map((status) => (
-            <Button
-              key={status}
-              variant={statusFilter === status ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setStatusFilter(status)}
-            >
-              {status === 'all' ? 'All' : status}
-            </Button>
+        {/* Stats */}
+        <div className="grid gap-4 md:grid-cols-4">
+          {[
+            { label: 'Total Structures', value: stats.total, key: 'all', Icon: FileText, color: 'text-muted-foreground' },
+            { label: 'Draft', value: stats.draft, key: 'DRAFT', Icon: Edit, color: 'text-yellow-500' },
+            { label: 'Active', value: stats.active, key: 'ACTIVE', Icon: CheckCircle, color: 'text-green-500' },
+            { label: 'Archived', value: stats.archived, key: 'ARCHIVED', Icon: Archive, color: 'text-gray-500' },
+          ].map(s => (
+            <Card key={s.key} className="cursor-pointer hover:border-primary transition-colors" onClick={() => setStatusFilter(s.key)}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{s.label}</CardTitle>
+                <s.Icon className={`h-4 w-4 ${s.color}`} />
+              </CardHeader>
+              <CardContent><div className="text-2xl font-bold">{s.value}</div></CardContent>
+            </Card>
           ))}
         </div>
 
-        {/* Structures List */}
-        {/* Structures List */}
-        <div className="min-h-[200px]">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-40">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        {/* List */}
+        <Card className="border-0 shadow-none border">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Structures ({structures?.length || 0})</CardTitle>
+                <CardDescription>All fee structures for the active academic year</CardDescription>
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="DRAFT">Draft</SelectItem>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="ARCHIVED">Archived</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {structures?.length === 0 && (
-                <Card className="p-8 text-center">
-                  <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No fee structures found</p>
-                  {/* <Button className="mt-4" onClick={() => setIsCreateOpen(true)}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Your First Structure
-                  </Button> */}
-                </Card>
-              )}
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex items-center justify-center h-40"><Loader2 className="w-7 h-7 animate-spin text-muted-foreground" /></div>
+            ) : structures?.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed rounded-lg">
+                <FileText className="w-12 h-12 text-muted-foreground/40 mb-3" />
+                <p className="text-muted-foreground font-medium">No fee structures found</p>
+                <p className="text-sm text-muted-foreground/70 mt-1 mb-4">Create a structure for each class to get started</p>
+                <Button variant="outline" size="sm" onClick={openCreate}><Plus className="w-4 h-4 mr-2" />Create Structure</Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {structures?.map(s => {
+                  const StatusIcon = STATUS_ICONS[s.status];
+                  const isDraft = s.status === 'DRAFT';
+                  const isActive = s.status === 'ACTIVE';
+                  const isArchived = s.status === 'ARCHIVED';
+                  const assigned = s._count?.studentFees || 0;
 
-              {structures?.map((structure) => {
-                const StatusIcon = STATUS_ICONS[structure.status];
-                const isDraft = structure.status === 'DRAFT';
-                const isActive = structure.status === 'ACTIVE';
-                const isArchived = structure.status === 'ARCHIVED';
-                const assignedCount = structure._count?.studentFees || 0;
+                  // ✅ Group particulars for card summary
+                  const monthly = s.particulars?.filter(p => p.type === 'MONTHLY' && !p.isOptional) || [];
+                  const annual = s.particulars?.filter(p => (p.type === 'ANNUAL' || p.type === 'TERM') && !p.isOptional) || [];
+                  const oneTime = s.particulars?.filter(p => p.type === 'ONE_TIME' && !p.isOptional) || [];
+                  const optional = s.particulars?.filter(p => p.isOptional) || [];
 
-                return (
-                  <Card key={structure.id} className={isArchived ? 'opacity-60 hover:opacity-100 transition-opacity' : ''}>
-                    <CardHeader className="pb-2">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
+                  return (
+                    <div key={s.id} className={`border rounded-lg p-4 hover:bg-muted/20 transition-colors ${isArchived ? 'opacity-60 hover:opacity-100' : ''}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <CardTitle className="text-lg">{structure.name}</CardTitle>
-                            <Badge className={STATUS_COLORS[structure.status]}>
-                              <StatusIcon className="w-3 h-3 mr-1" />
-                              {STATUS_LABELS[structure.status]}
+                            <h3 className="font-semibold">{s.name}</h3>
+                            <Badge className={STATUS_COLORS[s.status]}>
+                              <StatusIcon className="w-3 h-3 mr-1" />{STATUS_LABELS[s.status]}
                             </Badge>
-                            <Badge variant="outline">{structure.mode}</Badge>
-                            {structure.version > 1 && (
-                              <Badge variant="secondary">v{structure.version}</Badge>
+                            {s.version > 1 && <Badge variant="secondary">v{s.version}</Badge>}
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {s.class?.className} &middot; {s.particulars?.length || 0} components &middot; Created {new Date(s.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </p>
+
+                          {/* ✅ Component group pills */}
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {monthly.length > 0 && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-800">
+                                📘 {monthly.length} monthly
+                              </span>
+                            )}
+                            {annual.length > 0 && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-800">
+                                📅 {annual.length} annual
+                              </span>
+                            )}
+                            {oneTime.length > 0 && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300 border border-purple-100 dark:border-purple-800">
+                                🧾 {oneTime.length} one-time
+                              </span>
+                            )}
+                            {optional.length > 0 && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400 border border-orange-100 dark:border-orange-800">
+                                ⭐ {optional.length} optional
+                              </span>
                             )}
                           </div>
-                          <CardDescription className="mt-1">
-                            {structure.class?.className} • {structure.particulars?.length || 0} Particulars •
-                            Created {new Date(structure.createdAt).toLocaleDateString()}
-                            {structure.enableInstallments && structure.installmentRules?.length > 0 && (
-                              <span className="ml-2 text-blue-600">• {structure.installmentRules.length} Installments</span>
-                            )}
-                          </CardDescription>
                         </div>
 
-                        {/* Actions Dropdown */}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0"><MoreVertical className="w-4 h-4" /></Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => {
-                              setSelectedStructure(structure);
-                              setViewDetailsOpen(true);
-                            }}>
-                              <Eye className="w-4 h-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-
-                            {isDraft && (
-                              <DropdownMenuItem onClick={() => handleEdit(structure)}>
-                                <Edit className="w-4 h-4 mr-2" />
-                                Edit
-                              </DropdownMenuItem>
-                            )}
-
-                            <DropdownMenuItem onClick={() => handleCloneClick(structure)}>
-                              <Copy className="w-4 h-4 mr-2" />
-                              Clone
-                            </DropdownMenuItem>
-
+                          <DropdownMenuContent align="end" className="w-44">
+                            <DropdownMenuItem onClick={() => { setSelected(s); setViewOpen(true); }}><Eye className="w-4 h-4 mr-2" />View Details</DropdownMenuItem>
+                            {isDraft && <DropdownMenuItem onClick={() => openEdit(s)}><Edit className="w-4 h-4 mr-2" />Edit</DropdownMenuItem>}
+                            <DropdownMenuItem onClick={() => { setCloneTarget(s); setCloneName(`${s.name} (Copy)`); setCloneYearId(academicYearId); setCloneOpen(true); }}><Copy className="w-4 h-4 mr-2" />Clone</DropdownMenuItem>
                             <DropdownMenuSeparator />
-
-                            {isActive && (
-                              <DropdownMenuItem
-                                onClick={() => handleArchive(structure.id)}
-                                className="text-orange-600"
-                              >
-                                <Archive className="w-4 h-4 mr-2" />
-                                Archive
-                              </DropdownMenuItem>
-                            )}
-
-                            {isArchived && (
-                              <DropdownMenuItem
-                                onClick={() => handleUnarchive(structure.id)}
-                                className="text-blue-600"
-                              >
-                                <CheckCircle className="w-4 h-4 mr-2" />
-                                Restore to Active
-                              </DropdownMenuItem>
-                            )}
-
-                            {isDraft && (
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  if (confirm('Delete this draft structure?')) {
-                                    deleteMutation.mutate(structure.id);
-                                  }
-                                }}
-                                className="text-red-600"
-                              >
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            )}
-
-                            {(isActive || isArchived) && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div className="px-2 py-1.5 text-sm text-muted-foreground flex items-center">
-                                    <Lock className="w-4 h-4 mr-2" />
-                                    {isArchived ? 'Cannot delete archived' : 'Cannot delete (assigned)'}
-                                  </div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  {isArchived
-                                    ? 'Archived structures are kept for historical reference'
-                                    : `Assigned to ${assignedCount} students`
-                                  }
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
+                            {isActive && <DropdownMenuItem onClick={() => archiveMutation.mutate(s.id)} className="text-orange-600"><Archive className="w-4 h-4 mr-2" />Archive</DropdownMenuItem>}
+                            {isArchived && <DropdownMenuItem onClick={() => unarchiveMutation.mutate(s.id)} className="text-green-600"><CheckCircle className="w-4 h-4 mr-2" />Restore</DropdownMenuItem>}
+                            {isDraft && <DropdownMenuItem onClick={() => { if (confirm('Delete this draft?')) deleteMutation.mutate(s.id); }} className="text-red-600"><Trash2 className="w-4 h-4 mr-2" />Delete</DropdownMenuItem>}
+                            {(isActive || isArchived) && <div className="px-2 py-1.5 text-xs text-muted-foreground flex items-center gap-1.5"><Lock className="w-3.5 h-3.5" />{isArchived ? 'Read only' : `${assigned} students`}</div>}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
-                    </CardHeader>
 
-                    <CardContent>
-                      {/* Installment Preview */}
-                      {structure.enableInstallments && structure.installmentRules?.length > 0 && (
-                        <div className="mb-4 p-3 bg-muted/50 rounded-lg">
-                          <p className="text-sm font-medium mb-2">Payment Schedule</p>
-                          <div className="grid grid-cols-4 md:grid-cols-6 gap-2 text-xs">
-                            {structure.installmentRules.slice(0, 6).map(rule => (
-                              <div key={rule.id} className="text-center border rounded-2xl p-2 bg-background">
-                                <p className="font-medium">Inst. {rule.installmentNumber}</p>
-                                <p className="text-sm font-bold">{formatCurrency(rule.amount)}</p>
-                                <p className="text-muted-foreground text-xs">
-                                  {new Date(rule.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                          {structure.installmentRules.length > 6 && (
-                            <p className="text-xs text-muted-foreground mt-2 text-center">
-                              +{structure.installmentRules.length - 6} more installments
-                            </p>
-                          )}
-                        </div>
-                      )}
-
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between mt-3 pt-3 border-t">
                         <div className="flex items-center gap-6">
                           <div>
-                            <p className="text-sm text-muted-foreground">Total Amount</p>
-                            <p className="text-2xl font-bold">{formatCurrency(structure.totalAmount)}</p>
+                            <p className="text-xs text-muted-foreground">Annual Total <span className="text-[10px]">(excl. optional)</span></p>
+                            <p className="text-xl font-bold">{INR(s.totalAmount)}</p>
                           </div>
                           <div>
-                            <p className="text-sm text-muted-foreground">Assigned To</p>
-                            <p className="text-lg font-semibold flex items-center gap-1">
-                              <Users className="w-4 h-4" />
-                              {assignedCount} Students
-                            </p>
+                            <p className="text-xs text-muted-foreground">Assigned To</p>
+                            <p className="text-base font-semibold">{assigned} students</p>
                           </div>
                         </div>
-
-                        {isDraft && (
-                          <Button>
-                            <Users className="w-4 h-4 mr-2" />
-                            Assign to Students
-                          </Button>
-                        )}
-
-                        {isActive && (
-                          <Badge variant="outline" className="text-green-600 border-green-300">
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            In Use
-                          </Badge>
-                        )}
+                        {isDraft && <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white">Assign to Students</Button>}
+                        {isActive && <Badge variant="outline" className="text-green-600 border-green-300"><CheckCircle className="w-3 h-3 mr-1" />In Use</Badge>}
                       </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* View Details Dialog */}
-        {
-          selectedStructure && (
-            <Dialog open={viewDetailsOpen} onOpenChange={setViewDetailsOpen}>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    {selectedStructure.name}
-                    <Badge className={STATUS_COLORS[selectedStructure.status]}>
-                      {STATUS_LABELS[selectedStructure.status]}
-                    </Badge>
-                  </DialogTitle>
-                  <DialogDescription>
-                    {selectedStructure.class?.className} • {selectedStructure.mode}
-                    {selectedStructure.version > 1 && ` • Version ${selectedStructure.version}`}
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <h4 className="font-medium">Fee Particulars</h4>
-                  {selectedStructure.particulars?.map((particular) => (
-                    <div key={particular.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium">{particular.name}</p>
-                        <p className="text-sm text-muted-foreground">{particular.category}</p>
-                      </div>
-                      <p className="font-bold text-lg">{formatCurrency(particular.amount)}</p>
                     </div>
-                  ))}
-                  <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-                    <span className="font-semibold text-lg">Total</span>
-                    <span className="text-2xl font-bold">{formatCurrency(selectedStructure.totalAmount)}</span>
-                  </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-                  {selectedStructure.installmentRules?.length > 0 && (
-                    <>
-                      <h4 className="font-medium pt-4">Installment Schedule</h4>
-                      <div className="grid grid-cols-2 gap-2">
-                        {selectedStructure.installmentRules.map(rule => (
-                          <div key={rule.id} className="p-3 border rounded-lg">
-                            <div className="flex justify-between">
-                              <span className="font-medium">Installment {rule.installmentNumber}</span>
-                              <span className="font-bold">{formatCurrency(rule.amount)}</span>
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                              Due: {new Date(rule.dueDate).toLocaleDateString()}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </>
+        {/* ══ CREATE / EDIT DIALOG ══ */}
+        <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) closeDialog(); }}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <div className="flex items-start justify-between">
+                <div>
+                  <DialogTitle>{isEditing ? 'Edit Fee Structure' : 'Create Fee Structure'}</DialogTitle>
+                  <DialogDescription className="mt-1">
+                    {isEditing ? 'Only DRAFT structures can be edited.' : 'Starts as Draft — goes Active when assigned to students.'}
+                  </DialogDescription>
+                  {(watch('classId') || isEditing) && (
+                    <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                      <span className="text-muted-foreground/60">Applies to:</span>
+                      <span className="font-medium text-foreground">
+                        {classes?.find(c => c.id === watch('classId'))?.className || selectedStructure?.class?.className || '—'}
+                      </span>
+                      <span className="text-muted-foreground/40">•</span>
+                      <span className="font-medium text-foreground">
+                        {academicYears?.find(y => y.id === academicYearId)?.name || '—'}
+                      </span>
+                    </p>
                   )}
                 </div>
-              </DialogContent>
-            </Dialog>
-          )
-        }
+                {/* ✅ Live total in header */}
+                <div className="text-right ml-4 shrink-0">
+                  <p className="text-xs text-muted-foreground">Est. Annual (required)</p>
+                  <p className="text-xl font-bold text-green-600">{INR(requiredTotal)}</p>
+                  {hasOptional && (
+                    <p className="text-[10px] text-muted-foreground">+{INR(optionalTotal)} optional</p>
+                  )}
+                </div>
+              </div>
+            </DialogHeader>
 
-        {/* Clone Dialog */}
-        <Dialog open={cloneDialogOpen} onOpenChange={setCloneDialogOpen}>
-          <DialogContent>
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 mt-2">
+              {/* Basic Info */}
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Basic Info</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2 space-y-1.5">
+                    <Label>Structure Name *</Label>
+                    <Input {...register('name')} placeholder="e.g. Class 1 Annual Fee 2025–26" className={errors.name ? 'border-red-400' : ''} />
+                    {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Class *</Label>
+                    <Select value={watch('classId')?.toString() || ''} onValueChange={v => setValue('classId', parseInt(v))}>
+                      <SelectTrigger className={errors.classId ? 'border-red-400' : ''}><SelectValue placeholder="Select class" /></SelectTrigger>
+                      <SelectContent>{classes?.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.className}</SelectItem>)}</SelectContent>
+                    </Select>
+                    {errors.classId && <p className="text-xs text-red-500">{errors.classId.message}</p>}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Description</Label>
+                    <Input {...register('description')} placeholder="Optional note" />
+                  </div>
+                </div>
+              </div>
+
+              {/* ✅ GROUPED FEE COMPONENTS */}
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Fee Components</p>
+                <div className="space-y-3">
+                  {GROUPS.map(group => (
+                    <GroupSection
+                      key={group.key}
+                      group={group}
+                      fields={fields}
+                      register={register}
+                      watch={watch}
+                      setValue={setValue}
+                      remove={remove}
+                      append={append}
+                      lateFeeRules={lateFeeRules}
+                      services={services}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* ✅ SPLIT TOTAL SUMMARY */}
+              <div className="border rounded-lg overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 bg-muted/40">
+                  <div>
+                    <p className="text-sm font-medium">Estimated Annual Total</p>
+                    <p className="text-xs text-muted-foreground">MONTHLY×12, TERM×4, others×1</p>
+                  </div>
+                  <p className="text-2xl font-bold text-green-600">{INR(requiredTotal)}</p>
+                </div>
+                {hasOptional && (
+                  <div className="flex items-center justify-between px-4 py-2.5 border-t bg-orange-50/50 dark:bg-orange-950/10">
+                    <p className="text-xs text-orange-600 dark:text-orange-400 flex items-center gap-1">
+                      <Star className="w-3 h-3" />Optional services (excluded from total)
+                    </p>
+                    <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">+{INR(optionalTotal)}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 justify-end pt-1">
+                <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>
+                <Button type="submit" disabled={isPending} className="bg-green-600 hover:bg-green-700 text-white min-w-[130px]">
+                  {isPending
+                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{isEditing ? 'Saving…' : 'Creating…'}</>
+                    : <><Save className="w-4 h-4 mr-2" />{isEditing ? 'Save Changes' : 'Save as Draft'}</>
+                  }
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* ══ VIEW DIALOG ══ */}
+        {selectedStructure && (
+          <Dialog open={viewOpen} onOpenChange={setViewOpen}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  {selectedStructure.name}
+                  <Badge className={STATUS_COLORS[selectedStructure.status]}>{STATUS_LABELS[selectedStructure.status]}</Badge>
+                </DialogTitle>
+                <DialogDescription>{selectedStructure.class?.className}{selectedStructure.version > 1 && ` • v${selectedStructure.version}`}</DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-2 max-h-[55vh] overflow-y-auto">
+                {/* ✅ Grouped view */}
+                {GROUPS.map(group => {
+                  const groupItems = selectedStructure.particulars?.filter(p => group.match(p)) || [];
+                  if (groupItems.length === 0) return null;
+                  return (
+                    <div key={group.key}>
+                      <p className={`text-xs font-semibold mb-1.5 ${group.headerColor}`}>{group.label}</p>
+                      {groupItems.map(p => (
+                        <div key={p.id} className="flex items-center justify-between p-3 border rounded-lg mb-1.5">
+                          <div>
+                            <p className="text-sm font-medium">{p.name}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <Badge variant="outline" className="text-[10px] h-4">{TYPE_CONFIG[p.type]?.label}</Badge>
+                              <span className="text-xs text-muted-foreground">{p.category}</span>
+                              {p.isOptional && <span className="text-[10px] text-orange-500">Optional</span>}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold">{INR(p.amount)}<span className="text-[10px] text-muted-foreground ml-1">{TYPE_CONFIG[p.type]?.per}</span></p>
+                            {(p.type === 'MONTHLY' || p.type === 'TERM') && (
+                              <p className="text-[10px] text-muted-foreground">{INR(p.type === 'MONTHLY' ? p.amount * 12 : p.amount * 4)}/yr</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+                {/* Optional items */}
+                {selectedStructure.particulars?.filter(p => p.isOptional).length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold mb-1.5 text-orange-600">⭐ Optional Services</p>
+                    {selectedStructure.particulars.filter(p => p.isOptional).map(p => (
+                      <div key={p.id} className="flex items-center justify-between p-3 border border-dashed rounded-lg mb-1.5 bg-orange-50/30 dark:bg-orange-950/10">
+                        <div>
+                          <p className="text-sm font-medium">{p.name}</p>
+                          <Badge variant="outline" className="text-[10px] h-4 mt-0.5">{TYPE_CONFIG[p.type]?.label}</Badge>
+                        </div>
+                        <p className="font-semibold">{INR(p.amount)}<span className="text-[10px] text-muted-foreground ml-1">{TYPE_CONFIG[p.type]?.per}</span></p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex items-center justify-between p-4 bg-muted/40 rounded-lg">
+                  <div>
+                    <span className="font-semibold">Annual Total</span>
+                    <p className="text-xs text-muted-foreground">Required fees only</p>
+                  </div>
+                  <span className="text-xl font-bold">{INR(selectedStructure.totalAmount)}</span>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* ══ CLONE DIALOG ══ */}
+        <Dialog open={cloneOpen} onOpenChange={setCloneOpen}>
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Clone Fee Structure</DialogTitle>
-              <DialogDescription>
-                Create a copy of this structure as a new DRAFT
-              </DialogDescription>
+              <DialogDescription>Creates a copy as a new Draft</DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>New Structure Name</Label>
-                <Input
-                  value={cloneName}
-                  onChange={(e) => setCloneName(e.target.value)}
-                  placeholder="Enter name for the cloned structure"
-                />
+            <div className="space-y-4 py-2">
+              <div className="space-y-1.5">
+                <Label>New Name</Label>
+                <Input value={cloneName} onChange={e => setCloneName(e.target.value)} />
               </div>
-
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label>Academic Year</Label>
-                <Select value={cloneTargetYearId} onValueChange={setCloneTargetYearId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Academic Year" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {academicYears?.map((year) => (
-                      <SelectItem key={year.id} value={year.id}>
-                        {year.name} {year.isActive && '(Current)'}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                <Select value={cloneYearId} onValueChange={setCloneYearId}>
+                  <SelectTrigger><SelectValue placeholder="Select year" /></SelectTrigger>
+                  <SelectContent>{academicYears?.map(y => <SelectItem key={y.id} value={y.id}>{y.name}{y.isActive && ' (Current)'}</SelectItem>)}</SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  The structure will be cloned into this academic year.
-                </p>
               </div>
-
               <Alert>
                 <Copy className="w-4 h-4" />
-                <AlertDescription>
-                  Clone will copy all particulars and installment rules.
-                  The new structure will be in <strong>DRAFT</strong> status.
-                </AlertDescription>
+                <AlertDescription className="text-xs">All components will be copied. New structure will be in <strong>Draft</strong>.</AlertDescription>
               </Alert>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setCloneDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleCloneConfirm} disabled={cloneMutation.isPending || !cloneName}>
-                {cloneMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Cloning...
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-4 h-4 mr-2" />
-                    Create Clone
-                  </>
-                )}
+              <Button variant="outline" onClick={() => setCloneOpen(false)}>Cancel</Button>
+              <Button onClick={() => cloneMutation.mutate({ id: cloneTarget?.id, newName: cloneName, targetAcademicYearId: cloneYearId })} disabled={cloneMutation.isPending || !cloneName} className="bg-green-600 hover:bg-green-700 text-white">
+                {cloneMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Copy className="w-4 h-4 mr-2" />}
+                Create Clone
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div >
-    </TooltipProvider >
+
+      </div>
+    </TooltipProvider>
   );
-}
+} 

@@ -221,42 +221,47 @@ export default function PaymentTracking() {
         enabled: !!schoolId,
     });
 
-    // Fetch installments when dialog opens for a student
-    const { data: studentInstallments, isLoading: installmentsLoading } = useQuery({
-        queryKey: ['student-installments', selectedStudent?.fee?.id],
+    // Fetch ledger when dialog opens for a student
+    const { data: studentLedger, isLoading: ledgerLoading } = useQuery({
+        queryKey: ['student-ledger', selectedStudent?.fee?.id],
         queryFn: async () => {
-            const res = await fetch(`/api/schools/fee/students/${selectedStudent.userId}?academicYearId=${academicYearId}`);
+            const res = await fetch(`/api/schools/fee/students/${selectedStudent.userId}?academicYearId=${academicYearId}&feeSessionId=${academicYearId}`);
             if (!res.ok) throw new Error('Failed');
             const data = await res.json();
-            return data.installments || [];
+            return data.ledger || [];
         },
         enabled: !!selectedStudent?.fee?.id && !!academicYearId && recordPaymentOpen,
     });
 
-    // Pending/partial installments for the picker
-    const pendingInstallments = useMemo(() => {
-        if (!studentInstallments) return [];
-        return studentInstallments.filter(i => i.status !== 'PAID').sort((a, b) => a.installmentNumber - b.installmentNumber);
-    }, [studentInstallments]);
+    // Pending/partial ledger entries for the picker
+    const pendingLedgerEntries = useMemo(() => {
+        if (!studentLedger) return [];
+        return studentLedger
+            .filter(i => i.status !== 'PAID')
+            .sort((a, b) => {
+                const monthOrder = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"];
+                return monthOrder.indexOf(a.month) - monthOrder.indexOf(b.month);
+            });
+    }, [studentLedger]);
 
     // Compute live allocation preview
     const allocationPreview = useMemo(() => {
-        if (!pendingInstallments.length || !paymentAmount) return [];
+        if (!pendingLedgerEntries.length || !paymentAmount) return [];
         const amount = parseFloat(paymentAmount) || 0;
         if (amount <= 0) return [];
 
         let remaining = amount;
         const preview = [];
-        const targetInstallments = selectedInstallmentIds.length > 0
-            ? pendingInstallments.filter(i => selectedInstallmentIds.includes(i.id))
-            : pendingInstallments;
+        const targetEntries = selectedInstallmentIds.length > 0
+            ? pendingLedgerEntries.filter(i => selectedInstallmentIds.includes(i.id))
+            : pendingLedgerEntries;
 
-        for (const inst of targetInstallments) {
+        for (const entry of targetEntries) {
             if (remaining <= 0) break;
-            const balance = inst.amount - (inst.paidAmount || 0);
+            const balance = entry.amount - (entry.paidAmount || 0);
             const allocated = Math.min(remaining, balance);
             preview.push({
-                number: inst.installmentNumber,
+                name: `${entry.feeComponent?.name || 'Fee'} (${entry.month})`,
                 allocated,
                 willComplete: allocated >= balance,
                 balance,
@@ -264,7 +269,7 @@ export default function PaymentTracking() {
             remaining -= allocated;
         }
         return preview;
-    }, [pendingInstallments, paymentAmount, selectedInstallmentIds]);
+    }, [pendingLedgerEntries, paymentAmount, selectedInstallmentIds]);
 
     // Calculate stats from students data
     const stats = useMemo(() => {
@@ -339,8 +344,8 @@ export default function PaymentTracking() {
         if (type === 'full') {
             setPaymentAmount(selectedStudent.fee.balanceAmount.toString());
             setSelectedInstallmentIds([]);
-        } else if (type === 'next' && pendingInstallments.length > 0) {
-            const next = pendingInstallments[0];
+        } else if (type === 'next' && pendingLedgerEntries.length > 0) {
+            const next = pendingLedgerEntries[0];
             const balance = next.amount - (next.paidAmount || 0);
             setPaymentAmount(balance.toString());
             setSelectedInstallmentIds([next.id]);
@@ -372,6 +377,7 @@ export default function PaymentTracking() {
             studentId: selectedStudent.userId,
             schoolId,
             academicYearId,
+            feeSessionId: academicYearId, // 🟢 Required for V2 Ledger Engine
             amount: parseFloat(paymentAmount),
             paymentMethod,
             referenceNumber: referenceNumber || undefined,
@@ -1017,10 +1023,10 @@ export default function PaymentTracking() {
                                         size="sm"
                                         className="flex-1 text-xs"
                                         onClick={() => handleQuickFill('next')}
-                                        disabled={!pendingInstallments.length}
+                                        disabled={!pendingLedgerEntries.length}
                                     >
                                         <Calendar className="w-3 h-3 mr-1" />
-                                        Pay Next Installment
+                                        Pay Next Component
                                     </Button>
                                     <Button
                                         variant="outline"
@@ -1035,40 +1041,42 @@ export default function PaymentTracking() {
                                     </Button>
                                 </div>
 
-                                {/* Installment Picker */}
-                                {installmentsLoading ? (
+                                {/* Ledger Components Picker */}
+                                {ledgerLoading ? (
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground p-3">
                                         <Loader2 className="w-4 h-4 animate-spin" />
-                                        Loading installments...
+                                        Loading ledger entries...
                                     </div>
-                                ) : pendingInstallments.length > 0 && (
+                                ) : pendingLedgerEntries.length > 0 && (
                                     <div className="space-y-2">
                                         <Label className="text-xs text-muted-foreground">
-                                            Select installments (optional — leave empty to auto-allocate)
+                                            Select entries to prioritize (optional — leave empty to auto-allocate oldest first)
                                         </Label>
                                         <div className="border rounded-lg divide-y max-h-40 overflow-y-auto">
-                                            {pendingInstallments.map((inst) => {
-                                                const balance = inst.amount - (inst.paidAmount || 0);
+                                            {pendingLedgerEntries.map((entry) => {
+                                                const balance = entry.amount - (entry.paidAmount || 0);
+                                                const isOverdue = entry.status === 'OVERDUE';
+
                                                 return (
                                                     <label
-                                                        key={inst.id}
+                                                        key={entry.id}
                                                         className="flex items-center gap-3 p-2.5 hover:bg-muted/50 cursor-pointer text-sm"
                                                     >
                                                         <Checkbox
-                                                            checked={selectedInstallmentIds.includes(inst.id)}
-                                                            onCheckedChange={() => toggleInstallment(inst.id)}
+                                                            checked={selectedInstallmentIds.includes(entry.id)}
+                                                            onCheckedChange={() => toggleInstallment(entry.id)}
                                                         />
                                                         <div className="flex-1">
-                                                            <span className="font-medium">Inst. {inst.installmentNumber}</span>
+                                                            <span className="font-medium">{entry.feeComponent?.name || 'Fee'} ({entry.month})</span>
                                                             <span className="text-muted-foreground ml-2 text-xs">
-                                                                Due: {new Date(inst.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                                                Due: {new Date(entry.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
                                                             </span>
                                                         </div>
                                                         <div className="text-right">
-                                                            <span className={`font-medium ${inst.isOverdue ? 'text-red-600' : ''}`}>
+                                                            <span className={`font-medium ${isOverdue ? 'text-red-600' : ''}`}>
                                                                 {formatCurrency(balance)}
                                                             </span>
-                                                            {inst.isOverdue && (
+                                                            {isOverdue && (
                                                                 <span className="block text-[10px] text-red-500">Overdue</span>
                                                             )}
                                                         </div>
@@ -1097,12 +1105,12 @@ export default function PaymentTracking() {
                                 {/* Allocation Preview */}
                                 {allocationPreview.length > 0 && (
                                     <div className="p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
-                                        <p className="text-xs font-medium text-green-700 dark:text-green-400 mb-2">Payment Allocation Preview</p>
+                                        <p className="text-xs font-medium text-green-700 dark:text-green-400 mb-2">Payment Allocation Preview (Oldest First)</p>
                                         <div className="space-y-1">
-                                            {allocationPreview.map((a) => (
-                                                <div key={a.number} className="flex items-center justify-between text-xs">
+                                            {allocationPreview.map((a, idx) => (
+                                                <div key={idx} className="flex items-center justify-between text-xs">
                                                     <span>
-                                                        Inst. {a.number}
+                                                        {a.name}
                                                         {a.willComplete && (
                                                             <CheckCircle className="w-3 h-3 inline ml-1 text-green-600" />
                                                         )}
