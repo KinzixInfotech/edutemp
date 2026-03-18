@@ -1,120 +1,118 @@
-/**
- * API Route: /api/schools/fee/student-services
- * Method: GET, POST
- * Description: Subscribes / Unsubscribes a student to a specific service. Generates ledger entries when subscribing.
- */
+// ═══════════════════════════════════════════════════════════════
+// ADD THESE TWO METHODS to /api/schools/fee/student-services/route.js
+// alongside the existing GET and POST
+// ═══════════════════════════════════════════════════════════════
 
-import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { addOptionalComponent } from "@/lib/fee/ledger-engine";
-
-export async function GET(req) {
+// PATCH: update override amount or toggle active status
+export async function PATCH(req) {
     try {
-        const { searchParams } = new URL(req.url);
-        const studentId = searchParams.get("studentId");
+        const body = await req.json();
+        const { subscriptionId, overrideAmount, isActive } = body;
 
-        if (!studentId) return NextResponse.json({ error: "Missing studentId" }, { status: 400 });
+        if (!subscriptionId) {
+            return NextResponse.json({ error: "subscriptionId required" }, { status: 400 });
+        }
 
-        const services = await prisma.studentService.findMany({
-            where: { studentId },
-            include: { service: true }
+        const subscription = await prisma.studentService.findUnique({
+            where: { id: subscriptionId },
+            include: { service: true },
         });
 
-        return NextResponse.json({ success: true, services });
+        if (!subscription) {
+            return NextResponse.json({ error: "Subscription not found" }, { status: 404 });
+        }
 
+        const updateData = {};
+        if (overrideAmount !== undefined) updateData.overrideAmount = overrideAmount;
+        if (isActive !== undefined) {
+            updateData.isActive = isActive;
+            if (!isActive) updateData.endDate = new Date();
+            else updateData.endDate = null;
+        }
+
+        const updated = await prisma.studentService.update({
+            where: { id: subscriptionId },
+            data: updateData,
+            include: { service: true },
+        });
+
+        // If override amount changed, update existing unfrozen ledger entries
+        if (overrideAmount !== undefined) {
+            // Find fee component linked to this service in the active session
+            const component = await prisma.feeComponent.findFirst({
+                where: { serviceId: subscription.serviceId, isActive: true },
+            });
+
+            if (component) {
+                await prisma.studentFeeLedger.updateMany({
+                    where: {
+                        studentId: subscription.studentId,
+                        feeComponentId: component.id,
+                        isFrozen: false,
+                    },
+                    data: {
+                        originalAmount: overrideAmount,
+                        netAmount: overrideAmount,
+                        balanceAmount: overrideAmount,
+                    },
+                });
+            }
+        }
+
+        return NextResponse.json({ success: true, subscription: updated });
     } catch (error) {
+        console.error("PATCH StudentService Error:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
 
-export async function POST(req) {
+// DELETE: remove subscription + cancel future ledger entries
+export async function DELETE(req) {
     try {
-        const body = await req.json();
-        const { action, studentId, serviceId, schoolId, academicYearId, feeSessionId, userId, overrideAmount } = body;
+        const { searchParams } = new URL(req.url);
+        const subscriptionId = searchParams.get("subscriptionId");
 
-        const actorId = userId || "SYSTEM";
-
-        if (!studentId || !serviceId) {
-            return NextResponse.json({ error: "Missing required parameters" }, { status: 400 });
+        if (!subscriptionId) {
+            return NextResponse.json({ error: "subscriptionId required" }, { status: 400 });
         }
 
-        if (action === "subscribe") {
-            if (!schoolId || !academicYearId || !feeSessionId) {
-                return NextResponse.json({ error: "Missing session/school parameters for subscription" }, { status: 400 });
-            }
+        const subscription = await prisma.studentService.findUnique({
+            where: { id: subscriptionId },
+        });
 
-            // 1. Create mapping
-            const subscription = await prisma.studentService.upsert({
-                where: { studentId_serviceId: { studentId, serviceId } },
-                create: { studentId, serviceId, isActive: true, overrideAmount },
-                update: { isActive: true, endDate: null, overrideAmount }
-            });
-
-            // 2. Find FeeComponent linked to this service in active session
-            const component = await prisma.feeComponent.findFirst({
-                where: { serviceId, feeSessionId, isActive: true }
-            });
-
-            let ledgerGenerated = 0;
-            if (component && component.isOptional) {
-                const res = await addOptionalComponent({
-                    studentId, schoolId, academicYearId, feeSessionId,
-                    feeComponentId: component.id, userId: actorId
-                });
-                ledgerGenerated = res.created;
-
-                // Adjust the auto-generated entries with the override amount if provided
-                if (overrideAmount !== undefined) {
-                    await prisma.studentFeeLedger.updateMany({
-                        where: { studentId, feeSessionId, feeComponentId: component.id, isFrozen: false },
-                        data: {
-                            originalAmount: overrideAmount,
-                            netAmount: overrideAmount,
-                            balanceAmount: overrideAmount
-                        }
-                    });
-                }
-            }
-
-            return NextResponse.json({ success: true, subscription, ledgerGenerated });
+        if (!subscription) {
+            return NextResponse.json({ error: "Subscription not found" }, { status: 404 });
         }
 
-        if (action === "unsubscribe") {
-            // Unsubscribe logic (stop generating future entries)
-            const subscription = await prisma.studentService.update({
-                where: { studentId_serviceId: { studentId, serviceId } },
-                data: { isActive: false, endDate: new Date() }
+        // Find component linked to this service
+        const component = await prisma.feeComponent.findFirst({
+            where: { serviceId: subscription.serviceId, isActive: true },
+        });
+
+        let deletedLedgers = 0;
+        if (component) {
+            const startOfNextMonth = new Date();
+            startOfNextMonth.setMonth(startOfNextMonth.getMonth() + 1);
+            startOfNextMonth.setDate(1);
+            startOfNextMonth.setHours(0, 0, 0, 0);
+
+            const res = await prisma.studentFeeLedger.deleteMany({
+                where: {
+                    studentId: subscription.studentId,
+                    feeComponentId: component.id,
+                    isFrozen: false,
+                    month: { gte: startOfNextMonth },
+                },
             });
-
-            // Delete future unfrozen ledger entries related to this service
-            const component = await prisma.feeComponent.findFirst({
-                where: { serviceId, isActive: true }
-            });
-
-            let deletedLedgers = 0;
-            if (component) {
-                const startOfNextMonth = new Date();
-                startOfNextMonth.setMonth(startOfNextMonth.getMonth() + 1);
-                startOfNextMonth.setDate(1);
-                startOfNextMonth.setHours(0,0,0,0);
-
-                const res = await prisma.studentFeeLedger.deleteMany({
-                    where: {
-                        studentId,
-                        feeComponentId: component.id,
-                        isFrozen: false,
-                        month: { gte: startOfNextMonth }
-                    }
-                });
-                deletedLedgers = res.count;
-            }
-
-            return NextResponse.json({ success: true, subscription, deletedLedgers });
+            deletedLedgers = res.count;
         }
 
-        return NextResponse.json({ error: "Invalid action. Use subscribe or unsubscribe." }, { status: 400 });
+        // Delete the subscription record
+        await prisma.studentService.delete({ where: { id: subscriptionId } });
 
+        return NextResponse.json({ success: true, deletedLedgers });
     } catch (error) {
+        console.error("DELETE StudentService Error:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
