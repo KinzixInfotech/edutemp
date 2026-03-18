@@ -36,6 +36,7 @@ export async function POST(request, { params }) {
             // Create transaction record
             const newTransaction = await tx.libraryTransaction.create({
                 data: {
+                    schoolId,
                     copyId,
                     userId,
                     userType,

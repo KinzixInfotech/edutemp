@@ -25,6 +25,7 @@ export async function GET(request, { params }) {
                         { title: { contains: search, mode: "insensitive" } },
                         { author: { contains: search, mode: "insensitive" } },
                         { ISBN: { contains: search, mode: "insensitive" } },
+                        { publisher: { contains: search, mode: "insensitive" } },
                     ],
                 }),
                 ...(category && category !== "all" && { category }),
