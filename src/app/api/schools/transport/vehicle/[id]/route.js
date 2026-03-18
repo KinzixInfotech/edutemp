@@ -11,6 +11,7 @@
 
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { invalidatePattern } from "@/lib/cache";
 
 export async function GET(req, props) {
     const params = await props.params;
@@ -41,9 +42,7 @@ export async function GET(req, props) {
         if (!vehicle) {
             return NextResponse.json({ error: 'Vehicle not found' }, { status: 404 });
         }
-        return NextResponse.json({ vehicle }, {
-            headers: { 'Cache-Control': 's-maxage=3600, stale-while-revalidate' },
-        });
+        return NextResponse.json({ vehicle });
     } catch (error) {
         console.error(error);
         return NextResponse.json({ error: 'Failed to fetch vehicle' }, { status: 500 });
@@ -94,6 +93,9 @@ export async function PUT(req, props) {
                 updatedAt: true,
             },
         });
+        
+        await invalidatePattern(`transport:vehicles:*${vehicle.schoolId ?? ''}*`);
+        
         return NextResponse.json({ vehicle });
     } catch (error) {
         console.error(error);
@@ -105,7 +107,10 @@ export async function DELETE(req, props) {
     const params = await props.params;
     const { id } = params;
     try {
-        await prisma.vehicle.delete({ where: { id } });
+        const vehicle = await prisma.vehicle.delete({ where: { id } });
+        
+        await invalidatePattern(`transport:vehicles:*${vehicle.schoolId}*`);
+        
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error(error);

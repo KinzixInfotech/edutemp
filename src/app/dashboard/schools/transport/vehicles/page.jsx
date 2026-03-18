@@ -477,7 +477,7 @@ export default function VehicleManagement() {
                         </div>
                     </div>
                     <DialogFooter className="gap-2 sm:gap-0">
-                        <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
+                        <Button variant="outline" className="mr-2" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
                         <Button onClick={handleSubmit} disabled={saving}>
                             {saving ? (
                                 <>

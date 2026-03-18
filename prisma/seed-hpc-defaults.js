@@ -1,8 +1,16 @@
 // Default SEL Parameters Seeder for NEP 2020 HPC
-// Run: node prisma/seed-sel-parameters.js
+// Run: node prisma/seed-hpc-defaults.js
 
-const { PrismaClient } = require("@prisma/client");
-const prisma = new PrismaClient();
+require('dotenv').config();
+const { PrismaPg } = require("@prisma/adapter-pg");
+const { PrismaClient } = require("../src/app/generated/prisma/client");
+
+const adapter = new PrismaPg({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+});
+
+const prisma = new PrismaClient({ adapter });
 
 const DEFAULT_SEL_PARAMETERS = [
     // Behavioral

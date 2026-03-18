@@ -9,6 +9,7 @@
 
 import prisma from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { remember, generateKey, invalidatePattern } from "@/lib/cache";
 
 export async function GET(req) {
     const { searchParams } = new URL(req.url);
@@ -23,51 +24,54 @@ export async function GET(req) {
     }
 
     try {
-        const [vehicles, total] = await Promise.all([
-            prisma.vehicle.findMany({
-                where: {
-                    schoolId,
-                    OR: [
-                        { licensePlate: { contains: search, mode: 'insensitive' } },
-                        { model: { contains: search, mode: 'insensitive' } },
-                    ],
-                },
-                select: {
-                    id: true,
-                    licensePlate: true,
-                    model: true,
-                    capacity: true,
-                    maintenanceDue: true,
-                    status: true,
-                    fuelType: true,
-                    mileage: true,
-                    rcNumber: true,
-                    rcExpiry: true,
-                    insuranceNumber: true,
-                    insuranceExpiry: true,
-                    pucNumber: true,
-                    pucExpiry: true,
-                    createdAt: true,
-                    updatedAt: true,
-                },
-                skip,
-                take: limit,
-                orderBy: { createdAt: 'desc' },
-            }),
-            prisma.vehicle.count({
-                where: {
-                    schoolId,
-                    OR: [
-                        { licensePlate: { contains: search, mode: 'insensitive' } },
-                        { model: { contains: search, mode: 'insensitive' } },
-                    ],
-                },
-            }),
-        ]);
+        const cacheKey = generateKey('transport:vehicles', { schoolId, search, page, limit });
 
-        return NextResponse.json({ vehicles, total }, {
-            headers: { 'Cache-Control': 's-maxage=3600, stale-while-revalidate' },
-        });
+        const { vehicles, total } = await remember(cacheKey, async () => {
+            const [fetchedVehicles, fetchedTotal] = await Promise.all([
+                prisma.vehicle.findMany({
+                    where: {
+                        schoolId,
+                        OR: [
+                            { licensePlate: { contains: search, mode: 'insensitive' } },
+                            { model: { contains: search, mode: 'insensitive' } },
+                        ],
+                    },
+                    select: {
+                        id: true,
+                        licensePlate: true,
+                        model: true,
+                        capacity: true,
+                        maintenanceDue: true,
+                        status: true,
+                        fuelType: true,
+                        mileage: true,
+                        rcNumber: true,
+                        rcExpiry: true,
+                        insuranceNumber: true,
+                        insuranceExpiry: true,
+                        pucNumber: true,
+                        pucExpiry: true,
+                        createdAt: true,
+                        updatedAt: true,
+                    },
+                    skip,
+                    take: limit,
+                    orderBy: { createdAt: 'desc' },
+                }),
+                prisma.vehicle.count({
+                    where: {
+                        schoolId,
+                        OR: [
+                            { licensePlate: { contains: search, mode: 'insensitive' } },
+                            { model: { contains: search, mode: 'insensitive' } },
+                        ],
+                    },
+                }),
+            ]);
+            return { vehicles: fetchedVehicles, total: fetchedTotal };
+        }, 3600); // cache for 1 hour, to match the previous s-maxage
+
+        return NextResponse.json({ vehicles, total });
     } catch (error) {
         console.error(error);
         return NextResponse.json({ error: 'Failed to fetch vehicles' }, { status: 500 });
@@ -107,6 +111,9 @@ export async function POST(req) {
                 updatedAt: true,
             },
         });
+
+        await invalidatePattern(`transport:vehicles:*${rest.schoolId}*`);
+
         return NextResponse.json({ vehicle });
     } catch (error) {
         console.error(error);

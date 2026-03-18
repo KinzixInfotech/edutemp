@@ -27,7 +27,7 @@ export async function GET(req, { params }) {
                     include: {
                         parent: {
                             include: {
-                                user: { select: { name: true, email: true } }
+                                user: { select: { name: true, email: true, profilePicture: true, status: true } }
                             }
                         }
                     }

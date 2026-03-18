@@ -424,12 +424,12 @@ export default function ParentListPage() {
                                                             <span className="text-xs font-medium truncate max-w-[120px]">
                                                                 {link.student.name}
                                                             </span>
-                                                            <span className={cn(
+                                                            {/* <span className={cn(
                                                                 'inline-flex items-center px-1.5 py-0.5 rounded border text-[9px] font-bold uppercase tracking-wider',
                                                                 RELATION_COLORS[link.relation] || RELATION_COLORS.OTHER
                                                             )}>
                                                                 {link.relation}
-                                                            </span>
+                                                            </span> */}
                                                         </div>
                                                     ))}
                                                     {parent.studentLinks.length > 2 && (
