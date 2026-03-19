@@ -24,9 +24,6 @@ export async function GET(req) {
                         monthLabel: true,
                         feeComponent: { select: { name: true } }
                     }
-                },
-                user: {
-                    select: { name: true, email: true }
                 }
             },
             orderBy: {

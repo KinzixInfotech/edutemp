@@ -156,14 +156,15 @@ export async function calculateLateFees(studentId, feeSessionId, forceRecalculat
 
     // Write all updates in one transaction
     if (updatesToPerform.length > 0) {
-        await prisma.$transaction(async (tx) => {
-            for (const update of updatesToPerform) {
-                await tx.studentFeeLedger.update({
+        await prisma.$transaction(
+            updatesToPerform.map(update =>
+                prisma.studentFeeLedger.update({
                     where: { id: update.id },
                     data: update,
-                });
-            }
-        });
+                })
+            ),
+            { timeout: 15000, maxWait: 10000 }
+        );
     }
 
     return updatedEntries;
