@@ -316,7 +316,7 @@ export async function generateClassLedger({
                     });
                 }
             }
-        });
+        }, { timeout: 60000, maxWait: 20000 });
     }
 
     return results;
