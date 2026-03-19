@@ -190,8 +190,8 @@ export default function HPCCompetenciesPage() {
     // Group by subject
     const competenciesBySubject = filteredCompetencies.reduce((acc, comp) => {
         const subjectName = comp.subject?.subjectName || 'General';
-        const displayGroup = comp.subject?.class?.className 
-            ? `${subjectName} (${comp.subject.class.className})` 
+        const displayGroup = comp.subject?.class?.className
+            ? `${subjectName} (${comp.subject.class.className})`
             : subjectName;
         if (!acc[displayGroup]) acc[displayGroup] = [];
         acc[displayGroup].push(comp);

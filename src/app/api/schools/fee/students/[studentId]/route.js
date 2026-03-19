@@ -44,7 +44,7 @@ export async function GET(req, props) {
         if (feeSessionId) {
             resolvedSession = await prisma.feeSession.findUnique({ where: { id: feeSessionId } });
         }
-        
+
         if (!resolvedSession) {
             const student = await prisma.student.findUnique({
                 where: { userId: studentId },
@@ -113,11 +113,11 @@ export async function GET(req, props) {
                 where: { id: feeSessionId }
             });
         }
-        
+
         // 🟢 V2: Always regenerate ledger on every load to stay fresh
         let ledgerEntries = [];
         let walletBalance = 0;
-        
+
         if (feeSessionId && studentFee?.globalFeeStructureId && resolvedSession) {
             try {
                 // Sync FeeComponents from GlobalFeeParticular (no-op if already synced)
@@ -306,6 +306,6 @@ export async function GET(req, props) {
         });
     } catch (error) {
         console.error("Get Student Fee Error:", error);
-        return NextResponse.json({ error: "Failed to fetch student fee details" }, { status: 500 });
+        return NextResponse.json({ error: `Failed to fetch student fee details ${error}`, }, { status: 500 });
     }
 }
