@@ -111,7 +111,7 @@ export function AcademicYearSetupBannerProvider({ children }) {
                 // Active needs setup - only show if this is NOT the first/only year
                 // First year setup is handled by onboarding, not this banner
                 type = "setup-needed";
-                show = true;
+                show = false;
             }
         }
 

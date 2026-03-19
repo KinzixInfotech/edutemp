@@ -189,9 +189,12 @@ export default function HPCCompetenciesPage() {
 
     // Group by subject
     const competenciesBySubject = filteredCompetencies.reduce((acc, comp) => {
-        const subjectName = comp.subject?.name || 'General';
-        if (!acc[subjectName]) acc[subjectName] = [];
-        acc[subjectName].push(comp);
+        const subjectName = comp.subject?.subjectName || 'General';
+        const displayGroup = comp.subject?.class?.className 
+            ? `${subjectName} (${comp.subject.class.className})` 
+            : subjectName;
+        if (!acc[displayGroup]) acc[displayGroup] = [];
+        acc[displayGroup].push(comp);
         return acc;
     }, {});
 
@@ -255,8 +258,8 @@ export default function HPCCompetenciesPage() {
                             <SelectContent>
                                 <SelectItem value="all">All Subjects</SelectItem>
                                 {subjects.map((subject) => (
-                                    <SelectItem key={subject.id} value={subject.id}>
-                                        {subject.name}
+                                    <SelectItem key={subject.id} value={subject.id.toString()}>
+                                        {subject.subjectName} {subject.class?.className ? `(${subject.class.className})` : ''}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
@@ -359,8 +362,8 @@ export default function HPCCompetenciesPage() {
                                 </SelectTrigger>
                                 <SelectContent>
                                     {subjects.map((subject) => (
-                                        <SelectItem key={subject.id} value={subject.id}>
-                                            {subject.name}
+                                        <SelectItem key={subject.id} value={subject.id.toString()}>
+                                            {subject.subjectName} {subject.class?.className ? `(${subject.class.className})` : ''}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

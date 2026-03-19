@@ -8,8 +8,12 @@ export async function POST(req, { params }) {
 
         // 1. Get all subjects for the school
         const subjects = await prisma.subject.findMany({
-            where: { schoolId },
-            select: { id: true, name: true }
+            where: {
+                class: {
+                    schoolId: schoolId
+                }
+            },
+            select: { id: true, subjectName: true }
         });
 
         if (subjects.length === 0) {
@@ -26,10 +30,10 @@ export async function POST(req, { params }) {
         for (const [subjectKey, competencies] of Object.entries(DEFAULT_COMPETENCIES)) {
             // Find matching subjects (e.g., "Mathematics" matches "Maths", "Mathematics", "Class 5 Maths")
             const matchingSubjects = subjects.filter(s =>
-                s.name.toLowerCase().includes(subjectKey.toLowerCase()) ||
-                (subjectKey === 'Mathematics' && s.name.toLowerCase().includes('math')) ||
-                (subjectKey === 'English' && s.name.toLowerCase().includes('eng')) ||
-                (subjectKey === 'Science' && s.name.toLowerCase().includes('sci'))
+                s.subjectName.toLowerCase().includes(subjectKey.toLowerCase()) ||
+                (subjectKey === 'Mathematics' && s.subjectName.toLowerCase().includes('math')) ||
+                (subjectKey === 'English' && s.subjectName.toLowerCase().includes('eng')) ||
+                (subjectKey === 'Science' && s.subjectName.toLowerCase().includes('sci'))
             );
 
             for (const subject of matchingSubjects) {
@@ -54,7 +58,7 @@ export async function POST(req, { params }) {
                         addedCount++;
                     }
                 }
-                results.push({ subject: subject.name, count: competencies.length });
+                results.push({ subject: subject.subjectName, count: competencies.length });
             }
         }
 

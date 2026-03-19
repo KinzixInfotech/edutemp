@@ -174,9 +174,12 @@ export default function HPCDashboard() {
 
     // Group competencies by subject
     const competenciesBySubject = competencies.reduce((acc, comp) => {
-        const subjectName = comp.subject?.name || 'General';
-        if (!acc[subjectName]) acc[subjectName] = [];
-        acc[subjectName].push(comp);
+        const subjectName = comp.subject?.subjectName || 'General';
+        const displayGroup = comp.subject?.class?.className 
+            ? `${subjectName} (${comp.subject.class.className})` 
+            : subjectName;
+        if (!acc[displayGroup]) acc[displayGroup] = [];
+        acc[displayGroup].push(comp);
         return acc;
     }, {});
 
@@ -876,17 +879,20 @@ export default function HPCDashboard() {
                                 value={competencyForm.name}
                                 onChange={(e) => setCompetencyForm({ ...competencyForm, name: e.target.value })}
                                 placeholder="e.g., Problem Solving"
+                                className="mt-2"
                             />
                         </div>
                         <div>
                             <Label>Subject</Label>
                             <Select value={competencyForm.subjectId} onValueChange={(v) => setCompetencyForm({ ...competencyForm, subjectId: v })}>
-                                <SelectTrigger>
+                                <SelectTrigger className="mt-2">
                                     <SelectValue placeholder="Select subject" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {subjects.map((s) => (
-                                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                        <SelectItem key={s.id} value={s.id}>
+                                            {s.subjectName} {s.class?.className ? `(${s.class.className})` : ''}
+                                        </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -894,6 +900,7 @@ export default function HPCDashboard() {
                         <div>
                             <Label>Description</Label>
                             <Textarea
+                                className="mt-2"
                                 value={competencyForm.description}
                                 onChange={(e) => setCompetencyForm({ ...competencyForm, description: e.target.value })}
                                 placeholder="Optional description"

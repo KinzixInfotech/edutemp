@@ -286,7 +286,7 @@ export default function HPCTermsPage() {
                                 </SelectTrigger>
                                 <SelectContent>
                                     {classes.map((c) => (
-                                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                        <SelectItem key={c.id} value={c.id.toString()}>{c.className}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
