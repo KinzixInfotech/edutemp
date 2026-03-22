@@ -366,7 +366,7 @@ export async function POST(req, { params }) {
                     targetClasses3.forEach(c => targetClassMap3.set(c.className, c.id));
 
                     const sourceFees = await prisma.globalFeeStructure.findMany({
-                        where: { academicYearId: fromYearId, schoolId },
+                        where: { academicYearId: fromYearId, schoolId, status: 'ACTIVE' },
                         include: { particulars: true, installmentRules: true },
                     });
 
@@ -802,7 +802,7 @@ export async function GET(req, { params }) {
                     class: classWhereClause,
                 },
             }),
-            prisma.globalFeeStructure.count({ where: { academicYearId: currentYear.id, schoolId } }),
+            prisma.globalFeeStructure.count({ where: { academicYearId: currentYear.id, schoolId, status: 'ACTIVE' } }),
             prisma.student.count({ where: { academicYearId: currentYear.id, schoolId } }),
             prisma.timetableEntry.count({ where: { academicYearId: currentYear.id } }),
             prisma.leaveBucket.count({ where: { academicYearId: currentYear.id, schoolId } }),

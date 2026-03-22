@@ -443,7 +443,7 @@ export default function StartSessionPage() {
                                     {
                                         key: "feeStructure",
                                         title: "Fee Structures",
-                                        desc: `${preview?.preview?.feeStructuresToClone || 0} fee structures (as DRAFT)`,
+                                        desc: `${preview?.preview?.feeStructuresToClone || 0} fee structures will be cloned`,
                                         icon: CreditCard,
                                         recommended: true,
                                     },
@@ -873,7 +873,7 @@ export default function StartSessionPage() {
                                         },
                                         {
                                             label: "Fee Structures",
-                                            value: carryForward.feeStructure ? `${preview?.preview?.feeStructuresToClone || 0} structures cloned as DRAFT` : "Not cloned",
+                                            value: carryForward.feeStructure ? `${preview?.preview?.feeStructuresToClone || 0} structures cloned` : "Not cloned",
                                             icon: carryForward.feeStructure ? "✅" : "⏭️",
                                         },
                                         {
