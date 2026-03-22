@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -40,6 +41,8 @@ export default function StudentListPage() {
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;
     const queryClient = useQueryClient();
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
 
     const [selected, setSelected] = useState([]);
     const [dialogData, setDialogData] = useState(null);
@@ -59,9 +62,11 @@ export default function StudentListPage() {
 
     // Fetch classes & sections
     const { data: allClasses = [] } = useQuery({
-        queryKey: ['classes', schoolId],
+        queryKey: ['classes', schoolId, academicYearId],
         queryFn: async () => {
-            const res = await axios.get(`/api/schools/${schoolId}/classes?limit=-1`);
+            const params = new URLSearchParams({ limit: '-1' });
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await axios.get(`/api/schools/${schoolId}/classes?${params}`);
             const data = res.data;
             return Array.isArray(data) ? data : (data.data || []);
         },
@@ -80,14 +85,14 @@ export default function StudentListPage() {
 
     // Fetch students with optimized query
     const { data: studentData = {}, isLoading: studentsLoading, isFetching } = useQuery({
-        queryKey: ['students', schoolId, page, debouncedSearch, classFilter, sectionFilter, sortBy],
+        queryKey: ['students', schoolId, academicYearId, page, debouncedSearch, classFilter, sectionFilter, sortBy],
         queryFn: async () => {
             const selectedClass = allClasses.find(c => c.className === classFilter);
             const classId = classFilter === 'ALL' ? '' : selectedClass?.id || '';
             const selectedSection = allSections.find(s => s.name === sectionFilter);
             const sectionId = sectionFilter === 'ALL' ? '' : selectedSection?.id || '';
             const res = await axios.get(`/api/schools/${schoolId}/students`, {
-                params: { page, limit: itemsPerPage, classId, sectionId, search: debouncedSearch, sortBy }
+                params: { page, limit: itemsPerPage, classId, sectionId, search: debouncedSearch, sortBy, academicYearId }
             });
             return res.data || {};
         },

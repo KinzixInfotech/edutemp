@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Users, CheckCircle, XCircle, Trophy, BarChart3 } from "lucide-react";
@@ -10,6 +11,8 @@ import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recha
 
 export default function ExamStatsPage() {
     const { fullUser } = useAuth();
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const [exams, setExams] = useState([]);
     const [selectedExamId, setSelectedExamId] = useState("");
     const [stats, setStats] = useState(null);
@@ -19,7 +22,7 @@ export default function ExamStatsPage() {
         if (fullUser?.schoolId) {
             fetchExams();
         }
-    }, [fullUser?.schoolId]);
+    }, [fullUser?.schoolId, academicYearId]);
 
     useEffect(() => {
         if (selectedExamId) {
@@ -29,7 +32,9 @@ export default function ExamStatsPage() {
 
     const fetchExams = async () => {
         try {
-            const res = await axios.get(`/api/schools/${fullUser.schoolId}/examination/exams`);
+            const params = new URLSearchParams();
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await axios.get(`/api/schools/${fullUser.schoolId}/examination/exams?${params}`);
             setExams(res.data);
             if (res.data.length > 0) {
                 setSelectedExamId(res.data[0].id.toString());

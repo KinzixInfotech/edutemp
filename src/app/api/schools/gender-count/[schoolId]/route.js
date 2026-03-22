@@ -11,15 +11,29 @@ export async function GET(req, props) {
     }
 
     try {
+        const { searchParams } = new URL(req.url);
+        let academicYearId = searchParams.get('academicYearId');
+
+        // Auto-resolve active year
+        if (!academicYearId) {
+            const activeYear = await prisma.academicYear.findFirst({
+                where: { schoolId, isActive: true },
+                select: { id: true },
+            });
+            if (activeYear) academicYearId = activeYear.id;
+        }
+
+        const yearFilter = academicYearId ? { class: { academicYearId } } : {};
+
         // Group by gender to get male/female count
         const genderStats = await prisma.student.groupBy({
             by: ['gender'],
             _count: { gender: true },
-            where: { schoolId },
+            where: { schoolId, ...yearFilter },
         });
 
         // Total students
-        const total = await prisma.student.count({ where: { schoolId } });
+        const total = await prisma.student.count({ where: { schoolId, ...yearFilter } });
 
         const result = genderStats.reduce(
             (acc, curr) => {

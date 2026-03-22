@@ -6,10 +6,21 @@ export async function GET(req, props) {
     try {
         const params = await props.params;
         const { schoolId } = params;
+        const { searchParams } = new URL(req.url);
+        let academicYearId = searchParams.get('academicYearId');
 
-        // Get total students
+        // Auto-resolve active year
+        if (!academicYearId) {
+            const activeYear = await prisma.academicYear.findFirst({
+                where: { schoolId, isActive: true },
+                select: { id: true },
+            });
+            if (activeYear) academicYearId = activeYear.id;
+        }
+
+        // Get total students (filtered by academic year)
         const totalStudents = await prisma.student.count({
-            where: { schoolId }
+            where: { schoolId, ...(academicYearId ? { class: { academicYearId } } : {}) }
         });
 
         // Get total teaching staff

@@ -18,6 +18,7 @@ import { Plus, Trash } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { useAuth } from '@/context/AuthContext'
+import { useAcademicYear } from '@/context/AcademicYearContext'
 
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 export default function TimetableBuilder() {
@@ -31,13 +32,17 @@ export default function TimetableBuilder() {
         { label: '3', time: '09:50-10:30' },
     ])
     const { fullUser } = useAuth()
+    const { selectedYear } = useAcademicYear()
+    const academicYearId = selectedYear?.id
     const schoolId = fullUser?.schoolId
 
     const fetchClasses = async () => {
         if (!schoolId) return
         setFetchingLoading(true)
         try {
-            const res = await fetch(`/api/schools/${schoolId}/classes`)
+            const params = new URLSearchParams()
+            if (academicYearId) params.append('academicYearId', academicYearId)
+            const res = await fetch(`/api/schools/${schoolId}/classes?${params}`)
             const data = await res.json()
             setClasses(Array.isArray(data) ? data : [])
         } catch {
@@ -49,7 +54,7 @@ export default function TimetableBuilder() {
     }
     useEffect(() => {
         fetchClasses()
-    }, [schoolId])
+    }, [schoolId, academicYearId])
 
     const [breakIndex, setBreakIndex] = useState(null)
     const [timetable, setTimetable] = useState({})

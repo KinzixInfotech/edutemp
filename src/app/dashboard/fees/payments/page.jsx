@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import { toJpeg } from 'html-to-image';
@@ -48,6 +49,7 @@ import ReceiptTemplate from '@/components/receipts/ReceiptTemplate';
 
 export default function PaymentTracking() {
     const { fullUser } = useAuth();
+    const { selectedYear } = useAcademicYear();
     const schoolId = fullUser?.schoolId;
     const queryClient = useQueryClient();
 
@@ -195,9 +197,11 @@ export default function PaymentTracking() {
 
     // Fetch classes
     const { data: classes } = useQuery({
-        queryKey: ['classes', schoolId],
+        queryKey: ['classes', schoolId, academicYearId],
         queryFn: async () => {
-            const res = await fetch(`/api/schools/${schoolId}/classes`);
+            const params = new URLSearchParams();
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await fetch(`/api/schools/${schoolId}/classes?${params}`);
             if (!res.ok) throw new Error('Failed');
             return res.json();
         },

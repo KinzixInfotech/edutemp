@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import { BarChart3, Download, FileText, Users, ChevronLeft, Loader2, Eye, Printer, TrendingUp, AlertCircle, Trophy } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,15 +17,19 @@ import { Progress } from '@/components/ui/progress';
 export default function HPCReportsPage() {
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const [selectedClass, setSelectedClass] = useState('all');
     const [selectedTerm, setSelectedTerm] = useState('1');
     const [activeTab, setActiveTab] = useState('generate');
 
     // Fetch Classes
     const { data: classesData } = useQuery({
-        queryKey: ['classes', schoolId],
+        queryKey: ['classes', schoolId, academicYearId],
         queryFn: async () => {
-            const res = await fetch(`/api/schools/${schoolId}/classes`);
+            const params = new URLSearchParams();
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await fetch(`/api/schools/${schoolId}/classes?${params}`);
             if (!res.ok) return [];
             return res.json();
         },

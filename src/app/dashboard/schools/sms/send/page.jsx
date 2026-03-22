@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -52,6 +53,8 @@ const RECIPIENT_TYPES = [
 export default function SendSmsPage() {
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const queryClient = useQueryClient();
 
     const [recipientType, setRecipientType] = useState('parents');
@@ -94,9 +97,11 @@ export default function SendSmsPage() {
     });
 
     const { data: classes } = useQuery({
-        queryKey: ['classes', schoolId],
+        queryKey: ['classes', schoolId, academicYearId],
         queryFn: async () => {
-            const res = await fetch(`/api/schools/${schoolId}/classes`);
+            const params = new URLSearchParams();
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await fetch(`/api/schools/${schoolId}/classes?${params}`);
             if (!res.ok) throw new Error('Failed');
             return res.json();
         },

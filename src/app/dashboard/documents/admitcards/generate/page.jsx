@@ -33,6 +33,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
 import * as htmlToImage from 'html-to-image';
@@ -54,6 +55,8 @@ export default function GenerateAdmitCardPage() {
     const router = useRouter();
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const [generating, setGenerating] = useState(false);
     const [previewUrl, setPreviewUrl] = useState(null);
     const [previewConfig, setPreviewConfig] = useState(null);
@@ -98,10 +101,12 @@ export default function GenerateAdmitCardPage() {
 
     // Fetch students
     const { data: students, isLoading: loadingStudents } = useQuery({
-        queryKey: ['students', schoolId],
+        queryKey: ['students', schoolId, academicYearId],
         queryFn: async () => {
             if (!schoolId) throw new Error('No school ID');
-            const res = await fetch(`/api/students?schoolId=${schoolId}`);
+            const params = new URLSearchParams({ schoolId });
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await fetch(`/api/students?${params}`);
             if (!res.ok) throw new Error('Failed to fetch students');
             return res.json();
         },

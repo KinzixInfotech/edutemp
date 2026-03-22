@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useR2Upload } from "@/hooks/useR2Upload";
 import { useAuth } from "@/context/AuthContext";
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import dynamic from "next/dynamic";
 import axios from "axios";
 import Link from "next/link";
@@ -39,6 +40,8 @@ function useDebounce(value, delay = 400) {
 export default function SyllabusManagement() {
     const { startUpload } = useR2Upload({ folder: 'documents' });
     const { fullUser } = useAuth();
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const queryClient = useQueryClient();
 
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -65,9 +68,11 @@ export default function SyllabusManagement() {
 
     // Fetch classes
     const { data: classes = [] } = useQuery({
-        queryKey: ['classes', fullUser?.schoolId],
+        queryKey: ['classes', fullUser?.schoolId, academicYearId],
         queryFn: async () => {
-            const res = await axios.get(`/api/schools/${fullUser.schoolId}/classes`);
+            const params = new URLSearchParams();
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await axios.get(`/api/schools/${fullUser.schoolId}/classes?${params}`);
             return res.data;
         },
         enabled: !!fullUser?.schoolId,
@@ -85,9 +90,11 @@ export default function SyllabusManagement() {
 
     // Fetch statistics
     const { data: stats, isLoading: statsLoading } = useQuery({
-        queryKey: ['syllabus-stats', fullUser?.schoolId],
+        queryKey: ['syllabus-stats', fullUser?.schoolId, academicYearId],
         queryFn: async () => {
-            const res = await axios.get(`/api/schools/syllabus/stats?schoolId=${fullUser?.schoolId}`);
+            let url = `/api/schools/syllabus/stats?schoolId=${fullUser?.schoolId}`;
+            if (academicYearId) url += `&academicYearId=${academicYearId}`;
+            const res = await axios.get(url);
             return res.data.stats;
         },
         enabled: !!fullUser?.schoolId,
@@ -95,9 +102,10 @@ export default function SyllabusManagement() {
 
     // Fetch syllabi — server-side search + pagination
     const { data: syllabusData, isLoading: loading, isFetching } = useQuery({
-        queryKey: ['syllabi', fullUser?.schoolId, filterClass, debouncedSearch, currentPage],
+        queryKey: ['syllabi', fullUser?.schoolId, academicYearId, filterClass, debouncedSearch, currentPage],
         queryFn: async () => {
             let url = `/api/schools/syllabus?schoolId=${fullUser?.schoolId}&page=${currentPage}&limit=${pageSize}`;
+            if (academicYearId) url += `&academicYearId=${academicYearId}`;
             if (filterClass && filterClass !== 'all') url += `&classId=${filterClass}`;
             if (debouncedSearch) url += `&search=${encodeURIComponent(debouncedSearch)}`;
 

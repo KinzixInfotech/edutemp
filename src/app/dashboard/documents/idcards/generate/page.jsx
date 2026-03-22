@@ -32,6 +32,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/context/AuthContext';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -49,6 +50,8 @@ export default function GenerateIdCardPage() {
     const router = useRouter();
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
 
     // State
     const [generating, setGenerating] = useState(false);
@@ -81,9 +84,11 @@ export default function GenerateIdCardPage() {
 
     // --- DATA FETCHING ---
     const { data: classes, isLoading: loadingClasses } = useQuery({
-        queryKey: ['classes', schoolId],
+        queryKey: ['classes', schoolId, academicYearId],
         queryFn: async () => {
-            const res = await fetch(`/api/schools/${schoolId}/classes`);
+            const params = new URLSearchParams();
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await fetch(`/api/schools/${schoolId}/classes?${params}`);
             const data = await res.json();
             return data.data || data;
         },

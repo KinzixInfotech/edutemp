@@ -38,6 +38,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import { useR2Upload } from '@/hooks/useR2Upload';
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
 
@@ -53,6 +54,8 @@ const formSchema = z.object({
 export default function BulkGenerateCertificatesPage() {
     const router = useRouter();
     const { fullUser } = useAuth();
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const schoolId = fullUser?.schoolId;
     const [generating, setGenerating] = useState(false);
     const [progress, setProgress] = useState(0);
@@ -89,10 +92,12 @@ export default function BulkGenerateCertificatesPage() {
 
     // Fetch classes
     const { data: classes, isLoading: loadingClasses } = useQuery({
-        queryKey: ['classes', schoolId],
+        queryKey: ['classes', schoolId, academicYearId],
         queryFn: async () => {
             if (!schoolId) throw new Error('No school ID');
-            const res = await fetch(`/api/schools/${schoolId}/classes`);
+            const params = new URLSearchParams();
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await fetch(`/api/schools/${schoolId}/classes?${params}`);
             if (!res.ok) throw new Error('Failed to fetch classes');
             const data = await res.json();
             return data.data || data;

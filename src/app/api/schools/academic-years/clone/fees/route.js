@@ -115,7 +115,7 @@ export async function POST(req) {
                         mode: fee.mode,
                         totalAmount: fee.totalAmount,
                         isActive: true, // Set active by default
-                        status: "DRAFT", // Start as DRAFT in new year
+                        status: "ACTIVE", // Published directly
                         version: 1,
                         clonedFromId: fee.id,
                         enableInstallments: fee.enableInstallments,
@@ -127,7 +127,12 @@ export async function POST(req) {
                                 amount: p.amount,
                                 isOptional: p.isOptional,
                                 category: p.category,
-                                displayOrder: p.displayOrder
+                                displayOrder: p.displayOrder,
+                                type: p.type || 'MONTHLY',
+                                chargeTiming: p.chargeTiming || 'SESSION_START',
+                                serviceId: p.serviceId || null,
+                                lateFeeRuleId: p.lateFeeRuleId || null,
+                                applicableMonths: p.applicableMonths || null,
                             }))
                         },
 

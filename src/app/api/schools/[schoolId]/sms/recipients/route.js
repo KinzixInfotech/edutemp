@@ -11,6 +11,17 @@ export async function GET(req, { params }) {
         const classId = searchParams.get('classId');
         const sectionId = searchParams.get('sectionId');
 
+        // Auto-resolve active year for student filtering
+        let academicYearId = searchParams.get('academicYearId');
+        if (!academicYearId) {
+            const activeYear = await prisma.academicYear.findFirst({
+                where: { schoolId, isActive: true },
+                select: { id: true },
+            });
+            if (activeYear) academicYearId = activeYear.id;
+        }
+        const yearStudentFilter = academicYearId ? { class: { academicYearId } } : {};
+
         // Cache key for this specific query
         const cacheKey = `sms:recipients:${schoolId}:${type}:${classId || 'all'}:${sectionId || 'all'}`;
 
@@ -33,7 +44,7 @@ export async function GET(req, { params }) {
                 // Get all parents for this school (from Student table + Parent table)
                 // This ensures we get specific Father/Mother numbers even if Parent record doesn't exist
                 const students = await prisma.student.findMany({
-                    where: { schoolId },
+                    where: { schoolId, ...yearStudentFilter },
                     select: {
                         FatherNumber: true,
                         MotherNumber: true,
@@ -146,7 +157,7 @@ export async function GET(req, { params }) {
             case 'students': {
                 // Get student contact numbers
                 const students = await prisma.student.findMany({
-                    where: { schoolId },
+                    where: { schoolId, ...yearStudentFilter },
                     select: { contactNumber: true },
                 });
                 recipients = students

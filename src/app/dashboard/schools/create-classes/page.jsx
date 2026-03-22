@@ -44,6 +44,7 @@ import {
     RefreshCw, Settings2, Info, ChevronsDownUp, ChevronsUpDown, Pencil, Check,
 } from "lucide-react"
 import { useAuth } from "@/context/AuthContext"
+import { useAcademicYear } from "@/context/AcademicYearContext"
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import {
@@ -200,6 +201,8 @@ export default function ManageClassSectionPage() {
     const schoolId = fullUser?.schoolId
     const router = useRouter()
     const queryClient = useQueryClient()
+    const { selectedYear } = useAcademicYear()
+    const academicYearId = selectedYear?.id
 
     // State
     const [searchQuery, setSearchQuery] = useState("")
@@ -253,9 +256,11 @@ export default function ManageClassSectionPage() {
 
     // ─── Queries ───────────────────────────────────────────────────
     const { data: stats } = useQuery({
-        queryKey: ['class-stats', schoolId],
+        queryKey: ['class-stats', schoolId, academicYearId],
         queryFn: async () => {
-            const res = await fetch(`/api/schools/${schoolId}/classes/stats`)
+            const params = new URLSearchParams();
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await fetch(`/api/schools/${schoolId}/classes/stats?${params}`)
             if (!res.ok) throw new Error('Failed to fetch stats')
             return res.json()
         },
@@ -276,7 +281,7 @@ export default function ManageClassSectionPage() {
     const rawTeachers = Array.isArray(teachersData) ? teachersData : (teachersData?.staff || [])
 
     const { data: classesResponse, isLoading, isFetching } = useQuery({
-        queryKey: ['classes', schoolId, debouncedSearch, teacherFilter, capacityFilter, sortBy, page],
+        queryKey: ['classes', schoolId, academicYearId, debouncedSearch, teacherFilter, capacityFilter, sortBy, page],
         queryFn: async () => {
             const params = new URLSearchParams({
                 getAcademicYear: 'true',
@@ -284,6 +289,7 @@ export default function ManageClassSectionPage() {
                 limit: String(itemsPerPage),
                 sort: sortBy,
             })
+            if (academicYearId) params.set('academicYearId', academicYearId)
             if (debouncedSearch) params.set('search', debouncedSearch)
             if (teacherFilter !== 'ALL') params.set('teacherFilter', teacherFilter)
             if (capacityFilter !== 'ALL') params.set('capacityFilter', capacityFilter)
@@ -337,9 +343,11 @@ export default function ManageClassSectionPage() {
     const [chartsOpen, setChartsOpen] = useState(true)
 
     const { data: allClassesForCharts = [] } = useQuery({
-        queryKey: ['classes-chart-data', schoolId],
+        queryKey: ['classes-chart-data', schoolId, academicYearId],
         queryFn: async () => {
-            const res = await fetch(`/api/schools/${schoolId}/classes?limit=-1&getAcademicYear=true`)
+            const params = new URLSearchParams({ limit: '-1', getAcademicYear: 'true' });
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await fetch(`/api/schools/${schoolId}/classes?${params}`)
             if (!res.ok) throw new Error('Failed')
             const json = await res.json()
             return Array.isArray(json) ? json : (json?.data || [])

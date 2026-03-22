@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
+import { useAcademicYear } from "@/context/AcademicYearContext";
 import { useR2Upload } from "@/hooks/useR2Upload";
 import dynamic from "next/dynamic";
 import axios from "axios";
@@ -39,6 +40,8 @@ function useDebounce(value, delay = 400) {
 
 export default function HomeworkManagement() {
     const { fullUser } = useAuth();
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const { startUpload } = useR2Upload({ folder: 'homework' });
     const queryClient = useQueryClient();
 
@@ -70,9 +73,11 @@ export default function HomeworkManagement() {
 
     // Fetch classes
     const { data: classes = [] } = useQuery({
-        queryKey: ['classes', fullUser?.schoolId],
+        queryKey: ['classes', fullUser?.schoolId, academicYearId],
         queryFn: async () => {
-            const res = await axios.get(`/api/schools/${fullUser.schoolId}/classes`);
+            const params = new URLSearchParams();
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await axios.get(`/api/schools/${fullUser.schoolId}/classes?${params}`);
             return res.data;
         },
         enabled: !!fullUser?.schoolId,
@@ -101,9 +106,11 @@ export default function HomeworkManagement() {
 
     // Fetch statistics
     const { data: stats, isLoading: statsLoading } = useQuery({
-        queryKey: ['homework-stats', fullUser?.schoolId],
+        queryKey: ['homework-stats', fullUser?.schoolId, academicYearId],
         queryFn: async () => {
-            const res = await axios.get(`/api/schools/homework/stats?schoolId=${fullUser?.schoolId}`);
+            let url = `/api/schools/homework/stats?schoolId=${fullUser?.schoolId}`;
+            if (academicYearId) url += `&academicYearId=${academicYearId}`;
+            const res = await axios.get(url);
             return res.data.stats;
         },
         enabled: !!fullUser?.schoolId,
@@ -111,9 +118,10 @@ export default function HomeworkManagement() {
 
     // Fetch homework — server-side search + pagination
     const { data: homeworkData, isLoading: loading, isFetching } = useQuery({
-        queryKey: ['homework', fullUser?.schoolId, filterClass, debouncedSearch, currentPage],
+        queryKey: ['homework', fullUser?.schoolId, academicYearId, filterClass, debouncedSearch, currentPage],
         queryFn: async () => {
             let url = `/api/schools/homework?schoolId=${fullUser?.schoolId}&page=${currentPage}&limit=${pageSize}`;
+            if (academicYearId) url += `&academicYearId=${academicYearId}`;
             if (filterClass && filterClass !== 'all') url += `&classId=${filterClass}`;
             if (debouncedSearch) url += `&search=${encodeURIComponent(debouncedSearch)}`;
 

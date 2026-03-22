@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -30,15 +31,19 @@ import Link from "next/link";
 
 export default function OnlineExamResultsPage() {
     const { fullUser } = useAuth();
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const [selectedExam, setSelectedExam] = useState("all");
     const [selectedClass, setSelectedClass] = useState(null);
     const [searchQuery, setSearchQuery] = useState("");
 
     // Fetch all exams
     const { data: exams = [] } = useQuery({
-        queryKey: ['online-exams', fullUser?.schoolId],
+        queryKey: ['online-exams', fullUser?.schoolId, academicYearId],
         queryFn: async () => {
-            const res = await axios.get(`/api/schools/${fullUser.schoolId}/examination/exams?type=ONLINE`);
+            const params = new URLSearchParams({ type: 'ONLINE' });
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await axios.get(`/api/schools/${fullUser.schoolId}/examination/exams?${params}`);
             return res.data;
         },
         enabled: !!fullUser?.schoolId
@@ -46,9 +51,11 @@ export default function OnlineExamResultsPage() {
 
     // Fetch all classes with attempt stats
     const { data: classes = [], isLoading: classesLoading } = useQuery({
-        queryKey: ['classes', fullUser?.schoolId],
+        queryKey: ['classes', fullUser?.schoolId, academicYearId],
         queryFn: async () => {
-            const res = await axios.get(`/api/schools/${fullUser.schoolId}/classes`);
+            const params = new URLSearchParams();
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await axios.get(`/api/schools/${fullUser.schoolId}/classes?${params}`);
             return res.data;
         },
         enabled: !!fullUser?.schoolId

@@ -116,9 +116,11 @@ export default function AdminFeeDashboard() {
 
   // Fetch classes
   const { data: classes } = useQuery({
-    queryKey: ['classes', schoolId],
+    queryKey: ['classes', schoolId, academicYearId],
     queryFn: async () => {
-      const res = await fetch(`/api/schools/${schoolId}/classes?limit=-1`);
+      const params = new URLSearchParams({ limit: '-1' });
+      if (academicYearId) params.append('academicYearId', academicYearId);
+      const res = await fetch(`/api/schools/${schoolId}/classes?${params}`);
       if (!res.ok) throw new Error('Failed');
       const json = await res.json();
       return Array.isArray(json) ? json : (json.data ?? []);

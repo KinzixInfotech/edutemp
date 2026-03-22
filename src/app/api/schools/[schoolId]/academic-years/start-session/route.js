@@ -233,7 +233,41 @@ export async function POST(req, { params }) {
                 let classCount = 0;
                 const classIdMap = new Map(); // oldClassId -> newClassId
 
+                // Pre-fetch existing classes in target year to avoid duplicates
+                const existingTargetClasses = await prisma.class.findMany({
+                    where: { academicYearId: toYearId, schoolId },
+                    include: { sections: true },
+                });
+                const existingByName = new Map();
+                existingTargetClasses.forEach(c => existingByName.set(c.className, c));
+                console.log("[WIZARD DEBUG] Existing classes in target year:", existingTargetClasses.length);
+
                 for (const cls of sourceClasses) {
+                    // Check if this class already exists in target year
+                    const existing = existingByName.get(cls.className);
+                    if (existing) {
+                        console.log(`[WIZARD DEBUG] Class "${cls.className}" already exists in target year, reusing id=${existing.id}`);
+                        classIdMap.set(cls.id, existing.id);
+
+                        // Still create any missing sections
+                        if (cls.sections?.length > 0) {
+                            const existingSectionNames = new Set(existing.sections.map(s => s.name));
+                            const missingSections = cls.sections.filter(s => !existingSectionNames.has(s.name));
+                            if (missingSections.length > 0) {
+                                await prisma.section.createMany({
+                                    data: missingSections.map(sec => ({
+                                        name: sec.name,
+                                        classId: existing.id,
+                                        schoolId,
+                                    })),
+                                });
+                                console.log(`[WIZARD DEBUG] Added ${missingSections.length} missing sections to existing class "${cls.className}"`);
+                            }
+                        }
+                        classCount++;
+                        continue;
+                    }
+
                     const newClass = await prisma.class.create({
                         data: {
                             className: cls.className,
@@ -355,7 +389,7 @@ export async function POST(req, { params }) {
                                     mode: fee.mode,
                                     totalAmount: fee.totalAmount,
                                     isActive: true,
-                                    status: "DRAFT",
+                                    status: "ACTIVE",
                                     version: 1,
                                     clonedFromId: fee.id,
                                     enableInstallments: fee.enableInstallments,
@@ -366,6 +400,11 @@ export async function POST(req, { params }) {
                                             isOptional: p.isOptional,
                                             category: p.category,
                                             displayOrder: p.displayOrder,
+                                            type: p.type || 'MONTHLY',
+                                            chargeTiming: p.chargeTiming || 'SESSION_START',
+                                            serviceId: p.serviceId || null,
+                                            lateFeeRuleId: p.lateFeeRuleId || null,
+                                            applicableMonths: p.applicableMonths || null,
                                         })),
                                     },
                                     installmentRules: {

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useAcademicYear } from "@/context/AcademicYearContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +48,8 @@ import { cn } from "@/lib/utils";
 export default function ManageSubjectsPage() {
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
 
     const [masterSubjects, setMasterSubjects] = useState([]);
     const [filteredSubjects, setFilteredSubjects] = useState([]);
@@ -80,9 +83,11 @@ export default function ManageSubjectsPage() {
     const fetchData = async () => {
         setIsFetching(true);
         try {
+            const classParams = new URLSearchParams();
+            if (academicYearId) classParams.append('academicYearId', academicYearId);
             const [subjectsRes, classesRes] = await Promise.all([
                 axios.get(`/api/schools/${schoolId}/subjects/master`),
-                axios.get(`/api/schools/${schoolId}/classes`),
+                axios.get(`/api/schools/${schoolId}/classes?${classParams}`),
             ]);
             setMasterSubjects(subjectsRes.data);
 

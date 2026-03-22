@@ -7,33 +7,46 @@ export async function GET(req, props) {
     const params = await props.params;
     try {
         const { schoolId } = params;
+        const { searchParams } = new URL(req.url);
+        let academicYearId = searchParams.get('academicYearId');
 
-        const cacheKey = generateKey('classes:stats', { schoolId });
+        // Auto-resolve active year
+        if (!academicYearId) {
+            const activeYear = await prisma.academicYear.findFirst({
+                where: { schoolId, isActive: true },
+                select: { id: true },
+            });
+            if (activeYear) academicYearId = activeYear.id;
+        }
+
+        const cacheKey = generateKey('classes:stats', { schoolId, academicYearId });
 
         const stats = await remember(cacheKey, async () => {
+            const yearFilter = academicYearId ? { academicYearId } : {};
+
             // Get total classes
             const totalClasses = await prisma.class.count({
-                where: { schoolId }
+                where: { schoolId, ...yearFilter }
             });
 
             // Get total sections
             const totalSections = await prisma.section.count({
-                where: { schoolId }
+                where: { schoolId, ...(academicYearId ? { class: { academicYearId } } : {}) }
             });
 
             // Get total students
             const totalStudents = await prisma.student.count({
-                where: { schoolId, isAlumni: false }
+                where: { schoolId, isAlumni: false, ...(academicYearId ? { class: { academicYearId } } : {}) }
             });
 
             // Sections without class teacher
             const sectionsWithoutTeacher = await prisma.section.count({
-                where: { schoolId, teachingStaffUserId: null }
+                where: { schoolId, teachingStaffUserId: null, ...(academicYearId ? { class: { academicYearId } } : {}) }
             });
 
             // Empty sections (0 students)
             const sectionsWithStudents = await prisma.section.findMany({
-                where: { schoolId },
+                where: { schoolId, ...(academicYearId ? { class: { academicYearId } } : {}) },
                 select: {
                     id: true,
                     _count: { select: { students: true } }
@@ -45,7 +58,8 @@ export async function GET(req, props) {
             const teachersAssigned = await prisma.section.findMany({
                 where: {
                     schoolId,
-                    teachingStaffUserId: { not: null }
+                    teachingStaffUserId: { not: null },
+                    ...(academicYearId ? { class: { academicYearId } } : {})
                 },
                 select: { teachingStaffUserId: true },
                 distinct: ['teachingStaffUserId']
@@ -54,7 +68,7 @@ export async function GET(req, props) {
 
             // Get students per class breakdown
             const classesWithCounts = await prisma.class.findMany({
-                where: { schoolId },
+                where: { schoolId, ...yearFilter },
                 include: {
                     sections: {
                         include: {

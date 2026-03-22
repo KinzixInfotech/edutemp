@@ -25,6 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 
 import { useAuth } from '@/context/AuthContext';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import { cn } from "@/lib/utils";
 import { uploadFilesToR2 } from '@/hooks/useR2Upload';
 
@@ -119,6 +120,8 @@ export default function StudentProfilePage() {
     const router = useRouter();
     const queryClient = useQueryClient();
     const { fullUser } = useAuth();
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const schoolId = fullUser?.schoolId;
     const studentId = params.studentId;
 
@@ -144,9 +147,11 @@ export default function StudentProfilePage() {
 
     // Fetch Classes for editing
     const { data: schoolClasses } = useQuery({
-        queryKey: ['school-classes', schoolId],
+        queryKey: ['school-classes', schoolId, academicYearId],
         queryFn: async () => {
-            const res = await axios.get(`/api/schools/${schoolId}/classes`);
+            const params = new URLSearchParams();
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await axios.get(`/api/schools/${schoolId}/classes?${params}`);
             return Array.isArray(res.data) ? res.data : res.data?.data || [];
         },
         enabled: !!schoolId,

@@ -145,10 +145,12 @@ export default function GenerateCertificatePage() {
 
     // Fetch students
     const { data: students, isLoading: loadingStudents } = useQuery({
-        queryKey: ['students', schoolId],
+        queryKey: ['students', schoolId, academicYearId],
         queryFn: async () => {
             if (!schoolId) throw new Error('No school ID');
-            const res = await fetch(`/api/students?schoolId=${schoolId}`);
+            const params = new URLSearchParams({ schoolId });
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await fetch(`/api/students?${params}`);
             if (!res.ok) throw new Error('Failed to fetch students');
             return res.json();
         },

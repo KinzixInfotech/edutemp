@@ -39,6 +39,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/context/AuthContext';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -53,6 +54,8 @@ import {
 export default function AdmitCardHistoryPage() {
     const router = useRouter();
     const { fullUser } = useAuth();
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const queryClient = useQueryClient();
     const schoolId = fullUser?.schoolId;
     const [searchQuery, setSearchQuery] = useState('');
@@ -76,10 +79,12 @@ export default function AdmitCardHistoryPage() {
 
     // Fetch exams for filter
     const { data: exams } = useQuery({
-        queryKey: ['exams', schoolId],
+        queryKey: ['exams', schoolId, academicYearId],
         queryFn: async () => {
             if (!schoolId) throw new Error('No school ID');
-            const res = await fetch(`/api/schools/${schoolId}/examination/exams`);
+            const params = new URLSearchParams();
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await fetch(`/api/schools/${schoolId}/examination/exams?${params}`);
             if (!res.ok) throw new Error('Failed to fetch exams');
             const data = await res.json();
             return data.data || data;

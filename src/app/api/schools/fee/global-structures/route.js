@@ -170,7 +170,7 @@ export async function POST(req) {
                     description,
                     mode,
                     totalAmount,
-                    status: 'DRAFT',
+                    status: 'ACTIVE',
                     particulars: {
                         create: particulars.map((p, i) => ({
                             name: p.name,

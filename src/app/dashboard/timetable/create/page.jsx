@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useAcademicYear } from "@/context/AcademicYearContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,8 @@ const DAYS = [
 
 export default function CreateTimetablePage() {
     const { fullUser } = useAuth();
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const router = useRouter();
     const searchParams = useSearchParams();
     const classId = searchParams.get("classId");
@@ -96,8 +99,10 @@ export default function CreateTimetablePage() {
 
     const fetchInitialData = async () => {
         try {
+            const classParams = new URLSearchParams({ limit: '-1' });
+            if (academicYearId) classParams.append('academicYearId', academicYearId);
             const [classesRes, slotsRes] = await Promise.all([
-                axios.get(`/api/schools/${fullUser.schoolId}/classes?limit=-1`),
+                axios.get(`/api/schools/${fullUser.schoolId}/classes?${classParams}`),
                 axios.get(`/api/schools/${fullUser.schoolId}/timetable/slots`),
             ]);
             const classesData = classesRes.data;

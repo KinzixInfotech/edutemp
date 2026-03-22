@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useCallback, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
+import { useAcademicYear } from "@/context/AcademicYearContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -72,6 +73,8 @@ function displayClassName(name) {
 export default function TimetableManagePage() {
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const [searchQuery, setSearchQuery] = useState("");
     const [classPage, setClassPage] = useState(1);
     const [teacherPage, setTeacherPage] = useState(1);
@@ -91,9 +94,11 @@ export default function TimetableManagePage() {
     });
 
     const { data: classes = [], isLoading: classesLoading } = useQuery({
-        queryKey: ["classes-with-sections", schoolId],
+        queryKey: ["classes-with-sections", schoolId, academicYearId],
         queryFn: async () => {
-            const res = await fetch(`/api/schools/${schoolId}/classes?includeSections=true`);
+            const params = new URLSearchParams({ includeSections: 'true' });
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await fetch(`/api/schools/${schoolId}/classes?${params}`);
             if (!res.ok) throw new Error("Failed to fetch classes");
             return res.json();
         },

@@ -43,6 +43,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 
 import CertificateDesignEditor from '@/components/certificate-editor/CertificateDesignEditor';
 
@@ -65,6 +66,8 @@ export default function BulkGenerateAdmitCardsPage() {
     const router = useRouter();
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const [generating, setGenerating] = useState(false);
     const [progress, setProgress] = useState(0);
     const [statusMessage, setStatusMessage] = useState('');
@@ -106,10 +109,12 @@ export default function BulkGenerateAdmitCardsPage() {
 
     // Fetch classes
     const { data: classes, isLoading: loadingClasses } = useQuery({
-        queryKey: ['classes', schoolId],
+        queryKey: ['classes', schoolId, academicYearId],
         queryFn: async () => {
             if (!schoolId) throw new Error('No school ID');
-            const res = await fetch(`/api/schools/${schoolId}/classes`);
+            const params = new URLSearchParams();
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await fetch(`/api/schools/${schoolId}/classes?${params}`);
             if (!res.ok) throw new Error('Failed to fetch classes');
             const data = await res.json();
             return data.data || data;
@@ -132,10 +137,12 @@ export default function BulkGenerateAdmitCardsPage() {
 
     // Fetch exams
     const { data: exams, isLoading: loadingExams } = useQuery({
-        queryKey: ['exams', schoolId],
+        queryKey: ['exams', schoolId, academicYearId],
         queryFn: async () => {
             if (!schoolId) throw new Error('No school ID');
-            const res = await fetch(`/api/schools/${schoolId}/examination/exams`);
+            const params = new URLSearchParams();
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await fetch(`/api/schools/${schoolId}/examination/exams?${params}`);
             if (!res.ok) throw new Error('Failed to fetch exams');
             const data = await res.json();
             return data.data || data;

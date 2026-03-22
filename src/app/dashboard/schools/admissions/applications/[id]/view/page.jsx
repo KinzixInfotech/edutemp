@@ -26,6 +26,7 @@ import {
 import { CheckCircle2, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import {
     Dialog,
     DialogContent,
@@ -167,6 +168,8 @@ export default function ApplicationDetails() {
     const applicationId = params.id;
     const local = localStorage.getItem('user');
     const fullUser = JSON.parse(local);
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
 
     const [assignedRollNumbers, setAssignedRollNumbers] = useState([]);
     const [rollNumberWarning, setRollNumberWarning] = useState("");
@@ -355,17 +358,19 @@ export default function ApplicationDetails() {
         staleTime: 1000 * 60 * 5, // 5 minutes
         cacheTime: 1000 * 60 * 10, // 10 minutes
     });
-    const fetchClasses = async (schoolId) => {
+    const fetchClasses = async (schoolId, yearId) => {
         if (!schoolId) throw new Error("schoolId is required")
-        const res = await fetch(`/api/schools/${schoolId}/classes?limit=-1`)
+        const params = new URLSearchParams({ limit: '-1' });
+        if (yearId) params.append('academicYearId', yearId);
+        const res = await fetch(`/api/schools/${schoolId}/classes?${params}`)
         if (!res.ok) throw new Error("Failed to fetch classes")
         const data = await res.json()
         return Array.isArray(data) ? data : (data.data || [])
     }
     // TanStack Query hook for fetching classes
     const { data: classes = [], isLoading: loadingClasses, error } = useQuery({
-        queryKey: ['classes', schoolId],
-        queryFn: () => fetchClasses(schoolId),
+        queryKey: ['classes', schoolId, academicYearId],
+        queryFn: () => fetchClasses(schoolId, academicYearId),
         enabled: !!schoolId, // Only fetch when schoolId is available
         retry: 1,
         staleTime: 5 * 60 * 1000, // Cache for 5 minutes

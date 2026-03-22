@@ -107,9 +107,19 @@ export async function GET(req, props) {
       const isAll = !hasPaginationParams || limit === -1;
 
       // Build where clause with optional search
+      // Auto-filter by active academic year if no academicYearId provided
+      let effectiveAcademicYearId = academicYearId;
+      if (!effectiveAcademicYearId) {
+        const activeYear = await prisma.academicYear.findFirst({
+          where: { schoolId, isActive: true },
+          select: { id: true },
+        });
+        if (activeYear) effectiveAcademicYearId = activeYear.id;
+      }
+
       const where = {
         schoolId,
-        ...(academicYearId && { academicYearId }),
+        ...(effectiveAcademicYearId && { academicYearId: effectiveAcademicYearId }),
       };
 
       // If searching, match against class name, section name, or teacher name

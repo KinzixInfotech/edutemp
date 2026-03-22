@@ -33,10 +33,13 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 
 export default function AdminAttendanceDashboard() {
   const { fullUser } = useAuth();
   const schoolId = fullUser?.schoolId;
+  const { selectedYear } = useAcademicYear();
+  const academicYearId = selectedYear?.id;
 
   const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
   const [classFilter, setClassFilter] = useState('all');
@@ -51,12 +54,13 @@ export default function AdminAttendanceDashboard() {
 
   // Fetch dashboard data
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['attendance-dashboard', schoolId, dateFilter, classFilter, trendRange],
+    queryKey: ['attendance-dashboard', schoolId, academicYearId, dateFilter, classFilter, trendRange],
     queryFn: async () => {
       const params = new URLSearchParams({
         date: dateFilter,
         trendRange,
-        ...(classFilter !== 'all' && { classId: classFilter })
+        ...(classFilter !== 'all' && { classId: classFilter }),
+        ...(academicYearId && { academicYearId }),
       });
       const res = await fetch(`/api/schools/${schoolId}/attendance/admin/dashboard?${params}`);
       if (!res.ok) throw new Error('Failed to fetch');

@@ -94,7 +94,7 @@ export async function GET(req) {
                         user: { role: { name: 'NON_TEACHING_STAFF' } }
                     }
                 }),
-                prisma.student.count({ where: { schoolId } }),
+                prisma.student.count({ where: { schoolId, ...(academicYearId ? { class: { academicYearId } } : {}) } }),
                 prisma.user.count({ where: { schoolId, role: { name: 'TEACHING_STAFF' } } }),
                 prisma.user.count({ where: { schoolId, role: { name: 'NON_TEACHING_STAFF' } } }),
 
@@ -238,8 +238,8 @@ export async function GET(req) {
                 }).catch(() => null),
 
                 // ===== SETUP STATUS =====
-                prisma.class.count({ where: { schoolId } }),
-                prisma.globalFeeStructure.count({ where: { schoolId } }),
+                prisma.class.count({ where: { schoolId, ...(academicYearId ? { academicYearId } : {}) } }),
+                prisma.globalFeeStructure.count({ where: { schoolId, ...(academicYearId ? { academicYearId } : {}) } }),
             ]);
 
             return {

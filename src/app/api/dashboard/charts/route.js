@@ -136,7 +136,23 @@ export async function GET(req) {
                 feeCollectionTrendQuery,
 
                 // ===== TODAY'S ATTENDANCE BREAKDOWN (for bar chart) =====
-                prisma.$queryRaw`
+                // Filter by academic year to avoid counting students from other years
+                academicYearId ? prisma.$queryRaw`
+                    SELECT 
+                        CASE 
+                            WHEN a."status" IS NULL THEN 'ABSENT'
+                            ELSE a."status"::text
+                        END AS status,
+                        COUNT(*)::int AS count
+                    FROM "Student" s
+                    JOIN "User" u ON u.id = s."userId"
+                    JOIN "Class" c ON c.id = s."classId"
+                    LEFT JOIN "Attendance" a ON a."userId" = u.id 
+                        AND a."date" >= ${today} AND a."date" < ${tomorrow}
+                    WHERE s."schoolId" = ${schoolId}::uuid
+                        AND c."academicYearId" = ${academicYearId}::uuid
+                    GROUP BY a."status"
+                `.catch(() => []) : prisma.$queryRaw`
                     SELECT 
                         CASE 
                             WHEN a."status" IS NULL THEN 'ABSENT'

@@ -11,11 +11,32 @@ const SOFT_BUFFER_PERCENT = 5;
 export async function GET(request, props) {
     const params = await props.params;
     const { schoolId } = params;
+    const { searchParams } = new URL(request.url);
+    const academicYearIdParam = searchParams.get('academicYearId');
 
     try {
-        const cacheKey = generateKey('school:stats', { schoolId });
+        // Resolve academic year: use param, or fall back to active year
+        let academicYearId = academicYearIdParam;
+        if (!academicYearId) {
+            const activeYear = await prisma.academicYear.findFirst({
+                where: { schoolId, isActive: true },
+                select: { id: true },
+            });
+            if (activeYear) academicYearId = activeYear.id;
+        }
+
+        const cacheKey = generateKey('school:stats', { schoolId, academicYearId });
 
         const stats = await remember(cacheKey, async () => {
+            // Build year-scoped where clauses
+            const classWhere = { schoolId, ...(academicYearId && { academicYearId }) };
+            const studentWhere = academicYearId
+                ? { schoolId, class: { academicYearId } }
+                : { schoolId };
+            const feeWhere = academicYearId
+                ? { schoolId, academicYearId }
+                : { schoolId };
+
             const [
                 studentCount,
                 teachingStaffCount,
@@ -31,19 +52,19 @@ export async function GET(request, props) {
                 classDistribution,
                 subscription,
             ] = await Promise.all([
-                prisma.student.count({ where: { schoolId } }),
+                prisma.student.count({ where: studentWhere }),
                 prisma.teachingStaff.count({ where: { schoolId } }),
                 prisma.nonTeachingStaff.count({ where: { schoolId } }),
                 prisma.parent.count({ where: { schoolId } }),
-                prisma.class.count({ where: { schoolId } }),
-                prisma.section.count({ where: { class: { schoolId } } }),
+                prisma.class.count({ where: classWhere }),
+                prisma.section.count({ where: { class: classWhere } }),
                 prisma.vehicle.count({ where: { schoolId } }),
                 prisma.route.count({ where: { schoolId } }),
                 prisma.user.count({ where: { schoolId } }),
 
-                // Fee aggregation
+                // Fee aggregation — scoped to year
                 prisma.studentFee.aggregate({
-                    where: { schoolId },
+                    where: feeWhere,
                     _sum: {
                         finalAmount: true,
                         paidAmount: true,
@@ -51,9 +72,9 @@ export async function GET(request, props) {
                     },
                 }),
 
-                // Recent 5 students (Student has no createdAt, use admissionDate)
+                // Recent 5 students — scoped to year
                 prisma.student.findMany({
-                    where: { schoolId },
+                    where: studentWhere,
                     take: 5,
                     orderBy: { admissionDate: 'desc' },
                     select: {
@@ -65,9 +86,9 @@ export async function GET(request, props) {
                     },
                 }),
 
-                // Student count per class for chart
+                // Student count per class — scoped to year
                 prisma.class.findMany({
-                    where: { schoolId },
+                    where: classWhere,
                     select: {
                         className: true,
                         _count: { select: { students: true } },
@@ -75,7 +96,7 @@ export async function GET(request, props) {
                     orderBy: { className: 'asc' },
                 }),
 
-                // Subscription / plan data
+                // Subscription / plan data (not year-scoped)
                 prisma.schoolSubscription.findUnique({
                     where: { schoolId },
                 }),

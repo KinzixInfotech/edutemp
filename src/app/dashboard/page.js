@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 ;
 
 import { useAuth } from '@/context/AuthContext';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import { IconTrendingDown, IconTrendingUp } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -300,6 +301,7 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
   const [date, setDate] = useState(new Date());
   const { fullUser, loading } = useAuth();
+  const { selectedYear } = useAcademicYear();
 
   // Widget State - Removed as per fixed layout requirement
   // const [activeWidgets, setActiveWidgets] = useState(DEFAULT_WIDGETS);
@@ -384,20 +386,22 @@ export default function Dashboard() {
   });
 
   const activeAcademicYear = academicYearsQuery.data?.find(y => y.isActive);
+  // Use selectedYear (from year switcher context) for all dashboard queries
+  const viewingYear = selectedYear || activeAcademicYear;
 
   // ========== CONSOLIDATED DASHBOARD API (for ADMIN) ==========
   // Single API call that replaces multiple individual queries
   const consolidatedQuery = useQuery({
-    queryKey: ['dashboard-consolidated', fullUser?.schoolId, activeAcademicYear?.id],
+    queryKey: ['dashboard-consolidated', fullUser?.schoolId, viewingYear?.id],
     queryFn: async () => {
       if (!fullUser?.schoolId) return null;
       const params = new URLSearchParams({ schoolId: fullUser.schoolId });
-      if (activeAcademicYear?.id) params.append('academicYearId', activeAcademicYear.id);
+      if (viewingYear?.id) params.append('academicYearId', viewingYear.id);
       const res = await fetch(`/api/dashboard/consolidated?${params}`);
       if (!res.ok) throw new Error('Failed to fetch dashboard data');
       return res.json();
     },
-    enabled: fullUser?.role?.name === 'ADMIN' && !!fullUser?.schoolId && !!activeAcademicYear?.id,
+    enabled: fullUser?.role?.name === 'ADMIN' && !!fullUser?.schoolId && !!viewingYear?.id,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
@@ -550,7 +554,7 @@ export default function Dashboard() {
             <div className='px-4'>
               <DailyStatsCards
                 schoolId={fullUser?.schoolId}
-                academicYearId={activeAcademicYear?.id}
+                academicYearId={viewingYear?.id}
                 data={consolidatedQuery.data?.dailyStats}
               />
             </div>

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
     Table,
@@ -19,6 +20,8 @@ import { Button } from "@/components/ui/button";
 
 export default function SubjectStatsPage() {
     const { fullUser } = useAuth();
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
 
@@ -26,12 +29,14 @@ export default function SubjectStatsPage() {
         if (fullUser?.schoolId) {
             fetchStats();
         }
-    }, [fullUser?.schoolId]);
+    }, [fullUser?.schoolId, academicYearId]);
 
     const fetchStats = async () => {
         try {
+            const params = new URLSearchParams();
+            if (academicYearId) params.append('academicYearId', academicYearId);
             const response = await axios.get(
-                `/api/schools/${fullUser.schoolId}/subjects/stats`
+                `/api/schools/${fullUser.schoolId}/subjects/stats?${params}`
             );
             setStats(response.data);
         } catch (error) {

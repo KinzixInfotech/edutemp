@@ -18,12 +18,15 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import Link from 'next/link';
 import { useAuth } from "@/context/AuthContext";
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import { Badge } from "@/components/ui/badge";
 import axios from "axios";
 import { Label } from "@/components/ui/label";
 
 export default function Applications() {
     const { fullUser } = useAuth();
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const schoolId = fullUser?.schoolId;
 
     // State
@@ -139,9 +142,11 @@ export default function Applications() {
 
     // Fetch Classes for Admission Dialog
     const { data: classes = [] } = useQuery({
-        queryKey: ["classes", schoolId],
+        queryKey: ["classes", schoolId, academicYearId],
         queryFn: async () => {
-            const res = await axios.get(`/api/schools/${schoolId}/classes`);
+            const params = new URLSearchParams();
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await axios.get(`/api/schools/${schoolId}/classes?${params}`);
             return res.data;
         },
         enabled: !!schoolId && admitDialogOpen,

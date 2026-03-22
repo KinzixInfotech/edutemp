@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -372,6 +373,8 @@ function GroupSection({ group, fields, register, watch, setValue, remove, append
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function FeeStructuresManagement() {
   const { fullUser } = useAuth();
+  const { selectedYear } = useAcademicYear();
+  const sidebarAcademicYearId = selectedYear?.id;
   const schoolId = fullUser?.schoolId;
   const queryClient = useQueryClient();
 
@@ -491,8 +494,13 @@ export default function FeeStructuresManagement() {
     enabled: !!schoolId, staleTime: 1000 * 60 * 10, refetchOnWindowFocus: false,
   });
   const { data: classes } = useQuery({
-    queryKey: ['classes', schoolId],
-    queryFn: async () => { const r = await fetch(`/api/schools/${schoolId}/classes`); if (!r.ok) throw new Error('Failed'); return r.json(); },
+    queryKey: ['classes', schoolId, sidebarAcademicYearId],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (sidebarAcademicYearId) params.append('academicYearId', sidebarAcademicYearId);
+      const r = await fetch(`/api/schools/${schoolId}/classes?${params}`);
+      if (!r.ok) throw new Error('Failed'); return r.json();
+    },
     enabled: !!schoolId, staleTime: 1000 * 60 * 10, refetchOnWindowFocus: false,
   });
   const { data: lateFeeRules } = useQuery({
@@ -751,7 +759,7 @@ export default function FeeStructuresManagement() {
                   {isEditing ? 'Edit Fee Structure' : 'Create Fee Structure'}
                 </DialogTitle>
                 <DialogDescription className="mt-0.5 text-xs">
-                  {isEditing ? 'Only DRAFT structures can be edited.' : 'Starts as Draft — goes Active when assigned to students.'}
+                  {isEditing ? 'Only DRAFT structures can be edited.' : 'Create and publish a fee structure.'}
                   {(watch('classId') || isEditing) && (
                     <span className="ml-2 text-foreground font-medium">
                       {classes?.find(c => c.id === watch('classId'))?.className || selectedStructure?.class?.className || ''}
@@ -851,7 +859,7 @@ export default function FeeStructuresManagement() {
                     <Button type="submit" disabled={isPending} className="flex-1 bg-green-600 hover:bg-green-700 text-white">
                       {isPending
                         ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{isEditing ? 'Saving…' : 'Creating…'}</>
-                        : <><Save className="w-4 h-4 mr-2" />{isEditing ? 'Save Changes' : 'Save as Draft'}</>
+                        : <><Save className="w-4 h-4 mr-2" />{isEditing ? 'Save Changes' : 'Publish Structure'}</>
                       }
                     </Button>
                   </div>

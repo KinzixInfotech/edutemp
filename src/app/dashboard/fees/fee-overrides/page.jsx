@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from "@/context/AuthContext";
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import {
     Dialog,
     DialogContent,
@@ -53,6 +54,8 @@ const assignSchema = z.object({
 
 export default function FeeStructuresTable() {
     const { fullUser } = useAuth();
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const queryClient = useQueryClient();
     // const [students, setStudents] = useState([]);
     // const [loadingFee, setloadingFee] = useState(false)
@@ -100,9 +103,11 @@ export default function FeeStructuresTable() {
         });
 
         queryClient.prefetchQuery({
-            queryKey: ['classes', fullUser.schoolId],
+            queryKey: ['classes', fullUser.schoolId, academicYearId],
             queryFn: async () => {
-                const res = await fetch(`/api/schools/${fullUser.schoolId}/classes`);
+                const params = new URLSearchParams();
+                if (academicYearId) params.append('academicYearId', academicYearId);
+                const res = await fetch(`/api/schools/${fullUser.schoolId}/classes?${params}`);
                 if (!res.ok) throw new Error("Failed to fetch classes");
                 return res.json();
             },
@@ -148,7 +153,7 @@ export default function FeeStructuresTable() {
             }
         });
 
-    }, [fullUser?.schoolId, queryClient]);
+    }, [fullUser?.schoolId, queryClient, academicYearId]);
 
     // Use useQuery for students
     const { data: students = [], isLoading: studentsLoading } = useQuery({
@@ -177,9 +182,11 @@ export default function FeeStructuresTable() {
     // });
     // Use useQuery for classes and map them directly
     const { data: classes = [], isLoading: classesLoading } = useQuery({
-        queryKey: ['classes', fullUser?.schoolId],
+        queryKey: ['classes', fullUser?.schoolId, academicYearId],
         queryFn: async () => {
-            const res = await fetch(`/api/schools/${fullUser.schoolId}/classes`);
+            const params = new URLSearchParams();
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await fetch(`/api/schools/${fullUser.schoolId}/classes?${params}`);
             if (!res.ok) throw new Error("Failed to fetch classes");
             return res.json();
         },

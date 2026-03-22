@@ -14,10 +14,13 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 
 export default function ClassAttendanceMarking() {
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const markerId = fullUser?.id;
     const queryClient = useQueryClient();
 
@@ -30,9 +33,11 @@ export default function ClassAttendanceMarking() {
 
     // Fetch classes
     const { data: classes } = useQuery({
-        queryKey: ['classes', schoolId],
+        queryKey: ['classes', schoolId, academicYearId],
         queryFn: async () => {
-            const res = await fetch(`/api/schools/${schoolId}/classes?limit=-1`);
+            const params = new URLSearchParams({ limit: '-1' });
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await fetch(`/api/schools/${schoolId}/classes?${params}`);
             if (!res.ok) throw new Error('Failed');
             const data = await res.json();
             return Array.isArray(data) ? data : (data.data || []);

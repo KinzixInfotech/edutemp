@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,6 +41,8 @@ import { Textarea } from "@/components/ui/textarea";
 
 export default function ExamListPage() {
   const { fullUser } = useAuth();
+  const { selectedYear } = useAcademicYear();
+  const academicYearId = selectedYear?.id;
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState(null);
@@ -82,12 +85,14 @@ export default function ExamListPage() {
     if (fullUser?.schoolId) {
       fetchExams();
     }
-  }, [fullUser?.schoolId]);
+  }, [fullUser?.schoolId, academicYearId]);
 
   const fetchExams = async () => {
     try {
+      const params = new URLSearchParams();
+      if (academicYearId) params.append('academicYearId', academicYearId);
       const response = await axios.get(
-        `/api/schools/${fullUser.schoolId}/examination/exams`
+        `/api/schools/${fullUser.schoolId}/examination/exams?${params}`
       );
       setExams(response.data);
     } catch (error) {

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,8 @@ import axios from "axios";
 
 export default function MarksEntryPage() {
     const { fullUser } = useAuth();
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const [loading, setLoading] = useState(false);
     const [fetchingData, setFetchingData] = useState(true);
 
@@ -47,12 +50,14 @@ export default function MarksEntryPage() {
         if (fullUser?.schoolId) {
             fetchExams();
         }
-    }, [fullUser?.schoolId]);
+    }, [fullUser?.schoolId, academicYearId]);
 
     const fetchExams = async () => {
         try {
+            const params = new URLSearchParams();
+            if (academicYearId) params.append('academicYearId', academicYearId);
             const res = await axios.get(
-                `/api/schools/${fullUser.schoolId}/examination/exams`
+                `/api/schools/${fullUser.schoolId}/examination/exams?${params}`
             );
             setExams(res.data);
         } catch (error) {

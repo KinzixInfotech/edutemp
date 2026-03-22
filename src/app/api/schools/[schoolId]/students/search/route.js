@@ -6,14 +6,25 @@ export async function GET(req, props) {
     const { schoolId } = params;
     const { searchParams } = new URL(req.url);
     const query = searchParams.get("q") || "";
+    let academicYearId = searchParams.get("academicYearId");
 
     // Simple UUID validator
     const isUUID = /^[0-9a-fA-F-]{36}$/.test(query);
 
     try {
+        // Auto-resolve active year
+        if (!academicYearId) {
+            const activeYear = await prisma.academicYear.findFirst({
+                where: { schoolId, isActive: true },
+                select: { id: true },
+            });
+            if (activeYear) academicYearId = activeYear.id;
+        }
+
         const students = await prisma.student.findMany({
             where: {
                 schoolId,
+                ...(academicYearId ? { class: { academicYearId } } : {}),
                 OR: [
                     {
                         name: {

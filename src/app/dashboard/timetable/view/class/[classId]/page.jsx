@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,6 +48,8 @@ function displayClassName(name) {
 
 export default function ClassTimetableViewPage() {
     const { fullUser } = useAuth();
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const params = useParams();
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -68,9 +71,11 @@ export default function ClassTimetableViewPage() {
 
     // Fallback: fetch class info separately if API doesn't return className yet (cache)
     const { data: classInfo } = useQuery({
-        queryKey: ["class-info-fallback", fullUser?.schoolId, classId],
+        queryKey: ["class-info-fallback", fullUser?.schoolId, classId, academicYearId],
         queryFn: async () => {
-            const res = await fetch(`/api/schools/${fullUser.schoolId}/classes`);
+            const params = new URLSearchParams();
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await fetch(`/api/schools/${fullUser.schoolId}/classes?${params}`);
             if (!res.ok) return null;
             const data = await res.json();
             const arr = Array.isArray(data) ? data : data?.data || [];

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useAcademicYear } from "@/context/AcademicYearContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,8 @@ import axios from "axios";
 
 export default function CreateSubjectPage() {
     const { fullUser } = useAuth();
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const router = useRouter();
     const searchParams = useSearchParams();
     const subjectId = searchParams.get("id"); // Editing existing mapping
@@ -45,7 +48,9 @@ export default function CreateSubjectPage() {
 
     const fetchInitialData = async () => {
         try {
-            const classesRes = await axios.get(`/api/schools/${fullUser.schoolId}/classes?limit=-1`);
+            const classParams = new URLSearchParams({ limit: '-1' });
+            if (academicYearId) classParams.append('academicYearId', academicYearId);
+            const classesRes = await axios.get(`/api/schools/${fullUser.schoolId}/classes?${classParams}`);
             const classesData = classesRes.data;
             setClasses(Array.isArray(classesData) ? classesData : (classesData.data || []));
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import { Calendar, Lock, Unlock, Loader2, ChevronLeft, Eye, AlertCircle, School, User, BookOpen, Heart, Activity, GraduationCap } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,8 @@ import Link from 'next/link';
 export default function HPCTermsPage() {
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const queryClient = useQueryClient();
 
     const [lockDialog, setLockDialog] = useState({ open: false, term: null, action: '' });
@@ -58,9 +61,11 @@ export default function HPCTermsPage() {
 
     // ====== FETCH CLASSES ======
     const { data: classesData } = useQuery({
-        queryKey: ['classes', schoolId],
+        queryKey: ['classes', schoolId, academicYearId],
         queryFn: async () => {
-            const res = await fetch(`/api/schools/${schoolId}/classes`);
+            const params = new URLSearchParams();
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await fetch(`/api/schools/${schoolId}/classes?${params}`);
             if (!res.ok) return [];
             return res.json();
         },

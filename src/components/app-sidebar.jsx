@@ -70,6 +70,63 @@ import {
 import { useCommandMenu } from "./CommandMenuContext"
 import { cn } from "@/lib/utils"
 import { useEffect } from "react"
+import { Skeleton } from "@/components/ui/skeleton"
+
+// ─── Sidebar Skeleton ─────────────────────────────────────────────────────────
+function SidebarSkeleton({ isCollapsed, sections }) {
+    if (isCollapsed) {
+        // Count total visible items across all sections (capped at a reasonable max)
+        const totalItems = Math.min(
+            sections.reduce((sum, s) => sum + s.items.length, 0),
+            12
+        )
+        return (
+            <div className="flex flex-col gap-2 p-2">
+                {Array.from({ length: totalItems }).map((_, i) => (
+                    <Skeleton key={i} className="h-8 w-8 rounded-lg" />
+                ))}
+            </div>
+        )
+    }
+    return (
+        <div className="flex flex-col gap-1 px-2 py-2">
+            {sections.map((section, sectionIdx) => (
+                <div key={sectionIdx} className="py-2">
+                    {/* Section title skeleton */}
+                    {section.title && (
+                        <div className="px-2 mb-2">
+                            <Skeleton className="h-3 w-20 rounded-lg" />
+                        </div>
+                    )}
+                    {/* Item skeletons — one per item in this section */}
+                    <div className="space-y-1">
+                        {section.items.map((_, i) => (
+                            <div key={i} className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
+                                <Skeleton className="h-4 w-4 rounded-lg shrink-0" />
+                                <Skeleton className="h-4 rounded-lg" style={{ width: `${55 + (i * 13) % 35}%` }} />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ))}
+        </div>
+    )
+}
+
+function SidebarFooterSkeleton({ isCollapsed }) {
+    if (isCollapsed) {
+        return <Skeleton className="h-8 w-8 rounded-full mx-auto my-2" />
+    }
+    return (
+        <div className="flex items-center gap-3 p-3">
+            <Skeleton className="h-8 w-8 rounded-full shrink-0" />
+            <div className="flex-1 space-y-1.5">
+                <Skeleton className="h-3.5 w-24 rounded-lg" />
+                <Skeleton className="h-3 w-32 rounded-lg" />
+            </div>
+        </div>
+    )
+}
 
 export const SidebarData = [
     {
@@ -673,7 +730,7 @@ import { useAcademicYear } from "@/context/AcademicYearContext";
 
 export function AppSidebar({ ...props }) {
     const { resolvedTheme } = useTheme()
-    const { fullUser } = useAuth()
+    const { fullUser, loading: authLoading } = useAuth()
     const { setOpen } = useCommandMenu()
     const pathname = usePathname()
     const { state } = useSidebar()
@@ -716,8 +773,19 @@ export function AppSidebar({ ...props }) {
                     </SidebarMenuItem>
 
                     <SidebarMenuItem>
+                        {/* Academic Year Skeleton */}
+                        {authLoading && !isCollapsed && (
+                            <div className="mt-6">
+                                <Skeleton className="h-9 w-full rounded-md" />
+                            </div>
+                        )}
+                        {authLoading && isCollapsed && (
+                            <div className="mt-1.5 flex justify-center">
+                                <Skeleton className="h-9 w-9 rounded-md" />
+                            </div>
+                        )}
                         {/* Academic Year Switcher — client-side view mode only */}
-                        {isAdmin && !yearLoading && switchableYears?.length > 0 && (
+                        {!authLoading && isAdmin && !yearLoading && switchableYears?.length > 0 && (
                             <>
                                 {!isCollapsed ? (
                                     <SidebarMenuButton asChild className={'mt-6'}>
@@ -778,14 +846,22 @@ export function AppSidebar({ ...props }) {
                     isCollapsed && 'scrollbar-hide-collapsed'
                 )}
             >
-                <NavSidebarSections
-                    sections={SidebarData}
-                    userRole={fullUser?.role?.name}
-                    activePath={pathname}
-                />
+                {authLoading ? (
+                    <SidebarSkeleton isCollapsed={isCollapsed} sections={SidebarData} />
+                ) : (
+                    <NavSidebarSections
+                        sections={SidebarData}
+                        userRole={fullUser?.role?.name}
+                        activePath={pathname}
+                    />
+                )}
             </SidebarContent>
             <SidebarFooter className='border-t bg-background'>
-                <NavUser user={navUser.user} />
+                {authLoading ? (
+                    <SidebarFooterSkeleton isCollapsed={isCollapsed} />
+                ) : (
+                    <NavUser user={navUser.user} />
+                )}
             </SidebarFooter>
         </Sidebar>
     )

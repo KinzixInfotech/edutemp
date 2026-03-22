@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import {
     exportSummaryToExcel,
     exportMonthlyToExcel,
@@ -27,6 +28,8 @@ import {
 export default function AttendanceReports() {
     const { fullUser } = useAuth();
     const schoolId = fullUser?.schoolId;
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
 
     const [reportType, setReportType] = useState('SUMMARY');
     const [dateRange, setDateRange] = useState({
@@ -71,9 +74,11 @@ export default function AttendanceReports() {
 
     // Fetch classes for filter
     const { data: classes } = useQuery({
-        queryKey: ['classes', schoolId],
+        queryKey: ['classes', schoolId, academicYearId],
         queryFn: async () => {
-            const res = await fetch(`/api/schools/${schoolId}/classes`);
+            const params = new URLSearchParams();
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await fetch(`/api/schools/${schoolId}/classes?${params}`);
             return res.json();
         },
         enabled: !!schoolId

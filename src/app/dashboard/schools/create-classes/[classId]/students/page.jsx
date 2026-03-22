@@ -25,6 +25,7 @@ import {
 import { useParams, useRouter } from "next/navigation"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useAuth } from "@/context/AuthContext"
+import { useAcademicYear } from '@/context/AcademicYearContext'
 import { cn } from "@/lib/utils"
 import { useDebounce } from "@/hooks/useDebounce"
 import * as XLSX from 'xlsx'
@@ -52,6 +53,8 @@ export default function ClassStudentsPage() {
     const params = useParams()
     const router = useRouter()
     const { fullUser } = useAuth()
+    const { selectedYear } = useAcademicYear()
+    const academicYearId = selectedYear?.id
     const queryClient = useQueryClient()
     const { classId } = params
     const schoolId = fullUser?.schoolId
@@ -72,9 +75,11 @@ export default function ClassStudentsPage() {
 
     // ─── Queries ───────────────────────────────────────────────────
     const { data: classInfo } = useQuery({
-        queryKey: ['class-info', schoolId, classId],
+        queryKey: ['class-info', schoolId, classId, academicYearId],
         queryFn: async () => {
-            const res = await fetch(`/api/schools/${schoolId}/classes?limit=-1`)
+            const params = new URLSearchParams({ 'limit': '-1' })
+            if (academicYearId) params.append('academicYearId', academicYearId)
+            const res = await fetch(`/api/schools/${schoolId}/classes?${params}`)
             if (!res.ok) throw new Error('Failed to fetch class')
             const classes = await res.json()
             return classes.find(c => c.id === parseInt(classId))

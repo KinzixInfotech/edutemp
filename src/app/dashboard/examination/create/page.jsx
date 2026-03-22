@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,8 @@ import axios from "axios";
 
 export default function CreateExamPage() {
   const { fullUser } = useAuth();
+  const { selectedYear } = useAcademicYear();
+  const academicYearId = selectedYear?.id;
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
@@ -45,13 +48,15 @@ export default function CreateExamPage() {
     if (fullUser?.schoolId) {
       fetchInitialData();
     }
-  }, [fullUser?.schoolId]);
+  }, [fullUser?.schoolId, academicYearId]);
 
   const fetchInitialData = async () => {
     try {
+      const classParams = new URLSearchParams();
+      if (academicYearId) classParams.append('academicYearId', academicYearId);
       const [yearsRes, classesRes] = await Promise.all([
         axios.get(`/api/schools/${fullUser.schoolId}/academic-years`),
-        axios.get(`/api/schools/${fullUser.schoolId}/classes`),
+        axios.get(`/api/schools/${fullUser.schoolId}/classes?${classParams}`),
       ]);
       setAcademicYears(yearsRes.data);
       setClasses(classesRes.data);

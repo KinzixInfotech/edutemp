@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -753,6 +754,8 @@ function ReturnTab({ schoolId, settings }) {
 // ═════════════════════════════════════════════════════════════════════════════
 export default function LibraryIssueReturn() {
     const { fullUser } = useAuth();
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const schoolId = fullUser?.schoolId;
     const [settings, setSettings] = useState(null);
     const [classes, setClasses] = useState([]);
@@ -760,8 +763,10 @@ export default function LibraryIssueReturn() {
     useEffect(() => {
         if (!schoolId) return;
         axios.get(`/api/schools/${schoolId}/library/settings`).then(r => setSettings(r.data)).catch(() => { });
-        axios.get(`/api/schools/${schoolId}/classes`).then(r => setClasses(r.data || [])).catch(() => { });
-    }, [schoolId]);
+        const classParams = new URLSearchParams();
+        if (academicYearId) classParams.append('academicYearId', academicYearId);
+        axios.get(`/api/schools/${schoolId}/classes?${classParams}`).then(r => setClasses(r.data || [])).catch(() => { });
+    }, [schoolId, academicYearId]);
 
     if (!schoolId) return <div className="flex items-center justify-center h-96"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
 

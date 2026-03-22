@@ -16,6 +16,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import CropImageDialog from "@/app/components/CropImageDialog"
 import { uploadFilesToR2 } from '@/hooks/useR2Upload'
+import { useAcademicYear } from '@/context/AcademicYearContext'
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -97,6 +98,8 @@ export default function NewProfilePage() {
     const { schoolId, role } = useParams()
     const router = useRouter()
     const queryClient = useQueryClient()
+    const { selectedYear } = useAcademicYear()
+    const academicYearId = selectedYear?.id
     const roleType = role?.toLowerCase()
     const config = ROLE_CONFIG[roleType] || { title: "Profile", icon: User, color: "gray" }
 
@@ -176,9 +179,11 @@ export default function NewProfilePage() {
 
     // Queries
     const { data: classes = [], isLoading: classesLoading } = useQuery({
-        queryKey: ['classes', schoolId],
+        queryKey: ['classes', schoolId, academicYearId],
         queryFn: async () => {
-            const res = await fetch(`/api/schools/${schoolId}/classes`)
+            const params = new URLSearchParams()
+            if (academicYearId) params.append('academicYearId', academicYearId)
+            const res = await fetch(`/api/schools/${schoolId}/classes?${params}`)
             if (!res.ok) throw new Error('Failed')
             const data = await res.json()
             return data.map(cls => ({ ...cls, sections: cls.sections || [] }))

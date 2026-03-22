@@ -10,6 +10,7 @@ export async function GET(req, props) {
     let {
         classId,
         sectionId,
+        academicYearId,
         page = "1",
         limit = "10",
         search = "",
@@ -48,10 +49,21 @@ export async function GET(req, props) {
     }
 
     try {
+        // Auto-resolve active year if no academicYearId provided
+        if (!academicYearId) {
+            const activeYear = await prisma.academicYear.findFirst({
+                where: { schoolId, isActive: true },
+                select: { id: true },
+            });
+            if (activeYear) academicYearId = activeYear.id;
+        }
+
         const whereClause = {
             schoolId,
             ...(parsedClassId ? { classId: parsedClassId } : {}),
             ...(parsedSectionId ? { sectionId: parsedSectionId } : {}),
+            // Filter by academic year through the class relation
+            ...(academicYearId ? { class: { academicYearId } } : {}),
             ...(search
                 ? {
                     OR: [
@@ -70,6 +82,7 @@ export async function GET(req, props) {
             search,
             classId: parsedClassId || "ALL",
             sectionId: parsedSectionId || "ALL",
+            academicYearId: academicYearId || "ALL",
             sortBy,
         });
 

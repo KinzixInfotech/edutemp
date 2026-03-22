@@ -78,9 +78,9 @@ export async function GET(req) {
                     }
                 }),
 
-                // Total students in school
+                // Total students in school (filtered by academic year)
                 prisma.student.count({
-                    where: { schoolId }
+                    where: { schoolId, ...(academicYearId ? { class: { academicYearId } } : {}) }
                 }),
 
                 // Total teaching staff in school

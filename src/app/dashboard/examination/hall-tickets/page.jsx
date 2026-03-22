@@ -30,9 +30,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 
 export default function HallTicketsPage() {
     const { fullUser } = useAuth();
+    const { selectedYear } = useAcademicYear();
+    const academicYearId = selectedYear?.id;
     const schoolId = fullUser?.schoolId;
     const queryClient = useQueryClient();
 
@@ -52,9 +55,11 @@ export default function HallTicketsPage() {
 
     // Fetch exams
     const { data: examsData, isLoading: examsLoading } = useQuery({
-        queryKey: ['exams', schoolId],
+        queryKey: ['exams', schoolId, academicYearId],
         queryFn: async () => {
-            const res = await fetch(`/api/schools/${schoolId}/examination/exams`);
+            const params = new URLSearchParams();
+            if (academicYearId) params.append('academicYearId', academicYearId);
+            const res = await fetch(`/api/schools/${schoolId}/examination/exams?${params}`);
             return res.json();
         },
         enabled: !!schoolId

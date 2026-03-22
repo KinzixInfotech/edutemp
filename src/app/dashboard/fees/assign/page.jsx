@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import { useFeeAssignJob } from '@/context/FeeAssignJobContext';
 import { toast } from 'sonner';
 import {
@@ -57,6 +58,8 @@ function Avatar({ name, size = 36 }) {
 
 export default function AssignFeesToStudents() {
     const { fullUser } = useAuth();
+    const { selectedYear } = useAcademicYear();
+    const sidebarAcademicYearId = selectedYear?.id;
     const schoolId = fullUser?.schoolId;
     const { startJob } = useFeeAssignJob();
     const queryClient = useQueryClient();
@@ -91,8 +94,13 @@ export default function AssignFeesToStudents() {
     });
 
     const { data: classes } = useQuery({
-        queryKey: ['classes', schoolId],
-        queryFn: async () => { const r = await fetch(`/api/schools/${schoolId}/classes`); if (!r.ok) throw new Error(); return r.json(); },
+        queryKey: ['classes', schoolId, sidebarAcademicYearId],
+        queryFn: async () => {
+            const params = new URLSearchParams();
+            if (sidebarAcademicYearId) params.append('academicYearId', sidebarAcademicYearId);
+            const r = await fetch(`/api/schools/${schoolId}/classes?${params}`);
+            if (!r.ok) throw new Error(); return r.json();
+        },
         enabled: !!schoolId, staleTime: 1000 * 60 * 10, refetchOnWindowFocus: false,
     });
 

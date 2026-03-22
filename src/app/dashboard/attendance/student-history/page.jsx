@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/AuthContext';
+import { useAcademicYear } from '@/context/AcademicYearContext';
 import LoaderPage from '@/components/loader-page';
 import { cn } from '@/lib/utils';
 
@@ -31,6 +32,8 @@ const displayClassName = (name) => {
 export default function StudentAttendanceHistory() {
   const { fullUser } = useAuth();
   const schoolId = fullUser?.schoolId;
+  const { selectedYear } = useAcademicYear();
+  const academicYearId = selectedYear?.id;
   if (!schoolId) return <LoaderPage />;
 
   const [studentId, setStudentId] = useState('');
@@ -45,9 +48,11 @@ export default function StudentAttendanceHistory() {
 
   // ─── Fetch classes with sections ────────────────────────────────
   const { data: classesData, isLoading: classesLoading, isFetching: classesFetching } = useQuery({
-    queryKey: ['classes-for-history', schoolId],
+    queryKey: ['classes-for-history', schoolId, academicYearId],
     queryFn: async () => {
-      const res = await fetch(`/api/schools/${schoolId}/classes?limit=-1&getAcademicYear=true`);
+      const params = new URLSearchParams({ limit: '-1', getAcademicYear: 'true' });
+      if (academicYearId) params.append('academicYearId', academicYearId);
+      const res = await fetch(`/api/schools/${schoolId}/classes?${params}`);
       if (!res.ok) throw new Error('Failed to fetch classes');
       const json = await res.json();
       return Array.isArray(json) ? json : (json?.data || []);
