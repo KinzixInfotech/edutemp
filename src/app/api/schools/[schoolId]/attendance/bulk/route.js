@@ -415,6 +415,12 @@ export async function POST(req, props) {
     const results = { success: [], failed: [], skipped: [] };
     let providedAttendance = Array.isArray(attendance) ? attendance : [];
 
+    // Fetch active academic year for session binding
+    const activeAcademicYear = await prisma.academicYear.findFirst({
+      where: { schoolId, isActive: true },
+      select: { id: true }
+    });
+
     await prisma.$transaction(async (tx) => {
       // If markAllPresent, get all students
       let attendanceData = providedAttendance;
@@ -507,6 +513,7 @@ export async function POST(req, props) {
                 userId: record.userId,
                 schoolId,
                 date: attendanceDate,
+                academicYearId: activeAcademicYear?.id || null,
                 ...attendancePayload
               }
             });
@@ -544,6 +551,7 @@ export async function POST(req, props) {
           sectionId: sectionId && sectionId !== 'all' ? toInt(sectionId) : null,
           date: attendanceDate,
           markedBy,
+          academicYearId: activeAcademicYear?.id || null,
           totalStudents: results.success.length,
           presentCount: statusCounts.PRESENT || 0,
           absentCount: statusCounts.ABSENT || 0,

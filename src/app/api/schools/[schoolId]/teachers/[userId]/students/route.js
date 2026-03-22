@@ -385,6 +385,24 @@ export async function POST(req, props) {
                 },
             });
 
+            // Create StudentSession + set currentSessionId
+            if (activeAcademicYear?.id) {
+                const session = await tx.studentSession.create({
+                    data: {
+                        studentId: user.id,
+                        academicYearId: activeAcademicYear.id,
+                        classId: parsed.classId,
+                        sectionId: Number(parsed.sectionId),
+                        rollNumber: parsed.rollNumber || "",
+                        status: "ACTIVE",
+                    },
+                });
+                await tx.student.update({
+                    where: { userId: user.id },
+                    data: { currentSessionId: session.id },
+                });
+            }
+
             // Handle Parent Profile Creation / Linking
             let finalParentId = parsed.linkedParentId;
 

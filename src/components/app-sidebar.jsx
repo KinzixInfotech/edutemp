@@ -668,9 +668,8 @@ const navUser = {
     },
 }
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { SessionSwitchDialog, shouldShowSessionWarning } from "./SessionSwitchDialog";
-import { SessionSwitchLoader } from "./SessionSwitchLoader";
+
+import { useAcademicYear } from "@/context/AcademicYearContext";
 
 export function AppSidebar({ ...props }) {
     const { resolvedTheme } = useTheme()
@@ -678,71 +677,19 @@ export function AppSidebar({ ...props }) {
     const { setOpen } = useCommandMenu()
     const pathname = usePathname()
     const { state } = useSidebar()
-    const queryClient = useQueryClient()
 
-    const [showSwitchDialog, setShowSwitchDialog] = React.useState(false);
-    const [pendingYearId, setPendingYearId] = React.useState(null);
-
+    const {
+        switchableYears,
+        activeYear,
+        selectedYear,
+        isViewingPastYear,
+        isLoading: yearLoading,
+        switchYear,
+        resetToActiveYear,
+    } = useAcademicYear() || {};
 
     const isCollapsed = state === "collapsed"
-
-    // Fetch academic years using TanStack Query
-    const { data: academicYears = [], isLoading: loading } = useQuery({
-        queryKey: ['academic-years', fullUser?.schoolId],
-        queryFn: async () => {
-            if (!fullUser?.schoolId) return [];
-            const response = await fetch(`/api/schools/academic-years?schoolId=${fullUser.schoolId}`);
-            const data = await response.json();
-            return Array.isArray(data) ? data : (data.academicYears || []);
-        },
-        enabled: !!fullUser?.schoolId && fullUser?.role?.name === 'ADMIN',
-        staleTime: 5 * 60 * 1000, // 5 minutes
-    });
-
-    const activeYear = academicYears.find(y => y.isActive);
-
-    // Handle session switch using Mutation
-    const switchSessionMutation = useMutation({
-        mutationFn: async (yearId) => {
-            const response = await fetch('/api/schools/academic-years/activate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ academicYearId: yearId })
-            });
-            return response.json();
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries(['academic-years']);
-            window.location.reload();
-        }
-    });
-
-    const handleSessionSwitch = (yearId) => {
-        if (yearId === activeYear?.id) return; // Don't switch if same session
-
-        // Check if we should show the warning
-        if (shouldShowSessionWarning()) {
-            setPendingYearId(yearId);
-            setShowSwitchDialog(true);
-        } else {
-            // Directly switch without showing dialog
-            switchSessionMutation.mutate(yearId);
-        }
-    };
-
-    const confirmSessionSwitch = () => {
-        if (pendingYearId) {
-            switchSessionMutation.mutate(pendingYearId);
-        }
-        setShowSwitchDialog(false);
-        setPendingYearId(null);
-    };
-
-    const cancelSessionSwitch = () => {
-        setShowSwitchDialog(false);
-        setPendingYearId(null);
-    };
-    // console.log(fullUser);
+    const isAdmin = fullUser?.role?.name === 'ADMIN';
 
     return (
         <Sidebar collapsible="icon" {...props}>
@@ -769,47 +716,55 @@ export function AppSidebar({ ...props }) {
                     </SidebarMenuItem>
 
                     <SidebarMenuItem>
-                        {/* Academic Year Switcher */}
-                        {fullUser?.role?.name === 'ADMIN' && !loading && academicYears.length > 0 && (
+                        {/* Academic Year Switcher — client-side view mode only */}
+                        {isAdmin && !yearLoading && switchableYears?.length > 0 && (
                             <>
                                 {!isCollapsed ? (
                                     <SidebarMenuButton asChild className={'mt-6'}>
-                                        <Select value={activeYear?.id} onValueChange={handleSessionSwitch} >
+                                        <Select value={selectedYear?.id} onValueChange={(yearId) => switchYear(yearId)} >
                                             <SelectTrigger className="h-9 bg-[#f9fafb] w-full dark:bg-[#171717]  border ">
                                                 <SelectValue>
                                                     <div className="flex items-center gap-2">
-                                                        <div className={cn("h-2 w-2 rounded-full", activeYear ? "bg-green-500" : "bg-gray-300")}></div>
+                                                        <div className={cn("h-2 w-2 rounded-full", isViewingPastYear ? "bg-amber-500" : "bg-green-500")}></div>
                                                         <span className="text-sm font-medium truncate">
-                                                            {activeYear ? activeYear.name : (academicYears.length > 0 ? 'Select Session' : 'No Sessions')}
+                                                            {selectedYear ? selectedYear.name : 'Select Session'}
+                                                            {isViewingPastYear && <span className="text-[10px] ml-1 opacity-60">(viewing)</span>}
                                                         </span>
                                                     </div>
                                                 </SelectValue>
                                             </SelectTrigger>
                                             <SelectContent>
-                                                {academicYears.length > 0 ? (
-                                                    academicYears.map((year) => (
-                                                        <SelectItem key={year.id} value={year.id}>
-                                                            <div className="flex items-center gap-2">
-                                                                <div className={cn(
-                                                                    "h-2 w-2 rounded-full",
-                                                                    year.isActive ? "bg-green-500" : "bg-transparent border border-muted-foreground"
-                                                                )}></div>
-                                                                <span>{year.name}</span>
-                                                            </div>
-                                                        </SelectItem>
-                                                    ))
-                                                ) : (
-                                                    <SelectItem value="none" disabled>No sessions available</SelectItem>
-                                                )}
+                                                {switchableYears.map((year) => (
+                                                    <SelectItem key={year.id} value={year.id}>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className={cn(
+                                                                "h-2 w-2 rounded-full",
+                                                                year.isActive ? "bg-green-500" : "bg-transparent border border-muted-foreground"
+                                                            )}></div>
+                                                            <span>{year.name}</span>
+                                                            {year.isActive && <span className="text-[10px] text-green-600 ml-1">(active)</span>}
+                                                        </div>
+                                                    </SelectItem>
+                                                ))}
                                             </SelectContent>
                                         </Select>
                                     </SidebarMenuButton>
                                 ) : (
-                                    <SidebarMenuButton asChild className={'mt-1.5'} tooltip={activeYear?.name || 'No Session'}>
+                                    <SidebarMenuButton asChild className={'mt-1.5'} tooltip={selectedYear?.name || 'No Session'}>
                                         <div className="h-9 w-9 dark:bg-[#171717] rounded-md bg-white flex items-center justify-center border ">
-                                            <div className="h-2.5 w-2.5 rounded-full bg-green-500"></div>
+                                            <div className={cn("h-2.5 w-2.5 rounded-full", isViewingPastYear ? "bg-amber-500" : "bg-green-500")}></div>
                                         </div>
                                     </SidebarMenuButton>
+                                )}
+
+                                {/* "Back to active year" button when viewing a different year */}
+                                {isViewingPastYear && !isCollapsed && (
+                                    <button
+                                        onClick={resetToActiveYear}
+                                        className="mt-1.5 w-full text-xs text-center py-1 px-2 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition-colors"
+                                    >
+                                        ↩ Back to {activeYear?.name}
+                                    </button>
                                 )}
                             </>
                         )}
@@ -832,19 +787,7 @@ export function AppSidebar({ ...props }) {
             <SidebarFooter className='border-t bg-background'>
                 <NavUser user={navUser.user} />
             </SidebarFooter>
-
-            {/* Session Switch Warning Dialog */}
-            <SessionSwitchDialog
-                isOpen={showSwitchDialog}
-                onClose={cancelSessionSwitch}
-                onConfirm={confirmSessionSwitch}
-                fromSession={activeYear?.name || 'Current Session'}
-                toSession={academicYears.find(y => y.id === pendingYearId)?.name || 'New Session'}
-                toSessionData={academicYears.find(y => y.id === pendingYearId)}
-            />
-
-            {/* Session Switch Loader */}
-            <SessionSwitchLoader isActive={switchSessionMutation.isPending} />
         </Sidebar>
     )
 }
+

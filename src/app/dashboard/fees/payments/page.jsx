@@ -188,7 +188,10 @@ export default function PaymentTracking() {
         enabled: !!schoolId,
     });
 
-    const academicYearId = academicYears?.find(y => y.isActive)?.id;
+    // Academic year: allow switching, default to active
+    const [selectedYearId, setSelectedYearId] = useState(null);
+    const activeYearId = academicYears?.find(y => y.isActive)?.id;
+    const academicYearId = selectedYearId || activeYearId;
 
     // Fetch classes
     const { data: classes } = useQuery({
@@ -206,12 +209,13 @@ export default function PaymentTracking() {
     const sections = selectedClassData?.sections || [];
 
 
-    // Fetch students with fee details - show ALL students, not filtered by academic year
+    // Fetch students with fee details — FILTERED by academic year
     const { data: students, isLoading, refetch } = useQuery({
-        queryKey: ['students-fees', schoolId, selectedClass, statusFilter],
+        queryKey: ['students-fees', schoolId, academicYearId, selectedClass, statusFilter],
         queryFn: async () => {
             const params = new URLSearchParams({
                 schoolId,
+                academicYearId,
                 ...(selectedClass !== 'all' && { classId: selectedClass }),
             });
 
@@ -219,7 +223,7 @@ export default function PaymentTracking() {
             if (!res.ok) throw new Error('Failed');
             return res.json();
         },
-        enabled: !!schoolId,
+        enabled: !!schoolId && !!academicYearId,
     });
 
     // Fetch ledger when dialog opens for a student
@@ -680,7 +684,7 @@ export default function PaymentTracking() {
             {/* Filters */}
             <Card className="border-0 shadow-none border">
                 <CardContent className="pt-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4">
                         <div className="relative lg:col-span-2">
                             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                             <Input
@@ -690,6 +694,18 @@ export default function PaymentTracking() {
                                 className="pl-10"
                             />
                         </div>
+                        <Select value={academicYearId || ''} onValueChange={(v) => { setSelectedYearId(v); setCurrentPage(1); }}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Academic Year" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {academicYears?.map((yr) => (
+                                    <SelectItem key={yr.id} value={yr.id}>
+                                        {yr.name} {yr.isActive ? '(Active)' : ''}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                         <Select value={selectedClass} onValueChange={(v) => { setSelectedClass(v); setSelectedSection('all'); setCurrentPage(1); }}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Select Class" />

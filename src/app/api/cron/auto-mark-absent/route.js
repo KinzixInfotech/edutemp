@@ -628,6 +628,7 @@ async function markBatchAbsentWithRetry(schoolId, date, users, academicYearId, a
             schoolId,
             date,
             status: 'ABSENT',
+            academicYearId: academicYearId || null,
             markedBy: null,
             markedAt: new Date(),
             remarks: 'Auto-marked absent by system',

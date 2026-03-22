@@ -1069,16 +1069,19 @@ model Route {
 }
 
 model StudentRouteAssignment {
-  id         String   @id @default(uuid()) @db.Uuid
-  studentId  String   @db.Uuid
-  routeId    String   @db.Uuid
-  schoolId   String   @db.Uuid
-  assignedAt DateTime @default(now())
-  student    Student  @relation(fields: [studentId], references: [userId])
-  route      Route    @relation(fields: [routeId], references: [id])
+  id             String        @id @default(uuid()) @db.Uuid
+  studentId      String        @db.Uuid
+  routeId        String        @db.Uuid
+  schoolId       String        @db.Uuid
+  academicYearId String?       @db.Uuid
+  assignedAt     DateTime      @default(now())
+  student        Student       @relation(fields: [studentId], references: [userId])
+  route          Route         @relation(fields: [routeId], references: [id])
+  academicYear   AcademicYear? @relation(fields: [academicYearId], references: [id])
 
   @@index([studentId])
   @@index([routeId])
+  @@index([academicYearId])
 }
 
 model VehicleLocation {
@@ -1967,6 +1970,9 @@ model Student {
   schoolId         String  @db.Uuid
   academicYearId   String? @db.Uuid
 
+  // Current session pointer (fast lookup)
+  currentSessionId String? @unique @db.Uuid
+
   // Alumni Tracking
   isAlumni          Boolean   @default(false)
   alumniConvertedAt DateTime?
@@ -2011,9 +2017,54 @@ model Student {
   studentServices  StudentService[]
   studentWallet    StudentWallet?
 
+  // StudentSession (per-year enrollment)
+  sessions       StudentSession[]
+  currentSession StudentSession?  @relation("CurrentSession", fields: [currentSessionId], references: [id])
+
   @@index([classId])
   @@index([sectionId])
   @@index([parentId])
+  @@index([currentSessionId])
+}
+
+// ============================================
+// STUDENT SESSION (per-year enrollment)
+// ============================================
+
+model StudentSession {
+  id             String        @id @default(uuid()) @db.Uuid
+  studentId      String        @db.Uuid
+  academicYearId String        @db.Uuid
+  classId        Int
+  sectionId      Int
+  rollNumber     String?
+  status         SessionStatus @default(ACTIVE)
+
+  joinedAt DateTime  @default(now())
+  leftAt   DateTime?
+
+  student      Student      @relation(fields: [studentId], references: [userId])
+  currentFor   Student?     @relation("CurrentSession")
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  class        Class        @relation(fields: [classId], references: [id])
+  section      Section      @relation(fields: [sectionId], references: [id])
+
+  @@unique([studentId, academicYearId])
+  @@index([studentId, academicYearId])
+  @@index([studentId, status])
+  @@index([academicYearId])
+  @@index([classId])
+  @@index([sectionId])
+  @@index([status])
+}
+
+enum SessionStatus {
+  ACTIVE
+  PROMOTED
+  DETAINED
+  ALUMNI
+  DROPOUT
+  TRANSFERRED
 }
 
 // ============================================
@@ -2274,6 +2325,9 @@ model Class {
   // Chat / Messaging System
   chatConversations Conversation[]
 
+  // StudentSession enrollments
+  studentSessions StudentSession[]
+
   @@unique([id, schoolId])
   @@index([schoolId])
 }
@@ -2324,6 +2378,9 @@ model Section {
   // Chat / Messaging System
   chatConversations Conversation[]
 
+  // StudentSession enrollments
+  studentSessions StudentSession[]
+
   @@unique([classId, name])
   @@index([classId])
 }
@@ -2366,11 +2423,12 @@ model TimetableEntry {
   schoolId String @db.Uuid
 
   // Linking
-  classId    Int
-  sectionId  Int?
-  subjectId  Int
-  teacherId  String @db.Uuid
-  timeSlotId String @db.Uuid
+  classId        Int
+  sectionId      Int?
+  subjectId      Int
+  teacherId      String  @db.Uuid
+  timeSlotId     String  @db.Uuid
+  academicYearId String? @db.Uuid
 
   // Schedule
   dayOfWeek  Int // 1=Monday, 2=Tuesday, ..., 6=Saturday
@@ -2389,6 +2447,7 @@ model TimetableEntry {
   subject       Subject        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   teacher       TeachingStaff  @relation(fields: [teacherId], references: [userId], onDelete: Cascade)
   timeSlot      TimeSlot       @relation(fields: [timeSlotId], references: [id], onDelete: Cascade)
+  academicYear  AcademicYear?  @relation(fields: [academicYearId], references: [id])
   teacherShifts TeacherShift[]
 
   @@unique([classId, sectionId, timeSlotId, dayOfWeek])
@@ -2396,6 +2455,7 @@ model TimetableEntry {
   @@index([teacherId, dayOfWeek])
   @@index([classId, sectionId, dayOfWeek])
   @@index([timeSlotId, dayOfWeek])
+  @@index([academicYearId])
 }
 
 // Date-specific Teacher Shift (Timetable)
@@ -2538,12 +2598,13 @@ model Department {
 
 // Enhanced Homework Model
 model Homework {
-  id        String @id @default(uuid()) @db.Uuid
-  schoolId  String @db.Uuid
-  classId   Int
-  sectionId Int?
-  subjectId Int?
-  teacherId String @db.Uuid
+  id             String  @id @default(uuid()) @db.Uuid
+  schoolId       String  @db.Uuid
+  classId        Int
+  sectionId      Int?
+  subjectId      Int?
+  teacherId      String  @db.Uuid
+  academicYearId String? @db.Uuid
 
   // Homework Details
   title       String
@@ -2563,11 +2624,12 @@ model Homework {
   updatedAt DateTime @updatedAt
 
   // Relations
-  school  School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  class   Class         @relation(fields: [classId], references: [id])
-  section Section?      @relation(fields: [sectionId], references: [id])
-  subject Subject?      @relation(fields: [subjectId], references: [id])
-  teacher TeachingStaff @relation(fields: [teacherId], references: [userId])
+  school       School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class        Class         @relation(fields: [classId], references: [id])
+  section      Section?      @relation(fields: [sectionId], references: [id])
+  subject      Subject?      @relation(fields: [subjectId], references: [id])
+  teacher      TeachingStaff @relation(fields: [teacherId], references: [userId])
+  academicYear AcademicYear? @relation(fields: [academicYearId], references: [id])
 
   submissions HomeworkSubmission[]
 
@@ -2577,6 +2639,7 @@ model Homework {
   @@index([teacherId])
   @@index([dueDate])
   @@index([isActive])
+  @@index([academicYearId])
 }
 
 model Exam {
@@ -2757,9 +2820,22 @@ model AcademicYear {
   hpcreports             HPCReport[]
   termLocks              TermLock[]
 
+  // Session-bound module relations
+  timetableEntries        TimetableEntry[]
+  homework                Homework[]
+  studentRouteAssignments StudentRouteAssignment[]
+  libraryTransactions     LibraryTransaction[]
+
   // Financial Ledger Engine
   feeSessions      FeeSession[]
   feeLedgerEntries StudentFeeLedger[]
+
+  // StudentSession enrollments
+  studentSessions StudentSession[]
+
+  // Attendance binding
+  attendance     Attendance[]
+  bulkAttendance BulkAttendance[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
@@ -2839,6 +2915,9 @@ model Attendance {
   date         DateTime @db.Date
   delegationId String?  @db.Uuid // Track if marked via delegation
 
+  // Session binding
+  academicYearId String? @db.Uuid
+
   // Status & Timing
   status       AttendanceStatus
   checkInTime  DateTime?
@@ -2873,6 +2952,7 @@ model Attendance {
   // Relations
   user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   school         School               @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  AcademicYear   AcademicYear?        @relation(fields: [academicYearId], references: [id])
   marker         User?                @relation("MarkedBy", fields: [markedBy], references: [id])
   approver       User?                @relation("ApprovedBy", fields: [approvedBy], references: [id])
   leaveRequest   LeaveRequest?        @relation("AttendanceLeave", fields: [leaveRequestId], references: [id])
@@ -2883,6 +2963,7 @@ model Attendance {
   @@index([userId, date])
   @@index([schoolId, date])
   @@index([schoolId, date, status]) // Composite for dashboard count queries
+  @@index([schoolId, academicYearId])
   @@index([status])
   @@index([approvalStatus])
   @@index([markedBy])
@@ -3162,6 +3243,9 @@ model BulkAttendance {
   markedBy  String   @db.Uuid
   markedAt  DateTime @default(now())
 
+  // Session binding
+  academicYearId String? @db.Uuid
+
   // Summary
   totalStudents Int
   presentCount  Int
@@ -3172,12 +3256,14 @@ model BulkAttendance {
   // Metadata
   remarks String?
 
-  school  School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  class   Class?   @relation(fields: [classId], references: [id])
-  section Section? @relation(fields: [sectionId], references: [id])
-  marker  User     @relation(fields: [markedBy], references: [id])
+  school       School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class        Class?        @relation(fields: [classId], references: [id])
+  section      Section?      @relation(fields: [sectionId], references: [id])
+  marker       User          @relation(fields: [markedBy], references: [id])
+  AcademicYear AcademicYear? @relation(fields: [academicYearId], references: [id])
 
   @@index([schoolId, date])
+  @@index([schoolId, academicYearId])
   @@index([classId, date])
   @@index([markedBy])
 }
@@ -3408,11 +3494,12 @@ model LibraryBookCopy {
 }
 
 model LibraryTransaction {
-  id       String @id @default(uuid()) @db.Uuid
-  schoolId String @db.Uuid
-  userId   String @db.Uuid // Student or Staff ID
-  copyId   String @db.Uuid // specific copy
-  userType String // STUDENT, TEACHER, STAFF
+  id             String  @id @default(uuid()) @db.Uuid
+  schoolId       String  @db.Uuid
+  userId         String  @db.Uuid // Student or Staff ID
+  copyId         String  @db.Uuid // specific copy
+  userType       String // STUDENT, TEACHER, STAFF
+  academicYearId String? @db.Uuid
 
   issueDate  DateTime  @default(now())
   dueDate    DateTime
@@ -3424,11 +3511,13 @@ model LibraryTransaction {
   finePaid   Boolean @default(false)
   remarks    String?
 
-  copy LibraryBookCopy @relation(fields: [copyId], references: [id])
+  copy         LibraryBookCopy @relation(fields: [copyId], references: [id])
+  academicYear AcademicYear?   @relation(fields: [academicYearId], references: [id])
 
   @@index([userId])
   @@index([status])
   @@index([dueDate])
+  @@index([academicYearId])
 }
 
 model LibrarySettings {

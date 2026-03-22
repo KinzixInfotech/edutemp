@@ -6,19 +6,31 @@ export async function GET(req) {
         const { searchParams } = new URL(req.url);
         const schoolId = searchParams.get('schoolId');
         const classId = searchParams.get('classId');
-        const academicYearId = searchParams.get('academicYearId');
+        let academicYearId = searchParams.get('academicYearId');
 
         if (!schoolId) {
             return NextResponse.json({ error: 'Missing schoolId' }, { status: 400 });
         }
 
-        // Build filter - only filter by schoolId and classId if provided
+        // Auto-resolve academicYearId from active year if not provided
+        if (!academicYearId) {
+            const activeYear = await prisma.academicYear.findFirst({
+                where: { schoolId, isActive: true },
+                select: { id: true },
+            });
+            if (!activeYear) {
+                return NextResponse.json({ error: 'No active academic year found' }, { status: 400 });
+            }
+            academicYearId = activeYear.id;
+        }
+
+        // Build filter — always scoped to academic year
         const filters = {
             schoolId,
+            academicYearId,
         };
 
         if (classId) filters.classId = parseInt(classId, 10);
-        if (academicYearId) filters.academicYearId = academicYearId;
 
         // Fetch all students with their related info and fee data
         const students = await prisma.student.findMany({
@@ -42,8 +54,9 @@ export async function GET(req) {
                         name: true,
                     }
                 },
-                // Include fee data
+                // Include fee data — FILTERED by academic year
                 studentFees: {
+                    where: { academicYearId },
                     select: {
                         id: true,
                         finalAmount: true,

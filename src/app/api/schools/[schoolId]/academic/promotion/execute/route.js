@@ -190,6 +190,42 @@ export async function POST(req, props) {
                     data: updateData
                 });
 
+                // ── StudentSession lifecycle ──
+                // 1) Deactivate all ACTIVE sessions
+                await tx.studentSession.updateMany({
+                    where: { studentId, status: 'ACTIVE' },
+                    data: {
+                        status: status === 'GRADUATE' ? 'ALUMNI' : 'PROMOTED',
+                        leftAt: new Date(),
+                    },
+                });
+
+                // 2) Create new StudentSession for target year (skip for graduates)
+                if (status !== 'GRADUATE') {
+                    const newSession = await tx.studentSession.create({
+                        data: {
+                            studentId,
+                            academicYearId: toYearId,
+                            classId: status === 'DETAINED' ? currentStudent.classId : toClassId,
+                            sectionId: status === 'DETAINED' ? (currentStudent.sectionId ?? toSectionId) : toSectionId,
+                            rollNumber: null,
+                            status: 'ACTIVE',
+                        },
+                    });
+
+                    // 3) Update pointer
+                    await tx.student.update({
+                        where: { userId: studentId },
+                        data: { currentSessionId: newSession.id },
+                    });
+                } else {
+                    // Graduate: clear pointer
+                    await tx.student.update({
+                        where: { userId: studentId },
+                        data: { currentSessionId: null },
+                    });
+                }
+
                 updates.push({
                     studentId,
                     name: currentStudent.name,

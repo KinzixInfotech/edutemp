@@ -11,14 +11,25 @@ export async function GET(req, props) {
         const { searchParams } = new URL(req.url);
         const status = searchParams.get("status"); // e.g., ISSUED, RETURNED, OVERDUE
         const userId = searchParams.get("userId");
+        let academicYearId = searchParams.get("academicYearId");
         const { page, limit } = getPagination(req);
 
-        const cacheKey = generateKey('library:transactions', { schoolId, status, userId, page, limit });
+        // Auto-resolve active academic year
+        if (!academicYearId) {
+            const activeYear = await prisma.academicYear.findFirst({
+                where: { schoolId, isActive: true },
+                select: { id: true },
+            });
+            academicYearId = activeYear?.id;
+        }
+
+        const cacheKey = generateKey('library:transactions', { schoolId, status, userId, academicYearId, page, limit });
 
         const result = await remember(cacheKey, async () => {
             const skip = (page - 1) * limit;
             const where = {
                 schoolId: schoolId,
+                ...(academicYearId && { academicYearId }),
                 ...(status && { status }),
                 ...(userId && { userId }),
             };

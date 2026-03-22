@@ -48,6 +48,12 @@ export async function POST(req, props) {
 
         const formData = application.data || {};
 
+        // Get active academic year for session binding
+        const activeYear = await prisma.academicYear.findFirst({
+            where: { schoolId, isActive: true },
+            select: { id: true },
+        });
+
         const student = await prisma.student.create({
             data: {
                 schoolId,
@@ -64,8 +70,26 @@ export async function POST(req, props) {
                 phone: formData.phone || null,
                 address: formData.address || null,
                 status: "ACTIVE",
+                ...(activeYear && { academicYearId: activeYear.id }),
             },
         });
+
+        // Create StudentSession + set currentSessionId
+        if (activeYear?.id && classId && sectionId) {
+            const session = await prisma.studentSession.create({
+                data: {
+                    studentId: student.userId || student.id,
+                    academicYearId: activeYear.id,
+                    classId: classId,
+                    sectionId: sectionId,
+                    status: "ACTIVE",
+                },
+            });
+            await prisma.student.update({
+                where: { userId: student.userId || student.id },
+                data: { currentSessionId: session.id },
+            });
+        }
 
         // Update Application Stage to "Enrolled"
         const enrolledStage = await prisma.stage.findFirst({

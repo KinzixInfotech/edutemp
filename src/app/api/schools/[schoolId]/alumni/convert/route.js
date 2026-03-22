@@ -82,6 +82,12 @@ export async function POST(req, props) {
                     }
                 });
 
+                // Mark active StudentSession as ALUMNI
+                await prisma.studentSession.updateMany({
+                    where: { studentId, status: 'ACTIVE' },
+                    data: { status: 'ALUMNI', leftAt: new Date() },
+                });
+
                 results.push({ studentId, alumniId: alumni.id, success: true });
             } catch (error) {
                 console.error(`Error converting student ${studentId}:`, error);

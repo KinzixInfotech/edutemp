@@ -14,13 +14,23 @@ export async function GET(req) {
     const search = searchParams.get("search");
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
+    let academicYearId = searchParams.get("academicYearId");
 
     if (!schoolId) {
         return NextResponse.json({ error: "schoolId is required" }, { status: 400 });
     }
 
     try {
-        const where = { schoolId };
+        // Auto-resolve active academic year
+        if (!academicYearId) {
+            const activeYear = await prisma.academicYear.findFirst({
+                where: { schoolId, isActive: true },
+                select: { id: true },
+            });
+            academicYearId = activeYear?.id;
+        }
+
+        const where = { schoolId, ...(academicYearId && { academicYearId }) };
 
         if (classId) where.classId = parseInt(classId);
         if (sectionId) where.sectionId = parseInt(sectionId);
@@ -204,6 +214,14 @@ export async function POST(req) {
             }
         }
 
+        // Auto-resolve academic year for new homework
+        let academicYearId = null;
+        const activeYear = await prisma.academicYear.findFirst({
+            where: { schoolId, isActive: true },
+            select: { id: true },
+        });
+        academicYearId = activeYear?.id;
+
         // Create homework
         const homework = await prisma.homework.create({
             data: {
@@ -217,7 +235,8 @@ export async function POST(req) {
                 fileUrl,
                 fileName,
                 dueDate: new Date(dueDate),
-                isActive: true
+                isActive: true,
+                ...(academicYearId && { academicYearId }),
             },
             include: {
                 class: {

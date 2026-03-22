@@ -613,6 +613,7 @@ exports.Prisma.StudentRouteAssignmentScalarFieldEnum = {
   studentId: 'studentId',
   routeId: 'routeId',
   schoolId: 'schoolId',
+  academicYearId: 'academicYearId',
   assignedAt: 'assignedAt'
 };
 
@@ -1067,8 +1068,21 @@ exports.Prisma.StudentScalarFieldEnum = {
   admissionNo: 'admissionNo',
   schoolId: 'schoolId',
   academicYearId: 'academicYearId',
+  currentSessionId: 'currentSessionId',
   isAlumni: 'isAlumni',
   alumniConvertedAt: 'alumniConvertedAt'
+};
+
+exports.Prisma.StudentSessionScalarFieldEnum = {
+  id: 'id',
+  studentId: 'studentId',
+  academicYearId: 'academicYearId',
+  classId: 'classId',
+  sectionId: 'sectionId',
+  rollNumber: 'rollNumber',
+  status: 'status',
+  joinedAt: 'joinedAt',
+  leftAt: 'leftAt'
 };
 
 exports.Prisma.ParentScalarFieldEnum = {
@@ -1233,6 +1247,7 @@ exports.Prisma.TimetableEntryScalarFieldEnum = {
   subjectId: 'subjectId',
   teacherId: 'teacherId',
   timeSlotId: 'timeSlotId',
+  academicYearId: 'academicYearId',
   dayOfWeek: 'dayOfWeek',
   roomNumber: 'roomNumber',
   isActive: 'isActive',
@@ -1321,6 +1336,7 @@ exports.Prisma.HomeworkScalarFieldEnum = {
   sectionId: 'sectionId',
   subjectId: 'subjectId',
   teacherId: 'teacherId',
+  academicYearId: 'academicYearId',
   title: 'title',
   description: 'description',
   fileUrl: 'fileUrl',
@@ -1454,6 +1470,7 @@ exports.Prisma.AttendanceScalarFieldEnum = {
   schoolId: 'schoolId',
   date: 'date',
   delegationId: 'delegationId',
+  academicYearId: 'academicYearId',
   status: 'status',
   checkInTime: 'checkInTime',
   checkOutTime: 'checkOutTime',
@@ -1606,6 +1623,7 @@ exports.Prisma.BulkAttendanceScalarFieldEnum = {
   date: 'date',
   markedBy: 'markedBy',
   markedAt: 'markedAt',
+  academicYearId: 'academicYearId',
   totalStudents: 'totalStudents',
   presentCount: 'presentCount',
   absentCount: 'absentCount',
@@ -1697,6 +1715,7 @@ exports.Prisma.LibraryTransactionScalarFieldEnum = {
   userId: 'userId',
   copyId: 'copyId',
   userType: 'userType',
+  academicYearId: 'academicYearId',
   issueDate: 'issueDate',
   dueDate: 'dueDate',
   returnDate: 'returnDate',
@@ -3632,6 +3651,15 @@ exports.UserStatus = exports.$Enums.UserStatus = {
   BANNED: 'BANNED'
 };
 
+exports.SessionStatus = exports.$Enums.SessionStatus = {
+  ACTIVE: 'ACTIVE',
+  PROMOTED: 'PROMOTED',
+  DETAINED: 'DETAINED',
+  ALUMNI: 'ALUMNI',
+  DROPOUT: 'DROPOUT',
+  TRANSFERRED: 'TRANSFERRED'
+};
+
 exports.ParentRelationType = exports.$Enums.ParentRelationType = {
   FATHER: 'FATHER',
   MOTHER: 'MOTHER',
@@ -4277,6 +4305,7 @@ exports.Prisma.ModelName = {
   Librarian: 'Librarian',
   Accountant: 'Accountant',
   Student: 'Student',
+  StudentSession: 'StudentSession',
   Parent: 'Parent',
   StudentParentLink: 'StudentParentLink',
   ExamSeries: 'ExamSeries',

@@ -498,6 +498,12 @@ async function importStudent(data, schoolId) {
     // Generate UUID for user
     const userId = require('crypto').randomUUID();
 
+    // Get active academic year for session binding
+    const activeYear = await prisma.academicYear.findFirst({
+        where: { schoolId, isActive: true },
+        select: { id: true },
+    });
+
     // Create DB records FIRST using transaction
     const result = await prisma.$transaction(async (tx) => {
         // Create user record
@@ -539,8 +545,27 @@ async function importStudent(data, schoolId) {
                 MotherNumber: rest.motherPhone || '',
                 bloodGroup: rest.bloodGroup || '',
                 admissionDate: new Date().toISOString().split('T')[0],
+                ...(activeYear && { academicYearId: activeYear.id }),
             }
         });
+
+        // Create StudentSession + set currentSessionId
+        if (activeYear?.id) {
+            const session = await tx.studentSession.create({
+                data: {
+                    studentId: user.id,
+                    academicYearId: activeYear.id,
+                    classId: existingClass.id,
+                    sectionId: section.id,
+                    rollNumber: rest.rollNumber || '',
+                    status: 'ACTIVE',
+                },
+            });
+            await tx.student.update({
+                where: { userId: user.id },
+                data: { currentSessionId: session.id },
+            });
+        }
 
         return user;
     });

@@ -507,16 +507,18 @@ export default function FeeStructuresManagement() {
   });
 
   const academicYearId = academicYears?.find(y => y.isActive)?.id;
+  const [selectedYearId, setSelectedYearId] = useState(null);
+  const activeAcademicYearId = selectedYearId || academicYearId;
 
   const { data: structures, isLoading } = useQuery({
-    queryKey: ['fee-structures', schoolId, academicYearId, statusFilter],
+    queryKey: ['fee-structures', schoolId, activeAcademicYearId, statusFilter],
     queryFn: async () => {
-      const params = new URLSearchParams({ schoolId, academicYearId, ...(statusFilter !== 'all' && { status: statusFilter }), includeArchived: statusFilter === 'ARCHIVED' || statusFilter === 'all' ? 'true' : 'false' });
+      const params = new URLSearchParams({ schoolId, academicYearId: activeAcademicYearId, ...(statusFilter !== 'all' && { status: statusFilter }), includeArchived: statusFilter === 'ARCHIVED' || statusFilter === 'all' ? 'true' : 'false' });
       const r = await fetch(`/api/schools/fee/global-structures?${params}`);
       if (!r.ok) throw new Error('Failed');
       return r.json();
     },
-    enabled: !!schoolId && !!academicYearId, staleTime: 1000 * 60 * 2, refetchOnWindowFocus: false,
+    enabled: !!schoolId && !!activeAcademicYearId, staleTime: 1000 * 60 * 2, refetchOnWindowFocus: false,
   });
 
   // ── Mutations ──
@@ -602,15 +604,27 @@ export default function FeeStructuresManagement() {
                 <CardTitle>Structures ({structures?.length || 0})</CardTitle>
                 <CardDescription>All fee structures for the active academic year</CardDescription>
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="DRAFT">Draft</SelectItem>
-                  <SelectItem value="ACTIVE">Active</SelectItem>
-                  <SelectItem value="ARCHIVED">Archived</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <Select value={activeAcademicYearId || ''} onValueChange={setSelectedYearId}>
+                  <SelectTrigger className="w-44"><SelectValue placeholder="Academic Year" /></SelectTrigger>
+                  <SelectContent>
+                    {academicYears?.map(yr => (
+                      <SelectItem key={yr.id} value={yr.id}>
+                        {yr.name} {yr.isActive ? '(Active)' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="DRAFT">Draft</SelectItem>
+                    <SelectItem value="ACTIVE">Active</SelectItem>
+                    <SelectItem value="ARCHIVED">Archived</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardHeader>
           <CardContent>

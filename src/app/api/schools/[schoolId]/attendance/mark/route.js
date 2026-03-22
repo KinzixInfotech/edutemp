@@ -131,7 +131,13 @@ export async function POST(req, props) {
         const checkOutDeadline = new Date(schoolEnd);
         checkOutDeadline.setHours(checkOutDeadline.getHours() + CHECK_OUT_GRACE_HOURS);
 
-        // ───── 4. Transaction ─────
+        // ───── 4. Fetch active academic year ─────
+        const activeAcademicYear = await prisma.academicYear.findFirst({
+            where: { schoolId, isActive: true },
+            select: { id: true }
+        });
+
+        // ───── 5. Transaction ─────
         const result = await prisma.$transaction(async (tx) => {
             // ────────────────────────
             // CHECK_IN
@@ -195,7 +201,7 @@ export async function POST(req, props) {
                     });
                 } else {
                     attendance = await tx.attendance.create({
-                        data: { userId, schoolId, date: today, ...data },
+                        data: { userId, schoolId, date: today, academicYearId: activeAcademicYear?.id || null, ...data },
                     });
                 }
 

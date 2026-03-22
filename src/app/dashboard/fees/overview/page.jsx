@@ -84,7 +84,9 @@ export default function AdminFeeDashboard() {
     staleTime: 1000 * 60 * 5,
   });
   const activeAcademicYear = academicYears?.find(y => y.isActive);
-  const academicYearId = activeAcademicYear?.id;
+  const [selectedYearId, setSelectedYearId] = useState(null);
+  const academicYearId = selectedYearId || activeAcademicYear?.id;
+  const selectedYearName = academicYears?.find(y => y.id === academicYearId)?.name;
 
   // Format dates for date input min/max
   const academicYearMinDate = activeAcademicYear?.startDate
@@ -300,6 +302,21 @@ export default function AdminFeeDashboard() {
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-wrap items-end gap-4">
+            <div className="w-48">
+              <label className="block text-sm font-medium mb-2">Academic Year</label>
+              <Select value={academicYearId || ''} onValueChange={(v) => setSelectedYearId(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Academic Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  {academicYears?.map((yr) => (
+                    <SelectItem key={yr.id} value={yr.id}>
+                      {yr.name} {yr.isActive ? '(Active)' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="w-48">
               <label className="block text-sm font-medium mb-2">Class</label>
               <Select value={selectedClass} onValueChange={setSelectedClass}>

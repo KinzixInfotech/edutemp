@@ -222,6 +222,18 @@ export async function PATCH(req, { params }) {
                 data: studentData
             });
 
+            // Sync class/section changes to active StudentSession
+            if (studentData.classId || studentData.sectionId) {
+                const sessionUpdate = {};
+                if (studentData.classId) sessionUpdate.classId = studentData.classId;
+                if (studentData.sectionId) sessionUpdate.sectionId = studentData.sectionId;
+
+                await tx.studentSession.updateMany({
+                    where: { studentId, status: 'ACTIVE' },
+                    data: sessionUpdate,
+                });
+            }
+
             return updatedStudent;
         });
 

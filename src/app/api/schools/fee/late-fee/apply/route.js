@@ -29,6 +29,12 @@ export async function POST(req) {
             });
         }
 
+        // Auto-resolve active academic year
+        const activeYear = await prisma.academicYear.findFirst({
+            where: { schoolId, isActive: true },
+            select: { id: true },
+        });
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -36,10 +42,13 @@ export async function POST(req) {
         const gracePeriodDate = new Date(today);
         gracePeriodDate.setDate(gracePeriodDate.getDate() - feeSettings.gracePeriodDays);
 
-        // Find overdue installments that haven't been charged late fee yet
+        // Find overdue installments — scoped to active academic year
         const overdueInstallments = await prisma.studentFeeInstallment.findMany({
             where: {
-                studentFee: { schoolId },
+                studentFee: {
+                    schoolId,
+                    ...(activeYear && { academicYearId: activeYear.id }),
+                },
                 status: { in: ["PENDING", "PARTIAL"] },
                 dueDate: { lt: gracePeriodDate },
                 lateFee: 0, // Not yet charged

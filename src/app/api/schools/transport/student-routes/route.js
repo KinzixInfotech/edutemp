@@ -75,6 +75,15 @@ export async function POST(req) {
     try {
         const data = await req.json();
 
+        // Auto-resolve active academic year
+        if (!data.academicYearId && data.schoolId) {
+            const activeYear = await prisma.academicYear.findFirst({
+                where: { schoolId: data.schoolId, isActive: true },
+                select: { id: true },
+            });
+            if (activeYear) data.academicYearId = activeYear.id;
+        }
+
         const assignment = await prisma.studentRouteAssignment.create({
             data: data,
             select: {

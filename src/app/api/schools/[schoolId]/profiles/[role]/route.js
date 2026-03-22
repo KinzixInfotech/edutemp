@@ -889,6 +889,24 @@ export async function POST(req, context) {
                             } : {}),
                         },
                     });
+
+                    // Create StudentSession + set currentSessionId
+                    if (activeAcademicYear?.id) {
+                        const session = await tx.studentSession.create({
+                            data: {
+                                studentId: user.id,
+                                academicYearId: activeAcademicYear.id,
+                                classId: parsed.classId,
+                                sectionId: Number(parsed.sectionId),
+                                rollNumber: parsed.rollNumber || "",
+                                status: "ACTIVE",
+                            },
+                        });
+                        await tx.student.update({
+                            where: { userId: user.id },
+                            data: { currentSessionId: session.id },
+                        });
+                    }
                     break;
 
                 case "TEACHING_STAFF":

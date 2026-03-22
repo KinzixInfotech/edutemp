@@ -139,6 +139,24 @@ export async function POST(req, props) {
                         academicYearId: activeAcademicYear.id,
                     }
                 });
+
+                // Create StudentSession + set currentSessionId
+                if (activeAcademicYear?.id) {
+                    const session = await tx.studentSession.create({
+                        data: {
+                            studentId: createdUserId,
+                            academicYearId: activeAcademicYear.id,
+                            classId: parseInt(stageData.classId),
+                            sectionId: parseInt(stageData.sectionId),
+                            rollNumber: stageData.rollNumber || "",
+                            status: "ACTIVE",
+                        },
+                    });
+                    await tx.student.update({
+                        where: { userId: createdUserId },
+                        data: { currentSessionId: session.id },
+                    });
+                }
             });
         }
 

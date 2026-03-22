@@ -14,17 +14,27 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const schoolId = searchParams.get('schoolId');
     const studentId = searchParams.get('studentId');
+    let academicYearId = searchParams.get('academicYearId');
 
     if (!schoolId) {
         return NextResponse.json({ error: 'schoolId is required' }, { status: 400 });
     }
 
     try {
+        // Auto-resolve active academic year
+        if (!academicYearId) {
+            const activeYear = await prisma.academicYear.findFirst({
+                where: { schoolId, isActive: true },
+                select: { id: true },
+            });
+            academicYearId = activeYear?.id;
+        }
+
         // Generate cache key based on params
-        const cacheKey = generateKey('student-transport-assignments-v2', { schoolId, studentId: studentId || 'all' });
+        const cacheKey = generateKey('student-transport-assignments-v2', { schoolId, studentId: studentId || 'all', academicYearId });
 
         const transformedAssignments = await remember(cacheKey, async () => {
-            const where = { schoolId };
+            const where = { schoolId, ...(academicYearId && { academicYearId }) };
             if (studentId) where.studentId = studentId;
 
             // Fetch student route assignments with related data

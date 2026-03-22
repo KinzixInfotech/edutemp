@@ -1,13 +1,13 @@
 /* Modern School Website Styles */
 
 /* Import Modern Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Open+Sans:wght@300;400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&display=swap');
 
 /* Scoped wrapper to prevent CSS leakage into admin interface */
 .website-preview-wrapper {
   min-height: 100vh;
   background: white;
-  font-family: 'Open Sans', sans-serif;
+  font-family: 'Google Sans', sans-serif;
   color: #1f2937;
 }
 
@@ -49,8 +49,8 @@
   --container-padding: 0 20px;
 
   /* Typography */
-  --font-heading: 'Inter', sans-serif;
-  --font-body: 'Open Sans', sans-serif;
+  --font-heading: 'Google Sans', sans-serif;
+  --font-body: 'Google Sans', sans-serif;
 
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);

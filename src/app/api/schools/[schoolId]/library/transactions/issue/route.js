@@ -31,6 +31,12 @@ export async function POST(request, { params }) {
             );
         }
 
+        // Auto-resolve active academic year
+        const activeYear = await prisma.academicYear.findFirst({
+            where: { schoolId, isActive: true },
+            select: { id: true },
+        });
+
         // Start transaction
         const transaction = await prisma.$transaction(async (tx) => {
             // Create transaction record
@@ -43,6 +49,7 @@ export async function POST(request, { params }) {
                     issueDate: new Date(),
                     dueDate: new Date(dueDate),
                     status: "ISSUED",
+                    ...(activeYear && { academicYearId: activeYear.id }),
                 },
             });
 

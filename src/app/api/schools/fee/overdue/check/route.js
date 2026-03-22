@@ -13,12 +13,27 @@ export async function POST(req) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // Build where clause
+        // Auto-resolve active academic year to scope overdue check
+        let academicYearFilter = {};
+        if (schoolId) {
+            const activeYear = await prisma.academicYear.findFirst({
+                where: { schoolId, isActive: true },
+                select: { id: true },
+            });
+            if (activeYear) {
+                academicYearFilter = { academicYearId: activeYear.id };
+            }
+        }
+
+        // Build where clause — scoped to active session
         const whereClause = {
             status: { in: ["PENDING", "PARTIAL"] },
             dueDate: { lt: today },
             isOverdue: false, // Only update ones not already marked
-            ...(schoolId && { studentFee: { schoolId } }),
+            studentFee: {
+                ...(schoolId && { schoolId }),
+                ...academicYearFilter,
+            },
         };
 
         // Find installments that should be marked as overdue
@@ -120,10 +135,25 @@ export async function GET(req) {
 
         const today = new Date();
 
+        // Auto-resolve active academic year
+        let academicYearFilter = {};
+        if (schoolId) {
+            const activeYear = await prisma.academicYear.findFirst({
+                where: { schoolId, isActive: true },
+                select: { id: true },
+            });
+            if (activeYear) {
+                academicYearFilter = { academicYearId: activeYear.id };
+            }
+        }
+
         const whereClause = {
             status: { in: ["PENDING", "PARTIAL", "OVERDUE"] },
             dueDate: { lt: today },
-            ...(schoolId && { studentFee: { schoolId } }),
+            studentFee: {
+                ...(schoolId && { schoolId }),
+                ...academicYearFilter,
+            },
         };
 
         // Get overdue stats

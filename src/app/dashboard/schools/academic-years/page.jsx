@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Loader2, Plus, Trash2, CheckCircle, Power, Archive, Edit2, Layers, GraduationCap, Users } from "lucide-react"
+import { Loader2, Plus, Trash2, CheckCircle, Power, Archive, Edit2, Layers, GraduationCap, Users, Rocket } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/context/AuthContext"
 import LoaderPage from "@/components/loader-page"
@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { Checkbox } from "@/components/ui/checkbox"
 import ConfirmDialog from "@/components/ui/ConfirmDialog"
+import { useRouter } from "next/navigation"
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,6 +33,7 @@ export default function AcademicYearsPage() {
         onConfirm: async () => { },
     })
     const { fullUser } = useAuth();
+    const router = useRouter();
     // if (!fullUser) {
 
     //     return <LoaderPage showmsg={false} />
@@ -311,11 +313,14 @@ export default function AcademicYearsPage() {
                     <p className="text-muted-foreground">Manage your school's academic sessions and timelines</p>
                 </div>
                 <div className="flex gap-2">
+                    <Button onClick={() => router.push("/dashboard/schools/academic-years/start-session")} className="hover:bg-muted hover:border-1 border-0 hover:text-black border dark:hover:text-white">
+                        <Rocket className="mr-2 h-4 w-4" /> Start New Session
+                    </Button>
                     <Button onClick={() => setBulkOpen(true)} variant="outline">
                         <Layers className="mr-2 h-4 w-4" /> Bulk Create
                     </Button>
-                    <Button onClick={openCreate}>
-                        <Plus className="mr-2 h-4 w-4" /> Create Academic Year
+                    <Button onClick={openCreate} variant="outline">
+                        <Plus className="mr-2 h-4 w-4" /> Create Year
                     </Button>
                 </div>
             </div>

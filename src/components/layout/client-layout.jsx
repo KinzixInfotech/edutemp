@@ -35,6 +35,7 @@ import { ApiProgressBar } from "@/components/ui/api-progress-bar";
 import { apiLoader } from "@/lib/api-loader";
 import { BulkUploadProvider } from "@/context/BulkUploadContext";
 import BulkUploadToast from "@/components/gallery/BulkUploadToast";
+import { AcademicYearProvider } from "@/context/AcademicYearContext";
 
 const TopProgressBar = dynamic(() => import("@/app/components/TopProgressBar"), {
     ssr: false,
@@ -262,6 +263,7 @@ export default function ClientLayout({ children }) {
                     <AcademicYearSetupBannerProvider>
                         <QueryClientProvider client={queryClient}>
                             <BulkUploadProvider>
+                            <AcademicYearProvider>
                                 {/* Inject animation styles */}
                                 <style dangerouslySetInnerHTML={{ __html: spinnerStyles }} />
 
@@ -464,6 +466,7 @@ export default function ClientLayout({ children }) {
                                 </SidebarProvider>
                                 <BulkUploadToast />
                                 {/* <DatabaseErrorDialog open={isDbDown} /> */}
+                            </AcademicYearProvider>
                             </BulkUploadProvider>
                         </QueryClientProvider>
                     </AcademicYearSetupBannerProvider>

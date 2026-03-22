@@ -68,13 +68,29 @@ export async function GET(req) {
         const cacheKey = generateKey('academic-years', { schoolId });
 
         const academicYears = await remember(cacheKey, async () => {
-            return await prisma.academicYear.findMany({
+            const years = await prisma.academicYear.findMany({
                 orderBy: { createdAt: "desc" },
                 where: { schoolId },
                 include: {
                     _count: true
                 }
-            })
+            });
+
+            // For archived years where live _count.students is 0,
+            // look up historical count from StudentSession records
+            for (const year of years) {
+                if (!year.isActive && year._count.students === 0) {
+                    const sessionCount = await prisma.studentSession.count({
+                        where: { academicYearId: year.id },
+                    });
+                    if (sessionCount > 0) {
+                        year._count.students = sessionCount;
+                        year._count._isHistorical = true; // flag so frontend can show differently
+                    }
+                }
+            }
+
+            return years;
         }, 3600 * 24); // Cache for 24 hours as this rarely changes
 
         return NextResponse.json(academicYears)

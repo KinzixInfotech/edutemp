@@ -12,9 +12,20 @@ export async function GET(req, props) {
         const sectionId = searchParams.get('sectionId');
         const teacherId = searchParams.get('teacherId');
         const dayOfWeek = searchParams.get('dayOfWeek');
+        let academicYearId = searchParams.get('academicYearId');
+
+        // Auto-resolve active academic year
+        if (!academicYearId) {
+            const activeYear = await prisma.academicYear.findFirst({
+                where: { schoolId, isActive: true },
+                select: { id: true },
+            });
+            academicYearId = activeYear?.id;
+        }
 
         const where = {
             schoolId,
+            ...(academicYearId && { academicYearId }),
             ...(classId && { classId: parseInt(classId) }),
             ...(sectionId && { sectionId: parseInt(sectionId) }),
             ...(teacherId && { teacherId }),
@@ -143,6 +154,14 @@ export async function POST(req, props) {
             }
         }
 
+        // Auto-resolve active academic year for new entry
+        let academicYearId = null;
+        const activeYear = await prisma.academicYear.findFirst({
+            where: { schoolId, isActive: true },
+            select: { id: true },
+        });
+        academicYearId = activeYear?.id;
+
         const entry = await prisma.timetableEntry.create({
             data: {
                 schoolId,
@@ -154,6 +173,7 @@ export async function POST(req, props) {
                 dayOfWeek: parseInt(dayOfWeek),
                 roomNumber: roomNumber || null,
                 notes: notes || null,
+                ...(academicYearId && { academicYearId }),
             },
             include: {
                 class: { select: { className: true } },

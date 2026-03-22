@@ -32,6 +32,22 @@ export async function POST(req, props) {
             }
         });
 
+        // Re-activate StudentSession (find most recent ALUMNI session and restore to ACTIVE)
+        const lastSession = await prisma.studentSession.findFirst({
+            where: { studentId: alumni.originalStudentId, status: 'ALUMNI' },
+            orderBy: { leftAt: 'desc' },
+        });
+        if (lastSession) {
+            await prisma.studentSession.update({
+                where: { id: lastSession.id },
+                data: { status: 'ACTIVE', leftAt: null },
+            });
+            await prisma.student.update({
+                where: { userId: alumni.originalStudentId },
+                data: { currentSessionId: lastSession.id },
+            });
+        }
+
         // Optionally delete alumni record or keep it for history
         // For now, we'll delete it
         await prisma.alumni.delete({

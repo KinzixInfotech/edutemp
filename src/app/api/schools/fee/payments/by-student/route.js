@@ -9,13 +9,28 @@ export async function GET(req) {
     try {
         const { searchParams } = new URL(req.url);
         const studentId = searchParams.get("studentId");
-        const academicYearId = searchParams.get("academicYearId");
+        let academicYearId = searchParams.get("academicYearId");
 
         if (!studentId) {
             return NextResponse.json(
                 { error: "studentId required" },
                 { status: 400 }
             );
+        }
+
+        // Auto-resolve academicYearId from active year if not passed
+        if (!academicYearId) {
+            const student = await prisma.student.findUnique({
+                where: { userId: studentId },
+                select: { schoolId: true },
+            });
+            if (student) {
+                const activeYear = await prisma.academicYear.findFirst({
+                    where: { schoolId: student.schoolId, isActive: true },
+                    select: { id: true },
+                });
+                academicYearId = activeYear?.id;
+            }
         }
 
         const where = {

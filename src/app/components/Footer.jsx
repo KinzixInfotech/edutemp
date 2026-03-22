@@ -118,16 +118,27 @@ export default function Footer() {
                             <Linkedin className="w-5 h-5" />
                         </a>
                     </div>
-
-                    {/* Google Play button */}
-                    <a target="_blank" href="https://play.google.com/store/apps/details?id=com.kinzix.edubreezy">
-                        <img
-                            src="/play.png"
-                            alt="Google Play"
-                            width={120}
-                            height={120}
-                        />
-                    </a>
+                    <div className="flex flex-row gap-2">
+                        {/* Google Play button */}
+                        <a target="_blank" href="https://play.google.com/store/apps/details?id=com.kinzix.edubreezy">
+                            <img
+                                src="/buttons/play.svg"
+                                alt="Google Play"
+                                width={130}
+                                height={130}
+                            />
+                        </a>
+                        <a onClick={() => {
+                            alert('Coming Soon!')
+                        }}>
+                            <img
+                                src="/buttons/appstore.svg"
+                                alt="App Store"
+                                width={130}
+                                height={130}
+                            />
+                        </a>
+                    </div>
                 </div>
 
 
