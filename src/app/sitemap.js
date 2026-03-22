@@ -3,10 +3,19 @@
 // Optimized for large databases with streaming/chunking
 
 import prisma from '@/lib/prisma';
+import { createClient } from '@sanity/client';
 
 // Force dynamic rendering to avoid build-time database queries
 export const dynamic = 'force-dynamic';
 export const revalidate = 3600; // Revalidate every hour
+
+// Sanity client for fetching doc slugs
+const sanityClient = createClient({
+    projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID,
+    dataset: process.env.NEXT_PUBLIC_SANITY_DATASET,
+    apiVersion: '2024-01-01',
+    useCdn: true,
+});
 
 // For very large sitemaps (50k+ URLs), Google recommends splitting into multiple files
 // This implementation handles up to ~50,000 URLs which is Google's limit per sitemap
@@ -42,6 +51,12 @@ export default async function sitemap() {
             lastModified: new Date(),
             changeFrequency: 'monthly',
             priority: 0.9,
+        },
+        {
+            url: `${baseUrl}/features/docs`,
+            lastModified: new Date(),
+            changeFrequency: 'weekly',
+            priority: 0.8,
         },
         {
             url: `${baseUrl}/partners`,
@@ -151,8 +166,29 @@ export default async function sitemap() {
 
     } catch (error) {
         console.error('Sitemap: Error fetching schools:', error);
-        // Return static pages only if database fails
     }
 
-    return [...staticPages, ...explorerPages, ...payPages, ...schoolPages];
+    // Dynamic docs pages from Sanity CMS
+    let docsPages = [];
+    try {
+        const docs = await sanityClient.fetch(
+            `*[_type == "docs" && defined(slug.current)] {
+                "slug": slug.current,
+                _updatedAt
+            }`
+        );
+
+        docsPages = (docs || []).map((doc) => ({
+            url: `${baseUrl}/features/docs/${doc.slug}`,
+            lastModified: doc._updatedAt ? new Date(doc._updatedAt) : new Date(),
+            changeFrequency: 'weekly',
+            priority: 0.7,
+        }));
+
+        console.log(`[Sitemap] Generated ${docsPages.length} docs URLs`);
+    } catch (error) {
+        console.error('Sitemap: Error fetching docs from Sanity:', error);
+    }
+
+    return [...staticPages, ...explorerPages, ...payPages, ...schoolPages, ...docsPages];
 }

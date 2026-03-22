@@ -86,6 +86,8 @@ const nextConfig = {
 
   images: {
     remotePatterns: [
+      // Sanity CDN
+      { protocol: "https", hostname: "cdn.sanity.io" },
       // Cloudflare R2 CDN (new)
       { protocol: "https", hostname: "cdn.edubreezy.com" },
       // Legacy UploadThing domains (for existing images)
