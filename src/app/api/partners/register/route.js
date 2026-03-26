@@ -19,7 +19,8 @@ export async function POST(req) {
             address,
             city,
             state,
-            postalCode
+            postalCode,
+            dateOfBirth
         } = body;
 
         // Validation
@@ -79,7 +80,8 @@ export async function POST(req) {
                     password: password, // Storing plain/hashed depending on previous logic, but Supabase handles auth now.
                     name,
                     roleId: partnerRole.id,
-                    status: "ACTIVE"
+                    status: "ACTIVE",
+                    ...(dateOfBirth && { dateOfBirth: new Date(dateOfBirth) }),
                 }
             });
 

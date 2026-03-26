@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "../../../../../../../../../sanity-backend"
+		},
+		{
+			"path": "../../../../../../../../../edubreezy_partner_app"
 		}
 	],
 	"settings": {

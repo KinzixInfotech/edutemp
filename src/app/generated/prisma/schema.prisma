@@ -1726,6 +1726,7 @@ model User {
   password             String
   name                 String?
   gender               String     @default("Unknown")
+  dateOfBirth          DateTime?
   profilePicture       String     @default("default.png")
   createdAt            DateTime   @default(now())
   updatedAt            DateTime   @updatedAt

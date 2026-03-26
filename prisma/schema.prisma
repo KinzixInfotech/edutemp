@@ -1069,14 +1069,14 @@ model Route {
 }
 
 model StudentRouteAssignment {
-  id             String   @id @default(uuid()) @db.Uuid
-  studentId      String   @db.Uuid
-  routeId        String   @db.Uuid
-  schoolId       String   @db.Uuid
-  academicYearId String?  @db.Uuid
-  assignedAt     DateTime @default(now())
-  student        Student  @relation(fields: [studentId], references: [userId])
-  route          Route    @relation(fields: [routeId], references: [id])
+  id             String        @id @default(uuid()) @db.Uuid
+  studentId      String        @db.Uuid
+  routeId        String        @db.Uuid
+  schoolId       String        @db.Uuid
+  academicYearId String?       @db.Uuid
+  assignedAt     DateTime      @default(now())
+  student        Student       @relation(fields: [studentId], references: [userId])
+  route          Route         @relation(fields: [routeId], references: [id])
   academicYear   AcademicYear? @relation(fields: [academicYearId], references: [id])
 
   @@index([studentId])
@@ -1726,6 +1726,7 @@ model User {
   password             String
   name                 String?
   gender               String     @default("Unknown")
+  dateOfBirth          DateTime?
   profilePicture       String     @default("default.png")
   createdAt            DateTime   @default(now())
   updatedAt            DateTime   @updatedAt
@@ -2018,8 +2019,8 @@ model Student {
   studentWallet    StudentWallet?
 
   // StudentSession (per-year enrollment)
-  sessions         StudentSession[]
-  currentSession   StudentSession?  @relation("CurrentSession", fields: [currentSessionId], references: [id])
+  sessions       StudentSession[]
+  currentSession StudentSession?  @relation("CurrentSession", fields: [currentSessionId], references: [id])
 
   @@index([classId])
   @@index([sectionId])
@@ -2040,14 +2041,14 @@ model StudentSession {
   rollNumber     String?
   status         SessionStatus @default(ACTIVE)
 
-  joinedAt       DateTime      @default(now())
-  leftAt         DateTime?
+  joinedAt DateTime  @default(now())
+  leftAt   DateTime?
 
-  student        Student       @relation(fields: [studentId], references: [userId])
-  currentFor     Student?      @relation("CurrentSession")
-  academicYear   AcademicYear  @relation(fields: [academicYearId], references: [id])
-  class          Class         @relation(fields: [classId], references: [id])
-  section        Section       @relation(fields: [sectionId], references: [id])
+  student      Student      @relation(fields: [studentId], references: [userId])
+  currentFor   Student?     @relation("CurrentSession")
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  class        Class        @relation(fields: [classId], references: [id])
+  section      Section      @relation(fields: [sectionId], references: [id])
 
   @@unique([studentId, academicYearId])
   @@index([studentId, academicYearId])
@@ -2821,21 +2822,21 @@ model AcademicYear {
   termLocks              TermLock[]
 
   // Session-bound module relations
-  timetableEntries       TimetableEntry[]
-  homework               Homework[]
+  timetableEntries        TimetableEntry[]
+  homework                Homework[]
   studentRouteAssignments StudentRouteAssignment[]
-  libraryTransactions    LibraryTransaction[]
+  libraryTransactions     LibraryTransaction[]
 
   // Financial Ledger Engine
   feeSessions      FeeSession[]
   feeLedgerEntries StudentFeeLedger[]
 
   // StudentSession enrollments
-  studentSessions  StudentSession[]
+  studentSessions StudentSession[]
 
   // Attendance binding
-  attendance       Attendance[]
-  bulkAttendance   BulkAttendance[]
+  attendance     Attendance[]
+  bulkAttendance BulkAttendance[]
 
   @@unique([schoolId, name])
   @@index([schoolId])
