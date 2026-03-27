@@ -29,12 +29,24 @@ export async function POST(req) {
             );
         }
 
-        // Check if partner profile already exists
-        const existingPartner = await prisma.partner.findFirst({
+        // Check if partner profile already exists (by userId or email)
+        let existingPartner = await prisma.partner.findFirst({
             where: { userId },
         });
+        if (!existingPartner) {
+            existingPartner = await prisma.partner.findFirst({
+                where: { contactEmail: email },
+            });
+        }
 
         if (existingPartner) {
+            // If partner was linked to old userId, update to new one
+            if (existingPartner.userId !== userId) {
+                await prisma.partner.update({
+                    where: { id: existingPartner.id },
+                    data: { userId },
+                });
+            }
             return NextResponse.json({
                 success: true,
                 message: "Partner profile already exists",
@@ -42,10 +54,14 @@ export async function POST(req) {
             });
         }
 
-        // Check if User record already exists in our DB (Supabase created the auth user)
-        const existingUser = await prisma.user.findUnique({
+        // Check if User record already exists in our DB by id OR email
+        const existingUserById = await prisma.user.findUnique({
             where: { id: userId },
         });
+        const existingUserByEmail = !existingUserById
+            ? await prisma.user.findUnique({ where: { email } })
+            : null;
+        const existingUser = existingUserById || existingUserByEmail;
 
         // Generate unique referral code
         const referralCode = `REF${Date.now()}${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
@@ -56,7 +72,7 @@ export async function POST(req) {
             let user;
 
             if (existingUser) {
-                // User record exists – ensure it has the PARTNER role
+                // User record exists – update with new userId (in case Supabase user was recreated) and PARTNER role
                 const partnerRole = await tx.role.findFirst({
                     where: { name: "PARTNER" },
                 });
@@ -66,8 +82,9 @@ export async function POST(req) {
                 }
 
                 user = await tx.user.update({
-                    where: { id: userId },
+                    where: { id: existingUser.id },
                     data: {
+                        id: userId, // Update to new Supabase user ID
                         roleId: partnerRole.id,
                         name: existingUser.name || name,
                         ...(avatarUrl && { profilePicture: avatarUrl }),
