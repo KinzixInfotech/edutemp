@@ -129,7 +129,58 @@ export async function POST(req, { params }) {
 
     try {
         const body = await req.json();
-        const { content, attachments, replyToId } = body;
+        const { content, attachments, replyToId, _directMessageId } = body;
+
+        // If message was already inserted directly via Supabase, just handle side effects
+        if (_directMessageId) {
+            const existingMsg = await prisma.message.findUnique({
+                where: { id: _directMessageId },
+                include: {
+                    sender: {
+                        select: {
+                            id: true,
+                            name: true,
+                            profilePicture: true,
+                            role: { select: { name: true } },
+                        },
+                    },
+                },
+            });
+
+            if (existingMsg && existingMsg.conversationId === conversationId) {
+                // Update conversation metadata and read position
+                const sanitized = sanitizeMessageContent(existingMsg.content || '');
+                await prisma.$transaction([
+                    prisma.conversation.update({
+                        where: { id: conversationId },
+                        data: {
+                            lastMessageAt: existingMsg.createdAt,
+                            lastMessageText: sanitized.slice(0, 100) || (existingMsg.attachments ? '📎 Attachment' : ''),
+                        },
+                    }),
+                    prisma.conversationParticipant.update({
+                        where: {
+                            conversationId_userId: { conversationId, userId: dbUser.id },
+                        },
+                        data: {
+                            lastReadAt: new Date(),
+                            lastReadMsgId: existingMsg.id,
+                        },
+                    }),
+                ]);
+
+                // Invalidate caches
+                await invalidatePattern(`chat:conversations*`);
+
+                // Trigger push notification (non-blocking)
+                triggerChatPushNotification(conversationId, dbUser, sanitized, existingMsg.id).catch(err => {
+                    console.error('Failed to trigger chat push notification:', err);
+                });
+
+                return NextResponse.json({ success: true, message: { id: existingMsg.id }, persisted: true });
+            }
+            // If message not found, fall through to create normally
+        }
 
         // Validate content
         const sanitizedContent = sanitizeMessageContent(content);
@@ -294,6 +345,7 @@ async function triggerChatPushNotification(conversationId, sender, content, mess
         message: messagePreview,
         type: 'CHAT_MESSAGE',
         jobType: 'CHAT_MESSAGE',
+        imageUrl: sender.profilePicture || null,
         targetOptions: {
             userIds: eligibleUserIds,
             excludeUserIds: [sender.id]
@@ -303,6 +355,7 @@ async function triggerChatPushNotification(conversationId, sender, content, mess
             messageId,
             senderId: sender.id,
             senderName: sender.name,
+            senderProfilePicture: sender.profilePicture || '',
         },
     });
 }

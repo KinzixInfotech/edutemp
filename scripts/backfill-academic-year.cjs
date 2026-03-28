@@ -26,6 +26,7 @@ const adapter = new PrismaPg({
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
+    w
     console.log('🔄 Starting academic year backfill...\n');
 
     // 1. Get all schools with their active academic year

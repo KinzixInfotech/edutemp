@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { ArrowRight, Loader2, AlertCircle, CheckCircle, MapPin, Search, School, Navigation, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { InteractiveGridPattern } from "@/components/ui/interactive-grid-pattern";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 const SCHOOLS_PER_PAGE = 4;
@@ -626,7 +627,7 @@ const Hero = () => {
                                 >
                                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0569ff]/10 to-[#0569ff]/05 flex items-center justify-center shrink-0 group-hover/item:from-[#0569ff]/20 group-hover/item:to-[#0569ff]/10 transition-colors overflow-hidden">
                                         {school.profilePicture ? (
-                                            <img src={school.profilePicture} alt="" className="w-full h-full object-cover rounded-xl" />
+                                            <Image src={school.profilePicture} alt={school.name || ''} width={40} height={40} className="w-full h-full object-cover rounded-xl" unoptimized />
                                         ) : (
                                             <School className="w-5 h-5 text-[#0569ff]" />
                                         )}

@@ -56,7 +56,7 @@ async function validateParentTeacherPermission(userId, schoolId, roleName, parti
         const parent = await prisma.parent.findUnique({
             where: { userId },
             select: {
-                students: {
+                studentLinks: {
                     select: {
                         student: {
                             select: {
@@ -80,7 +80,7 @@ async function validateParentTeacherPermission(userId, schoolId, roleName, parti
 
         // Collect all eligible teacher user IDs
         const eligibleTeacherIds = new Set();
-        for (const link of parent.students) {
+        for (const link of parent.studentLinks) {
             const student = link.student;
             if (student?.section) {
                 // Class teacher
@@ -224,9 +224,7 @@ async function validateTeacherTeacherPermission(userId, schoolId, roleName, part
  * Get users that the current user is eligible to message.
  */
 export async function getEligibleUsers(userId, schoolId, roleName) {
-    const eligibleUsers = [];
-
-    // Fetch existing direct conversations to prevent duplicates
+    // ── Build a map of existing 1:1 conversations for the "OPEN" badge ──
     const existingConvs = await prisma.conversationParticipant.findMany({
         where: {
             userId,
@@ -235,9 +233,10 @@ export async function getEligibleUsers(userId, schoolId, roleName) {
                 type: { in: ['DIRECT', 'PARENT_TEACHER', 'TEACHER_TEACHER'] }
             }
         },
-        include: {
+        select: {
+            conversationId: true,
             conversation: {
-                include: {
+                select: {
                     participants: {
                         where: { userId: { not: userId }, isActive: true },
                         select: { userId: true }
@@ -249,119 +248,88 @@ export async function getEligibleUsers(userId, schoolId, roleName) {
 
     const convMap = new Map();
     for (const p of existingConvs) {
-        const otherParticipant = p.conversation.participants[0];
-        if (otherParticipant) {
-            convMap.set(otherParticipant.userId, p.conversationId);
-        }
+        const other = p.conversation.participants[0];
+        if (other) convMap.set(other.userId, p.conversationId);
     }
 
-    if (roleName === 'PARENT') {
-        // Parents can message their children's teachers
-        const parent = await prisma.parent.findUnique({
-            where: { userId },
+    // ── Shared: fetch user details for a set of IDs ──
+    async function fetchUserDetails(userIds) {
+        if (userIds.length === 0) return [];
+        return prisma.user.findMany({
+            where: { id: { in: userIds }, status: 'ACTIVE' },
             select: {
-                studentLinks: {
+                id: true,
+                name: true,
+                profilePicture: true,
+                role: { select: { name: true } },
+                teacher: {
                     select: {
-                        student: {
+                        Class: { select: { className: true } },
+                        sectionsAssigned: {
+                            select: { name: true, class: { select: { className: true } } }
+                        },
+                        SectionSubjectTeacher: {
                             select: {
-                                sectionId: true,
-                                classId: true,
                                 section: {
                                     select: {
-                                        subjectTeachers: {
-                                            select: {
-                                                teacher: {
-                                                    select: {
-                                                        user: {
-                                                            select: {
-                                                                id: true,
-                                                                name: true,
-                                                                profilePicture: true,
-                                                                role: { select: { name: true } },
-                                                                teacher: {
-                                                                    select: {
-                                                                        Class: { select: { className: true } },
-                                                                        sectionsAssigned: { select: { name: true, class: { select: { className: true } } } }
-                                                                    }
-                                                                }
-                                                            },
-                                                        },
-                                                    },
-                                                },
-                                            },
-                                        },
-                                        teachingStaff: {
-                                            select: {
-                                                user: {
-                                                    select: {
-                                                        id: true,
-                                                        name: true,
-                                                        profilePicture: true,
-                                                        role: { select: { name: true } },
-                                                        teacher: {
-                                                            select: {
-                                                                Class: { select: { className: true } },
-                                                                sectionsAssigned: { select: { name: true, class: { select: { className: true } } } },
-                                                                SectionSubjectTeacher: {
-                                                                    select: {
-                                                                        section: {
-                                                                            select: {
-                                                                                name: true,
-                                                                                class: { select: { className: true } }
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    },
-                                                },
-                                            },
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-            },
-        });
-
-        if (parent) {
-            const seen = new Set();
-            for (const link of parent.studentLinks) {
-                const section = link.student?.section;
-                if (!section) continue;
-
-                // Section supervisor
-                if (section.teachingStaff?.user && !seen.has(section.teachingStaff.user.id)) {
-                    seen.add(section.teachingStaff.user.id);
-                    eligibleUsers.push({
-                        ...section.teachingStaff.user,
-                        conversationType: 'PARENT_TEACHER',
-                        existingConversationId: convMap.get(section.teachingStaff.user.id),
-                    });
-                }
-
-                // Subject teachers
-                for (const st of section.subjectTeachers) {
-                    if (st.teacher?.user && !seen.has(st.teacher.user.id)) {
-                        seen.add(st.teacher.user.id);
-                        eligibleUsers.push({
-                            ...st.teacher.user,
-                            conversationType: 'PARENT_TEACHER',
-                            existingConversationId: convMap.get(st.teacher.user.id),
-                        });
+                                        name: true,
+                                        class: { select: { className: true } }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
-        }
+        });
     }
 
+    // ══════════════════════════════════════════
+    // PARENT: can message teachers of their children's sections
+    // ══════════════════════════════════════════
+    if (roleName === 'PARENT') {
+        // Step 1: Get parent's student links → sectionIds
+        const parentLinks = await prisma.studentParentLink.findMany({
+            where: { parent: { userId }, isActive: true },
+            select: { student: { select: { sectionId: true } } }
+        });
+        const sectionIds = [...new Set(parentLinks.map(l => l.student?.sectionId).filter(Boolean))];
+
+        if (sectionIds.length === 0) return [];
+
+        // Step 2: Get teacher userIds from those sections (flat queries in parallel)
+        const [sectionSupervisors, subjectTeachers] = await Promise.all([
+            prisma.section.findMany({
+                where: { id: { in: sectionIds }, teachingStaffUserId: { not: null } },
+                select: { teachingStaffUserId: true }
+            }),
+            prisma.sectionSubjectTeacher.findMany({
+                where: { section: { id: { in: sectionIds } } },
+                select: { teachingStaffUserId: true }
+            })
+        ]);
+
+        const teacherUserIds = [...new Set([
+            ...sectionSupervisors.map(s => s.teachingStaffUserId),
+            ...subjectTeachers.map(s => s.teachingStaffUserId),
+        ].filter(Boolean))];
+
+        // Step 3: Fetch user details for those teachers
+        const teachers = await fetchUserDetails(teacherUserIds);
+
+        return teachers.map(t => ({
+            ...t,
+            conversationType: 'PARENT_TEACHER',
+            existingConversationId: convMap.get(t.id),
+        }));
+    }
+
+    // ══════════════════════════════════════════
+    // TEACHING_STAFF: can message other teachers + parents of students in their sections
+    // ══════════════════════════════════════════
     if (roleName === 'TEACHING_STAFF') {
-        // Teachers can message: other teachers + parents of their students
-        const [otherTeachers, teacherSections] = await Promise.all([
-            // Other teaching staff in same school
+        // Step 1: Get all other teachers + sections this teacher teaches (parallel)
+        const [otherTeacherUsers, teacherSections] = await Promise.all([
             prisma.user.findMany({
                 where: {
                     schoolId,
@@ -370,21 +338,18 @@ export async function getEligibleUsers(userId, schoolId, roleName) {
                     status: 'ACTIVE',
                 },
                 select: {
-                    id: true,
-                    name: true,
-                    profilePicture: true,
+                    id: true, name: true, profilePicture: true,
                     role: { select: { name: true } },
                     teacher: {
                         select: {
                             Class: { select: { className: true } },
-                            sectionsAssigned: { select: { name: true, class: { select: { className: true } } } },
+                            sectionsAssigned: {
+                                select: { name: true, class: { select: { className: true } } }
+                            },
                             SectionSubjectTeacher: {
                                 select: {
                                     section: {
-                                        select: {
-                                            name: true,
-                                            class: { select: { className: true } }
-                                        }
+                                        select: { name: true, class: { select: { className: true } } }
                                     }
                                 }
                             }
@@ -392,60 +357,65 @@ export async function getEligibleUsers(userId, schoolId, roleName) {
                     }
                 },
             }),
-            // Sections this teacher teaches
             prisma.sectionSubjectTeacher.findMany({
                 where: { teachingStaffUserId: userId },
-                select: {
-                    section: {
-                        select: {
-                            id: true,
-                            name: true,
-                            classId: true,
-                            class: { select: { id: true, className: true } },
-                            students: {                          // ← was "studentParentLinks"
-                                select: {
-                                    studentParentLinks: {        // ← go through Student
-                                        where: { isActive: true },
-                                        select: {
-                                            parent: {
-                                                select: {
-                                                    user: {
-                                                        select: {
-                                                            id: true,
-                                                            name: true,
-                                                            profilePicture: true,
-                                                            role: { select: { name: true } },
-                                                            parent: {
-                                                                select: {
-                                                                    studentLinks: {
-                                                                        select: {
-                                                                            student: {
-                                                                                select: {
-                                                                                    user: { select: { name: true } },
-                                                                                    class: { select: { className: true } },
-                                                                                    section: { select: { name: true } },
-                                                                                },
-                                                                            },
-                                                                        },
-                                                                    },
-                                                                },
-                                                            },
-                                                        },
-                                                    },
-                                                },
-                                            },
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-            }),
+                select: { sectionId: true }
+            })
         ]);
 
-        // Add other teachers
-        for (const t of otherTeachers) {
+        const sectionIds = [...new Set(teacherSections.map(s => s.sectionId))];
+
+        // Step 2: Get parent userIds from those sections (flat, fast)
+        let parentUsers = [];
+        if (sectionIds.length > 0) {
+            // Get students in those sections → their parent links → parent userIds
+            const studentParentLinks = await prisma.studentParentLink.findMany({
+                where: {
+                    isActive: true,
+                    student: { sectionId: { in: sectionIds } }
+                },
+                select: {
+                    parent: {
+                        select: { userId: true }
+                    }
+                }
+            });
+
+            const parentUserIds = [...new Set(
+                studentParentLinks.map(l => l.parent?.userId).filter(Boolean)
+            )];
+
+            if (parentUserIds.length > 0) {
+                // Fetch parent user details + their children info for subtitle
+                parentUsers = await prisma.user.findMany({
+                    where: { id: { in: parentUserIds }, status: 'ACTIVE' },
+                    select: {
+                        id: true, name: true, profilePicture: true,
+                        role: { select: { name: true } },
+                        parent: {
+                            select: {
+                                studentLinks: {
+                                    select: {
+                                        student: {
+                                            select: {
+                                                user: { select: { name: true } },
+                                                class: { select: { className: true } },
+                                                section: { select: { name: true } },
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // Step 3: Combine results
+        const eligibleUsers = [];
+
+        for (const t of otherTeacherUsers) {
             eligibleUsers.push({
                 ...t,
                 conversationType: 'TEACHER_TEACHER',
@@ -453,124 +423,59 @@ export async function getEligibleUsers(userId, schoolId, roleName) {
             });
         }
 
-        // Add parents from their sections
-        // Add parents from their sections
         const seenParents = new Set();
-        for (const entry of teacherSections) {
-            // ← now iterate section.students, then each student's studentParentLinks
-            if (!entry.section?.students) continue;
-            for (const student of entry.section.students) {
-                for (const link of student.studentParentLinks) {
-                    const parentUser = link.parent?.user;
-                    if (parentUser && !seenParents.has(parentUser.id)) {
-                        seenParents.add(parentUser.id);
-                        eligibleUsers.push({
-                            ...parentUser,
-                            conversationType: 'PARENT_TEACHER',
-                            existingConversationId: convMap.get(parentUser.id),
-                        });
-                    }
-                }
-            }
-        }
-    }
-
-    if (roleName === 'STUDENT') {
-        // Students can message teachers of their class/section
-        const student = await prisma.student.findUnique({
-            where: { userId },
-            select: {
-                section: {
-                    select: {
-                        subjectTeachers: {
-                            select: {
-                                teacher: {
-                                    select: {
-                                        user: {
-                                            select: {
-                                                id: true,
-                                                name: true,
-                                                profilePicture: true,
-                                                role: { select: { name: true } },
-                                                teacher: {
-                                                    select: {
-                                                        Class: { select: { className: true } },
-                                                        sectionsAssigned: { select: { name: true, class: { select: { className: true } } } },
-                                                        SectionSubjectTeacher: {
-                                                            select: {
-                                                                section: {
-                                                                    select: {
-                                                                        name: true,
-                                                                        class: { select: { className: true } }
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            },
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                        teachingStaff: {
-                            select: {
-                                user: {
-                                    select: {
-                                        id: true,
-                                        name: true,
-                                        profilePicture: true,
-                                        role: { select: { name: true } },
-                                        teacher: {
-                                            select: {
-                                                Class: { select: { className: true } },
-                                                sectionsAssigned: { select: { name: true, class: { select: { className: true } } } },
-                                                SectionSubjectTeacher: {
-                                                    select: {
-                                                        section: {
-                                                            select: {
-                                                                name: true,
-                                                                class: { select: { className: true } }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-            },
-        });
-
-        if (student?.section) {
-            const seen = new Set();
-            if (student.section.teachingStaff?.user) {
-                seen.add(student.section.teachingStaff.user.id);
+        for (const p of parentUsers) {
+            if (!seenParents.has(p.id)) {
+                seenParents.add(p.id);
                 eligibleUsers.push({
-                    ...student.section.teachingStaff.user,
-                    conversationType: 'DIRECT',
-                    existingConversationId: convMap.get(student.section.teachingStaff.user.id),
+                    ...p,
+                    conversationType: 'PARENT_TEACHER',
+                    existingConversationId: convMap.get(p.id),
                 });
             }
-            for (const st of student.section.subjectTeachers) {
-                if (st.teacher?.user && !seen.has(st.teacher.user.id)) {
-                    seen.add(st.teacher.user.id);
-                    eligibleUsers.push({
-                        ...st.teacher.user,
-                        conversationType: 'DIRECT',
-                        existingConversationId: convMap.get(st.teacher.user.id),
-                    });
-                }
-            }
         }
+
+        return eligibleUsers;
     }
 
-    return eligibleUsers;
+    // ══════════════════════════════════════════
+    // STUDENT: can message teachers of their section
+    // ══════════════════════════════════════════
+    if (roleName === 'STUDENT') {
+        const student = await prisma.student.findUnique({
+            where: { userId },
+            select: { sectionId: true }
+        });
+
+        if (!student?.sectionId) return [];
+
+        // Get teacher userIds from this section (flat parallel)
+        const [sectionInfo, subjectTeachers] = await Promise.all([
+            prisma.section.findUnique({
+                where: { id: student.sectionId },
+                select: { teachingStaffUserId: true }
+            }),
+            prisma.sectionSubjectTeacher.findMany({
+                where: { sectionId: student.sectionId },
+                select: { teachingStaffUserId: true }
+            })
+        ]);
+
+        const teacherUserIds = [...new Set([
+            sectionInfo?.teachingStaffUserId,
+            ...subjectTeachers.map(s => s.teachingStaffUserId),
+        ].filter(Boolean))];
+
+        const teachers = await fetchUserDetails(teacherUserIds);
+
+        return teachers.map(t => ({
+            ...t,
+            conversationType: 'DIRECT',
+            existingConversationId: convMap.get(t.id),
+        }));
+    }
+
+    return [];
 }
 
 // ============================================
