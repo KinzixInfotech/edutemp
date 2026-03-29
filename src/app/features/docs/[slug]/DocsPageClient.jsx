@@ -10,7 +10,7 @@ import {
   Menu, X, ArrowRight,
 } from 'lucide-react';
 import { useDocsCategories, useDocBySlug } from '@/hooks/useSanityDocs';
-import { portableTextComponents, extractHeadings } from '../PortableTextComponents';
+import { portableTextComponents, extractHeadings, Lightbox } from '../PortableTextComponents';
 import { urlFor } from '@/sanity/imageUrl';
 import DocsSearchOverlay from '../DocsSearchOverlay';
 
@@ -115,7 +115,7 @@ function DocsSidebar({ categories, activeSlug, onSelectDoc, isMobileMenuOpen, se
             >
               <div className="flex items-center gap-2">
                 <IconComp name={category.icon} />
-                <span>{category.title}</span>
+                <span className='truncate'>{category.title}</span>
               </div>
               <ChevronDown size={16} className={`text-gray-400 transition-transform ${expandedCategories.includes(category._id) ? 'rotate-180' : ''}`} />
             </button>
@@ -293,6 +293,7 @@ export default function DocsPageClient({ initialSlug }) {
 
   return (
     <div className="min-h-screen bg-white">
+      <Lightbox />
       <div className="lg:hidden fixed top-16 left-0 right-0 z-50 bg-[#ffffffbf] backdrop-blur-md border-b border-gray-200 px-4 py-3 flex items-center gap-3">
         <button onClick={() => setMobileMenuOpen(true)} className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
           <Menu size={20} />

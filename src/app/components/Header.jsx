@@ -22,7 +22,7 @@ const menuConfig = {
         {
             name: "Features",
             type: "link",
-            link: "/features",
+            link: "/features/docs",
             target: "_self"
         },
         {
