@@ -3791,7 +3791,8 @@ exports.NotificationType = exports.$Enums.NotificationType = {
   RESULT: 'RESULT',
   TIMETABLE: 'TIMETABLE',
   BIRTHDAY: 'BIRTHDAY',
-  ANNIVERSARY: 'ANNIVERSARY'
+  ANNIVERSARY: 'ANNIVERSARY',
+  CHAT_MESSAGE: 'CHAT_MESSAGE'
 };
 
 exports.NotificationStatus = exports.$Enums.NotificationStatus = {
