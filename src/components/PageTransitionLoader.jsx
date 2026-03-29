@@ -1,48 +1,113 @@
 'use client';
+export const dynamic = 'force-dynamic';
 
-import { useEffect, useState } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { useEffect, useState, useRef } from 'react';
+import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
+
+const REFRESH_LOADER_PATHS = [
+    '/',
+    '/dashboard',
+    '/courses',
+];
+
+function shouldShowOnRefresh(pathname) {
+    return REFRESH_LOADER_PATHS.some(
+        (p) => pathname === p || pathname.startsWith(p + '/')
+    );
+}
 
 export default function PageTransitionLoader() {
     const [isLoading, setIsLoading] = useState(false);
     const pathname = usePathname();
     const searchParams = useSearchParams();
+    const router = useRouter();
 
+    const isNavigating = useRef(false);
+    const shownAt = useRef(null);
+
+    const show = () => {
+        isNavigating.current = true;
+        shownAt.current = Date.now();
+        setIsLoading(true);
+    };
+
+    const hide = () => {
+        if (!isNavigating.current) return;
+        const elapsed = Date.now() - (shownAt.current ?? 0);
+        const remaining = Math.max(0, 400 - elapsed);
+        setTimeout(() => {
+            isNavigating.current = false;
+            setIsLoading(false);
+        }, remaining);
+    };
+
+    // Hide only when Next.js confirms the new page is fully loaded
     useEffect(() => {
-        // When route changes, we need to handle the transition
-        // This will be controlled by the Header component
+        hide();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pathname, searchParams]);
 
-    // This component will be controlled via a global event
+    // Intercept router.push / replace / back
     useEffect(() => {
-        const handleStart = () => setIsLoading(true);
-        const handleComplete = () => {
-            setTimeout(() => setIsLoading(false), 800);
-        };
+        const originalPush = router.push;
+        const originalReplace = router.replace;
+        const originalBack = router.back;
 
-        window.addEventListener('pageTransitionStart', handleStart);
-        window.addEventListener('pageTransitionComplete', handleComplete);
+        router.push = (...args) => { show(); return originalPush(...args); };
+        router.replace = (...args) => { show(); return originalReplace(...args); };
+        router.back = (...args) => { show(); return originalBack(...args); };
 
         return () => {
-            window.removeEventListener('pageTransitionStart', handleStart);
-            window.removeEventListener('pageTransitionComplete', handleComplete);
+            router.push = originalPush;
+            router.replace = originalReplace;
+            router.back = originalBack;
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [router]);
+
+    // Intercept <a> / <Link> clicks
+    useEffect(() => {
+        const handleClick = (e) => {
+            const anchor = e.target.closest('a');
+            if (!anchor?.href) return;
+
+            const url = new URL(anchor.href);
+            const current = new URL(window.location.href);
+
+            const isInternal =
+                url.origin === current.origin &&
+                url.pathname !== current.pathname &&
+                !anchor.target &&
+                !e.ctrlKey &&
+                !e.metaKey &&
+                !e.shiftKey &&
+                e.button === 0;
+
+            if (isInternal) show();
+        };
+
+        document.addEventListener('click', handleClick);
+        return () => document.removeEventListener('click', handleClick);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Auto-complete when pathname changes
+    // Safety net: never hang forever
     useEffect(() => {
-        if (isLoading) {
-            const timer = setTimeout(() => setIsLoading(false), 1200);
-            return () => clearTimeout(timer);
-        }
-    }, [pathname, isLoading]);
+        if (!isLoading) return;
+        const id = setTimeout(() => {
+            isNavigating.current = false;
+            setIsLoading(false);
+        }, 10_000);
+        return () => clearTimeout(id);
+    }, [isLoading]);
 
     return (
         <AnimatePresence>
             {isLoading && (
                 <motion.div
+                    key="page-loader"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -52,30 +117,20 @@ export default function PageTransitionLoader() {
                 >
                     {/* Background Graphics */}
                     <div className="absolute inset-0 overflow-hidden">
-                        {/* Gradient Orbs */}
                         <motion.div
-                            animate={{
-                                scale: [1, 1.2, 1],
-                                opacity: [0.3, 0.5, 0.3],
-                            }}
+                            animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
                             transition={{ duration: 3, repeat: Infinity }}
                             className="absolute -top-[20%] -left-[10%] w-[500px] h-[500px] rounded-full"
                             style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%)' }}
                         />
                         <motion.div
-                            animate={{
-                                scale: [1, 1.3, 1],
-                                opacity: [0.2, 0.4, 0.2],
-                            }}
+                            animate={{ scale: [1, 1.3, 1], opacity: [0.2, 0.4, 0.2] }}
                             transition={{ duration: 4, repeat: Infinity, delay: 0.5 }}
                             className="absolute -bottom-[20%] -right-[10%] w-[600px] h-[600px] rounded-full"
                             style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)' }}
                         />
                         <motion.div
-                            animate={{
-                                scale: [1, 1.15, 1],
-                                opacity: [0.15, 0.25, 0.15],
-                            }}
+                            animate={{ scale: [1, 1.15, 1], opacity: [0.15, 0.25, 0.15] }}
                             transition={{ duration: 3.5, repeat: Infinity, delay: 1 }}
                             className="absolute top-[30%] right-[20%] w-[300px] h-[300px] rounded-full"
                             style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%)' }}
@@ -124,7 +179,7 @@ export default function PageTransitionLoader() {
                             className="absolute inset-0 opacity-[0.03]"
                             style={{
                                 backgroundImage: `linear-gradient(white 1px, transparent 1px), linear-gradient(90deg, white 1px, transparent 1px)`,
-                                backgroundSize: '50px 50px'
+                                backgroundSize: '50px 50px',
                             }}
                         />
 
@@ -134,19 +189,17 @@ export default function PageTransitionLoader() {
                             transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
                             className="absolute inset-0 opacity-[0.02]"
                             style={{
-                                backgroundImage: `repeating-linear-gradient(45deg, white, white 1px, transparent 1px, transparent 100px)`
+                                backgroundImage: `repeating-linear-gradient(45deg, white, white 1px, transparent 1px, transparent 100px)`,
                             }}
                         />
                     </div>
 
-                    {/* Center Content */}
+                    {/* Centre Content */}
                     <div className="relative z-10 flex flex-col items-center gap-8">
-                        {/* Logo */}
                         <motion.div
                             initial={{ scale: 0.8, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             transition={{ duration: 0.5, delay: 0.2 }}
-                            className="relative"
                         >
                             <Image
                                 src="/edu.png"
@@ -157,23 +210,21 @@ export default function PageTransitionLoader() {
                                 priority
                             />
                         </motion.div>
-                        {/* Loading Animation */}
+
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.5, delay: 0.4 }}
                             className="flex flex-col items-center gap-4"
                         >
-                            {/* Loading Text */}
                             <motion.div
                                 animate={{ opacity: [0.5, 1, 0.5] }}
                                 transition={{ duration: 1.5, repeat: Infinity }}
                                 className="text-white/80 text-sm font-medium tracking-wider uppercase"
                             >
-                                Loading...
+                                Loading…
                             </motion.div>
 
-                            {/* Progress Bar */}
                             <div className="w-52 h-1.5 bg-white/20 rounded-full overflow-hidden">
                                 <motion.div
                                     initial={{ x: '-100%' }}
@@ -190,7 +241,6 @@ export default function PageTransitionLoader() {
     );
 }
 
-// Export a function to trigger the loader
 export function triggerPageTransition() {
     if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('pageTransitionStart'));

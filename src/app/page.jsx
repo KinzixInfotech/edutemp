@@ -1,5 +1,5 @@
 'use client'
-import React, { useRef, useState, useEffect } from 'react';
+import { useEffect, useRef, useState, memo } from 'react';
 import { AnimatePresence, motion, useScroll, useTransform, useSpring } from 'motion/react';
 import Script from 'next/script';
 
@@ -104,7 +104,8 @@ export default function HomePage() {
 
 
 // Hero Section - Typewriter Animation with Glowing Cursor
-function HeroSection() {
+let heroAnimationDone = false;
+const HeroSection = memo(function HeroSection() {
     const [isVideoOpen, setIsVideoOpen] = useState(false);
     const videoSrc = "https://www.youtube.com/embed/Jj1yQMCjE9c?si=8e3HihKJEpKjZaOO";
 
@@ -114,16 +115,29 @@ function HeroSection() {
     const cursor1Ref = useRef(null);
     const cursor2Ref = useRef(null);
     const cursorFadeRef = useRef(null);
-    const [showContent, setShowContent] = useState(false);
+
+    // Start fully visible if animation already ran this SPA session
+    const [showContent, setShowContent] = useState(heroAnimationDone);
 
     useEffect(() => {
+        if (heroAnimationDone) {
+            // Restore text and show everything instantly — no animation
+            if (line1Ref.current) line1Ref.current.textContent = 'The Modern School ERP';
+            if (line2Ref.current) line2Ref.current.textContent = 'Built for Real Schools';
+            if (line2WrapperRef.current) line2WrapperRef.current.style.display = 'inline-block';
+            setShowContent(true); // ← this is what was missing before — badge/subtitle/buttons
+            return;
+        }
+
         let cancelled = false;
-        const line1 = "The Modern School ERP";
-        const line2 = "Built for Real Schools";
+        const line1 = 'The Modern School ERP';
+        const line2 = 'Built for Real Schools';
 
         const typeText = async () => {
-            if (cursor1Ref.current) cursor1Ref.current.style.display = 'inline-block';
-            if (cursor1Ref.current) cursor1Ref.current.classList.add('typewriter-cursor-idle');
+            if (cursor1Ref.current) {
+                cursor1Ref.current.style.display = 'inline-block';
+                cursor1Ref.current.classList.add('typewriter-cursor-idle');
+            }
             await new Promise(r => setTimeout(r, 1200));
             if (cancelled) return;
             if (cursor1Ref.current) cursor1Ref.current.classList.remove('typewriter-cursor-idle');
@@ -157,29 +171,29 @@ function HeroSection() {
             if (cancelled) return;
             if (cursorFadeRef.current) cursorFadeRef.current.style.display = 'none';
 
-            setShowContent(true);
+            heroAnimationDone = true; // mark in memory
+            setShowContent(true);    // reveal badge, subtitle, buttons
         };
 
         typeText();
         return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     return (
         <section className="relative min-h-screen flex items-start lg:items-center justify-center overflow-hidden bg-white pt-24 md:pt-28 lg:pt-10">
-            {/* Interactive Grid Pattern Background */}
             <InteractiveGridPattern
                 className="absolute opacity-40 inset-0 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,white_40%,transparent_70%)]"
                 squares={[60, 60]}
             />
 
-            {/* Large Background Text "ERP" */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
                 <span className="text-[clamp(8rem,35vw,28rem)] font-black text-gray-100/30 leading-none tracking-tighter">
                     ERP
                 </span>
             </div>
 
-            {/* Floating School Icons - Left Side */}
+            {/* Floating Icons - Left */}
             <div className="absolute top-[12%] left-[5%] md:left-[8%] opacity-[0.05] pointer-events-none animate-float-slow">
                 <GraduationCap className="w-8 h-8 md:w-16 md:h-16 text-black rotate-[-15deg]" strokeWidth={1} />
             </div>
@@ -196,7 +210,7 @@ function HeroSection() {
                 <BookOpen className="w-6 h-6 md:w-12 md:h-12 text-black rotate-[12deg]" strokeWidth={1} />
             </div>
 
-            {/* Floating School Icons - Right Side */}
+            {/* Floating Icons - Right */}
             <div className="absolute top-[10%] right-[5%] md:right-[8%] opacity-[0.05] pointer-events-none animate-float-slower" style={{ animationDelay: '0.8s' }}>
                 <BookMarked className="w-7 h-7 md:w-14 md:h-14 text-black rotate-[18deg]" strokeWidth={1} />
             </div>
@@ -213,11 +227,9 @@ function HeroSection() {
                 <Ruler className="w-6 h-6 md:w-12 md:h-12 text-black rotate-[-12deg]" strokeWidth={1} />
             </div>
 
-            {/* Gradient Orb */}
             <div className="absolute top-20 right-0 w-[300px] h-[300px] md:w-[400px] md:h-[400px] bg-[#0469ff]/5 rounded-full blur-3xl" />
 
             <div className="relative max-w-[1400px] mx-auto px-3 sm:px-6 py-10 md:py-16 lg:py-20 z-10 w-full">
-                {/* Hero Content */}
                 <div className="text-center space-y-5 md:space-y-8">
 
                     {/* Badge */}
@@ -251,22 +263,20 @@ function HeroSection() {
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.7 }}>
                             <path d="M12 2L13.5 9.5L21 11L13.5 12.5L12 20L10.5 12.5L3 11L10.5 9.5L12 2Z" fill="#0469ff" />
                         </svg>
-                        <style>{`
-                            @keyframes badgeShimmer {
-                                0% { background-position: 200% center; }
-                                100% { background-position: -200% center; }
-                            }
-                        `}</style>
                     </div>
 
-                    {/* Main Heading with Typewriter */}
+                    {/* Typewriter Heading — w-fit + text-left so cursor starts from the text */}
                     <h1 className="text-[clamp(2rem,7.5vw,6.5rem)] font-bold leading-[1.08] tracking-tight px-0">
                         <span className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent">
                             <span ref={line1Ref}></span>
                             <span ref={cursor1Ref} className="typewriter-cursor" style={{ display: 'none' }} />
                         </span>
                         <br />
-                        <span ref={line2WrapperRef} className="relative inline-block mt-1 md:mt-2" style={{ display: 'none' }}>
+                        <span
+                            ref={line2WrapperRef}
+                            className="relative inline-block mt-1 md:mt-2"
+                            style={{ display: heroAnimationDone ? 'inline-block' : 'none' }}
+                        >
                             <span className="text-[#0469ff]">
                                 <span ref={line2Ref}></span>
                                 <span ref={cursor2Ref} className="typewriter-cursor" style={{ display: 'none' }} />
@@ -286,7 +296,7 @@ function HeroSection() {
                         EduBreezy helps schools manage admissions, fees, attendance, payroll, and communication with a clean interface and powerful automation.
                     </p>
 
-                    {/* CTA + Video Section */}
+                    {/* CTA + Video */}
                     <div
                         className="flex flex-col items-center justify-center gap-5 md:gap-6 pt-2 md:pt-4 transition-all duration-700 delay-200"
                         style={{
@@ -294,7 +304,6 @@ function HeroSection() {
                             transform: showContent ? 'translateY(0)' : 'translateY(22px)',
                         }}
                     >
-                        {/* See it in action label */}
                         <div className="flex items-center justify-center gap-3">
                             <div className="h-px w-8 sm:w-12 bg-gradient-to-r from-transparent to-gray-300" />
                             <span className="text-xs sm:text-sm font-semibold text-gray-400 tracking-widest uppercase">See it in action</span>
@@ -305,15 +314,9 @@ function HeroSection() {
                         <div className="relative group w-full max-w-5xl rounded-2xl md:rounded-3xl overflow-hidden shadow-[0_8px_60px_rgba(4,105,255,0.12)] border border-gray-100">
                             {!isVideoOpen ? (
                                 <div className="relative cursor-pointer" onClick={() => setIsVideoOpen(true)}>
-                                    <img
-                                        src="/thumb_2.png"
-                                        alt="Product Demo"
-                                        className="w-full aspect-video object-cover"
-                                    />
+                                    <img src="/thumb_2.png" alt="Product Demo" className="w-full aspect-video object-cover" />
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
                                     <div className="absolute inset-0 bg-[#0469ff]/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-                                    {/* Play button */}
                                     <div className="absolute inset-0 flex items-center justify-center">
                                         <div className="relative">
                                             <div className="absolute inset-0 rounded-full bg-white/20 animate-ping" style={{ animationDuration: '2s' }} />
@@ -323,8 +326,6 @@ function HeroSection() {
                                             </div>
                                         </div>
                                     </div>
-
-                                    {/* Bottom caption */}
                                     <div className="absolute bottom-0 left-0 right-0 px-4 sm:px-8 py-3 sm:py-5 flex items-center justify-between">
                                         <div>
                                             <p className="text-white font-bold text-sm sm:text-lg leading-tight">Full Product Walkthrough</p>
@@ -354,7 +355,7 @@ function HeroSection() {
                             )}
                         </div>
 
-                        {/* Get Started Button */}
+                        {/* Buttons */}
                         <div className="flex items-center justify-center gap-3 sm:gap-4 flex-wrap pt-1">
                             <Link href="/contact">
                                 <button className="group relative px-8 sm:px-10 py-3.5 sm:py-4 rounded-full font-bold text-base sm:text-lg text-white bg-[#0469ff] hover:shadow-2xl transition-all duration-300 overflow-hidden">
@@ -383,6 +384,10 @@ function HeroSection() {
             </div>
 
             <style jsx>{`
+                @keyframes badgeShimmer {
+                    0% { background-position: 200% center; }
+                    100% { background-position: -200% center; }
+                }
                 @keyframes float-slow {
                     0%, 100% { transform: translateY(0px); }
                     50% { transform: translateY(-25px); }
@@ -438,7 +443,9 @@ function HeroSection() {
             `}</style>
         </section>
     );
-}
+});
+
+
 
 function AttendanceSection() {
     return (
@@ -1897,7 +1904,7 @@ function Footer() {
                 </div>
 
                 <div className="border-t border-white/10 pt-6 text-center text-white/50 text-sm">
-                    © 2024 EduBreezy. All rights reserved.
+                    © {new Date().getFullYear()} EduBreezy. All rights reserved.
                 </div>
             </div>
         </footer>
