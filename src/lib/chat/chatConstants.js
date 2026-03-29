@@ -29,10 +29,18 @@ export const ALLOWED_FILE_TYPES = [
     'image/jpeg',
     'image/jpg',
     'image/png',
+    'image/gif',
+    'image/webp',
+    'image/heic',
+    'image/heif',
+    'video/mp4',
+    'video/quicktime',
+    'video/webm',
+    'video/3gpp',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
 ];
 
-export const ALLOWED_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png', 'docx'];
+export const ALLOWED_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'mp4', 'mov', 'webm', 'docx'];
 
 // Max file size in bytes (10MB)
 export const MAX_FILE_SIZE = 10 * 1024 * 1024;
