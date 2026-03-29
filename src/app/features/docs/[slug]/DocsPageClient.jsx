@@ -63,14 +63,24 @@ function ContentSkeleton() {
 }
 
 // ─── Sidebar ───
-function DocsSidebar({ categories, activeSlug, onSelectDoc, isMobileMenuOpen, setMobileMenuOpen }) {
+const DocsSidebar = React.memo(({ categories, activeSlug, onSelectDoc, isMobileMenuOpen, setMobileMenuOpen }) => {
   const [expandedCategories, setExpandedCategories] = useState([]);
+  const [expandedGroups, setExpandedGroups] = useState([]);
 
   useEffect(() => {
     if (categories && activeSlug) {
       const cat = categories.find((c) => c.docs?.some((d) => d.slug === activeSlug));
-      if (cat && !expandedCategories.includes(cat._id)) {
-        setExpandedCategories((prev) => [...prev, cat._id]);
+      if (cat) {
+        if (!expandedCategories.includes(cat._id)) {
+          setExpandedCategories((prev) => [...prev, cat._id]);
+        }
+        const activeDoc = cat.docs.find((d) => d.slug === activeSlug);
+        if (activeDoc && activeDoc.groupTitle) {
+          const groupId = `${cat._id}-${activeDoc.groupTitle}`;
+          if (!expandedGroups.includes(groupId)) {
+            setExpandedGroups((prev) => [...prev, groupId]);
+          }
+        }
       }
     }
   }, [categories, activeSlug]);
@@ -88,9 +98,14 @@ function DocsSidebar({ categories, activeSlug, onSelectDoc, isMobileMenuOpen, se
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
 
-  const IconComp = ({ name }) => {
+  const toggleGroup = (id) =>
+    setExpandedGroups((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+
+  const IconComp = ({ name, color }) => {
     const I = getIcon(name);
-    return <I size={16} className="text-[#0569ff]" />;
+    return <I size={16} style={{ color: color || '#0569ff' }} />;
   };
 
   return (
@@ -114,22 +129,79 @@ function DocsSidebar({ categories, activeSlug, onSelectDoc, isMobileMenuOpen, se
               className="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold text-[#1a1a2e] hover:bg-gray-100 rounded-lg transition-colors"
             >
               <div className="flex items-center gap-2">
-                <IconComp name={category.icon} />
+                <IconComp name={category.icon} color={category.color} />
                 <span className='truncate'>{category.title}</span>
               </div>
               <ChevronDown size={16} className={`text-gray-400 transition-transform ${expandedCategories.includes(category._id) ? 'rotate-180' : ''}`} />
             </button>
             {expandedCategories.includes(category._id) && (
-              <div className="ml-4 mt-1 space-y-1 border-l-2 border-gray-100 pl-3">
-                {category.docs.map((doc) => (
-                  <button
-                    key={doc._id}
-                    onClick={() => { onSelectDoc(doc.slug); setMobileMenuOpen(false); }}
-                    className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${activeSlug === doc.slug ? 'bg-[#0569ff]/10 text-[#0569ff] font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-[#1a1a2e]'}`}
-                  >
-                    {doc.title}
-                  </button>
-                ))}
+              <div className="ml-4 mt-2 mb-2 border-l-2 border-gray-100 pl-3 space-y-4">
+                {(() => {
+                  const groupedDocsMap = category.docs.reduce((acc, doc) => {
+                    const groupName = doc.groupTitle || 'uncategorized';
+                    if (!acc[groupName]) {
+                      acc[groupName] = {
+                        docs: [],
+                        order: doc.groupOrder != null ? doc.groupOrder : 999
+                      };
+                    }
+                    acc[groupName].docs.push(doc);
+                    return acc;
+                  }, {});
+
+                  // Separate uncategorized
+                  const uncategorizedDocs = groupedDocsMap['uncategorized']?.docs || [];
+                  delete groupedDocsMap['uncategorized'];
+
+                  // Sort the remaining groups by their order
+                  const sortedGroups = Object.entries(groupedDocsMap).sort((a, b) => a[1].order - b[1].order);
+
+                  return (
+                    <div className="space-y-4">
+                      {uncategorizedDocs.length > 0 && (
+                        <div className="space-y-1">
+                          {uncategorizedDocs.map((doc) => (
+                            <button
+                              key={doc._id}
+                              onClick={() => { onSelectDoc(doc.slug); setMobileMenuOpen(false); }}
+                              className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${activeSlug === doc.slug ? 'bg-[#0569ff]/10 text-[#0569ff] font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-[#1a1a2e]'}`}
+                            >
+                              {doc.title}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {sortedGroups.map(([groupName, groupData]) => {
+                        const groupId = `${category._id}-${groupName}`;
+                        const isExpanded = expandedGroups.includes(groupId);
+                        return (
+                          <div key={groupName} className="space-y-1">
+                            <button
+                              onClick={() => toggleGroup(groupId)}
+                              className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-bold text-gray-500 uppercase tracking-wider hover:bg-gray-50 rounded-lg transition-colors"
+                            >
+                              <span>{groupName}</span>
+                              <ChevronDown size={14} className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                            </button>
+                            {isExpanded && (
+                              <div className="ml-2 mt-1 space-y-1 border-l-2 border-gray-100 pl-2">
+                                {groupData.docs.map((doc) => (
+                                  <button
+                                    key={doc._id}
+                                    onClick={() => { onSelectDoc(doc.slug); setMobileMenuOpen(false); }}
+                                    className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${activeSlug === doc.slug ? 'bg-[#0569ff]/10 text-[#0569ff] font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-[#1a1a2e]'}`}
+                                  >
+                                    {doc.title}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
@@ -137,7 +209,7 @@ function DocsSidebar({ categories, activeSlug, onSelectDoc, isMobileMenuOpen, se
       </nav>
     </aside>
   );
-}
+});
 
 // ─── Table of Contents ───
 function DocsTableOfContents({ doc }) {

@@ -9,13 +9,15 @@ const CATEGORIES_WITH_DOCS_QUERY = `
     title,
     "slug": slug.current,
     icon,
-    color,
+    "color": color.hex,
     order,
     "docs": *[_type == "docs" && references(^._id)] | order(order asc) {
       _id,
       title,
       "slug": slug.current,
       subtitle,
+      "groupTitle": group->title,
+      "groupOrder": group->order,
       order
     }
   }

@@ -6,16 +6,12 @@ import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 
-const REFRESH_LOADER_PATHS = [
-    '/',
-    '/dashboard',
-    '/courses',
-];
+// ✅ EXACT paths only — no children, no slugs, no /dashboard, nothing else
+const TRANSITION_PATHS = ['/', '/features/docs', '/about', '/partners', '/contact'];
 
-function shouldShowOnRefresh(pathname) {
-    return REFRESH_LOADER_PATHS.some(
-        (p) => pathname === p || pathname.startsWith(p + '/')
-    );
+function shouldShowTransition(pathname) {
+    // Strict exact match only
+    return TRANSITION_PATHS.includes(pathname);
 }
 
 export default function PageTransitionLoader() {
@@ -43,21 +39,44 @@ export default function PageTransitionLoader() {
         }, remaining);
     };
 
-    // Hide only when Next.js confirms the new page is fully loaded
+    // Hide when Next.js confirms the new page is loaded
+    // ✅ Also force-hide if we somehow land on a non-allowed page
     useEffect(() => {
+        if (!shouldShowTransition(pathname)) {
+            isNavigating.current = false;
+            setIsLoading(false);
+            return;
+        }
         hide();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pathname, searchParams]);
 
-    // Intercept router.push / replace / back
+    // Intercept router.push / replace
     useEffect(() => {
         const originalPush = router.push;
         const originalReplace = router.replace;
         const originalBack = router.back;
 
-        router.push = (...args) => { show(); return originalPush(...args); };
-        router.replace = (...args) => { show(); return originalReplace(...args); };
-        router.back = (...args) => { show(); return originalBack(...args); };
+        router.push = (href, ...rest) => {
+            try {
+                const url = new URL(String(href), window.location.origin);
+                if (shouldShowTransition(url.pathname)) show();
+            } catch { }
+            return originalPush(href, ...rest);
+        };
+
+        router.replace = (href, ...rest) => {
+            try {
+                const url = new URL(String(href), window.location.origin);
+                if (shouldShowTransition(url.pathname)) show();
+            } catch { }
+            return originalReplace(href, ...rest);
+        };
+
+        router.back = (...args) => {
+            // Can't know destination — skip loader
+            return originalBack(...args);
+        };
 
         return () => {
             router.push = originalPush;
@@ -67,13 +86,19 @@ export default function PageTransitionLoader() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [router]);
 
-    // Intercept <a> / <Link> clicks
+    // Intercept <a> / Next.js <Link> clicks
     useEffect(() => {
         const handleClick = (e) => {
             const anchor = e.target.closest('a');
             if (!anchor?.href) return;
 
-            const url = new URL(anchor.href);
+            let url;
+            try {
+                url = new URL(anchor.href);
+            } catch {
+                return;
+            }
+
             const current = new URL(window.location.href);
 
             const isInternal =
@@ -85,11 +110,14 @@ export default function PageTransitionLoader() {
                 !e.shiftKey &&
                 e.button === 0;
 
-            if (isInternal) show();
+            // ✅ Only fire if destination is EXACTLY in the allowed list
+            if (isInternal && shouldShowTransition(url.pathname)) {
+                show();
+            }
         };
 
-        document.addEventListener('click', handleClick);
-        return () => document.removeEventListener('click', handleClick);
+        document.addEventListener('click', handleClick, true); // capture phase
+        return () => document.removeEventListener('click', handleClick, true);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -115,7 +143,6 @@ export default function PageTransitionLoader() {
                     className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden"
                     style={{ backgroundColor: '#014dc2' }}
                 >
-                    {/* Background Graphics */}
                     <div className="absolute inset-0 overflow-hidden">
                         <motion.div
                             animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
@@ -135,8 +162,6 @@ export default function PageTransitionLoader() {
                             className="absolute top-[30%] right-[20%] w-[300px] h-[300px] rounded-full"
                             style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%)' }}
                         />
-
-                        {/* Floating School Icons */}
                         <motion.div
                             animate={{ y: [-10, 10, -10], rotate: [0, 5, 0] }}
                             transition={{ duration: 4, repeat: Infinity }}
@@ -173,8 +198,6 @@ export default function PageTransitionLoader() {
                                 <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
                             </svg>
                         </motion.div>
-
-                        {/* Grid Pattern */}
                         <div
                             className="absolute inset-0 opacity-[0.03]"
                             style={{
@@ -182,8 +205,6 @@ export default function PageTransitionLoader() {
                                 backgroundSize: '50px 50px',
                             }}
                         />
-
-                        {/* Diagonal Lines */}
                         <motion.div
                             animate={{ x: [-100, 100] }}
                             transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
@@ -194,7 +215,6 @@ export default function PageTransitionLoader() {
                         />
                     </div>
 
-                    {/* Centre Content */}
                     <div className="relative z-10 flex flex-col items-center gap-8">
                         <motion.div
                             initial={{ scale: 0.8, opacity: 0 }}
