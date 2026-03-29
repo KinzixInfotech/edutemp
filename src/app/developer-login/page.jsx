@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, Suspense  } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,7 +13,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import Turnstile from 'react-turnstile';
 
-export default function DeveloperLoginPage() {
+function DeveloperLoginContent() {
     const router = useRouter();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -460,3 +461,11 @@ export default function DeveloperLoginPage() {
         </div>
     );
 }
+export default function DeveloperLoginPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-[#f8fafc] flex items-center justify-center" />}>
+            <DeveloperLoginContent />
+        </Suspense>
+    );
+}
+
