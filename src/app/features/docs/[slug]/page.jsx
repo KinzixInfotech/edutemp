@@ -49,7 +49,7 @@ export async function generateMetadata({ params }) {
     "education software",
   ].filter(Boolean);
 
-  const ogImage = doc.ogImage || "https://www.edubreezy.com/og-default.png";
+  const ogImage = doc.ogImage || "https://www.edubreezy.com/by.png";
 
   return {
     title,
@@ -89,47 +89,47 @@ export default async function DocsSlugPage({ params }) {
   // Schema.org: TechArticle + BreadcrumbList structured data
   const jsonLd = doc
     ? {
-        "@context": "https://schema.org",
-        "@type": "TechArticle",
-        headline: doc.title,
-        description: doc.description || doc.subtitle || `Learn about ${doc.title} in EduBreezy ERP.`,
-        image: doc.ogImage || undefined,
-        datePublished: doc._createdAt,
-        dateModified: doc._updatedAt,
-        author: {
-          "@type": "Organization",
-          name: "EduBreezy",
-          url: "https://www.edubreezy.com",
+      "@context": "https://schema.org",
+      "@type": "TechArticle",
+      headline: doc.title,
+      description: doc.description || doc.subtitle || `Learn about ${doc.title} in EduBreezy ERP.`,
+      image: doc.ogImage || 'https://www.edubreezy.com/by.png',
+      datePublished: doc._createdAt,
+      dateModified: doc._updatedAt,
+      author: {
+        "@type": "Organization",
+        name: "EduBreezy",
+        url: "https://www.edubreezy.com",
+      },
+      publisher: {
+        "@type": "Organization",
+        name: "EduBreezy",
+        url: "https://www.edubreezy.com",
+        logo: {
+          "@type": "ImageObject",
+          url: "https://www.edubreezy.com/favicon.ico",
         },
-        publisher: {
-          "@type": "Organization",
-          name: "EduBreezy",
-          url: "https://www.edubreezy.com",
-          logo: {
-            "@type": "ImageObject",
-            url: "https://www.edubreezy.com/favicon.ico",
-          },
-        },
-        mainEntityOfPage: {
-          "@type": "WebPage",
-          "@id": `https://www.edubreezy.com/features/docs/${slug}`,
-        },
-        keywords: [
-          ...(doc.tags || []),
-          doc.categoryTitle,
-          "EduBreezy",
-          "school ERP",
-        ]
-          .filter(Boolean)
-          .join(", "),
-        articleSection: doc.categoryTitle || "Features",
-        about: {
-          "@type": "SoftwareApplication",
-          name: "EduBreezy",
-          applicationCategory: "EducationalApplication",
-          operatingSystem: "Web, Android, iOS",
-        },
-      }
+      },
+      mainEntityOfPage: {
+        "@type": "WebPage",
+        "@id": `https://www.edubreezy.com/features/docs/${slug}`,
+      },
+      keywords: [
+        ...(doc.tags || []),
+        doc.categoryTitle,
+        "EduBreezy",
+        "school ERP",
+      ]
+        .filter(Boolean)
+        .join(", "),
+      articleSection: doc.categoryTitle || "Features",
+      about: {
+        "@type": "SoftwareApplication",
+        name: "EduBreezy",
+        applicationCategory: "EducationalApplication",
+        operatingSystem: "Web, Android, iOS",
+      },
+    }
     : null;
 
   const breadcrumbLd = {
@@ -156,13 +156,13 @@ export default async function DocsSlugPage({ params }) {
       },
       ...(doc
         ? [
-            {
-              "@type": "ListItem",
-              position: 4,
-              name: doc.title,
-              item: `https://www.edubreezy.com/features/docs/${slug}`,
-            },
-          ]
+          {
+            "@type": "ListItem",
+            position: 4,
+            name: doc.title,
+            item: `https://www.edubreezy.com/features/docs/${slug}`,
+          },
+        ]
         : []),
     ],
   };

@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { PortableText } from '@portabletext/react';
@@ -14,6 +14,10 @@ import { portableTextComponents, extractHeadings, Lightbox } from '../PortableTe
 import { urlFor } from '@/sanity/imageUrl';
 import DocsSearchOverlay from '../DocsSearchOverlay';
 
+// ─── Constants ───
+const LS_CATS_KEY = 'docs_expanded_categories';
+const LS_GROUPS_KEY = 'docs_expanded_groups';
+
 // ─── Icon Map ───
 const iconMap = {
   Home, Users, GraduationCap, CreditCard, Clock, FileText, Bus,
@@ -21,6 +25,21 @@ const iconMap = {
   Handshake, Award, UserCheck, Sparkles,
 };
 function getIcon(name) { return iconMap[name] || FileText; }
+
+// ─── localStorage helpers ───
+function readLS(key) {
+  try {
+    const val = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+    return val ? JSON.parse(val) : null;
+  } catch {
+    return null;
+  }
+}
+function writeLS(key, value) {
+  try {
+    if (typeof window !== 'undefined') localStorage.setItem(key, JSON.stringify(value));
+  } catch { /* ignore */ }
+}
 
 // ─── Skeletons ───
 function SidebarSkeleton() {
@@ -62,68 +81,17 @@ function ContentSkeleton() {
   );
 }
 
-// ─── Sidebar ───
-const DocsSidebar = React.memo(({ categories, activeSlug, onSelectDoc, isMobileMenuOpen, setMobileMenuOpen }) => {
-  // Synchronously initialize expanded states to prevent layout shift/flicker on navigation
-  const [expandedCategories, setExpandedCategories] = useState(() => {
-    if (!categories || !activeSlug) return [];
-    const cat = categories.find((c) => c.docs?.some((d) => d.slug === activeSlug));
-    return cat ? [cat._id] : (categories[0] ? [categories[0]._id] : []);
-  });
-
-  const [expandedGroups, setExpandedGroups] = useState(() => {
-    if (!categories || !activeSlug) return [];
-    const cat = categories.find((c) => c.docs?.some((d) => d.slug === activeSlug));
-    if (!cat) return [];
-    const activeDoc = cat.docs.find((d) => d.slug === activeSlug);
-    return activeDoc && activeDoc.groupTitle ? [`${cat._id}-${activeDoc.groupTitle}`] : [];
-  });
-
-  // Track the previous slug to detect navigation and auto-expand if needed
-  const prevSlugRef = useRef(activeSlug);
-
-  useEffect(() => {
-    if (categories && activeSlug && activeSlug !== prevSlugRef.current) {
-      const cat = categories.find((c) => c.docs?.some((d) => d.slug === activeSlug));
-      if (cat) {
-        setExpandedCategories((prev) => 
-          prev.includes(cat._id) ? prev : [...prev, cat._id]
-        );
-        const activeDoc = cat.docs.find((d) => d.slug === activeSlug);
-        if (activeDoc && activeDoc.groupTitle) {
-          const groupId = `${cat._id}-${activeDoc.groupTitle}`;
-          setExpandedGroups((prev) => 
-            prev.includes(groupId) ? prev : [...prev, groupId]
-          );
-        }
-      }
-      prevSlugRef.current = activeSlug;
-    }
-  }, [categories, activeSlug]);
-
-  // Handle initial category expansion if not already set (e.g., when categories finish loading)
-  useEffect(() => {
-    if (categories?.length > 0 && expandedCategories.length === 0) {
-      setExpandedCategories([categories[0]._id]);
-    }
-  }, [categories]);
-
-  const filtered = (categories || []).filter((c) => c.docs?.length > 0);
-
-  const toggle = (id) =>
-    setExpandedCategories((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-
-  const toggleGroup = (id) =>
-    setExpandedGroups((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-
-  const IconComp = ({ name, color }) => {
-    const I = getIcon(name);
-    return <I size={16} style={{ color: color || '#0569ff' }} />;
-  };
+// ─── Sidebar (memoized, state lifted to parent) ───
+const DocsSidebar = React.memo(function DocsSidebar({
+  categories, activeSlug, onSelectDoc,
+  isMobileMenuOpen, setMobileMenuOpen,
+  expandedCategories, expandedGroups,
+  onToggleCategory, onToggleGroup,
+}) {
+  const filtered = useMemo(
+    () => (categories || []).filter((c) => c.docs?.length > 0),
+    [categories]
+  );
 
   return (
     <aside
@@ -139,69 +107,43 @@ const DocsSidebar = React.memo(({ categories, activeSlug, onSelectDoc, isMobileM
       </div>
 
       <nav className="p-4 space-y-2">
-        {filtered.map((category) => (
-          <div key={category._id}>
-            <button
-              onClick={() => toggle(category._id)}
-              className="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold text-[#1a1a2e] hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <IconComp name={category.icon} color={category.color} />
-                <span className='truncate'>{category.title}</span>
-              </div>
-              <ChevronDown size={16} className={`text-gray-400 transition-transform ${expandedCategories.includes(category._id) ? 'rotate-180' : ''}`} />
-            </button>
-            {expandedCategories.includes(category._id) && (
-              <div className="ml-4 mt-2 mb-2 border-l-2 border-gray-100 pl-3 space-y-4">
-                {(() => {
-                  const groupedDocsMap = category.docs.reduce((acc, doc) => {
-                    const groupName = doc.groupTitle || 'uncategorized';
-                    if (!acc[groupName]) {
-                      acc[groupName] = {
-                        docs: [],
-                        // Default uncategorized to order 1, so groups with 0 can go above it
-                        order: groupName === 'uncategorized' ? 1 : (doc.groupOrder != null ? doc.groupOrder : 999)
-                      };
-                    }
-                    acc[groupName].docs.push(doc);
-                    return acc;
-                  }, {});
+        {filtered.map((category) => {
+          const IconI = getIcon(category.icon);
+          return (
+            <div key={category._id}>
+              <button
+                onClick={() => onToggleCategory(category._id)}
+                className="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold text-[#1a1a2e] hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <IconI size={16} style={{ color: category.color || '#0569ff' }} />
+                  <span className='truncate'>{category.title}</span>
+                </div>
+                <ChevronDown size={16} className={`text-gray-400 transition-transform ${expandedCategories.includes(category._id) ? 'rotate-180' : ''}`} />
+              </button>
+              {expandedCategories.includes(category._id) && (
+                <div className="ml-4 mt-2 mb-2 border-l-2 border-gray-100 pl-3 space-y-4">
+                  {(() => {
+                    const groupedDocsMap = category.docs.reduce((acc, doc) => {
+                      const groupName = doc.groupTitle || 'uncategorized';
+                      if (!acc[groupName]) {
+                        acc[groupName] = {
+                          docs: [],
+                          order: groupName === 'uncategorized' ? 1 : (doc.groupOrder != null ? doc.groupOrder : 999)
+                        };
+                      }
+                      acc[groupName].docs.push(doc);
+                      return acc;
+                    }, {});
 
-                  // Sort all groups (including uncategorized) by their order
-                  const sortedGroups = Object.entries(groupedDocsMap).sort((a, b) => a[1].order - b[1].order);
+                    const sortedGroups = Object.entries(groupedDocsMap).sort((a, b) => a[1].order - b[1].order);
 
-                  return (
-                    <div className="space-y-4">
-                      {sortedGroups.map(([groupName, groupData]) => {
-                        if (groupName === 'uncategorized') {
-                          return (
-                            <div key="uncategorized" className="space-y-1">
-                              {groupData.docs.map((doc) => (
-                                <button
-                                  key={doc._id}
-                                  onClick={() => { onSelectDoc(doc.slug); setMobileMenuOpen(false); }}
-                                  className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${activeSlug === doc.slug ? 'bg-[#0569ff]/10 text-[#0569ff] font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-[#1a1a2e]'}`}
-                                >
-                                  {doc.title}
-                                </button>
-                              ))}
-                            </div>
-                          );
-                        }
-
-                        const groupId = `${category._id}-${groupName}`;
-                        const isExpanded = expandedGroups.includes(groupId);
-                        return (
-                          <div key={groupName} className="space-y-1">
-                            <button
-                              onClick={() => toggleGroup(groupId)}
-                              className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-bold text-gray-500 uppercase tracking-wider hover:bg-gray-50 rounded-lg transition-colors"
-                            >
-                              <span>{groupName}</span>
-                              <ChevronDown size={14} className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                            </button>
-                            {isExpanded && (
-                              <div className="ml-2 mt-1 space-y-1 border-l-2 border-gray-100 pl-2">
+                    return (
+                      <div className="space-y-4">
+                        {sortedGroups.map(([groupName, groupData]) => {
+                          if (groupName === 'uncategorized') {
+                            return (
+                              <div key="uncategorized" className="space-y-1">
                                 {groupData.docs.map((doc) => (
                                   <button
                                     key={doc._id}
@@ -212,17 +154,44 @@ const DocsSidebar = React.memo(({ categories, activeSlug, onSelectDoc, isMobileM
                                   </button>
                                 ))}
                               </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
-          </div>
-        ))}
+                            );
+                          }
+
+                          const groupId = `${category._id}-${groupName}`;
+                          const isExpanded = expandedGroups.includes(groupId);
+                          return (
+                            <div key={groupName} className="space-y-1">
+                              <button
+                                onClick={() => onToggleGroup(groupId)}
+                                className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-bold text-gray-500 uppercase tracking-wider hover:bg-gray-50 rounded-lg transition-colors"
+                              >
+                                <span>{groupName}</span>
+                                <ChevronDown size={14} className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                              </button>
+                              {isExpanded && (
+                                <div className="ml-2 mt-1 space-y-1 border-l-2 border-gray-100 pl-2">
+                                  {groupData.docs.map((doc) => (
+                                    <button
+                                      key={doc._id}
+                                      onClick={() => { onSelectDoc(doc.slug); setMobileMenuOpen(false); }}
+                                      className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${activeSlug === doc.slug ? 'bg-[#0569ff]/10 text-[#0569ff] font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-[#1a1a2e]'}`}
+                                    >
+                                      {doc.title}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </nav>
     </aside>
   );
@@ -360,6 +329,108 @@ export default function DocsPageClient({ initialSlug }) {
   const { data: categories, isLoading: categoriesLoading } = useDocsCategories();
   const { data: doc, isLoading: docLoading } = useDocBySlug(activeSlug);
 
+  // ─── Sidebar state lifted here with localStorage persistence ───
+  const [expandedCategories, setExpandedCategories] = useState(() => readLS(LS_CATS_KEY) || []);
+  const [expandedGroups, setExpandedGroups] = useState(() => readLS(LS_GROUPS_KEY) || []);
+  const initializedRef = useRef(false);
+
+  // On first load with categories, ensure the active doc's category + group are expanded
+  useEffect(() => {
+    if (!categories || initializedRef.current) return;
+    initializedRef.current = true;
+
+    const stored = readLS(LS_CATS_KEY);
+    if (stored && stored.length > 0) {
+      // localStorage has state — just ensure active doc's category is also open
+      if (activeSlug) {
+        const cat = categories.find((c) => c.docs?.some((d) => d.slug === activeSlug));
+        if (cat && !stored.includes(cat._id)) {
+          const updated = [...stored, cat._id];
+          setExpandedCategories(updated);
+          writeLS(LS_CATS_KEY, updated);
+        }
+        if (cat) {
+          const activeDoc = cat.docs.find((d) => d.slug === activeSlug);
+          if (activeDoc?.groupTitle) {
+            const groupId = `${cat._id}-${activeDoc.groupTitle}`;
+            setExpandedGroups((prev) => {
+              if (prev.includes(groupId)) return prev;
+              const updated = [...prev, groupId];
+              writeLS(LS_GROUPS_KEY, updated);
+              return updated;
+            });
+          }
+        }
+      }
+      return;
+    }
+
+    // No stored state — initialize from active slug or first category
+    if (activeSlug) {
+      const cat = categories.find((c) => c.docs?.some((d) => d.slug === activeSlug));
+      if (cat) {
+        const cats = [cat._id];
+        setExpandedCategories(cats);
+        writeLS(LS_CATS_KEY, cats);
+        const activeDoc = cat.docs.find((d) => d.slug === activeSlug);
+        if (activeDoc?.groupTitle) {
+          const groups = [`${cat._id}-${activeDoc.groupTitle}`];
+          setExpandedGroups(groups);
+          writeLS(LS_GROUPS_KEY, groups);
+        }
+      }
+    } else if (categories[0]) {
+      const cats = [categories[0]._id];
+      setExpandedCategories(cats);
+      writeLS(LS_CATS_KEY, cats);
+    }
+  }, [categories, activeSlug]);
+
+  // When navigating to a new slug, only ADD the needed expansion (never close anything)
+  const prevSlugRef = useRef(activeSlug);
+  useEffect(() => {
+    if (!categories || !activeSlug || activeSlug === prevSlugRef.current) return;
+    prevSlugRef.current = activeSlug;
+
+    const cat = categories.find((c) => c.docs?.some((d) => d.slug === activeSlug));
+    if (!cat) return;
+
+    setExpandedCategories((prev) => {
+      if (prev.includes(cat._id)) return prev;
+      const updated = [...prev, cat._id];
+      writeLS(LS_CATS_KEY, updated);
+      return updated;
+    });
+
+    const activeDoc = cat.docs.find((d) => d.slug === activeSlug);
+    if (activeDoc?.groupTitle) {
+      const groupId = `${cat._id}-${activeDoc.groupTitle}`;
+      setExpandedGroups((prev) => {
+        if (prev.includes(groupId)) return prev;
+        const updated = [...prev, groupId];
+        writeLS(LS_GROUPS_KEY, updated);
+        return updated;
+      });
+    }
+  }, [categories, activeSlug]);
+
+  // Stable toggle callbacks that persist to localStorage
+  const handleToggleCategory = useCallback((id) => {
+    setExpandedCategories((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+      writeLS(LS_CATS_KEY, next);
+      return next;
+    });
+  }, []);
+
+  const handleToggleGroup = useCallback((id) => {
+    setExpandedGroups((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+      writeLS(LS_GROUPS_KEY, next);
+      return next;
+    });
+  }, []);
+
   // If no initial slug, redirect to first doc
   useEffect(() => {
     if (!activeSlug && categories?.length > 0) {
@@ -406,6 +477,10 @@ export default function DocsPageClient({ initialSlug }) {
             onSelectDoc={handleSelectDoc}
             isMobileMenuOpen={isMobileMenuOpen}
             setMobileMenuOpen={setMobileMenuOpen}
+            expandedCategories={expandedCategories}
+            expandedGroups={expandedGroups}
+            onToggleCategory={handleToggleCategory}
+            onToggleGroup={handleToggleGroup}
           />
         )}
 
