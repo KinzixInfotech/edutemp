@@ -64,27 +64,44 @@ function ContentSkeleton() {
 
 // ─── Sidebar ───
 const DocsSidebar = React.memo(({ categories, activeSlug, onSelectDoc, isMobileMenuOpen, setMobileMenuOpen }) => {
-  const [expandedCategories, setExpandedCategories] = useState([]);
-  const [expandedGroups, setExpandedGroups] = useState([]);
+  // Synchronously initialize expanded states to prevent layout shift/flicker on navigation
+  const [expandedCategories, setExpandedCategories] = useState(() => {
+    if (!categories || !activeSlug) return [];
+    const cat = categories.find((c) => c.docs?.some((d) => d.slug === activeSlug));
+    return cat ? [cat._id] : (categories[0] ? [categories[0]._id] : []);
+  });
+
+  const [expandedGroups, setExpandedGroups] = useState(() => {
+    if (!categories || !activeSlug) return [];
+    const cat = categories.find((c) => c.docs?.some((d) => d.slug === activeSlug));
+    if (!cat) return [];
+    const activeDoc = cat.docs.find((d) => d.slug === activeSlug);
+    return activeDoc && activeDoc.groupTitle ? [`${cat._id}-${activeDoc.groupTitle}`] : [];
+  });
+
+  // Track the previous slug to detect navigation and auto-expand if needed
+  const prevSlugRef = useRef(activeSlug);
 
   useEffect(() => {
-    if (categories && activeSlug) {
+    if (categories && activeSlug && activeSlug !== prevSlugRef.current) {
       const cat = categories.find((c) => c.docs?.some((d) => d.slug === activeSlug));
       if (cat) {
-        if (!expandedCategories.includes(cat._id)) {
-          setExpandedCategories((prev) => [...prev, cat._id]);
-        }
+        setExpandedCategories((prev) => 
+          prev.includes(cat._id) ? prev : [...prev, cat._id]
+        );
         const activeDoc = cat.docs.find((d) => d.slug === activeSlug);
         if (activeDoc && activeDoc.groupTitle) {
           const groupId = `${cat._id}-${activeDoc.groupTitle}`;
-          if (!expandedGroups.includes(groupId)) {
-            setExpandedGroups((prev) => [...prev, groupId]);
-          }
+          setExpandedGroups((prev) => 
+            prev.includes(groupId) ? prev : [...prev, groupId]
+          );
         }
       }
+      prevSlugRef.current = activeSlug;
     }
   }, [categories, activeSlug]);
 
+  // Handle initial category expansion if not already set (e.g., when categories finish loading)
   useEffect(() => {
     if (categories?.length > 0 && expandedCategories.length === 0) {
       setExpandedCategories([categories[0]._id]);
@@ -142,36 +159,36 @@ const DocsSidebar = React.memo(({ categories, activeSlug, onSelectDoc, isMobileM
                     if (!acc[groupName]) {
                       acc[groupName] = {
                         docs: [],
-                        order: doc.groupOrder != null ? doc.groupOrder : 999
+                        // Default uncategorized to order 1, so groups with 0 can go above it
+                        order: groupName === 'uncategorized' ? 1 : (doc.groupOrder != null ? doc.groupOrder : 999)
                       };
                     }
                     acc[groupName].docs.push(doc);
                     return acc;
                   }, {});
 
-                  // Separate uncategorized
-                  const uncategorizedDocs = groupedDocsMap['uncategorized']?.docs || [];
-                  delete groupedDocsMap['uncategorized'];
-
-                  // Sort the remaining groups by their order
+                  // Sort all groups (including uncategorized) by their order
                   const sortedGroups = Object.entries(groupedDocsMap).sort((a, b) => a[1].order - b[1].order);
 
                   return (
                     <div className="space-y-4">
-                      {uncategorizedDocs.length > 0 && (
-                        <div className="space-y-1">
-                          {uncategorizedDocs.map((doc) => (
-                            <button
-                              key={doc._id}
-                              onClick={() => { onSelectDoc(doc.slug); setMobileMenuOpen(false); }}
-                              className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${activeSlug === doc.slug ? 'bg-[#0569ff]/10 text-[#0569ff] font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-[#1a1a2e]'}`}
-                            >
-                              {doc.title}
-                            </button>
-                          ))}
-                        </div>
-                      )}
                       {sortedGroups.map(([groupName, groupData]) => {
+                        if (groupName === 'uncategorized') {
+                          return (
+                            <div key="uncategorized" className="space-y-1">
+                              {groupData.docs.map((doc) => (
+                                <button
+                                  key={doc._id}
+                                  onClick={() => { onSelectDoc(doc.slug); setMobileMenuOpen(false); }}
+                                  className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${activeSlug === doc.slug ? 'bg-[#0569ff]/10 text-[#0569ff] font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-[#1a1a2e]'}`}
+                                >
+                                  {doc.title}
+                                </button>
+                              ))}
+                            </div>
+                          );
+                        }
+
                         const groupId = `${category._id}-${groupName}`;
                         const isExpanded = expandedGroups.includes(groupId);
                         return (
