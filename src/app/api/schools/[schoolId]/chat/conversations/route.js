@@ -54,7 +54,32 @@ export async function GET(req, { params }) {
                                         id: true,
                                         name: true,
                                         profilePicture: true,
+                                        lastSeenAt: true,
                                         role: { select: { name: true } },
+                                        parent: {
+                                            select: {
+                                                studentLinks: {
+                                                    where: { isActive: true },
+                                                    take: 1,
+                                                    select: {
+                                                        student: {
+                                                            select: {
+                                                                class: { select: { className: true } },
+                                                                section: { select: { name: true } },
+                                                            },
+                                                        },
+                                                    },
+                                                },
+                                            },
+                                        },
+                                        teacher: {
+                                            select: {
+                                                sectionsAssigned: {
+                                                    take: 1,
+                                                    select: { name: true, class: { select: { className: true } } },
+                                                },
+                                            },
+                                        },
                                     },
                                 },
                             },
@@ -176,7 +201,21 @@ export async function POST(req, { params }) {
                         where: { isActive: true },
                         include: {
                             user: {
-                                select: { id: true, name: true, profilePicture: true, role: { select: { name: true } } },
+                                select: {
+                                    id: true, name: true, profilePicture: true, lastSeenAt: true,
+                                    role: { select: { name: true } },
+                                    parent: {
+                                        select: {
+                                            studentLinks: {
+                                                where: { isActive: true }, take: 1,
+                                                select: { student: { select: { class: { select: { className: true } }, section: { select: { name: true } } } } },
+                                            },
+                                        },
+                                    },
+                                    teacher: {
+                                        select: { sectionsAssigned: { take: 1, select: { name: true, class: { select: { className: true } } } } },
+                                    },
+                                },
                             },
                         },
                     },
@@ -248,7 +287,21 @@ export async function POST(req, { params }) {
                         where: { isActive: true },
                         include: {
                             user: {
-                                select: { id: true, name: true, profilePicture: true, role: { select: { name: true } } },
+                                select: {
+                                    id: true, name: true, profilePicture: true, lastSeenAt: true,
+                                    role: { select: { name: true } },
+                                    parent: {
+                                        select: {
+                                            studentLinks: {
+                                                where: { isActive: true }, take: 1,
+                                                select: { student: { select: { class: { select: { className: true } }, section: { select: { name: true } } } } },
+                                            },
+                                        },
+                                    },
+                                    teacher: {
+                                        select: { sectionsAssigned: { take: 1, select: { name: true, class: { select: { className: true } } } } },
+                                    },
+                                },
                             },
                         },
                     },

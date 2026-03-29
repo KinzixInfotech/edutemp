@@ -58,6 +58,8 @@ import { CheckIcon, ImagePlusIcon } from "lucide-react"
 import { useCharacterLimit } from "@/hooks/use-character-limit"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { supabase } from '@/lib/supabase';
+import { FcGoogle } from 'react-icons/fc';
 
 const data = {
   nav: [
@@ -252,7 +254,7 @@ function FileUploadAvatar({ field, onChange, resetKey, defValue }) {
 }
 
 export function Profile() {
-  const { fullUser } = useAuth();
+  const { user, fullUser } = useAuth();
   const today = new Date();
   // Add state for selected month
   const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
@@ -512,6 +514,54 @@ export function Profile() {
 
   const [updatedFields, setUpdatedFields] = useState({});
   const [isSaving, setIsSaving] = useState(false);
+
+  // Identity Linking State
+  const [identities, setIdentities] = useState([]);
+  const [linkingGoogle, setLinkingGoogle] = useState(false);
+
+  useEffect(() => {
+    if (user?.identities) {
+      setIdentities(user.identities);
+    } else {
+      const getIds = async () => {
+        const { data } = await supabase.auth.getUserIdentities();
+        if (data?.identities) setIdentities(data.identities);
+      };
+      getIds();
+    }
+  }, [user]);
+
+  const handleLinkGoogle = async () => {
+    try {
+      setLinkingGoogle(true);
+      const { data, error } = await supabase.auth.linkIdentity({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(window.location.pathname + window.location.search)}`,
+        }
+      });
+      if (error) throw error;
+    } catch (err) {
+      toast.error(err.message || 'Failed to link Google account');
+    } finally {
+      setLinkingGoogle(false);
+    }
+  };
+
+  const handleUnlinkGoogle = async (identity) => {
+    try {
+      setLinkingGoogle(true);
+      const { data, error } = await supabase.auth.unlinkIdentity(identity);
+      if (error) throw error;
+      toast.success("Google account unlinked successfully");
+      const { data: idData } = await supabase.auth.getUserIdentities();
+      if (idData?.identities) setIdentities(idData.identities);
+    } catch (err) {
+      toast.error(err.message || 'Failed to unlink account');
+    } finally {
+      setLinkingGoogle(false);
+    }
+  };
 
   const handleInputChange = (field, value) => {
     setUpdatedFields((prev) => ({
@@ -1099,8 +1149,52 @@ export function Profile() {
             <div className="px-6 pt-4 pb-6">
               <form className="space-y-4">
                 <div className="flex flex-col gap-4 sm:flex-row">
-                  <div className="flex-1 space-y-2">
+                  <div className="flex-1 space-y-4">
                     {renderContent()}
+
+                    {/* Google Linked Accounts Section */}
+                    <div className="mt-8 border-t pt-6">
+                      <h4 className="text-sm font-semibold mb-4 text-gray-900 dark:text-gray-100">Linked Accounts</h4>
+                      <div className="flex items-center justify-between p-4 border rounded-xl bg-gray-50/50 dark:bg-gray-800/50">
+                        <div className="flex items-center gap-3">
+                          <FcGoogle className="w-6 h-6" />
+                          <div>
+                            <p className="text-sm font-medium">Google</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {identities.find(id => id.provider === 'google')
+                                ? "Connected"
+                                : "Not connected"}
+                            </p>
+                          </div>
+                        </div>
+                        {identities.find(id => id.provider === 'google') ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={linkingGoogle || identities.length <= 1}
+                            onClick={() => handleUnlinkGoogle(identities.find(id => id.provider === 'google'))}
+                          >
+                            {linkingGoogle ? <Loader2 className="w-4 h-4 animate-spin" /> : "Unlink"}
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={linkingGoogle}
+                            onClick={handleLinkGoogle}
+                          >
+                            {linkingGoogle ? <Loader2 className="w-4 h-4 animate-spin" /> : "Link Account"}
+                          </Button>
+                        )}
+                      </div>
+                      {identities.length <= 1 && identities.find(id => id.provider === 'google') && (
+                        <p className="text-xs text-amber-600 mt-2">
+                          You cannot unlink your only sign-in method.
+                        </p>
+                      )}
+                    </div>
 
                   </div>
                 </div>

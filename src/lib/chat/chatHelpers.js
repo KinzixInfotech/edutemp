@@ -598,11 +598,36 @@ export function formatConversationForClient(conversation, currentUserId) {
         isMuted,
         mutedUntil: myParticipant?.mutedUntil,
         unreadCount,
-        participants: otherParticipants.map(p => ({
-            id: p.userId,
-            name: p.user?.name,
-            profilePicture: p.user?.profilePicture,
-            role: p.user?.role?.name,
-        })),
+        participants: otherParticipants.map(p => {
+            const roleName = p.user?.role?.name;
+            let classSection = null;
+
+            if (roleName === 'PARENT') {
+                // Resolve from parent → studentLinks → student class/section
+                const link = p.user?.parent?.studentLinks?.[0];
+                if (link?.student) {
+                    const cls = link.student.class?.className;
+                    const sec = link.student.section?.name;
+                    classSection = cls && sec ? `${cls} ${sec}` : cls || null;
+                }
+            } else if (roleName === 'TEACHING_STAFF') {
+                // Resolve from teacher → sectionsAssigned
+                const sec = p.user?.teacher?.sectionsAssigned?.[0];
+                if (sec) {
+                    classSection = sec.class?.className && sec.name
+                        ? `${sec.class.className} ${sec.name}`
+                        : sec.class?.className || null;
+                }
+            }
+
+            return {
+                id: p.userId,
+                name: p.user?.name,
+                profilePicture: p.user?.profilePicture,
+                role: p.user?.role?.name,
+                classSection,
+                lastSeenAt: p.user?.lastSeenAt,
+            };
+        }),
     };
 }

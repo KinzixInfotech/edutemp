@@ -37,6 +37,17 @@ export async function GET(req, { params }) {
                                 profilePicture: true,
                                 lastSeenAt: true,
                                 role: { select: { name: true } },
+                                parent: {
+                                    select: {
+                                        studentLinks: {
+                                            where: { isActive: true }, take: 1,
+                                            select: { student: { select: { class: { select: { className: true } }, section: { select: { name: true } } } } },
+                                        },
+                                    },
+                                },
+                                teacher: {
+                                    select: { sectionsAssigned: { take: 1, select: { name: true, class: { select: { className: true } } } } },
+                                },
                             },
                         },
                     },
