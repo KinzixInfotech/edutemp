@@ -30,6 +30,7 @@ import dynamic from 'next/dynamic';
 import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
 import ProductGuideAI from '@/components/ProductGuideAI';
 import SectionHeading from '@/components/SectionHeading';
+import Image from 'next/image';
 
 // Organization Schema for SEO
 const organizationSchema = {
@@ -181,7 +182,7 @@ const HeroSection = memo(function HeroSection() {
     }, []);
 
     return (
-        <section className="relative min-h-screen flex items-start lg:items-center justify-center overflow-hidden bg-white pt-24 md:pt-28 lg:pt-10">
+        <section className="relative min-h-screen flex items-start lg:items-center justify-center overflow-hidden bg-white pt-24 md:pt-28 lg:pt-20">
             <InteractiveGridPattern
                 className="absolute opacity-40 inset-0 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,white_40%,transparent_70%)]"
                 squares={[60, 60]}
@@ -230,41 +231,16 @@ const HeroSection = memo(function HeroSection() {
             <div className="absolute top-20 right-0 w-[300px] h-[300px] md:w-[400px] md:h-[400px] bg-[#0469ff]/5 rounded-full blur-3xl" />
 
             <div className="relative max-w-[1400px] mx-auto px-3 sm:px-6 py-10 md:py-16 lg:py-20 z-10 w-full">
-                <div className="text-center space-y-5 md:space-y-8">
+                <div className="text-center space-y-5 md:space-y-5">
 
-                    {/* Badge */}
                     <div
-                        className="inline-flex items-center gap-2 sm:gap-2.5 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-full transition-all duration-700"
                         style={{
                             opacity: showContent ? 1 : 0,
-                            transform: showContent ? 'translateY(0)' : 'translateY(12px)',
-                            background: 'linear-gradient(135deg, rgba(4,105,255,0.08) 0%, rgba(4,105,255,0.04) 100%)',
-                            border: '1px solid rgba(4,105,255,0.2)',
-                            boxShadow: '0 0 0 1px rgba(4,105,255,0.06), 0 2px 16px rgba(4,105,255,0.08), inset 0 1px 0 rgba(255,255,255,0.8)',
-                        }}
-                    >
-                        <span className="relative flex items-center justify-center w-2 h-2">
-                            <span className="absolute inline-flex w-full h-full rounded-full bg-[#0469ff]/40 animate-ping" style={{ animationDuration: '2s' }} />
-                            <span className="relative w-2 h-2 rounded-full bg-[#0469ff]" style={{ boxShadow: '0 0 6px rgba(4,105,255,0.8)' }} />
-                        </span>
-                        <span
-                            className="text-xs sm:text-sm font-semibold tracking-wide"
-                            style={{
-                                background: 'linear-gradient(90deg, #0358dd 0%, #0469ff 40%, #3b8fff 60%, #0469ff 100%)',
-                                backgroundSize: '200% auto',
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent',
-                                backgroundClip: 'text',
-                                animation: 'badgeShimmer 3s linear infinite',
-                            }}
-                        >
-                            AI Powered School ERP
-                        </span>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.7 }}>
-                            <path d="M12 2L13.5 9.5L21 11L13.5 12.5L12 20L10.5 12.5L3 11L10.5 9.5L12 2Z" fill="#0469ff" />
-                        </svg>
+                        }} className="flex items-center gap-2 transition-all duration-700 delay-100 flex-row justify-center shrink-0">
+                        <Link href="/" className="text-primary hover:text-primary/90">
+                            <Image src='/edu.png' width={150} height={150} alt="EduBreezy" priority className="w-[120px] md:w-[200px]" />
+                        </Link>
                     </div>
-
                     {/* Typewriter Heading — w-fit + text-left so cursor starts from the text */}
                     <h1 className="text-[clamp(2rem,7.5vw,6.5rem)] font-bold leading-[1.08] tracking-tight px-0">
                         <span className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent">

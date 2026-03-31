@@ -1,7 +1,7 @@
 import { StatusIndicator } from "@/components/layout/client-layout";
 import Link from "next/link";
 import Image from "next/image";
-import { Instagram, Youtube, Linkedin } from "lucide-react";
+import { Instagram, Youtube, Linkedin, Facebook } from "lucide-react";
 
 const footerData = {
     logo: {
@@ -116,6 +116,9 @@ export default function Footer() {
                         </a>
                         <a href="https://www.linkedin.com/company/edubreezy/" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 transition-all duration-300 flex items-center justify-center text-slate-700 hover:scale-110">
                             <Linkedin className="w-5 h-5" />
+                        </a>
+                        <a href="https://www.facebook.com/edubreezyindia/" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 transition-all duration-300 flex items-center justify-center text-slate-700 hover:scale-110">
+                            <Facebook className="w-5 h-5" />
                         </a>
                     </div>
                     <div className="flex flex-row gap-2">
