@@ -1888,7 +1888,7 @@ function Footer() {
                         { title: 'Quick Links', links: ['About Us', 'Careers', 'Contact'] },
                         { title: 'Resources', links: ['Help Center', 'Documentation', 'Blog'] },
                         { title: 'Legal', links: ['Privacy Policy', 'Terms of Service'] },
-                        { title: 'Contact Us', links: ['support@edubreezy.com', '+91 9471 532 682'] }
+                        { title: 'Contact Us', links: ['support@edubreezy.com', '+91 94705 56016'] }
                     ].map((col, i) => (
                         <div key={i}>
                             <div className="font-semibold mb-4 text-sm">

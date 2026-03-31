@@ -34,7 +34,7 @@ const PublicFooter = () => {
                         </a>
                         <a href="tel:+919471532682" className="flex items-center gap-1.5 hover:text-[#0051f9] transition-colors">
                             <Phone className="w-4 h-4" />
-                            <span>+91 9471 532 682</span>
+                            <span>+91 94705 56016</span>
                         </a>
                     </div>
                 </div>

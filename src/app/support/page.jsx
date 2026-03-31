@@ -174,7 +174,7 @@ export default function SupportPage() {
                                     {
                                         icon: Phone,
                                         title: "Phone Support",
-                                        value: "+91 9471 532 682",
+                                        value: "+91 94705 56016",
                                         subtext: "Mon-Sat, 9AM-6PM IST",
                                         color: "#0569ff"
                                     },
@@ -324,7 +324,7 @@ export default function SupportPage() {
                                                     value={formData.phone}
                                                     onChange={handleChange}
                                                     className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:border-[#0569ff] focus:ring-2 focus:ring-[#0569ff]/20 outline-none transition-all"
-                                                    placeholder="+91 9471 532 682"
+                                                    placeholder="+91 94705 56016"
                                                 />
                                             </div>
                                             <div>

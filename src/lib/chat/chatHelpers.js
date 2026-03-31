@@ -329,7 +329,7 @@ export async function getEligibleUsers(userId, schoolId, roleName) {
     // ══════════════════════════════════════════
     if (roleName === 'TEACHING_STAFF') {
         // Step 1: Get all other teachers + sections this teacher teaches (parallel)
-        const [otherTeacherUsers, teacherSections] = await Promise.all([
+        const [otherTeacherUsers, teacherSections, teacherSupervisedSections, teacherClasses] = await Promise.all([
             prisma.user.findMany({
                 where: {
                     schoolId,
@@ -360,10 +360,29 @@ export async function getEligibleUsers(userId, schoolId, roleName) {
             prisma.sectionSubjectTeacher.findMany({
                 where: { teachingStaffUserId: userId },
                 select: { sectionId: true }
+            }),
+            prisma.section.findMany({
+                where: { teachingStaffUserId: userId },
+                select: { id: true }
+            }),
+            prisma.class.findMany({
+                where: { teachingStaffUserId: userId },
+                select: { id: true }
             })
         ]);
 
-        const sectionIds = [...new Set(teacherSections.map(s => s.sectionId))];
+        const classesSectionIds = teacherClasses && teacherClasses.length > 0
+            ? await prisma.section.findMany({
+                where: { classId: { in: teacherClasses.map(c => c.id) } },
+                select: { id: true }
+            }).then(res => res.map(s => s.id))
+            : [];
+
+        const sectionIds = [...new Set([
+            ...(teacherSections?.map(s => s.sectionId) || []),
+            ...(teacherSupervisedSections?.map(s => s.id) || []),
+            ...classesSectionIds
+        ])];
 
         // Step 2: Get parent userIds from those sections (flat, fast)
         let parentUsers = [];

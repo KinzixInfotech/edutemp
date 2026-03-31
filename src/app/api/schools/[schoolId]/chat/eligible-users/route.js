@@ -33,6 +33,13 @@ export async function GET(req, { params }) {
         const roleName = dbUser.role?.name;
         const cacheKey = eligibleUsersCacheKey(dbUser.id, schoolId, roleName);
 
+        const url = new URL(req.url);
+        const isRefresh = url.searchParams.get('refresh') === 'true';
+
+        if (isRefresh) {
+            await delCache(cacheKey);
+        }
+
         const result = await remember(
             cacheKey,
             async () => {

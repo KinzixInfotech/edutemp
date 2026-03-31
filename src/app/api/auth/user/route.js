@@ -335,7 +335,6 @@ export async function GET(req) {
             where: { id: userId },
             include: { role: true }, // fetch role relation
         });
-
         if (!user) {
             console.log("❌ [API] User not found in database");
             return NextResponse.json({ error: "User not found" }, { status: 404 });

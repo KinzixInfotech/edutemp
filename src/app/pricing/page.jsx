@@ -251,7 +251,7 @@ export default function PricingCalculatorPage() {
                                                 <h4 className="font-semibold text-[#1a1a2e] mb-1">Need Help?</h4>
                                                 <p className="text-sm text-slate-600 mb-2">Talk to our sales team for custom pricing</p>
                                                 <a href="tel:+919471532682" className="text-[#0569ff] font-semibold text-sm hover:underline">
-                                                    +91 9471 532 682
+                                                    +91 94705 56016
                                                 </a>
                                             </div>
                                         </div>
