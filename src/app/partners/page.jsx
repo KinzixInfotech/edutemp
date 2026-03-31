@@ -910,7 +910,7 @@ function FinalCTASection() {
                         <Mail size={18} />
                         partners@edubreezy.com
                     </a>
-                    <a href="tel:+919471532682" className="flex items-center gap-2 hover:text-[#0569ff] transition-colors">
+                    <a href="tel:+919470556016" className="flex items-center gap-2 hover:text-[#0569ff] transition-colors">
                         <Phone size={18} />
                         +91 9471532682
                     </a>

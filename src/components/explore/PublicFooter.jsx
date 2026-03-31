@@ -32,7 +32,7 @@ const PublicFooter = () => {
                             <Mail className="w-4 h-4" />
                             <span>atlas@edubreezy.com</span>
                         </a>
-                        <a href="tel:+919471532682" className="flex items-center gap-1.5 hover:text-[#0051f9] transition-colors">
+                        <a href="tel:+919470556016" className="flex items-center gap-1.5 hover:text-[#0051f9] transition-colors">
                             <Phone className="w-4 h-4" />
                             <span>+91 94705 56016</span>
                         </a>

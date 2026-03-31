@@ -67,7 +67,7 @@ export default function DeleteAccount() {
             <p className="mb-4">For questions or deletion requests, contact:</p>
             <ul className="space-y-2 mb-6">
                 <li>📧 Email: <a href="mailto:support@edubreezy.com" className="text-blue-600 hover:underline">support@edubreezy.com</a></li>
-                <li>📞 Phone: <a href="tel:+919471532682" className="text-blue-600 hover:underline">+91 94715 32682</a></li>
+                <li>📞 Phone: <a href="tel:+919470556016" className="text-blue-600 hover:underline">+91 94715 32682</a></li>
             </ul>
 
             {/* Footer */}
