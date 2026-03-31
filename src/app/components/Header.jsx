@@ -107,20 +107,20 @@ export default function Header() {
             {/* Top Contact Bar */}
             <div className={headerClasses}>
                 {/* Top Contact Bar */}
-                <div className="w-full bg-[#0f1623] text-white px-4 lg:px-16" style={{ lineHeight: '1' }}>
-                    <div className="max-w-7xl mx-auto flex flex-wrap gap-2" style={{ minHeight: '44px', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div className="w-full bg-[#0f1623] text-white px-2 sm:px-4 lg:px-16 pb-2 pt-2 md:py-0" style={{ lineHeight: '1' }}>
+                    <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-3 md:gap-2 lg:min-h-[44px] min-h-[20px] items-center justify-center md:justify-between">
                         {/* Left */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                            <a href="tel:+919470556016" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#a0b4cc', fontSize: '12.5px', textDecoration: 'none', lineHeight: '1' }}>
-                                <Phone size={13} strokeWidth={2} style={{ display: 'block', flexShrink: 0 }} />
+                        <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 md:gap-5">
+                            <a href="tel:+919470556016" className="flex items-center gap-1.5 text-[#a0b4cc] hover:text-white transition-all text-[12.5px] no-underline leading-none">
+                                <Phone size={13} strokeWidth={2} className="block shrink-0" />
                                 <span className="mt-[1.5px] hover:text-white transition-all">+91 94705 56016</span>
                             </a>
-                            <div style={{ width: '1px', height: '12px', background: '#2a3a4a' }} />
-                            <a href="mailto:hello@edubreezy.com" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#a0b4cc', fontSize: '12.5px', textDecoration: 'none', lineHeight: '1' }}>
-                                <Mail size={13} strokeWidth={2} style={{ display: 'block', flexShrink: 0 }} />
+                            <div className="hidden sm:block w-[1px] h-[12px] bg-[#2a3a4a]" />
+                            <a href="mailto:hello@edubreezy.com" className="flex items-center gap-1.5 text-[#a0b4cc] hover:text-white transition-all text-[12.5px] no-underline leading-none">
+                                <Mail size={13} strokeWidth={2} className="block shrink-0" />
                                 <span className="mt-[1.5px] hover:text-white transition-all">hello@edubreezy.com</span>
                             </a>
-                            <span style={{ fontSize: '11px', color: '#3af0a0', background: 'rgba(58,240,160,0.1)', border: '1px solid rgba(58,240,160,0.3)', borderRadius: '100px', padding: '3px 10px 1px 10px', fontWeight: 500, lineHeight: '1.5' }} className="relative overflow-hidden hidden sm:inline-flex items-center justify-center">
+                            <span style={{ fontSize: '11px', color: '#3af0a0', background: 'rgba(58,240,160,0.1)', border: '1px solid rgba(58,240,160,0.3)', borderRadius: '100px', padding: '3px 10px 1px 10px', fontWeight: 500, lineHeight: '1.5' }} className="relative overflow-hidden hidden md:inline-flex items-center justify-center">
                                 <span className="relative z-10">Not Your Typical School ERP!</span>
                                 <span className="absolute inset-0 flex" style={{ animation: 'shimmer-slide 6s infinite' }}>
                                     <span className="w-1/2 h-full bg-gradient-to-r from-transparent via-white/40 to-transparent -skew-x-12" />
@@ -136,7 +136,7 @@ export default function Header() {
                         </div>
 
                         {/* Right - Social Icons */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div className="lg:flex items-center justify-center gap-2 hidden ">
                             <a href="https://www.youtube.com/@edubreezy" target="_blank" rel="noopener noreferrer" style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <Youtube size={13} color="white" style={{ display: 'block' }} />
                             </a>
