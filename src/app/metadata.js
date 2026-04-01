@@ -29,10 +29,6 @@ export const metadata = {
         ],
         shortcut: "/favicon.ico",
     },
-
-    // Manifest for PWA
-    manifest: "/site.webmanifest",
-
     // Open Graph for social sharing
     openGraph: {
         type: "website",
