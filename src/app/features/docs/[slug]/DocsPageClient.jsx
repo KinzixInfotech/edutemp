@@ -492,7 +492,7 @@ export default function DocsPageClient({ initialSlug }) {
           </div>
         </main>
       </div>
-      <div className='w-full '>
+      <div className='w-full hidden lg:block'>
         <img src={'/banner.svg'} className='object-cover w-[100%] pointer-events-none' />
       </div>
     </div>
