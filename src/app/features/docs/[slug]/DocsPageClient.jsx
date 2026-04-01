@@ -452,9 +452,9 @@ export default function DocsPageClient({ initialSlug }) {
   );
 
   return (
-    <div className="min-h-screen bg-white pt-24">
+    <div className="min-h-screen bg-white  ">
       <Lightbox />
-      <div className="lg:hidden fixed top-16 left-0 right-0 z-50 bg-[#ffffffbf] backdrop-blur-md border-b border-gray-200 px-4 py-3 flex items-center gap-3">
+      <div className="lg:hidden  pt-14 fixed top-16 left-0 right-0 z-50 bg-[#ffffffbf] backdrop-blur-md border-b border-gray-200 px-4 py-3 flex items-center gap-3">
         <button onClick={() => setMobileMenuOpen(true)} className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
           <Menu size={20} />
         </button>
@@ -465,7 +465,7 @@ export default function DocsPageClient({ initialSlug }) {
         <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setMobileMenuOpen(false)} />
       )}
 
-      <div className="flex pt-32 lg:pt-0 ">
+      <div className="flex pt-40 lg:pt-25 ">
 
         {categoriesLoading ? (
           <aside className="hidden lg:block w-72 shrink-0">

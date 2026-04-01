@@ -78,6 +78,7 @@ export default function RootLayout({ children }) {
         <head>
           <meta name="facebook-domain-verification" content="ztcrr8bo64h6o5wo2fk5vxtdf09ial" />
           {/* Google Tag Manager */}
+          <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
           <script
             dangerouslySetInnerHTML={{
               __html: `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':

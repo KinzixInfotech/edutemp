@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, Menu, X, ArrowRight, Phone, Mail, Twitter, Linkedin, Instagram, Facebook, Youtube } from 'lucide-react';
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { HiOutlineMenuAlt3 } from "react-icons/hi";
@@ -63,15 +63,11 @@ export default function Header() {
         })
     }, [])
 
-    // Scroll detection for homepage
     useEffect(() => {
-        const handleScroll = () => {
-            setIsScrolled(window.scrollY > 50);
-        };
-        window.addEventListener('scroll', handleScroll);
+        const handleScroll = () => setIsScrolled(window.scrollY > 80);
+        window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
-
     const handleMouseEnter = (menuName) => {
         setActiveSubmenu(menuName);
     };
@@ -95,19 +91,34 @@ export default function Header() {
             }, 100);
         }
     };
+    // Add ref to header
+    const headerRef = useRef(null);
+    const [headerHeight, setHeaderHeight] = useState(100);
+
+    useEffect(() => {
+        const update = () => setHeaderHeight(headerRef.current?.offsetHeight ?? 100);
+        update();
+        window.addEventListener('resize', update);
+        window.addEventListener('scroll', update);
+        return () => {
+            window.removeEventListener('resize', update);
+            window.removeEventListener('scroll', update);
+        };
+    }, []);
+
+
 
     // Check if we're on the homepage
     const isHomePage = pathname === '/';
 
     // Dynamic classes for header
-    const headerClasses = 'fixed w-full left-0 right-0 top-0 z-[100] transition-all duration-300 bg-[#ffffffdb] backdrop-blur-md border-b border-gray-200';
-
+    const headerClasses = 'fixed w-full left-0 right-0 top-0 z-[100] bg-[#ffffffdb] backdrop-blur-md border-b border-gray-200 [padding-top:env(safe-area-inset-top)]';
     return (
         <>
             {/* Top Contact Bar */}
-            <div className={headerClasses}>
+            <div className={headerClasses} ref={headerRef} style={{ transform: 'translateZ(0)', willChange: 'transform' }}>
                 {/* Top Contact Bar */}
-                <div className="w-full bg-[#0f1623] text-white px-2 sm:px-4 lg:px-16 pb-2 pt-2 md:py-0" style={{ lineHeight: '1' }}>
+                <div className={`w-full bg-[#0f1623] text-white px-2 sm:px-4 lg:px-16 pb-2 pt-2 md:py-0 transition-all duration-300 ${isScrolled ? 'hidden md:block' : 'block'}`} style={{ lineHeight: '1' }}>
                     <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-3 md:gap-2 lg:min-h-[44px] min-h-[20px] items-center justify-center md:justify-between">
                         {/* Left */}
                         <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 md:gap-5">
@@ -270,16 +281,14 @@ export default function Header() {
                                         <span className="sr-only">Toggle menu</span>
                                     </Button>
                                 </SheetTrigger>
-                                <SheetContent side="right" className="w-[300px] sm:w-[340px] p-0 flex flex-col">
-                                    {/* Header */}
-                                    <div className="flex items-center h-16 px-6 border-b shrink-0">
-                                        <Link href="/" onClick={() => setMobileMenuOpen(false)}>
-                                            <Image src='/edu.png' width={120} height={36} alt="EduBreezy" priority />
-                                        </Link>
-                                    </div>
+                                <SheetContent
+                                    side="right"
+                                    className="w-[300px] sm:w-[340px] p-0 flex flex-col [padding-bottom:env(safe-area-inset-bottom)] z-[99]"
+                                    style={{ top: `${headerHeight}px`, height: `calc(100dvh - ${headerHeight}px)` }}
+                                >
 
                                     {/* Navigation Links */}
-                                    <nav className="flex-1 py-4 overflow-y-auto">
+                                    <nav className="flex-1 pt-10 pb-4 overflow-y-auto">
                                         {menuConfig.menus.map((menu, index) => (
                                             <div key={index}>
                                                 {menu.type === 'link' ? (
@@ -331,7 +340,7 @@ export default function Header() {
                                     </nav>
 
                                     {/* Bottom Section - Buttons */}
-                                    <div className="shrink-0 border-t border-gray-100 p-6 space-y-3 bg-gray-50/50">
+                                    <div className="shrink-0 border-t border-gray-100 px-6 pt-5 pb-8 space-y-3 bg-gray-50/50">
                                         {AlreadyLoggedIn ? (
                                             <Link href="/dashboard" className="block" onClick={() => setMobileMenuOpen(false)}>
                                                 <button className="group w-full flex items-center justify-center pr-1 gap-2 bg-[#0569ff] text-white rounded-full text-sm font-semibold cursor-pointer transition-all duration-300 hover:bg-[#0450d4]">
