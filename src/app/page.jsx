@@ -72,8 +72,10 @@ export default function HomePage() {
 
             <HeroSection />
             <MarqueeBanner />
+
             {/* <AboutBriefSection />s */}
             <WebDashboardCTA />
+
             <BusTrackingSection />
             <AttendanceSection />
             <HPCSection />
@@ -95,8 +97,13 @@ export default function HomePage() {
                 <DownloadAppCTA />
             </div> */}
             {/* <ProductGuideAI /> */}
+
             {/* </div> */}
+            <div className='w-full hidden lg:block'>
+                <img src={'./banner.svg'} className='object-cover hidden lg:block w-[100%] pointer-events-none' />
+            </div>
             <FinalCTA />
+
             <PartnerTeaser />
             {/* <Footer /> */}
         </div>

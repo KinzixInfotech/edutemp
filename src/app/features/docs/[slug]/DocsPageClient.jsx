@@ -465,7 +465,8 @@ export default function DocsPageClient({ initialSlug }) {
         <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setMobileMenuOpen(false)} />
       )}
 
-      <div className="flex pt-32 lg:pt-20">
+      <div className="flex pt-32 lg:pt-0 ">
+
         {categoriesLoading ? (
           <aside className="hidden lg:block w-72 shrink-0">
             <div className="sticky top-[116px] h-[calc(100vh-116px)] overflow-y-auto"><SidebarSkeleton /></div>
@@ -490,6 +491,9 @@ export default function DocsPageClient({ initialSlug }) {
             <DocsTableOfContents doc={doc} />
           </div>
         </main>
+      </div>
+      <div className='w-full '>
+        <img src={'/banner.svg'} className='object-cover w-[100%] pointer-events-none' />
       </div>
     </div>
   );
