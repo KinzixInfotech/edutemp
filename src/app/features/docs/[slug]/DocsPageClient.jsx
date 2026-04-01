@@ -95,7 +95,7 @@ const DocsSidebar = React.memo(function DocsSidebar({
 
   return (
     <aside
-      className={`fixed lg:sticky top-0 left-0 z-50 h-screen lg:h-[calc(100vh-80px)] lg:top-20 w-72 bg-white lg:bg-transparent border-r border-gray-200 lg:border-0 transform transition-transform duration-300 ease-in-out shadow-xl lg:shadow-none ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} overflow-y-auto`}
+      className={`fixed lg:sticky top-0 left-0 z-50 h-screen lg:h-[calc(100vh-116px)] lg:top-[116px] w-72 bg-white lg:bg-transparent border-r border-gray-200 lg:border-0 transform transition-transform duration-300 ease-in-out shadow-xl lg:shadow-none ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} overflow-y-auto`}
     >
       <div className="flex items-center justify-between p-4 lg:hidden border-b">
         <span className="font-bold text-lg">Features</span>
@@ -235,7 +235,7 @@ function DocsTableOfContents({ doc }) {
 
   return (
     <aside className="hidden xl:block w-56 shrink-0">
-      <div className="sticky top-24">
+      <div className="sticky top-[136px]">
         <h4 className="text-sm font-semibold text-[#1a1a2e] mb-4">On this page</h4>
         <nav className="space-y-1.5 text-sm">
           {allEntries.map((e) => (
@@ -270,7 +270,7 @@ function DocsContent({ doc, isLoading }) {
 
   return (
     <article className="max-w-3xl">
-      <div id="overview" className="mb-10 scroll-mt-28">
+      <div id="overview" className="mb-10 scroll-mt-[136px]">
         <h1 className="text-3xl md:text-4xl font-bold text-[#1a1a2e] mb-3">{doc.title}</h1>
         {doc.subtitle && <p className="text-lg text-[#0569ff] font-medium mb-4">{doc.subtitle}</p>}
         {doc.description && <p className="text-gray-600 text-lg leading-relaxed">{doc.description}</p>}
@@ -285,7 +285,7 @@ function DocsContent({ doc, isLoading }) {
       )}
 
       {doc.keyFeatures?.features?.length > 0 && (
-        <div id="key-features" className="space-y-6 mb-10 scroll-mt-28">
+        <div id="key-features" className="space-y-6 mb-10 scroll-mt-[136px]">
           <h2 className="text-xl font-bold text-[#1a1a2e] border-b pb-3">{doc.keyFeatures.sectionTitle || 'Key Features'}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {doc.keyFeatures.features.map((f, i) => (
@@ -452,7 +452,7 @@ export default function DocsPageClient({ initialSlug }) {
   );
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white pt-24">
       <Lightbox />
       <div className="lg:hidden fixed top-16 left-0 right-0 z-50 bg-[#ffffffbf] backdrop-blur-md border-b border-gray-200 px-4 py-3 flex items-center gap-3">
         <button onClick={() => setMobileMenuOpen(true)} className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
@@ -468,7 +468,7 @@ export default function DocsPageClient({ initialSlug }) {
       <div className="flex pt-32 lg:pt-20">
         {categoriesLoading ? (
           <aside className="hidden lg:block w-72 shrink-0">
-            <div className="sticky top-20 h-[calc(100vh-80px)] overflow-y-auto"><SidebarSkeleton /></div>
+            <div className="sticky top-[116px] h-[calc(100vh-116px)] overflow-y-auto"><SidebarSkeleton /></div>
           </aside>
         ) : (
           <DocsSidebar
