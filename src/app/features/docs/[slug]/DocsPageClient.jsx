@@ -41,6 +41,7 @@ function writeLS(key, value) {
   } catch { /* ignore */ }
 }
 
+
 // ─── Skeletons ───
 function SidebarSkeleton() {
   return (
@@ -95,7 +96,12 @@ const DocsSidebar = React.memo(function DocsSidebar({
 
   return (
     <aside
-      className={`fixed lg:sticky top-0 left-0 z-50 h-screen lg:h-[calc(100vh-116px)] lg:top-[116px] w-72 bg-white lg:bg-transparent border-r border-gray-200 lg:border-0 transform transition-transform duration-300 ease-in-out shadow-xl lg:shadow-none ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} overflow-y-auto`}
+
+      className={`fixed lg:sticky left-0 z-50 w-72 bg-white lg:bg-transparent border-r border-gray-200 lg:border-0 transform transition-transform duration-300 ease-in-out shadow-xl lg:shadow-none ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} overflow-y-auto`}
+      style={{
+        top: 'var(--header-height, 100px)',
+        height: 'calc(100dvh - var(--header-height, 100px))'
+      }}
     >
       <div className="flex items-center justify-between p-4 lg:hidden border-b">
         <span className="font-bold text-lg">Features</span>
@@ -454,7 +460,7 @@ export default function DocsPageClient({ initialSlug }) {
   return (
     <div className="min-h-screen bg-white  ">
       <Lightbox />
-      <div className="lg:hidden  pt-14 fixed top-16 left-0 right-0 z-50 bg-[#ffffffbf] backdrop-blur-md border-b border-gray-200 px-4 py-3 flex items-center gap-3">
+      <div className="lg:hidden fixed left-0 right-0 z-50 bg-[#ffffffbf] backdrop-blur-md border-b border-gray-200 px-4 py-3 flex items-center gap-3" style={{ top: 'var(--header-height, 100px)' }}>
         <button onClick={() => setMobileMenuOpen(true)} className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
           <Menu size={20} />
         </button>

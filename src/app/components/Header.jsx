@@ -96,7 +96,11 @@ export default function Header() {
     const [headerHeight, setHeaderHeight] = useState(100);
 
     useEffect(() => {
-        const update = () => setHeaderHeight(headerRef.current?.offsetHeight ?? 100);
+        const update = () => {
+            const h = headerRef.current?.offsetHeight ?? 100;
+            setHeaderHeight(h);
+            document.documentElement.style.setProperty('--header-height', `${h}px`);
+        };
         update();
         window.addEventListener('resize', update);
         window.addEventListener('scroll', update);
@@ -105,7 +109,6 @@ export default function Header() {
             window.removeEventListener('scroll', update);
         };
     }, []);
-
 
 
     // Check if we're on the homepage
