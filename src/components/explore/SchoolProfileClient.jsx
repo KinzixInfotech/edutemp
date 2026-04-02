@@ -544,9 +544,9 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                             </div>
 
                             {/* Right — Sidebar */}
-                            <div className="space-y-5">
+                            <div className="space-y-5 lg:sticky lg:top-20 self-start">
                                 {/* Enquiry Form */}
-                                <Card className="p-6 rounded-2xl border-gray-200 sticky top-20">
+                                <Card className="p-6 rounded-2xl border-gray-200">
                                     <div className="bg-[#2563eb] text-white text-center p-4 -mx-6 -mt-6 rounded-t-2xl mb-5">
                                         <h3 className="text-base font-bold">Interested in {school.school?.name?.split(' ')[0]}?</h3>
                                         <p className="text-xs text-blue-100 mt-0.5">Get in touch with Admissions Directly</p>

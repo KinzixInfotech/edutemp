@@ -22,20 +22,30 @@ export async function GET(req, props) {
         const cacheKey = generateKey('school-profile', { id });
 
         const fetchProfile = async () => {
-            // Optimized: Single query with OR condition instead of 2 separate queries
             const isIdUUID = isUUID(id);
 
             const profile = await prisma.schoolPublicProfile.findFirst({
                 where: {
-                    isPubliclyVisible: true,
-                    OR: [
-                        // If it's a UUID, try schoolId match
-                        ...(isIdUUID ? [{ schoolId: id }] : []),
-                        // Always try slug match (works for both)
-                        { slug: id }
-                    ]
+                    AND: [
+                        {
+                            OR: [
+                                ...(isIdUUID ? [{ schoolId: id }, { id }] : []),
+                                { slug: id },
+                            ],
+                        },
+                        {
+                            OR: [
+                                { isPubliclyVisible: true },
+                                {
+                                    school: {
+                                        SubscriptionType: 'ATLAS_ONLY',
+                                    },
+                                },
+                            ],
+                        },
+                    ],
                 },
-                include: getProfileIncludes()
+                include: getProfileIncludes(),
             });
 
             return profile;

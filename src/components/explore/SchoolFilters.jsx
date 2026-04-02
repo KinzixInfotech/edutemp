@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 const facilities = ['Swimming Pool', 'Science Lab', 'Library', 'Sports Ground', 'Computer Lab', 'Auditorium'];
 const extracurriculars = ['Robotics', 'Debate', 'Arts', 'Music', 'Sports', 'Drama'];
@@ -14,8 +14,19 @@ const extracurriculars = ['Robotics', 'Debate', 'Arts', 'Music', 'Sports', 'Dram
 export default function SchoolFilters({ filters, onFilterChange, isOpen, setIsOpen }) {
     const [selectedFacilities, setSelectedFacilities] = useState([]);
     const [selectedExtras, setSelectedExtras] = useState([]);
-    const [localRange, setLocalRange] = useState([0, 600000]);
-    const debounceRef = useRef(null);
+    const sliderResetKey = `${filters.minFee ?? 0}-${filters.maxFee ?? 600000}`;
+    const feeCommitDebounceRef = useRef(null);
+    const [localRange, setLocalRange] = useState([
+        typeof filters.minFee === 'number' ? filters.minFee : 0,
+        typeof filters.maxFee === 'number' ? filters.maxFee : 600000,
+    ]);
+
+    useEffect(() => {
+        setLocalRange([
+            typeof filters.minFee === 'number' ? filters.minFee : 0,
+            typeof filters.maxFee === 'number' ? filters.maxFee : 600000,
+        ]);
+    }, [filters.minFee, filters.maxFee]);
 
     const clearFilters = () => {
         onFilterChange({ search: '', location: '', minFee: '', maxFee: '', minRating: '', sort: '' });
@@ -36,17 +47,27 @@ export default function SchoolFilters({ filters, onFilterChange, isOpen, setIsOp
         );
     };
 
-    // Debounced slider handler — only fetches after user stops dragging
     const handleSliderChange = useCallback((values) => {
         setLocalRange(values);
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => {
+    }, []);
+
+    // Only after the drag ends do we schedule the real filter update.
+    const handleSliderCommit = useCallback((values) => {
+        if (feeCommitDebounceRef.current) clearTimeout(feeCommitDebounceRef.current);
+        feeCommitDebounceRef.current = setTimeout(() => {
             onFilterChange({
                 minFee: values[0] > 0 ? values[0] : '',
                 maxFee: values[1] < 600000 ? values[1] : '',
             });
-        }, 500);
+        }, 300);
     }, [onFilterChange]);
+
+    useEffect(() => {
+        return () => {
+            if (feeCommitDebounceRef.current) clearTimeout(feeCommitDebounceRef.current);
+            if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+        };
+    }, []);
 
     const formatSliderValue = (val) => {
         if (val >= 100000) return `₹${(val / 100000).toFixed(1)}L`;
@@ -79,7 +100,7 @@ export default function SchoolFilters({ filters, onFilterChange, isOpen, setIsOp
                 </div>
             </div>
 
-            {/* Tuition Range — with debounced slider */}
+            {/* Tuition Range — no filter/API update during drag; debounce after release */}
             <div className="space-y-3">
                 <div className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4 text-blue-500" />
@@ -91,10 +112,12 @@ export default function SchoolFilters({ filters, onFilterChange, isOpen, setIsOp
                         <span>{formatSliderValue(localRange[1])}{localRange[1] >= 600000 ? '+' : ''}</span>
                     </div>
                     <Slider
-                        value={localRange}
+                        key={sliderResetKey}
+                        defaultValue={localRange}
                         max={600000}
                         step={10000}
                         onValueChange={handleSliderChange}
+                        onValueCommit={handleSliderCommit}
                         className="[&_[role=slider]]:bg-blue-500 [&_[role=slider]]:border-blue-500 [&_[role=slider]]:shadow-md [&_[role=slider]]:w-5 [&_[role=slider]]:h-5"
                     />
                 </div>

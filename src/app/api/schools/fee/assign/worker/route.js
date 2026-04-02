@@ -4,12 +4,11 @@
 
 import { NextResponse } from 'next/server';
 import { verifySignatureAppRouter } from '@upstash/qstash/nextjs';
-import { Client as QStashClient } from '@upstash/qstash';
+import qstash from '@/lib/qstash';
 import prisma from '@/lib/prisma';
 import { getJob, updateJob } from '../route';
 import { sendNotification } from '@/lib/notifications/notificationHelper';
 
-const qstash = new QStashClient({ token: process.env.QSTASH_TOKEN });
 const CHUNK_SIZE = 25;
 const IS_DEV = process.env.NODE_ENV === 'development';
 const INTERNAL_KEY = process.env.INTERNAL_API_KEY || 'edubreezy_internal';

@@ -19,8 +19,15 @@ import {
     CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
     Save, Eye, EyeOff, CheckCircle2, AlertCircle,
-    ChevronDown, ChevronUp, Clock, BadgeCheck, ShieldCheck, Send, Link2
+    ChevronDown, ChevronUp, Clock, BadgeCheck, ShieldCheck, Send, Link2, Plus, Trash2
 } from 'lucide-react';
 import FileUploadButton from '@/components/fileupload';
 
@@ -435,10 +442,101 @@ export default function PublicProfileSettings() {
                                 />
                             </div>
                         </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <Label htmlFor="boards">Educational Boards</Label>
+                                <Input 
+                                    id="boards" 
+                                    value={formData.boards?.join(', ') || ''} 
+                                    onChange={(e) => handleChange('boards', e.target.value.split(',').map(s=>s.trim()))} 
+                                    placeholder="e.g. CBSE, ICSE, State Board" 
+                                    className="mt-2" 
+                                />
+                                <p className="text-xs text-muted-foreground mt-1">Comma-separated</p>
+                            </div>
+                            <div>
+                                <Label htmlFor="genderType">Gender Focus</Label>
+                                <Select value={formData.genderType || ''} onValueChange={(v) => handleChange('genderType', v)}>
+                                    <SelectTrigger id="genderType" className="mt-2">
+                                        <SelectValue placeholder="Select type..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Co-ed">Co-ed</SelectItem>
+                                        <SelectItem value="Boys">Boys</SelectItem>
+                                        <SelectItem value="Girls">Girls</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            </div>
                     </div>
                 </Card>
 
-                {/* Media  */}
+                {/* Leadership */}
+                <Card className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-semibold">Leadership Team</h2>
+                        <Button type="button" variant="outline" size="sm" onClick={() => {
+                            const list = [...(formData.leadership || [])];
+                            if (list.length >= 10) return alert('Maximum 10 leaders allowed');
+                            list.push({ role: '', name: '', photo: '', linkedin: '' });
+                            handleChange('leadership', list);
+                        }}>
+                            <Plus className="w-4 h-4 mr-1" /> Add Member
+                        </Button>
+                    </div>
+                    <div className="space-y-4">
+                        {formData.leadership?.length > 0 ? formData.leadership.map((leader, index) => (
+                            <div key={index} className="border p-4 rounded-md relative space-y-4">
+                                <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => {
+                                    const list = [...formData.leadership];
+                                    list.splice(index, 1);
+                                    handleChange('leadership', list);
+                                }}>
+                                    <Trash2 className="w-4 h-4" />
+                                </Button>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mr-8">
+                                    <div>
+                                        <Label>Role (e.g. Principal, Director)</Label>
+                                        <Input value={leader.role || ''} onChange={(e) => {
+                                            const list = [...formData.leadership];
+                                            list[index].role = e.target.value;
+                                            handleChange('leadership', list);
+                                        }} placeholder="e.g. Principal" className="mt-1" />
+                                    </div>
+                                    <div>
+                                        <Label>Name</Label>
+                                        <Input value={leader.name || ''} onChange={(e) => {
+                                            const list = [...formData.leadership];
+                                            list[index].name = e.target.value;
+                                            handleChange('leadership', list);
+                                        }} placeholder="e.g. Dr. A. P. J. Abdul Kalam" className="mt-1" />
+                                    </div>
+                                    <div>
+                                        <Label>Photo URL</Label>
+                                        <Input type="url" value={leader.photo || ''} onChange={(e) => {
+                                            const list = [...formData.leadership];
+                                            list[index].photo = e.target.value;
+                                            handleChange('leadership', list);
+                                        }} placeholder="https://..." className="mt-1" />
+                                    </div>
+                                    <div>
+                                        <Label>LinkedIn URL</Label>
+                                        <Input type="url" value={leader.linkedin || ''} onChange={(e) => {
+                                            const list = [...formData.leadership];
+                                            list[index].linkedin = e.target.value;
+                                            handleChange('leadership', list);
+                                        }} placeholder="https://linkedin.com/in/..." className="mt-1" />
+                                    </div>
+                                </div>
+                            </div>
+                        )) : (
+                            <div className="text-center py-6 text-sm text-muted-foreground border rounded-md border-dashed">
+                                No leadership members added yet. Click &quot;Add Member&quot; to begin.
+                            </div>
+                        )}
+                    </div>
+                </Card>
                 <Card className="p-6">
                     <h2 className="text-xl font-semibold mb-4">Media</h2>
                     <div className="space-y-6">
@@ -550,6 +648,56 @@ export default function PublicProfileSettings() {
                                 placeholder="https://www.school.com"
                                 className="mt-2"
                             />
+                        </div>
+
+                        <Separator className="my-6" />
+
+                        <h3 className="text-sm font-medium mb-4">Social Links</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <Label htmlFor="facebook">Facebook URL</Label>
+                                <Input
+                                    id="facebook"
+                                    type="url"
+                                    value={formData.socials?.facebook || ''}
+                                    onChange={(e) => handleChange('socials', { ...formData.socials, facebook: e.target.value })}
+                                    placeholder="https://facebook.com/..."
+                                    className="mt-2"
+                                />
+                            </div>
+                            <div>
+                                <Label htmlFor="instagram">Instagram URL</Label>
+                                <Input
+                                    id="instagram"
+                                    type="url"
+                                    value={formData.socials?.instagram || ''}
+                                    onChange={(e) => handleChange('socials', { ...formData.socials, instagram: e.target.value })}
+                                    placeholder="https://instagram.com/..."
+                                    className="mt-2"
+                                />
+                            </div>
+                            <div>
+                                <Label htmlFor="twitter">Twitter URL</Label>
+                                <Input
+                                    id="twitter"
+                                    type="url"
+                                    value={formData.socials?.twitter || ''}
+                                    onChange={(e) => handleChange('socials', { ...formData.socials, twitter: e.target.value })}
+                                    placeholder="https://twitter.com/..."
+                                    className="mt-2"
+                                />
+                            </div>
+                            <div>
+                                <Label htmlFor="linkedin">LinkedIn URL</Label>
+                                <Input
+                                    id="linkedin"
+                                    type="url"
+                                    value={formData.socials?.linkedin || ''}
+                                    onChange={(e) => handleChange('socials', { ...formData.socials, linkedin: e.target.value })}
+                                    placeholder="https://linkedin.com/..."
+                                    className="mt-2"
+                                />
+                            </div>
                         </div>
                     </div>
                 </Card>

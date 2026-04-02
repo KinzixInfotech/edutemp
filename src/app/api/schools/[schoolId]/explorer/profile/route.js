@@ -16,6 +16,7 @@ const PROFILE_FIELDS = [
     'establishedYear', 'totalStudents', 'totalTeachers', 'studentTeacherRatio',
     'latitude', 'longitude',
     'isPubliclyVisible', 'isFeatured',
+    'boards', 'genderType', 'socials', 'leadership'
 ];
 
 export async function GET(req, props) {

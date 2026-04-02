@@ -5,10 +5,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import redis from '@/lib/redis';
-import { Client as QStashClient } from '@upstash/qstash';
-
-// ── QStash client ─────────────────────────────────────────────
-const qstash = new QStashClient({ token: process.env.QSTASH_TOKEN });
+import qstash from '@/lib/qstash';
 
 // ── Job helpers (exported so worker + status routes can import) ─
 const JOB_TTL = 60 * 60 * 2; // 2 hours

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { startTransition, useState } from 'react';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import SchoolCard from '@/components/explore/SchoolCard';
 import SchoolFilters from '@/components/explore/SchoolFilters';
 import { Card } from '@/components/ui/card';
@@ -23,7 +23,7 @@ export default function SchoolsPage() {
     });
     const [filtersOpen, setFiltersOpen] = useState(false);
 
-    const { data, isLoading, isError, error } = useQuery({
+    const { data, isLoading, isFetching, isError, error } = useQuery({
         queryKey: ['schools', filters],
         queryFn: async () => {
             const params = new URLSearchParams();
@@ -39,14 +39,17 @@ export default function SchoolsPage() {
         },
         staleTime: 5 * 60 * 1000,
         cacheTime: 10 * 60 * 1000,
+        placeholderData: keepPreviousData,
     });
 
     const handleFilterChange = (newFilters) => {
-        setFilters((prev) => ({
-            ...prev,
-            ...newFilters,
-            page: 1,
-        }));
+        startTransition(() => {
+            setFilters((prev) => ({
+                ...prev,
+                ...newFilters,
+                page: 1,
+            }));
+        });
     };
 
     const handlePageChange = (newPage) => {
@@ -138,6 +141,12 @@ export default function SchoolsPage() {
 
                     {/* Schools Grid */}
                     <div className="lg:col-span-3">
+                        {isFetching && !isLoading && (
+                            <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
+                                Updating results...
+                            </div>
+                        )}
+
                         {/* Loading State */}
                         {isLoading && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">

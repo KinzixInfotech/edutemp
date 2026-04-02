@@ -190,6 +190,9 @@ export default function DailyStatsCards({ schoolId, academicYearId, data: propDa
     const attendanceBar = staticChartData?.attendanceBar || [];
     const feePie = staticChartData?.feePie || [];
 
+    // ── Summary stats ──
+    const totalStaff = (data?.totalTeachingStaff ?? 0) + (data?.totalNonTeachingStaff ?? 0);
+    const totalStudents = data?.totalStudents ?? 0;
     // ── Format large numbers (Indian: K, L, Cr) ──
     const formatCount = (num) => {
         if (num == null) return '0';
@@ -198,10 +201,6 @@ export default function DailyStatsCards({ schoolId, academicYearId, data: propDa
         if (num >= 1000) return `${(num / 1000).toFixed(1).replace(/\.0$/, '')} K`;
         return num.toLocaleString('en-IN');
     };
-
-    // ── Summary stats ──
-    const totalStaff = (data?.totalTeachingStaff ?? 0) + (data?.totalNonTeachingStaff ?? 0);
-    const totalStudents = data?.totalStudents ?? 0;
 
     const stats = [
         {
@@ -250,6 +249,9 @@ export default function DailyStatsCards({ schoolId, academicYearId, data: propDa
         }
     ];
 
+    const chartCardClass =
+        'border-gray-200/70 bg-white/95 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur dark:border-gray-800 dark:bg-[#1a1a1d]';
+
     if (isLoading) {
         return (
             <div className="mb-6 space-y-6">
@@ -292,8 +294,9 @@ export default function DailyStatsCards({ schoolId, academicYearId, data: propDa
                         return (
                             <div
                                 key={index}
-                                className="group border relative p-5 rounded-xl bg-white dark:bg-[#1a1a1d] hover:border-gray-200 dark:hover:border-gray-700 transition-all duration-200"
+                                className="group border relative overflow-hidden p-5 rounded-xl bg-white dark:bg-[#1a1a1d] hover:border-gray-200 dark:hover:border-gray-700 transition-all duration-200 shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
                             >
+                                <div className="pointer-events-none absolute inset-x-0 top-0 h-20 opacity-70 blur-2xl" style={{ background: `linear-gradient(90deg, transparent 0%, ${index === 0 ? 'rgba(59,130,246,0.18)' : index === 1 ? 'rgba(34,197,94,0.18)' : index === 2 ? 'rgba(168,85,247,0.18)' : 'rgba(249,115,22,0.18)'} 50%, transparent 100%)` }} />
                                 <div className="flex items-start justify-between mb-4">
                                     <div className={`p-2.5 rounded-lg ${stat.iconBg}`}>
                                         <Icon className={`h-5 w-5 ${stat.iconColor}`} />
@@ -322,7 +325,9 @@ export default function DailyStatsCards({ schoolId, academicYearId, data: propDa
             {/* ═══ Attendance Charts Row ═══ */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* Attendance Area Chart */}
-                <Card className="lg:col-span-2">
+                <Card className={`lg:col-span-2 overflow-hidden relative ${chartCardClass}`}>
+                    <div className="pointer-events-none absolute -top-10 left-10 h-32 w-40 rounded-full bg-emerald-500/10 blur-3xl" />
+                    <div className="pointer-events-none absolute top-0 right-0 h-28 w-36 rounded-full bg-amber-400/10 blur-3xl" />
                     <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
                             <div>
@@ -355,7 +360,7 @@ export default function DailyStatsCards({ schoolId, academicYearId, data: propDa
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="h-[250px] w-full">
+                        <div className="h-[250px] w-full rounded-2xl border border-emerald-100/70 bg-gradient-to-b from-emerald-50/70 via-white to-white p-3 dark:border-emerald-900/30 dark:from-emerald-950/20 dark:via-[#1a1a1d] dark:to-[#1a1a1d]">
                             {attendanceChartLoading ? (
                                 <div className="h-full flex items-center justify-center">
                                     <Skeleton className="h-full w-full rounded-lg" />
@@ -373,9 +378,9 @@ export default function DailyStatsCards({ schoolId, academicYearId, data: propDa
                                                 <stop offset="95%" stopColor={COLORS.absent} stopOpacity={0} />
                                             </linearGradient>
                                         </defs>
-                                        <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                                        <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" className="text-muted-foreground" />
-                                        <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" />
+                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.22)" vertical={false} />
+                                        <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'rgb(100 116 139)' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                                        <YAxis tick={{ fontSize: 11, fill: 'rgb(100 116 139)' }} axisLine={false} tickLine={false} />
                                         <Tooltip content={<ChartTooltip />} />
                                         <Area type="monotone" dataKey="present" name="Present" stroke={COLORS.present} fill="url(#gradPresent)" strokeWidth={2} />
                                         <Area type="monotone" dataKey="absent" name="Absent" stroke={COLORS.absent} fill="url(#gradAbsent)" strokeWidth={2} />
@@ -394,7 +399,8 @@ export default function DailyStatsCards({ schoolId, academicYearId, data: propDa
                 </Card>
 
                 {/* Today's Attendance Bar Chart */}
-                <Card>
+                <Card className={`overflow-hidden relative ${chartCardClass}`}>
+                    <div className="pointer-events-none absolute -top-10 right-4 h-28 w-28 rounded-full bg-blue-500/10 blur-3xl" />
                     <CardHeader className="pb-2">
                         <CardTitle className="text-base">Today&apos;s Breakdown</CardTitle>
                         <CardDescription>Student attendance status</CardDescription>
@@ -404,12 +410,12 @@ export default function DailyStatsCards({ schoolId, academicYearId, data: propDa
                             <Skeleton className="h-[220px] w-full rounded-lg" />
                         ) : attendanceBar.length > 0 ? (
                             <>
-                                <div className="h-[180px]">
+                                <div className="h-[180px] rounded-2xl border border-blue-100/70 bg-gradient-to-b from-blue-50/70 via-white to-white p-3 dark:border-blue-900/30 dark:from-blue-950/20 dark:via-[#1a1a1d] dark:to-[#1a1a1d]">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <BarChart data={attendanceBar} margin={{ top: 5, right: 5, left: -15, bottom: 5 }}>
-                                            <CartesianGrid strokeDasharray="3 3" className="opacity-30" vertical={false} />
-                                            <XAxis dataKey="name" tick={{ fontSize: 11 }} className="text-muted-foreground" />
-                                            <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" allowDecimals={false} />
+                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.22)" vertical={false} />
+                                            <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'rgb(100 116 139)' }} axisLine={false} tickLine={false} />
+                                            <YAxis tick={{ fontSize: 11, fill: 'rgb(100 116 139)' }} axisLine={false} tickLine={false} allowDecimals={false} />
                                             <Tooltip content={<BarTooltip />} />
                                             <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={40}>
                                                 {attendanceBar.map((entry, i) => (
@@ -445,7 +451,8 @@ export default function DailyStatsCards({ schoolId, academicYearId, data: propDa
             {/* ═══ Fee Charts Row ═══ */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 {/* Fee Collection Area Chart */}
-                <Card className="lg:col-span-2">
+                <Card className={`lg:col-span-2 overflow-hidden relative ${chartCardClass}`}>
+                    <div className="pointer-events-none absolute -top-10 left-8 h-32 w-40 rounded-full bg-violet-500/10 blur-3xl" />
                     <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
                             <div>
@@ -470,7 +477,7 @@ export default function DailyStatsCards({ schoolId, academicYearId, data: propDa
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="h-[250px] w-full">
+                        <div className="h-[250px] w-full rounded-2xl border border-violet-100/70 bg-gradient-to-b from-violet-50/70 via-white to-white p-3 dark:border-violet-900/30 dark:from-violet-950/20 dark:via-[#1a1a1d] dark:to-[#1a1a1d]">
                             {feeChartLoading ? (
                                 <div className="h-full flex items-center justify-center">
                                     <Skeleton className="h-full w-full rounded-lg" />
@@ -484,9 +491,9 @@ export default function DailyStatsCards({ schoolId, academicYearId, data: propDa
                                                 <stop offset="95%" stopColor={COLORS.fee} stopOpacity={0} />
                                             </linearGradient>
                                         </defs>
-                                        <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                                        <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" className="text-muted-foreground" />
-                                        <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" tickFormatter={(v) => `₹${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`} />
+                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.22)" vertical={false} />
+                                        <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'rgb(100 116 139)' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                                        <YAxis tick={{ fontSize: 11, fill: 'rgb(100 116 139)' }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`} />
                                         <Tooltip content={<FeeTooltip />} />
                                         <Area type="monotone" dataKey="amount" name="Collection" stroke={COLORS.fee} fill="url(#gradFee)" strokeWidth={2} />
                                     </AreaChart>
@@ -503,7 +510,8 @@ export default function DailyStatsCards({ schoolId, academicYearId, data: propDa
                 </Card>
 
                 {/* Fee Breakdown Pie */}
-                <Card>
+                <Card className={`overflow-hidden relative ${chartCardClass}`}>
+                    <div className="pointer-events-none absolute -top-8 right-6 h-28 w-28 rounded-full bg-orange-500/10 blur-3xl" />
                     <CardHeader className="pb-2">
                         <CardTitle className="text-base">Fee Overview</CardTitle>
                         <CardDescription>Year-to-date breakdown</CardDescription>
@@ -513,7 +521,7 @@ export default function DailyStatsCards({ schoolId, academicYearId, data: propDa
                             <Skeleton className="h-[180px] w-full rounded-lg" />
                         ) : feePie.length > 0 ? (
                             <>
-                                <div className="h-[160px]">
+                                <div className="h-[160px] rounded-2xl border border-orange-100/70 bg-gradient-to-b from-orange-50/70 via-white to-white p-3 dark:border-orange-900/30 dark:from-orange-950/20 dark:via-[#1a1a1d] dark:to-[#1a1a1d]">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <PieChart>
                                             <Pie
