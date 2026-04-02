@@ -14,6 +14,7 @@ import FloatingDemoButton from "@/components/FloatingDemoButton";
 import AOSProvider from "@/components/AosProvider";
 
 export const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.edubreezy.com';
+export { metadata } from './metadata';
 export default function RootLayout({ children }) {
   // JSON-LD structured data for Google site name
   const websiteSchema = {

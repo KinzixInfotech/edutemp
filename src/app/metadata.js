@@ -1,4 +1,4 @@
-import { baseUrl } from "./layout";
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.edubreezy.com';
 
 export const metadata = {
     // Core metadata

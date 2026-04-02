@@ -31,7 +31,10 @@ import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern
 import ProductGuideAI from '@/components/ProductGuideAI';
 import SectionHeading from '@/components/SectionHeading';
 import Image from 'next/image';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
+gsap.registerPlugin(ScrollTrigger);
 // Organization Schema for SEO
 const organizationSchema = {
     "@context": "https://schema.org",
@@ -102,8 +105,8 @@ export default function HomePage() {
             <div className='w-full hidden lg:block'>
                 <img src={'./banner.svg'} className='object-cover hidden lg:block w-[100%] pointer-events-none' />
             </div>
-            <FinalCTA />
 
+            <FinalCTA />
             <PartnerTeaser />
             {/* <Footer /> */}
         </div>
@@ -1334,15 +1337,15 @@ function IntegrationsSection() {
 
                 {/* CTA */}
                 <div className="text-center">
-                    <Link href="/features">
+                    <Link href="/features/docs">
                         <button className="inline-flex items-center gap-2 px-8 py-4 bg-[#046bff] text-white font-bold rounded-full hover:bg-[#0358dd] transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
                             Explore All Integrations
                             <ArrowRight size={18} />
                         </button>
                     </Link>
-                    <p className="mt-5 text-xs text-gray-400 uppercase tracking-widest">
+                    {/* <p className="mt-5 text-xs text-gray-400 uppercase tracking-widest">
                         Trusted by 2000+ Schools
-                    </p>
+                    </p> */}
                 </div>
             </div>
         </section>
@@ -1617,69 +1620,76 @@ function PricingSection() {
     ];
 
     return (
-        <section className="py-24 md:py-32 px-5 bg-white relative overflow-hidden" id="pricing">
-            <div className="max-w-[1200px] mx-auto relative z-10">
+        <section className="pt-24 md:pt-32 bg-white relative overflow-hidden" id="pricing">
+            <div className="w-full relative z-10">
                 {/* Section Header */}
-                <SectionHeading
-                    badge="SIMPLE PRICING"
-                    title="Transparent Pricing for"
-                    highlightedText="Every School"
-                    description="One simple plan. No hidden fees. Pay yearly and save 30%."
-                />
+                <div className="max-w-[1200px] mx-auto px-5">
+                    <SectionHeading
+                        badge="SIMPLE PRICING"
+                        title="Transparent Pricing for"
+                        highlightedText="Every School"
+                        description="One simple plan. No hidden fees. Pay yearly and save 30%."
+                    />
+                </div>
 
-                {/* Pricing Card - Full Width with Two Columns */}
-                <div className="bg-gradient-to-br from-[#0569ff] to-[#0145c4] rounded-[2.5rem] overflow-hidden border-2 border-black">
-                    <div className="grid grid-cols-1 lg:grid-cols-2">
-                        {/* Left - Pricing Info (Blue gradient background) */}
-                        <div className="p-8 md:p-12 lg:p-16">
-                            {/* 30% OFF Badge */}
-                            <span className="inline-flex items-center gap-1.5 bg-white/20 text-white px-4 py-2 rounded-full text-sm font-bold mb-6 backdrop-blur-sm border border-white/30">
+                {/* Pricing Card - Full Width */}
+                <div className="bg-gradient-to-br from-[#0569ff] to-[#0145c4] overflow-hidden border-y-2 border-black">
+                    <div className="max-w-[1400px] mx-auto grid grid-cols-1 lg:grid-cols-2 min-h-[500px]">
+                        {/* Left */}
+                        <div className="p-10 md:p-16 lg:p-20 flex flex-col justify-center">
+                            <span className="inline-flex items-center gap-1.5 bg-white/20 text-white px-4 py-2 rounded-full text-sm font-bold mb-8 backdrop-blur-sm border border-white/30 w-fit">
                                 <Zap className="w-4 h-4" />
                                 30% OFF - Limited Time
                             </span>
 
-                            {/* Main Price */}
-                            <div className="mb-8">
-                                <div className="flex items-baseline gap-3">
-                                    <span className="text-6xl md:text-7xl font-black text-white">₹120</span>
+                            <div className="mb-10">
+                                <div className="flex items-baseline gap-3 mb-4">
+                                    <span className="text-7xl md:text-8xl font-black text-white">₹120</span>
                                     <div className="flex flex-col">
-                                        <span className="text-white/90 text-lg font-semibold">per student</span>
-                                        <span className="text-white/60 text-sm">per year</span>
+                                        <span className="text-white/90 text-xl font-semibold">per student</span>
+                                        <span className="text-white/60 text-base">per year</span>
                                     </div>
                                 </div>
-                                <p className="text-white text-base font-semibold mt-4 flex items-center gap-2">
-                                    <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                                <p className="text-white/80 text-lg font-medium flex items-center gap-2">
+                                    <span className="w-2 h-2 bg-white rounded-full animate-pulse shrink-0"></span>
                                     Only ₹10 per month, billed yearly
                                 </p>
                             </div>
 
-                            {/* CTA Buttons */}
-                            <div className="space-y-3">
-                                <Link href="/pricing" className="block">
-                                    <button className="w-full py-4 bg-white text-[#0569ff] font-bold rounded-full hover:bg-white/90 transition-all duration-300 flex items-center justify-center gap-2 group shadow-lg">
+                            {/* Quotes row */}
+                            <div className="mb-10 border-l-4 border-white/40 pl-5">
+                                <p className="text-white/90 text-xl md:text-2xl font-medium leading-relaxed italic">
+                                    "Technology will not replace great teachers, but technology in the hands of great teachers can be transformational."
+                                </p>
+                                <p className="text-white/50 text-sm mt-3 font-medium">— George Couros</p>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <Link href="/pricing" className="flex-1">
+                                    <button className="w-full py-4 bg-white text-[#0569ff] font-bold rounded-full hover:bg-white/90 transition-all duration-300 flex items-center justify-center gap-2 group shadow-lg text-base">
                                         Calculate Your Price
                                         <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                                     </button>
                                 </Link>
-                                <Link href="/contact" className="block">
-                                    <button className="w-full py-4 bg-white/10 text-white font-bold rounded-full border border-white/30 hover:bg-white/20 transition-all duration-300 backdrop-blur-sm">
+                                <Link href="/contact" className="flex-1">
+                                    <button className="w-full py-4 bg-white/10 text-white font-bold rounded-full border border-white/30 hover:bg-white/20 transition-all duration-300 backdrop-blur-sm text-base">
                                         Talk to Sales
                                     </button>
                                 </Link>
                             </div>
 
-                            {/* Note */}
-                            <p className="text-white/60 text-sm mt-6">
+                            <p className="text-white/50 text-sm mt-6">
                                 💡 Billed annually. Minimum 100 students.
                             </p>
                         </div>
 
-                        {/* Right - Features List */}
-                        <div className="bg-white border-t lg:border-t-0 lg:border-l border-slate-100">
-                            <div className="">
-                                <img src="./120.png" alt="Pricing Features" className="w-full h-full object-contain rounded-2xl  " />
-                            </div>
-
+                        {/* Right */}
+                        <div className="bg-white/5 border-t lg:border-t-0 lg:border-l border-white/10 relative min-h-[400px] lg:min-h-full">
+                            <img
+                                src="./120.png"
+                                alt="Pricing Features"
+                                className="absolute inset-0 w-full h-full object-cover"
+                            />
                         </div>
                     </div>
                 </div>

@@ -52,6 +52,7 @@ export default function Header() {
     const [activeSubmenu, setActiveSubmenu] = useState(null);
     const [mobileExpandedMenu, setMobileExpandedMenu] = useState(null);
     const [isScrolled, setIsScrolled] = useState(false);
+    const [schoolInfo, setSchoolInfo] = useState(null);
     const pathname = usePathname();
     const router = useRouter();
 
