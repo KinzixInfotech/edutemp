@@ -129,23 +129,22 @@ const DEFAULT_ELEMENTS = {
     },
     [ELEMENT_TYPES.TABLE]: {
         type: ELEMENT_TYPES.TABLE,
-        width: 600,
-        height: 200,
+        width: 450,
+        height: 100,
         columns: [
-            { key: 'date', label: 'Date', placeholder: '{{exam_date}}', width: 150 },
-            { key: 'subject', label: 'Subject', placeholder: '{{exam_subject_name}}', width: 200 },
-            { key: 'time', label: 'Time', placeholder: '{{exam_time}}', width: 150 },
-            { key: 'marks', label: 'Max Marks', placeholder: '{{exam_max_marks}}', width: 100 },
+            { key: 'col1', label: 'Column 1', placeholder: '{{data_1}}', width: 150 },
+            { key: 'col2', label: 'Column 2', placeholder: '{{data_2}}', width: 150 },
+            { key: 'col3', label: 'Column 3', placeholder: '{{data_3}}', width: 150 },
         ],
         rowHeight: 30,
-        headerBackgroundColor: '#e0f2fe',
+        headerBackgroundColor: '#f1f5f9',
         rowBackgroundColor: '#ffffff',
         borderColor: '#cbd5e1',
         borderWidth: 1,
         fontSize: 12,
         headerFontWeight: 'bold',
         textAlign: 'center',
-        dataSource: 'exam_subjects', // Special key to populate from exam subjects
+        dataSource: 'custom', 
     },
 };
 
@@ -178,7 +177,12 @@ const MemoizedRndElement = React.memo(({
             )}
             style={{ zIndex: isSelected ? 9998 : el.zIndex, pointerEvents: readOnly ? 'none' : 'auto' }}
         >
-            <ElementRenderer element={el} />
+            <ElementRenderer 
+                element={el}
+                isSelected={isSelected}
+                readOnly={readOnly}
+                onUpdate={(updates) => callbacksRef.current.updateElement(el.id, updates)}
+            />
         </Rnd>
     );
 }, (prevProps, nextProps) => {
@@ -227,7 +231,7 @@ export default function CertificateDesignEditor({
 }) {
     const safeConfig = initialConfig || {};
     const [elements, setElements] = useState(safeConfig.elements || []);
-    const [selectedId, setSelectedId] = useState(null);
+    const [selectedIds, setSelectedIds] = useState([]);
     const [canvasSize, setCanvasSize] = useState(safeConfig.canvasSize || { width: 800, height: 600 });
     const [backgroundImage, setBackgroundImage] = useState(safeConfig.backgroundImage || '');
     const [backgroundColor, setBackgroundColor] = useState(safeConfig.backgroundColor || '#ffffff');
@@ -237,6 +241,7 @@ export default function CertificateDesignEditor({
     const [isInitialized, setIsInitialized] = useState(false);
     const onChangeRef = useRef(onChange);
     const [canvasScale, setCanvasScale] = useState(1);
+    const [isAutoFit, setIsAutoFit] = useState(true);
     const guideXRef = useRef(null);
     const guideYRef = useRef(null);
     const SNAP_THRESHOLD = 6;
@@ -315,9 +320,10 @@ export default function CertificateDesignEditor({
         if (readOnly) return;
         const handler = (e) => {
             // Delete/Backspace to remove selected element
-            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length > 0 && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
                 e.preventDefault();
-                removeElement(selectedId);
+                setElements(prev => prev.filter(el => !selectedIds.includes(el.id)));
+                setSelectedIds([]);
             }
             // Ctrl+Z / Cmd+Z = Undo
             if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
@@ -330,27 +336,30 @@ export default function CertificateDesignEditor({
                 redo();
             }
             // Ctrl+D = Duplicate
-            if ((e.ctrlKey || e.metaKey) && e.key === 'd' && selectedId) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'd' && selectedIds.length > 0) {
                 e.preventDefault();
-                duplicateElement(selectedId);
+                duplicateElements(selectedIds);
             }
             // Arrow keys = Nudge
-            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && selectedId && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && selectedIds.length > 0 && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
                 e.preventDefault();
                 const nudge = e.shiftKey ? 10 : 1;
-                const updates = {};
-                if (e.key === 'ArrowUp') updates.y = (elements.find(el => el.id === selectedId)?.y || 0) - nudge;
-                if (e.key === 'ArrowDown') updates.y = (elements.find(el => el.id === selectedId)?.y || 0) + nudge;
-                if (e.key === 'ArrowLeft') updates.x = (elements.find(el => el.id === selectedId)?.x || 0) - nudge;
-                if (e.key === 'ArrowRight') updates.x = (elements.find(el => el.id === selectedId)?.x || 0) + nudge;
-                updateElement(selectedId, updates);
+                setElements(prev => prev.map(el => {
+                    if (!selectedIds.includes(el.id)) return el;
+                    const updates = {};
+                    if (e.key === 'ArrowUp') updates.y = el.y - nudge;
+                    if (e.key === 'ArrowDown') updates.y = el.y + nudge;
+                    if (e.key === 'ArrowLeft') updates.x = el.x - nudge;
+                    if (e.key === 'ArrowRight') updates.x = el.x + nudge;
+                    return { ...el, ...updates };
+                }));
             }
             // Escape = Deselect
-            if (e.key === 'Escape') setSelectedId(null);
+            if (e.key === 'Escape') setSelectedIds([]);
         };
         window.addEventListener('keydown', handler);
         return () => window.removeEventListener('keydown', handler);
-    }, [readOnly, selectedId, elements, undo, redo]);
+    }, [readOnly, selectedIds, elements, undo, redo]);
 
     // Update state when initialConfig changes
     useEffect(() => {
@@ -390,6 +399,7 @@ export default function CertificateDesignEditor({
     // Auto-scale canvas to fit the available area (edit mode only)
     useEffect(() => {
         if (readOnly) { setCanvasScale(1); return; }
+        if (!isAutoFit) return;
         const area = canvasAreaRef.current;
         if (!area) return;
         const observer = new ResizeObserver(entries => {
@@ -404,7 +414,7 @@ export default function CertificateDesignEditor({
         });
         observer.observe(area);
         return () => observer.disconnect();
-    }, [canvasSize, readOnly]);
+    }, [canvasSize, readOnly, isAutoFit]);
 
     const addElement = (type) => {
         const newElement = {
@@ -414,33 +424,42 @@ export default function CertificateDesignEditor({
             zIndex: elements.length + 1,
             ...DEFAULT_ELEMENTS[type],
         };
-        setElements([...elements, newElement]);
-        setSelectedId(newElement.id);
+        setElements(prev => [...prev, newElement]);
+        setSelectedIds([newElement.id]);
     };
 
-    const updateElement = (id, updates) => {
-        setElements(elements.map(el => el.id === id ? { ...el, ...updates } : el));
-    };
+    const updateElement = useCallback((id, updates) => {
+        setElements(prev => prev.map(el => el.id === id ? { ...el, ...updates } : el));
+    }, []);
 
     const removeElement = (id) => {
-        setElements(elements.filter(el => el.id !== id));
-        setSelectedId(null);
+        setElements(prev => prev.filter(el => el.id !== id));
+        setSelectedIds(prev => prev.filter(i => i !== id));
     };
 
-    const duplicateElement = (id) => {
-        const element = elements.find(el => el.id === id);
-        if (!element) return;
-
-        const newElement = {
-            ...element,
-            id: `${element.type}-${Date.now()}`,
-            x: element.x + 20,
-            y: element.y + 20,
-            zIndex: elements.length + 1,
-        };
-        setElements([...elements, newElement]);
-        setSelectedId(newElement.id);
-    };
+    const duplicateElements = useCallback((ids) => {
+        setElements(prev => {
+            const newElements = [];
+            const newIds = [];
+            let maxZ = Math.max(0, ...prev.map(e => e.zIndex));
+            ids.forEach(id => {
+                const element = prev.find(el => el.id === id);
+                if (element) {
+                    const newElement = {
+                        ...element,
+                        id: `${element.type}-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+                        x: element.x + 20,
+                        y: element.y + 20,
+                        zIndex: ++maxZ,
+                    };
+                    newElements.push(newElement);
+                    newIds.push(newElement.id);
+                }
+            });
+            setSelectedIds(newIds);
+            return [...prev, ...newElements];
+        });
+    }, []);
 
     // Find the single closest snap per axis — no React state, pure DOM
     const findSnap = useCallback((dragId, x, y, w, h) => {
@@ -543,17 +562,92 @@ export default function CertificateDesignEditor({
         });
     };
 
-    const selectedElement = elements.find(el => el.id === selectedId);
+    const handleSelect = useCallback((id, e) => {
+        if (e && e.shiftKey) {
+            setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+        } else {
+            setSelectedIds([id]);
+        }
+    }, []);
 
-    // Keep callbacks fresh for memoized children
+    const selectedElement = selectedIds.length === 1 ? elements.find(el => el.id === selectedIds[0]) : null;
+
+    const computeSelectionBBox = () => {
+         if (selectedIds.length === 0) return null;
+         const selEls = elements.filter(el => selectedIds.includes(el.id));
+         if (selEls.length === 0) return null;
+         
+         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+         selEls.forEach(el => {
+             const x = el.x;
+             const y = el.y;
+             const w = typeof el.width === 'number' ? el.width : parseInt(el.width || 100);
+             const h = typeof el.height === 'number' ? el.height : parseInt(el.height || 50);
+             if (x < minX) minX = x;
+             if (y < minY) minY = y;
+             if ((x + w) > maxX) maxX = x + w;
+             if ((y + h) > maxY) maxY = y + h;
+         });
+         return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+    };
+
+    const handleGroup = () => {
+         if (selectedIds.length < 2) return;
+         const selEls = elements.filter(el => selectedIds.includes(el.id));
+         const bbox = computeSelectionBBox();
+         if (!bbox) return;
+
+         const groupedItems = selEls.map(el => ({
+             ...el,
+             x: el.x - bbox.x,
+             y: el.y - bbox.y
+         }));
+
+         const newGroup = {
+             id: `group-${Date.now()}`,
+             type: ELEMENT_TYPES.GROUP,
+             x: bbox.x,
+             y: bbox.y,
+             width: Math.max(bbox.width, 20),
+             height: Math.max(bbox.height, 20),
+             zIndex: Math.max(...selEls.map(e => e.zIndex)) + 1,
+             items: groupedItems,
+         };
+
+         setElements(prev => [
+             ...prev.filter(el => !selectedIds.includes(el.id)),
+             newGroup
+         ]);
+         setSelectedIds([newGroup.id]);
+    };
+
+    const handleUngroup = (groupId) => {
+         const group = elements.find(el => el.id === groupId);
+         if (!group || group.type !== ELEMENT_TYPES.GROUP) return;
+
+         const restoredItems = group.items.map((child, index) => ({
+             ...child,
+             x: group.x + child.x,
+             y: group.y + child.y,
+             zIndex: group.zIndex + index
+         }));
+
+         setElements(prev => [
+             ...prev.filter(el => el.id !== groupId),
+             ...restoredItems
+         ]);
+         setSelectedIds(restoredItems.map(r => r.id));
+    };
+
     useEffect(() => {
         callbacksRef.current = {
             handleDrag,
             handleDragStop,
             handleResizeStop,
-            setSelectedId
+            setSelectedId: handleSelect,
+            updateElement
         };
-    }, [handleDrag, handleDragStop, handleResizeStop, setSelectedId]);
+    }, [handleDrag, handleDragStop, handleResizeStop, handleSelect, updateElement]);
 
     // Canvas alignment helpers
     const alignElement = (alignment) => {
@@ -765,6 +859,28 @@ export default function CertificateDesignEditor({
 
                 {/* Main Canvas Area */}
                 <div ref={canvasAreaRef} className={cn("flex-1 min-w-0 bg-[#f5f5f5] dark:bg-muted/50 relative overflow-auto flex items-start justify-center py-8 px-8", readOnly && "bg-transparent p-0 overflow-visible")}>
+                    
+                    {/* Zoom Slider */}
+                    {!readOnly && (
+                        <div className="fixed bottom-6 right-80 bg-background/90 backdrop-blur-md border rounded-lg shadow-xl flex items-center px-3 py-2 gap-3 z-50">
+                            <span className="text-xs font-mono w-10 text-right">{Math.round(canvasScale * 100)}%</span>
+                            <Slider 
+                               value={[canvasScale * 100]} 
+                               min={10} 
+                               max={500} 
+                               step={5} 
+                               className="w-32"
+                               onValueChange={([val]) => {
+                                   setIsAutoFit(false);
+                                   setCanvasScale(val / 100);
+                               }}
+                            />
+                            <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2 border" onClick={() => setIsAutoFit(true)}>
+                                Fit
+                            </Button>
+                        </div>
+                    )}
+
                     {/* Sizing wrapper */}
                     <div style={!readOnly ? { width: canvasSize.width * canvasScale, height: canvasSize.height * canvasScale, flexShrink: 0 } : undefined}>
                         <div
@@ -777,12 +893,12 @@ export default function CertificateDesignEditor({
                                 backgroundImage: backgroundImage ? `url(${backgroundImage})` : 'none',
                                 backgroundSize: 'cover',
                                 backgroundPosition: 'center',
-                                transform: readOnly ? 'scale(1)' : `scale(${canvasScale})`,
+                                                            transform: readOnly ? 'scale(1)' : `scale(${canvasScale})`,
                                 transformOrigin: 'top left',
                                 overflow: 'hidden',
                             }}
                             onClick={(e) => {
-                                if (!readOnly && e.target === containerRef.current) setSelectedId(null);
+                                if (!readOnly && e.target === containerRef.current) setSelectedIds([]);
                             }}
                         >
                             {/* Alignment guide lines */}
@@ -793,7 +909,7 @@ export default function CertificateDesignEditor({
                                 </>
                             )}
                             {elements.map((el) => {
-                                const isSelected = selectedId === el.id && !readOnly;
+                                const isSelected = selectedIds.includes(el.id) && !readOnly;
                                 return (
                                     <MemoizedRndElement
                                         key={el.id}
@@ -806,48 +922,103 @@ export default function CertificateDesignEditor({
                                     />
                                 );
                             })}
+
+                            {/* Floating Context Toolbar */}
+                            {!readOnly && selectedIds.length > 0 && (() => {
+                                const bbox = computeSelectionBBox();
+                                if (!bbox) return null;
+                                const isGroup = selectedIds.length > 1;
+                                return (
+                                    <div 
+                                        className="absolute flex items-center bg-[#18191b] rounded-full shadow-lg border border-white/10 px-2 py-1.5 gap-1 text-white z-[9999]"
+                                        style={{ 
+                                             left: bbox.x + bbox.width / 2, 
+                                             top: bbox.y - 48, 
+                                             transform: 'translateX(-50%)',
+                                             pointerEvents: 'auto'
+                                        }}
+                                        onPointerDown={e => e.stopPropagation()}
+                                        onClick={e => e.stopPropagation()}
+                                    >
+                                         {isGroup ? (
+                                             <button onClick={handleGroup} className="flex items-center gap-2 px-3 py-1 hover:bg-white/20 rounded-full text-xs font-medium focus:outline-none">
+                                                 <Layers className="h-3.5 w-3.5" /> Group
+                                             </button>
+                                         ) : selectedElement?.type === ELEMENT_TYPES.GROUP ? (
+                                             <button onClick={() => handleUngroup(selectedElement.id)} className="flex items-center gap-2 px-3 py-1 hover:bg-white/20 rounded-full text-xs font-medium focus:outline-none">
+                                                 <Layers className="h-3.5 w-3.5" /> Ungroup
+                                             </button>
+                                         ) : null}
+
+                                         {(isGroup || selectedElement?.type === ELEMENT_TYPES.GROUP) && <div className="w-[1px] h-4 bg-white/20 mx-1" />}
+
+                                         <button onClick={() => duplicateElements(selectedIds)} className="p-1.5 hover:bg-white/20 rounded-full focus:outline-none" title="Duplicate">
+                                             <Copy className="h-3.5 w-3.5" />
+                                         </button>
+                                         <button onClick={() => {
+                                             setElements(prev => prev.map(el => selectedIds.includes(el.id) ? { ...el, locked: !el.locked } : el));
+                                         }} className="p-1.5 hover:bg-white/20 rounded-full focus:outline-none" title="Lock/Unlock">
+                                             {elements.find(el => selectedIds.includes(el.id))?.locked ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
+                                         </button>
+                                         <button onClick={() => {
+                                             setElements(prev => prev.filter(el => !selectedIds.includes(el.id)));
+                                             setSelectedIds([]);
+                                         }} className="p-1.5 hover:bg-white/20 rounded-full text-red-500 focus:outline-none" title="Delete">
+                                             <Trash2 className="h-3.5 w-3.5" />
+                                         </button>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
                 </div>
 
                 {/* Properties Panel */}
                 {!readOnly && (
-                    <div className="w-80 border-l bg-background flex flex-col min-h-0 overflow-hidden">
-                        <Tabs defaultValue="properties" className="w-full flex-1 flex flex-col min-h-0">
-                            <TabsList className="w-full justify-start rounded-none border-b px-4 h-12 flex-shrink-0">
-                                <TabsTrigger value="properties">Properties</TabsTrigger>
-                                <TabsTrigger value="layers">Layers</TabsTrigger>
-                                <TabsTrigger value="settings">Settings</TabsTrigger>
-                            </TabsList>
+                    <div className="properties-sidebar">
+                        <Tabs defaultValue="properties" className="w-full  flex-1 flex flex-col min-h-0">
+                            <div className='bg-[#ebeef0] dark:bg-black border-b'>
+                                <TabsList className="w-full rounded-none border-b px-2 h-11 flex-shrink-0 grid grid-cols-3  gap-1">
+                                    <TabsTrigger value="properties" className="text-xs ">Properties</TabsTrigger>
+                                    <TabsTrigger value="layers" className="text-xs">Layers</TabsTrigger>
+                                    <TabsTrigger value="settings" className="text-xs">Settings</TabsTrigger>
+                                </TabsList>
+                            </div>
 
-                            <TabsContent value="properties" className="flex-1 m-0 overflow-hidden min-h-0">
-                                <ScrollArea className="h-full" style={{ height: 'calc(100vh - 100px - 48px - 48px)' }}>
-                                    <div className="p-4 space-y-4">
-                                        {selectedElement ? (
-                                            <PropertiesEditor
-                                                element={selectedElement}
-                                                onUpdate={(updates) => updateElement(selectedElement.id, updates)}
-                                                onDelete={() => removeElement(selectedElement.id)}
-                                                onDuplicate={() => duplicateElement(selectedElement.id)}
-                                                placeholders={placeholders}
-                                                allFonts={allFonts}
-                                                onCustomFontUpload={handleCustomFontUpload}
-                                            />
-                                        ) : (
-                                            <div className="text-center text-muted-foreground py-8">
-                                                Select an element to edit properties
-                                            </div>
-                                        )}
-                                    </div>
-                                </ScrollArea>
+                            {/* PROPERTIES TAB */}
+                            <TabsContent value="properties" className="flex-1 m-0 overflow-hidden min-h-0 flex flex-col">
+                                <div className="sidebar-inner-scroll">
+                                    {selectedIds.length > 1 ? (
+                                        <div className="flex flex-col items-center justify-center gap-3 py-16 text-center text-muted-foreground">
+                                            <span className="text-4xl opacity-20"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M22 6l-10 7L2 6"/></svg></span>
+                                            <p className="text-sm leading-relaxed">{selectedIds.length} elements selected<br />Use floating toolbar to group</p>
+                                        </div>
+                                    ) : selectedElement ? (
+                                        <PropertiesEditor
+                                            element={selectedElement}
+                                            onUpdate={(updates) => updateElement(selectedElement.id, updates)}
+                                            onDelete={() => removeElement(selectedElement.id)}
+                                            onDuplicate={() => duplicateElements([selectedElement.id])}
+                                            placeholders={placeholders}
+                                            allFonts={allFonts}
+                                            onCustomFontUpload={handleCustomFontUpload}
+                                        />
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center gap-3 py-16 text-center text-muted-foreground">
+                                            <span className="text-4xl opacity-20">↖</span>
+                                            <p className="text-sm leading-relaxed">Select an element<br />to edit its properties</p>
+                                        </div>
+                                    )}
+                                </div>
                             </TabsContent>
 
-                            <TabsContent value="layers" className="flex-1 m-0 overflow-hidden min-h-0">
-                                <div className="h-full overflow-hidden">
+                            {/* LAYERS TAB */}
+                            <TabsContent value="layers" className="flex-1 m-0 overflow-hidden min-h-0 flex flex-col">
+                                <div className="sidebar-inner-scroll">
                                     <LayersPanel
                                         elements={elements}
-                                        selectedId={selectedId}
-                                        onSelect={setSelectedId}
+                                        selectedIds={selectedIds}
+                                        onSelect={(id) => setSelectedIds([id])}
                                         onReorder={setElements}
                                         onToggleLock={(id) => {
                                             const el = elements.find(e => e.id === id);
@@ -861,119 +1032,95 @@ export default function CertificateDesignEditor({
                                 </div>
                             </TabsContent>
 
-                            <TabsContent value="settings" className="flex-1 m-0 overflow-hidden">
-                                <ScrollArea className="h-full">
-                                    <div className="p-4 space-y-4">
-                                        {/* Page Size Presets */}
-                                        <div className="space-y-2">
-                                            <Label>Page Preset</Label>
-                                            <Select
-                                                value={PAGE_PRESETS.find(p => p.width === canvasSize.width && p.height === canvasSize.height)?.label || 'Custom'}
-                                                onValueChange={(label) => {
-                                                    const preset = PAGE_PRESETS.find(p => p.label === label);
-                                                    if (preset && preset.width > 0) setCanvasSize({ width: preset.width, height: preset.height });
-                                                }}
-                                            >
-                                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                                <SelectContent>
-                                                    {PAGE_PRESETS.map(p => (
-                                                        <SelectItem key={p.label} value={p.label} disabled={p.width === 0}>{p.label}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        {/* Custom Dimensions */}
-                                        <div className="space-y-2">
-                                            <Label>Canvas Size</Label>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <div>
-                                                    <Label className="text-xs text-muted-foreground">Width</Label>
-                                                    <Input type="number" value={canvasSize.width} onChange={(e) => setCanvasSize({ ...canvasSize, width: parseInt(e.target.value) || 100 })} />
-                                                </div>
-                                                <div>
-                                                    <Label className="text-xs text-muted-foreground">Height</Label>
-                                                    <Input type="number" value={canvasSize.height} onChange={(e) => setCanvasSize({ ...canvasSize, height: parseInt(e.target.value) || 100 })} />
-                                                </div>
+                            {/* SETTINGS TAB */}
+                            <TabsContent value="settings" className="flex-1 m-0 overflow-hidden min-h-0 flex flex-col">
+                                <div className="sidebar-inner-scroll">
+                                    {/* ── Page Size Presets ── */}
+                                    <div className="space-y-2">
+                                        <Label>Page Preset</Label>
+                                        <Select
+                                            value={PAGE_PRESETS.find(p => p.width === canvasSize.width && p.height === canvasSize.height)?.label || 'Custom'}
+                                            onValueChange={(label) => {
+                                                const preset = PAGE_PRESETS.find(p => p.label === label);
+                                                if (preset && preset.width > 0) setCanvasSize({ width: preset.width, height: preset.height });
+                                            }}
+                                        >
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                {PAGE_PRESETS.map(p => (
+                                                    <SelectItem key={p.label} value={p.label} disabled={p.width === 0}>{p.label}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    {/* ── Custom Dimensions ── */}
+                                    <div className="space-y-2 mt-4">
+                                        <Label>Canvas Size</Label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <Label className="text-xs text-muted-foreground">Width</Label>
+                                                <Input type="number" value={canvasSize.width} onChange={(e) => setCanvasSize({ ...canvasSize, width: parseInt(e.target.value) || 100 })} />
                                             </div>
-                                            <Button variant="outline" size="sm" className="w-full" onClick={() => setCanvasSize({ width: canvasSize.height, height: canvasSize.width })}>
-                                                <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Swap Orientation
-                                            </Button>
-                                        </div>
-                                        <Separator />
-                                        {/* Background Color */}
-                                        <div className="space-y-2">
-                                            <Label>Background Color</Label>
-                                            <div className="flex gap-2">
-                                                <DebouncedColorPicker value={backgroundColor} onChange={(val) => setBackgroundColor(val)} className="w-12 h-9 p-0.5 cursor-pointer" />
-                                                <Input value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} className="flex-1" placeholder="#ffffff" />
+                                            <div>
+                                                <Label className="text-xs text-muted-foreground">Height</Label>
+                                                <Input type="number" value={canvasSize.height} onChange={(e) => setCanvasSize({ ...canvasSize, height: parseInt(e.target.value) || 100 })} />
                                             </div>
                                         </div>
-                                        {/* Background Image */}
-                                        <div className="space-y-2">
-                                            <Label>Background Image</Label>
-                                            <Input
-                                                value={backgroundImage}
-                                                onChange={(e) => setBackgroundImage(e.target.value)}
-                                                placeholder="Paste image URL..."
-                                            />
-                                            <div className="flex gap-2">
-                                                <Button variant="outline" size="sm" className="w-full" onClick={() => {
-                                                    const input = document.createElement('input');
-                                                    input.type = 'file'; input.accept = 'image/*';
-                                                    input.onchange = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (ev) => setBackgroundImage(ev.target.result); reader.readAsDataURL(file); } };
-                                                    input.click();
-                                                }}>
-                                                    <ImageIcon className="h-3.5 w-3.5 mr-1.5" /> Upload Image
-                                                </Button>
-                                                {backgroundImage && (
-                                                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setBackgroundImage('')}>Clear</Button>
-                                                )}
-                                            </div>
-                                            {backgroundImage && (
-                                                <img src={backgroundImage} alt="Background" className="w-full h-20 object-cover rounded border mt-1" />
-                                            )}
-                                        </div>
-                                        <Separator />
-                                        {/* Custom Fonts */}
-                                        <div className="space-y-2">
-                                            <Label>Custom Fonts</Label>
-                                            <Button variant="outline" size="sm" className="w-full" onClick={handleCustomFontUpload}>
-                                                <Upload className="h-3.5 w-3.5 mr-1.5" /> Upload Font (.ttf, .woff2)
-                                            </Button>
-                                            {customFonts.length > 0 && (
-                                                <div className="space-y-1">
-                                                    {customFonts.map((f, i) => (
-                                                        <div key={i} className="flex items-center justify-between p-2 bg-muted/30 rounded text-sm">
-                                                            <span style={{ fontFamily: f.name }}>{f.name}</span>
-                                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setCustomFonts(prev => prev.filter((_, idx) => idx !== i))}>
-                                                                <Trash2 className="h-3 w-3" />
-                                                            </Button>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <Separator />
-                                        {/* Available Placeholders Reference */}
-                                        <div className="space-y-2">
-                                            <Label>Available Placeholders</Label>
-                                            <p className="text-xs text-muted-foreground">Use these in text elements: {"{{placeholder_name}}"}</p>
-                                            {PLACEHOLDER_CATEGORIES.map(cat => (
-                                                <div key={cat.id} className="space-y-1">
-                                                    <p className="text-xs font-semibold text-muted-foreground">{cat.label}</p>
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {cat.placeholders.filter(p => p.type === 'text').map(ph => (
-                                                            <span key={ph.value} className="text-[10px] bg-muted px-1.5 py-0.5 rounded cursor-pointer hover:bg-primary/10 transition-colors" title={ph.description}
-                                                                onClick={() => { navigator.clipboard.writeText(`{{${ph.value}}}`); toast.success(`Copied {{${ph.value}}}`); }}>
-                                                                {`{{${ph.value}}}`}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            ))}
+                                        <Button variant="outline" size="sm" className="w-full" onClick={() => setCanvasSize({ width: canvasSize.height, height: canvasSize.width })}>
+                                            <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Swap Orientation
+                                        </Button>
+                                    </div>
+                                    <Separator className="my-4" />
+                                    {/* ── Background Color ── */}
+                                    <div className="space-y-2">
+                                        <Label>Background Color</Label>
+                                        <div className="flex gap-2">
+                                            <Input type="color" value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} className="w-12 h-9 p-0.5 cursor-pointer" />
+                                            <Input value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} className="flex-1" placeholder="#ffffff" />
                                         </div>
                                     </div>
-                                </ScrollArea>
+                                    {/* ── Background Image ── */}
+                                    <div className="space-y-2 mt-4">
+                                        <Label>Background Image</Label>
+                                        <Input value={backgroundImage} onChange={(e) => setBackgroundImage(e.target.value)} placeholder="Paste image URL..." />
+                                        <div className="flex gap-2">
+                                            <Button variant="outline" size="sm" className="flex-1" onClick={() => {
+                                                const input = document.createElement('input');
+                                                input.type = 'file'; input.accept = 'image/*';
+                                                input.onchange = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (ev) => setBackgroundImage(ev.target.result); reader.readAsDataURL(file); } };
+                                                input.click();
+                                            }}>
+                                                <ImageIcon className="h-3.5 w-3.5 mr-1.5" /> Upload
+                                            </Button>
+                                            {backgroundImage && (
+                                                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setBackgroundImage('')}>Clear</Button>
+                                            )}
+                                        </div>
+                                        {backgroundImage && (
+                                            <img src={backgroundImage} alt="Background" className="w-full h-20 object-cover rounded border mt-1" />
+                                        )}
+                                    </div>
+                                    <Separator className="my-4" />
+                                    {/* ── Available Placeholders Reference ── */}
+                                    <div className="space-y-2">
+                                        <Label>Available Placeholders</Label>
+                                        <p className="text-xs text-muted-foreground">Click to copy, then paste in a text element</p>
+                                        {PLACEHOLDER_CATEGORIES.map(cat => (
+                                            <div key={cat.id} className="space-y-1">
+                                                <p className="ph-cat-label">{cat.label}</p>
+                                                <div className="ph-chip-wrap">
+                                                    {cat.placeholders.filter(p => p.type === 'text').map(ph => (
+                                                        <button key={ph.value} className="ph-chip"
+                                                            title={ph.description}
+                                                            onClick={() => { navigator.clipboard.writeText(`{{${ph.value}}}`); toast.success(`Copied {{${ph.value}}}`); }}>
+                                                            {`{{${ph.value}}}`}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             </TabsContent>
                         </Tabs>
                     </div>
@@ -992,7 +1139,7 @@ function ToolButton({ icon: Icon, label, onClick }) {
     );
 }
 
-function ElementRenderer({ element }) {
+function ElementRenderer({ element, isSelected, readOnly, onUpdate }) {
     const style = {
         width: '100%',
         height: '100%',
@@ -1035,9 +1182,24 @@ function ElementRenderer({ element }) {
                     />
                 </div>
             );
+        case ELEMENT_TYPES.GROUP:
+            return (
+                <div style={{ ...style, position: 'relative', width: '100%', height: '100%' }}>
+                    {element.items && element.items.map(child => (
+                        <div key={child.id} style={{ position: 'absolute', left: child.x, top: child.y, width: child.width, height: child.height }}>
+                             <ElementRenderer element={child} readOnly={readOnly} />
+                        </div>
+                    ))}
+                </div>
+            );
         case ELEMENT_TYPES.SHAPE:
             return <div style={style} />;
-        case ELEMENT_TYPES.TABLE:
+        case ELEMENT_TYPES.TABLE: {
+            const displayRows = element.rows || [{
+                id: 'row_1',
+                cells: element.columns?.reduce((acc, col) => ({ ...acc, [col.key]: col.placeholder }), {}) || {}
+            }];
+
             return (
                 <div style={{ ...style, overflow: 'auto' }}>
                     <table style={{
@@ -1057,10 +1219,52 @@ function ElementRenderer({ element }) {
                                         style={{
                                             padding: '8px',
                                             border: `${element.borderWidth || 1}px solid ${element.borderColor || '#cbd5e1'}`,
-                                            width: col.width || 'auto'
+                                            width: col.width || 'auto',
+                                            position: 'relative'
                                         }}
                                     >
-                                        {col.label}
+                                        {!readOnly && isSelected ? (
+                                            <div className="flex items-center gap-1">
+                                                <input
+                                                    value={col.label}
+                                                    onChange={e => {
+                                                        const newCols = [...element.columns];
+                                                        newCols[idx] = { ...newCols[idx], label: e.target.value };
+                                                        onUpdate({ columns: newCols });
+                                                    }}
+                                                    onPointerDown={e => e.stopPropagation()}
+                                                    className="bg-transparent border-none outline-none text-center w-full focus:ring-1 focus:ring-blue-500 rounded px-1"
+                                                    style={{ color: 'inherit', fontWeigth: 'inherit', fontSize: 'inherit' }}
+                                                />
+                                                <div className="opacity-0 hover:opacity-100 flex flex-col absolute -top-6 left-1/2 -translate-x-1/2 bg-white border shadow-sm rounded overflow-hidden">
+                                                    <div className="flex">
+                                                      <button 
+                                                          onClick={e => {
+                                                              e.stopPropagation();
+                                                              if (element.columns.length <= 1) return;
+                                                              onUpdate({ columns: element.columns.filter((_, i) => i !== idx) });
+                                                          }} 
+                                                          className="p-1 hover:bg-destructive hover:text-white"
+                                                      >
+                                                          <Trash2 className="h-3 w-3" />
+                                                      </button>
+                                                      <button 
+                                                          onClick={e => {
+                                                              e.stopPropagation();
+                                                              const newCols = [...element.columns];
+                                                              newCols.splice(idx + 1, 0, { key: `col_${Date.now()}`, label: 'New Col', placeholder: 'Data', width: 100 });
+                                                              onUpdate({ columns: newCols });
+                                                          }} 
+                                                          className="p-1 hover:bg-accent text-primary"
+                                                      >
+                                                          <Plus className="h-3 w-3" />
+                                                      </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            col.label
+                                        )}
                                     </th>
                                 ))}
                             </tr>
@@ -1087,29 +1291,76 @@ function ElementRenderer({ element }) {
                                     </tr>
                                 ))
                             ) : (
-                                // Show one sample row in builder mode
-                                <tr style={{
-                                    backgroundColor: element.rowBackgroundColor || '#ffffff'
-                                }}>
-                                    {element.columns && element.columns.map((col, idx) => (
-                                        <td
-                                            key={idx}
-                                            style={{
-                                                padding: '6px',
-                                                border: `${element.borderWidth || 1}px solid ${element.borderColor || '#cbd5e1'}`,
-                                                height: `${element.rowHeight || 30}px`,
-                                                color: '#94a3b8'
-                                            }}
-                                        >
-                                            {col.placeholder || ''}
-                                        </td>
-                                    ))}
-                                </tr>
+                                // Show builder rows in design mode
+                                displayRows.map((row, rowIdx) => (
+                                    <tr key={row.id || rowIdx} style={{
+                                        backgroundColor: element.rowBackgroundColor || '#ffffff'
+                                    }}>
+                                        {element.columns && element.columns.map((col, colIdx) => (
+                                            <td
+                                                key={colIdx}
+                                                style={{
+                                                    padding: '6px',
+                                                    border: `${element.borderWidth || 1}px solid ${element.borderColor || '#cbd5e1'}`,
+                                                    height: `${element.rowHeight || 30}px`,
+                                                    color: '#94a3b8',
+                                                    position: 'relative'
+                                                }}
+                                            >
+                                                {!readOnly && isSelected ? (
+                                                    <div className="flex items-center gap-1 group">
+                                                        <input
+                                                            value={row.cells?.[col.key] || ''}
+                                                            onChange={e => {
+                                                                const currentRows = element.rows ? [...element.rows] : [...displayRows];
+                                                                currentRows[rowIdx] = { ...currentRows[rowIdx], cells: { ...currentRows[rowIdx].cells, [col.key]: e.target.value } };
+                                                                onUpdate({ rows: currentRows });
+                                                            }}
+                                                            onPointerDown={e => e.stopPropagation()}
+                                                            className="bg-transparent border-none outline-none text-center w-full focus:ring-1 focus:ring-blue-500 rounded px-1"
+                                                            style={{ color: 'inherit', fontSize: 'inherit' }}
+                                                        />
+                                                        {colIdx === 0 && (
+                                                            <div className="opacity-0 group-hover:opacity-100 flex absolute top-1/2 -left-6 -translate-y-1/2 bg-white border shadow-sm rounded overflow-hidden z-20">
+                                                              <button 
+                                                                  onClick={e => {
+                                                                      e.stopPropagation();
+                                                                      let currentRows = element.rows ? [...element.rows] : [...displayRows];
+                                                                      if (currentRows.length <= 1) return;
+                                                                      currentRows.splice(rowIdx, 1);
+                                                                      onUpdate({ rows: currentRows });
+                                                                  }} 
+                                                                  className="p-1 hover:bg-destructive hover:text-white"
+                                                              >
+                                                                  <Trash2 className="h-3 w-3" />
+                                                              </button>
+                                                              <button 
+                                                                  onClick={e => {
+                                                                      e.stopPropagation();
+                                                                      let currentRows = element.rows ? [...element.rows] : [...displayRows];
+                                                                      currentRows.splice(rowIdx + 1, 0, { id: `row_${Date.now()}`, cells: {} });
+                                                                      onUpdate({ rows: currentRows });
+                                                                  }} 
+                                                                  className="p-1 hover:bg-accent text-primary"
+                                                              >
+                                                                  <Plus className="h-3 w-3" />
+                                                              </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    row.cells?.[col.key] || ''
+                                                )}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))
                             )}
                         </tbody>
                     </table>
                 </div>
             );
+        }
         default:
             return null;
     }
@@ -1149,385 +1400,323 @@ function getElementStyle(element) {
     }
 }
 
-function PropertiesEditor({ element, onUpdate, onDelete, onDuplicate, placeholders, allFonts = [], onCustomFontUpload }) {
-    const [phSearch, setPhSearch] = useState('');
 
-    // Filter placeholders based on search
-    const filteredCategories = PLACEHOLDER_CATEGORIES.map(cat => ({
+function PropertiesEditor({ element, onUpdate, onDelete, onDuplicate, placeholders, allFonts = [], onCustomFontUpload }) {
+    const [phSearch, setPhSearch] = React.useState('');
+
+    const filtered = PLACEHOLDER_CATEGORIES.map(cat => ({
         ...cat,
         placeholders: cat.placeholders.filter(ph =>
-            ph.type === 'text' && (ph.label.toLowerCase().includes(phSearch.toLowerCase()) || ph.value.toLowerCase().includes(phSearch.toLowerCase()))
+            ph.type === 'text' && (
+                ph.label.toLowerCase().includes(phSearch.toLowerCase()) ||
+                ph.value.toLowerCase().includes(phSearch.toLowerCase())
+            )
         )
     })).filter(cat => cat.placeholders.length > 0);
 
     return (
-        <div className="space-y-5">
-            <div className="flex items-center justify-between pb-1">
-                <h3 className="text-sm font-semibold tracking-tight capitalize">{element.type}</h3>
+        <div className="space-y-0 pb-40">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
+                <span className="text-sm font-semibold capitalize tracking-tight">{element.type}</span>
                 <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" onClick={onDuplicate} title="Duplicate">
-                        <Copy className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={onDelete} title="Delete" className="text-destructive hover:text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onDuplicate} title="Duplicate"><Copy className="h-3.5 w-3.5" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={onDelete} title="Delete"><Trash2 className="h-3.5 w-3.5" /></Button>
                 </div>
             </div>
 
-            <Separator />
+            <Separator className="mb-4" />
 
-            {/* Common Position & Size */}
-            <div>
-                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Position & Size</p>
-                <div className="grid grid-cols-2 gap-2">
-                    <div>
-                        <Label className="text-xs">X</Label>
-                        <Input type="number" value={Math.round(element.x)} onChange={(e) => onUpdate({ x: parseInt(e.target.value) })} className="h-8 text-sm" />
+            {/* Position & Size */}
+            <p className="prop-section-title">Position & Size</p>
+            <div className="prop-grid-2">
+                {[['X', 'x'], ['Y', 'y'], ['W', 'width'], ['H', 'height']].map(([lbl, key]) => (
+                    <div key={key}>
+                        <label>{lbl}</label>
+                        <Input type="number" className="h-8 text-sm"
+                            value={Math.round(element[key])}
+                            onChange={e => onUpdate({ [key]: parseInt(e.target.value) || 0 })} />
                     </div>
-                    <div>
-                        <Label className="text-xs">Y</Label>
-                        <Input type="number" value={Math.round(element.y)} onChange={(e) => onUpdate({ y: parseInt(e.target.value) })} className="h-8 text-sm" />
-                    </div>
-                    <div>
-                        <Label className="text-xs">Width</Label>
-                        <Input type="number" value={Math.round(element.width)} onChange={(e) => onUpdate({ width: parseInt(e.target.value) })} className="h-8 text-sm" />
-                    </div>
-                    <div>
-                        <Label className="text-xs">Height</Label>
-                        <Input type="number" value={Math.round(element.height)} onChange={(e) => onUpdate({ height: parseInt(e.target.value) })} className="h-8 text-sm" />
-                    </div>
-                </div>
+                ))}
+            </div>
 
-                {/* ── TEXT PROPERTIES ── */}
-                {element.type === ELEMENT_TYPES.TEXT && (
-                    <>
-                        {/* Smart Text Content — supports mixed static + {{placeholders}} */}
-                        <div className="space-y-2">
-                            <Label>Content</Label>
-                            <textarea
-                                value={element.content}
-                                onChange={(e) => onUpdate({ content: e.target.value })}
-                                placeholder="Type text or use {{placeholder_name}}..."
-                                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring min-h-[60px] resize-y"
-                                rows={3}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                Mix text with dynamic fields: "This certifies that {'{{student_name}}'} of class {'{{class}}'}..."
-                            </p>
-                        </div>
-                        {/* Quick-insert placeholders */}
-                        <div className="space-y-2">
-                            <Label className="text-xs">Insert Placeholder</Label>
-                            <Input
-                                value={phSearch}
-                                onChange={(e) => setPhSearch(e.target.value)}
-                                placeholder="Search placeholders..."
-                                className="h-8 text-xs"
-                            />
-                            <div className="max-h-32 overflow-y-auto space-y-1">
-                                {filteredCategories.map(cat => (
-                                    <div key={cat.id}>
-                                        <p className="text-[10px] font-semibold text-muted-foreground mt-1">{cat.label}</p>
-                                        <div className="flex flex-wrap gap-1">
-                                            {cat.placeholders.map(ph => (
-                                                <button
-                                                    key={ph.value}
-                                                    className="text-[10px] bg-muted hover:bg-primary/10 px-1.5 py-0.5 rounded transition-colors"
-                                                    onClick={() => onUpdate({ content: (element.content || '') + `{{${ph.value}}}` })}
-                                                    title={ph.description}
-                                                >
-                                                    {ph.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        <Separator />
-                        {/* Font Family */}
-                        <div className="space-y-2">
-                            <Label>Font Family</Label>
-                            <Select value={element.fontFamily} onValueChange={(v) => onUpdate({ fontFamily: v })}>
-                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                                <SelectContent className="max-h-60">
-                                    {(allFonts.length > 0 ? allFonts : FONT_LIST).map(f => (
-                                        <SelectItem key={f} value={f} style={{ fontFamily: f }}>{f}</SelectItem>
-                                    ))}
-                                    {onCustomFontUpload && (
-                                        <>
-                                            <Separator className="my-1" />
-                                            <Button variant="ghost" size="sm" className="w-full text-xs justify-start" onClick={onCustomFontUpload}>
-                                                <Upload className="h-3 w-3 mr-1" /> Upload Font
-                                            </Button>
-                                        </>
-                                    )}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        {/* Font Size */}
-                        <div className="space-y-2">
-                            <Label>Font Size ({element.fontSize}px)</Label>
-                            <Slider value={[element.fontSize]} min={8} max={100} step={1} onValueChange={([val]) => onUpdate({ fontSize: val })} />
-                        </div>
-                        {/* Bold / Italic / Underline */}
-                        <div className="flex gap-2">
-                            <Button variant={element.fontWeight === 'bold' ? 'secondary' : 'outline'} size="icon" onClick={() => onUpdate({ fontWeight: element.fontWeight === 'bold' ? 'normal' : 'bold' })}><Bold className="h-4 w-4" /></Button>
-                            <Button variant={element.fontStyle === 'italic' ? 'secondary' : 'outline'} size="icon" onClick={() => onUpdate({ fontStyle: element.fontStyle === 'italic' ? 'normal' : 'italic' })}><Italic className="h-4 w-4" /></Button>
-                            <Button variant={element.textDecoration === 'underline' ? 'secondary' : 'outline'} size="icon" onClick={() => onUpdate({ textDecoration: element.textDecoration === 'underline' ? 'none' : 'underline' })}><Underline className="h-4 w-4" /></Button>
-                        </div>
-                        {/* Alignment */}
-                        <div className="flex gap-2">
-                            <Button variant={element.textAlign === 'left' ? 'secondary' : 'outline'} size="icon" onClick={() => onUpdate({ textAlign: 'left' })}><AlignLeft className="h-4 w-4" /></Button>
-                            <Button variant={element.textAlign === 'center' ? 'secondary' : 'outline'} size="icon" onClick={() => onUpdate({ textAlign: 'center' })}><AlignCenter className="h-4 w-4" /></Button>
-                            <Button variant={element.textAlign === 'right' ? 'secondary' : 'outline'} size="icon" onClick={() => onUpdate({ textAlign: 'right' })}><AlignRight className="h-4 w-4" /></Button>
-                        </div>
-                        {/* Color */}
-                        <div className="space-y-2">
-                            <Label>Color</Label>
-                            <div className="flex gap-2">
-                                <DebouncedColorPicker value={element.color} onChange={(val) => onUpdate({ color: val })} className="w-12 p-1 h-8" />
-                                <Input value={element.color} onChange={(e) => onUpdate({ color: e.target.value })} className="flex-1 h-8" />
-                            </div>
-                        </div>
-                        {/* Line Height */}
-                        <div className="space-y-2">
-                            <Label>Line Height ({element.lineHeight || 1.4})</Label>
-                            <Slider value={[element.lineHeight ? element.lineHeight * 10 : 14]} min={10} max={30} step={1} onValueChange={([val]) => onUpdate({ lineHeight: val / 10 })} />
-                        </div>
-                        {/* Letter Spacing */}
-                        <div className="space-y-2">
-                            <Label>Letter Spacing ({element.letterSpacing || 0}px)</Label>
-                            <Slider value={[element.letterSpacing || 0]} min={-2} max={10} step={0.5} onValueChange={([val]) => onUpdate({ letterSpacing: val })} />
-                        </div>
-                    </>
-                )}
-
-                {/* ── IMAGE PROPERTIES ── */}
-                {element.type === ELEMENT_TYPES.IMAGE && (
-                    <>
-                        <div className="space-y-2">
-                            <Label>Image Source</Label>
-                            <Select
-                                value={element.url?.replace(/[{}]/g, '') || '_custom_'}
-                                onValueChange={(value) => onUpdate({ url: value === '_custom_' ? '' : `{{${value}}}` })}
-                            >
-                                <SelectTrigger><SelectValue placeholder="Select image source" /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="_custom_">Custom URL...</SelectItem>
-                                    {IMAGE_PLACEHOLDERS.map(ph => (
-                                        <SelectItem key={ph.value} value={ph.value}>{ph.label}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            {element.url !== `{{${element.url?.replace(/[{}]/g, '')}}}` && (
-                                <Input
-                                    value={element.url || ''}
-                                    onChange={(e) => onUpdate({ url: e.target.value })}
-                                    placeholder="Enter image URL"
-                                />
-                            )}
-                            <p className="text-xs text-muted-foreground">
-                                Select a dynamic field or enter a custom image URL
-                            </p>
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Opacity</Label>
-                            <Slider
-                                value={[element.opacity * 100]}
-                                min={0}
-                                max={100}
-                                step={1}
-                                onValueChange={([val]) => onUpdate({ opacity: val / 100 })}
-                            />
-                        </div>
-                    </>
-                )}
-
-                {element.type === ELEMENT_TYPES.QRCODE && (
-                    <div className="space-y-2">
+            {/* ── TEXT ── */}
+            {element.type === ELEMENT_TYPES.TEXT && (
+                <div className="space-y-4">
+                    {/* Content */}
+                    <div className="space-y-1.5">
                         <Label>Content</Label>
-                        <Input value={element.content} onChange={(e) => onUpdate({ content: e.target.value })} />
-                        <div className="space-y-2">
-                            <Label>Color</Label>
-                            <DebouncedColorPicker value={element.color} onChange={(val) => onUpdate({ color: val })} className="w-full h-8" />
+                        <textarea
+                            value={element.content}
+                            onChange={e => onUpdate({ content: e.target.value })}
+                            placeholder='Type text or use {{placeholder_name}}...'
+                            className="w-full min-h-[68px] resize-y rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            rows={3}
+                        />
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                            Mix text + dynamic fields: <code className="bg-muted px-1 py-0.5 rounded text-[10px]">{'{{studentName}}'}</code>
+                        </p>
+                    </div>
+
+                    {/* Insert Placeholder */}
+                    <div className="space-y-2">
+                        <Label>Insert Placeholder</Label>
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
+                            <Input
+                                className="pl-7 h-8 text-xs"
+                                value={phSearch}
+                                onChange={e => setPhSearch(e.target.value)}
+                                placeholder="Search..."
+                            />
                         </div>
-                        <div className="space-y-2">
-                            <Label>Background Color</Label>
-                            <DebouncedColorPicker value={element.backgroundColor} onChange={(val) => onUpdate({ backgroundColor: val })} className="w-full h-8" />
+                        <div style={{ maxHeight: 176, overflowY: 'auto', paddingRight: 2 }}>
+                            {filtered.map(cat => (
+                                <div key={cat.id}>
+                                    <p className="ph-cat-label">{cat.label}</p>
+                                    <div className="ph-chip-wrap">
+                                        {cat.placeholders.map(ph => (
+                                            <button
+                                                key={ph.value}
+                                                className="border! text-sm py-2 px-2 rounded-lg bg-muted"
+                                                onClick={() => onUpdate({ content: (element.content || '') + `{{${ph.value}}}` })}
+                                                title={`Insert {{${ph.value}}}`}
+                                            >
+                                                {`{{${ph.value}}}`}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
-                )}
 
-                {element.type === ELEMENT_TYPES.SHAPE && (
-                    <>
-                        <div className="space-y-2">
-                            <Label>Shape Type</Label>
-                            <Select value={element.shapeType} onValueChange={(val) => onUpdate({ shapeType: val })}>
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="rectangle">Rectangle</SelectItem>
-                                    <SelectItem value="circle">Circle</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Background Color</Label>
-                            <DebouncedColorPicker value={element.backgroundColor} onChange={(val) => onUpdate({ backgroundColor: val })} className="w-full h-8" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Border Color</Label>
-                            <DebouncedColorPicker value={element.borderColor} onChange={(val) => onUpdate({ borderColor: val })} className="w-full h-8" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Border Width</Label>
-                            <Slider
-                                value={[element.borderWidth]}
-                                min={0}
-                                max={20}
-                                step={1}
-                                onValueChange={([val]) => onUpdate({ borderWidth: val })}
-                            />
-                        </div>
-                        {element.shapeType !== 'circle' && (
-                            <div className="space-y-2">
-                                <Label>Border Radius</Label>
-                                <Slider
-                                    value={[element.borderRadius]}
-                                    min={0}
-                                    max={100}
-                                    step={1}
-                                    onValueChange={([val]) => onUpdate({ borderRadius: val })}
-                                />
-                            </div>
-                        )}
-                    </>
-                )}
+                    <Separator />
 
-                {element.type === ELEMENT_TYPES.TABLE && (
-                    <>
-                        <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                                <Label>Table Columns</Label>
-                                <Button
-                                    size="sm"
-                                    onClick={() => {
-                                        const newColumns = [...(element.columns || []), {
-                                            key: `col_${Date.now()}`,
-                                            label: 'New Column',
-                                            placeholder: '{{placeholder}}',
-                                            width: 100
-                                        }];
-                                        onUpdate({ columns: newColumns });
-                                    }}
-                                >
-                                    Add Column
-                                </Button>
-                            </div>
-                            <div className="space-y-3 max-h-60 overflow-y-auto">
-                                {element.columns && element.columns.map((col, idx) => (
-                                    <div key={idx} className="p-3 border rounded-lg space-y-2 bg-muted/30">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-sm font-medium">Column {idx + 1}</span>
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => {
-                                                    const newColumns = element.columns.filter((_, i) => i !== idx);
-                                                    onUpdate({ columns: newColumns });
-                                                }}
-                                            >
-                                                <Trash2 className="h-3 w-3" />
-                                            </Button>
-                                        </div>
-                                        <div>
-                                            <Label className="text-xs">Label</Label>
-                                            <Input
-                                                value={col.label}
-                                                onChange={(e) => {
-                                                    const newColumns = [...element.columns];
-                                                    newColumns[idx].label = e.target.value;
-                                                    onUpdate({ columns: newColumns });
-                                                }}
-                                                placeholder="Column header"
-                                                className="h-8"
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label className="text-xs">Data Key</Label>
-                                            <Input
-                                                value={col.key}
-                                                onChange={(e) => {
-                                                    const newColumns = [...element.columns];
-                                                    newColumns[idx].key = e.target.value;
-                                                    onUpdate({ columns: newColumns });
-                                                }}
-                                                placeholder="e.g., date, subject"
-                                                className="h-8"
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label className="text-xs">Placeholder</Label>
-                                            <Input
-                                                value={col.placeholder}
-                                                onChange={(e) => {
-                                                    const newColumns = [...element.columns];
-                                                    newColumns[idx].placeholder = e.target.value;
-                                                    onUpdate({ columns: newColumns });
-                                                }}
-                                                placeholder="{{placeholder_name}}"
-                                                className="h-8"
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label className="text-xs">Width (px)</Label>
-                                            <Input
-                                                type="number"
-                                                value={col.width}
-                                                onChange={(e) => {
-                                                    const newColumns = [...element.columns];
-                                                    newColumns[idx].width = parseInt(e.target.value);
-                                                    onUpdate({ columns: newColumns });
-                                                }}
-                                                className="h-8"
-                                            />
-                                        </div>
-                                    </div>
+                    {/* Font Family */}
+                    <div className="space-y-1.5">
+                        <Label>Font Family</Label>
+                        <Select value={element.fontFamily} onValueChange={v => onUpdate({ fontFamily: v })}>
+                            <SelectTrigger className="h-8 w-full text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent className="max-h-56">
+                                {(allFonts.length > 0 ? allFonts : FONT_LIST).map(f => (
+                                    <SelectItem key={f} value={f} style={{ fontFamily: f }}>{f}</SelectItem>
                                 ))}
-                            </div>
+                                {onCustomFontUpload && (
+                                    <>
+                                        <Separator className="my-1" />
+                                        <Button variant="ghost" size="sm" className="w-full text-xs justify-start" onClick={onCustomFontUpload}>
+                                            <Upload className="h-3 w-3 mr-1" /> Upload Font
+                                        </Button>
+                                    </>
+                                )}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {/* Font Size */}
+                    <div className="space-y-1.5">
+                        <div className="prop-slider-label">Font Size <span>{element.fontSize}px</span></div>
+                        <Slider value={[element.fontSize]} min={8} max={100} step={1} onValueChange={([v]) => onUpdate({ fontSize: v })} />
+                    </div>
+
+                    {/* Bold / Italic / Underline */}
+                    <div className="space-y-1.5">
+                        <Label>Style</Label>
+                        <div className="flex gap-1.5">
+                            <button className={`prop-style-btn ${element.fontWeight === 'bold' ? 'is-active' : ''}`}
+                                onClick={() => onUpdate({ fontWeight: element.fontWeight === 'bold' ? 'normal' : 'bold' })}>
+                                <Bold className="h-3.5 w-3.5" />
+                            </button>
+                            <button className={`prop-style-btn ${element.fontStyle === 'italic' ? 'is-active' : ''}`}
+                                onClick={() => onUpdate({ fontStyle: element.fontStyle === 'italic' ? 'normal' : 'italic' })}>
+                                <Italic className="h-3.5 w-3.5" />
+                            </button>
+                            <button className={`prop-style-btn ${element.textDecoration === 'underline' ? 'is-active' : ''}`}
+                                onClick={() => onUpdate({ textDecoration: element.textDecoration === 'underline' ? 'none' : 'underline' })}>
+                                <Underline className="h-3.5 w-3.5" />
+                            </button>
                         </div>
-                        <div className="space-y-2">
-                            <Label>Header Background</Label>
-                            <DebouncedColorPicker value={element.headerBackgroundColor} onChange={(val) => onUpdate({ headerBackgroundColor: val })} className="w-full h-8" />
+                    </div>
+
+                    {/* Alignment */}
+                    <div className="space-y-1.5">
+                        <Label>Alignment</Label>
+                        <div className="flex gap-1.5">
+                            {(['left', 'center', 'right']).map(a => (
+                                <button key={a}
+                                    className={`prop-style-btn flex-1 ${element.textAlign === a ? 'is-active' : ''}`}
+                                    onClick={() => onUpdate({ textAlign: a })}>
+                                    {a === 'left' ? <AlignLeft className="h-3.5 w-3.5" /> : a === 'center' ? <AlignCenter className="h-3.5 w-3.5" /> : <AlignRight className="h-3.5 w-3.5" />}
+                                </button>
+                            ))}
                         </div>
-                        <div className="space-y-2">
-                            <Label>Row Background</Label>
-                            <DebouncedColorPicker value={element.rowBackgroundColor} onChange={(val) => onUpdate({ rowBackgroundColor: val })} className="w-full h-8" />
+                    </div>
+
+                    {/* Text Color */}
+                    <div className="space-y-1.5">
+                        <Label>Color</Label>
+                        <div className="prop-color-row">
+                            <Input type="color" value={element.color} onChange={e => onUpdate({ color: e.target.value })} className="w-10 h-8 p-1 cursor-pointer" />
+                            <Input value={element.color} onChange={e => onUpdate({ color: e.target.value })} className="flex-1 h-8 font-mono text-xs" />
                         </div>
-                        <div className="space-y-2">
-                            <Label>Border Color</Label>
-                            <DebouncedColorPicker value={element.borderColor} onChange={(val) => onUpdate({ borderColor: val })} className="w-full h-8" />
+                    </div>
+
+                    {/* Line Height */}
+                    <div className="space-y-1.5">
+                        <div className="prop-slider-label">Line Height <span>{element.lineHeight || 1.4}</span></div>
+                        <Slider value={[(element.lineHeight || 1.4) * 10]} min={10} max={30} step={1} onValueChange={([v]) => onUpdate({ lineHeight: v / 10 })} />
+                    </div>
+
+                    {/* Letter Spacing */}
+                    <div className="space-y-1.5">
+                        <div className="prop-slider-label">Letter Spacing <span>{element.letterSpacing || 0}px</span></div>
+                        <Slider value={[element.letterSpacing || 0]} min={-2} max={10} step={0.5} onValueChange={([v]) => onUpdate({ letterSpacing: v })} />
+                    </div>
+                </div>
+            )}
+
+            {/* ── IMAGE ── */}
+            {element.type === ELEMENT_TYPES.IMAGE && (
+                <div className="space-y-4">
+                    <div className="space-y-1.5">
+                        <Label>Image Source</Label>
+                        <Select
+                            value={element.url?.replace(/[{}]/g, '') || '_custom_'}
+                            onValueChange={(value) => onUpdate({ url: value === '_custom_' ? '' : `{{${value}}}` })}
+                        >
+                            <SelectTrigger><SelectValue placeholder="Select image source" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="_custom_">Custom URL...</SelectItem>
+                                {IMAGE_PLACEHOLDERS.map(ph => (
+                                    <SelectItem key={ph.value} value={ph.value}>{ph.label}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Input value={element.url || ''} onChange={e => onUpdate({ url: e.target.value })} placeholder="Or enter image URL" className="h-8 text-xs" />
+                    </div>
+                    <div className="space-y-1.5">
+                        <div className="prop-slider-label">Opacity <span>{Math.round((element.opacity ?? 1) * 100)}%</span></div>
+                        <Slider value={[(element.opacity ?? 1) * 100]} min={0} max={100} step={1} onValueChange={([v]) => onUpdate({ opacity: v / 100 })} />
+                    </div>
+                </div>
+            )}
+
+            {/* ── QRCODE ── */}
+            {element.type === ELEMENT_TYPES.QRCODE && (
+                <div className="space-y-4">
+                    <div className="space-y-1.5">
+                        <Label>QR Content</Label>
+                        <Input value={element.content} onChange={e => onUpdate({ content: e.target.value })} className="h-8 text-xs" />
+                    </div>
+                    <div className="space-y-1.5">
+                        <Label>Color</Label>
+                        <div className="prop-color-row">
+                            <Input type="color" value={element.color} onChange={e => onUpdate({ color: e.target.value })} className="w-10 h-8 p-1 cursor-pointer" />
+                            <Input value={element.color} onChange={e => onUpdate({ color: e.target.value })} className="flex-1 h-8 font-mono text-xs" />
                         </div>
-                        <div className="space-y-2">
-                            <Label>Font Size</Label>
-                            <Slider
-                                value={[element.fontSize || 12]}
-                                min={8}
-                                max={24}
-                                step={1}
-                                onValueChange={([val]) => onUpdate({ fontSize: val })}
-                            />
+                    </div>
+                    <div className="space-y-1.5">
+                        <Label>Background</Label>
+                        <div className="prop-color-row">
+                            <Input type="color" value={element.backgroundColor} onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-10 h-8 p-1 cursor-pointer" />
+                            <Input value={element.backgroundColor} onChange={e => onUpdate({ backgroundColor: e.target.value })} className="flex-1 h-8 font-mono text-xs" />
                         </div>
-                    </>
-                )}
-            </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── SHAPE ── */}
+            {element.type === ELEMENT_TYPES.SHAPE && (
+                <div className="space-y-4">
+                    <div className="space-y-1.5">
+                        <Label>Shape Type</Label>
+                        <Select value={element.shapeType} onValueChange={v => onUpdate({ shapeType: v })}>
+                            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="rectangle">Rectangle</SelectItem>
+                                <SelectItem value="circle">Circle</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                        <Label>Fill Color</Label>
+                        <div className="prop-color-row">
+                            <Input type="color" value={element.backgroundColor} onChange={e => onUpdate({ backgroundColor: e.target.value })} className="w-10 h-8 p-1 cursor-pointer" />
+                            <Input value={element.backgroundColor} onChange={e => onUpdate({ backgroundColor: e.target.value })} className="flex-1 h-8 font-mono text-xs" />
+                        </div>
+                    </div>
+                    <div className="space-y-1.5">
+                        <Label>Border Color</Label>
+                        <div className="prop-color-row">
+                            <Input type="color" value={element.borderColor} onChange={e => onUpdate({ borderColor: e.target.value })} className="w-10 h-8 p-1 cursor-pointer" />
+                            <Input value={element.borderColor} onChange={e => onUpdate({ borderColor: e.target.value })} className="flex-1 h-8 font-mono text-xs" />
+                        </div>
+                    </div>
+                    <div className="space-y-1.5">
+                        <div className="prop-slider-label">Border Width <span>{element.borderWidth}px</span></div>
+                        <Slider value={[element.borderWidth]} min={0} max={20} step={1} onValueChange={([v]) => onUpdate({ borderWidth: v })} />
+                    </div>
+                    {element.shapeType !== 'circle' && (
+                        <div className="space-y-1.5">
+                            <div className="prop-slider-label">Border Radius <span>{element.borderRadius}px</span></div>
+                            <Slider value={[element.borderRadius]} min={0} max={100} step={1} onValueChange={([v]) => onUpdate({ borderRadius: v })} />
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ── TABLE ── (same as before, just add spacing) */}
+            {element.type === ELEMENT_TYPES.TABLE && (
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                            <Label>Table Columns</Label>
+                            <Button size="sm" onClick={() => {
+                                const newColumns = [...(element.columns || []), { key: `col_${Date.now()}`, label: 'New Column', placeholder: '{{placeholder}}', width: 100 }];
+                                onUpdate({ columns: newColumns });
+                            }}>Add Column</Button>
+                        </div>
+                        <div className="space-y-3 max-h-52 overflow-y-auto pr-1">
+                            {element.columns && element.columns.map((col, idx) => (
+                                <div key={idx} className="p-3 border rounded-lg space-y-2 bg-muted/30">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-xs font-semibold text-muted-foreground">Column {idx + 1}</span>
+                                        <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => {
+                                            onUpdate({ columns: element.columns.filter((_, i) => i !== idx) });
+                                        }}><Trash2 className="h-3 w-3" /></Button>
+                                    </div>
+                                    {['label', 'key', 'placeholder'].map(field => (
+                                        <div key={field}>
+                                            <Label className="text-[11px] text-muted-foreground capitalize">{field}</Label>
+                                            <Input className="h-7 text-xs mt-0.5" value={col[field]} onChange={e => {
+                                                const nc = [...element.columns]; nc[idx] = { ...nc[idx], [field]: e.target.value }; onUpdate({ columns: nc });
+                                            }} />
+                                        </div>
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="space-y-1.5">
+                        <Label>Header Background</Label>
+                        <div className="prop-color-row">
+                            <Input type="color" value={element.headerBackgroundColor} onChange={e => onUpdate({ headerBackgroundColor: e.target.value })} className="w-10 h-8 p-1" />
+                            <Input value={element.headerBackgroundColor} onChange={e => onUpdate({ headerBackgroundColor: e.target.value })} className="flex-1 h-8 font-mono text-xs" />
+                        </div>
+                    </div>
+                    <div className="space-y-1.5">
+                        <div className="prop-slider-label">Font Size <span>{element.fontSize || 12}px</span></div>
+                        <Slider value={[element.fontSize || 12]} min={8} max={24} step={1} onValueChange={([v]) => onUpdate({ fontSize: v })} />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
 
-function LayersPanel({ elements, selectedId, onSelect, onReorder, onToggleLock, onToggleVisible }) {
+
+function LayersPanel({ elements, selectedIds, onSelect, onReorder, onToggleLock, onToggleVisible }) {
     const sortedElements = [...elements].sort((a, b) => b.zIndex - a.zIndex);
 
     const getIcon = (type) => {
@@ -1537,6 +1726,7 @@ function LayersPanel({ elements, selectedId, onSelect, onReorder, onToggleLock, 
             case ELEMENT_TYPES.QRCODE: return <QrCode className="h-3.5 w-3.5" />;
             case ELEMENT_TYPES.SHAPE: return <Square className="h-3.5 w-3.5" />;
             case ELEMENT_TYPES.TABLE: return <TableIcon className="h-3.5 w-3.5" />;
+            case ELEMENT_TYPES.GROUP: return <Layers className="h-3.5 w-3.5" />;
             default: return null;
         }
     };
@@ -1559,7 +1749,7 @@ function LayersPanel({ elements, selectedId, onSelect, onReorder, onToggleLock, 
                         key={el.id}
                         className={cn(
                             "flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer hover:bg-muted/60 transition-colors group",
-                            selectedId === el.id && "bg-primary/10 ring-1 ring-primary/30",
+                            selectedIds.includes(el.id) && "bg-primary/10 ring-1 ring-primary/30",
                             el.hidden && "opacity-40"
                         )}
                         onClick={() => onSelect(el.id)}
