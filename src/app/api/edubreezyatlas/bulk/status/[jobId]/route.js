@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getJob, updateJob } from '../route';
+import { getJob, updateJob } from '../../route';
 
 // ── GET /api/edubreezyatlas/bulk/status/[jobId] ───────────────
 export async function GET(req, { params }) {
