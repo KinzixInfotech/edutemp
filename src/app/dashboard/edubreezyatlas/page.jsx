@@ -71,6 +71,7 @@ const DEFAULT_FORM = {
     isNewSchool: false,
     newSchoolName: '',
     schoolId: '',
+    location: '',
     tagline: '',
     description: '',
     vision: '',
@@ -100,6 +101,7 @@ const DEFAULT_FORM = {
     isVerified: false,
     boards: [],
     genderType: '',
+    religiousAffiliation: '',
     socials: { facebook: '', instagram: '', twitter: '', linkedin: '', youtube: '' },
     leadership: [],
 }
@@ -246,6 +248,7 @@ export default function EdubreezyAtlasPage() {
         setEditingProfile(profile)
         setFormData({
             schoolId: profile.schoolId,
+            location: profile.school?.location || '',
             tagline: profile.tagline || '',
             description: profile.description || '',
             vision: profile.vision || '',
@@ -271,6 +274,7 @@ export default function EdubreezyAtlasPage() {
             detailedFeeStructure: profile.detailedFeeStructure || { avgFee: '', admissionFee: '', monthlyTuition: '' },
             boards: profile.boards || [],
             genderType: profile.genderType || '',
+            religiousAffiliation: profile.religiousAffiliation || '',
             socials: profile.socials || { facebook: '', instagram: '', twitter: '', linkedin: '', youtube: '' },
             leadership: profile.leadership || [],
         })
@@ -940,7 +944,14 @@ function AtlasFormDialog({ open, onOpenChange, editingProfile, initialFormData, 
                                         ) : (
                                             <div>
                                                 <Label>Select ERP School <span className="text-destructive">*</span></Label>
-                                                <Select value={formData.schoolId} onValueChange={(v) => onChange('schoolId', v)}>
+                                                <Select
+                                                    value={formData.schoolId}
+                                                    onValueChange={(v) => {
+                                                        const selectedSchool = availableSchools.find((school) => school.id === v)
+                                                        onChange('schoolId', v)
+                                                        onChange('location', selectedSchool?.location || '')
+                                                    }}
+                                                >
                                                     <SelectTrigger className="mt-2">
                                                         <SelectValue placeholder="Choose a school to list..." />
                                                     </SelectTrigger>
@@ -961,10 +972,27 @@ function AtlasFormDialog({ open, onOpenChange, editingProfile, initialFormData, 
                                                 {fieldErrors.schoolId && (
                                                     <p className="mt-1 text-xs text-destructive">{fieldErrors.schoolId}</p>
                                                 )}
+                                                {formData.schoolId && formData.location && (
+                                                    <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                                                        <MapPin className="w-4 h-4" />
+                                                        <span>{formData.location}</span>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
                                 )}
+
+                                <div>
+                                    <Label htmlFor="location">Location</Label>
+                                    <Input
+                                        id="location"
+                                        value={formData.location || ''}
+                                        onChange={(e) => onChange('location', e.target.value)}
+                                        placeholder="e.g. Hazaribagh, Jharkhand"
+                                        className="mt-2"
+                                    />
+                                </div>
 
                                 <div>
                                     <Label htmlFor="tagline">Tagline <span className="text-destructive">*</span></Label>
@@ -983,7 +1011,32 @@ function AtlasFormDialog({ open, onOpenChange, editingProfile, initialFormData, 
                                     )}
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <Label htmlFor="vision">Vision</Label>
+                                        <Textarea
+                                            id="vision"
+                                            value={formData.vision || ''}
+                                            onChange={(e) => onChange('vision', e.target.value)}
+                                            placeholder="Share the school's long-term vision..."
+                                            rows={4}
+                                            className="mt-2"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="mission">Mission</Label>
+                                        <Textarea
+                                            id="mission"
+                                            value={formData.mission || ''}
+                                            onChange={(e) => onChange('mission', e.target.value)}
+                                            placeholder="Share the school's mission..."
+                                            rows={4}
+                                            className="mt-2"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
                                     <div>
                                         <Label htmlFor="boards">Educational Boards</Label>
                                         <Input id="boards" value={formData.boards?.join(', ') || ''} onChange={(e) => onChange('boards', e.target.value.split(',').map(s => s.trim()))} placeholder="e.g. CBSE, ICSE, State Board" className="mt-2" />
@@ -996,9 +1049,28 @@ function AtlasFormDialog({ open, onOpenChange, editingProfile, initialFormData, 
                                                 <SelectValue placeholder="Select type..." />
                                             </SelectTrigger>
                                             <SelectContent>
+                                                <SelectItem value="none">None</SelectItem>
                                                 <SelectItem value="Co-ed">Co-ed</SelectItem>
                                                 <SelectItem value="Boys">Boys</SelectItem>
                                                 <SelectItem value="Girls">Girls</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="religiousAffiliation">Religious Affiliation</Label>
+                                        <Select value={formData.religiousAffiliation || ''} onValueChange={(v) => onChange('religiousAffiliation', v === "none" ? "" : v)}>
+                                            <SelectTrigger id="religiousAffiliation" className="mt-2">
+                                                <SelectValue placeholder="Select affiliation..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="none">None</SelectItem>
+                                                <SelectItem value="Hindu">Hindu</SelectItem>
+                                                <SelectItem value="Muslim">Muslim</SelectItem>
+                                                <SelectItem value="Christian">Christian</SelectItem>
+                                                <SelectItem value="Sikh">Sikh</SelectItem>
+                                                <SelectItem value="Buddhist">Buddhist</SelectItem>
+                                                <SelectItem value="Jain">Jain</SelectItem>
+                                                <SelectItem value="Other">Other</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>

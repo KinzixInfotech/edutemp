@@ -1,7 +1,8 @@
 // Edubreezy Atlas Admin — Single school profile API
-// SUPER_ADMIN only: Get detail, update, delete
+// No authentication required - public endpoint (Wait, GET is public, PATCH/DELETE are protected)
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { generateSchoolSlug, generateUniqueSlug, isPlaceholderSlug } from '@/lib/slug-generator';
 
 // GET — Detailed school profile with analytics
 export async function GET(req, props) {
@@ -58,6 +59,21 @@ export async function GET(req, props) {
                         infrastructureRating: true,
                         sportsRating: true,
                     },
+                },
+                gallery: {
+                    select: { id: true, imageUrl: true, caption: true, category: true, displayOrder: true },
+                    orderBy: { displayOrder: 'asc' },
+                },
+                facilities: {
+                    select: { id: true, category: true, name: true, description: true, icon: true, isAvailable: true },
+                    orderBy: { category: 'asc' },
+                },
+                achievements: {
+                    select: { id: true, title: true, description: true, category: true, year: true, imageUrl: true, rank: true, level: true },
+                    orderBy: { year: 'desc' },
+                },
+                badges: {
+                    select: { id: true, badgeType: true, earnedAt: true, expiresAt: true },
                 },
             },
         });
@@ -123,16 +139,70 @@ export async function PATCH(req, props) {
         const body = await req.json();
 
         // Remove non-profile fields
-        const { school, _count, ratings, recentInquiries, avgRatings, id, createdAt, updatedAt, lastProfileUpdate, ...updateData } = body;
+        const { school, _count, ratings, recentInquiries, avgRatings, id, createdAt, updatedAt, lastProfileUpdate, location, ...updateData } = body;
 
-        const profile = await prisma.schoolPublicProfile.update({
-            where: { schoolId },
-            data: updateData,
-            include: {
-                school: {
-                    select: { id: true, name: true, location: true, profilePicture: true },
+        ['gallery', 'facilities', 'achievements'].forEach((relation) => {
+            if (Array.isArray(updateData[relation])) {
+                updateData[relation] = {
+                    deleteMany: {},
+                    create: updateData[relation].map(({ id, profileId, createdAt, updatedAt, ...rest }) => {
+                        // Cast specific fields to Int correctly
+                        if (relation === 'achievements') {
+                            if (rest.year) rest.year = parseInt(rest.year);
+                            if (rest.rank) rest.rank = parseInt(rest.rank);
+                            else rest.rank = null;
+                        }
+                        if (relation === 'gallery') {
+                            if (rest.displayOrder) rest.displayOrder = parseInt(rest.displayOrder);
+                            else rest.displayOrder = 0;
+                        }
+                        return rest;
+                    })
+                };
+            }
+        });
+
+        const profile = await prisma.$transaction(async (tx) => {
+            let finalLocation = location;
+            if (typeof location === 'string' && location.trim()) {
+                await tx.school.update({
+                    where: { id: schoolId },
+                    data: { location: location.trim() },
+                });
+                finalLocation = location.trim();
+            }
+
+            // Regenerate slug if missing, placeholder, or location updated
+            const existingProfile = await tx.schoolPublicProfile.findUnique({
+                where: { schoolId },
+                select: { slug: true, school: { select: { name: true, location: true } } }
+            });
+
+            const shouldRegenerate = !existingProfile?.slug || 
+                                     isPlaceholderSlug(existingProfile.slug) || 
+                                     (location !== undefined && location !== existingProfile.school.location);
+
+            if (shouldRegenerate && existingProfile?.school && !updateData.slug) {
+                const baseSlug = generateSchoolSlug(existingProfile.school.name, finalLocation || existingProfile.school.location);
+                if (baseSlug) {
+                    const existingSlugs = await tx.schoolPublicProfile.findMany({
+                        where: { slug: { startsWith: baseSlug } },
+                        select: { slug: true }
+                    }).then(res => res.map(r => r.slug));
+                    const finalSlug = generateUniqueSlug(baseSlug, existingSlugs);
+                    updateData.slug = finalSlug;
+                }
+            }
+
+            return tx.schoolPublicProfile.update({
+                where: { schoolId },
+                data: updateData,
+                include: {
+                    school: {
+                        select: { id: true, name: true, location: true, profilePicture: true },
+                    },
                 },
-            },
+            });
         });
 
         return NextResponse.json({

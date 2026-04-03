@@ -2,6 +2,7 @@
 // SUPER_ADMIN only: List & create school marketplace profiles
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { generateSchoolSlug, generateUniqueSlug } from '@/lib/slug-generator';
 
 // GET — List all schools with their marketplace profiles
 export async function GET(req) {
@@ -152,7 +153,7 @@ export async function GET(req) {
 export async function POST(req) {
     try {
         const body = await req.json();
-        const { isNewSchool, newSchoolName, schoolId: providedSchoolId, ...profileData } = body;
+        const { isNewSchool, newSchoolName, schoolId: providedSchoolId, location, ...profileData } = body;
 
         let activeSchoolId = providedSchoolId;
 
@@ -172,7 +173,7 @@ export async function POST(req) {
                     domain: generatedDomain.substring(0, 190), // ensure it fits length constraints
                     schoolCode: generatedSchoolCode,
                     profilePicture: profileData.logoImage || '',
-                    location: 'Not Specified',
+                    location: location?.trim() || 'Not Specified',
                     contactNumber: profileData.publicPhone || 'Not Provided',
                     SubscriptionType: 'ATLAS_ONLY',
                     Language: 'en',
@@ -189,18 +190,48 @@ export async function POST(req) {
             if (!school) {
                 return NextResponse.json({ error: 'School not found' }, { status: 404 });
             }
+
+            if (typeof location === 'string' && location.trim()) {
+                await prisma.school.update({
+                    where: { id: activeSchoolId },
+                    data: { location: location.trim() },
+                });
+            }
         }
 
-        // Upsert the public profile
-        const profile = await prisma.schoolPublicProfile.upsert({
-            where: { schoolId: activeSchoolId },
-            create: {
-                schoolId: activeSchoolId,
-                ...profileData,
-                isPubliclyVisible: profileData.isPubliclyVisible ?? (isNewSchool ? true : false),
-            },
-            update: profileData,
-            include: {
+            const existingProfile = await prisma.schoolPublicProfile.findUnique({
+                where: { schoolId: activeSchoolId },
+                select: { slug: true }
+            });
+
+            // Upsert the public profile
+            // Generate a unique slug if there is no existing slug, or if we are creating a new one
+            let finalSlug = existingProfile?.slug;
+            if (!finalSlug) {
+                const schoolData = await prisma.school.findUnique({ where: { id: activeSchoolId } });
+                const baseSlug = generateSchoolSlug(schoolData?.name || newSchoolName, location || schoolData?.location);
+                if (baseSlug) {
+                    const existingSlugs = await prisma.schoolPublicProfile.findMany({
+                        where: { slug: { startsWith: baseSlug } },
+                        select: { slug: true }
+                    }).then(res => res.map(r => r.slug));
+                    finalSlug = generateUniqueSlug(baseSlug, existingSlugs);
+                }
+            }
+
+            const profile = await prisma.schoolPublicProfile.upsert({
+                where: { schoolId: activeSchoolId },
+                create: {
+                    schoolId: activeSchoolId,
+                    ...profileData,
+                    slug: finalSlug,
+                    isPubliclyVisible: profileData.isPubliclyVisible ?? (isNewSchool ? true : false),
+                },
+                update: {
+                    ...profileData,
+                    ...(finalSlug && { slug: finalSlug })
+                },
+                include: {
                 school: {
                     select: {
                         id: true,

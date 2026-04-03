@@ -320,10 +320,11 @@ model SchoolPublicProfile {
   detailedFeeStructure Json?
 
   // Additional Profile Details
-  boards     String[] @default([])
-  genderType String? // e.g., "Boys", "Girls", "Co-ed"
-  socials    Json? // e.g., { facebook: "", instagram: "", linkedin: "", twitter: "", youtube: "" }
-  leadership Json? // Array of { role: "Director", name: "...", photo: "...", linkedin: "..." }
+  boards               String[] @default([])
+  genderType           String? // e.g., "Boys", "Girls", "Co-ed"
+  religiousAffiliation String? // e.g., "Hindu", "Muslim", "Christian"
+  socials              Json? // e.g., { facebook: "", instagram: "", linkedin: "", twitter: "", youtube: "" }
+  leadership           Json? // Array of { role: "Director", name: "...", photo: "...", linkedin: "..." }
 
   // Stats
   establishedYear     Int?

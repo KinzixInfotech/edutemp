@@ -26,6 +26,14 @@ export function slugify(text) {
         .replace(/-+$/, '');
 }
 
+export function isPlaceholderSlug(slug) {
+    if (!slug) return true;
+    const lower = slug.toLowerCase();
+    return lower.includes('not-specified') || 
+           lower.includes('not-provided') || 
+           lower.includes('unknown');
+}
+
 /**
  * Generates a school slug from name and location
  * @param {string} name - School name
@@ -36,7 +44,15 @@ export function generateSchoolSlug(name, location) {
     if (!name) return '';
 
     const namePart = slugify(name);
-    const locationPart = location ? slugify(location) : '';
+    
+    // Ignore placeholder locations when generating slug
+    const isPlaceholder = location && (
+        location.toLowerCase().includes('not specified') || 
+        location.toLowerCase().includes('not provided') ||
+        location.toLowerCase().includes('unknown')
+    );
+    
+    const locationPart = location && !isPlaceholder ? slugify(location) : '';
 
     // If location exists and isn't already in the name, append it
     if (locationPart && !namePart.includes(locationPart)) {

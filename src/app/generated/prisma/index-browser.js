@@ -219,6 +219,7 @@ exports.Prisma.SchoolPublicProfileScalarFieldEnum = {
   detailedFeeStructure: 'detailedFeeStructure',
   boards: 'boards',
   genderType: 'genderType',
+  religiousAffiliation: 'religiousAffiliation',
   socials: 'socials',
   leadership: 'leadership',
   establishedYear: 'establishedYear',

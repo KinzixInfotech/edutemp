@@ -17,7 +17,8 @@ import {
     Star, Award, Trophy, Image as ImageIcon, ArrowLeft, CheckCircle2,
     Calendar, BookOpen, Share2, Heart, ChevronRight, Home, Clock,
     Building2, Droplets, MonitorPlay, Microscope, Library, Dumbbell,
-    Copy, Check, X, LayoutGrid, IndianRupee, MessageSquare
+    Copy, Check, X, LayoutGrid, IndianRupee, MessageSquare,
+    UserCheck, Linkedin,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -220,6 +221,11 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                                         <Calendar className="w-3.5 h-3.5 text-gray-400" /> Est. {school.establishedYear}
                                     </span>
                                 )}
+                                {school.religiousAffiliation && (
+                                    <Badge variant="secondary" className="gap-1 text-[11px] bg-gray-100 text-gray-600 border-gray-200 uppercase tracking-wider font-semibold">
+                                        {school.religiousAffiliation}
+                                    </Badge>
+                                )}
                                 {school.isVerified && (
                                     <Badge className="gap-1 bg-green-50 text-green-700 border-green-200 text-[11px]">
                                         <CheckCircle2 className="h-3 w-3" /> Accredited
@@ -333,6 +339,7 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                             { value: 'overview', label: 'Overview', icon: <LayoutGrid className="w-3.5 h-3.5" /> },
                             { value: 'curriculum', label: 'Curriculum', icon: <BookOpen className="w-3.5 h-3.5" /> },
                             { value: 'facilities', label: 'Facilities', icon: <Building2 className="w-3.5 h-3.5" /> },
+                            { value: 'gallery', label: 'Gallery', icon: <ImageIcon className="w-3.5 h-3.5" /> },
                             { value: 'fees', label: 'Tuition & Fees', icon: <IndianRupee className="w-3.5 h-3.5" /> },
                             { value: 'reviews', label: 'Reviews', icon: <MessageSquare className="w-3.5 h-3.5" /> },
                         ].map((tab) => (
@@ -620,6 +627,35 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                                     </div>
                                 </Card>
 
+                                {/* Leadership Team */}
+                                {school.leadership && Array.isArray(school.leadership) && school.leadership.length > 0 && (
+                                    <Card className="p-5 rounded-2xl border-gray-200">
+                                        <h3 className="text-sm font-bold text-[#0f172a] mb-4 uppercase tracking-wider">Leadership Team</h3>
+                                        <div className="space-y-3">
+                                            {school.leadership.map((leader, i) => (
+                                                <div key={i} className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-full overflow-hidden bg-indigo-50 flex items-center justify-center shrink-0">
+                                                        {leader.photo ? (
+                                                            <img src={leader.photo} alt={leader.name} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <UserCheck className="w-4 h-4 text-indigo-600" />
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-semibold text-[#0f172a]">{leader.name}</p>
+                                                        <p className="text-xs text-gray-500">{leader.role}</p>
+                                                    </div>
+                                                    {leader.linkedin && (
+                                                        <a href={leader.linkedin} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-[#2563eb] transition-colors">
+                                                            <Linkedin className="w-4 h-4" />
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </Card>
+                                )}
+
                                 {/* Google Maps Embed */}
                                 {school.latitude && school.longitude && (
                                     <Card className="rounded-2xl pt-0 border-gray-200 overflow-hidden">
@@ -725,6 +761,33 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                             <Card className="p-12 text-center rounded-xl border-gray-200">
                                 <Building2 className="h-10 w-10 mx-auto mb-3 text-gray-300" />
                                 <p className="text-gray-400 text-sm">No facilities listed yet.</p>
+                            </Card>
+                        )}
+                    </TabsContent>
+
+                    {/* ═══ Gallery ═══ */}
+                    <TabsContent value="gallery">
+                        {school.gallery && school.gallery.length > 0 ? (
+                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                                {school.gallery.map((img) => (
+                                    <div key={img.id} className="relative aspect-square rounded-xl overflow-hidden group border border-gray-100 shadow-sm">
+                                        <img 
+                                            src={img.imageUrl} 
+                                            alt={img.caption || 'School gallery image'} 
+                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                        />
+                                        {img.caption && (
+                                            <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/70 to-transparent">
+                                                <p className="text-white text-sm font-medium line-clamp-1">{img.caption}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <Card className="p-12 text-center rounded-xl border-gray-200">
+                                <ImageIcon className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+                                <p className="text-gray-400 text-sm">No gallery images available yet.</p>
                             </Card>
                         )}
                     </TabsContent>
