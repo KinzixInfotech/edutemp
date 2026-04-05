@@ -33,8 +33,8 @@ export async function GET(req) {
         console.log('[ATLAS IMPORT CRON] Starting pipeline orchestration...');
 
         // 1. Fetch pending pincodes that need processing
-        // Order by retryCount ascending so we process fresh ones before retries
-        const pendingPincodes = await prisma.importProgress.findMany({
+        // Prioritize Jharkhand (and Bihar) regional pincodes first (starting with '8')
+        let pendingPincodes = await prisma.importProgress.findMany({
             where: {
                 status: {
                     in: ['pending', 'failed'],
@@ -42,6 +42,9 @@ export async function GET(req) {
                 retryCount: {
                     lt: 3, // Max 3 retries
                 },
+                pincode: { 
+                    startsWith: '8' // Jharkhand pincodes predominantly start with 81, 82, 83.
+                } 
             },
             orderBy: [
                 { status: 'desc' }, // 'pending' comes before 'failed'
@@ -54,6 +57,28 @@ export async function GET(req) {
                 retryCount: true,
             },
         });
+
+        // 1b. If Jharkhand queue is nearly finished, grab random states to fill the batch
+        if (pendingPincodes.length < BATCH_SIZE) {
+            const extraPincodes = await prisma.importProgress.findMany({
+                where: {
+                    status: { in: ['pending', 'failed'] },
+                    retryCount: { lt: 3 },
+                    NOT: { pincode: { startsWith: '8' } }
+                },
+                orderBy: [
+                    { status: 'desc' },
+                    { retryCount: 'asc' },
+                ],
+                take: BATCH_SIZE - pendingPincodes.length,
+                select: {
+                    pincode: true,
+                    status: true,
+                    retryCount: true,
+                },
+            });
+            pendingPincodes = [...pendingPincodes, ...extraPincodes];
+        }
 
         if (pendingPincodes.length === 0) {
             console.log('[ATLAS IMPORT CRON] No pending pincodes found. Pipeline idle.');

@@ -5,83 +5,71 @@
 import { fileURLToPath } from 'url';
 import path from 'path';
 import dotenv from 'dotenv';
-import { PrismaClient } from '../src/app/generated/prisma/client.js';
+import fs from 'fs';
+import pg from 'pg';
 
 // Load environment variables
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '../.env.local') });
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
-const prisma = new PrismaClient();
-
-// In a real scenario, this would be a JSON file of all 19,000+ Indian pincodes mapped to LGD districts
-// We are hardcoding a small array here containing valid Delhi pincodes for verification.
-const TEST_PINCODES = [
-    { pincode: '110001', districtCode: '85', stateCode: '7' }, // New Delhi (District 85, State 7 in LGD)
-    { pincode: '110002', districtCode: '85', stateCode: '7' }, 
-    { pincode: '110003', districtCode: '85', stateCode: '7' }, 
-    { pincode: '110020', districtCode: '89', stateCode: '7' }, // South Delhi
-];
+const pool = new pg.Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+});
 
 async function seedPincodes() {
-    console.log('🌱 Seeding Test Pincodes for UDISE Ingestion Pipeline...');
+    console.log('🌱 Seeding All India Pincodes for UDISE Ingestion Pipeline...');
+    
+    // Connect to DB via PG
+    const client = await pool.connect();
+    console.log('✅ DB connected');
+
     try {
-        for (const data of TEST_PINCODES) {
-            
-            // Check if district and state exist in the DB
-            const district = await prisma.globalDistrict.findUnique({
-                where: { lgdCode: data.districtCode }
-            });
-            const state = await prisma.globalState.findUnique({
-                where: { stateCode: data.stateCode }
-            });
+        const filePath = path.join(__dirname, '../src/app/atlas/all_india_pincodes.json');
+        const rawData = fs.readFileSync(filePath, 'utf8');
+        const uniquePincodes = JSON.parse(rawData);
 
-            if (!state) {
-                console.warn(`[WARN] State ${data.stateCode} not found for Pincode ${data.pincode}. Ensure you ran seed-districts.mjs first. Skipping.`);
-                continue;
+        console.log(`Loaded ${uniquePincodes.length} unique pincodes across India.`);
+        console.log(`Inserting ${uniquePincodes.length} pincodes into ImportProgress queue...`);
+
+        // Chunking the inserts to avoid postgres max params limit (65535)
+        const chunkSize = 5000;
+        let insertedRows = 0;
+
+        for (let i = 0; i < uniquePincodes.length; i += chunkSize) {
+            const chunk = uniquePincodes.slice(i, i + chunkSize);
+            let chunkValues = [];
+            let chunkParams = [];
+            let cIndex = 1;
+
+            for (const p of chunk) {
+                const pin = String(p.pincode);
+                chunkValues.push(`($${cIndex++}, $${cIndex++}, $${cIndex++}, $${cIndex++}, NOW())`);
+                const fakeCuid = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2) + i + cIndex;
+                chunkParams.push(fakeCuid, pin, 'pending', null);
             }
 
-            if (!district) {
-                console.warn(`[WARN] District ${data.districtCode} not found for Pincode ${data.pincode}. Skiping.`);
-                continue;
-            }
-
-            console.log(`Inserting Pincode: ${data.pincode}`);
-            
-            // 1. Upsert GlobalPincode
-            await prisma.globalPincode.upsert({
-                where: { pincode: data.pincode },
-                update: {
-                    districtCode: data.districtCode,
-                    stateCode: data.stateCode,
-                },
-                create: {
-                    pincode: data.pincode,
-                    districtCode: data.districtCode,
-                    stateCode: data.stateCode,
-                }
-            });
-
-            // 2. Queue in ImportProgress Queue table
-            await prisma.importProgress.upsert({
-                where: { pincode: data.pincode },
-                update: {
-                    status: 'pending', // Reset status for testing
-                    retryCount: 0
-                },
-                create: {
-                    pincode: data.pincode,
-                    status: 'pending'
-                }
-            });
+            const query = `
+                INSERT INTO "ImportProgress" ("id", "pincode", "status", "lastRunAt", "updatedAt") 
+                VALUES ${chunkValues.join(', ')}
+                ON CONFLICT ("pincode") DO UPDATE SET "status" = 'pending', "updatedAt" = NOW()
+            `;
+            await client.query(query, chunkParams);
+            insertedRows += chunk.length;
+            console.log(` - Chunk inserted... (${insertedRows}/${uniquePincodes.length})`);
         }
-        
-        console.log('✅ Seeding completed! Hit GET /api/cron/atlas-import to test the ingestion pipeline.');
+
+        console.log(`✅ Seeding completed! Inserted ${insertedRows} new pincodes into the queue.`);
+        console.log('You can now see these in Prisma Studio under the ImportProgress table and let the Cron process the entire country automatically!');
+
     } catch (e) {
         console.error('❌ Seeding failed:', e);
     } finally {
-        await prisma.$disconnect();
+        client.release();
+        await pool.end();
     }
 }
 
 seedPincodes();
+
