@@ -139,6 +139,16 @@ exports.Prisma.SchoolScalarFieldEnum = {
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
   deletedAt: 'deletedAt',
+  atlas_classFrom: 'atlas_classFrom',
+  atlas_classTo: 'atlas_classTo',
+  atlas_managementType: 'atlas_managementType',
+  atlas_category: 'atlas_category',
+  atlas_genderType: 'atlas_genderType',
+  atlas_source: 'atlas_source',
+  atlas_pincode: 'atlas_pincode',
+  atlas_latitude: 'atlas_latitude',
+  atlas_longitude: 'atlas_longitude',
+  atlas_lastFetchedAt: 'atlas_lastFetchedAt',
   biometricAgentKey: 'biometricAgentKey',
   onboardingComplete: 'onboardingComplete',
   onboardingDismissed: 'onboardingDismissed',
@@ -308,6 +318,45 @@ exports.Prisma.AdmissionInquiryScalarFieldEnum = {
   status: 'status',
   assignedTo: 'assignedTo',
   notes: 'notes',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.GlobalStateScalarFieldEnum = {
+  id: 'id',
+  stateCode: 'stateCode',
+  name: 'name',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.GlobalDistrictScalarFieldEnum = {
+  id: 'id',
+  lgdCode: 'lgdCode',
+  name: 'name',
+  stateCode: 'stateCode',
+  shortName: 'shortName',
+  censusCode: 'censusCode',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.GlobalPincodeScalarFieldEnum = {
+  id: 'id',
+  pincode: 'pincode',
+  districtCode: 'districtCode',
+  stateCode: 'stateCode',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.ImportProgressScalarFieldEnum = {
+  id: 'id',
+  pincode: 'pincode',
+  status: 'status',
+  lastRunAt: 'lastRunAt',
+  lastSchoolCount: 'lastSchoolCount',
+  errorMessage: 'errorMessage',
+  retryCount: 'retryCount',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -4258,6 +4307,10 @@ exports.Prisma.ModelName = {
   SchoolGallery: 'SchoolGallery',
   SchoolRating: 'SchoolRating',
   AdmissionInquiry: 'AdmissionInquiry',
+  GlobalState: 'GlobalState',
+  GlobalDistrict: 'GlobalDistrict',
+  GlobalPincode: 'GlobalPincode',
+  ImportProgress: 'ImportProgress',
   Partner: 'Partner',
   PartnerLead: 'PartnerLead',
   LeadActivity: 'LeadActivity',

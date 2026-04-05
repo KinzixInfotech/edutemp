@@ -109,6 +109,18 @@ model School {
   smsWallet        SmsWallet?
   feeSettings      FeeSettings?
 
+  // Atlas Integration Fields
+  atlas_classFrom      String?
+  atlas_classTo        String?
+  atlas_managementType String?
+  atlas_category       String?
+  atlas_genderType     String?
+  atlas_source         String?
+  atlas_pincode        String?
+  atlas_latitude       Float?
+  atlas_longitude      Float?
+  atlas_lastFetchedAt  DateTime?
+
   // Transport Auto-Generation
   transportSettings     TransportSettings?
   busServiceSuspensions BusServiceSuspension[]
@@ -476,6 +488,69 @@ model AdmissionInquiry {
   @@index([profileId])
   @@index([status])
   @@index([createdAt])
+}
+
+// ============================================
+// GLOBAL GEOGRAPHY — LGD States & Districts
+// ============================================
+
+model GlobalState {
+  id        String @id @default(cuid())
+  stateCode String @unique // LGD state code (e.g. "7" for Delhi)
+  name      String // Cleaned name (e.g. "Delhi")
+
+  districts GlobalDistrict[]
+  pincodes  GlobalPincode[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+}
+
+model GlobalDistrict {
+  id         String  @id @default(cuid())
+  lgdCode    String  @unique // District LGD code (e.g. "77")
+  name       String // District name in English (e.g. "Central")
+  stateCode  String // FK to GlobalState.stateCode
+  shortName  String? // Short abbreviation (e.g. "CNT")
+  censusCode String? // Census 2011 code
+
+  state    GlobalState     @relation(fields: [stateCode], references: [stateCode])
+  pincodes GlobalPincode[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([stateCode])
+  @@index([name])
+}
+
+model GlobalPincode {
+  id           String @id @default(cuid())
+  pincode      String @unique
+  districtCode String
+  stateCode    String
+
+  district GlobalDistrict @relation(fields: [districtCode], references: [lgdCode])
+  state    GlobalState    @relation(fields: [stateCode], references: [stateCode])
+
+  createdAt DateTime @default(now())
+}
+
+model ImportProgress {
+  id              String    @id @default(cuid())
+  pincode         String    @unique
+  status          String    @default("pending") // pending | running | completed | failed
+  lastRunAt       DateTime?
+  lastSchoolCount Int       @default(0)
+  errorMessage    String?
+  retryCount      Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
 }
 
 // ============================================
