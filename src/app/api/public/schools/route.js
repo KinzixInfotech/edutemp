@@ -21,56 +21,119 @@ export async function GET(req) {
         const minRating = searchParams.get('minRating') ? parseFloat(searchParams.get('minRating')) : undefined;
         const location = searchParams.get('location') || '';
         const featured = searchParams.get('featured') === 'true';
-        const sort = searchParams.get('sort') || 'name'; // name, rating, fees
+        const sort = searchParams.get('sort') || 'name';
 
-        // Generate cache key based on all parameters
-        const cacheKey = generateKey('public-schools', {
-            page,
-            limit,
-            search,
-            minFee,
-            maxFee,
-            minRating,
-            location,
-            featured,
-            sort
+        // NEW filters
+        const board = searchParams.get('board') || '';             // e.g. "CBSE"
+        const genderType = searchParams.get('genderType') || '';   // "Boys" | "Girls" | "Co-ed"
+        const religiousAffiliation = searchParams.get('religiousAffiliation') || '';
+        // facilities & extracurriculars come as comma-separated strings
+        const facilitiesParam = searchParams.get('facilities') || '';
+        const extracurricularsParam = searchParams.get('extracurriculars') || '';
+        const facilities = facilitiesParam ? facilitiesParam.split(',').map(f => f.trim()).filter(Boolean) : [];
+        const extracurriculars = extracurricularsParam ? extracurricularsParam.split(',').map(e => e.trim()).filter(Boolean) : [];
+
+        const cacheKey = generateKey('public-schools-v2', {
+            page, limit, search, minFee, maxFee, minRating,
+            location, featured, sort, board, genderType,
+            religiousAffiliation,
+            facilities: facilities.join(','),
+            extracurriculars: extracurriculars.join(','),
         });
 
-        // Use Redis cache with 5 minute TTL
         const result = await remember(cacheKey, async () => {
-            // Build where clause
-            const where = {
-                // isPubliclyVisible: true, // Temporary: Allow hidden schools to show for development
-                ...(search && {
-                    OR: [
-                        { school: { name: { contains: search, mode: 'insensitive' } } },
-                        { school: { location: { contains: search, mode: 'insensitive' } } },
-                        { tagline: { contains: search, mode: 'insensitive' } },
-                    ]
-                }),
-                ...(location && {
-                    school: { location: { contains: location, mode: 'insensitive' } }
-                }),
-                ...(minFee && { minFee: { gte: minFee } }),
-                ...(maxFee && { maxFee: { lte: maxFee } }),
-                ...(minRating && { overallRating: { gte: minRating } }),
-                ...(featured && { isFeatured: true }),
+            // ── Search: hits name, location, city, state, district via atlas fields,
+            //    tagline, and the public profile slug
+            const searchConditions = search ? {
+                OR: [
+                    { school: { name: { contains: search, mode: 'insensitive' } } },
+                    { school: { location: { contains: search, mode: 'insensitive' } } },
+                    { school: { city: { contains: search, mode: 'insensitive' } } },
+                    { school: { state: { contains: search, mode: 'insensitive' } } },
+                    { school: { atlas_pincode: { contains: search, mode: 'insensitive' } } },
+                    { tagline: { contains: search, mode: 'insensitive' } },
+                    { description: { contains: search, mode: 'insensitive' } },
+                    { slug: { contains: search, mode: 'insensitive' } },
+                ]
+            } : {};
+
+            const locationConditions = location ? {
+                OR: [
+                    { school: { location: { contains: location, mode: 'insensitive' } } },
+                    { school: { city: { contains: location, mode: 'insensitive' } } },
+                    { school: { state: { contains: location, mode: 'insensitive' } } },
+                ]
+            } : {};
+
+            // Board filter: SchoolPublicProfile.boards is String[]
+            // Prisma array field filter: has (exact match, case-sensitive)
+            // We do a has check — boards field is String[] in Prisma
+            const boardCondition = board ? {
+                boards: { has: board }
+            } : {};
+
+            const genderCondition = genderType ? { genderType } : {};
+
+            const religiousCondition = religiousAffiliation ? {
+                religiousAffiliation: { contains: religiousAffiliation, mode: 'insensitive' }
+            } : {};
+
+            const feeConditions = {
+                ...(minFee !== undefined ? { minFee: { gte: minFee } } : {}),
+                ...(maxFee !== undefined ? { maxFee: { lte: maxFee } } : {}),
             };
 
-            // Build orderBy
+            const ratingCondition = minRating ? { overallRating: { gte: minRating } } : {};
+            const featuredCondition = featured ? { isFeatured: true } : {};
+
+            // Facilities filter: SchoolFacility has `name` field
+            // We need profiles whose facilities include ALL selected ones
+            const facilitiesCondition = facilities.length > 0 ? {
+                facilities: {
+                    some: {
+                        name: { in: facilities, mode: 'insensitive' },
+                        isAvailable: true,
+                    }
+                }
+            } : {};
+
+            // Extracurriculars: stored as SchoolFacility with category = "Sports" / "Cultural"
+            // OR as badge types. Best approach: search facilities by name for extracurriculars too
+            const extracurricularsCondition = extracurriculars.length > 0 ? {
+                facilities: {
+                    some: {
+                        name: { in: extracurriculars, mode: 'insensitive' },
+                    }
+                }
+            } : {};
+
+            const where = {
+                ...searchConditions,
+                ...locationConditions,
+                ...boardCondition,
+                ...genderCondition,
+                ...religiousCondition,
+                ...feeConditions,
+                ...ratingCondition,
+                ...featuredCondition,
+                ...facilitiesCondition,
+                ...extracurricularsCondition,
+            };
+
             const orderBy = (() => {
                 switch (sort) {
                     case 'rating':
                         return { overallRating: 'desc' };
-                    case 'fees':
+                    case 'fees_asc':
                         return { minFee: 'asc' };
+                    case 'fees_desc':
+                        return { minFee: 'desc' };
                     case 'name':
                     default:
                         return { school: { name: 'asc' } };
                 }
             })();
 
-            // Fetch schools with pagination
             const [schools, total] = await Promise.all([
                 prisma.schoolPublicProfile.findMany({
                     where,
@@ -97,11 +160,17 @@ export async function GET(req) {
                         sportsRating: true,
                         isFeatured: true,
                         isVerified: true,
-                        detailedFeeStructure: true,
+                        boards: true,
+                        genderType: true,
+                        religiousAffiliation: true,
+                        publicPhone: true,
+                        publicEmail: true,
                         school: {
                             select: {
                                 name: true,
                                 location: true,
+                                city: true,
+                                state: true,
                                 profilePicture: true,
                                 classes: {
                                     select: { className: true },
@@ -110,15 +179,19 @@ export async function GET(req) {
                             }
                         },
                         badges: {
-                            select: {
-                                badgeType: true,
-                            },
+                            select: { badgeType: true },
                             take: 3,
+                        },
+                        facilities: {
+                            select: { name: true, category: true, isAvailable: true },
+                            where: { isAvailable: true },
+                            take: 10,
                         },
                         _count: {
                             select: {
                                 achievements: true,
                                 facilities: true,
+                                ratings: true,
                             }
                         }
                     }
@@ -135,7 +208,7 @@ export async function GET(req) {
                     totalPages: Math.ceil(total / limit),
                 }
             };
-        }, 300); // 5 minutes cache
+        }, 300); // 5 min cache
 
         return NextResponse.json(result);
 
