@@ -18,7 +18,7 @@ import {
     Calendar, BookOpen, Share2, Heart, ChevronRight, Home, Clock,
     Building2, Droplets, MonitorPlay, Microscope, Library, Dumbbell,
     Copy, Check, X, LayoutGrid, IndianRupee, MessageSquare,
-    UserCheck, Linkedin,
+    UserCheck, Linkedin, School
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -256,6 +256,16 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                 </motion.div>
 
                 {/* ── Photo Gallery Grid ── */}
+                {/* Fallback no images */}
+                {(!school?.coverImage || String(school?.coverImage).trim() === '' || String(school?.coverImage) === 'null') && (!galleryImages || galleryImages.length === 0) && (
+                    <div className="rounded-2xl overflow-hidden h-40 md:h-[240px] bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center border border-gray-200 shadow-inner w-full mt-2 mb-2">
+                        <div className="text-center text-gray-400">
+                            <School className="w-12 h-12 md:w-16 md:h-16 mx-auto mb-3 opacity-50" />
+                            <p className="font-medium text-sm">Visuals coming soon</p>
+                        </div>
+                    </div>
+                )}
+
                 {school.coverImage && galleryImages.length === 0 && (
                     /* Cover image only — full width */
                     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
@@ -367,9 +377,13 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                                         </div>
                                         About {school.school?.name}
                                     </h2>
-                                    {school.description && (
+                                    {school.description ? (
                                         <div className="text-[15px] text-gray-600 whitespace-pre-line leading-[1.85] mb-8">
                                             {school.description}
+                                        </div>
+                                    ) : (
+                                        <div className="text-sm text-gray-400 italic mb-8 border border-dashed border-gray-200 rounded-xl p-6 text-center bg-gray-50/50">
+                                            <p>A detailed description for {school.school?.name} has not been provided yet.</p>
                                         </div>
                                     )}
 
@@ -408,12 +422,12 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                                 )}
 
                                 {/* Academic Programs */}
-                                {school.school?.classes?.length > 0 && (
-                                    <div>
-                                        <h2 className="text-xl font-bold text-[#0f172a] mb-4 flex items-center gap-2">
-                                            <span className="w-1 h-6 bg-[#2563eb] rounded-full" />
-                                            Academic Programs
-                                        </h2>
+                                <div>
+                                    <h2 className="text-xl font-bold text-[#0f172a] mb-4 flex items-center gap-2">
+                                        <span className="w-1 h-6 bg-[#2563eb] rounded-full" />
+                                        Academic Programs
+                                    </h2>
+                                    {school.school?.classes?.length > 0 ? (
                                         <Card className="rounded-2xl  pt-0 border-gray-200 overflow-hidden">
                                             {/* Gradient header */}
                                             <div className="bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-500 p-5 text-white">
@@ -481,16 +495,21 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                                                 </div>
                                             )}
                                         </Card>
-                                    </div>
-                                )}
+                                    ) : (
+                                        <Card className="p-8 border border-dashed border-gray-200 text-center bg-gray-50/50 rounded-2xl">
+                                            <GraduationCap className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                                            <p className="text-sm font-medium text-gray-500">Classes information not provided</p>
+                                        </Card>
+                                    )}
+                                </div>
 
                                 {/* Campus Facilities */}
-                                {school.facilities && school.facilities.length > 0 && (
-                                    <div>
-                                        <h2 className="text-xl font-bold text-[#0f172a] mb-4 flex items-center gap-2">
-                                            <span className="w-1 h-6 bg-[#2563eb] rounded-full" />
-                                            Campus Facilities
-                                        </h2>
+                                <div>
+                                    <h2 className="text-xl font-bold text-[#0f172a] mb-4 flex items-center gap-2">
+                                        <span className="w-1 h-6 bg-[#2563eb] rounded-full" />
+                                        Campus Facilities
+                                    </h2>
+                                    {school.facilities && school.facilities.length > 0 ? (
                                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                                             {school.facilities.slice(0, 8).map((facility, idx) => {
                                                 const FIcon = getFacilityIcon(facility.name);
@@ -505,8 +524,13 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                                                 );
                                             })}
                                         </div>
-                                    </div>
-                                )}
+                                    ) : (
+                                        <Card className="p-8 border border-dashed border-gray-200 text-center bg-gray-50/50 rounded-2xl">
+                                            <Building2 className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                                            <p className="text-sm font-medium text-gray-500">Facility details are updating</p>
+                                        </Card>
+                                    )}
+                                </div>
 
                                 {/* Fee Table Preview */}
                                 {school.detailedFeeStructure && school.detailedFeeStructure.length > 0 && (
@@ -628,9 +652,9 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                                 </Card>
 
                                 {/* Leadership Team */}
-                                {school.leadership && Array.isArray(school.leadership) && school.leadership.length > 0 && (
-                                    <Card className="p-5 rounded-2xl border-gray-200">
-                                        <h3 className="text-sm font-bold text-[#0f172a] mb-4 uppercase tracking-wider">Leadership Team</h3>
+                                <Card className="p-5 rounded-2xl border-gray-200">
+                                    <h3 className="text-sm font-bold text-[#0f172a] mb-4 uppercase tracking-wider">Leadership Team</h3>
+                                    {school.leadership && Array.isArray(school.leadership) && school.leadership.length > 0 ? (
                                         <div className="space-y-3">
                                             {school.leadership.map((leader, i) => (
                                                 <div key={i} className="flex items-center gap-3">
@@ -653,8 +677,12 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                                                 </div>
                                             ))}
                                         </div>
-                                    </Card>
-                                )}
+                                    ) : (
+                                        <div className="p-4 border border-dashed border-gray-200 rounded-lg text-center bg-gray-50/50">
+                                            <p className="text-xs text-gray-400 italic">No leadership profiles added</p>
+                                        </div>
+                                    )}
+                                </Card>
 
                                 {/* Google Maps Embed */}
                                 {school.latitude && school.longitude && (
@@ -682,17 +710,21 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                                 )}
 
                                 {/* Fee Range */}
-                                {(school.minFee || school.maxFee) && (
-                                    <Card className="p-5 rounded-2xl border-gray-200">
-                                        <h3 className="text-sm font-bold text-[#0f172a] mb-3 uppercase tracking-wider">Annual Fee Range</h3>
+                                <Card className="p-5 rounded-2xl border-gray-200">
+                                    <h3 className="text-sm font-bold text-[#0f172a] mb-3 uppercase tracking-wider">Annual Fee Range</h3>
+                                    {(school.minFee || school.maxFee) ? (
                                         <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
                                             <DollarSign className="h-5 w-5 text-[#2563eb]" />
                                             <span className="text-lg font-bold text-[#2563eb]">
-                                                ₹{school.minFee?.toLocaleString()} — ₹{school.maxFee?.toLocaleString()}
+                                                {school.minFee && school.maxFee ? `₹${school.minFee.toLocaleString()} — ₹${school.maxFee.toLocaleString()}` : `${school.minFee ? `From ₹${school.minFee.toLocaleString()}` : `Up to ₹${school.maxFee.toLocaleString()}`}`}
                                             </span>
                                         </div>
-                                    </Card>
-                                )}
+                                    ) : (
+                                        <div className="p-4 rounded-lg border border-dashed border-gray-200 bg-gray-50/50 text-center">
+                                            <p className="text-xs text-gray-500 font-medium italic">Contact school for fee details</p>
+                                        </div>
+                                    )}
+                                </Card>
                             </div>
                         </div>
                     </TabsContent>
@@ -771,9 +803,9 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                                 {school.gallery.map((img) => (
                                     <div key={img.id} className="relative aspect-square rounded-xl overflow-hidden group border border-gray-100 shadow-sm">
-                                        <img 
-                                            src={img.imageUrl} 
-                                            alt={img.caption || 'School gallery image'} 
+                                        <img
+                                            src={img.imageUrl}
+                                            alt={img.caption || 'School gallery image'}
                                             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                                         />
                                         {img.caption && (

@@ -7,7 +7,7 @@ import SchoolFilters from '@/components/explore/SchoolFilters';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Skeleton } from '@/components/ui/skeleton';
+import SchoolCardSkeleton from '@/components/explore/SchoolCardSkeleton';
 import { AlertCircle, ChevronLeft, ChevronRight, ChevronDown, School, Home, SlidersHorizontal } from 'lucide-react';
 
 const DEFAULT_FILTERS = {
@@ -144,34 +144,11 @@ export default function SchoolsPage() {
 
                     {/* Results */}
                     <div className="lg:col-span-3">
-                        {/* Updating indicator */}
-                        {isFetching && !isLoading && (
-                            <div className="mb-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-2.5 text-[13px] font-medium text-blue-700">
-                                Updating results...
-                            </div>
-                        )}
-
                         {/* Loading skeletons */}
                         {isLoading && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
                                 {[...Array(6)].map((_, i) => (
-                                    <div key={i} className="bg-white rounded-2xl overflow-hidden border border-gray-100">
-                                        <Skeleton className="h-[190px] w-full" />
-                                        <div className="p-4 space-y-2.5">
-                                            <Skeleton className="h-4 w-3/4" />
-                                            <Skeleton className="h-3 w-1/2" />
-                                            <div className="flex gap-1">
-                                                <Skeleton className="h-5 w-14 rounded-full" />
-                                                <Skeleton className="h-5 w-12 rounded-full" />
-                                            </div>
-                                            <Skeleton className="h-3 w-full" />
-                                            <Skeleton className="h-3 w-4/5" />
-                                            <div className="flex gap-2 pt-1">
-                                                <Skeleton className="h-9 flex-1 rounded-lg" />
-                                                <Skeleton className="h-9 flex-1 rounded-lg" />
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <SchoolCardSkeleton key={i} />
                                 ))}
                             </div>
                         )}
@@ -190,7 +167,7 @@ export default function SchoolsPage() {
 
                         {/* Grid */}
                         {!isLoading && !isError && data?.schools && (
-                            <>
+                            <div className={`transition-opacity duration-300 ${isFetching ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
                                 {data.schools.length > 0 ? (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
                                         {data.schools.map((school) => (
@@ -264,7 +241,7 @@ export default function SchoolsPage() {
                                         </button>
                                     </div>
                                 )}
-                            </>
+                            </div>
                         )}
                     </div>
                 </div>
