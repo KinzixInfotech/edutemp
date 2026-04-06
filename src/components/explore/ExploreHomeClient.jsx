@@ -1,19 +1,17 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
     Search, MapPin, School as SchoolIcon, ArrowRight,
-    Heart, Star, ChevronRight, BookOpen, GraduationCap,
+    Heart, Star, ChevronRight,
     Globe, Users, Award, Compass, PenTool, Lightbulb,
     CalendarCheck, CreditCard, Clock, ClipboardList, MessageSquare, BarChart3, Sparkles, Zap,
-    Pencil, BookMarked, Ruler, Calculator, Library, Trophy, Microscope, Bell
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { InteractiveGridPattern } from '@/components/ui/interactive-grid-pattern';
 
 // ─── Animation variants ───
 const fadeInUp = {
@@ -29,20 +27,13 @@ const staggerContainer = {
 export default function ExploreHomeClient() {
     const [searchQuery, setSearchQuery] = useState('');
 
-    // Fetch featured schools — fallback to all schools if none are featured
-    const { data: featuredSchoolsData, isLoading: featuredLoading } = useQuery({
-        queryKey: ['featured-schools-home'],
+    // Fetch schools for hero keywords and list section
+    const { data: schoolsData, isLoading: schoolsLoading } = useQuery({
+        queryKey: ['schools-home'],
         queryFn: async () => {
-            // Try featured first
-            const res = await fetch('/api/public/schools?featured=true&limit=8');
-            if (res.ok) {
-                const data = await res.json();
-                if (data.schools && data.schools.length > 0) return data;
-            }
-            // Fallback to regular schools sorted by rating
-            const fallback = await fetch('/api/public/schools?sort=rating&limit=8');
-            if (!fallback.ok) throw new Error('Failed to fetch schools');
-            return fallback.json();
+            const res = await fetch('/api/public/schools?limit=10');
+            if (!res.ok) throw new Error('Failed to fetch schools');
+            return res.json();
         },
     });
 
@@ -54,6 +45,10 @@ export default function ExploreHomeClient() {
     };
 
     const popularCities = ['Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Chennai', 'Pune'];
+    const schoolKeywords = (schoolsData?.schools || [])
+        .map((profile) => profile.school?.name || profile.name)
+        .filter(Boolean)
+        .slice(0, 5);
 
     const formatFee = (fee) => {
         if (!fee) return null;
@@ -66,84 +61,25 @@ export default function ExploreHomeClient() {
         <div className="relative min-h-screen bg-white" style={{ fontFamily: "'Inter', sans-serif" }}>
 
             {/* ═══════════ HERO SECTION — page.jsx style ═══════════ */}
-            <HeroSection searchQuery={searchQuery} setSearchQuery={setSearchQuery} handleSearch={handleSearch} popularCities={popularCities} />
+            <HeroSection
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                handleSearch={handleSearch}
+                popularCities={popularCities}
+                schoolKeywords={schoolKeywords}
+            />
 
             {/* ═══════════ MARQUEE BANNER ═══════════ */}
-            <MarqueeBanner />
+            {/* <MarqueeBanner /> */}
 
-            {/* ═══════════ FEATURES GRID ═══════════ */}
-            <section className="py-20 bg-white">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <motion.div
-                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
-                        initial="hidden"
-                        whileInView="visible"
-                        viewport={{ once: true, margin: '-50px' }}
-                        variants={staggerContainer}
-                    >
-                        {[
-                            {
-                                icon: (
-                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                                    </svg>
-                                ),
-                                title: 'Compare Schools',
-                                desc: 'Side-by-side comparison of curriculum, facilities, and culture.',
-                                href: '/explore/schools',
-                            },
-                            {
-                                icon: (
-                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                                    </svg>
-                                ),
-                                title: 'View Fees',
-                                desc: 'Transparent access to up-to-date tuition and hidden fee structures.',
-                                href: '/explore/schools',
-                            },
-                            {
-                                icon: (
-                                    <Star className="w-6 h-6" />
-                                ),
-                                title: 'Read Reviews',
-                                desc: 'Authentic feedback from verified parents, students, and alumni.',
-                                href: '/explore/schools',
-                            },
-                            {
-                                icon: (
-                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                    </svg>
-                                ),
-                                title: 'Admission Enquiry',
-                                desc: 'Directly contact school admissions offices with one simple form.',
-                                href: '/explore/schools',
-                            },
-                        ].map((item, idx) => (
-                            <motion.div key={idx} variants={fadeInUp}>
-                                <Link href={item.href} className="block group">
-                                    <div className="p-8 rounded-2xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-xl hover:shadow-[#0052ff]/5 transition-all duration-300">
-                                        <div className="w-12 h-12 bg-[#0052ff]/10 rounded-xl flex items-center justify-center text-[#0052ff] mb-6 group-hover:bg-[#0052ff] group-hover:text-white transition-all">
-                                            {item.icon}
-                                        </div>
-                                        <h3 className="text-lg font-bold mb-3 text-slate-900">{item.title}</h3>
-                                        <p className="text-slate-600 text-sm leading-relaxed">{item.desc}</p>
-                                    </div>
-                                </Link>
-                            </motion.div>
-                        ))}
-                    </motion.div>
-                </div>
-            </section>
 
-            {/* ═══════════ TOP RATED SCHOOLS ═══════════ */}
+            {/* ═══════════ ALL SCHOOLS ═══════════ */}
             <section className="py-24 bg-[#f5f7f8]">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-end mb-12">
                         <div>
-                            <h2 className="text-3xl font-black text-slate-900 mb-4">Top Rated Schools</h2>
-                            <p className="text-slate-600">Discover the highest rated institutions across all levels.</p>
+                            <h2 className="text-3xl font-black text-slate-900 mb-4">All Schools</h2>
+                            <p className="text-slate-600">Browse schools across cities with fees, ratings, and admission details.</p>
                         </div>
                         <Link
                             href="/explore/schools"
@@ -155,8 +91,8 @@ export default function ExploreHomeClient() {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                        {featuredLoading ? (
-                            [...Array(4)].map((_, i) => (
+                        {schoolsLoading ? (
+                            [...Array(8)].map((_, i) => (
                                 <div key={i}>
                                     <Card className="overflow-hidden pt-0 rounded-2xl">
                                         <Skeleton className="aspect-[4/3] w-full" />
@@ -168,8 +104,8 @@ export default function ExploreHomeClient() {
                                     </Card>
                                 </div>
                             ))
-                        ) : featuredSchoolsData?.schools?.length > 0 ? (
-                            featuredSchoolsData.schools.slice(0, 4).map((profile) => {
+                        ) : schoolsData?.schools?.length > 0 ? (
+                            schoolsData.schools.slice(0, 10).map((profile) => {
                                 const name = profile.school?.name || profile.name || 'School';
                                 const location = profile.school?.location || profile.location || '';
                                 const slug = profile.slug || profile.schoolId || profile.id;
@@ -421,198 +357,97 @@ export default function ExploreHomeClient() {
     );
 }
 
-// ═══════════ HERO SECTION — Typewriter style from page.jsx ═══════════
-function HeroSection({ searchQuery, setSearchQuery, handleSearch, popularCities }) {
-    const line1Ref = useRef(null);
-    const line2Ref = useRef(null);
-    const line2WrapperRef = useRef(null);
-    const cursor1Ref = useRef(null);
-    const cursor2Ref = useRef(null);
-    const cursorFadeRef = useRef(null);
-    const [showContent, setShowContent] = useState(false);
-
-    useEffect(() => {
-        let cancelled = false;
-        const line1 = "Find the Best Schools";
-        const line2 = "Near You";
-
-        const typeText = async () => {
-            if (cursor1Ref.current) cursor1Ref.current.style.display = 'inline-block';
-            if (cursor1Ref.current) cursor1Ref.current.classList.add('typewriter-cursor-idle');
-            await new Promise(r => setTimeout(r, 1200));
-            if (cancelled) return;
-            if (cursor1Ref.current) cursor1Ref.current.classList.remove('typewriter-cursor-idle');
-
-            for (let i = 0; i <= line1.length; i++) {
-                if (cancelled) return;
-                if (line1Ref.current) line1Ref.current.textContent = line1.slice(0, i);
-                await new Promise(r => setTimeout(r, 55 + Math.random() * 45));
-            }
-
-            await new Promise(r => setTimeout(r, 350));
-            if (cancelled) return;
-
-            if (cursor1Ref.current) cursor1Ref.current.style.display = 'none';
-            if (line2WrapperRef.current) line2WrapperRef.current.style.display = 'inline-block';
-            if (cursor2Ref.current) cursor2Ref.current.style.display = 'inline-block';
-
-            for (let i = 0; i <= line2.length; i++) {
-                if (cancelled) return;
-                if (line2Ref.current) line2Ref.current.textContent = line2.slice(0, i);
-                await new Promise(r => setTimeout(r, 55 + Math.random() * 45));
-            }
-
-            await new Promise(r => setTimeout(r, 400));
-            if (cancelled) return;
-
-            if (cursor2Ref.current) cursor2Ref.current.style.display = 'none';
-            if (cursorFadeRef.current) cursorFadeRef.current.style.display = 'inline-block';
-
-            await new Promise(r => setTimeout(r, 600));
-            if (cancelled) return;
-            if (cursorFadeRef.current) cursorFadeRef.current.style.display = 'none';
-
-            setShowContent(true);
-        };
-
-        typeText();
-        return () => { cancelled = true; };
-    }, []);
+// ═══════════ HERO SECTION ═══════════
+function HeroSection({ searchQuery, setSearchQuery, handleSearch, popularCities, schoolKeywords }) {
+    const quickLinks = [
+        ...popularCities.slice(0, 3).map((city) => ({
+            label: city,
+            href: `/explore/schools?location=${encodeURIComponent(city)}`,
+        })),
+        ...schoolKeywords.map((school) => ({
+            label: school,
+            href: `/explore/schools?search=${encodeURIComponent(school)}`,
+        })),
+    ].slice(0, 6);
 
     return (
-        <section className="relative pt-28 pb-16 lg:pt-20 lg:pb-20 flex items-center justify-center overflow-hidden bg-white">
-            {/* Interactive Grid Pattern Background */}
-            <InteractiveGridPattern
-                className="absolute opacity-40 inset-0 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,white_40%,transparent_70%)]"
-                squares={[60, 60]}
-            />
+        <section className="relative pt-28 pb-16 lg:pt-20 lg:pb-20 flex items-center overflow-hidden bg-slate-950 min-h-[760px]">
+            <video
+                className="absolute inset-0 h-full w-full object-cover"
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="auto"
+                aria-hidden="true"
+            >
+                <source src="https://cdn.edubreezy.com/13130854_1920_1080_30fps.mp4" type="video/mp4" />
+            </video>
 
-            {/* Large Background Text "ATLAS" */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
-                <span className="text-[clamp(10rem,30vw,24rem)] font-black text-gray-100/30 leading-none tracking-tighter">
-                    ATLAS
-                </span>
-            </div>
-
-            {/* Floating School Icons - Left Side */}
-            <div className="absolute top-[12%] left-[5%] md:left-[8%] opacity-[0.05] pointer-events-none animate-float-slow">
-                <GraduationCap className="w-10 h-10 md:w-16 md:h-16 text-black rotate-[-15deg]" strokeWidth={1} />
-            </div>
-            <div className="absolute top-[68%] left-[6%] md:left-[10%] opacity-[0.06] pointer-events-none animate-float-slow" style={{ animationDelay: '2s' }}>
-                <Calculator className="w-9 h-9 md:w-14 md:h-14 text-black rotate-[-8deg]" strokeWidth={1} />
-            </div>
-            <div className="absolute top-[85%] left-[5%] md:left-[7%] opacity-[0.04] pointer-events-none animate-float-slower" style={{ animationDelay: '0.5s' }}>
-                <Pencil className="w-7 h-7 md:w-11 md:h-11 text-black rotate-[20deg]" strokeWidth={1} />
-            </div>
-            <div className="absolute top-[45%] left-[4%] md:left-[6%] opacity-[0.05] pointer-events-none animate-float-slower" style={{ animationDelay: '2.5s' }}>
-                <Library className="w-8 h-8 md:w-13 md:h-13 text-black rotate-[15deg]" strokeWidth={1} />
-            </div>
-            <div className="absolute top-[28%] left-[5%] md:left-[7%] opacity-[0.06] pointer-events-none animate-float-slower" style={{ animationDelay: '1s' }}>
-                <BookOpen className="w-8 h-8 md:w-12 md:h-12 text-black rotate-[12deg]" strokeWidth={1} />
-            </div>
-
-            {/* Floating School Icons - Right Side */}
-            <div className="absolute top-[10%] right-[5%] md:right-[8%] opacity-[0.05] pointer-events-none animate-float-slower" style={{ animationDelay: '0.8s' }}>
-                <BookMarked className="w-9 h-9 md:w-14 md:h-14 text-black rotate-[18deg]" strokeWidth={1} />
-            </div>
-            <div className="absolute top-[70%] right-[6%] md:right-[10%] opacity-[0.06] pointer-events-none animate-float-slower" style={{ animationDelay: '2.2s' }}>
-                <Trophy className="w-10 h-10 md:w-15 md:h-15 text-black rotate-[10deg]" strokeWidth={1} />
-            </div>
-            <div className="absolute top-[88%] right-[5%] md:right-[7%] opacity-[0.05] pointer-events-none animate-float-slow" style={{ animationDelay: '0.3s' }}>
-                <Microscope className="w-9 h-9 md:w-14 md:h-14 text-black rotate-[-15deg]" strokeWidth={1} />
-            </div>
-            <div className="absolute top-[50%] right-[4%] md:right-[6%] opacity-[0.04] pointer-events-none animate-float-slow" style={{ animationDelay: '2.8s' }}>
-                <Bell className="w-7 h-7 md:w-11 md:h-11 text-black rotate-[-8deg]" strokeWidth={1} />
-            </div>
-            <div className="absolute top-[25%] right-[5%] md:right-[7%] opacity-[0.06] pointer-events-none animate-float-slow" style={{ animationDelay: '1.8s' }}>
-                <Ruler className="w-8 h-8 md:w-12 md:h-12 text-black rotate-[-12deg]" strokeWidth={1} />
-            </div>
-
-            {/* Gradient Orb */}
-            <div className="absolute top-20 right-0 w-[400px] h-[400px] bg-[#0052ff]/5 rounded-full blur-3xl" />
+            <div className="absolute inset-0 bg-slate-950/55" />
+            <div className="absolute inset-0 bg-gradient-to-b from-slate-950/45 via-slate-950/20 to-slate-950/70" />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/50 to-black/15" />
 
             <div className="relative max-w-[1400px] mx-auto px-6 py-20 z-10 w-full">
-                <div className="text-center space-y-8">
-                    {/* Badge */}
-                    <div
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-full border-2 border-[#0052ff]/20 bg-[#0052ff]/5 transition-all duration-700"
-                        style={{
-                            opacity: showContent ? 1 : 0,
-                            transform: showContent ? 'translateY(0)' : 'translateY(12px)',
-                        }}
-                    >
-                        <div className="w-2 h-2 rounded-full bg-[#0052ff] animate-pulse" />
-                        <span className="text-sm font-semibold text-[#0052ff]">India's Trusted School Discovery Platform</span>
-                    </div>
+                <div className="max-w-4xl space-y-8 text-center lg:text-left">
 
-                    {/* Main Heading with Typewriter */}
-                    <h1 className="text-[clamp(2.8rem,8vw,6.5rem)] font-bold leading-[1.05] tracking-tight">
-                        <span className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent">
-                            <span ref={line1Ref}></span>
-                            <span ref={cursor1Ref} className="typewriter-cursor" style={{ display: 'none' }} />
-                        </span>
+
+                    <h1 className="max-w-7xl w-[100%] text-[5em] font-medium leading-[1.05] tracking-tight text-white">
+                        Find the Best Schools
                         <br />
-                        <span ref={line2WrapperRef} className="relative inline-block mt-2" style={{ display: 'none' }}>
-                            <span className="text-[#0052ff]">
-                                <span ref={line2Ref}></span>
-                                <span ref={cursor2Ref} className="typewriter-cursor" style={{ display: 'none' }} />
-                            </span>
-                        </span>
-                        <span ref={cursorFadeRef} className="typewriter-cursor typewriter-cursor-fade" style={{ display: 'none' }} />
+                        <span className="underline italic">Near You</span>
                     </h1>
 
-                    {/* Subtitle */}
-                    <p
-                        className="text-xl md:text-2xl text-gray-600 max-w-[800px] mx-auto leading-relaxed font-medium transition-all duration-700 delay-100"
-                        style={{
-                            opacity: showContent ? 1 : 0,
-                            transform: showContent ? 'translateY(0)' : 'translateY(18px)',
-                        }}
-                    >
+                    <p className="text-xl md:text-2xl text-white/85 max-w-[760px] lg:mx-0 mx-auto leading-relaxed font-medium">
                         Discover, compare, and connect with top-rated schools in your city. Your child's future education starts with a single search.
                     </p>
 
-                    {/* Search Bar */}
-                    <div
-                        className="transition-all duration-700 delay-200"
-                        style={{
-                            opacity: showContent ? 1 : 0,
-                            transform: showContent ? 'translateY(0)' : 'translateY(22px)',
-                        }}
-                    >
-                        <form onSubmit={handleSearch} className="relative max-w-2xl mx-auto">
-                            <div className="flex flex-col  sm:flex-row p-2 bg-white rounded-2xl sm:rounded-full border-2 border-muted transition-all focus-within:ring-2 focus-within:ring-[#0052ff]/20">
-                                <div className="flex-1 flex items-center px-4 py-3 sm:py-0">
+                    <div>
+                        <form onSubmit={handleSearch} className="relative max-w-4xl lg:mx-0 mx-auto">
+                            <div className="flex flex-col sm:flex-row p-2 bg-white/95 backdrop-blur-sm rounded-4xl border border-white/20 shadow-2xl transition-all focus-within:ring-2 focus-within:ring-[#0052ff]/30">
+                                <div className="flex-1 flex items-center  px-4 py-3 sm:py-0 min-h-[64px]">
                                     <MapPin className="w-5 h-5 text-slate-400 mr-3 shrink-0" />
                                     <input
                                         type="text"
                                         placeholder="Enter city or school name"
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full bg-transparent outline-none focus-none border-none text-slate-800 placeholder:text-slate-400 text-sm"
+                                        className="w-full bg-transparent outline-none focus-none border-none text-slate-800 placeholder:text-slate-400 text-base"
                                     />
                                 </div>
                                 <button
                                     type="submit"
-                                    className="group relative bg-[#0052ff] text-white px-8 py-4 sm:py-3 rounded-xl sm:rounded-full font-bold flex items-center justify-center gap-2 hover:bg-[#0052ff]/90 transition-all active:scale-95 text-sm overflow-hidden"
+                                    className="group relative bg-[#0052ff] text-white px-8 py-4 sm:py-3 rounded-4xl font-bold flex items-center justify-center gap-2 hover:bg-[#0052ff]/90 transition-all active:scale-95 text-sm overflow-hidden min-w-[160px]"
                                 >
                                     <span className="absolute inset-0 bg-[#003dd4] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                                     <span className="relative flex items-center gap-2">
                                         Explore Schools
-                                        <ArrowRight className="w-4 h-4" />
+                                        <Search className="w-4 h-4" />
                                     </span>
                                 </button>
                             </div>
                         </form>
 
-                        {/* Popular Cities */}
-                        <div className="mt-4 flex flex-wrap justify-center gap-3">
-                            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Popular Cities:</span>
+                        <div className="mt-5 flex flex-wrap justify-center lg:justify-start gap-3">
+                            {quickLinks.map((item) => (
+                                <Link
+                                    key={item.label}
+                                    href={item.href}
+                                    className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/5 px-4 py-2 text-sm font-medium text-white/85 backdrop-blur-sm transition-all hover:bg-white/12 hover:text-white"
+                                >
+                                    {item.label}
+                                    <ArrowRight className="h-3.5 w-3.5" />
+                                </Link>
+                            ))}
+                        </div>
+
+                        <div className="mt-6 flex flex-wrap items-center justify-center lg:justify-start gap-x-6 gap-y-3 text-white/60">
+                            <span className="text-sm font-semibold">Popular cities:</span>
                             {popularCities.map((city) => (
                                 <Link
                                     key={city}
                                     href={`/explore/schools?location=${encodeURIComponent(city)}`}
-                                    className="text-xs font-medium text-slate-600 hover:text-[#0052ff] underline underline-offset-4 decoration-[#0052ff]/30 transition-colors"
+                                    className="text-sm font-medium text-white/75 transition-colors hover:text-white"
                                 >
                                     {city}
                                 </Link>
@@ -621,77 +456,6 @@ function HeroSection({ searchQuery, setSearchQuery, handleSearch, popularCities 
                     </div>
                 </div>
             </div>
-
-            <style jsx>{`
-                @keyframes float-slow {
-                    0%, 100% { transform: translateY(0px); }
-                    50% { transform: translateY(-25px); }
-                }
-                @keyframes float-slower {
-                    0%, 100% { transform: translateY(0px); }
-                    50% { transform: translateY(-20px); }
-                }
-                .animate-float-slow {
-                    animation: float-slow 7s ease-in-out infinite;
-                }
-                .animate-float-slower {
-                    animation: float-slower 9s ease-in-out infinite;
-                }
-
-                /* Glowing Typewriter Cursor */
-                .typewriter-cursor {
-                    display: inline-block;
-                    position: relative;
-                    width: 4px;
-                    height: 1.1em;
-                    margin-left: 3px;
-                    vertical-align: middle;
-                    border-radius: 4px 4px 6px 6px;
-                    background: linear-gradient(180deg, #0052ff 0%, #037a7b 45%, rgba(3, 122, 123, 0.4) 75%, rgba(0, 0, 0, 0.08) 100%);
-                    animation: cursorGlow 2s ease-in-out infinite;
-                }
-                .typewriter-cursor::after {
-                    content: '';
-                    position: absolute;
-                    bottom: -8px;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    width: 10px;
-                    height: 14px;
-                    border-radius: 50%;
-                    background: radial-gradient(ellipse, rgba(3, 122, 123, 0.35) 0%, rgba(0, 81, 249, 0.15) 40%, transparent 70%);
-                    filter: blur(3px);
-                    pointer-events: none;
-                }
-                .typewriter-cursor-idle {
-                    animation: cursorBlink 0.6s steps(1) infinite, cursorGlow 2s ease-in-out infinite;
-                }
-                .typewriter-cursor-fade {
-                    animation: cursorFadeOut 0.6s ease forwards;
-                }
-                @keyframes cursorBlink {
-                    0%, 50% { opacity: 1; }
-                    51%, 100% { opacity: 0; }
-                }
-                @keyframes cursorGlow {
-                    0%, 100% {
-                        box-shadow:
-                            0 0 6px rgba(0, 81, 249, 0.5),
-                            0 0 14px rgba(3, 122, 123, 0.3),
-                            0 0 20px rgba(0, 81, 249, 0.15);
-                    }
-                    50% {
-                        box-shadow:
-                            0 0 10px rgba(0, 81, 249, 0.7),
-                            0 0 22px rgba(3, 122, 123, 0.5),
-                            0 0 32px rgba(0, 81, 249, 0.3);
-                    }
-                }
-                @keyframes cursorFadeOut {
-                    0% { opacity: 1; }
-                    100% { opacity: 0; }
-                }
-            `}</style>
         </section>
     );
 }
@@ -711,7 +475,7 @@ function MarqueeBanner() {
     ];
 
     return (
-        <div className="w-full bg-gray-50 py-4 md:py-8 overflow-hidden border-y border-gray-200">
+        <div className="w-full bg-[#fff] py-4 md:py-8 overflow-hidden border-y border-gray-200">
             <div className="relative flex">
                 {/* First marquee group */}
                 <div className="animate-marquee flex shrink-0 items-center">
@@ -739,4 +503,3 @@ function MarqueeBanner() {
         </div>
     );
 }
-
