@@ -12,7 +12,7 @@ export const MUTE_DURATIONS = {
 
 // Rate limits
 export const RATE_LIMITS = {
-    MESSAGES_PER_MINUTE: 10,
+    MESSAGES_PER_MINUTE: 30,
     ATTACHMENTS_PER_HOUR: 20,
     CONVERSATIONS_PER_HOUR: 10,
 };

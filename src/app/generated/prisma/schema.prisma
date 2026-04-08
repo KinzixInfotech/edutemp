@@ -1919,8 +1919,26 @@ model User {
 
   paymentReversals PaymentReversal[] @relation("PaymentReversalUser")
 
+  // Multi-device push notifications
+  devices UserDevice[]
+
   @@index([schoolId])
   @@index([roleId])
+}
+
+model UserDevice {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  fcmToken   String   @unique
+  platform   String? // 'ios', 'android', 'web'
+  isActive   Boolean  @default(true)
+  lastActive DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // model GmailAccount {

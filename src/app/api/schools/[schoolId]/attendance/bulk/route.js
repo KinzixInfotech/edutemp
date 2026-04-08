@@ -391,7 +391,9 @@ export async function POST(req, props) {
         }, { status: 403 });
       }
 
-      if (teacherAttendance.status !== 'PRESENT') {
+      const ALLOWED_MARKER_STATUSES = ['PRESENT', 'LATE'];
+
+      if (!ALLOWED_MARKER_STATUSES.includes(teacherAttendance.status)) {
         return NextResponse.json({
           error: "Cannot mark attendance",
           message: `⚠️ You cannot mark student attendance because you are marked as ${teacherAttendance.status} for ${attendanceDate.toISOString().split('T')[0]}.`,

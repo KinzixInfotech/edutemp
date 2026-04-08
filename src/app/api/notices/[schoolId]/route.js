@@ -323,91 +323,73 @@ async function getTargetUsers(schoolId, audience, targets) {
     console.log(`[Notice Push] Getting target users for audience: ${audience}, schoolId: ${schoolId}`);
 
     let users = [];
+    const includeDevices = {
+        devices: {
+            where: { isActive: true },
+            select: { fcmToken: true, platform: true }
+        }
+    };
 
     if (audience === 'ALL') {
-        // Get all users in the school
         users = await prisma.user.findMany({
             where: { schoolId, status: 'ACTIVE' },
-            select: { id: true, name: true, fcmToken: true }
+            select: { id: true, name: true, ...includeDevices }
         });
     } else if (audience === 'STUDENTS') {
-        // Get all students
         users = await prisma.user.findMany({
-            where: {
-                schoolId,
-                status: 'ACTIVE',
-                role: { name: 'STUDENT' }
-            },
-            select: { id: true, name: true, fcmToken: true }
+            where: { schoolId, status: 'ACTIVE', role: { name: 'STUDENT' } },
+            select: { id: true, name: true, ...includeDevices }
         });
     } else if (audience === 'TEACHERS') {
-        // Get all teaching staff - role is TEACHING_STAFF not TEACHER
         users = await prisma.user.findMany({
-            where: {
-                schoolId,
-                status: 'ACTIVE',
-                role: { name: 'TEACHING_STAFF' }
-            },
-            select: { id: true, name: true, fcmToken: true }
+            where: { schoolId, status: 'ACTIVE', role: { name: 'TEACHING_STAFF' } },
+            select: { id: true, name: true, ...includeDevices }
         });
     } else if (audience === 'PARENTS') {
-        // Get all parents
         users = await prisma.user.findMany({
-            where: {
-                schoolId,
-                status: 'ACTIVE',
-                role: { name: 'PARENT' }
-            },
-            select: { id: true, name: true, fcmToken: true }
+            where: { schoolId, status: 'ACTIVE', role: { name: 'PARENT' } },
+            select: { id: true, name: true, ...includeDevices }
         });
     } else if (audience === 'STAFF') {
-        // Get all staff (teaching + non-teaching)
         users = await prisma.user.findMany({
-            where: {
-                schoolId,
-                status: 'ACTIVE',
-                role: { name: { in: ['TEACHING_STAFF', 'NON_TEACHING_STAFF'] } }
-            },
-            select: { id: true, name: true, fcmToken: true }
+            where: { schoolId, status: 'ACTIVE', role: { name: { in: ['TEACHING_STAFF', 'NON_TEACHING_STAFF'] } } },
+            select: { id: true, name: true, ...includeDevices }
         });
     } else if (audience === 'CLASS') {
-        // Get students in specific classes
         const classIds = targets.map(t => t.classId).filter(Boolean);
         const students = await prisma.student.findMany({
             where: { schoolId, classId: { in: classIds } },
             select: {
-                user: {
-                    select: { id: true, name: true, fcmToken: true }
-                }
+                user: { select: { id: true, name: true, ...includeDevices } }
             }
         });
-        users = students.map(s => s.user);
+        users = students.map(s => s.user).filter(Boolean);
     } else if (audience === 'SECTION') {
-        // Get students in specific sections
         const sectionIds = targets.map(t => t.sectionId).filter(Boolean);
         const students = await prisma.student.findMany({
             where: { schoolId, sectionId: { in: sectionIds } },
             select: {
-                user: {
-                    select: { id: true, name: true, fcmToken: true }
-                }
+                user: { select: { id: true, name: true, ...includeDevices } }
             }
         });
-        users = students.map(s => s.user);
+        users = students.map(s => s.user).filter(Boolean);
     }
 
-    const usersWithTokens = users.filter(u => u.fcmToken);
-    console.log(`[Notice Push] Found ${users.length} target users, ${usersWithTokens.length} have FCM tokens`);
-    if (usersWithTokens.length > 0) {
-        console.log(`[Notice Push] Users with FCM tokens:`, usersWithTokens.map(u => ({ id: u.id, name: u.name })));
-    }
-    return users;
+    const usersWithTokens = users.filter(u => u.devices && u.devices.length > 0);
+    console.log(`[Notice Push] Found ${users.length} target users, ${usersWithTokens.length} have active devices`);
+    return usersWithTokens;
 }
 
 async function sendPushNotifications(users, notice) {
-    const tokens = users
-        .map(u => u.fcmToken)
-        .filter(Boolean);
+    // Flatten all active device tokens from all targeted users
+    const tokens = [];
+    users.forEach(u => {
+        if (u.devices && u.devices.length > 0) {
+            u.devices.forEach(d => {
+                if (d.fcmToken) tokens.push(d.fcmToken);
+            });
+        }
+    });
 
     if (tokens.length === 0) {
         console.log('[Notice Push] No FCM tokens found, skipping push notification');
@@ -416,15 +398,13 @@ async function sendPushNotifications(users, notice) {
 
     console.log(`[Notice Push] Sending push to ${tokens.length} devices for notice: "${notice.title}"${notice.fileUrl ? ' (with image)' : ''}`);
 
-    // Build notification payload with optional image
     const notificationPayload = {
         title: notice.title,
         body: notice.subtitle || notice.description.substring(0, 100) + ' - TAP TO VIEW',
     };
 
-    // Add image if notice has one (use 'image' for FCM standard field)
     if (notice.fileUrl) {
-        notificationPayload.image = notice.fileUrl; // Standard FCM field for notification image
+        notificationPayload.image = notice.fileUrl;
     }
 
     const message = {
@@ -435,13 +415,13 @@ async function sendPushNotifications(users, notice) {
             category: notice.category,
             priority: notice.priority,
             click_action: 'FLUTTER_NOTIFICATION_CLICK',
-            ...(notice.fileUrl && { imageUrl: notice.fileUrl }), // Also include in data for React Native apps
+            ...(notice.fileUrl && { imageUrl: notice.fileUrl }),
         },
         android: {
             notification: {
                 channelId: 'default',
                 priority: 'high',
-                ...(notice.fileUrl && { image: notice.fileUrl }), // Android Big Picture style (use 'image' not 'imageUrl')
+                ...(notice.fileUrl && { image: notice.fileUrl }),
             },
         },
         apns: {
@@ -449,16 +429,14 @@ async function sendPushNotifications(users, notice) {
                 aps: {
                     sound: 'default',
                     contentAvailable: true,
-                    'mutable-content': 1, // Required for iOS to display images (must be hyphenated and value 1)
+                    'mutable-content': 1,
                 },
             },
             ...(notice.fileUrl && {
-                fcm_options: {
-                    image: notice.fileUrl, // iOS image support
-                },
+                fcm_options: { image: notice.fileUrl },
             }),
         },
-        tokens: tokens,
+        tokens,
     };
 
     try {
@@ -469,18 +447,20 @@ async function sendPushNotifications(users, notice) {
         if (response.failureCount > 0) {
             const failedTokens = [];
             response.responses.forEach((resp, idx) => {
-                if (!resp.success) {
-                    console.log(`[Notice Push] Token failed: ${resp.error?.code || resp.error?.message}`);
+                const errorCode = resp.error?.code;
+                if (!resp.success &&
+                    (errorCode === 'messaging/invalid-registration-token' || errorCode === 'messaging/registration-token-not-registered')
+                ) {
+                    console.log(`[Notice Push] Token failed (${errorCode}): removing bad token`);
                     failedTokens.push(tokens[idx]);
                 }
             });
 
             if (failedTokens.length > 0) {
-                await prisma.user.updateMany({
-                    where: { fcmToken: { in: failedTokens } },
-                    data: { fcmToken: null }
+                await prisma.userDevice.deleteMany({
+                    where: { fcmToken: { in: failedTokens } }
                 });
-                console.log(`[Notice Push] Removed ${failedTokens.length} invalid tokens`);
+                console.log(`[Notice Push] Removed ${failedTokens.length} invalid tokens from UserDevice`);
             }
         }
     } catch (error) {

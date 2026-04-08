@@ -22,6 +22,12 @@ try {
     const raw = process.env.FIREBASE_SERVICE_ACCOUNT.trim();
     if (!raw) throw new Error('Empty FIREBASE_SERVICE_ACCOUNT');
     serviceAccount = JSON.parse(raw);
+
+    // 🔥 CRITICAL FIX: Next.js / dotenv sometimes leaves literal "\n" strings instead of real newlines in the private_key.
+    if (serviceAccount.private_key) {
+      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+    }
+
     console.log('Firebase Admin: Initialized from ENV (project_id:', serviceAccount.project_id, ')');
   } else {
     try {
@@ -30,6 +36,7 @@ try {
       serviceAccount = localServiceAccount;
       console.log('Firebase Admin: Initialized from local file');
     } catch (err) {
+      console.log('Firebase Admin: error', err);
       throw new Error('Firebase Service Account not found (ENV or local file)');
     }
   }

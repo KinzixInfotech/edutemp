@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { invalidatePattern } from "@/lib/cache";
 
 // PATCH: Update copy details (e.g., generate barcode, change condition)
 export async function PATCH(req, props) {
@@ -15,7 +16,17 @@ export async function PATCH(req, props) {
         const updatedCopy = await prisma.libraryBookCopy.update({
             where: { id: copyId },
             data: body,
+            include: {
+                book: {
+                    select: { schoolId: true },
+                },
+            },
         });
+
+        if (updatedCopy.book?.schoolId) {
+            await invalidatePattern(`library:books:*schoolId:${updatedCopy.book.schoolId}*`);
+            await invalidatePattern(`library:stats:*schoolId:${updatedCopy.book.schoolId}*`);
+        }
 
         return NextResponse.json(updatedCopy);
     } catch (error) {
@@ -48,9 +59,19 @@ export async function DELETE(req, props) {
             );
         }
 
-        await prisma.libraryBookCopy.delete({
+        const deletedCopy = await prisma.libraryBookCopy.delete({
             where: { id: copyId },
+            include: {
+                book: {
+                    select: { schoolId: true },
+                },
+            },
         });
+
+        if (deletedCopy.book?.schoolId) {
+            await invalidatePattern(`library:books:*schoolId:${deletedCopy.book.schoolId}*`);
+            await invalidatePattern(`library:stats:*schoolId:${deletedCopy.book.schoolId}*`);
+        }
 
         return NextResponse.json({ message: "Copy deleted successfully" });
     } catch (error) {

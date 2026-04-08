@@ -1038,6 +1038,17 @@ exports.Prisma.UserScalarFieldEnum = {
   lastSeenAt: 'lastSeenAt'
 };
 
+exports.Prisma.UserDeviceScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  fcmToken: 'fcmToken',
+  platform: 'platform',
+  isActive: 'isActive',
+  lastActive: 'lastActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.GmailAccountScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
@@ -4358,6 +4369,7 @@ exports.Prisma.ModelName = {
   NoticeRead: 'NoticeRead',
   Role: 'Role',
   User: 'User',
+  UserDevice: 'UserDevice',
   GmailAccount: 'GmailAccount',
   Admin: 'Admin',
   MasterAdmin: 'MasterAdmin',

@@ -7,7 +7,7 @@ export async function POST(request, props) {
     try {
         const { userId } = params;
         const body = await request.json();
-        const { fcmToken } = body;
+        const { fcmToken, platform } = body;
 
         // Validate inputs
         if (!userId) {
@@ -24,58 +24,52 @@ export async function POST(request, props) {
             );
         }
 
-        console.log('📱 Registering FCM token for user:', userId);
+        console.log('📱 Registering FCM token for user:', userId, '| platform:', platform || 'unknown');
         console.log('🔑 Token:', fcmToken.substring(0, 20) + '...');
 
-        // Update user's FCM token
-        const updatedUser = await prisma.user.update({
+        // Upsert into UserDevice table — if this token already exists,
+        // re-assign it to the current user and update lastActive.
+        // This handles cross-role login on the same physical device.
+        const device = await prisma.userDevice.upsert({
+            where: { fcmToken },
+            update: {
+                userId,
+                platform: platform || null,
+                isActive: true,
+                lastActive: new Date(),
+            },
+            create: {
+                userId,
+                fcmToken,
+                platform: platform || null,
+                isActive: true,
+                lastActive: new Date(),
+            },
+        });
+
+        // Also keep the legacy fcmToken field in sync for backward compatibility
+        await prisma.user.update({
             where: { id: userId },
             data: { fcmToken },
-            select: {
-                id: true,
-                email: true,
-                fcmToken: true
-            }
         });
 
-        // CRITICAL: Clear this same token from any OTHER users
-        // This prevents cross-role notification leak when multiple profiles
-        // on the same device share the same FCM token
-        const cleared = await prisma.user.updateMany({
-            where: {
-                fcmToken: fcmToken,
-                id: { not: userId }
-            },
-            data: { fcmToken: null }
-        });
-
-        if (cleared.count > 0) {
-            console.log(`🧹 Cleared stale FCM token from ${cleared.count} other user(s)`);
-        }
-
-        console.log('✅ FCM token registered successfully for:', updatedUser.email);
+        console.log('✅ FCM device registered:', device.id, '| platform:', device.platform);
 
         return NextResponse.json({
             success: true,
             message: 'FCM token registered successfully',
-            userId: updatedUser.id
+            userId,
+            deviceId: device.id,
+            platform: device.platform,
         });
 
     } catch (error) {
         console.error('❌ Error registering FCM token:', error);
 
-        // Handle specific Prisma errors
         if (error.code === 'P2025') {
             return NextResponse.json(
                 { error: 'User not found' },
                 { status: 404 }
-            );
-        }
-
-        if (error.code === 'P2002') {
-            return NextResponse.json(
-                { error: 'FCM token already exists' },
-                { status: 409 }
             );
         }
 
@@ -102,14 +96,36 @@ export async function DELETE(request, props) {
             );
         }
 
-        console.log('🗑️ Deleting FCM token for user:', userId);
+        // Check if body has a specific token to delete
+        let specificToken = null;
+        try {
+            const body = await request.json();
+            specificToken = body?.fcmToken;
+        } catch {
+            // No body — delete all devices for this user
+        }
 
+        if (specificToken) {
+            // Delete one specific device
+            console.log('🗑️ Deleting specific device for user:', userId);
+            await prisma.userDevice.deleteMany({
+                where: { userId, fcmToken: specificToken },
+            });
+        } else {
+            // Delete ALL devices for this user (full logout)
+            console.log('🗑️ Deleting ALL devices for user:', userId);
+            await prisma.userDevice.deleteMany({
+                where: { userId },
+            });
+        }
+
+        // Clear legacy field
         await prisma.user.update({
             where: { id: userId },
-            data: { fcmToken: null }
+            data: { fcmToken: null },
         });
 
-        console.log('✅ FCM token deleted successfully');
+        console.log('✅ FCM token(s) deleted successfully');
 
         return NextResponse.json({
             success: true,

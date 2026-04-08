@@ -114,10 +114,12 @@
 import redis from './redis';
 
 const DEFAULT_TTL = 3600;
+const hasValue = (value) => value !== null && value !== undefined;
 
 export const generateKey = (prefix, params = {}) => {
     if (typeof params === 'string') return `${prefix}:${params}`;
     const sortedParams = Object.keys(params)
+        .filter((key) => hasValue(params[key]))
         .sort()
         .map(key => `${key}:${params[key]}`)
         .join(':');
@@ -156,16 +158,28 @@ export const delCache = async (key) => {
 
 export const invalidatePattern = async (pattern) => {
     try {
-        let cursor = 0;
+        let cursor = '0';
         do {
-            const [nextCursor, keys] = await redis.scan(cursor, { match: pattern, count: 100 });
-            cursor = nextCursor;
-            if (keys.length > 0) {
+            const scanResult = await redis.scan(cursor, { match: pattern, count: 100 });
+            const nextCursor = Array.isArray(scanResult)
+                ? scanResult[0]
+                : scanResult?.cursor ?? '0';
+            const keys = Array.isArray(scanResult)
+                ? (scanResult[1] || [])
+                : (scanResult?.keys || []);
+
+            cursor = String(nextCursor);
+
+            if (keys.length > 0 && typeof redis.pipeline === 'function') {
                 const pipeline = redis.pipeline();
-                keys.forEach(key => pipeline.del(key));
-                await pipeline.exec();
+                if (typeof pipeline?.del === 'function') {
+                    keys.forEach(key => pipeline.del(key));
+                    await pipeline.exec();
+                } else {
+                    await Promise.all(keys.map((key) => redis.del(key)));
+                }
             }
-        } while (cursor !== 0 && cursor !== '0');
+        } while (cursor !== '0');
     } catch (error) {
         console.warn(`Cache invalidate pattern error for ${pattern}:`, error);
     }
@@ -177,12 +191,12 @@ export const invalidatePattern = async (pattern) => {
 // Fix: use explicit null check — only treat actual null/undefined asw a miss.
 export const remember = async (key, fetchFn, ttl = DEFAULT_TTL) => {
     const cached = await getCache(key);
-    if (cached !== null && cached !== undefined) return cached;
+    if (hasValue(cached)) return cached;
 
     const data = await fetchFn();
     // Also fix: store even if data is 0, false, or [] — those are valid results.
     // Only skip caching if data is null/undefined (fetch truly returned nothing).
-    if (data !== null && data !== undefined) {
+    if (hasValue(data)) {
         await setCache(key, data, ttl);
     }
     return data;

@@ -504,16 +504,22 @@ export async function getEligibleUsers(userId, schoolId, roleName) {
 /**
  * Check if user has exceeded the message rate limit.
  * Uses Redis with a sliding window counter.
- * @returns {{ allowed: boolean, remaining: number }}
+ * @returns {{ allowed: boolean, remaining: number, retryAfter: number }}
  */
-export async function checkMessageRateLimit(userId) {
+export async function checkMessageRateLimit(userId, conversationId) {
     try {
-        const key = `chat:ratelimit:msg:${userId}`;
+        const scope = conversationId || 'global';
+        const key = `chat:ratelimit:msg:${userId}:${scope}`;
         const current = await redis.get(key);
         const count = parseInt(current || '0', 10);
+        const ttl = current ? await redis.ttl(key) : -1;
 
         if (count >= RATE_LIMITS.MESSAGES_PER_MINUTE) {
-            return { allowed: false, remaining: 0 };
+            return {
+                allowed: false,
+                remaining: 0,
+                retryAfter: ttl > 0 ? ttl : 60,
+            };
         }
 
         // Increment and set TTL of 60 seconds if new key
@@ -524,11 +530,19 @@ export async function checkMessageRateLimit(userId) {
         }
         await pipeline.exec();
 
-        return { allowed: true, remaining: RATE_LIMITS.MESSAGES_PER_MINUTE - count - 1 };
+        return {
+            allowed: true,
+            remaining: RATE_LIMITS.MESSAGES_PER_MINUTE - count - 1,
+            retryAfter: 0,
+        };
     } catch (err) {
         // If Redis fails, allow the message (fail open)
         console.warn('Rate limit check failed, allowing message:', err.message);
-        return { allowed: true, remaining: RATE_LIMITS.MESSAGES_PER_MINUTE };
+        return {
+            allowed: true,
+            remaining: RATE_LIMITS.MESSAGES_PER_MINUTE,
+            retryAfter: 0,
+        };
     }
 }
 

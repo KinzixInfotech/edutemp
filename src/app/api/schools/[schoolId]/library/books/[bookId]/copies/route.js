@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
+import { invalidatePattern } from "@/lib/cache";
 
 // GET: List all copies of a specific book
 export async function GET(request, { params }) {
@@ -70,6 +71,16 @@ export async function POST(request, { params }) {
             data: copiesData,
             skipDuplicates: true, // In case of collision
         });
+
+        const book = await prisma.libraryBook.findUnique({
+            where: { id: bookId },
+            select: { schoolId: true },
+        });
+
+        if (book?.schoolId) {
+            await invalidatePattern(`library:books:*schoolId:${book.schoolId}*`);
+            await invalidatePattern(`library:stats:*schoolId:${book.schoolId}*`);
+        }
 
         return NextResponse.json(
             { message: "Copies added successfully", count: createdCopies.count },

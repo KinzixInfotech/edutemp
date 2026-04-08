@@ -710,22 +710,21 @@ async function sendPushNotifications({
     maxAttempts = 3
 }) {
     try {
-        // Get FCM tokens for users
-        const users = await prisma.user.findMany({
+        // Get FCM tokens from UserDevice table (multi-device support)
+        const devices = await prisma.userDevice.findMany({
             where: {
-                id: { in: userIds },
-                fcmToken: { not: null }
+                userId: { in: userIds },
+                isActive: true,
             },
-            select: { id: true, fcmToken: true }
+            select: { id: true, userId: true, fcmToken: true, platform: true }
         });
 
-        const validUsers = users.filter(u => u.fcmToken);
-        const tokens = validUsers.map(u => u.fcmToken);
-
-        if (tokens.length === 0) {
-            console.log('No FCM tokens found for push notification');
+        if (devices.length === 0) {
+            console.log('No FCM devices found for push notification');
             return { success: true, sent: 0, failed: 0 };
         }
+
+        const tokens = devices.map(d => d.fcmToken);
 
         // Sanitize data (FCM requires all values to be strings)
         const stringifiedData = Object.entries(data).reduce((acc, [key, value]) => {
@@ -741,8 +740,8 @@ async function sendPushNotifications({
 
         // Send to Firebase Cloud Messaging
         const attemptLabel = retryAttempt > 0 ? ` (Retry ${retryAttempt})` : '';
-        console.log(`[Push${attemptLabel}] Sending to ${tokens.length} devices`);
-        console.log(`[Push] Targeting User IDs:`, validUsers.map(u => u.id));
+        console.log(`[Push${attemptLabel}] Sending to ${tokens.length} devices (${devices.map(d => d.platform || '?').join(', ')})`);
+        console.log(`[Push] Targeting User IDs:`, [...new Set(devices.map(d => d.userId))]);
 
         // Build FCM message with optional image support
         const fcmMessage = {
@@ -790,24 +789,24 @@ async function sendPushNotifications({
         console.log(`[Push${attemptLabel}] Sent: ${response.successCount}, Failed: ${response.failureCount}`);
 
         // Track failures by type
-        const invalidTokenUserIds = [];  // Invalid/expired tokens - cleanup
-        const retryableUserIds = [];      // Temporary failures - retry
+        const invalidTokenIds = [];   // Invalid/expired device IDs - cleanup
+        const retryableUserIds = [];  // Temporary failures - retry
 
         if (response.failureCount > 0) {
             response.responses.forEach((resp, idx) => {
                 if (!resp.success) {
-                    const userId = validUsers[idx].id;
+                    const device = devices[idx];
                     const errorCode = resp.error?.code;
                     const errorMsg = resp.error?.message;
 
-                    console.error(`[Push] Failed for user ${userId}:`, errorCode || errorMsg);
+                    console.error(`[Push] Failed for device ${device.id} (user ${device.userId}, ${device.platform}):`, errorCode || errorMsg);
 
                     // Categorize the failure
                     if (errorCode === 'messaging/registration-token-not-registered' ||
                         errorCode === 'messaging/invalid-registration-token' ||
                         errorMsg?.includes('NotRegistered')) {
-                        // Invalid token - needs cleanup, don't retry
-                        invalidTokenUserIds.push(userId);
+                        // Invalid token - delete this specific device entry
+                        invalidTokenIds.push(device.id);
                     } else if (
                         errorCode === 'messaging/internal-error' ||
                         errorCode === 'messaging/server-unavailable' ||
@@ -817,35 +816,35 @@ async function sendPushNotifications({
                         errorMsg?.includes('network')
                     ) {
                         // Temporary failure - can retry
-                        retryableUserIds.push(userId);
+                        retryableUserIds.push(device.userId);
                     }
                     // Other errors (invalid payload, etc.) - don't retry
                 }
             });
 
-            // Cleanup invalid tokens
-            if (invalidTokenUserIds.length > 0) {
-                console.log(`[Push] Cleaning up ${invalidTokenUserIds.length} invalid tokens`);
-                await prisma.user.updateMany({
-                    where: { id: { in: invalidTokenUserIds } },
-                    data: { fcmToken: null }
+            // Cleanup invalid tokens — delete from UserDevice table
+            if (invalidTokenIds.length > 0) {
+                console.log(`[Push] Cleaning up ${invalidTokenIds.length} invalid device tokens`);
+                await prisma.userDevice.deleteMany({
+                    where: { id: { in: invalidTokenIds } }
                 });
             }
 
             // Queue retry for temporary failures (if not maxed out)
-            if (retryableUserIds.length > 0 && retryAttempt < maxAttempts) {
-                console.log(`[Push] Queueing retry for ${retryableUserIds.length} failed users`);
+            const uniqueRetryUserIds = [...new Set(retryableUserIds)];
+            if (uniqueRetryUserIds.length > 0 && retryAttempt < maxAttempts) {
+                console.log(`[Push] Queueing retry for ${uniqueRetryUserIds.length} failed users`);
 
                 await enqueueDelayedRetry({
                     jobType: 'PUSH_RETRY',
-                    userIds: retryableUserIds,
+                    userIds: uniqueRetryUserIds,
                     title,
                     message,
                     imageUrl,
                     data
                 }, retryAttempt + 1, maxAttempts);
-            } else if (retryableUserIds.length > 0) {
-                console.log(`[Push] Max retries reached, ${retryableUserIds.length} users will not receive push`);
+            } else if (uniqueRetryUserIds.length > 0) {
+                console.log(`[Push] Max retries reached, ${uniqueRetryUserIds.length} users will not receive push`);
             }
         }
 
@@ -853,7 +852,7 @@ async function sendPushNotifications({
             success: true,
             sent: response.successCount,
             failed: response.failureCount,
-            invalidTokens: invalidTokenUserIds.length,
+            invalidTokens: invalidTokenIds.length,
             retryQueued: retryableUserIds.length
         };
 
@@ -1776,19 +1775,18 @@ export async function notifyBulkAttendanceMarked(params) {
  */
 async function sendPushNotificationsOptimized({ userIds, title, message, data = {} }) {
     try {
-        // Fetch FCM tokens in bulk
-        const users = await prisma.user.findMany({
+        // Fetch FCM tokens from UserDevice table (multi-device support)
+        const devices = await prisma.userDevice.findMany({
             where: {
-                id: { in: userIds },
-                fcmToken: { not: null }
+                userId: { in: userIds },
+                isActive: true,
             },
-            select: { id: true, fcmToken: true }
+            select: { id: true, userId: true, fcmToken: true, platform: true }
         });
 
-        const validUsers = users.filter(u => u.fcmToken);
-        if (validUsers.length === 0) return;
+        if (devices.length === 0) return;
 
-        const tokens = validUsers.map(u => u.fcmToken);
+        const tokens = devices.map(d => d.fcmToken);
 
         // Sanitize data
         const stringifiedData = Object.entries(data).reduce((acc, [key, value]) => {
@@ -1822,26 +1820,25 @@ async function sendPushNotificationsOptimized({ userIds, title, message, data = 
             },
         });
 
-        console.log(`[Push] Sent to ${response.successCount}/${tokens.length} devices`);
+        console.log(`[Push] Sent to ${response.successCount}/${tokens.length} devices (${devices.map(d => d.platform || '?').join(', ')})`);
 
-        // Cleanup invalid tokens in background
+        // Cleanup invalid tokens in background — delete from UserDevice table
         if (response.failureCount > 0) {
-            const invalidUserIds = [];
+            const invalidDeviceIds = [];
             response.responses.forEach((resp, idx) => {
                 if (!resp.success) {
                     const errorCode = resp.error?.code;
                     if (errorCode === 'messaging/registration-token-not-registered' ||
                         errorCode === 'messaging/invalid-registration-token') {
-                        invalidUserIds.push(validUsers[idx].id);
+                        invalidDeviceIds.push(devices[idx].id);
                     }
                 }
             });
 
-            if (invalidUserIds.length > 0) {
-                prisma.user.updateMany({
-                    where: { id: { in: invalidUserIds } },
-                    data: { fcmToken: null }
-                }).catch(e => console.error('[Push] Token cleanup error:', e));
+            if (invalidDeviceIds.length > 0) {
+                prisma.userDevice.deleteMany({
+                    where: { id: { in: invalidDeviceIds } }
+                }).catch(e => console.error('[Push] Device token cleanup error:', e));
             }
         }
     } catch (error) {

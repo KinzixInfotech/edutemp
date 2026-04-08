@@ -53,6 +53,25 @@ export async function GET(req, props) {
             ),
         });
 
+        // Filter sectionsAssigned to only include sections from classes that have active students
+        // This avoids returning stale sections from old/duplicate class sets
+        if (teacher?.sectionsAssigned?.length > 0) {
+            const sectionClassIds = [...new Set(teacher.sectionsAssigned.map(s => s.classId))];
+            const classesWithStudents = await prisma.student.groupBy({
+                by: ['classId'],
+                where: {
+                    schoolId,
+                    classId: { in: sectionClassIds },
+                    user: { deletedAt: null, status: 'ACTIVE' },
+                },
+                _count: { userId: true },
+            });
+            const activeClassIds = new Set(classesWithStudents.map(c => c.classId));
+            if (activeClassIds.size > 0) {
+                teacher.sectionsAssigned = teacher.sectionsAssigned.filter(s => activeClassIds.has(s.classId));
+            }
+        }
+
         return teacher ? { teacher } : null;
     }, CACHE_TTL);
 

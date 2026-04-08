@@ -3,12 +3,18 @@ import { NextResponse } from "next/server"
 import { paginate, getPagination, apiResponse, errorResponse } from "@/lib/api-utils"
 import { remember, generateKey, invalidatePattern } from "@/lib/cache"
 
-// 👉 Create new class and automatically connect to active academic year
-export async function POST(req) {
-  try {
-    const { name, schoolId, capacity, sections: sectionCount } = await req.json()
+const normalizeClassName = (value) => value?.trim().replace(/\s+/g, " ") || "";
 
-    if (!name || !schoolId) {
+// 👉 Create new class and automatically connect to active academic year
+export async function POST(req, props) {
+  const params = await props.params
+  try {
+    const { schoolId: routeSchoolId } = params
+    const { name, schoolId: bodySchoolId, capacity, sections: sectionCount } = await req.json()
+    const normalizedName = normalizeClassName(name)
+    const schoolId = routeSchoolId || bodySchoolId
+
+    if (!normalizedName || !schoolId) {
       return NextResponse.json({ error: "Name and schoolId are required" }, { status: 400 })
     }
 
@@ -20,11 +26,41 @@ export async function POST(req) {
       },
     })
 
+    // Prevent duplicates for the active academic year, while also catching
+    // legacy rows that may have been created without an academicYearId.
+    const existingClass = await prisma.class.findFirst({
+      where: {
+        schoolId,
+        className: { equals: normalizedName, mode: "insensitive" },
+        ...(activeAcademicYear
+          ? {
+              OR: [
+                { academicYearId: activeAcademicYear.id },
+                { academicYearId: null },
+              ],
+            }
+          : {}),
+      },
+      include: {
+        sections: { orderBy: { name: "asc" } },
+      },
+    })
+
+    if (existingClass) {
+      return NextResponse.json(
+        {
+          error: `Class ${normalizedName} already exists for this school/academic year.`,
+          existingClass,
+        },
+        { status: 409 }
+      )
+    }
+
     // Use transaction to create class + sections in one go
     const result = await prisma.$transaction(async (tx) => {
       const newClass = await tx.class.create({
         data: {
-          className: name,
+          className: normalizedName,
           schoolId,
           capacity: capacity ? parseInt(capacity, 10) : null,
           ...(activeAcademicYear && {

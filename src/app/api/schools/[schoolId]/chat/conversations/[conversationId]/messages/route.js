@@ -119,11 +119,17 @@ export async function POST(req, { params }) {
     }
 
     // Rate limit
-    const { allowed, remaining } = await checkMessageRateLimit(dbUser.id);
+    const { allowed, remaining, retryAfter } = await checkMessageRateLimit(dbUser.id, conversationId);
     if (!allowed) {
         return NextResponse.json(
             { error: 'Rate limit exceeded. Please wait before sending more messages.' },
-            { status: 429, headers: { 'X-RateLimit-Remaining': '0' } }
+            {
+                status: 429,
+                headers: {
+                    'Retry-After': String(retryAfter || 60),
+                    'X-RateLimit-Remaining': '0',
+                },
+            }
         );
     }
 

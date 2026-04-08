@@ -7,15 +7,30 @@ export async function GET(request, { params }) {
     try {
         const { schoolId } = await params;
         const { searchParams } = new URL(request.url);
-        const search = searchParams.get("search") || "";
+        const search = searchParams.get("search")?.trim() || "";
         const category = searchParams.get("category");
-        const page = searchParams.get("page") ? parseInt(searchParams.get("page")) : null;
-        const limit = searchParams.get("limit") ? parseInt(searchParams.get("limit")) : null;
+        const hasPage = searchParams.has("page");
+        const rawPage = searchParams.get("page");
+        const rawLimit = searchParams.get("limit");
+        const page = hasPage ? Math.max(1, parseInt(rawPage, 10) || 1) : null;
+        const limit = rawLimit ? Math.max(1, parseInt(rawLimit, 10) || 0) : null;
 
         const sortColumn = searchParams.get("sortColumn");
         const sortDirection = searchParams.get("sortDirection") === "desc" ? "desc" : "asc";
+        const shouldPaginate = Boolean(hasPage && limit);
+        const shouldLimit = Boolean(limit);
+        const validSortColumns = ['title', 'author', 'category', 'createdAt'];
+        const validSortColumn = validSortColumns.includes(sortColumn) ? sortColumn : 'createdAt';
 
-        const cacheKey = generateKey('library:books', { schoolId, search, category, page, limit, sortColumn, sortDirection });
+        const cacheKey = generateKey('library:books', {
+            schoolId,
+            search,
+            category,
+            page,
+            limit,
+            sortColumn: validSortColumn,
+            sortDirection,
+        });
 
         const result = await remember(cacheKey, async () => {
             const where = {
@@ -31,39 +46,63 @@ export async function GET(request, { params }) {
                 ...(category && category !== "all" && { category }),
             };
 
-            const validSortColumns = ['title', 'author', 'category', 'createdAt'];
-            const validSortColumn = validSortColumns.includes(sortColumn) ? sortColumn : 'createdAt';
-
             const queryOptions = {
                 where,
                 orderBy: { [validSortColumn]: sortDirection },
-                include: {
-                    // Total copies count — no data fetching
+                select: {
+                    id: true,
+                    schoolId: true,
+                    title: true,
+                    author: true,
+                    ISBN: true,
+                    category: true,
+                    publisher: true,
+                    edition: true,
+                    description: true,
+                    coverImage: true,
+                    createdAt: true,
+                    updatedAt: true,
                     _count: { select: { copies: true } },
-                    // Only fetch available copies (just id for minimal payload)
-                    copies: {
-                        where: { status: "AVAILABLE" },
-                        select: { id: true },
-                    },
                 },
             };
 
-            let total = null;
-            if (page && limit) {
-                queryOptions.skip = (page - 1) * limit;
+            if (shouldLimit) {
                 queryOptions.take = limit;
-                total = await prisma.libraryBook.count({ where });
+            }
+            if (shouldPaginate) {
+                queryOptions.skip = (page - 1) * limit;
             }
 
-            const books = await prisma.libraryBook.findMany(queryOptions);
+            const [books, total] = await Promise.all([
+                prisma.libraryBook.findMany(queryOptions),
+                shouldPaginate ? prisma.libraryBook.count({ where }) : Promise.resolve(null),
+            ]);
 
-            const enhancedBooks = books.map(({ copies, _count, ...book }) => ({
+            const bookIds = books.map((book) => book.id);
+            const availableCopiesByBook = bookIds.length > 0
+                ? await prisma.libraryBookCopy.groupBy({
+                    by: ['bookId'],
+                    where: {
+                        bookId: { in: bookIds },
+                        status: "AVAILABLE",
+                    },
+                    _count: {
+                        _all: true,
+                    },
+                })
+                : [];
+
+            const availableCopiesMap = new Map(
+                availableCopiesByBook.map((entry) => [entry.bookId, entry._count._all])
+            );
+
+            const enhancedBooks = books.map(({ _count, ...book }) => ({
                 ...book,
                 totalCopies: _count.copies,
-                availableCopies: copies.length,
+                availableCopies: availableCopiesMap.get(book.id) || 0,
             }));
 
-            if (page && limit) {
+            if (shouldPaginate) {
                 return {
                     data: enhancedBooks,
                     total,
@@ -72,7 +111,7 @@ export async function GET(request, { params }) {
             }
 
             return enhancedBooks;
-        }, 5);
+        }, 120);
 
         return NextResponse.json(result);
     } catch (error) {
