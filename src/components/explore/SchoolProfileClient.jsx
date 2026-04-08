@@ -51,6 +51,34 @@ const facilityColors = [
     { bg: 'bg-cyan-50', text: 'text-cyan-600', border: 'border-cyan-100' },
 ];
 
+function getEmbeddedVideoUrl(url) {
+    if (!url) return null;
+
+    try {
+        const parsed = new URL(url);
+
+        if (parsed.hostname.includes('youtube.com')) {
+            const videoId = parsed.searchParams.get('v');
+            if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+
+            const shortsMatch = parsed.pathname.match(/\/shorts\/([^/?]+)/);
+            if (shortsMatch?.[1]) return `https://www.youtube.com/embed/${shortsMatch[1]}`;
+
+            const embedMatch = parsed.pathname.match(/\/embed\/([^/?]+)/);
+            if (embedMatch?.[1]) return `https://www.youtube.com/embed/${embedMatch[1]}`;
+        }
+
+        if (parsed.hostname.includes('youtu.be')) {
+            const videoId = parsed.pathname.replace(/^\/+/, '').split('/')[0];
+            if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+        }
+
+        return url;
+    } catch {
+        return null;
+    }
+}
+
 export default function SchoolProfileClient({ schoolId, initialData }) {
     const router = useRouter();
     const [reviewPage, setReviewPage] = useState(1);
@@ -179,6 +207,7 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
 
     const galleryImages = school.gallery || [];
     const gradeRange = getGradeRange();
+    const embeddedVideoUrl = getEmbeddedVideoUrl(school.videoUrl);
 
     return (
         <div className="min-h-screen bg-[#f8fafc]">
@@ -422,7 +451,7 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                                 )}
 
                                 {/* Academic Programs */}
-                                <div>
+                                <div className='bg-white py-6 px-6 rounded-2xl border border-gray-200'>
                                     <h2 className="text-xl font-bold text-[#0f172a] mb-4 flex items-center gap-2">
                                         <span className="w-1 h-6 bg-[#2563eb] rounded-full" />
                                         Academic Programs
@@ -504,7 +533,7 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                                 </div>
 
                                 {/* Campus Facilities */}
-                                <div>
+                                <div className='bg-white py-6 px-6 rounded-2xl border border-gray-200'>
                                     <h2 className="text-xl font-bold text-[#0f172a] mb-4 flex items-center gap-2">
                                         <span className="w-1 h-6 bg-[#2563eb] rounded-full" />
                                         Campus Facilities
@@ -525,7 +554,7 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                                             })}
                                         </div>
                                     ) : (
-                                        <Card className="p-8 border border-dashed border-gray-200 text-center bg-gray-50/50 rounded-2xl">
+                                        <Card className="p-8 border border-dashed border-gray-200 text-center bg-white rounded-2xl">
                                             <Building2 className="h-8 w-8 text-gray-300 mx-auto mb-2" />
                                             <p className="text-sm font-medium text-gray-500">Facility details are updating</p>
                                         </Card>
@@ -683,6 +712,26 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                                         </div>
                                     )}
                                 </Card>
+
+                                {embeddedVideoUrl && (
+                                    <Card className="rounded-2xl pt-0 border-gray-200 overflow-hidden">
+                                        <div className="p-5 pb-3">
+                                            <h3 className="text-sm font-bold text-[#0f172a] uppercase tracking-wider">School Video</h3>
+                                        </div>
+                                        <div className="px-5 pb-5">
+                                            <div className="overflow-hidden rounded-xl bg-black aspect-video">
+                                                <iframe
+                                                    title={`${school.school?.name} video`}
+                                                    src={embeddedVideoUrl}
+                                                    className="w-full h-full"
+                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                                    referrerPolicy="strict-origin-when-cross-origin"
+                                                    allowFullScreen
+                                                />
+                                            </div>
+                                        </div>
+                                    </Card>
+                                )}
 
                                 {/* Google Maps Embed */}
                                 {school.latitude && school.longitude && (

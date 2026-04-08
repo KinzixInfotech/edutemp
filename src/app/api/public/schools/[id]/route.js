@@ -8,6 +8,20 @@ import { remember, generateKey } from '@/lib/cache';
 import redis from '@/lib/redis';
 import { isUUID } from '@/lib/slug-generator';
 
+function normalizeProfile(profile) {
+    if (!profile) return profile;
+    return {
+        ...profile,
+        school: profile.school || {
+            name: profile.independentName || 'Unnamed School',
+            location: profile.independentLocation || '',
+            profilePicture: profile.independentLogo || profile.logoImage || '',
+            contactNumber: profile.independentPhone || profile.publicPhone || '',
+            classes: [],
+        },
+    };
+}
+
 export async function GET(req, props) {
     try {
         const params = await props.params;
@@ -36,11 +50,7 @@ export async function GET(req, props) {
                         {
                             OR: [
                                 { isPubliclyVisible: true },
-                                {
-                                    school: {
-                                        SubscriptionType: 'ATLAS_ONLY',
-                                    },
-                                },
+                                { listingSource: 'INDEPENDENT' },
                             ],
                         },
                     ],
@@ -68,7 +78,8 @@ export async function GET(req, props) {
 
         // Create a unique key for this IP + date (use schoolId for consistency)
         const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-        const viewKey = `view:${school.schoolId}:${ip}:${today}`;
+        const viewIdentifier = school.schoolId || school.id;
+        const viewKey = `view:${viewIdentifier}:${ip}:${today}`;
 
         // Check if this IP already viewed today (using Redis)
         const alreadyViewed = await redis.get(viewKey);
@@ -76,7 +87,7 @@ export async function GET(req, props) {
         if (!alreadyViewed) {
             // Increment view count (fire and forget - don't await)
             prisma.schoolPublicProfile.update({
-                where: { schoolId: school.schoolId },
+                where: { id: school.id },
                 data: { profileViews: { increment: 1 } }
             }).catch(err => console.error('[View count update failed]', err));
 
@@ -84,7 +95,7 @@ export async function GET(req, props) {
             redis.set(viewKey, '1', { ex: 86400 }).catch(() => { });
         }
 
-        return NextResponse.json(school);
+        return NextResponse.json(normalizeProfile(school));
 
     } catch (error) {
         console.error('[SCHOOL PROFILE API ERROR]', error);

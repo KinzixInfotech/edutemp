@@ -167,7 +167,7 @@ export default async function SchoolProfilePage(props) {
     const baseUrl = isDev ? 'http://atlas.localhost:3000' : 'https://atlas.edubreezy.com';
 
     // Use slug for URLs, fallback to schoolId
-    const urlIdentifier = school.slug || school.schoolId;
+    const urlIdentifier = school.slug || school.schoolId || school.id;
 
     // JSON-LD for Organization (EduBreezy brand consolidation)
     const organizationJsonLd = {
@@ -303,7 +303,7 @@ export default async function SchoolProfilePage(props) {
                     dangerouslySetInnerHTML={{ __html: JSON.stringify(schoolJsonLd) }}
                 />
             )}
-            <SchoolProfileClient schoolId={school.schoolId} initialData={school} />
+            <SchoolProfileClient schoolId={school.schoolId || school.id || school.slug} initialData={school} />
         </>
     );
 }

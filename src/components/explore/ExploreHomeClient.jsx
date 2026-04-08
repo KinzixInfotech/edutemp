@@ -31,7 +31,9 @@ export default function ExploreHomeClient() {
     const { data: schoolsData, isLoading: schoolsLoading } = useQuery({
         queryKey: ['schools-home'],
         queryFn: async () => {
-            const res = await fetch('/api/public/schools?limit=10');
+            const res = await fetch('/api/public/schools?limit=10&prioritizeCovers=true', {
+                cache: 'no-store',
+            });
             if (!res.ok) throw new Error('Failed to fetch schools');
             return res.json();
         },
@@ -49,7 +51,6 @@ export default function ExploreHomeClient() {
         .map((profile) => profile.school?.name || profile.name)
         .filter(Boolean)
         .slice(0, 5);
-
     const formatFee = (fee) => {
         if (!fee) return null;
         if (fee >= 100000) return `₹${(fee / 100000).toFixed(1)}L`;
@@ -105,7 +106,7 @@ export default function ExploreHomeClient() {
                                 </div>
                             ))
                         ) : schoolsData?.schools?.length > 0 ? (
-                            schoolsData.schools.slice(0, 10).map((profile) => {
+                            schoolsData.schools.map((profile) => {
                                 const name = profile.school?.name || profile.name || 'School';
                                 const location = profile.school?.location || profile.location || '';
                                 const slug = profile.slug || profile.schoolId || profile.id;

@@ -3,23 +3,28 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import supabaseServer from '@/lib/supabase-server'; // Use singleton
 
-// Helper to resolve profileId from schoolId (params.id)
-async function getProfileId(schoolId) {
-    const profile = await prisma.schoolPublicProfile.findUnique({
-        where: { schoolId },
-        select: { id: true }
+// Helper to resolve profile from schoolId, profile id, or slug
+async function getProfile(identifier) {
+    const profile = await prisma.schoolPublicProfile.findFirst({
+        where: {
+            OR: [
+                { schoolId: identifier },
+                { id: identifier },
+                { slug: identifier },
+            ],
+        },
+        select: { id: true, schoolId: true, listingSource: true }
     });
-    return profile?.id;
+    return profile;
 }
 
 export async function GET(req, props) {
     try {
         const params = await props.params;
-        const { id: schoolId } = params; // params.id is schoolId
+        const { id: identifier } = params;
 
-        // Resolve generic PublicProfile ID
-        const profileId = await getProfileId(schoolId);
-        if (!profileId) {
+        const profile = await getProfile(identifier);
+        if (!profile) {
             return NextResponse.json({ error: 'School profile not found' }, { status: 404 });
         }
 
@@ -31,12 +36,12 @@ export async function GET(req, props) {
         // Fetch reviews with pagination using profileId
         const [reviews, total] = await Promise.all([
             prisma.schoolRating.findMany({
-                where: { profileId },
+                where: { profileId: profile.id },
                 orderBy: { createdAt: 'desc' },
                 skip,
                 take: limit,
             }),
-            prisma.schoolRating.count({ where: { profileId } })
+            prisma.schoolRating.count({ where: { profileId: profile.id } })
         ]);
 
         return NextResponse.json({
@@ -55,7 +60,7 @@ export async function GET(req, props) {
 export async function POST(req, props) {
     try {
         const params = await props.params;
-        const { id: schoolId } = params; // params.id is schoolId
+        const { id: identifier } = params;
         const body = await req.json();
 
         // 1. Check Supabase authentication
@@ -94,13 +99,14 @@ export async function POST(req, props) {
 
         // 3. Verify parent belongs to this school
         // Look up the profile specifically to get both ID and Verify the specific schoolId
-        const profile = await prisma.schoolPublicProfile.findUnique({
-            where: { schoolId },
-            select: { id: true, schoolId: true }
-        });
+        const profile = await getProfile(identifier);
 
         if (!profile) {
             return NextResponse.json({ error: 'School not found' }, { status: 404 });
+        }
+
+        if (!profile.schoolId) {
+            return NextResponse.json({ error: 'Reviews are not available for this listing' }, { status: 400 });
         }
 
         const studentInSchool = parent.studentLinks.some(

@@ -5,6 +5,22 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { remember, generateKey } from '@/lib/cache';
 
+function normalizeProfile(profile) {
+    if (!profile) return profile;
+    return {
+        ...profile,
+        school: profile.school || {
+            name: profile.independentName || 'Unnamed School',
+            location: profile.independentLocation || '',
+            city: null,
+            state: null,
+            profilePicture: profile.independentLogo || profile.logoImage || '',
+            contactNumber: profile.independentPhone || profile.publicPhone || '',
+            classes: [],
+        },
+    };
+}
+
 export async function GET(req) {
     try {
         const { searchParams } = new URL(req.url);
@@ -22,6 +38,7 @@ export async function GET(req) {
         const location = searchParams.get('location') || '';
         const featured = searchParams.get('featured') === 'true';
         const sort = searchParams.get('sort') || 'name';
+        const prioritizeCovers = searchParams.get('prioritizeCovers') === 'true';
 
         // NEW filters
         const board = searchParams.get('board') || '';             // e.g. "CBSE"
@@ -36,6 +53,7 @@ export async function GET(req) {
         const cacheKey = generateKey('public-schools-v2', {
             page, limit, search, minFee, maxFee, minRating,
             location, featured, sort, board, genderType,
+            prioritizeCovers,
             religiousAffiliation,
             facilities: facilities.join(','),
             extracurriculars: extracurriculars.join(','),
@@ -51,6 +69,8 @@ export async function GET(req) {
                     { school: { city: { contains: search, mode: 'insensitive' } } },
                     { school: { state: { contains: search, mode: 'insensitive' } } },
                     { school: { atlas_pincode: { contains: search, mode: 'insensitive' } } },
+                    { independentName: { contains: search, mode: 'insensitive' } },
+                    { independentLocation: { contains: search, mode: 'insensitive' } },
                     { tagline: { contains: search, mode: 'insensitive' } },
                     { description: { contains: search, mode: 'insensitive' } },
                     { slug: { contains: search, mode: 'insensitive' } },
@@ -62,6 +82,7 @@ export async function GET(req) {
                     { school: { location: { contains: location, mode: 'insensitive' } } },
                     { school: { city: { contains: location, mode: 'insensitive' } } },
                     { school: { state: { contains: location, mode: 'insensitive' } } },
+                    { independentLocation: { contains: location, mode: 'insensitive' } },
                 ]
             } : {};
 
@@ -134,73 +155,97 @@ export async function GET(req) {
                 }
             })();
 
-            const [schools, total] = await Promise.all([
-                prisma.schoolPublicProfile.findMany({
-                    where,
-                    orderBy,
-                    skip,
-                    take: limit,
+            const select = {
+                id: true,
+                schoolId: true,
+                slug: true,
+                independentName: true,
+                independentLocation: true,
+                independentLogo: true,
+                independentPhone: true,
+                tagline: true,
+                description: true,
+                coverImage: true,
+                logoImage: true,
+                minFee: true,
+                maxFee: true,
+                establishedYear: true,
+                totalStudents: true,
+                totalTeachers: true,
+                studentTeacherRatio: true,
+                overallRating: true,
+                academicRating: true,
+                infrastructureRating: true,
+                sportsRating: true,
+                isFeatured: true,
+                isVerified: true,
+                boards: true,
+                genderType: true,
+                religiousAffiliation: true,
+                publicPhone: true,
+                publicEmail: true,
+                school: {
                     select: {
-                        id: true,
-                        schoolId: true,
-                        slug: true,
-                        tagline: true,
-                        description: true,
-                        coverImage: true,
-                        logoImage: true,
-                        minFee: true,
-                        maxFee: true,
-                        establishedYear: true,
-                        totalStudents: true,
-                        totalTeachers: true,
-                        studentTeacherRatio: true,
-                        overallRating: true,
-                        academicRating: true,
-                        infrastructureRating: true,
-                        sportsRating: true,
-                        isFeatured: true,
-                        isVerified: true,
-                        boards: true,
-                        genderType: true,
-                        religiousAffiliation: true,
-                        publicPhone: true,
-                        publicEmail: true,
-                        school: {
-                            select: {
-                                name: true,
-                                location: true,
-                                city: true,
-                                state: true,
-                                profilePicture: true,
-                                classes: {
-                                    select: { className: true },
-                                    orderBy: { className: 'asc' },
-                                },
-                            }
+                        name: true,
+                        location: true,
+                        city: true,
+                        state: true,
+                        profilePicture: true,
+                        classes: {
+                            select: { className: true },
+                            orderBy: { className: 'asc' },
                         },
-                        badges: {
-                            select: { badgeType: true },
-                            take: 3,
-                        },
-                        facilities: {
-                            select: { name: true, category: true, isAvailable: true },
-                            where: { isAvailable: true },
-                            take: 10,
-                        },
-                        _count: {
-                            select: {
-                                achievements: true,
-                                facilities: true,
-                                ratings: true,
-                            }
-                        }
                     }
-                }),
-                prisma.schoolPublicProfile.count({ where })
-            ]);
+                },
+                badges: {
+                    select: { badgeType: true },
+                    take: 3,
+                },
+                facilities: {
+                    select: { name: true, category: true, isAvailable: true },
+                    where: { isAvailable: true },
+                    take: 10,
+                },
+                _count: {
+                    select: {
+                        achievements: true,
+                        facilities: true,
+                        ratings: true,
+                    }
+                }
+            };
+
+            const [schools, total] = prioritizeCovers
+                ? await Promise.all([
+                    prisma.schoolPublicProfile.findMany({
+                        where,
+                        orderBy,
+                        select,
+                    }).then((profiles) =>
+                        profiles
+                            .sort((a, b) => {
+                                const aHasCover = Boolean(a.coverImage?.trim());
+                                const bHasCover = Boolean(b.coverImage?.trim());
+                                if (aHasCover === bHasCover) return 0;
+                                return aHasCover ? -1 : 1;
+                            })
+                            .slice(skip, skip + limit)
+                    ),
+                    prisma.schoolPublicProfile.count({ where })
+                ])
+                : await Promise.all([
+                    prisma.schoolPublicProfile.findMany({
+                        where,
+                        orderBy,
+                        skip,
+                        take: limit,
+                        select,
+                    }),
+                    prisma.schoolPublicProfile.count({ where })
+                ]);
 
             return {
-                schools,
+                schools: schools.map(normalizeProfile),
                 pagination: {
                     page,
                     limit,

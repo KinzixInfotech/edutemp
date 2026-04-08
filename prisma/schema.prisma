@@ -293,9 +293,16 @@ model ImportHistory {
 // ============================================
 
 model SchoolPublicProfile {
-  id       String @id @default(uuid()) @db.Uuid
-  schoolId String @unique @db.Uuid
-  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  id       String  @id @default(uuid()) @db.Uuid
+  schoolId String? @unique @db.Uuid
+  school   School? @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  // Source metadata for listings not attached to ERP schools
+  listingSource       String @default("ERP") // ERP | INDEPENDENT
+  independentName     String?
+  independentLocation String?
+  independentLogo     String?
+  independentPhone    String?
 
   // SEO-friendly URL slug (e.g., "dav-public-school-hazaribagh")
   slug String? @unique

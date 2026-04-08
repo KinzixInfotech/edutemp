@@ -4,79 +4,118 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { generateSchoolSlug, generateUniqueSlug, isPlaceholderSlug } from '@/lib/slug-generator';
 
+async function findProfile(identifier) {
+    return prisma.schoolPublicProfile.findFirst({
+        where: {
+            OR: [
+                { schoolId: identifier },
+                { id: identifier },
+                { slug: identifier },
+            ],
+        },
+        include: {
+            school: {
+                select: {
+                    id: true,
+                    name: true,
+                    location: true,
+                    city: true,
+                    state: true,
+                    profilePicture: true,
+                    contactNumber: true,
+                    schoolCode: true,
+                    domain: true,
+                    SubscriptionType: true,
+                    createdAt: true,
+                    principals: {
+                        include: { user: { select: { id: true, name: true, email: true, profilePicture: true } } },
+                    },
+                    directors: {
+                        include: { user: { select: { id: true, name: true, email: true, profilePicture: true } } },
+                    },
+                    _count: {
+                        select: {
+                            Student: true,
+                            TeachingStaff: true,
+                            NonTeachingStaff: true,
+                            classes: true,
+                        },
+                    },
+                },
+            },
+            _count: {
+                select: {
+                    inquiries: true,
+                    ratings: true,
+                    gallery: true,
+                    achievements: true,
+                    facilities: true,
+                    badges: true,
+                },
+            },
+            ratings: {
+                select: {
+                    overallRating: true,
+                    academicRating: true,
+                    infrastructureRating: true,
+                    sportsRating: true,
+                },
+            },
+            gallery: {
+                select: { id: true, imageUrl: true, caption: true, category: true, displayOrder: true },
+                orderBy: { displayOrder: 'asc' },
+            },
+            facilities: {
+                select: { id: true, category: true, name: true, description: true, icon: true, isAvailable: true },
+                orderBy: { category: 'asc' },
+            },
+            achievements: {
+                select: { id: true, title: true, description: true, category: true, year: true, imageUrl: true, rank: true, level: true },
+                orderBy: { year: 'desc' },
+            },
+            badges: {
+                select: { id: true, badgeType: true, earnedAt: true, expiresAt: true },
+            },
+        },
+    });
+}
+
+function normalizeProfile(profile) {
+    if (!profile) return profile;
+    return {
+        ...profile,
+        listingSource: profile.listingSource?.toLowerCase() || 'erp',
+        school: profile.school || {
+            id: null,
+            name: profile.independentName || 'Unnamed School',
+            location: profile.independentLocation || '',
+            city: null,
+            state: null,
+            profilePicture: profile.independentLogo || profile.logoImage || '',
+            contactNumber: profile.independentPhone || profile.publicPhone || '',
+            schoolCode: null,
+            domain: null,
+            SubscriptionType: 'ATLAS_ONLY',
+            createdAt: profile.createdAt,
+            principals: [],
+            directors: [],
+            _count: {
+                Student: 0,
+                TeachingStaff: 0,
+                NonTeachingStaff: 0,
+                classes: 0,
+            },
+        },
+    };
+}
+
 // GET — Detailed school profile with analytics
 export async function GET(req, props) {
     try {
         const params = await props.params;
         const { schoolId } = params;
 
-        const profile = await prisma.schoolPublicProfile.findUnique({
-            where: { schoolId },
-            include: {
-                school: {
-                    select: {
-                        id: true,
-                        name: true,
-                        location: true,
-                        city: true,
-                        state: true,
-                        profilePicture: true,
-                        contactNumber: true,
-                        schoolCode: true,
-                        domain: true,
-                        SubscriptionType: true,
-                        createdAt: true,
-                        principals: {
-                            include: { user: { select: { id: true, name: true, email: true, profilePicture: true } } },
-                        },
-                        directors: {
-                            include: { user: { select: { id: true, name: true, email: true, profilePicture: true } } },
-                        },
-                        _count: {
-                            select: {
-                                Student: true,
-                                TeachingStaff: true,
-                                NonTeachingStaff: true,
-                                classes: true,
-                            },
-                        },
-                    },
-                },
-                _count: {
-                    select: {
-                        inquiries: true,
-                        ratings: true,
-                        gallery: true,
-                        achievements: true,
-                        facilities: true,
-                        badges: true,
-                    },
-                },
-                ratings: {
-                    select: {
-                        overallRating: true,
-                        academicRating: true,
-                        infrastructureRating: true,
-                        sportsRating: true,
-                    },
-                },
-                gallery: {
-                    select: { id: true, imageUrl: true, caption: true, category: true, displayOrder: true },
-                    orderBy: { displayOrder: 'asc' },
-                },
-                facilities: {
-                    select: { id: true, category: true, name: true, description: true, icon: true, isAvailable: true },
-                    orderBy: { category: 'asc' },
-                },
-                achievements: {
-                    select: { id: true, title: true, description: true, category: true, year: true, imageUrl: true, rank: true, level: true },
-                    orderBy: { year: 'desc' },
-                },
-                badges: {
-                    select: { id: true, badgeType: true, earnedAt: true, expiresAt: true },
-                },
-            },
-        });
+        const profile = await findProfile(schoolId);
 
         if (!profile) {
             return NextResponse.json({ error: 'Atlas profile not found for this school' }, { status: 404 });
@@ -120,7 +159,7 @@ export async function GET(req, props) {
         const averageViews = listedCount > 0 ? Math.round(totalViews / listedCount) : 0;
 
         return NextResponse.json({
-            ...profile,
+            ...normalizeProfile(profile),
             avgRatings,
             recentInquiries,
             averageViews,
@@ -135,7 +174,7 @@ export async function GET(req, props) {
 export async function PATCH(req, props) {
     try {
         const params = await props.params;
-        const { schoolId } = params;
+        const { schoolId: identifier } = params;
         const body = await req.json();
 
         // Remove non-profile fields
@@ -163,27 +202,57 @@ export async function PATCH(req, props) {
         });
 
         const profile = await prisma.$transaction(async (tx) => {
+            const targetProfile = await tx.schoolPublicProfile.findFirst({
+                where: {
+                    OR: [
+                        { schoolId: identifier },
+                        { id: identifier },
+                        { slug: identifier },
+                    ],
+                },
+                select: {
+                    id: true,
+                    schoolId: true,
+                    slug: true,
+                    listingSource: true,
+                    independentName: true,
+                    independentLocation: true,
+                    school: { select: { name: true, location: true } },
+                },
+            });
+
+            if (!targetProfile) {
+                throw new Error('Atlas profile not found');
+            }
+
             let finalLocation = location;
-            if (typeof location === 'string' && location.trim()) {
+            if (targetProfile.schoolId && typeof location === 'string' && location.trim()) {
                 await tx.school.update({
-                    where: { id: schoolId },
+                    where: { id: targetProfile.schoolId },
                     data: { location: location.trim() },
                 });
                 finalLocation = location.trim();
+            } else if (typeof location === 'string') {
+                finalLocation = location.trim();
+                updateData.independentLocation = finalLocation;
             }
 
             // Regenerate slug if missing, placeholder, or location updated
-            const existingProfile = await tx.schoolPublicProfile.findUnique({
-                where: { schoolId },
-                select: { slug: true, school: { select: { name: true, location: true } } }
-            });
+            const existingProfile = {
+                slug: targetProfile.slug,
+                school: targetProfile.school,
+                independentName: targetProfile.independentName,
+                independentLocation: targetProfile.independentLocation,
+            };
 
             const shouldRegenerate = !existingProfile?.slug || 
                                      isPlaceholderSlug(existingProfile.slug) || 
-                                     (location !== undefined && location !== existingProfile.school.location);
+                                     (location !== undefined && location !== (existingProfile.school?.location || existingProfile.independentLocation));
 
-            if (shouldRegenerate && existingProfile?.school && !updateData.slug) {
-                const baseSlug = generateSchoolSlug(existingProfile.school.name, finalLocation || existingProfile.school.location);
+            if (shouldRegenerate && !updateData.slug) {
+                const schoolName = existingProfile.school?.name || existingProfile.independentName || updateData.independentName;
+                const schoolLocation = finalLocation || existingProfile.school?.location || existingProfile.independentLocation;
+                const baseSlug = generateSchoolSlug(schoolName, schoolLocation);
                 if (baseSlug) {
                     const existingSlugs = await tx.schoolPublicProfile.findMany({
                         where: { slug: { startsWith: baseSlug } },
@@ -195,7 +264,7 @@ export async function PATCH(req, props) {
             }
 
             return tx.schoolPublicProfile.update({
-                where: { schoolId },
+                where: { id: targetProfile.id },
                 data: updateData,
                 include: {
                     school: {
@@ -208,7 +277,7 @@ export async function PATCH(req, props) {
         return NextResponse.json({
             success: true,
             message: 'Atlas profile updated successfully',
-            profile,
+            profile: normalizeProfile(profile),
         });
     } catch (error) {
         console.error('[ATLAS UPDATE API ERROR]', error);
@@ -220,11 +289,26 @@ export async function PATCH(req, props) {
 export async function DELETE(req, props) {
     try {
         const params = await props.params;
-        const { schoolId } = params;
+        const { schoolId: identifier } = params;
+
+        const profile = await prisma.schoolPublicProfile.findFirst({
+            where: {
+                OR: [
+                    { schoolId: identifier },
+                    { id: identifier },
+                    { slug: identifier },
+                ],
+            },
+            select: { id: true },
+        });
+
+        if (!profile) {
+            return NextResponse.json({ error: 'Atlas profile not found' }, { status: 404 });
+        }
 
         // Soft delete: set visibility to false instead of deleting
         await prisma.schoolPublicProfile.update({
-            where: { schoolId },
+            where: { id: profile.id },
             data: { isPubliclyVisible: false, isFeatured: false },
         });
 

@@ -102,9 +102,9 @@ export default function HomePage() {
             {/* <ProductGuideAI /> */}
 
             {/* </div> */}
-            <div className='w-full hidden lg:block'>
+            {/* <div className='w-full hidden lg:block'>
                 <img src={'./banner.svg'} className='object-cover hidden lg:block w-[100%] pointer-events-none' />
-            </div>
+            </div> */}
 
             <FinalCTA />
             <PartnerTeaser />

@@ -4,6 +4,29 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { generateSchoolSlug, generateUniqueSlug } from '@/lib/slug-generator';
 
+function normalizeProfile(profile) {
+    if (!profile) return profile;
+
+    const normalizedSchool = profile.school || {
+        id: null,
+        name: profile.independentName || 'Unnamed School',
+        location: profile.independentLocation || '',
+        profilePicture: profile.independentLogo || profile.logoImage || '',
+        contactNumber: profile.independentPhone || profile.publicPhone || '',
+        schoolCode: null,
+        domain: null,
+        SubscriptionType: 'ATLAS_ONLY',
+        principals: [],
+        directors: [],
+    };
+
+    return {
+        ...profile,
+        listingSource: profile.listingSource?.toLowerCase() || 'erp',
+        school: normalizedSchool,
+    };
+}
+
 // GET — List all schools with their marketplace profiles
 export async function GET(req) {
     try {
@@ -25,6 +48,8 @@ export async function GET(req) {
             where.OR = [
                 { school: { name: { contains: search, mode: 'insensitive' } } },
                 { school: { location: { contains: search, mode: 'insensitive' } } },
+                { independentName: { contains: search, mode: 'insensitive' } },
+                { independentLocation: { contains: search, mode: 'insensitive' } },
                 { tagline: { contains: search, mode: 'insensitive' } },
             ];
         }
@@ -36,16 +61,10 @@ export async function GET(req) {
         if (verified === 'yes') where.isVerified = true;
         if (verified === 'no') where.isVerified = false;
         if (listingSource === 'erp') {
-            where.school = {
-                ...(where.school || {}),
-                SubscriptionType: { not: 'ATLAS_ONLY' },
-            };
+            where.listingSource = 'ERP';
         }
         if (listingSource === 'independent') {
-            where.school = {
-                ...(where.school || {}),
-                SubscriptionType: 'ATLAS_ONLY',
-            };
+            where.listingSource = 'INDEPENDENT';
         }
 
         const [profiles, total] = await Promise.all([
@@ -101,17 +120,13 @@ export async function GET(req) {
             prisma.schoolPublicProfile.count({
                 where: {
                     isPubliclyVisible: true,
-                    school: {
-                        SubscriptionType: { not: 'ATLAS_ONLY' },
-                    },
+                    listingSource: 'ERP',
                 },
             }),
             prisma.schoolPublicProfile.count({
                 where: {
                     isPubliclyVisible: true,
-                    school: {
-                        SubscriptionType: 'ATLAS_ONLY',
-                    },
+                    listingSource: 'INDEPENDENT',
                 },
             }),
         ]);
@@ -119,10 +134,7 @@ export async function GET(req) {
         const totalViewsCount = totalViews._sum.profileViews || 0;
         const averageViews = totalListed > 0 ? Math.round(totalViewsCount / totalListed) : 0;
 
-        const enrichedProfiles = profiles.map((profile) => ({
-            ...profile,
-            listingSource: profile.school?.SubscriptionType === 'ATLAS_ONLY' ? 'independent' : 'erp',
-        }));
+        const enrichedProfiles = profiles.map(normalizeProfile);
 
         return NextResponse.json({
             profiles: enrichedProfiles,
@@ -156,38 +168,19 @@ export async function POST(req) {
         const { isNewSchool, newSchoolName, schoolId: providedSchoolId, location, ...profileData } = body;
 
         let activeSchoolId = providedSchoolId;
+        let schoolRecord = null;
 
-        // Auto-create a pseudo-school if 'isNewSchool' is true
         if (isNewSchool) {
             if (!newSchoolName || newSchoolName.trim().length === 0) {
                 return NextResponse.json({ error: 'School name is required' }, { status: 400 });
             }
-            
-            const slugFriendlyName = newSchoolName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
-            const generatedDomain = `atlas-${slugFriendlyName}-${Date.now().toString(36)}`;
-            const generatedSchoolCode = `ATLAS-${Math.floor(100000 + Math.random() * 900000)}`;
-
-            const newSchool = await prisma.school.create({
-                data: {
-                    name: newSchoolName.trim(),
-                    domain: generatedDomain.substring(0, 190), // ensure it fits length constraints
-                    schoolCode: generatedSchoolCode,
-                    profilePicture: profileData.logoImage || '',
-                    location: location?.trim() || 'Not Specified',
-                    contactNumber: profileData.publicPhone || 'Not Provided',
-                    SubscriptionType: 'ATLAS_ONLY',
-                    Language: 'en',
-                }
-            });
-            activeSchoolId = newSchool.id;
         } else {
             if (!activeSchoolId) {
                 return NextResponse.json({ error: 'schoolId is required' }, { status: 400 });
             }
 
-            // Verify school exists
-            const school = await prisma.school.findUnique({ where: { id: activeSchoolId } });
-            if (!school) {
+            schoolRecord = await prisma.school.findUnique({ where: { id: activeSchoolId } });
+            if (!schoolRecord) {
                 return NextResponse.json({ error: 'School not found' }, { status: 404 });
             }
 
@@ -196,41 +189,87 @@ export async function POST(req) {
                     where: { id: activeSchoolId },
                     data: { location: location.trim() },
                 });
+                schoolRecord = {
+                    ...schoolRecord,
+                    location: location.trim(),
+                };
             }
         }
 
-            const existingProfile = await prisma.schoolPublicProfile.findUnique({
+        const existingProfile = activeSchoolId
+            ? await prisma.schoolPublicProfile.findUnique({
                 where: { schoolId: activeSchoolId },
-                select: { slug: true }
-            });
+                select: { id: true, slug: true },
+            })
+            : null;
 
-            // Upsert the public profile
-            // Generate a unique slug if there is no existing slug, or if we are creating a new one
-            let finalSlug = existingProfile?.slug;
-            if (!finalSlug) {
-                const schoolData = await prisma.school.findUnique({ where: { id: activeSchoolId } });
-                const baseSlug = generateSchoolSlug(schoolData?.name || newSchoolName, location || schoolData?.location);
-                if (baseSlug) {
-                    const existingSlugs = await prisma.schoolPublicProfile.findMany({
-                        where: { slug: { startsWith: baseSlug } },
-                        select: { slug: true }
-                    }).then(res => res.map(r => r.slug));
-                    finalSlug = generateUniqueSlug(baseSlug, existingSlugs);
-                }
+        let finalSlug = existingProfile?.slug;
+        if (!finalSlug) {
+            const baseSlug = generateSchoolSlug(
+                schoolRecord?.name || newSchoolName,
+                location || schoolRecord?.location || profileData.independentLocation
+            );
+            if (baseSlug) {
+                const existingSlugs = await prisma.schoolPublicProfile.findMany({
+                    where: { slug: { startsWith: baseSlug } },
+                    select: { slug: true }
+                }).then(res => res.map(r => r.slug));
+                finalSlug = generateUniqueSlug(baseSlug, existingSlugs);
             }
+        }
 
-            const profile = await prisma.schoolPublicProfile.upsert({
+        const createData = isNewSchool
+            ? {
+                ...profileData,
+                slug: finalSlug,
+                listingSource: 'INDEPENDENT',
+                independentName: newSchoolName.trim(),
+                independentLocation: location?.trim() || '',
+                independentLogo: profileData.logoImage || '',
+                independentPhone: profileData.publicPhone || '',
+                isPubliclyVisible: profileData.isPubliclyVisible ?? true,
+            }
+            : {
+                schoolId: activeSchoolId,
+                ...profileData,
+                slug: finalSlug,
+                listingSource: 'ERP',
+                isPubliclyVisible: profileData.isPubliclyVisible ?? false,
+            };
+
+        const updateData = isNewSchool
+            ? {
+                ...profileData,
+                ...(finalSlug && { slug: finalSlug }),
+                listingSource: 'INDEPENDENT',
+                independentName: newSchoolName.trim(),
+                independentLocation: location?.trim() || '',
+                independentLogo: profileData.logoImage || '',
+                independentPhone: profileData.publicPhone || '',
+            }
+            : {
+                ...profileData,
+                ...(finalSlug && { slug: finalSlug }),
+            };
+
+        const profile = isNewSchool || !activeSchoolId
+            ? await prisma.schoolPublicProfile.create({
+                data: createData,
+                include: {
+                    school: {
+                        select: {
+                            id: true,
+                            name: true,
+                            location: true,
+                            profilePicture: true,
+                        },
+                    },
+                },
+            })
+            : await prisma.schoolPublicProfile.upsert({
                 where: { schoolId: activeSchoolId },
-                create: {
-                    schoolId: activeSchoolId,
-                    ...profileData,
-                    slug: finalSlug,
-                    isPubliclyVisible: profileData.isPubliclyVisible ?? (isNewSchool ? true : false),
-                },
-                update: {
-                    ...profileData,
-                    ...(finalSlug && { slug: finalSlug })
-                },
+                create: createData,
+                update: updateData,
                 include: {
                 school: {
                     select: {
@@ -246,7 +285,7 @@ export async function POST(req) {
         return NextResponse.json({
             success: true,
             message: profile.createdAt === profile.updatedAt ? 'School listed on Atlas' : 'Atlas profile updated',
-            profile,
+            profile: normalizeProfile(profile),
         });
     } catch (error) {
         console.error('[ATLAS ADMIN CREATE API ERROR]', error);

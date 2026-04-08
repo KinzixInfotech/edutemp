@@ -207,6 +207,11 @@ exports.Prisma.ImportHistoryScalarFieldEnum = {
 exports.Prisma.SchoolPublicProfileScalarFieldEnum = {
   id: 'id',
   schoolId: 'schoolId',
+  listingSource: 'listingSource',
+  independentName: 'independentName',
+  independentLocation: 'independentLocation',
+  independentLogo: 'independentLogo',
+  independentPhone: 'independentPhone',
   slug: 'slug',
   isPubliclyVisible: 'isPubliclyVisible',
   isFeatured: 'isFeatured',

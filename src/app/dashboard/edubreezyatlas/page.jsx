@@ -66,6 +66,11 @@ const atlasFormSchema = z.object({
     }
 });
 
+const atlasEditFormSchema = z.object({
+    tagline: z.string().trim().min(1, 'Tagline is required').max(100, 'Tagline must be 100 characters or less'),
+    description: z.string().trim().min(1, 'Description is required'),
+});
+
 // ─── Constants ──────────────────────────────────────────────
 const DEFAULT_FORM = {
     isNewSchool: false,
@@ -178,7 +183,7 @@ export default function EdubreezyAtlasPage() {
         mutationFn: async (payload) => {
             if (editingProfile) {
                 // Update existing
-                const res = await fetchWithAuth(`/api/edubreezyatlas/${editingProfile.schoolId}`, {
+                const res = await fetchWithAuth(`/api/edubreezyatlas/${editingProfile.schoolId || editingProfile.id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload),
@@ -221,8 +226,8 @@ export default function EdubreezyAtlasPage() {
     })
 
     const toggleVisibilityMutation = useMutation({
-        mutationFn: async ({ schoolId, isPubliclyVisible }) => {
-            const res = await fetchWithAuth(`/api/edubreezyatlas/${schoolId}`, {
+        mutationFn: async ({ identifier, isPubliclyVisible }) => {
+            const res = await fetchWithAuth(`/api/edubreezyatlas/${identifier}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ isPubliclyVisible }),
@@ -702,7 +707,7 @@ export default function EdubreezyAtlasPage() {
                                                         variant="ghost"
                                                         className="h-8 w-8 p-0"
                                                         onClick={() => toggleVisibilityMutation.mutate({
-                                                            schoolId: profile.schoolId,
+                                                            identifier: profile.schoolId || profile.id,
                                                             isPubliclyVisible: !profile.isPubliclyVisible,
                                                         })}
                                                         title={profile.isPubliclyVisible ? 'Hide from Atlas' : 'Show on Atlas'}
@@ -718,7 +723,7 @@ export default function EdubreezyAtlasPage() {
                                                     >
                                                         <Edit className="w-3.5 h-3.5" />
                                                     </Button>
-                                                    <Link href={`/dashboard/edubreezyatlas/${profile.schoolId}`}>
+                                                    <Link href={`/dashboard/edubreezyatlas/${profile.schoolId || profile.id}`}>
                                                         <Button size="sm" variant="outline" className="h-8">
                                                             <BarChart3 className="w-3.5 h-3.5 mr-1" />
                                                             View
@@ -798,7 +803,7 @@ export default function EdubreezyAtlasPage() {
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            onClick={() => deleteMutation.mutate(deleteConfirm?.schoolId)}
+                            onClick={() => deleteMutation.mutate(deleteConfirm?.schoolId || deleteConfirm?.id)}
                             disabled={deleteMutation.isPending}
                         >
                             {deleteMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
@@ -868,7 +873,8 @@ function AtlasFormDialog({ open, onOpenChange, editingProfile, initialFormData, 
     )
 
     const handleSubmit = () => {
-        const validation = atlasFormSchema.safeParse(formData)
+        const schema = editingProfile ? atlasEditFormSchema : atlasFormSchema
+        const validation = schema.safeParse(formData)
         if (!validation.success) {
             const nextErrors = {}
             for (const issue of validation.error.issues) {
@@ -878,7 +884,8 @@ function AtlasFormDialog({ open, onOpenChange, editingProfile, initialFormData, 
                 }
             }
             setFieldErrors(nextErrors)
-            toast.error('Please fill the required fields')
+            const firstError = validation.error.issues[0]?.message || 'Please fill the required fields'
+            toast.error(firstError)
             return
         }
 
