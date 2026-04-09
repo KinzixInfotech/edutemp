@@ -14,13 +14,11 @@ export default function PricingCalculatorPage() {
     const [students, setStudents] = useState(100);
     const [inputValue, setInputValue] = useState('100');
 
-    // Pricing calculation - Simple & Transparent
-    const PRICE_PER_100_STUDENTS = 12000;
-    const units = Math.ceil(students / 100);
-    const yearlyPrice = units * PRICE_PER_100_STUDENTS;
+    // Pricing calculation - exact per-student pricing
     const perStudentYearly = 120;
-    const perStudentMonthly = perStudentYearly / 12; // ₹10
-    const monthlyEquivalent = Math.round(yearlyPrice / 12);
+    const perStudentMonthly = 10;
+    const yearlyPrice = students * perStudentYearly;
+    const monthlyEquivalent = students * perStudentMonthly;
 
     // Handle input change - max 100,000 students (realistic limit)
     const MAX_STUDENTS = 100000;
@@ -219,7 +217,7 @@ export default function PricingCalculatorPage() {
                                     </div>
 
                                     {/* Trust Indicators */}
-                                    <div className="bg-white lg:block hidden rounded-xl p-5 border border-slate-100">
+                                    {/* <div className="bg-white lg:block hidden rounded-xl p-5 border border-slate-100">
                                         <h4 className="font-semibold text-[#1a1a2e] mb-4 flex items-center gap-2">
                                             <CheckCircle className="w-4 h-4 text-green-500" />
                                             Why Schools Love Us
@@ -239,7 +237,7 @@ export default function PricingCalculatorPage() {
                                                 </div>
                                             ))}
                                         </div>
-                                    </div>
+                                    </div> */}
 
                                     {/* Need Help Card */}
                                     <div className="bg-gradient-to-br from-[#0569ff]/10 to-indigo-100/50 rounded-xl p-5 border border-[#0569ff]/20">
@@ -324,11 +322,15 @@ export default function PricingCalculatorPage() {
                                     <div className="bg-white rounded-xl p-4 border border-slate-100 mb-6">
                                         <div className="flex items-center justify-between text-sm">
                                             <span className="text-slate-600">
-                                                {units} unit{units > 1 ? 's' : ''} × ₹12,000
+                                                {students.toLocaleString('en-IN')} student{students > 1 ? 's' : ''} × ₹120/year
                                             </span>
                                             <span className="font-bold text-[#1a1a2e]">
                                                 = ₹{yearlyPrice.toLocaleString('en-IN')}
                                             </span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-sm mt-2 pt-2 border-t border-slate-100">
+                                            <span className="text-slate-600">Per student monthly</span>
+                                            <span className="font-bold text-[#0569ff]">₹{perStudentMonthly}/month</span>
                                         </div>
                                         <div className="flex items-center justify-between text-sm mt-2 pt-2 border-t border-slate-100">
                                             <span className="text-slate-600">Per student yearly</span>
@@ -338,7 +340,7 @@ export default function PricingCalculatorPage() {
 
                                     {/* Note */}
                                     <p className="text-xs text-slate-500 text-center mb-6">
-                                        💡 1 unit = 100 students. Pricing is calculated per unit.
+                                        💡 Exact pricing: ₹120 per student per year, or ₹10 per student per month.
                                     </p>
 
                                     {/* CTA Buttons */}
@@ -363,7 +365,7 @@ export default function PricingCalculatorPage() {
                 </section>
 
                 {/* Features Section */}
-                <section className="px-5 py-20">
+                {/* <section className="px-5 py-20">
                     <div className="max-w-5xl mx-auto">
                         <h2 className="text-2xl md:text-3xl font-bold text-[#1a1a2e] text-center mb-10">
                             Everything Included
@@ -390,10 +392,10 @@ export default function PricingCalculatorPage() {
                             ))}
                         </div>
                     </div>
-                </section>
+                </section> */}
 
                 {/* FAQ Section */}
-                <section className="px-5 py-16 bg-[#f5f7fa]">
+                {/* <section className="px-5 py-16 bg-[#f5f7fa]">
                     <div className="max-w-3xl mx-auto">
                         <h2 className="text-2xl md:text-3xl font-bold text-[#1a1a2e] text-center mb-10">
                             Frequently Asked Questions
@@ -401,16 +403,16 @@ export default function PricingCalculatorPage() {
                         <div className="space-y-4">
                             {[
                                 {
-                                    q: 'What is a unit?',
-                                    a: 'A unit covers up to 100 students. If you have 250 students, you need 3 units.'
+                                    q: 'How is pricing calculated?',
+                                    a: 'Pricing is calculated per student: ₹120 per student per year, or ₹10 per student per month.'
                                 },
                                 {
                                     q: 'Is there a minimum commitment?',
-                                    a: 'Minimum is 1 unit (100 students). The plan is billed annually.'
+                                    a: 'The plan is billed annually, based on your total active student count.'
                                 },
                                 {
                                     q: 'What if our student count changes?',
-                                    a: 'You can add more units anytime. Contact us to adjust your plan.'
+                                    a: 'Your pricing scales with your student count. Contact us anytime to adjust your plan.'
                                 },
                                 {
                                     q: 'Is setup included?',
@@ -424,7 +426,7 @@ export default function PricingCalculatorPage() {
                             ))}
                         </div>
                     </div>
-                </section>
+                </section> */}
             </main>
         </div>
     );
