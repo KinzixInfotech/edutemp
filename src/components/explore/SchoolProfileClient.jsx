@@ -503,6 +503,8 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-6 border-t border-gray-100">
                                         {[
                                             { label: 'ESTABLISHED', value: school.establishedYear || '—', color: 'text-[#2563eb]' },
+                                            { label: 'GENDER', value: school.genderType || '—', color: 'text-[#2563eb]' },
+                                            { label: 'BOARDS', value: Array.isArray(school.boards) && school.boards.length > 0 ? school.boards.join(', ') : '—', color: 'text-[#2563eb]' },
                                             { label: 'STUDENT:FACULTY', value: school.studentTeacherRatio ? `${school.studentTeacherRatio}:1` : '—', color: 'text-[#2563eb]' },
                                             { label: 'TOTAL TEACHERS', value: school.totalTeachers ? `${school.totalTeachers}+` : '—', color: 'text-[#2563eb]' },
                                             { label: 'TOTAL STUDENTS', value: school.totalStudents || '—', color: 'text-[#2563eb]' },

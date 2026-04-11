@@ -43,14 +43,23 @@ export async function generateMetadata(props) {
         const reviewCount = data?.reviewSummary?.totalReviews || data?._count?.ratings || 0;
         const ogImage = data?.logoImage || data?.school?.profilePicture || data?.coverImage || `${schoolBaseUrl}/edu_ex.png`;
 
-        // Build a rich description
+        // Build a rich description based on provided summary, falling back to generic
         const descParts = [`Explore ${schoolName} in ${location}`];
         if (rating) descParts.push(`Rated ${rating}`);
         if (reviewCount) descParts.push(`${reviewCount} parent reviews`);
         if (data?.establishedYear) descParts.push(`Est. ${data.establishedYear}`);
         if (data?.minFee && data?.maxFee) descParts.push(`Fees ₹${data.minFee.toLocaleString('en-IN')}–₹${data.maxFee.toLocaleString('en-IN')}`);
         if (data?._count?.facilities) descParts.push(`${data._count.facilities}+ facilities`);
-        const richDescription = `${descParts.join(' · ')}. View admissions, fees, curriculum, reviews & more on EduBreezy.`;
+
+        const schoolDescription = data?.description || data?.tagline || '';
+        const fallbackDesc = `${descParts.join(' · ')}. View admissions, fees, curriculum, reviews & more on EduBreezy.`;
+
+        // Use school description (max 155 chars for SEO) if available
+        let richDescription = fallbackDesc;
+        if (schoolDescription && typeof schoolDescription === 'string' && schoolDescription.trim().length > 0) {
+            const cleanDesc = schoolDescription.replace(/<[^>]*>?/gm, '').trim(); // Remove HTML tags if any
+            richDescription = cleanDesc.length > 155 ? `${cleanDesc.substring(0, 152)}...` : cleanDesc;
+        }
 
         // Use slug for canonical URL, fallback to schoolId
         const urlIdentifier = data?.slug || data?.schoolId || id;
