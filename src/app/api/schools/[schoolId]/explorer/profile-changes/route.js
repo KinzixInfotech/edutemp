@@ -4,7 +4,7 @@
 
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { invalidatePattern } from '@/lib/cache';
+import { invalidateSchoolMarketplaceCache } from '@/lib/cache';
 import { sendNotification } from '@/lib/notifications/notificationHelper';
 
 export async function GET(req, props) {
@@ -120,6 +120,7 @@ export async function POST(req, props) {
         const now = new Date();
 
         if (action === 'approve') {
+            let updatedProfile = null;
             if (changeRequest.type === 'PROFILE_UPDATE') {
                 // Apply the changes to the actual profile
                 const changes = changeRequest.changes;
@@ -128,26 +129,23 @@ export async function POST(req, props) {
                     updateData[field] = diff.new;
                 }
 
-                await prisma.schoolPublicProfile.update({
+                updatedProfile = await prisma.schoolPublicProfile.update({
                     where: { schoolId: changeRequest.schoolId },
                     data: updateData,
+                    select: { id: true, schoolId: true, slug: true },
                 });
-
-                // Invalidate caches
-                await invalidatePattern('public-schools:*');
-                await invalidatePattern('school-profile:*');
-                await invalidatePattern('leaderboard:*');
-                await invalidatePattern('school-explorer-analytics:*');
 
             } else if (changeRequest.type === 'VERIFICATION_REQUEST') {
                 // Set isVerified = true on the profile
-                await prisma.schoolPublicProfile.update({
+                updatedProfile = await prisma.schoolPublicProfile.update({
                     where: { schoolId: changeRequest.schoolId },
                     data: { isVerified: true },
+                    select: { id: true, schoolId: true, slug: true },
                 });
+            }
 
-                await invalidatePattern('public-schools:*');
-                await invalidatePattern('school-profile:*');
+            if (updatedProfile) {
+                await invalidateSchoolMarketplaceCache(updatedProfile);
             }
         }
 

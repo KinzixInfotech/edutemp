@@ -36,12 +36,17 @@ export async function generateMetadata(props) {
         const data = await response.json();
         const schoolName = data?.school?.name || 'School Profile';
         const location = data?.school?.location || '';
+        const locationParts = location.split(',').map((part) => part.trim()).filter(Boolean);
+        const primaryLocality = locationParts[0] || '';
+        const region = locationParts[locationParts.length - 1] || '';
         const rating = data?.overallRating ? `${data.overallRating.toFixed(1)}/5` : '';
-        const ogImage = data?.coverImage || data?.school?.profilePicture || `${schoolBaseUrl}/edu_ex.png`;
+        const reviewCount = data?.reviewSummary?.totalReviews || data?._count?.ratings || 0;
+        const ogImage = data?.logoImage || data?.school?.profilePicture || data?.coverImage || `${schoolBaseUrl}/edu_ex.png`;
 
         // Build a rich description
         const descParts = [`Explore ${schoolName} in ${location}`];
         if (rating) descParts.push(`Rated ${rating}`);
+        if (reviewCount) descParts.push(`${reviewCount} parent reviews`);
         if (data?.establishedYear) descParts.push(`Est. ${data.establishedYear}`);
         if (data?.minFee && data?.maxFee) descParts.push(`Fees ₹${data.minFee.toLocaleString('en-IN')}–₹${data.maxFee.toLocaleString('en-IN')}`);
         if (data?._count?.facilities) descParts.push(`${data._count.facilities}+ facilities`);
@@ -57,16 +62,26 @@ export async function generateMetadata(props) {
             `${schoolName} reviews`,
             `${schoolName} fees`,
             `${schoolName} admissions`,
+            `${schoolName} address`,
+            `${schoolName} contact number`,
+            `${schoolName} ${primaryLocality}`.trim(),
+            `${schoolName} ${region}`.trim(),
+            primaryLocality,
+            `${primaryLocality} school`,
+            `${primaryLocality} schools`,
+            `${schoolName} admissions ${primaryLocality}`.trim(),
+            `${schoolName} fees ${primaryLocality}`.trim(),
             location,
             `schools in ${location}`,
             `best schools ${location}`,
+            region && `best schools in ${region}`,
             "EduBreezy",
             "school reviews",
             "school explorer"
         ].filter(Boolean);
 
         return {
-            title: `${schoolName} - ${location} | EduBreezy`,
+            title: `${schoolName}${primaryLocality ? `, ${primaryLocality}` : ''} - Admissions, Fees, Reviews | EduBreezy`,
             description: richDescription,
 
             keywords: keywords,
@@ -78,7 +93,7 @@ export async function generateMetadata(props) {
 
             // Open Graph
             openGraph: {
-                title: `${schoolName} | EduBreezy School Explorer`,
+                title: `${schoolName}${primaryLocality ? `, ${primaryLocality}` : ''} | EduBreezy School Explorer`,
                 description: richDescription,
                 url: canonicalUrl,
                 siteName: 'EduBreezy',
@@ -89,7 +104,7 @@ export async function generateMetadata(props) {
                         url: ogImage,
                         width: 1200,
                         height: 630,
-                        alt: `${schoolName} campus - EduBreezy`,
+                        alt: `${schoolName} logo - EduBreezy`,
                     }
                 ],
             },
@@ -97,7 +112,7 @@ export async function generateMetadata(props) {
             // Twitter Card
             twitter: {
                 card: 'summary_large_image',
-                title: `${schoolName} - ${location} | EduBreezy`,
+                title: `${schoolName}${primaryLocality ? `, ${primaryLocality}` : ''} - Admissions, Fees, Reviews`,
                 description: richDescription,
                 images: [ogImage],
                 creator: '@edubreezy',
@@ -195,6 +210,7 @@ export default async function SchoolProfilePage(props) {
         name: school.school?.name,
         image: school.coverImage ? [school.coverImage] : (school.school?.profilePicture ? [school.school.profilePicture] : [`${baseUrl}/edu_ex.png`]),
         description: school.description || `Explore ${school.school?.name} on EduBreezy - India's trusted school explorer.`,
+        slogan: school.tagline || undefined,
         address: {
             '@type': 'PostalAddress',
             streetAddress: school.school?.location,
@@ -208,11 +224,14 @@ export default async function SchoolProfilePage(props) {
             longitude: school.longitude
         } : undefined,
         telephone: school.school?.contactNumber,
+        email: school.publicEmail || undefined,
         url: `${baseUrl}/explore/schools/${urlIdentifier}`,
+        hasMap: school.latitude && school.longitude ? `https://www.google.com/maps?q=${school.latitude},${school.longitude}` : undefined,
+        sameAs: Object.values(school.socials || {}).filter(Boolean),
         aggregateRating: school.overallRating > 0 ? {
             '@type': 'AggregateRating',
             ratingValue: school.overallRating.toFixed(1),
-            reviewCount: school._count?.ratings || 0,
+            reviewCount: school.reviewSummary?.totalReviews || school._count?.ratings || 0,
             bestRating: '5',
             worstRating: '1'
         } : undefined,
@@ -233,6 +252,26 @@ export default async function SchoolProfilePage(props) {
         publisher: {
             '@id': `${baseUrl}/#organization`
         }
+    } : null;
+
+    const webpageJsonLd = school ? {
+        '@context': 'https://schema.org',
+        '@type': 'WebPage',
+        '@id': `${baseUrl}/explore/schools/${urlIdentifier}#webpage`,
+        url: `${baseUrl}/explore/schools/${urlIdentifier}`,
+        name: `${school.school?.name} - Admissions, Fees, Reviews`,
+        description: school.description || school.tagline || `School profile for ${school.school?.name}`,
+        isPartOf: { '@id': `${baseUrl}/#website` },
+        about: {
+            '@type': 'School',
+            name: school.school?.name,
+            address: school.school?.location,
+        },
+        primaryImageOfPage: (school.logoImage || school.school?.profilePicture || school.coverImage) ? {
+            '@type': 'ImageObject',
+            url: school.logoImage || school.school?.profilePicture || school.coverImage,
+        } : undefined,
+        dateModified: school.updatedAt || undefined,
     } : null;
 
     // JSON-LD for Sitelinks Searchbox (for Google sitelinks)
@@ -301,6 +340,12 @@ export default async function SchoolProfilePage(props) {
                 <script
                     type="application/ld+json"
                     dangerouslySetInnerHTML={{ __html: JSON.stringify(schoolJsonLd) }}
+                />
+            )}
+            {webpageJsonLd && (
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(webpageJsonLd) }}
                 />
             )}
             <SchoolProfileClient schoolId={school.schoolId || school.id || school.slug} initialData={school} />

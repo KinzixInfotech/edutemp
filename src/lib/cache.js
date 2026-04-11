@@ -111,6 +111,7 @@
 // };
 
 // lib/cache.js
+import { revalidatePath, revalidateTag } from 'next/cache';
 import redis from './redis';
 
 const DEFAULT_TTL = 3600;
@@ -183,6 +184,41 @@ export const invalidatePattern = async (pattern) => {
     } catch (error) {
         console.warn(`Cache invalidate pattern error for ${pattern}:`, error);
     }
+};
+
+export const invalidateSchoolMarketplaceCache = async (identifiers = {}) => {
+    const identifierValues = new Set(
+        [
+            identifiers.id,
+            identifiers.profileId,
+            identifiers.schoolId,
+            identifiers.slug,
+            identifiers.school?.id,
+        ].filter(Boolean)
+    );
+
+    const patterns = new Set([
+        'public-schools:*',
+        'public-schools-v2*',
+        'leaderboard:*',
+        'school-comparison*',
+        'school-explorer-analytics:*',
+        'school-profile:*',
+    ]);
+
+    Array.from(identifierValues).forEach((id) => {
+        patterns.add(`school-profile:*${id}*`);
+        patterns.add(`view:${id}:*`);
+    });
+
+    await Promise.all(Array.from(patterns).map((pattern) => invalidatePattern(pattern)));
+
+    Array.from(identifierValues).forEach((id) => {
+        revalidateTag(`school-profile-${id}`);
+        revalidatePath(`/explore/schools/${id}`, 'page');
+    });
+
+    revalidatePath('/explore/schools', 'page');
 };
 
 // FIX: original used `if (cached)` which is falsy for 0, false, [], ""

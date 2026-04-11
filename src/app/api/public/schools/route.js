@@ -16,6 +16,8 @@ function normalizeProfile(profile) {
             state: null,
             profilePicture: profile.independentLogo || profile.logoImage || '',
             contactNumber: profile.independentPhone || profile.publicPhone || '',
+            atlas_classFrom: profile.independentClassFrom || null,
+            atlas_classTo: profile.independentClassTo || null,
             classes: [],
         },
     };
@@ -163,6 +165,8 @@ export async function GET(req) {
                 independentLocation: true,
                 independentLogo: true,
                 independentPhone: true,
+                independentClassFrom: true,
+                independentClassTo: true,
                 tagline: true,
                 description: true,
                 coverImage: true,

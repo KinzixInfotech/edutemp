@@ -57,6 +57,9 @@ const FIELD_LABELS = {
     detailedFeeStructure: 'Fee Breakdown', establishedYear: 'Est. Year',
     totalStudents: 'Students', totalTeachers: 'Teachers', studentTeacherRatio: 'Ratio',
     isPubliclyVisible: 'Visible', isFeatured: 'Featured', isVerified: 'Verified',
+    boards: 'Educational Boards', genderType: 'Gender Focus',
+    religiousAffiliation: 'Religious Affiliation', socials: 'Social Links',
+    leadership: 'Leadership Team',
 };
 
 function formatValue(val) {

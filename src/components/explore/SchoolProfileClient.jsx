@@ -18,7 +18,7 @@ import {
     Calendar, BookOpen, Share2, Heart, ChevronRight, Home, Clock,
     Building2, Droplets, MonitorPlay, Microscope, Library, Dumbbell,
     Copy, Check, X, LayoutGrid, IndianRupee, MessageSquare,
-    UserCheck, Linkedin, School
+    UserCheck, Linkedin, School, Facebook, Instagram, Twitter, Youtube
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -79,6 +79,62 @@ function getEmbeddedVideoUrl(url) {
     }
 }
 
+const CLASS_ORDER = [
+    'Playgroup', 'Pre-Nursery', 'Nursery', 'LKG', 'UKG',
+    'Class - 1', 'Class - 2', 'Class - 3', 'Class - 4', 'Class - 5',
+    'Class - 6', 'Class - 7', 'Class - 8', 'Class - 9', 'Class - 10',
+    'Class - 11', 'Class - 12',
+];
+
+function normalizeClassLabel(value) {
+    if (!value) return '';
+    const trimmed = String(value).trim();
+    const lower = trimmed.toLowerCase();
+
+    if (lower === 'pre nursery' || lower === 'pre-nursery') return 'Pre-Nursery';
+    if (lower === 'nursery') return 'Nursery';
+    if (lower === 'lkg') return 'LKG';
+    if (lower === 'ukg') return 'UKG';
+    if (lower === 'playgroup' || lower === 'play group') return 'Playgroup';
+
+    const match = trimmed.match(/(\d{1,2})/);
+    if (match) return `Class - ${parseInt(match[1], 10)}`;
+
+    return trimmed;
+}
+
+function buildClassOfferings(classes = [], classFrom, classTo) {
+    const normalizedFrom = normalizeClassLabel(classFrom);
+    const normalizedTo = normalizeClassLabel(classTo);
+
+    if (normalizedFrom && normalizedTo) {
+        const start = CLASS_ORDER.indexOf(normalizedFrom);
+        const end = CLASS_ORDER.indexOf(normalizedTo);
+        if (start !== -1 && end !== -1 && start <= end) {
+            return CLASS_ORDER.slice(start, end + 1);
+        }
+    }
+
+    const manualRange = [normalizedFrom, normalizedTo].filter(Boolean);
+    if (manualRange.length > 0) {
+        return manualRange;
+    }
+
+    if (Array.isArray(classes) && classes.length > 0) {
+        return classes.map((item) => item.className).filter(Boolean);
+    }
+
+    return [];
+}
+
+const publicSocialIcons = {
+    facebook: Facebook,
+    instagram: Instagram,
+    twitter: Twitter,
+    linkedin: Linkedin,
+    youtube: Youtube,
+};
+
 export default function SchoolProfileClient({ schoolId, initialData }) {
     const router = useRouter();
     const [reviewPage, setReviewPage] = useState(1);
@@ -96,7 +152,8 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
             return response.json();
         },
         initialData,
-        staleTime: 10 * 60 * 1000,
+        staleTime: 0,
+        refetchOnMount: 'always',
     });
 
     const { data: reviewsData, isLoading: reviewsLoading, refetch: refetchReviews } = useQuery({
@@ -147,6 +204,15 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
 
     // ── Grade range calculation ──
     const getGradeRange = () => {
+        const manualFrom = normalizeClassLabel(school?.school?.atlas_classFrom);
+        const manualTo = normalizeClassLabel(school?.school?.atlas_classTo);
+        if (manualFrom && manualTo) {
+            return `${manualFrom} to ${manualTo}`;
+        }
+        if (manualFrom || manualTo) {
+            return manualFrom || manualTo;
+        }
+
         const classes = school?.school?.classes || [];
         if (!classes.length) return null;
         const gradeNumbers = classes
@@ -208,6 +274,18 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
     const galleryImages = school.gallery || [];
     const gradeRange = getGradeRange();
     const embeddedVideoUrl = getEmbeddedVideoUrl(school.videoUrl);
+    const reviewSummary = school.reviewSummary || {};
+    const reviewCount = reviewSummary.totalReviews || school._count?.ratings || 0;
+    const teacherRating = reviewSummary.teacherRating || 0;
+    const classOfferings = buildClassOfferings(
+        school.school?.classes || [],
+        school.school?.atlas_classFrom,
+        school.school?.atlas_classTo
+    );
+    const visibleClassOfferings = classOfferings.slice(0, 4);
+    const remainingClassCount = Math.max(classOfferings.length - visibleClassOfferings.length, 0);
+    const socials = school.socials || {};
+    const socialEntries = Object.entries(socials).filter(([, url]) => Boolean(url));
 
     return (
         <div className="min-h-screen bg-[#f8fafc]">
@@ -253,6 +331,11 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                                 {school.religiousAffiliation && (
                                     <Badge variant="secondary" className="gap-1 text-[11px] bg-gray-100 text-gray-600 border-gray-200 uppercase tracking-wider font-semibold">
                                         {school.religiousAffiliation}
+                                    </Badge>
+                                )}
+                                {reviewCount > 0 && (
+                                    <Badge variant="secondary" className="gap-1 text-[11px] bg-amber-50 text-amber-700 border-amber-200 font-semibold">
+                                        <MessageSquare className="h-3 w-3" /> {reviewCount} reviews
                                     </Badge>
                                 )}
                                 {school.isVerified && (
@@ -450,13 +533,13 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                                     </div>
                                 )}
 
-                                {/* Academic Programs */}
+                                {/* Academics */}
                                 <div className='bg-white py-6 px-6 rounded-2xl border border-gray-200'>
                                     <h2 className="text-xl font-bold text-[#0f172a] mb-4 flex items-center gap-2">
                                         <span className="w-1 h-6 bg-[#2563eb] rounded-full" />
-                                        Academic Programs
+                                        Academics
                                     </h2>
-                                    {school.school?.classes?.length > 0 ? (
+                                    {classOfferings.length > 0 ? (
                                         <Card className="rounded-2xl  pt-0 border-gray-200 overflow-hidden">
                                             {/* Gradient header */}
                                             <div className="bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-500 p-5 text-white">
@@ -466,8 +549,12 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                                                             <GraduationCap className="w-6 h-6 text-white" />
                                                         </div>
                                                         <div>
-                                                            <h3 className="font-bold text-lg">{school.school.classes.length} Classes</h3>
-                                                            {gradeRange && <p className="text-blue-100 text-sm">{gradeRange}</p>}
+                                                            <h3 className="font-bold text-lg">{classOfferings.length} Classes</h3>
+                                                            {(gradeRange || (school.school?.atlas_classFrom && school.school?.atlas_classTo)) && (
+                                                                <p className="text-blue-100 text-sm">
+                                                                    {gradeRange || `${school.school?.atlas_classFrom} to ${school.school?.atlas_classTo}`}
+                                                                </p>
+                                                            )}
                                                         </div>
                                                     </div>
                                                     {school.overallRating > 0 && (
@@ -484,33 +571,38 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                                             </div>
                                             {/* Classes grid */}
                                             <div className="p-5">
-                                                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Classes Offered</p>
-                                                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                                                    {school.school.classes.map((cls, idx) => {
-                                                        const colors = [
-                                                            'bg-blue-50 text-blue-700 border-blue-200',
-                                                            'bg-violet-50 text-violet-700 border-violet-200',
-                                                            'bg-emerald-50 text-emerald-700 border-emerald-200',
-                                                            'bg-amber-50 text-amber-700 border-amber-200',
-                                                            'bg-pink-50 text-pink-700 border-pink-200',
-                                                            'bg-cyan-50 text-cyan-700 border-cyan-200',
-                                                        ];
-                                                        return (
-                                                            <div key={idx} className={`flex items-center justify-center px-3 py-2.5 rounded-xl border text-xs font-semibold ${colors[idx % colors.length]} transition-transform hover:scale-105`}>
-                                                                {cls.className}
-                                                            </div>
-                                                        );
-                                                    })}
+                                                <div className="flex items-center justify-between gap-3 mb-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <BookOpen className="w-4 h-4 text-[#2563eb]" />
+                                                        <p className="text-sm font-semibold text-[#0f172a]">Classes Offered</p>
+                                                    </div>
+                                                    <p className="text-sm text-gray-400">{classOfferings.length} classes</p>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {visibleClassOfferings.map((className) => (
+                                                        <div
+                                                            key={className}
+                                                            className="flex items-center justify-center px-4 py-2 rounded-xl border border-blue-100 bg-blue-50 text-sm font-semibold text-blue-700"
+                                                        >
+                                                            {className}
+                                                        </div>
+                                                    ))}
+                                                    {remainingClassCount > 0 && (
+                                                        <div className="flex items-center justify-center px-4 py-2 rounded-xl border border-gray-200 bg-gray-100 text-sm font-semibold text-gray-700">
+                                                            +{remainingClassCount} more
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                             {/* Ratings breakdown */}
                                             {school.overallRating > 0 && (
                                                 <div className="border-t border-gray-100 p-5">
                                                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Rating Breakdown</p>
-                                                    <div className="grid grid-cols-3 gap-4">
+                                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                                                         {[
                                                             { label: 'Academic', value: school.academicRating, color: 'from-blue-500 to-blue-600', bg: 'bg-blue-50' },
                                                             { label: 'Infrastructure', value: school.infrastructureRating, color: 'from-purple-500 to-purple-600', bg: 'bg-purple-50' },
+                                                            { label: 'Teachers', value: teacherRating, color: 'from-amber-500 to-orange-600', bg: 'bg-amber-50' },
                                                             { label: 'Sports', value: school.sportsRating, color: 'from-green-500 to-green-600', bg: 'bg-green-50' },
                                                         ].map((r) => (
                                                             <div key={r.label} className="text-center">
@@ -679,6 +771,31 @@ export default function SchoolProfileClient({ schoolId, initialData }) {
                                         </div>
                                     </div>
                                 </Card>
+
+                                {socialEntries.length > 0 && (
+                                    <Card className="p-5 rounded-2xl border-gray-200">
+                                        <h3 className="text-sm font-bold text-[#0f172a] mb-4 uppercase tracking-wider">Connect Online</h3>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {socialEntries.map(([platform, url]) => {
+                                                const Icon = publicSocialIcons[platform];
+                                                if (!Icon) return null;
+
+                                                return (
+                                                    <a
+                                                        key={platform}
+                                                        href={url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-sm font-medium text-gray-600 transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-[#2563eb]"
+                                                    >
+                                                        <Icon className="w-4 h-4" />
+                                                        <span className="capitalize">{platform}</span>
+                                                    </a>
+                                                );
+                                            })}
+                                        </div>
+                                    </Card>
+                                )}
 
                                 {/* Leadership Team */}
                                 <Card className="p-5 rounded-2xl border-gray-200">

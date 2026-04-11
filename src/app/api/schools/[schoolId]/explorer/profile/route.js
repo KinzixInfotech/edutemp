@@ -4,7 +4,6 @@
 
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { invalidatePattern } from '@/lib/cache';
 import { sendNotification } from '@/lib/notifications/notificationHelper';
 
 // Fields that are part of the public profile and can be submitted for review
@@ -16,13 +15,22 @@ const PROFILE_FIELDS = [
     'establishedYear', 'totalStudents', 'totalTeachers', 'studentTeacherRatio',
     'latitude', 'longitude',
     'isPubliclyVisible', 'isFeatured',
-    'boards', 'genderType', 'socials', 'leadership'
+    'boards', 'genderType', 'religiousAffiliation', 'socials', 'leadership'
 ];
 
 export async function GET(req, props) {
     try {
         const params = await props.params;
         const { schoolId } = params;
+        const currentSchool = await prisma.school.findUnique({
+            where: { id: schoolId },
+            select: {
+                name: true,
+                location: true,
+                profilePicture: true,
+                contactNumber: true,
+            }
+        });
 
         let profile = await prisma.schoolPublicProfile.findUnique({
             where: { schoolId },
@@ -44,15 +52,13 @@ export async function GET(req, props) {
                 data: {
                     schoolId,
                     isPubliclyVisible: false,
+                    publicPhone: currentSchool?.contactNumber || null,
+                    publicEmail: null,
+                    logoImage: currentSchool?.profilePicture || null,
                 },
                 include: {
                     school: {
-                        select: {
-                            name: true,
-                            location: true,
-                            profilePicture: true,
-                            contactNumber: true,
-                        }
+                        select: { name: true, location: true, profilePicture: true, contactNumber: true }
                     }
                 }
             });

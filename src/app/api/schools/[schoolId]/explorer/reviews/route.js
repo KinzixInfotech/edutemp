@@ -1,6 +1,8 @@
 // Admin API: Manage school reviews
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { invalidateSchoolMarketplaceCache } from '@/lib/cache';
+import { calculateSchoolRatingSummary } from '@/lib/school-rating';
 
 export async function GET(req, props) {
     try {
@@ -74,24 +76,22 @@ export async function DELETE(req, props) {
             select: {
                 academicRating: true,
                 infrastructureRating: true,
+                teacherRating: true,
                 sportsRating: true,
                 overallRating: true
             }
         });
 
         if (allRatings.length > 0) {
-            const avgAcademic = allRatings.reduce((sum, r) => sum + r.academicRating, 0) / allRatings.length;
-            const avgInfrastructure = allRatings.reduce((sum, r) => sum + r.infrastructureRating, 0) / allRatings.length;
-            const avgSports = allRatings.reduce((sum, r) => sum + r.sportsRating, 0) / allRatings.length;
-            const avgOverall = allRatings.reduce((sum, r) => sum + r.overallRating, 0) / allRatings.length;
+            const summary = calculateSchoolRatingSummary(allRatings);
 
             await prisma.schoolPublicProfile.update({
                 where: { id: review.profileId },
                 data: {
-                    academicRating: avgAcademic,
-                    infrastructureRating: avgInfrastructure,
-                    sportsRating: avgSports,
-                    overallRating: avgOverall
+                    academicRating: summary.academicRating,
+                    infrastructureRating: summary.infrastructureRating,
+                    sportsRating: summary.sportsRating,
+                    overallRating: summary.overallRating
                 }
             });
         } else {
@@ -106,6 +106,13 @@ export async function DELETE(req, props) {
                 }
             });
         }
+
+        const profile = await prisma.schoolPublicProfile.findUnique({
+            where: { id: review.profileId },
+            select: { id: true, schoolId: true, slug: true }
+        });
+
+        await invalidateSchoolMarketplaceCache(profile || { profileId: review.profileId });
 
         return NextResponse.json({ success: true });
 

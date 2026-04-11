@@ -131,6 +131,7 @@ export default async function sitemap() {
             const schools = await prisma.schoolPublicProfile.findMany({
                 where: { isPubliclyVisible: true },
                 select: {
+                    id: true,
                     schoolId: true,
                     slug: true,
                     updatedAt: true,

@@ -163,7 +163,7 @@ export default function SchoolCard({ school }) {
             </div>
 
             {/* Body */}
-            <Link href={`/explore/schools/${school.id}`} >
+            <Link href={`/explore/schools/${slug}`} >
                 <div className="p-4 flex flex-col flex-1 gap-2">
                     {/* Name */}
                     <h3 className="font-bold text-[14px] text-[#0f172a] line-clamp-2 leading-snug group-hover:text-blue-600 transition-colors">

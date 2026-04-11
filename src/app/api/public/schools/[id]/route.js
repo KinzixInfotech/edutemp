@@ -7,16 +7,26 @@ import prisma from '@/lib/prisma';
 import { remember, generateKey } from '@/lib/cache';
 import redis from '@/lib/redis';
 import { isUUID } from '@/lib/slug-generator';
+import { calculateSchoolRatingSummary } from '@/lib/school-rating';
 
 function normalizeProfile(profile) {
     if (!profile) return profile;
+    const reviewSummary = calculateSchoolRatingSummary(profile.ratings || []);
+
     return {
         ...profile,
+        reviewSummary,
+        overallRating: reviewSummary.overallRating || profile.overallRating || 0,
+        academicRating: reviewSummary.academicRating || profile.academicRating || 0,
+        infrastructureRating: reviewSummary.infrastructureRating || profile.infrastructureRating || 0,
+        sportsRating: reviewSummary.sportsRating || profile.sportsRating || 0,
         school: profile.school || {
             name: profile.independentName || 'Unnamed School',
             location: profile.independentLocation || '',
             profilePicture: profile.independentLogo || profile.logoImage || '',
             contactNumber: profile.independentPhone || profile.publicPhone || '',
+            atlas_classFrom: profile.independentClassFrom || null,
+            atlas_classTo: profile.independentClassTo || null,
             classes: [],
         },
     };
@@ -115,6 +125,8 @@ function getProfileIncludes() {
                 location: true,
                 profilePicture: true,
                 contactNumber: true,
+                atlas_classFrom: true,
+                atlas_classTo: true,
                 classes: {
                     select: { className: true },
                     orderBy: { className: 'asc' },
@@ -131,6 +143,15 @@ function getProfileIncludes() {
         },
         badges: {
             take: 5 // Limit for performance
+        },
+        ratings: {
+            select: {
+                overallRating: true,
+                academicRating: true,
+                infrastructureRating: true,
+                teacherRating: true,
+                sportsRating: true,
+            },
         },
         gallery: {
             orderBy: { createdAt: 'desc' },

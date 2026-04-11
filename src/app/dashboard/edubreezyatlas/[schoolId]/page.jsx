@@ -369,11 +369,14 @@ export default function AtlasSchoolDetailPage(props) {
                     <CardContent>
                         <div className="text-2xl font-bold">{ratings ? ratings.overall.toFixed(1) : '—'}</div>
                         {ratings && (
-                            <div className="flex gap-1 mt-1">
-                                {[1, 2, 3, 4, 5].map(star => (
-                                    <Star key={star} className={`w-3 h-3 ${star <= Math.round(ratings.overall) ? 'fill-amber-500 text-amber-500' : 'text-muted-foreground/30'}`} />
-                                ))}
-                            </div>
+                            <>
+                                <div className="flex gap-1 mt-1">
+                                    {[1, 2, 3, 4, 5].map(star => (
+                                        <Star key={star} className={`w-3 h-3 ${star <= Math.round(ratings.overall) ? 'fill-amber-500 text-amber-500' : 'text-muted-foreground/30'}`} />
+                                    ))}
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">{ratings.totalReviews || counts.ratings || 0} parent reviews</p>
+                            </>
                         )}
                     </CardContent>
                 </Card>
@@ -566,6 +569,7 @@ export default function AtlasSchoolDetailPage(props) {
                                         {[
                                             { label: 'Academic', value: ratings.academic },
                                             { label: 'Infrastructure', value: ratings.infrastructure },
+                                            { label: 'Teachers', value: ratings.teacher },
                                             { label: 'Sports', value: ratings.sports },
                                         ].map(r => (
                                             <div key={r.label} className="space-y-1">

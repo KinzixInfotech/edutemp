@@ -212,6 +212,8 @@ exports.Prisma.SchoolPublicProfileScalarFieldEnum = {
   independentLocation: 'independentLocation',
   independentLogo: 'independentLogo',
   independentPhone: 'independentPhone',
+  independentClassFrom: 'independentClassFrom',
+  independentClassTo: 'independentClassTo',
   slug: 'slug',
   isPubliclyVisible: 'isPubliclyVisible',
   isFeatured: 'isFeatured',

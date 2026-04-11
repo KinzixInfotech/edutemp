@@ -298,11 +298,13 @@ model SchoolPublicProfile {
   school   School? @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
   // Source metadata for listings not attached to ERP schools
-  listingSource       String  @default("ERP") // ERP | INDEPENDENT
-  independentName     String?
-  independentLocation String?
-  independentLogo     String?
-  independentPhone    String?
+  listingSource        String  @default("ERP") // ERP | INDEPENDENT
+  independentName      String?
+  independentLocation  String?
+  independentLogo      String?
+  independentPhone     String?
+  independentClassFrom String?
+  independentClassTo   String?
 
   // SEO-friendly URL slug (e.g., "dav-public-school-hazaribagh")
   slug String? @unique

@@ -77,6 +77,8 @@ const DEFAULT_FORM = {
     newSchoolName: '',
     schoolId: '',
     location: '',
+    atlasClassFrom: '',
+    atlasClassTo: '',
     tagline: '',
     description: '',
     vision: '',
@@ -254,6 +256,8 @@ export default function EdubreezyAtlasPage() {
         setFormData({
             schoolId: profile.schoolId,
             location: profile.school?.location || '',
+            atlasClassFrom: profile.school?.atlas_classFrom || '',
+            atlasClassTo: profile.school?.atlas_classTo || '',
             tagline: profile.tagline || '',
             description: profile.description || '',
             vision: profile.vision || '',
@@ -999,6 +1003,31 @@ function AtlasFormDialog({ open, onOpenChange, editingProfile, initialFormData, 
                                         placeholder="e.g. Hazaribagh, Jharkhand"
                                         className="mt-2"
                                     />
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <Label htmlFor="atlasClassFrom">Admissions From</Label>
+                                        <Input
+                                            id="atlasClassFrom"
+                                            value={formData.atlasClassFrom || ''}
+                                            onChange={(e) => onChange('atlasClassFrom', e.target.value)}
+                                            placeholder="e.g. Nursery"
+                                            className="mt-2"
+                                        />
+                                        <p className="text-xs text-muted-foreground mt-1">Lowest class offered</p>
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="atlasClassTo">Admissions To</Label>
+                                        <Input
+                                            id="atlasClassTo"
+                                            value={formData.atlasClassTo || ''}
+                                            onChange={(e) => onChange('atlasClassTo', e.target.value)}
+                                            placeholder="e.g. Class - 12"
+                                            className="mt-2"
+                                        />
+                                        <p className="text-xs text-muted-foreground mt-1">Highest class offered</p>
+                                    </div>
                                 </div>
 
                                 <div>

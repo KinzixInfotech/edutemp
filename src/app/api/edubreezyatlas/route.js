@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { generateSchoolSlug, generateUniqueSlug } from '@/lib/slug-generator';
+import { invalidateSchoolMarketplaceCache } from '@/lib/cache';
 
 function normalizeProfile(profile) {
     if (!profile) return profile;
@@ -16,6 +17,8 @@ function normalizeProfile(profile) {
         schoolCode: null,
         domain: null,
         SubscriptionType: 'ATLAS_ONLY',
+        atlas_classFrom: profile.independentClassFrom || null,
+        atlas_classTo: profile.independentClassTo || null,
         principals: [],
         directors: [],
     };
@@ -78,6 +81,8 @@ export async function GET(req) {
                             location: true,
                             profilePicture: true,
                             contactNumber: true,
+                            atlas_classFrom: true,
+                            atlas_classTo: true,
                             schoolCode: true,
                             domain: true,
                             SubscriptionType: true,
@@ -166,6 +171,10 @@ export async function POST(req) {
     try {
         const body = await req.json();
         const { isNewSchool, newSchoolName, schoolId: providedSchoolId, location, ...profileData } = body;
+        const atlasClassFrom = body.atlasClassFrom;
+        const atlasClassTo = body.atlasClassTo;
+        delete profileData.atlasClassFrom;
+        delete profileData.atlasClassTo;
 
         let activeSchoolId = providedSchoolId;
         let schoolRecord = null;
@@ -187,12 +196,26 @@ export async function POST(req) {
             if (typeof location === 'string' && location.trim()) {
                 await prisma.school.update({
                     where: { id: activeSchoolId },
-                    data: { location: location.trim() },
+                    data: {
+                        location: location.trim(),
+                        atlas_classFrom: atlasClassFrom?.trim() || null,
+                        atlas_classTo: atlasClassTo?.trim() || null,
+                    },
                 });
                 schoolRecord = {
                     ...schoolRecord,
                     location: location.trim(),
+                    atlas_classFrom: atlasClassFrom?.trim() || null,
+                    atlas_classTo: atlasClassTo?.trim() || null,
                 };
+            } else if (atlasClassFrom !== undefined || atlasClassTo !== undefined) {
+                await prisma.school.update({
+                    where: { id: activeSchoolId },
+                    data: {
+                        atlas_classFrom: atlasClassFrom?.trim() || null,
+                        atlas_classTo: atlasClassTo?.trim() || null,
+                    },
+                });
             }
         }
 
@@ -227,6 +250,8 @@ export async function POST(req) {
                 independentLocation: location?.trim() || '',
                 independentLogo: profileData.logoImage || '',
                 independentPhone: profileData.publicPhone || '',
+                independentClassFrom: atlasClassFrom?.trim() || null,
+                independentClassTo: atlasClassTo?.trim() || null,
                 isPubliclyVisible: profileData.isPubliclyVisible ?? true,
             }
             : {
@@ -246,6 +271,8 @@ export async function POST(req) {
                 independentLocation: location?.trim() || '',
                 independentLogo: profileData.logoImage || '',
                 independentPhone: profileData.publicPhone || '',
+                independentClassFrom: atlasClassFrom?.trim() || null,
+                independentClassTo: atlasClassTo?.trim() || null,
             }
             : {
                 ...profileData,
@@ -281,6 +308,8 @@ export async function POST(req) {
                 },
             },
         });
+
+        await invalidateSchoolMarketplaceCache(profile);
 
         return NextResponse.json({
             success: true,

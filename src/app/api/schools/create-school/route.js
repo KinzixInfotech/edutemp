@@ -4,7 +4,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { addYears, addDays } from "date-fns";
-import { invalidatePattern } from "@/lib/cache";
+import { invalidatePattern, invalidateSchoolMarketplaceCache } from "@/lib/cache";
+import { generateSchoolSlug, generateUniqueSlug } from "@/lib/slug-generator";
 // Schema validation
 const schoolSchema = z.object({
   name: z.string(),
@@ -403,7 +404,39 @@ export async function POST(req) {
         });
       }
 
-      return { school, adminUser, directorUser, principalUser, subscription };
+      const baseSlug = generateSchoolSlug(parsed.name, parsed.location);
+      let finalSlug = null;
+      if (baseSlug) {
+        const existingSlugs = await tx.schoolPublicProfile.findMany({
+          where: { slug: { startsWith: baseSlug } },
+          select: { slug: true },
+        }).then((records) => records.map((record) => record.slug));
+        finalSlug = generateUniqueSlug(baseSlug, existingSlugs);
+      }
+
+      const publicProfile = await tx.schoolPublicProfile.upsert({
+        where: { schoolId: school.id },
+        update: {
+          slug: finalSlug,
+          logoImage: parsed.profilePicture || null,
+          publicPhone: parsed.phone || null,
+          publicEmail: parsed.email || null,
+          website: resolvedDomain ? `https://${resolvedDomain}` : null,
+        },
+        create: {
+          schoolId: school.id,
+          slug: finalSlug,
+          isPubliclyVisible: false,
+          listingSource: 'ERP',
+          logoImage: parsed.profilePicture || null,
+          publicPhone: parsed.phone || null,
+          publicEmail: parsed.email || null,
+          website: resolvedDomain ? `https://${resolvedDomain}` : null,
+        },
+        select: { id: true, schoolId: true, slug: true },
+      });
+
+      return { school, adminUser, directorUser, principalUser, subscription, publicProfile };
     }, {
       timeout: 30000, // 30 seconds timeout
       maxWait: 60000, // 60 seconds max wait
@@ -411,6 +444,7 @@ export async function POST(req) {
 
     // Invalidate school search cache so new school appears immediately
     await invalidatePattern('schools:search:*');
+    await invalidateSchoolMarketplaceCache(result.publicProfile);
 
     return NextResponse.json({ success: true, result });
 

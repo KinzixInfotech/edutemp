@@ -2,6 +2,8 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import supabaseServer from '@/lib/supabase-server'; // Use singleton
+import { invalidateSchoolMarketplaceCache } from '@/lib/cache';
+import { calculateSchoolRatingSummary } from '@/lib/school-rating';
 
 // Helper to resolve profile from schoolId, profile id, or slug
 async function getProfile(identifier) {
@@ -173,25 +175,25 @@ export async function POST(req, props) {
             select: {
                 academicRating: true,
                 infrastructureRating: true,
+                teacherRating: true,
                 sportsRating: true,
                 overallRating: true
             }
         });
 
-        const avgAcademic = allRatings.reduce((sum, r) => sum + r.academicRating, 0) / allRatings.length;
-        const avgInfrastructure = allRatings.reduce((sum, r) => sum + r.infrastructureRating, 0) / allRatings.length;
-        const avgSports = allRatings.reduce((sum, r) => sum + r.sportsRating, 0) / allRatings.length;
-        const avgOverall = allRatings.reduce((sum, r) => sum + r.overallRating, 0) / allRatings.length;
+        const summary = calculateSchoolRatingSummary(allRatings);
 
         await prisma.schoolPublicProfile.update({
             where: { id: profile.id },
             data: {
-                academicRating: avgAcademic,
-                infrastructureRating: avgInfrastructure,
-                sportsRating: avgSports,
-                overallRating: avgOverall
+                academicRating: summary.academicRating,
+                infrastructureRating: summary.infrastructureRating,
+                sportsRating: summary.sportsRating,
+                overallRating: summary.overallRating
             }
         });
+
+        await invalidateSchoolMarketplaceCache({ profileId: profile.id, schoolId: profile.schoolId, slug: identifier });
 
         return NextResponse.json({
             rating,

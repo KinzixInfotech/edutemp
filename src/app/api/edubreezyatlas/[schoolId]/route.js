@@ -3,6 +3,8 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { generateSchoolSlug, generateUniqueSlug, isPlaceholderSlug } from '@/lib/slug-generator';
+import { invalidateSchoolMarketplaceCache } from '@/lib/cache';
+import { calculateSchoolRatingSummary } from '@/lib/school-rating';
 
 async function findProfile(identifier) {
     return prisma.schoolPublicProfile.findFirst({
@@ -23,6 +25,8 @@ async function findProfile(identifier) {
                     state: true,
                     profilePicture: true,
                     contactNumber: true,
+                    atlas_classFrom: true,
+                    atlas_classTo: true,
                     schoolCode: true,
                     domain: true,
                     SubscriptionType: true,
@@ -58,6 +62,7 @@ async function findProfile(identifier) {
                     overallRating: true,
                     academicRating: true,
                     infrastructureRating: true,
+                    teacherRating: true,
                     sportsRating: true,
                 },
             },
@@ -96,6 +101,8 @@ function normalizeProfile(profile) {
             schoolCode: null,
             domain: null,
             SubscriptionType: 'ATLAS_ONLY',
+            atlas_classFrom: profile.independentClassFrom || null,
+            atlas_classTo: profile.independentClassTo || null,
             createdAt: profile.createdAt,
             principals: [],
             directors: [],
@@ -121,13 +128,14 @@ export async function GET(req, props) {
             return NextResponse.json({ error: 'Atlas profile not found for this school' }, { status: 404 });
         }
 
-        // Calculate average ratings
-        const ratingCount = profile.ratings.length;
-        const avgRatings = ratingCount > 0 ? {
-            overall: profile.ratings.reduce((s, r) => s + r.overallRating, 0) / ratingCount,
-            academic: profile.ratings.reduce((s, r) => s + r.academicRating, 0) / ratingCount,
-            infrastructure: profile.ratings.reduce((s, r) => s + r.infrastructureRating, 0) / ratingCount,
-            sports: profile.ratings.reduce((s, r) => s + r.sportsRating, 0) / ratingCount,
+        const ratingSummary = calculateSchoolRatingSummary(profile.ratings);
+        const avgRatings = ratingSummary.totalReviews > 0 ? {
+            overall: ratingSummary.overallRating,
+            academic: ratingSummary.academicRating,
+            infrastructure: ratingSummary.infrastructureRating,
+            teacher: ratingSummary.teacherRating,
+            sports: ratingSummary.sportsRating,
+            totalReviews: ratingSummary.totalReviews,
         } : null;
 
         // Recent inquiries
@@ -160,6 +168,7 @@ export async function GET(req, props) {
 
         return NextResponse.json({
             ...normalizeProfile(profile),
+            reviewSummary: ratingSummary,
             avgRatings,
             recentInquiries,
             averageViews,
@@ -178,7 +187,23 @@ export async function PATCH(req, props) {
         const body = await req.json();
 
         // Remove non-profile fields
-        const { school, _count, ratings, recentInquiries, avgRatings, id, createdAt, updatedAt, lastProfileUpdate, location, ...updateData } = body;
+        const {
+            school,
+            _count,
+            ratings,
+            recentInquiries,
+            avgRatings,
+            reviewSummary,
+            id,
+            schoolId,
+            createdAt,
+            updatedAt,
+            lastProfileUpdate,
+            location,
+            atlasClassFrom,
+            atlasClassTo,
+            ...updateData
+        } = body;
 
         ['gallery', 'facilities', 'achievements'].forEach((relation) => {
             if (Array.isArray(updateData[relation])) {
@@ -229,12 +254,29 @@ export async function PATCH(req, props) {
             if (targetProfile.schoolId && typeof location === 'string' && location.trim()) {
                 await tx.school.update({
                     where: { id: targetProfile.schoolId },
-                    data: { location: location.trim() },
+                    data: {
+                        location: location.trim(),
+                        atlas_classFrom: atlasClassFrom?.trim() || null,
+                        atlas_classTo: atlasClassTo?.trim() || null,
+                    },
                 });
                 finalLocation = location.trim();
+            } else if (targetProfile.schoolId && (atlasClassFrom !== undefined || atlasClassTo !== undefined)) {
+                await tx.school.update({
+                    where: { id: targetProfile.schoolId },
+                    data: {
+                        atlas_classFrom: atlasClassFrom?.trim() || null,
+                        atlas_classTo: atlasClassTo?.trim() || null,
+                    },
+                });
             } else if (typeof location === 'string') {
                 finalLocation = location.trim();
                 updateData.independentLocation = finalLocation;
+            }
+
+            if (!targetProfile.schoolId && (atlasClassFrom !== undefined || atlasClassTo !== undefined)) {
+                updateData.independentClassFrom = atlasClassFrom?.trim() || null;
+                updateData.independentClassTo = atlasClassTo?.trim() || null;
             }
 
             // Regenerate slug if missing, placeholder, or location updated
@@ -268,11 +310,20 @@ export async function PATCH(req, props) {
                 data: updateData,
                 include: {
                     school: {
-                        select: { id: true, name: true, location: true, profilePicture: true },
+                        select: {
+                            id: true,
+                            name: true,
+                            location: true,
+                            profilePicture: true,
+                            atlas_classFrom: true,
+                            atlas_classTo: true,
+                        },
                     },
                 },
             });
         });
+
+        await invalidateSchoolMarketplaceCache(profile);
 
         return NextResponse.json({
             success: true,
@@ -299,7 +350,7 @@ export async function DELETE(req, props) {
                     { slug: identifier },
                 ],
             },
-            select: { id: true },
+            select: { id: true, schoolId: true, slug: true },
         });
 
         if (!profile) {
@@ -307,10 +358,13 @@ export async function DELETE(req, props) {
         }
 
         // Soft delete: set visibility to false instead of deleting
-        await prisma.schoolPublicProfile.update({
+        const updatedProfile = await prisma.schoolPublicProfile.update({
             where: { id: profile.id },
             data: { isPubliclyVisible: false, isFeatured: false },
+            select: { id: true, schoolId: true, slug: true },
         });
+
+        await invalidateSchoolMarketplaceCache(updatedProfile);
 
         return NextResponse.json({
             success: true,

@@ -296,7 +296,6 @@ export async function POST(request, props) {
                 }
             }
         });
-
         if (status === 'PUBLISHED') {
             const targetUsers = await getTargetUsers(schoolId, audience, targets);
             // Exclude the notice creator from receiving push notification
@@ -305,7 +304,6 @@ export async function POST(request, props) {
             console.log(`[Notice Push] Notice fileUrl: ${notice.fileUrl || 'NO IMAGE'}`);
             await sendPushNotifications(usersExcludingSender, notice);
         }
-
         // Invalidate Redis cache for notices list so new notice appears immediately
         await invalidatePattern(`notices:list:*schoolId:${schoolId}*`);
 

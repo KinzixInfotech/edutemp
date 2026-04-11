@@ -56,6 +56,11 @@ const FIELD_LABELS = {
     isPubliclyVisible: 'Publicly Visible',
     isFeatured: 'Featured School',
     isVerified: 'Verified Badge',
+    boards: 'Educational Boards',
+    genderType: 'Gender Focus',
+    religiousAffiliation: 'Religious Affiliation',
+    socials: 'Social Links',
+    leadership: 'Leadership Team',
 };
 
 function formatValue(val) {
@@ -468,6 +473,24 @@ export default function PublicProfileSettings() {
                                     </SelectContent>
                                 </Select>
                             </div>
+                            <div>
+                                <Label htmlFor="religiousAffiliation">Religious Affiliation</Label>
+                                <Select value={formData.religiousAffiliation || 'none'} onValueChange={(v) => handleChange('religiousAffiliation', v === 'none' ? '' : v)}>
+                                    <SelectTrigger id="religiousAffiliation" className="mt-2">
+                                        <SelectValue placeholder="Select affiliation..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">Not specified</SelectItem>
+                                        <SelectItem value="Hindu">Hindu</SelectItem>
+                                        <SelectItem value="Muslim">Muslim</SelectItem>
+                                        <SelectItem value="Christian">Christian</SelectItem>
+                                        <SelectItem value="Sikh">Sikh</SelectItem>
+                                        <SelectItem value="Jain">Jain</SelectItem>
+                                        <SelectItem value="Buddhist">Buddhist</SelectItem>
+                                        <SelectItem value="Secular">Secular</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                             </div>
                     </div>
                 </Card>
@@ -695,6 +718,17 @@ export default function PublicProfileSettings() {
                                     value={formData.socials?.linkedin || ''}
                                     onChange={(e) => handleChange('socials', { ...formData.socials, linkedin: e.target.value })}
                                     placeholder="https://linkedin.com/..."
+                                    className="mt-2"
+                                />
+                            </div>
+                            <div>
+                                <Label htmlFor="youtube">YouTube URL</Label>
+                                <Input
+                                    id="youtube"
+                                    type="url"
+                                    value={formData.socials?.youtube || ''}
+                                    onChange={(e) => handleChange('socials', { ...formData.socials, youtube: e.target.value })}
+                                    placeholder="https://youtube.com/@..."
                                     className="mt-2"
                                 />
                             </div>
