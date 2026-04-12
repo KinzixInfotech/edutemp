@@ -54,6 +54,7 @@ export async function GET(req) {
         const classIdParam = searchParams.get("classId");
         const sectionIdParam = searchParams.get("sectionId");
         const admissionNumber = searchParams.get("admissionNumber") || undefined;
+        const academicYearId = searchParams.get("academicYearId") || undefined;  // ADDED
 
         const classId = classIdParam ? parseInt(classIdParam) : undefined;
         const sectionId = sectionIdParam ? parseInt(sectionIdParam) : undefined;
@@ -68,10 +69,11 @@ export async function GET(req) {
             schoolId,
             ...(classId && { classId }),
             ...(sectionId && { sectionId }),
+            ...(academicYearId && { academicYearId }),  // ADDED
             ...(admissionNumber && { admissionNumber: { contains: admissionNumber, mode: "insensitive" } }),
         };
 
-        const cacheKey = generateKey('students', { schoolId, classId, sectionId, admissionNumber, page, limit });
+        const cacheKey = generateKey('students', { schoolId, classId, sectionId, academicYearId, admissionNumber, page, limit });  // ADDED academicYearId
 
         const result = await remember(cacheKey, async () => {
             return await paginate(prisma.student, {
@@ -88,29 +90,34 @@ export async function GET(req) {
                             id: true,
                             className: true,
                             teachingStaffUserId: true,
-                            sections: { select: { id: true, name: true } },
                         },
                     },
                     section: {
                         select: {
                             id: true,
-                            name: true,
+                            name: true,          // Prisma field is 'name', renamed below
                             teachingStaffUserId: true,
                         },
-                    },
-                    studentFees: {
-                        select: {
-                            id: true,
-                            academicYearId: true
-                        }
                     },
                 },
                 orderBy: { user: { name: "asc" } },
             }, page, limit);
-        }, 300); // Cache for 5 mins
+        }, 300);
 
-        // Return data array for backward compatibility
-        return apiResponse(result.data);
+        // Normalize shape for certificate mapper
+        const normalized = result.data.map(s => ({
+            ...s,
+            // Prisma stores these as PascalCase — normalize to camelCase for mapper
+            fatherName: s.FatherName || s.fatherName || '',   // ADDED
+            motherName: s.MotherName || s.motherName || '',   // ADDED
+            // Prisma Section.name → section.sectionName (what the alias expects)
+            section: s.section ? {
+                ...s.section,
+                sectionName: s.section.name || '',            // ADDED
+            } : null,
+        }));
+
+        return apiResponse(normalized);
     } catch (err) {
         console.error("Fetch Students API error:", err);
         return errorResponse(err.message || "Internal server error");

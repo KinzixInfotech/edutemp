@@ -59,6 +59,10 @@ const PLACEHOLDER_ALIASES = {
     category: ['student.category'],
     admission_date: ['student.admissionDate'],
     parent_contact: ['student.parentContact', 'parent.phone'],
+    issuedate: ['form.issueDate'],
+    academicyear: ['form.academicYear', 'school.academicYearName'],
+    eventname: ['form.eventName'],
+    admissiondate: ['student.admissionDate'],
 };
 
 function getByPath(obj, path) {
@@ -127,7 +131,13 @@ export function buildCertificateMappingContext({
     });
 
     return {
-        student,
+        student: {
+            ...student,
+            // these as PascalCase — normalize both
+            fatherName: student?.FatherName || student?.fatherName || '',
+            motherName: student?.MotherName || student?.motherName || '',
+            name: student?.user?.name || student?.name || '',
+        },
         parent: {
             fatherName: student?.fatherName || '',
             motherName: student?.motherName || '',
@@ -136,7 +146,7 @@ export function buildCertificateMappingContext({
         teacher: {},
         school: {
             name: fullUser?.schoolName || fullUser?.school?.name || '',
-            address: fullUser?.school?.address || '',
+            address: fullUser?.school?.address || fullUser?.schoolAddress || fullUser?.address || '',
             academicYearName: selectedYear?.name || selectedYear?.label || '',
         },
         form: {
@@ -146,12 +156,20 @@ export function buildCertificateMappingContext({
             dateOfLeaving: formValues?.dateOfLeaving ? new Date(formValues.dateOfLeaving).toLocaleDateString() : '',
         },
         meta: certificateMeta,
+        // assets: {
+        //     studentPhoto: student?.user?.profilePicture || student?.photoUrl || student?.photo || '',
+        //     schoolLogo: fullUser?.school?.profilePicture || '',
+        //     principalSignature: docSettings?.signatureUrl || bestPrincipalSignature?.imageUrl || fullUser?.school?.signatureUrl || '',
+        //     classTeacherSignature: bestClassTeacherSignature?.imageUrl || '',
+        //     schoolStamp: docSettings?.stampUrl || fullUser?.school?.stampUrl || '',
+        //     ...assets,
+        // },
         assets: {
-            studentPhoto: student?.user?.profilePicture || student?.photoUrl || student?.photo || '',
-            schoolLogo: fullUser?.school?.profilePicture || '',
+            studentPhoto: student?.user?.profilePicture || student?.photoUrl || '',
+            schoolLogo: fullUser?.school?.profilePicture || fullUser?.schoolLogo || fullUser?.profilePicture || '',
             principalSignature: docSettings?.signatureUrl || bestPrincipalSignature?.imageUrl || fullUser?.school?.signatureUrl || '',
             classTeacherSignature: bestClassTeacherSignature?.imageUrl || '',
-            schoolStamp: docSettings?.stampUrl || fullUser?.school?.stampUrl || '',
+            schoolStamp: docSettings?.stampUrl || fullUser?.school?.stampUrl || fullUser?.stampUrl || '',
             ...assets,
         },
     };

@@ -19,7 +19,10 @@ export function generateCertificateNumber() {
   return `CERT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
 }
 
-
+export function debounce(fn, ms) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
 // utils.js
 export function adjustScheduleToCurrentWeek(events) {
   const now = new Date();

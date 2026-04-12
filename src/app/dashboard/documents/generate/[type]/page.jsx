@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm, useWatch } from 'react-hook-form';
@@ -54,6 +54,7 @@ import {
 } from '@/lib/certificate-template-mapping';
 import * as htmlToImage from 'html-to-image';
 import jsPDF from 'jspdf';
+import { debounce } from '@/lib/utils';
 
 // Certificate type configurations
 const CERTIFICATE_CONFIGS = {
@@ -114,7 +115,7 @@ const formSchema = z.object({
     showToParent: z.boolean().default(false),
 });
 
-export default function GenerateCertificatePage() {
+const GenerateCertificatePage = React.memo(function GenerateCertificatePage() {
     const router = useRouter();
     const params = useParams();
     const { fullUser } = useAuth();
@@ -188,7 +189,6 @@ export default function GenerateCertificatePage() {
             'showToParent',
         ],
     });
-
     const watchedValues = useMemo(() => ({
         studentId: watchedStudentId || '',
         templateId: watchedTemplateId || '',
@@ -222,6 +222,39 @@ export default function GenerateCertificatePage() {
         watchedContent,
         watchedShowToParent,
     ]);
+    // const watchedValues = useWatch(() => ({
+    //     studentId: watchedStudentId || '',
+    //     templateId: watchedTemplateId || '',
+    //     issueDate: watchedIssueDate || '',
+    //     conduct: watchedConduct || '',
+    //     remarks: watchedRemarks || '',
+    //     purpose: watchedPurpose || '',
+    //     academicYear: watchedAcademicYear || '',
+    //     dateOfLeaving: watchedDateOfLeaving || '',
+    //     reason: watchedReason || '',
+    //     eventName: watchedEventName || '',
+    //     position: watchedPosition || '',
+    //     date: watchedDate || '',
+    //     title: watchedTitle || '',
+    //     content: watchedContent || '',
+    //     showToParent: !!watchedShowToParent,
+    // }), [
+    //     watchedStudentId,
+    //     watchedTemplateId,
+    //     watchedIssueDate,
+    //     watchedConduct,
+    //     watchedRemarks,
+    //     watchedPurpose,
+    //     watchedAcademicYear,
+    //     watchedDateOfLeaving,
+    //     watchedReason,
+    //     watchedEventName,
+    //     watchedPosition,
+    //     watchedDate,
+    //     watchedTitle,
+    //     watchedContent,
+    //     watchedShowToParent,
+    // ]);
 
     // Fetch students
     const { data: students, isLoading: loadingStudents } = useQuery({
@@ -341,14 +374,15 @@ export default function GenerateCertificatePage() {
         return extractTemplatePlaceholders(selectedTemplate.layoutConfig.elements);
     }, [selectedTemplate]);
 
-    const certificateMeta = useMemo(() => {
-        const certNumber = `CERT-${Date.now()}`;
-        return {
-            certificateNumber: certNumber,
-            tcNumber: `TC-${Date.now()}`,
-            verificationUrl: typeof window !== 'undefined' ? `${window.location.origin}/verify/certificate/${certNumber}` : '',
-        };
-    }, [selectedTemplate?.id, watchedValues.studentId, watchedValues.templateId]);
+    // REPLACE with useRef so it's stable per session
+    const certNumberRef = useRef(`CERT-${Date.now()}`);
+    const certificateMeta = useMemo(() => ({
+        certificateNumber: certNumberRef.current,
+        tcNumber: `TC-${certNumberRef.current.slice(5)}`,
+        verificationUrl: typeof window !== 'undefined'
+            ? `${window.location.origin}/verify/certificate/${certNumberRef.current}`
+            : '',
+    }), []);
 
     const mappingContext = useMemo(() => buildCertificateMappingContext({
         student: selectedStudent || {},
@@ -373,29 +407,70 @@ export default function GenerateCertificatePage() {
     );
 
     const hasTemplateSelection = !!selectedTemplate;
-    const mappingReady = hasTemplateSelection && missingPlaceholders.length === 0;
+    const STUDENT_DEPENDENT_KEYS = [
+        'studentName', 'fatherName', 'motherName', 'class', 'section',
+        'dob', 'rollNumber', 'admissionNo', 'studentPhoto', 'gender',
+        'bloodGroup', 'address', 'category', 'nationality', 'religion'
+    ];
+
+    const missingNonStudentPlaceholders = useMemo(
+        () => placeholderKeys.filter(key =>
+            !resolvedMappings[key] && !STUDENT_DEPENDENT_KEYS.includes(key)
+        ),
+        [placeholderKeys, resolvedMappings]
+    );
+    const mappingReady = hasTemplateSelection && missingNonStudentPlaceholders.length === 0;
     const canGenerate = !!previewConfig && mappingReady && !!watchedValues.studentId && !generating;
     const selectedTemplateEditUrl = selectedTemplate
         ? `/dashboard/documents/templates/certificate/${selectedTemplate.id}?mode=edit`
         : null;
 
+    // useEffect(() => {
+    //     if (!selectedTemplate?.layoutConfig) {
+    //         setPreviewConfig(null);
+    //         return;
+    //     }
+
+    //     setPreviewConfig({
+    //         elements: applyMappingsToTemplateElements(
+    //             JSON.parse(JSON.stringify(selectedTemplate.layoutConfig.elements || [])),
+    //             resolvedMappings
+    //         ),
+    //         canvasSize: selectedTemplate.layoutConfig.canvasSize,
+    //         backgroundImage: selectedTemplate.layoutConfig.backgroundImage,
+    //         backgroundAsset: selectedTemplate.layoutConfig.backgroundAsset || null,
+    //     });
+    // }, [resolvedMappings, selectedTemplate]);
+    // Replace the previewConfig useEffect
+    const previewTimeoutRef = useRef(null);
+    const previewVersionRef = useRef(0);
     useEffect(() => {
         if (!selectedTemplate?.layoutConfig) {
             setPreviewConfig(null);
             return;
         }
 
-        setPreviewConfig({
-            elements: applyMappingsToTemplateElements(
-                JSON.parse(JSON.stringify(selectedTemplate.layoutConfig.elements || [])),
-                resolvedMappings
-            ),
-            canvasSize: selectedTemplate.layoutConfig.canvasSize,
-            backgroundImage: selectedTemplate.layoutConfig.backgroundImage,
-            backgroundAsset: selectedTemplate.layoutConfig.backgroundAsset || null,
-        });
-    }, [resolvedMappings, selectedTemplate]);
+        clearTimeout(previewTimeoutRef.current);
+        previewTimeoutRef.current = setTimeout(() => {
+            previewVersionRef.current += 1; // ADD THIS LINE
+            setPreviewConfig({
+                elements: applyMappingsToTemplateElements(
+                    JSON.parse(JSON.stringify(selectedTemplate.layoutConfig.elements || [])),
+                    resolvedMappings
+                ),
+                canvasSize: selectedTemplate.layoutConfig.canvasSize,
+                backgroundImage: selectedTemplate.layoutConfig.backgroundImage,
+                backgroundAsset: selectedTemplate.layoutConfig.backgroundAsset || null,
+            });
+        }, 400);
 
+        return () => clearTimeout(previewTimeoutRef.current);
+    }, [resolvedMappings, selectedTemplate]);
+    useEffect(() => {
+        if (selectedYear?.name) {
+            setValue('academicYear', selectedYear.name);
+        }
+    }, [selectedYear]);
     const handleGeneratePDF = async () => {
         if (!selectedTemplate) {
             toast.error('Choose a certificate template first.');
@@ -491,6 +566,12 @@ export default function GenerateCertificatePage() {
             setGenerating(false);
         }
     };
+    const handleTemplateSearch = useCallback(
+        debounce((val) => setTemplateSearch(val), 300), []
+    );
+    const handleStudentSearch = useCallback(
+        debounce((val) => setStudentSearch(val), 300), []
+    );
 
     if (!schoolId || loadingStudents || loadingTemplates) {
         return (
@@ -553,8 +634,8 @@ export default function GenerateCertificatePage() {
             {/* Main Content - Sidebar + Preview */}
             <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
                 {/* Left Sidebar - Form */}
-                <div className="w-full lg:w-96 border-b lg:border-b-0 lg:border-r bg-background flex-shrink-0 flex flex-col max-h-[48vh] lg:max-h-none">
-                    <ScrollArea className="flex-1">
+                <div className="w-full lg:w-96 border-b lg:border-b-0 lg:border-r bg-background flex-shrink-0 flex flex-col max-h-[48vh] lg:max-h-none overflow-hidden">
+                    <div className="flex-1 overflow-y-auto overflow-x-hidden">
                         <div className="p-4 space-y-4">
                             <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Generation Steps</h2>
 
@@ -564,11 +645,12 @@ export default function GenerateCertificatePage() {
                                     Certificate Template
                                 </Label>
                                 <Input
-                                    value={templateSearch}
-                                    onChange={(e) => setTemplateSearch(e.target.value)}
+                                    defaultValue=""
+                                    onChange={(e) => handleTemplateSearch(e.target.value)}
                                     placeholder="Search templates..."
                                     className="h-9 text-sm"
                                 />
+
                                 <Select
                                     value={watchedValues.templateId}
                                     onValueChange={(value) => {
@@ -660,7 +742,7 @@ export default function GenerateCertificatePage() {
                                                 return (
                                                     <div
                                                         key={ph}
-                                                        className={`flex items-start gap-1.5 p-2 rounded text-xs border ${isMapped
+                                                        className={`flex items-start gap-1.5 p-2 rounded text-xs border overflow-hidden ${isMapped
                                                             ? 'border-green-200 bg-green-50/50 dark:border-green-900/50 dark:bg-green-950/20'
                                                             : 'border-amber-200 bg-amber-50/50 dark:border-amber-900/50 dark:bg-amber-950/20'
                                                             }`}
@@ -670,7 +752,7 @@ export default function GenerateCertificatePage() {
                                                         ) : (
                                                             <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 flex-shrink-0" />
                                                         )}
-                                                        <div className="flex-1 min-w-0">
+                                                        <div className="flex-1 min-w-0 overflow-hidden">
                                                             <div className="font-medium text-[11px] text-foreground truncate">
                                                                 {`{{${ph}}}`}
                                                             </div>
@@ -740,8 +822,8 @@ export default function GenerateCertificatePage() {
                                                 <div className="sm:col-span-2">
                                                     <Input
                                                         placeholder="Search student by name or roll number..."
-                                                        value={studentSearch}
-                                                        onChange={(e) => setStudentSearch(e.target.value)}
+                                                        defaultValue=""
+                                                        onChange={(e) => handleStudentSearch(e.target.value)}
                                                         className="h-9 text-sm"
                                                     />
                                                 </div>
@@ -958,7 +1040,7 @@ export default function GenerateCertificatePage() {
                                 </div>
                             )}
                         </div>
-                    </ScrollArea>
+                    </div>
                 </div>
 
                 {/* Right Side - Preview Canvas */}
@@ -977,7 +1059,7 @@ export default function GenerateCertificatePage() {
                         <div className="min-h-full p-8 flex items-start justify-center">
                             <div id="certificate-capture-target" className="bg-white max-w-full">
                                 <CertificateDesignEditor
-                                    key={JSON.stringify(previewConfig)}
+                                    key={previewVersionRef.current}
                                     initialConfig={previewConfig}
                                     readOnly={true}
                                     templateType="certificate"
@@ -989,4 +1071,6 @@ export default function GenerateCertificatePage() {
             </div>
         </div>
     );
-}
+});
+
+export default GenerateCertificatePage;
