@@ -1,6 +1,6 @@
 
 import SchoolProfileClient from '@/components/explore/SchoolProfileClient';
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { isUUID } from '@/lib/slug-generator';
 
 // Helper to get Base URL
@@ -31,7 +31,16 @@ export async function generateMetadata(props) {
             next: { revalidate: process.env.NODE_ENV === 'development' ? 0 : 60 }
         });
 
-        if (!response.ok) return { title: 'School Not Found | EduBreezy' };
+        if (!response.ok) {
+            return {
+                title: 'School Not Found | EduBreezy',
+                description: 'This school profile could not be found on EduBreezy Atlas.',
+                robots: {
+                    index: false,
+                    follow: false,
+                },
+            };
+        }
 
         const data = await response.json();
         const schoolName = data?.school?.name || 'School Profile';
@@ -172,14 +181,7 @@ export default async function SchoolProfilePage(props) {
     const school = await getSchool(id);
 
     if (!school) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="text-center">
-                    <h1 className="text-2xl font-bold text-gray-900">School Not Found</h1>
-                    <p className="text-gray-600 mt-2">The school you're looking for doesn't exist or has been removed.</p>
-                </div>
-            </div>
-        );
+        notFound();
     }
 
     // If accessed via UUID but school has a slug, redirect to slug URL for SEO
